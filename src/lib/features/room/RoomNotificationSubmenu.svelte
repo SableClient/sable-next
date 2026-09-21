@@ -30,8 +30,8 @@
   };
 
   let mode = $state<NotificationModeView | null | undefined>();
-  let fallback = $state<NotificationModeView | undefined>();
-  let defaultLabel = $derived(fallback ? $i18n.t(modeLabels[fallback]) : '');
+  let fallback = $state<NotificationModeView>('mentions');
+  let defaultLabel = $derived($i18n.t(modeLabels[fallback]));
 
   $effect(() => {
     void settingsChanges.version;
@@ -42,7 +42,7 @@
     try {
       const settings = await core.commands.notificationSettings(roomId);
       mode = settings.room;
-      fallback = settings.default;
+      fallback = settings.default ?? 'mentions';
     } catch (error) {
       console.warn('[sable room] notification settings unavailable', error);
     }
