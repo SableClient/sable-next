@@ -43,6 +43,7 @@
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -995,7 +996,11 @@
     </DialogFrame>
   {/if}
 
-  <DialogFrame bind:open={prescreenOpen} variant="sheet" label={$i18n.t('call.prescreenTitle')}>
+  <BottomSheet
+    bind:open={prescreenOpen}
+    label={$i18n.t('call.prescreenTitle')}
+    closeLabel={$i18n.t('banner.close')}
+  >
     <CallDevicePreview
       media={prescreenMedia}
       joining={call.lifecycle === 'joining'}
@@ -1003,7 +1008,7 @@
       onJoin={() => void joinCall()}
       onCancel={() => (prescreenOpen = false)}
     />
-  </DialogFrame>
+  </BottomSheet>
 
   <RoomTopicViewer
     open={topicOpen}

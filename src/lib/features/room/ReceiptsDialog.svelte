@@ -2,6 +2,9 @@
   import type { MemberView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import MemberUserList from './MemberUserList.svelte';
@@ -14,9 +17,11 @@
   }
 
   let { open = $bindable(false), readers, members, onMemberProfile }: Props = $props();
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let desktop = $derived(appLayout.matches);
 </script>
 
-<DialogFrame bind:open variant="verification" label={$i18n.t('timeline.readReceipts')}>
+{#snippet content()}
   <div class="receipts-dialog">
     <h2>{$i18n.t('timeline.readReceipts')}</h2>
     <MemberUserList
@@ -27,7 +32,21 @@
       showHeader={false}
     />
   </div>
-</DialogFrame>
+{/snippet}
+
+{#if desktop}
+  <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.readReceipts')}>
+    {@render content()}
+  </DialogFrame>
+{:else}
+  <BottomSheet
+    bind:open
+    label={$i18n.t('timeline.readReceipts')}
+    closeLabel={$i18n.t('timeline.closeReadReceipts')}
+  >
+    {@render content()}
+  </BottomSheet>
+{/if}
 
 <style>
   .receipts-dialog {

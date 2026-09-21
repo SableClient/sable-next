@@ -5,7 +5,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
 
   interface Props {
     open?: boolean;
@@ -22,7 +22,11 @@
   }
 </script>
 
-<DialogFrame bind:open variant="sheet" label={$i18n.t('timeline.reproxyTitle')}>
+<BottomSheet
+  bind:open
+  label={$i18n.t('timeline.reproxyTitle')}
+  closeLabel={$i18n.t('timeline.closeMenu')}
+>
   <h2>{$i18n.t('timeline.reproxyTitle')}</h2>
   <ul class="reproxy-options">
     <li>
@@ -59,7 +63,7 @@
       </li>
     {/each}
   </ul>
-</DialogFrame>
+</BottomSheet>
 
 <style>
   h2 {
