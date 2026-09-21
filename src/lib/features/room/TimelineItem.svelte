@@ -163,6 +163,7 @@
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   let profile = $state<ProfileView | null>(null);
+  let senderTimezone = $derived(profile?.timezone ?? null);
   // Only a fallback: the core fills both fields, so most rows never scan.
   let senderMember = $derived(
     item.sender_name === null || item.sender_avatar === null
@@ -900,7 +901,7 @@
               style:color={senderColors.tinted ? undefined : senderColors.nameColor}
               >* {senderName}</span
             >
-            <FormattedBody html={item.content.html} {onMatrixLink} />
+            <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             {#if inlineReceipts}
               <span class="receipt-space" aria-hidden="true"></span>
               {@render receiptSlot()}
@@ -915,7 +916,7 @@
             ]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
           >
-            <FormattedBody html={item.content.html} {onMatrixLink} />
+            <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             <!-- Trails the body, where the edit happened, not the header. -->
             {#if item.content.edited}
               <span class="edited">{$i18n.t('timeline.edited')}</span>
@@ -936,6 +937,7 @@
           <div class:content-bubble={layout === 'bubble' && nonTextContent}>
             <MessageBody
               {item}
+              {senderTimezone}
               {members}
               {canRedactOthers}
               {encrypted}

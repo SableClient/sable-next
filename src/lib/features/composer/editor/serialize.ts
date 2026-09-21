@@ -17,6 +17,8 @@ import {
 import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
+import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
+import { mfmPlugin } from './mfm';
 import { composerSchema, ROOM_PING } from './schema';
 
 export interface ComposerMessage {
@@ -109,6 +111,9 @@ const markdown = new MarkdownSerializer(
     mention: (state, node) => {
       state.text(node.attrs.name as string, false);
     },
+    mfm_time: (state, node) => {
+      state.text(mfmUnixtime(node.attrs.datetime as string), false);
+    },
     emoticon: (state, node) => {
       state.text(`:${node.attrs.shortcode as string}:`, false);
     },
@@ -119,8 +124,22 @@ const markdown = new MarkdownSerializer(
     underline: { open: '', close: '', mixable: true },
     sub: { open: '', close: '', mixable: true },
     sup: { open: '', close: '', mixable: true },
-    color: { open: '', close: '', mixable: true },
-    bg_color: { open: '', close: '', mixable: true },
+    color: {
+      open: (_state, mark) => {
+        return `$[fg.color=${(mark.attrs.value as string).slice(1)} `;
+      },
+      close: ']',
+      mixable: true,
+      expelEnclosingWhitespace: true,
+    },
+    bg_color: {
+      open: (_state, mark) => {
+        return `$[bg.color=${(mark.attrs.value as string).slice(1)} `;
+      },
+      close: ']',
+      mixable: true,
+      expelEnclosingWhitespace: true,
+    },
     spoiler: { open: '||', close: '||', mixable: true, expelEnclosingWhitespace: true },
     link: {
       open: (state, mark, parent, index) => {
@@ -173,6 +192,78 @@ function isPlain(doc: ProseMirrorNode): boolean {
   });
 
   return plain;
+}
+
+function mfmMarks(node: ProseMirrorNode, fg?: string, bg?: string): readonly Mark[] {
+  let marks = node.marks;
+  if (fg) marks = composerSchema.marks.color.create({ value: fg }).addToSet(marks);
+  if (bg) marks = composerSchema.marks.bg_color.create({ value: bg }).addToSet(marks);
+  return marks;
+}
+
+function expandedMfmText(node: ProseMirrorNode): ProseMirrorNode[] {
+  const text = node.text ?? '';
+  const children: ProseMirrorNode[] = [];
+  let plainStart = 0;
+  let index = 0;
+
+  const pushText = (value: string, marks = node.marks): void => {
+    if (value !== '') children.push(composerSchema.text(value, marks));
+  };
+
+  while (index < text.length) {
+    const rest = text.slice(index);
+    if (rest.startsWith('\\')) {
+      const escaped = rest.slice(1).match(/^./u)?.[0] ?? '';
+      index += 1 + escaped.length;
+      continue;
+    }
+
+    const unix = parseMfmUnixtime(rest);
+    if (unix) {
+      pushText(text.slice(plainStart, index));
+      children.push(
+        composerSchema.nodes.mfm_time.create(
+          { datetime: unix.datetime, label: utcFallbackLabel(unix.datetime) },
+          null,
+          node.marks
+        )
+      );
+      index += unix.raw.length;
+      plainStart = index;
+      continue;
+    }
+
+    const color = parseMfmColor(rest);
+    if (color) {
+      pushText(text.slice(plainStart, index));
+      const colored = composerSchema.text(color.text, mfmMarks(node, color.args.fg, color.args.bg));
+      children.push(...expandedMfmText(colored));
+      index += color.raw.length;
+      plainStart = index;
+      continue;
+    }
+
+    index += rest.match(/^./u)?.[0].length ?? 1;
+  }
+
+  if (children.length === 0) return [node];
+  pushText(text.slice(plainStart));
+  return children;
+}
+
+function expandMfm(node: ProseMirrorNode): ProseMirrorNode {
+  if (node.isLeaf || node.type.spec.code) return node;
+
+  const children: ProseMirrorNode[] = [];
+  node.forEach((child) => {
+    if (child.isText && !composerSchema.marks.code.isInSet(child.marks)) {
+      children.push(...expandedMfmText(child));
+    } else {
+      children.push(expandMfm(child));
+    }
+  });
+  return node.copy(Fragment.fromArray(children));
 }
 
 function html(doc: ProseMirrorNode): string {
@@ -243,21 +334,22 @@ function imageSourcePacksOf(doc: ProseMirrorNode): ImageSourcePackReferenceView[
 
 export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const mentions = mentionsOf(doc);
-  const flat = withoutTrailingParagraph(flattenRoomPings(doc));
+  const source = withoutTrailingParagraph(flattenRoomPings(doc));
+  const sourceWasPlain = isPlain(source);
+  const flat = expandMfm(source);
   const imageSourcePacks = imageSourcePacksOf(flat);
   if (isPlain(flat)) {
     return {
-      body: plainTextOf(flat).trim(),
+      body: plainTextOf(source).trim(),
       formatted: null,
       mentions,
       ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
     };
   }
 
-  const body = markdown
-    .serialize(spoilerFallback(flat))
-    .replaceAll(SPOILER_FALLBACK, '[Spoiler]')
-    .trim();
+  const body = sourceWasPlain
+    ? plainTextOf(source).trim()
+    : markdown.serialize(spoilerFallback(flat)).replaceAll(SPOILER_FALLBACK, '[Spoiler]').trim();
   if (body === '')
     return {
       body,
@@ -311,7 +403,9 @@ export function mentionsOf(doc: ProseMirrorNode): OutgoingMentions {
   return { userIds: [...userIds], room: mentionsRoom(doc) };
 }
 
-const tokenizer = MarkdownIt('commonmark', { html: false }).enable(['strikethrough', 'table']);
+const tokenizer = MarkdownIt('commonmark', { html: false })
+  .enable(['strikethrough', 'table'])
+  .use(mfmPlugin);
 
 tokenizer.block.ruler.before(
   'heading',
@@ -363,6 +457,18 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
   code_inline: { mark: 'code', noCloseToken: true },
   link: { mark: 'link', getAttrs: (token) => ({ href: token.attrGet('href') ?? '' }) },
   hr: { node: 'horizontal_rule' },
+  mfm_time: {
+    node: 'mfm_time',
+    getAttrs: (token) => ({ datetime: token.content, label: utcFallbackLabel(token.content) }),
+  },
+  mfm_fg: {
+    mark: 'color',
+    getAttrs: (token) => ({ value: token.attrGet('value') ?? '' }),
+  },
+  mfm_bg: {
+    mark: 'bg_color',
+    getAttrs: (token) => ({ value: token.attrGet('value') ?? '' }),
+  },
   image: {
     node: 'image',
     getAttrs: (token) => ({
@@ -392,12 +498,15 @@ export function atomText(node: ProseMirrorNode): string {
   if (node.type === emoticon) return `:${node.attrs.shortcode as string}:`;
   if (node.type === roomPing) return ROOM_PING;
   if (node.type === image) return (node.attrs.alt as string) || (node.attrs.src as string);
+  if (node.type === composerSchema.nodes.mfm_time)
+    return mfmUnixtime(node.attrs.datetime as string);
   if (node.type === math) return `$${node.attrs.latex as string}$`;
   if (node.type === composerSchema.nodes.math_block) return `$$${node.attrs.latex as string}$$`;
   return (node.attrs.name as string | undefined) ?? '';
 }
 
 const PLACEHOLDER_ATOMS = new Set([
+  composerSchema.nodes.mfm_time,
   composerSchema.nodes.mention,
   composerSchema.nodes.emoticon,
   composerSchema.nodes.room_ping,

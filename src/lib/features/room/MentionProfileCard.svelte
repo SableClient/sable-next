@@ -530,7 +530,11 @@
   {#if showFailure}
     <Alert variant="warning" role="status">{$i18n.t('timeline.profileUnavailable')}</Alert>
   {:else if currentProfile?.bio}
-    <FormattedBody html={currentProfile.bio} {onMatrixLink} />
+    <FormattedBody
+      html={currentProfile.bio}
+      senderTimezone={currentProfile.timezone}
+      {onMatrixLink}
+    />
   {/if}
 {/snippet}
 
