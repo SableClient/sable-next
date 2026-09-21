@@ -871,6 +871,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.ringForGroupCallsHint',
         type: 'boolean',
       },
+      {
+        key: 'alwaysShowCallButton',
+        icon: PhoneIcon,
+        name: 'settings.alwaysShowCallButton',
+        description: 'settings.alwaysShowCallButtonHint',
+        type: 'boolean',
+      },
     ],
   },
   {

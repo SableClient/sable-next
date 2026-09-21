@@ -249,7 +249,11 @@
       (callSupport.has_focus || callParticipants.length > 0)
   );
   let callOffered = $derived(
-    callable && ((resolvedRoom?.is_direct ?? false) || callParticipants.length > 0)
+    callable &&
+      ((resolvedRoom?.is_direct ?? false) ||
+        callParticipants.length > 0 ||
+        preferences.alwaysShowCallButton ||
+        memberLoader.members.length <= 10)
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);

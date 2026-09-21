@@ -101,6 +101,7 @@ export interface Preferences {
   highlightMentions: boolean;
   faviconForMentionsOnly: boolean;
   ringForGroupCalls: boolean;
+  alwaysShowCallButton: boolean;
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callRingtoneVolume: CallRingtoneVolume;
@@ -270,6 +271,7 @@ const DEFAULTS: Preferences = {
   highlightMentions: true,
   faviconForMentionsOnly: false,
   ringForGroupCalls: false,
+  alwaysShowCallButton: false,
   incomingCallSound: true,
   outgoingRingback: true,
   callRingtoneVolume: 'normal',

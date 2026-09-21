@@ -1356,6 +1356,8 @@
     "clearNotificationsOnReadHint": "Dismiss a room's alerts once it is read, including on another device.",
     "ringForGroupCalls": "Ring for group calls",
     "ringForGroupCallsHint": "Show the full-screen call screen for calls in group rooms and voice channels, not just one-to-one calls.",
+    "alwaysShowCallButton": "Show call button for large rooms",
+    "alwaysShowCallButtonHint": "Keep the call button visible in rooms with more than 10 members.",
     "incomingCallSound": "Incoming call sound",
     "incomingCallSoundHint": "Rings in the app when a call comes in. The system ringtone is unaffected.",
     "outgoingRingback": "Outgoing ringback",
