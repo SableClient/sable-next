@@ -47,20 +47,27 @@ async function ensureRelease(tag, { sha, title, notes, prerelease }) {
     console.log(`Reusing the existing ${tag} release.`);
     return existing;
   }
-  const created = await request(
-    'POST',
-    '/releases',
-    json({
-      tag_name: tag,
-      target_commitish: sha,
-      name: title ?? tag,
-      body: notes ?? '',
-      draft: false,
-      prerelease: Boolean(prerelease),
-    })
-  );
-  console.log(`Created release ${tag}.`);
-  return created;
+  try {
+    const created = await request(
+      'POST',
+      '/releases',
+      json({
+        tag_name: tag,
+        target_commitish: sha,
+        name: title ?? tag,
+        body: notes ?? '',
+        draft: false,
+        prerelease: Boolean(prerelease),
+      })
+    );
+    console.log(`Created release ${tag}.`);
+    return created;
+  } catch (error) {
+    const raced = await getRelease(tag);
+    if (!raced) throw error;
+    console.log(`Reusing the ${tag} release another run created.`);
+    return raced;
+  }
 }
 
 async function waitForRelease(tag, attempts, intervalMs) {

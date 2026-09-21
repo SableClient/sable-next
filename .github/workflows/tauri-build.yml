@@ -42,9 +42,21 @@ jobs:
         with:
           input-tag: ${{ inputs.tag }}
       - name: Wait for release to exist
+        if: ${{ steps.meta.outputs.nightly != 'true' }}
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: node scripts/ci/forgejo-release.mjs wait --attempts 60 --interval 15
+      - name: Create nightly prerelease
+        if: ${{ steps.meta.outputs.nightly == 'true' }}
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          node scripts/ci/forgejo-release.mjs ensure \
+            --tag "${{ steps.meta.outputs.tag }}" \
+            --sha "$SHA" \
+            --prerelease true \
+            --title "Nightly build ${{ steps.meta.outputs.version }}" \
+            --notes "Nightly build from main at $SHA"
   build-web:
     name: Build web assets
     needs: setup-release
