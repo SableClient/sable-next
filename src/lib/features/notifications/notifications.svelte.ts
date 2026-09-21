@@ -12,6 +12,7 @@ import { appendLine, type ConversationLine, summarise } from './conversation';
 import { parsePushPayload } from './push-payload';
 import { enabled, line, tag, title } from './present';
 import { retireRoomAlerts } from './retire';
+import { playNotificationSound } from './sound';
 
 export const settingsChanges = $state({ version: 0 });
 
@@ -133,11 +134,13 @@ export class NotificationCenter {
     const lines = appendLine(this.conversations.get(view.room_id) ?? [], line(view));
     this.conversations.set(view.room_id, lines);
 
+    if (view.noisy !== false && preferences.notificationSounds && soundsAllowed()) {
+      void playNotificationSound().catch(() => undefined);
+    }
+
     if (!enabled() || this.reading === view.room_id) return;
 
     void this.show(view, lines);
-
-    if (view.noisy !== false && preferences.notificationSounds && soundsAllowed()) chime();
   }
 
   private retirePush(raw: string): void {
@@ -185,29 +188,4 @@ const FALLBACK_ICON = '/favicon.png';
 function soundsAllowed(): boolean {
   if (preferences.backgroundNotificationSounds) return true;
   return typeof document !== 'undefined' && document.hasFocus();
-}
-
-function chime(): void {
-  try {
-    play();
-  } catch (error) {
-    console.debug('[sable notifications] no chime', error);
-  }
-}
-
-function play(): void {
-  const context = new AudioContext();
-  const gain = context.createGain();
-  gain.gain.setValueAtTime(0.06, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
-  gain.connect(context.destination);
-
-  const tone = context.createOscillator();
-  tone.type = 'sine';
-  tone.frequency.setValueAtTime(880, context.currentTime);
-  tone.frequency.setValueAtTime(1174, context.currentTime + 0.12);
-  tone.connect(gain);
-  tone.start();
-  tone.stop(context.currentTime + 0.36);
-  tone.onended = () => void context.close();
 }
