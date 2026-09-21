@@ -761,7 +761,9 @@ mod tests {
         use matrix_sdk::ruma::{owned_device_id, room_id, user_id};
         use matrix_sdk::test_utils::mocks::MatrixMockServer;
         use matrix_sdk_base::crypto::{
-            olm::{Account, InboundGroupSession, OutboundGroupSession, SenderData},
+            olm::{
+                Account, EncryptionSettings, InboundGroupSession, OutboundGroupSession, SenderData,
+            },
             types::EventEncryptionAlgorithm,
         };
         use matrix_sdk_test::JoinedRoomBuilder;
@@ -797,7 +799,7 @@ mod tests {
             owned_device_id!("SENDER"),
             std::sync::Arc::new(keys),
             room,
-            Default::default(),
+            EncryptionSettings::default(),
         )
         .unwrap();
         let inbound = InboundGroupSession::new(
