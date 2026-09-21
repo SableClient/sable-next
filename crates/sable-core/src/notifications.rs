@@ -701,7 +701,13 @@ mod tests {
     use matrix_sdk::ruma::events::AnySyncTimelineEvent;
     use matrix_sdk::ruma::push::{PredefinedOverrideRuleId, RuleKind, Ruleset};
     use matrix_sdk::ruma::serde::Raw;
-    use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt, user_id};
+    use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt, owned_device_id, room_id, user_id};
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk_base::crypto::{
+        olm::{Account, EncryptionSettings, InboundGroupSession, OutboundGroupSession, SenderData},
+        types::EventEncryptionAlgorithm,
+    };
+    use matrix_sdk_test::JoinedRoomBuilder;
     use serde_json::json;
 
     use super::{
@@ -709,6 +715,7 @@ mod tests {
         mention_rule, push_account, read_mention_mode, timeline_body,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView};
+    use crate::session::{PersistedSession, restore_authenticated_client};
     use crate::store::{FileSessionStore, SessionStore};
 
     fn ts(millis: u32) -> MilliSecondsSinceUnixEpoch {
@@ -757,17 +764,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_cold_push_decrypts_from_androids_persisted_store() {
-        use crate::session::{PersistedSession, restore_authenticated_client};
-        use matrix_sdk::ruma::{owned_device_id, room_id, user_id};
-        use matrix_sdk::test_utils::mocks::MatrixMockServer;
-        use matrix_sdk_base::crypto::{
-            olm::{
-                Account, EncryptionSettings, InboundGroupSession, OutboundGroupSession, SenderData,
-            },
-            types::EventEncryptionAlgorithm,
-        };
-        use matrix_sdk_test::JoinedRoomBuilder;
-
         let data_dir =
             std::env::temp_dir().join(format!("sable-cold-push-test-{}", std::process::id()));
         let store_dir = cold_push_store_dir(&data_dir);
