@@ -1,7 +1,12 @@
 blockExoticSubdeps: true
 
 allowBuilds:
+  '@sentry/cli': true
+  cpu-features: false
   esbuild: true
   lightningcss: true
+  protobufjs: false
+  ssh2: false
+  workerd: true
 onlyBuiltDependencies:
   - esbuild
