@@ -205,6 +205,54 @@ test('paints the persisted room list before the subscription answers', async () 
   roomList.stop();
 });
 
+test('does not show cached unread counts before a room notification mode resolves', async () => {
+  const stored = stubLocalStorage();
+  const muted = {
+    room_id: '!muted:example.org',
+    unread: 4,
+    highlight: 0,
+    marked_unread: false,
+  } as RoomSummary;
+  stored.set('sable.room-list.acct', JSON.stringify([muted]));
+  let resolveModes: (value: { room_id: string; room: 'mute'; default: 'all' }[]) => void = () => {};
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [muted] })),
+      roomNotificationModes: vi.fn(
+        () =>
+          new Promise<{ room_id: string; room: 'mute'; default: 'all' }[]>((resolve) => {
+            resolveModes = resolve;
+          })
+      ),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  expect(roomList.unreadFor(muted)).toEqual({
+    unread: 0,
+    highlight: 0,
+    marked: false,
+    notifying: 0,
+  });
+  expect(roomList.notificationsFor(muted)).toEqual({ unread: 0, highlight: 0, marked: false });
+
+  resolveModes([{ room_id: muted.room_id, room: 'mute', default: 'all' }]);
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(muted.room_id)).toBe('mute');
+  });
+  expect(roomList.unreadFor(muted)).toEqual({
+    unread: 0,
+    highlight: 0,
+    marked: false,
+    notifying: 0,
+  });
+  roomList.stop();
+});
+
 test('persists the live room list for the next launch', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();
