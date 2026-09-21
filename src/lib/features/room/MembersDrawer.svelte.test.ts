@@ -94,6 +94,22 @@ test('sorts members by power then name and opens their profile', async () => {
   await unmount(instance);
 });
 
+test('resizes the desktop drawer with the keyboard', async () => {
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() },
+  });
+  await tick();
+
+  const drawer = document.querySelector<HTMLElement>('.members-drawer');
+  const handle = document.querySelector<HTMLButtonElement>('.resize-handle');
+  handle?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  await tick();
+
+  expect(drawer?.style.width).toBe('282px');
+  await unmount(instance);
+});
+
 test('honours the sort preference and fetches the membership a filter names', async () => {
   setPreference('memberSort', 'name-desc');
   const loadMembership = vi.fn(() => Promise.resolve([]));
