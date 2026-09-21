@@ -4,10 +4,7 @@ version = 2
 # select arrayref 0.3.10 without introducing additional duplicate dependencies.
 yanked = "warn"
 unmaintained = "workspace"
-ignore = [
-  { id = "RUSTSEC-2026-0194", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
-  { id = "RUSTSEC-2026-0195", reason = "Tauri 2.11.5 pins plist 1.7.4, which pins quick-xml 0.38; no compatible upstream release is available until Tauri updates plist" },
-]
+ignore = []
 
 [licenses]
 confidence-threshold = 0.93
@@ -52,7 +49,6 @@ skip = [
   { crate = "jni-sys@0.3.1", reason = "jni 0.21 requires jni-sys 0.3 while jni 0.22 requires jni-sys 0.4" },
   { crate = "jni-sys@0.4.1", reason = "jni 0.22 requires jni-sys 0.4 while jni 0.21 requires jni-sys 0.3" },
   { crate = "base64@0.22.1", reason = "transitive dependencies have not adopted the base64 0.23 line" },
-  { crate = "quick-xml@0.38.4", reason = "Tauri's plist pins quick-xml 0.38; wayland-scanner uses 0.41" },
   { crate = "bitflags@1.3.2", reason = "legacy GTK/WebKit bindings require bitflags 1.x" },
   { crate = "core-foundation@0.9.4", reason = "hyper-util's system-configuration requires core-foundation 0.9 while platform dependencies use 0.10" },
   { crate = "cpufeatures@0.2.17", reason = "AES and digest transitive dependencies have incompatible requirements" },
@@ -71,20 +67,34 @@ skip = [
   { crate = "hashbrown@0.15.5", reason = "transitive parser dependencies require hashbrown 0.15" },
   { crate = "heck@0.4.1", reason = "glib-macros has an incompatible heck requirement" },
   { crate = "html5ever@0.38.0", reason = "dom_query has an incompatible html5ever requirement" },
+  { crate = "html5ever@0.39.0", reason = "ruma-html requires html5ever 0.39 while ammonia requires 0.40" },
   { crate = "indexmap@1.9.3", reason = "schemars has an incompatible indexmap requirement" },
   { crate = "markup5ever@0.38.0", reason = "html5ever 0.38 requires its matching markup5ever release" },
+  { crate = "macroific@2.0.0", reason = "matrix_indexed_db_futures_macros_internal requires macroific 2 while matrix_indexed_db_futures uses 3" },
+  { crate = "macroific_attr_parse@2.0.0", reason = "paired with macroific 2.0.0 above" },
+  { crate = "macroific_core@2.0.0", reason = "paired with macroific 2.0.0 above" },
+  { crate = "macroific_macro@2.0.0", reason = "paired with macroific 2.0.0 above" },
+  { crate = "markup5ever@0.39.0", reason = "ruma-html requires markup5ever 0.39 while ammonia requires 0.40" },
+  { crate = "miniz_oxide@0.8.9", reason = "Sentry and Tauri use miniz_oxide 0.8 while reqwest uses 0.9" },
+  { crate = "phf@0.13.1", reason = "ruma-html requires phf 0.13 while ammonia requires 0.14" },
+  { crate = "phf_codegen@0.13.1", reason = "paired with phf 0.13.1 above" },
+  { crate = "phf_generator@0.13.1", reason = "paired with phf 0.13.1 above" },
+  { crate = "phf_shared@0.13.1", reason = "paired with phf 0.13.1 above" },
   { crate = "png@0.17.16", reason = "Tauri's ico dependency has not adopted png 0.18" },
   { crate = "proc-macro-crate@1.3.1", reason = "legacy proc-macro dependencies require proc-macro-crate 1.x" },
   { crate = "proc-macro-crate@2.0.2", reason = "legacy proc-macro dependencies require proc-macro-crate 2.x" },
   { crate = "r-efi@5.3.0", reason = "getrandom 0.3 has an incompatible r-efi requirement" },
-  { crate = "rand@0.8.7", reason = "legacy Matrix crypto dependencies require rand 0.8" },
+  { crate = "rand@0.8.8", reason = "legacy Matrix crypto dependencies require rand 0.8" },
   { crate = "rand@0.9.5", reason = "transitive crypto dependencies have not converged on rand 0.10" },
   { crate = "rand_chacha@0.3.1", reason = "rand 0.8 has an incompatible rand_chacha requirement" },
   { crate = "rand_core@0.6.4", reason = "rand 0.8 has an incompatible rand_core requirement" },
   { crate = "rand_core@0.9.5", reason = "rand 0.9 has an incompatible rand_core requirement" },
+  { crate = "sealed@0.6.0", reason = "matrix_indexed_db_futures_macros_internal requires sealed 0.6 while matrix_indexed_db_futures uses 0.7" },
   { crate = "serde_spanned@0.6.9", reason = "toml 0.8 has an incompatible serde_spanned requirement" },
   { crate = "syn@1.0.109", reason = "legacy proc-macro dependencies require syn 1.x" },
   { crate = "syn@2.0.119", reason = "current proc-macro dependencies have not all adopted syn 3.x" },
+  { crate = "string_cache@0.9.0", reason = "ruma-html's markup5ever uses string_cache 0.9 while ammonia uses 0.11" },
+  { crate = "string_cache_codegen@0.6.1", reason = "paired with string_cache 0.9.0 above" },
   { crate = "thiserror@1.0.69", reason = "legacy GTK/WebKit dependencies require thiserror 1.x" },
   { crate = "thiserror-impl@1.0.69", reason = "paired with thiserror 1.0.69 above" },
   { crate = "toml@0.8.2", reason = "legacy Tauri dependencies require toml 0.8" },
@@ -94,6 +104,11 @@ skip = [
   { crate = "toml_edit@0.19.15", reason = "legacy Tauri dependencies require toml_edit 0.19" },
   { crate = "toml_edit@0.20.2", reason = "legacy Tauri dependencies require toml_edit 0.20" },
   { crate = "windows-link@0.1.3", reason = "windows 0.61 has an incompatible windows-link requirement" },
+  { crate = "web_atoms@0.2.6", reason = "ruma-html uses web_atoms 0.2 while ammonia uses 0.3" },
+  { crate = "windows-core@0.61.2", reason = "Tauri uses windows-core 0.61 while chrono uses 0.62" },
+  { crate = "windows-registry@0.5.3", reason = "Tauri deep-link uses windows-registry 0.5 while reqwest uses 0.6" },
+  { crate = "windows-result@0.3.4", reason = "Tauri uses windows-result 0.3 while matrix dependencies use 0.4" },
+  { crate = "windows-strings@0.4.2", reason = "paired with windows-core 0.61.2 above" },
   { crate = "windows-sys@0.45.0", reason = "legacy platform crates require windows-sys 0.45" },
   { crate = "windows-sys@0.52.0", reason = "ring and platform dependencies have incompatible windows-sys requirements" },
   { crate = "windows-sys@0.59.0", reason = "Tauri plugin dependencies require windows-sys 0.59" },

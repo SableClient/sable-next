@@ -354,8 +354,11 @@ impl PathBuilder for UnstablePath {
 }
 
 impl SupportedPathBuilder for UnstablePath {
-    async fn get_path_builder_input(_client: &Client, _skip_auth: bool) -> HttpResult<()> {
-        Ok(())
+    fn get_path_builder_input(
+        _client: &Client,
+        _skip_auth: bool,
+    ) -> impl Future<Output = HttpResult<()>> {
+        std::future::ready(Ok(()))
     }
 }
 
