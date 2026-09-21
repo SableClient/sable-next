@@ -41,7 +41,7 @@ async function requireRelease(tag) {
   return release;
 }
 
-async function ensureRelease(tag, { sha, title, notes, draft, prerelease }) {
+async function ensureRelease(tag, { sha, title, notes, prerelease }) {
   const existing = await getRelease(tag);
   if (existing) {
     console.log(`Reusing the existing ${tag} release.`);
@@ -55,7 +55,7 @@ async function ensureRelease(tag, { sha, title, notes, draft, prerelease }) {
       target_commitish: sha,
       name: title ?? tag,
       body: notes ?? '',
-      draft: Boolean(draft),
+      draft: false,
       prerelease: Boolean(prerelease),
     })
   );
@@ -130,17 +130,7 @@ async function deleteAsset(tag, name) {
   console.log(`Removed ${name}`);
 }
 
-async function deleteRelease(tag) {
-  const release = await getRelease(tag);
-  if (!release) {
-    console.log(`No ${tag} release to delete.`);
-    return;
-  }
-  await request('DELETE', `/releases/${release.id}`);
-  console.log(`Deleted the ${tag} release.`);
-}
-
-async function editRelease(tag, { title, notes, draft, prerelease }) {
+async function editRelease(tag, { title, notes, prerelease }) {
   const release = await requireRelease(tag);
   await request(
     'PATCH',
@@ -148,7 +138,6 @@ async function editRelease(tag, { title, notes, draft, prerelease }) {
     json({
       ...(title !== undefined && { name: title }),
       ...(notes !== undefined && { body: notes }),
-      ...(draft !== undefined && { draft }),
       ...(prerelease !== undefined && { prerelease }),
     })
   );
@@ -199,7 +188,6 @@ try {
         sha: flags.sha,
         title: flags.title,
         notes: flags.notes,
-        draft: flags.draft === 'true',
         prerelease: flags.prerelease === 'true',
       });
       break;
@@ -221,14 +209,10 @@ try {
     case 'delete-asset':
       await deleteAsset(tag, flags.name);
       break;
-    case 'delete-release':
-      await deleteRelease(tag);
-      break;
     case 'edit':
       await editRelease(tag, {
         title: flags.title,
         notes: flags.notes,
-        ...(flags.draft !== undefined && { draft: flags.draft === 'true' }),
         ...(flags.prerelease !== undefined && { prerelease: flags.prerelease === 'true' }),
       });
       break;
@@ -240,7 +224,7 @@ try {
       break;
     default:
       console.error(
-        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|delete-release|find-previous|edit|body> [flags]'
+        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|find-previous|edit|body> [flags]'
       );
       process.exit(1);
   }

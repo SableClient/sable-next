@@ -512,7 +512,6 @@ jobs:
               exit 0
             fi
           done
-          # The API serves drafts; the URLs the client will use do not.
           for arch in x86_64 aarch64; do
             url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-next-$VERSION-linux-$arch.tar.gz"
             for attempt in $(seq 20); do

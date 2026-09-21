@@ -55,7 +55,6 @@ jobs:
           node scripts/ci/forgejo-release.mjs ensure \
             --tag "${{ steps.meta.outputs.tag }}" \
             --sha "$SHA" \
-            --draft true \
             --prerelease true \
             --title "Nightly build ${{ steps.meta.outputs.version }}" \
             --notes "Nightly build from main at $SHA"
@@ -528,44 +527,10 @@ jobs:
             --title 'Latest stable' \
             --notes "Stable manifests for $VERSION. Bundles live on the $TAG release."
           node scripts/ci/forgejo-release.mjs upload --tag latest latest.json altstore-source.json
-  publish-nightly-release:
-    name: Publish the nightly release
-    needs: [setup-release, linux, android]
-    # A draft serves no downloads, and the Flatpak repo on the GitHub mirror
-    # only waits ten minutes for the URLs it recorded. github-bundles is too
-    # late; the GitHub bundles land on an already-live release.
-    if: ${{ always() && needs.setup-release.result == 'success' && needs.setup-release.outputs.nightly == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    outputs:
-      published: ${{ steps.publish.outputs.published }}
-    env:
-      TAG: ${{ needs.setup-release.outputs.tag }}
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Publish the release
-        id: publish
-        run: |
-          # Assigned first so an API failure cannot read as an empty release.
-          names="$(node scripts/ci/forgejo-release.mjs assets)"
-          if printf '%s\n' "$names" | grep -q '^sable-next-'; then
-            node scripts/ci/forgejo-release.mjs edit --draft false --prerelease true
-            echo 'published=true' >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::$TAG carries no bundles; removing the draft."
-            node scripts/ci/forgejo-release.mjs delete-release
-            echo 'published=false' >> "$GITHUB_OUTPUT"
-          fi
   publish-nightly-channel:
     name: Refresh nightly channel metadata
-    needs: [setup-release, publish-nightly-release, updater-manifest, obtainium, altstore]
-    # Metadata is best-effort; the bundles are already published.
-    if: ${{ always() && needs.publish-nightly-release.outputs.published == 'true' }}
+    needs: [setup-release, updater-manifest, obtainium, altstore]
+    if: ${{ always() && needs.setup-release.outputs.nightly == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
