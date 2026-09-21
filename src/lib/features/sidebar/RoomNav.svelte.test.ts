@@ -522,6 +522,56 @@ test('an active call in a text room shows the live count without the voice icon'
   await unmount(instance);
 });
 
+test('a live voice room lists its call members', async () => {
+  observeImmediately();
+  core.userProfile.mockImplementation((userId: string) =>
+    Promise.resolve({
+      user_id: userId,
+      display_name: userId === '@alice:example.org' ? 'Alice' : 'Bob',
+      avatar_url: null,
+    })
+  );
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!voice:example.org',
+      name: 'Voice',
+      is_voice: true,
+      call_participants: ['@alice:example.org', '@bob:example.org'],
+    }),
+  ];
+
+  const instance = await mountNav();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.call-participant-list')?.textContent).toContain('Alice');
+  });
+
+  expect(document.querySelectorAll('.call-participant-list .avatar-root')).toHaveLength(2);
+  expect(core.userProfile).toHaveBeenCalledWith('@alice:example.org');
+  expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
+  await unmount(instance);
+});
+
+test('a collapsed live voice room keeps participant avatars labelled', async () => {
+  observeImmediately();
+  core.userProfile.mockResolvedValue({ display_name: 'Alice', avatar_url: null });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!voice:example.org',
+      name: 'Voice',
+      is_voice: true,
+      call_participants: ['@alice:example.org'],
+    }),
+  ];
+
+  const instance = await mountNav({ collapsed: true });
+  await vi.waitFor(() => {
+    expect(
+      document.querySelector('.call-participant-list .avatar-root')?.getAttribute('aria-label')
+    ).toBe('Alice');
+  });
+  await unmount(instance);
+});
+
 function observeImmediately(): void {
   globalThis.IntersectionObserver = class {
     #callback: IntersectionObserverCallback;

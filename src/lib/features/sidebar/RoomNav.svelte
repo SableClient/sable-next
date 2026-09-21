@@ -888,6 +888,33 @@
                   {/if}
                 {/if}
               </div>
+              {#if room?.is_voice && live > 0}
+                <ul
+                  class:collapsed
+                  class="call-participant-list"
+                  aria-label={$i18n.t('nav.voiceLive', { count: live })}
+                >
+                  {#each room.call_participants as userId (userId)}
+                    {@const profile = peerProfiles.get(userId)}
+                    <li
+                      {@attach whenVisible(() => {
+                        requestPeerProfile(userId);
+                      })}
+                    >
+                      <Avatar
+                        src={profile?.avatar_url ?? null}
+                        name={profile?.display_name ?? userId}
+                        id={userId}
+                        size="small"
+                        alt={collapsed ? (profile?.display_name ?? userId) : undefined}
+                      />
+                      {#if !collapsed}
+                        <span>{profile?.display_name ?? userId}</span>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
             {/if}
           {/each}
         </div>
@@ -1485,6 +1512,39 @@
     font-weight: var(--font-weight-bold);
     min-width: 1.25rem;
     padding: var(--space-050) var(--space-150);
+  }
+
+  .call-participant-list {
+    display: grid;
+    gap: var(--space-050);
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 calc(var(--space-400) + var(--room-depth, 0) * var(--space-400));
+  }
+
+  .call-participant-list li {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+    min-width: 0;
+    padding: var(--space-050) var(--space-200);
+  }
+
+  .call-participant-list li span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .call-participant-list.collapsed {
+    justify-items: center;
+    padding: 0;
+  }
+
+  .call-participant-list.collapsed li {
+    padding: var(--space-050) 0;
   }
 
   .room-list.collapsed {
