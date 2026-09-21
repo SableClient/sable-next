@@ -8,7 +8,9 @@ function keyboardInset(viewport: VisualViewport): number {
 
 export function trackKeyboardInset(): () => void {
   const os = document.documentElement.dataset.tauriOs;
-  if (os === 'ios' || os === 'android') return () => {};
+  // Android resizes the native webview for the IME. iOS overlays it instead,
+  // so viewport-fixed surfaces need VisualViewport's keyboard inset.
+  if (os === 'android') return () => {};
 
   const viewport = window.visualViewport;
   if (!viewport) return () => {};
