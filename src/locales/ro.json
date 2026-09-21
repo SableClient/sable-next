@@ -515,7 +515,8 @@
     "starting": "Sable începe…",
     "unableToStart": "Sable nu a putut porni. Verifică-ți conexiunea și încearcă din nou.",
     "startFailed": "Aplicația nu s-a putut conecta la „core” și nu a putut restabilii sesiunea.",
-    "tryAgain": "Încearcă din nou"
+    "tryAgain": "Încearcă din nou",
+    "pettingAnimal": "Drăgălășim {{animal}}"
   },
   "home": {
     "resourcesLabel": "Resurse Sable",
@@ -1560,7 +1561,16 @@
       "lesbian": "Lesbian",
       "mlm": "MLM",
       "pride": "Pride"
-    }
+    },
+    "timelineEmoteSize": "Mărimea emoji-urilor în cronologie",
+    "timelineEmoteSizeHint": "Alegeţi cât de mari apar emoji-urile personalizate în cronologie.",
+    "timelineEmoteSizeDefault": "Implicită",
+    "composerButtonOrder": "Ordinea butoanelor în compozitor",
+    "notifyOnce": "Notifică o singură dată",
+    "notifyOnceHint": "Mesajele noi dintr-o cameră vor schimba notificarea prezentă în loc de a crea una nouă.",
+    "alwaysShowCallButton": "Arată buton de apel în camere mari",
+    "alwaysShowCallButtonHint": "Păstrează butonul de apel vizibil în camere cu mai mult de 10 conturi membre.",
+    "showRoomIconSometimes": "Uneori"
   },
   "errors": {
     "pageTitle": "Ceva a eșuat",
