@@ -79,6 +79,9 @@ APKs ship with every build, and [Obtainium](https://obtainium.imranr.dev) update
 2. Tap **Add to Obtainium** above. It enables prereleases and selects the nightly build releases.
 3. Or download `obtainium.json` and import it with **Import/Export → Import from file**.
 
+Apps added before nightlies moved to per-build prereleases have to be removed and
+re-added: their stored config tracks the release date instead of the version.
+
 ## iOS (AltStore / SideStore)
 
 iOS builds are unsigned IPAs distributed through [AltStore](https://altstore.io) and [SideStore](https://sidestore.io). Each nightly publishes its IPA in its own prerelease; `altstore-source.json` lists them.

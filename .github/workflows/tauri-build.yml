@@ -470,7 +470,7 @@ jobs:
     name: Publish the nightly Flatpak repo
     needs: [setup-release, build-nightly-flatpak]
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     if: ${{ always() && needs.setup-release.outputs.nightly == 'true' }}
     permissions:
       actions: read
@@ -481,6 +481,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
     steps:
       - name: Check out repository
@@ -507,6 +508,23 @@ jobs:
           for arch in x86_64 aarch64; do
             if ! printf '%s\n' "$built" | grep -qx "flatpak-nightly-repo-$arch"; then
               echo "::notice::No $arch Flatpak repo; skipping the publish."
+              echo 'enabled=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          # The API serves drafts; the URLs the client will use do not.
+          for arch in x86_64 aarch64; do
+            url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-next-$VERSION-linux-$arch.tar.gz"
+            for attempt in $(seq 20); do
+              if curl -fsSLI -o /dev/null "$url"; then
+                unset url
+                break
+              fi
+              echo "Waiting for $url ($attempt/20)…"
+              sleep 30
+            done
+            if [ -n "${url:-}" ]; then
+              echo "::notice::$url is not public yet; skipping the publish."
               echo 'enabled=false' >> "$GITHUB_OUTPUT"
               exit 0
             fi

@@ -130,6 +130,16 @@ async function deleteAsset(tag, name) {
   console.log(`Removed ${name}`);
 }
 
+async function deleteRelease(tag) {
+  const release = await getRelease(tag);
+  if (!release) {
+    console.log(`No ${tag} release to delete.`);
+    return;
+  }
+  await request('DELETE', `/releases/${release.id}`);
+  console.log(`Deleted the ${tag} release.`);
+}
+
 async function editRelease(tag, { title, notes, draft, prerelease }) {
   const release = await requireRelease(tag);
   await request(
@@ -211,6 +221,9 @@ try {
     case 'delete-asset':
       await deleteAsset(tag, flags.name);
       break;
+    case 'delete-release':
+      await deleteRelease(tag);
+      break;
     case 'edit':
       await editRelease(tag, {
         title: flags.title,
@@ -227,7 +240,7 @@ try {
       break;
     default:
       console.error(
-        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|find-previous|edit|body> [flags]'
+        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|delete-release|find-previous|edit|body> [flags]'
       );
       process.exit(1);
   }
