@@ -3,6 +3,7 @@ import ArrowCircleUpIcon from 'phosphor-svelte/lib/ArrowCircleUpIcon';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
+import BellSimpleIcon from 'phosphor-svelte/lib/BellSimpleIcon';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
 import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
@@ -783,6 +784,13 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationSoundsHint',
         type: 'boolean',
         gatedBy: 'systemNotifications',
+      },
+      {
+        key: 'notifyOnce',
+        icon: BellSimpleIcon,
+        name: 'settings.notifyOnce',
+        description: 'settings.notifyOnceHint',
+        type: 'boolean',
       },
       {
         key: 'backgroundNotificationSounds',

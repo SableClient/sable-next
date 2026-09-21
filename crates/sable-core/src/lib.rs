@@ -93,6 +93,7 @@ pub struct Core {
     notification_content: AtomicBool,
     notification_encrypted_content: AtomicBool,
     notification_sounds: AtomicBool,
+    notify_once: AtomicBool,
     notifications_enabled: AtomicBool,
     read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
@@ -179,6 +180,7 @@ impl Core {
             notification_content: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
             notification_sounds: AtomicBool::new(true),
+            notify_once: AtomicBool::new(true),
             notifications_enabled: AtomicBool::new(true),
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
@@ -231,6 +233,11 @@ impl Core {
     #[must_use]
     pub fn notification_sounds(&self) -> bool {
         self.notification_sounds.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
+    pub fn notify_once(&self) -> bool {
+        self.notify_once.load(Ordering::Relaxed)
     }
 
     #[must_use]

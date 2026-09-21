@@ -756,6 +756,9 @@ pub enum Command {
     SetNotificationSounds {
         enabled: bool,
     },
+    SetNotifyOnce {
+        enabled: bool,
+    },
     SetNotificationsEnabled {
         enabled: bool,
     },
@@ -1278,6 +1281,7 @@ pub enum CommandOk {
     RemovePusher,
     SetNotificationContent,
     SetNotificationSounds,
+    SetNotifyOnce,
     SetNotificationsEnabled,
     SetReadRoom,
     SetPresence,

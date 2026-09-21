@@ -49,9 +49,10 @@ pub fn write_push_policy(
     content: bool,
     encrypted_content: bool,
     sounds: bool,
+    notify_once: bool,
 ) -> Result<(), String> {
     let root = shared_store_dir()?;
-    let value = serde_json::json!({"enabled":enabled,"content":content,"encrypted_content":encrypted_content,"sounds":sounds});
+    let value = serde_json::json!({"enabled":enabled,"content":content,"encrypted_content":encrypted_content,"sounds":sounds,"notify_once":notify_once});
     let temporary = root.join("push-policy.json.tmp");
     std::fs::write(&temporary, value.to_string()).map_err(|error| error.to_string())?;
     std::fs::rename(temporary, root.join("push-policy.json")).map_err(|error| error.to_string())

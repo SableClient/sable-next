@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   setReadRoom: vi.fn().mockResolvedValue(undefined),
   ackWebPusher: vi.fn().mockResolvedValue(undefined),
   watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
+  sound: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
@@ -16,6 +17,7 @@ vi.mock('#lib/platform/native-notifications.js', () => ({
   watchNativePushMessages: mocks.watchNativePushMessages,
 }));
 vi.mock('./retire', () => ({ retireRoomAlerts: mocks.retire }));
+vi.mock('./sound', () => ({ playNotificationSound: mocks.sound }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
@@ -27,7 +29,10 @@ beforeEach(() => {
   mocks.setReadRoom.mockClear();
   mocks.ackWebPusher.mockClear();
   mocks.watchNativePushMessages.mockClear();
+  mocks.sound.mockClear();
   preferences.systemNotifications = false;
+  preferences.notificationSounds = true;
+  preferences.notifyOnce = true;
   preferences.clearNotificationsOnRead = true;
 });
 
@@ -208,4 +213,32 @@ test('rejecting an invite removes its entry from the SDK non-left room list', ()
   notifications.retireRead([{ ...room(0), state: 'invited' }]);
   notifications.retireRead([]);
   expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
+});
+
+function message(eventId: string): NotificationView {
+  return { ...invite(), event_id: eventId, body: 'Hello', noisy: true };
+}
+
+test('a second message in a room with a standing alert does not sound again', () => {
+  const notifications = center();
+
+  notifications.present(message('$one'));
+  expect(mocks.sound).toHaveBeenCalledTimes(1);
+
+  notifications.present(message('$two'));
+  expect(mocks.sound).toHaveBeenCalledTimes(1);
+
+  notifications.retireRead([room(0)]);
+  notifications.present(message('$three'));
+  expect(mocks.sound).toHaveBeenCalledTimes(2);
+});
+
+test('every message sounds while only notifying once is off', () => {
+  preferences.notifyOnce = false;
+  const notifications = center();
+
+  notifications.present(message('$one'));
+  notifications.present(message('$two'));
+
+  expect(mocks.sound).toHaveBeenCalledTimes(2);
 });

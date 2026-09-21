@@ -129,7 +129,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   const options: NotificationOptions & { renotify?: boolean; timestamp?: number } = {
     body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
-    renotify: true,
+    renotify: !policy.notifyOnce || held.length === 0,
     icon: favicon,
     badge: favicon,
     timestamp: Date.now(),

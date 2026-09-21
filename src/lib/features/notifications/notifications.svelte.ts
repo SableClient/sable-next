@@ -139,10 +139,12 @@ export class NotificationCenter {
       this.unread.add(view.room_id);
     }
 
-    const lines = appendLine(this.conversations.get(view.room_id) ?? [], line(view));
+    const standing = this.conversations.get(view.room_id) ?? [];
+    const lines = appendLine(standing, line(view));
     this.conversations.set(view.room_id, lines);
 
-    if (view.noisy !== false && preferences.notificationSounds && soundsAllowed()) {
+    const quiet = preferences.notifyOnce && standing.length > 0;
+    if (view.noisy !== false && preferences.notificationSounds && !quiet && soundsAllowed()) {
       void playNotificationSound().catch(() => undefined);
     }
 

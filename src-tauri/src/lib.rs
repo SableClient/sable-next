@@ -355,16 +355,17 @@ async fn set_notification_encrypted_content(
     content: bool,
     enabled: bool,
     sounds: bool,
+    notify_once: bool,
 ) -> Result<(), CommandErr> {
     #[cfg(mobile)]
     app.notifications()
-        .set_push_policy(enabled, content, allowed, sounds)
+        .set_push_policy(enabled, content, allowed, sounds, notify_once)
         .await
         .map_err(|_| CommandErr::Unavailable)?;
     #[cfg(not(mobile))]
-    let _ = (content, enabled, sounds);
+    let _ = (content, enabled, sounds, notify_once);
     #[cfg(target_os = "ios")]
-    ios::write_push_policy(enabled, content, allowed, sounds)
+    ios::write_push_policy(enabled, content, allowed, sounds, notify_once)
         .map_err(|_| CommandErr::Unavailable)?;
     notifications::allow_encrypted_content(&app, allowed).await;
     Ok(())

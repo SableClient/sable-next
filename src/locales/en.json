@@ -1341,6 +1341,8 @@
     "systemNotificationsHint": "Lets the app raise a system notification for a message you have not read.",
     "notificationSounds": "Notification sounds",
     "notificationSoundsHint": "Plays a sound for mentions and direct messages.",
+    "notifyOnce": "Only notify once",
+    "notifyOnceHint": "Later messages from the same room update the existing alert instead of interrupting again.",
     "backgroundNotificationSounds": "Sounds while in the background",
     "backgroundNotificationSoundsHint": "Off plays a notification sound only while the window is focused.",
     "notificationContent": "Show message content",

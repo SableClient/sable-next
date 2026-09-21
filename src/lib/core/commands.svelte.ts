@@ -1272,6 +1272,10 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_notification_sounds', enabled });
     },
 
+    async setNotifyOnce(enabled: boolean): Promise<void> {
+      await transport().send({ type: 'set_notify_once', enabled });
+    },
+
     async setNotificationsEnabled(enabled: boolean): Promise<void> {
       await transport().send({ type: 'set_notifications_enabled', enabled });
     },

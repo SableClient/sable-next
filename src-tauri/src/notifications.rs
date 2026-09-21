@@ -378,7 +378,7 @@ pub async fn show<R: Runtime>(
     if cfg!(target_os = "android") {
         builder = builder.icon("notification_icon");
     }
-    builder = builder.only_alert_once(false);
+    builder = builder.only_alert_once(core.notify_once());
     if alerts_silently(view.noisy, core.notification_sounds()) {
         builder = builder.silent();
     }

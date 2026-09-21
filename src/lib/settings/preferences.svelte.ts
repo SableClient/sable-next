@@ -100,6 +100,7 @@ export interface Preferences {
 
   systemNotifications: boolean;
   notificationSounds: boolean;
+  notifyOnce: boolean;
   backgroundNotificationSounds: boolean;
   notificationContent: boolean;
   notificationEncryptedContent: boolean;
@@ -271,6 +272,7 @@ const DEFAULTS: Preferences = {
 
   systemNotifications: true,
   notificationSounds: true,
+  notifyOnce: true,
   backgroundNotificationSounds: true,
   notificationContent: false,
   notificationEncryptedContent: false,

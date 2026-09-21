@@ -62,6 +62,7 @@ export async function roomName(roomId: string): Promise<string | null> {
 export interface PushContentPolicy {
   content: boolean;
   encryptedContent: boolean;
+  notifyOnce: boolean;
 }
 
 const POLICY_KEY = '\u0000push-content-policy';
@@ -82,9 +83,10 @@ export async function pushContentPolicy(): Promise<PushContentPolicy> {
     return {
       content: stored?.content === true,
       encryptedContent: stored?.encryptedContent === true,
+      notifyOnce: stored?.notifyOnce === true,
     };
   } catch {
-    return { content: false, encryptedContent: false };
+    return { content: false, encryptedContent: false, notifyOnce: false };
   }
 }
 

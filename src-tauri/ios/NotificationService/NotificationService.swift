@@ -90,14 +90,21 @@ final class NotificationService: UNNotificationServiceExtension {
     }
 
     private func finish(_ content: UNNotificationContent) {
-        guard let identity = Self.messageIdentity(content.userInfo) else {
+        let identity = Self.messageIdentity(content.userInfo)
+        let thread = Self.conversationThread(content.userInfo)
+        guard identity != nil || thread != nil else {
             complete(content)
             return
         }
         UNUserNotificationCenter.current().getDeliveredNotifications { [weak self] delivered in
-            let duplicates = delivered.filter { Self.messageIdentity($0.request.content.userInfo) == identity }
-                .map { $0.request.identifier }
-            self?.complete(content, duplicates: duplicates)
+            let duplicates = identity.map { identity in
+                delivered.filter { Self.messageIdentity($0.request.content.userInfo) == identity }
+                    .map { $0.request.identifier }
+            } ?? []
+            let standing = thread.map { thread in
+                delivered.contains { $0.request.content.threadIdentifier == thread }
+            } ?? false
+            self?.complete(content, duplicates: duplicates, standing: standing)
         }
     }
 
@@ -112,7 +119,11 @@ final class NotificationService: UNNotificationServiceExtension {
         return thread + "\u{0}" + event
     }
 
-    private func complete(_ content: UNNotificationContent, duplicates: [String] = []) {
+    private func complete(
+        _ content: UNNotificationContent,
+        duplicates: [String] = [],
+        standing: Bool = false
+    ) {
         lock.lock()
         let handler = completion
         completion = nil
@@ -124,7 +135,9 @@ final class NotificationService: UNNotificationServiceExtension {
             handler(content)
             return
         }
-        updated.sound = duplicates.isEmpty && root?.withCString { sable_push_sounds($0) } == true ? sound : nil
+        let quiet = !duplicates.isEmpty
+            || (standing && root?.withCString { sable_push_notify_once($0) } == true)
+        updated.sound = !quiet && root?.withCString { sable_push_sounds($0) } == true ? sound : nil
         if !duplicates.isEmpty {
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: duplicates)
         }

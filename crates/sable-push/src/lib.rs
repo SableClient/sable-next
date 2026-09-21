@@ -9,6 +9,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 #[derive(Default, Deserialize)]
+#[serde(default)]
 #[expect(
     clippy::struct_excessive_bools,
     reason = "persisted notification preferences"
@@ -18,6 +19,7 @@ struct Policy {
     content: bool,
     encrypted_content: bool,
     sounds: bool,
+    notify_once: bool,
 }
 
 fn policy(root: &Path) -> Policy {
@@ -45,6 +47,27 @@ pub unsafe extern "C" fn sable_push_sounds(root: *const c_char) -> bool {
         };
         let settings = policy(Path::new(root));
         settings.enabled && settings.sounds
+    })
+    .unwrap_or(false)
+}
+
+/// # Safety
+/// `root` must be null or a valid NUL-terminated UTF-8 path for this call.
+#[expect(
+    unsafe_code,
+    reason = "C ABI used by the notification service extension"
+)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sable_push_notify_once(root: *const c_char) -> bool {
+    if root.is_null() {
+        return false;
+    }
+    std::panic::catch_unwind(|| {
+        // SAFETY: the caller guarantees a valid C string for this call.
+        let Ok(root) = (unsafe { CStr::from_ptr(root) }).to_str() else {
+            return false;
+        };
+        policy(Path::new(root)).notify_once
     })
     .unwrap_or(false)
 }
@@ -182,12 +205,31 @@ mod tests {
             (true, true, false, false),
             (false, true, true, false),
         ] {
-            std::fs::write(root.join("push-policy.json"), json!({"enabled":enabled,"content":content,"encrypted_content":false,"sounds":sounds}).to_string()).unwrap();
+            std::fs::write(root.join("push-policy.json"), json!({"enabled":enabled,"content":content,"encrypted_content":false,"sounds":sounds,"notify_once":false}).to_string()).unwrap();
             // SAFETY: path remains alive throughout the call.
             assert_eq!(unsafe { sable_push_sounds(path.as_ptr()) }, expected);
         }
         // SAFETY: null is explicitly accepted by this ABI.
         assert!(!unsafe { sable_push_sounds(std::ptr::null()) });
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[expect(unsafe_code, reason = "tests the extension C ABI with owned C strings")]
+    fn notify_once_is_read_back_from_the_stored_policy() {
+        let root = std::env::temp_dir().join(format!("sable-notify-once-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = CString::new(root.to_str().unwrap()).unwrap();
+        for notify_once in [true, false] {
+            std::fs::write(root.join("push-policy.json"), json!({"enabled":true,"content":true,"encrypted_content":false,"sounds":true,"notify_once":notify_once}).to_string()).unwrap();
+            assert_eq!(
+                // SAFETY: path remains alive throughout the call.
+                unsafe { sable_push_notify_once(path.as_ptr()) },
+                notify_once
+            );
+        }
+        // SAFETY: null is explicitly accepted by this ABI.
+        assert!(!unsafe { sable_push_notify_once(std::ptr::null()) });
         std::fs::remove_dir_all(root).unwrap();
     }
 

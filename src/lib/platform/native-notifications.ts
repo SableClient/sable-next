@@ -41,10 +41,17 @@ export async function setNativeEncryptedContentAllowed(
   allowed: boolean,
   content = false,
   enabled = true,
-  sounds = true
+  sounds = true,
+  notifyOnce = true
 ): Promise<void> {
   if (!isTauri()) return;
-  await invoke('set_notification_encrypted_content', { allowed, content, enabled, sounds });
+  await invoke('set_notification_encrypted_content', {
+    allowed,
+    content,
+    enabled,
+    sounds,
+    notifyOnce,
+  });
 }
 
 export async function sendNativeTestNotification(sequence: number): Promise<void> {

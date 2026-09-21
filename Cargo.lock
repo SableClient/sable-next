@@ -8073,7 +8073,7 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-notifications"
 version = "0.5.0"
-source = "git+https://github.com/SableClient/tauri-plugin-notifications.git?rev=5a4a139e9a924b77d4073f7950c6013aab786b87#5a4a139e9a924b77d4073f7950c6013aab786b87"
+source = "git+https://github.com/SableClient/tauri-plugin-notifications.git?rev=831346d510afd03a2999d00d6fbe77d850b7a711#831346d510afd03a2999d00d6fbe77d850b7a711"
 dependencies = [
  "log",
  "notify-rust",

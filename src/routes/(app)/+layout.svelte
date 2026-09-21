@@ -325,18 +325,22 @@
 
     void core.commands.setNotificationSounds(preferences.notificationSounds).catch(() => {});
 
+    void core.commands.setNotifyOnce(preferences.notifyOnce).catch(() => {});
+
     void core.commands.setNotificationsEnabled(preferences.systemNotifications).catch(() => {});
 
     void setNativeEncryptedContentAllowed(
       preferences.notificationContent && preferences.notificationEncryptedContent,
       preferences.notificationContent,
       preferences.systemNotifications,
-      preferences.notificationSounds
+      preferences.notificationSounds,
+      preferences.notifyOnce
     ).catch(() => {});
 
     void putPushContentPolicy({
       content: preferences.notificationContent,
       encryptedContent: preferences.notificationEncryptedContent,
+      notifyOnce: preferences.notifyOnce,
     });
   });
 
