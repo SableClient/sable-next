@@ -841,7 +841,9 @@
     "utdWithheldUnverified": "L’expéditeur a retenu la clé car cet appareil n’est pas vérifié ou n’est pas sûr.",
     "utdWithheldBySender": "L’expéditeur a choisi de ne pas envoyer la clé à cet appareil.",
     "utdRecoverAction": "Configurer la récupération",
-    "utdWaiting": "En attente de la clé de ce message…"
+    "utdWaiting": "En attente de la clé de ce message…",
+    "videoConverting": "Conversion de la video…",
+    "playVideo": "Jouer {{name}}"
   },
   "viewer": {
     "title": "Visionneuse de médias",
