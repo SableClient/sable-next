@@ -13,6 +13,13 @@ const session: SessionInfo = {
   needs_reauth: false,
 };
 
+const otherSession: SessionInfo = {
+  ...session,
+  account_id: 'account-b',
+  user_id: '@other:example.org',
+  device_id: 'PHONE',
+};
+
 function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
   const sent: { type: string }[] = [];
@@ -23,6 +30,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   });
   const transport = {
     send,
+    deleteAccountStore: vi.fn().mockResolvedValue(undefined),
     subscribe: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
 
@@ -57,6 +65,27 @@ test('a restore that returns a session leaves the client ready', async () => {
   expect(core.status).toBe('ready');
   expect(core.session?.user_id).toBe('@erwan:example.org');
   expect(core.accounts).toHaveLength(1);
+});
+
+test('logging out selects another saved account instead of returning to sign-in', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: accounts,
+    logout: {},
+    switch_account: { session: otherSession },
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  accounts.accounts = [otherSession];
+
+  await core.logout();
+
+  expect(core.session).toEqual(otherSession);
+  expect(core.accounts).toEqual([otherSession]);
+  expect(core.status).toBe('ready');
+  expect(fake.sent).toContainEqual({ type: 'switch_account', account_id: otherSession.account_id });
 });
 
 test('a restore that returns no session reports signed out, not an error', async () => {

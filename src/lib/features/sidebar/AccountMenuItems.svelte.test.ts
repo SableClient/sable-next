@@ -1,0 +1,100 @@
+// @vitest-environment happy-dom
+
+import { mount, tick, unmount } from 'svelte';
+import { afterEach, expect, test, vi } from 'vitest';
+
+vi.mock('#lib/i18n.js', () => ({
+  i18n: {
+    subscribe(run: (value: { t: (key: string) => string }) => void) {
+      run({ t: (key) => key });
+      return () => {};
+    },
+  },
+}));
+vi.mock('#lib/settings/preferences.svelte.js', () => ({
+  preferences: { sendPresence: false, presence: 'online' },
+  setPreference: vi.fn(),
+}));
+
+import AccountMenuItemsHarness from './AccountMenuItemsHarness.test.svelte';
+
+const accounts = [
+  {
+    account_id: 'current',
+    user_id: '@current:example.org',
+    device_id: 'DESKTOP',
+    homeserver: 'https://example.org',
+    needs_reauth: false,
+  },
+  {
+    account_id: 'other',
+    user_id: '@other:example.net',
+    device_id: 'PHONE',
+    homeserver: 'https://example.net',
+    needs_reauth: false,
+  },
+];
+
+afterEach(() => {
+  document.body.replaceChildren();
+});
+
+async function press(element: Element): Promise<void> {
+  element.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      button: 0,
+      isPrimary: true,
+    })
+  );
+  element.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
+  );
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await tick();
+}
+
+test('opens account choices in the switch-account submenu', async () => {
+  const onSwitch = vi.fn();
+  const onLogoutAccount = vi.fn();
+  const instance = mount(AccountMenuItemsHarness, {
+    target: document.body,
+    props: {
+      accounts,
+      onSwitch,
+      onLogoutAccount,
+    },
+  });
+  await tick();
+
+  async function openSwitcher(): Promise<void> {
+    const outerMenu = document.querySelector('.account-menu-trigger');
+    expect(outerMenu).not.toBeNull();
+    if (outerMenu) await press(outerMenu);
+    const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
+      item.textContent.includes('nav.switchAccount')
+    );
+    expect(switcher).not.toBeUndefined();
+    if (switcher) await press(switcher);
+  }
+
+  await openSwitcher();
+
+  const rows = document.querySelectorAll('.account-row');
+  expect(rows).toHaveLength(2);
+  const activeRow = rows.item(0);
+  const otherRow = rows.item(1);
+  expect((activeRow.querySelector('.account-select') as HTMLButtonElement).disabled).toBe(true);
+  await press(otherRow.querySelector('.btn-danger') as HTMLButtonElement);
+  expect(onLogoutAccount).toHaveBeenCalledWith('other');
+
+  await openSwitcher();
+  const otherAccount = document.querySelectorAll('.account-row').item(1);
+  await press(otherAccount.querySelector('.account-select') as HTMLButtonElement);
+  expect(onSwitch).toHaveBeenCalledWith('other');
+  await unmount(instance);
+});

@@ -538,12 +538,24 @@ export class CoreClient {
     await transport.send({ type: 'logout' });
     this.generation += 1;
     this.replaceSession(null);
-    this.accounts = [];
     this.verification = null;
-    this.status = 'signed-out';
+    this.status = 'authenticating';
     if (accountId !== null) {
       discardAccountStore(transport, accountId);
       clearRoomListSnapshot(accountId);
+    }
+
+    try {
+      await this.refreshAccounts();
+      const fallbackAccountId = this.accounts.find((account) => !account.needs_reauth)?.account_id;
+      if (fallbackAccountId !== undefined) {
+        await this.switchAccount(fallbackAccountId);
+        return;
+      }
+      this.status = 'signed-out';
+    } catch (error) {
+      this.status = 'signed-out';
+      throw error;
     }
   }
 

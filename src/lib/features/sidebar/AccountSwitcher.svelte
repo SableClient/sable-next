@@ -8,6 +8,8 @@
   import { i18n } from '#lib/i18n.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -28,6 +30,10 @@
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
   let switching = $state(false);
+  let logoutAccountId = $state<string | null>(null);
+  let accountToLogout = $derived(
+    core.accounts.find((account) => account.account_id === logoutAccountId) ?? null
+  );
   let profile = $state<ProfileView | null>(null);
   let activeProfile = $derived(profile?.user_id === core.session?.user_id ? profile : null);
   let displayName = $derived(activeProfile?.display_name ?? core.session?.user_id ?? '?');
@@ -40,7 +46,6 @@
   $effect(() => {
     const userId = core.session?.user_id;
     if (!userId) return;
-
     let cancelled = false;
     void core.userProfile(userId).then(
       (nextProfile) => {
@@ -72,8 +77,21 @@
     void goto(resolve('settings/account'));
   }
 
-  function openAccounts(): void {
-    void goto(resolve('profile'));
+  async function logoutAccount(accountId: string): Promise<void> {
+    if (switching) return;
+
+    switching = true;
+    try {
+      if (accountId !== core.session?.account_id) await core.switchAccount(accountId);
+      await logoutWithPush(core, pushOverride());
+      if (core.status === 'ready') await goto(resolve('/(app)/rooms'));
+    } finally {
+      switching = false;
+    }
+  }
+
+  function requestLogout(accountId: string): void {
+    logoutAccountId = accountId;
   }
 
   function logout(): void {
@@ -94,14 +112,34 @@
 {/snippet}
 
 {#if mode === 'mobile'}
-  <button
-    class="quick-tool mobile-tool account-tool selection-layer"
-    type="button"
-    aria-label={$i18n.t('nav.account')}
-    onclick={openAccounts}
+  <ActionMenu
+    label={$i18n.t('nav.switchAccount')}
+    class="account-popover"
+    side="top"
+    align="center"
+    sideOffset={8}
   >
-    {@render ownAvatar()}
-  </button>
+    {#snippet trigger({ props })}
+      <button
+        {...props}
+        class="quick-tool mobile-tool account-tool selection-layer"
+        type="button"
+        aria-label={$i18n.t('nav.switchAccount')}
+      >
+        {@render ownAvatar()}
+      </button>
+    {/snippet}
+    <AccountMenuItems
+      accounts={core.accounts}
+      currentAccountId={core.session?.account_id}
+      {switching}
+      onSwitch={switchAccount}
+      onProfile={openProfile}
+      onLogoutAccount={requestLogout}
+      onLogout={logout}
+      onAddAccount={openAddAccount}
+    />
+  </ActionMenu>
 {:else}
   {#snippet profileTrigger({ props: tooltipProps }: { props: Record<string, unknown> })}
     <ActionMenu
@@ -145,6 +183,7 @@
         {switching}
         onSwitch={switchAccount}
         onProfile={openProfile}
+        onLogoutAccount={requestLogout}
         onLogout={logout}
         onAddAccount={openAddAccount}
       />
@@ -157,6 +196,35 @@
   />
 {/if}
 
+<DialogFrame
+  open={accountToLogout !== null}
+  variant="verification"
+  label={$i18n.t('settings.logout')}
+  onOpenChange={(open) => {
+    if (!open && !switching) logoutAccountId = null;
+  }}
+>
+  {#if accountToLogout}
+    <div class="logout-dialog">
+      <h2>{$i18n.t('settings.logout')}</h2>
+      <p>{accountToLogout.user_id}</p>
+      <div class="dialog-actions">
+        <Button variant="ghost" disabled={switching} onclick={() => (logoutAccountId = null)}
+          >{$i18n.t('settings.cancel')}</Button
+        >
+        <Button
+          variant="danger"
+          loading={switching}
+          onclick={() => {
+            const accountId = accountToLogout?.account_id;
+            if (accountId) void logoutAccount(accountId).then(() => (logoutAccountId = null));
+          }}>{$i18n.t('settings.logout')}</Button
+        >
+      </div>
+    </div>
+  {/if}
+</DialogFrame>
+
 <style>
   .account-tool {
     position: relative;
@@ -166,5 +234,21 @@
     bottom: -0.125rem;
     position: absolute;
     right: -0.125rem;
+  }
+
+  .logout-dialog {
+    display: grid;
+    gap: var(--space-300);
+  }
+
+  .logout-dialog h2,
+  .logout-dialog p {
+    margin: 0;
+  }
+
+  .dialog-actions {
+    display: flex;
+    gap: var(--space-200);
+    justify-content: end;
   }
 </style>
