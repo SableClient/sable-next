@@ -13,7 +13,13 @@
     preview?: string | null;
   };
 
-  let { open = $bindable(false), preview = null, ...actions }: Props = $props();
+  let {
+    open = $bindable(false),
+    preview = null,
+    loadImagePacks,
+    roomId,
+    ...actions
+  }: Props = $props();
 
   function run(action: () => void): void {
     open = false;
@@ -37,7 +43,7 @@
   {/if}
   <IconContext values={{ 'aria-hidden': 'true' }}>
     {#if actions.onReact}
-      <MessageQuickReactions count={8} onReact={react} roomy />
+      <MessageQuickReactions count={8} {loadImagePacks} onReact={react} {roomId} roomy />
     {/if}
     <div class="sheet-list">
       {#each messageMenuRows(actions) as row (row.key)}

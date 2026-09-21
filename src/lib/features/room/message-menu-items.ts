@@ -1,4 +1,5 @@
 import type { Component } from 'svelte';
+import type { ImagePackView } from '#src/generated/protocol';
 
 import BookmarkIcon from 'phosphor-svelte/lib/BookmarkSimpleIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
@@ -20,6 +21,8 @@ import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 
 export type MessageActions = {
+  loadImagePacks?: (roomId: string) => Promise<ImagePackView[]>;
+  roomId?: string;
   onReact?: (emoji: string) => void;
   onAddReaction?: () => void;
   onViewReactions?: () => void;

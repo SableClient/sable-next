@@ -165,6 +165,7 @@
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
+    min-width: 0;
     width: 100%;
   }
 

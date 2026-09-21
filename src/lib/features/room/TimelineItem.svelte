@@ -270,6 +270,8 @@
           : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
     return {
+      loadImagePacks: core.commands.imagePacks,
+      roomId,
       onReact: onToggleReaction
         ? (
             emoji: string,
@@ -552,7 +554,6 @@
 {#snippet actionLayer()}
   {#if actionable && (engaged || actionsPinned)}
     <MessageActions
-      {roomId}
       onPickerOpenChange={pinActions}
       onOverflowOpenChange={pinActions}
       {...actions}
@@ -1329,7 +1330,7 @@
   .message-content {
     display: grid;
     flex: 1;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
   }
 
@@ -1344,8 +1345,7 @@
 
   .message-content > :global(.read-receipt-stack) {
     align-self: end;
-    grid-column: 2;
-    margin-inline-start: var(--space-150);
+    grid-column: 1;
   }
 
   .message header {

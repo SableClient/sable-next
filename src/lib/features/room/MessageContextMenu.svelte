@@ -38,7 +38,12 @@
         <IconContext values={{ 'aria-hidden': 'true' }}>
           {#if actions.onReact}
             {@const react = actions.onReact}
-            <MessageQuickReactions count={4} onReact={react} />
+            <MessageQuickReactions
+              count={4}
+              loadImagePacks={actions.loadImagePacks}
+              onReact={react}
+              roomId={actions.roomId}
+            />
           {/if}
           {#each messageMenuRows(actions) as row (row.key)}
             {@const RowIcon = row.icon}

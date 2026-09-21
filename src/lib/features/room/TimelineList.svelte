@@ -725,6 +725,7 @@
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
     position: relative;
   }
 
@@ -747,6 +748,7 @@
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
     position: relative;
   }
 
@@ -755,6 +757,7 @@
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
   }
 
   .timeline-loading {
@@ -795,6 +798,7 @@
     flex: 1;
     flex-direction: column;
     min-height: 0;
+    min-width: 0;
     overflow: auto;
     overflow-anchor: none;
     overscroll-behavior-y: contain;
@@ -842,6 +846,7 @@
 
     flex: 0 0 auto;
     margin-top: auto;
+    min-width: 0;
     position: relative;
     width: 100%;
   }
