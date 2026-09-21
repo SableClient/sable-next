@@ -16,21 +16,30 @@
     emoticon: 'settings.composerEmoteButton',
   };
 
-  function move(index: number, offset: number): void {
-    const target = index + offset;
-    if (target < 0 || target >= preferences.composerButtonOrder.length) return;
+  let shown = $derived(
+    preferences.composerButtonOrder.filter(
+      (button) =>
+        (button === 'gif' && preferences.composerGifButton) ||
+        (button === 'sticker' && preferences.composerStickerButton) ||
+        (button === 'emoticon' && preferences.composerEmoteButton)
+    )
+  );
+
+  function move(button: ComposerButton, index: number, offset: number): void {
+    const target = shown[index + offset];
+    if (target === undefined) return;
     const next = [...preferences.composerButtonOrder];
-    const source = next[index];
-    const destination = next[target];
-    if (source === undefined || destination === undefined) return;
-    next[index] = destination;
-    next[target] = source;
+    const sourceIndex = next.indexOf(button);
+    const targetIndex = next.indexOf(target);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    next[sourceIndex] = target;
+    next[targetIndex] = button;
     setPreference('composerButtonOrder', next);
   }
 </script>
 
 <ol class="button-order">
-  {#each preferences.composerButtonOrder as button, index (button)}
+  {#each shown as button, index (button)}
     <li>
       <span>{$i18n.t(labels[button])}</span>
       <div>
@@ -39,14 +48,14 @@
           size="small"
           disabled={index === 0}
           label={$i18n.t('personas.moveUp', { name: $i18n.t(labels[button]) })}
-          onclick={() => move(index, -1)}><ArrowUpIcon /></IconButton
+          onclick={() => move(button, index, -1)}><ArrowUpIcon /></IconButton
         >
         <IconButton
           variant="ghost"
           size="small"
-          disabled={index === preferences.composerButtonOrder.length - 1}
+          disabled={index === shown.length - 1}
           label={$i18n.t('personas.moveDown', { name: $i18n.t(labels[button]) })}
-          onclick={() => move(index, 1)}><ArrowDownIcon /></IconButton
+          onclick={() => move(button, index, 1)}><ArrowDownIcon /></IconButton
         >
       </div>
     </li>
