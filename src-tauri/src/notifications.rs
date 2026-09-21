@@ -855,7 +855,7 @@ mod tests {
 
     #[test]
     fn failed_capability_lookup_does_not_select_a_fallback_gateway() {
-        assert!(super::server_vapid_from_response(Err(super::CommandErr::Unavailable)).is_err());
+        super::server_vapid_from_response(Err(super::CommandErr::Unavailable)).unwrap_err();
         assert!(matches!(
             super::server_vapid_from_response(Ok(
                 sable_core::protocol::CommandOk::WebPusherSupport { vapid: None }
