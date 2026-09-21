@@ -1173,6 +1173,25 @@ mod tests {
     }
 
     #[test]
+    fn a_native_conversation_message_carries_its_event_identity() {
+        let message = super::conversation_message(
+            &Line {
+                sender_name: "Ada".to_owned(),
+                sender_key: "@ada:example.org".to_owned(),
+                body: "hello".to_owned(),
+                at: 1,
+                event_id: Some("$event".to_owned()),
+            },
+            true,
+        )
+        .expect("a native conversation message");
+        let wire = serde_json::to_value(message).expect("the plugin message is serializable");
+
+        assert_eq!(wire["eventId"], "$event");
+        assert_eq!(wire["encrypted"], true);
+    }
+
+    #[test]
     fn an_encrypted_room_needs_its_own_permission() {
         assert!(shows_content(false, true, false));
         assert!(!shows_content(true, true, false));
