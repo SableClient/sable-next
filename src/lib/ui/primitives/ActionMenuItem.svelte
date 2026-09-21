@@ -34,8 +34,8 @@
   ]);
 
   function select(): void {
-    if (surface.sheet && closeOnSelect) surface.close();
     onSelect();
+    if (surface.sheet && closeOnSelect) surface.close();
   }
 </script>
 
