@@ -10,20 +10,17 @@ mod sticky;
 use std::sync::Arc;
 use std::time::Duration;
 
-use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
 use matrix_sdk::ruma::api::client::rtc::RtcTransport;
-use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{Client, Room};
-use serde_json::Value;
 
 use crate::protocol::{
     CallMemberView, CallMode, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
@@ -69,56 +66,8 @@ async fn discovered_service_urls(client: &Client) -> Vec<String> {
         .collect()
 }
 
-const SLOT_ID: &str = crate::view::CALL_SLOT_ID;
-const SLOT_TYPES: [&str; 2] = [crate::view::RTC_SLOT_TYPE, "m.rtc.slot"];
-
-fn slot_is_open(content: &Value) -> bool {
-    content.get("status").and_then(Value::as_str) == Some("open")
-        && content
-            .get("application")
-            .and_then(|application| application.get("type"))
-            .and_then(Value::as_str)
-            == Some(APPLICATION_SUFFIX)
-}
-
-async fn stored_slot(room: &Room, event_type: &str) -> Option<Value> {
-    let raw = room
-        .get_state_event(event_type.into(), SLOT_ID)
-        .await
-        .ok()
-        .flatten()?;
-    let content = match raw {
-        RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
-        RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
-    };
-    content.ok().flatten()
-}
-
-async fn fetched_slot(room: &Room, event_type: &str) -> Option<Value> {
-    let response = room
-        .client()
-        .send(get_state_event_for_key::v3::Request::new(
-            room.room_id().to_owned(),
-            event_type.into(),
-            SLOT_ID.to_owned(),
-        ))
-        .await
-        .ok()?;
-    let value = serde_json::from_str::<Value>(response.event_or_content.get()).ok()?;
-    Some(value.get("content").cloned().unwrap_or(value))
-}
-
-async fn has_open_slot(room: &Room) -> bool {
-    for event_type in SLOT_TYPES {
-        let content = match stored_slot(room, event_type).await {
-            Some(content) => Some(content),
-            None => fetched_slot(room, event_type).await,
-        };
-        if content.is_some_and(|content| slot_is_open(&content)) {
-            return true;
-        }
-    }
-    false
+const fn can_join_call(state_allowed: bool, sticky_available: bool, message_allowed: bool) -> bool {
+    state_allowed || (sticky_available && message_allowed)
 }
 
 fn membership_state_key(
@@ -187,8 +136,7 @@ impl Core {
                 .client()
                 .unstable_features()
                 .await
-                .is_ok_and(|features| features.contains(&"org.matrix.msc4354".into()))
-            && has_open_slot(&room).await;
+                .is_ok_and(|features| features.contains(&"org.matrix.msc4354".into()));
         if !has_focus && sticky_available {
             let mut sync = sticky::StickySync::new(self.allocate_subscription().0);
             if let Ok(events) = sync.sync(&room, Duration::ZERO).await {
@@ -201,8 +149,11 @@ impl Core {
                         .is_empty();
             }
         }
-        let can_join = state_allowed
-            || (sticky_available && levels.user_can_send_message(&user_id, "m.rtc.member".into()));
+        let can_join = can_join_call(
+            state_allowed,
+            sticky_available,
+            levels.user_can_send_message(&user_id, "m.rtc.member".into()),
+        );
 
         Ok(CommandOk::CallSupport(CallSupportView {
             has_focus,
@@ -573,23 +524,12 @@ mod tests {
     use matrix_sdk::ruma::{device_id, owned_user_id, user_id};
 
     use super::membership::CallMember;
-    use super::{member_views, membership_state_key, pick_focus, slot_is_open};
+    use super::{can_join_call, member_views, membership_state_key, pick_focus};
 
     #[test]
-    fn test_only_an_open_call_slot_admits_a_sticky_join() {
-        assert!(slot_is_open(&serde_json::json!({
-            "status": "open",
-            "application": {"type": "m.call"},
-        })));
-        assert!(!slot_is_open(&serde_json::json!({
-            "status": "closed",
-            "application": {"type": "m.call"},
-        })));
-        assert!(!slot_is_open(&serde_json::json!({
-            "status": "open",
-            "application": {"type": "m.thirdroom"},
-        })));
-        assert!(!slot_is_open(&serde_json::json!({})));
+    fn test_sticky_membership_can_join_without_legacy_state_permission() {
+        assert!(can_join_call(false, true, true));
+        assert!(!can_join_call(false, true, false));
     }
 
     #[test]
