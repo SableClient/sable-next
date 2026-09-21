@@ -785,6 +785,7 @@
           media={prescreenMedia}
           joining={call.lifecycle === 'joining'}
           canJoin={callable}
+          hasPermission={callSupport?.can_join ?? false}
           onChange={(media: CallMedia) => (prescreenMedia = media)}
           onJoin={() => void joinCall()}
         />

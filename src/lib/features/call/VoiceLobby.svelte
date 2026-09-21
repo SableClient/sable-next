@@ -13,11 +13,13 @@
     media: CallMedia;
     joining: boolean;
     canJoin: boolean;
+    hasPermission: boolean;
     onChange: (media: CallMedia) => void;
     onJoin: () => void;
   }
 
-  let { participants, members, media, joining, canJoin, onChange, onJoin }: Props = $props();
+  let { participants, members, media, joining, canJoin, hasPermission, onChange, onJoin }: Props =
+    $props();
 
   let inVoice = $derived(
     participants.map((userId) => {
@@ -49,7 +51,7 @@
 
     {#if canJoin}
       <CallDevicePreview {media} {joining} {onChange} {onJoin} />
-    {:else}
+    {:else if !hasPermission}
       <p class="empty">{$i18n.t('call.lobbyNoPermission')}</p>
     {/if}
   </div>
