@@ -13,6 +13,12 @@ concurrency:
 
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
+  CARGO_INCREMENTAL: 0
+  SCCACHE_BUCKET: sccache
+  SCCACHE_S3_KEY_PREFIX: sable-next
+  SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
+  SCCACHE_REGION: us-east-1
+  SCCACHE_S3_USE_SSL: "true"
 jobs:
   build:
     name: Build web assets
@@ -20,6 +26,10 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+    env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
     steps:
       - name: Check out repository
         uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
