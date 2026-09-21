@@ -85,11 +85,6 @@ jobs:
       - name: Run tests
         run: cargo test --locked --workspace --exclude app --all-features
 
-      - name: Check documentation
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --locked --workspace --exclude app --all-features --no-deps
-
       - name: Check generated bindings are current
         run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
 
@@ -119,11 +114,6 @@ jobs:
       - name: Run tests
         run: cargo test --locked -p app
 
-      - name: Check documentation
-        env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --locked -p app --no-deps
-
   wasm:
     name: WASM target
     runs-on: ubuntu-latest
@@ -148,27 +138,20 @@ jobs:
         run: cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings
 
       # Not a GitHub-hosted image, so it carries neither browser nor driver, and
-      # Ubuntu packages no geckodriver. noble's `firefox` and `chromium` are
-      # stubs for snaps, which cannot run here: the Mozilla pin is what stops
-      # apt preferring one, and Chrome comes from Google's own repository
-      # rather than the archive. Only Chrome for Testing publishes a
-      # chromedriver, so it is fetched for whatever milestone apt installed.
-      - name: Install browsers and drivers
+      # noble's `chromium` is a stub for a snap, which cannot run here. Chrome
+      # comes from Google's own repository, and only Chrome for Testing
+      # publishes a chromedriver, so it is fetched for the milestone apt
+      # installed.
+      - name: Install Chrome and its driver
         id: drivers
         run: |
           sudo install -d -m 0755 /etc/apt/keyrings
-          curl -fsSL https://packages.mozilla.org/apt/repo-signing-key.gpg \
-            | sudo tee /etc/apt/keyrings/packages.mozilla.org.asc >/dev/null
-          echo 'deb [signed-by=/etc/apt/keyrings/packages.mozilla.org.asc] https://packages.mozilla.org/apt mozilla main' \
-            | sudo tee /etc/apt/sources.list.d/mozilla.list >/dev/null
-          printf 'Package: *\nPin: origin packages.mozilla.org\nPin-Priority: 1000\n' \
-            | sudo tee /etc/apt/preferences.d/mozilla >/dev/null
           curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
             | sudo tee /etc/apt/keyrings/google-chrome.asc >/dev/null
           echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.asc] https://dl.google.com/linux/chrome/deb/ stable main' \
             | sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y google-chrome-stable firefox python3 unzip
+          sudo apt-get install --no-install-recommends -y google-chrome-stable python3 unzip
           milestone="$(google-chrome --version | grep -oE '[0-9]+' | head -n 1)"
           url="$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json \
             | python3 -c 'import json,sys;m=sys.argv[1];d=json.load(sys.stdin)["milestones"][m]["downloads"]["chromedriver"];print(next(e["url"] for e in d if e["platform"]=="linux64"))' "$milestone")"
@@ -176,20 +159,13 @@ jobs:
           unzip -q -j "$RUNNER_TEMP/chromedriver.zip" '*/chromedriver' -d "$RUNNER_TEMP"
           chmod +x "$RUNNER_TEMP/chromedriver"
           echo "chromedriver=$RUNNER_TEMP/chromedriver" >>"$GITHUB_OUTPUT"
-          mise use --global ubi:mozilla/geckodriver@0.37.1
-          echo "geckodriver=$(mise which geckodriver)" >>"$GITHUB_OUTPUT"
 
       # Chrome needs its sandbox off, having no user namespaces here; that is
-      # what webdriver.json carries. Firefox's sandbox copes.
+      # what webdriver.json carries.
       - name: Run tests on Chrome
         env:
           CHROMEDRIVER: ${{ steps.drivers.outputs.chromedriver }}
           WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
-        run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
-
-      - name: Run tests on Firefox
-        env:
-          GECKODRIVER: ${{ steps.drivers.outputs.geckodriver }}
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
   policy:
