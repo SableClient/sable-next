@@ -35,7 +35,6 @@ env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
   CARGO_TERM_COLOR: always
-  # Full debuginfo costs 1.3 GB of rustc peak on sable-core. See rules/rust-core.md.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CARGO_PROFILE_TEST_DEBUG: line-tables-only
   SCCACHE_BUCKET: sccache
