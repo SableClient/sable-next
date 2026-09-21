@@ -20,15 +20,11 @@ env:
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: ${{ github.repository }}
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
-  # Empty resets cargo to no wrapper; fork PRs get no secrets.
-  RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
   SCCACHE_BUCKET: sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
   SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
   SCCACHE_REGION: us-east-1
   SCCACHE_S3_USE_SSL: "true"
-  AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
 jobs:
   setup-release:
     name: Resolve release target
@@ -77,6 +73,9 @@ jobs:
     permissions:
       contents: write
     env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       # Absent on forks, which builds an app with error reporting switched off.
@@ -184,6 +183,9 @@ jobs:
     permissions:
       contents: write
     env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
       ARCH: x86_64
       MISE_DISABLE_TOOLS: aqua:WebAssembly/binaryen,ubi:rustwasm/wasm-bindgen
       # rustc peaks at several GB per crate while compiling the CEF runtime.
@@ -277,6 +279,9 @@ jobs:
     permissions:
       contents: write
     env:
+      RUSTC_WRAPPER: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID != '' && 'sccache' || '' }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.SCCACHE_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.SCCACHE_AWS_SECRET_ACCESS_KEY }}
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       MISE_ENV: tauri
