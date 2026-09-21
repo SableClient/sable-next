@@ -149,6 +149,10 @@
     placeholder = false,
     placeholderCharacters = 35,
   }: Props = $props();
+
+  let timelineEmoteSize = $derived(
+    preferences.timelineEmoteSize === 'default' ? '1em' : `${preferences.timelineEmoteSize}px`
+  );
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   let profile = $state<ProfileView | null>(null);
@@ -674,6 +678,7 @@
     style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
     style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
     style:--name-color-on-dark={senderColors.nameColorDark ?? undefined}
+    style:--timeline-emote-size={timelineEmoteSize}
     style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
     style:transition={swipe.dragging ? 'none' : undefined}
     onpointerdown={rowPress.start}

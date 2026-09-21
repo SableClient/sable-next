@@ -12,6 +12,7 @@
     label: string;
     image?: string;
     imageClass?: ClassValue;
+    labelClass?: ClassValue;
     disabled?: boolean;
   };
 
@@ -66,7 +67,7 @@
                   aria-hidden="true"
                 />
               {/if}
-              <span class="selection-label">{item.label}</span>
+              <span class={['selection-label', item.labelClass]}>{item.label}</span>
               {#if selected}<CheckIcon class="select-check" aria-hidden="true" />{/if}
             {/snippet}
           </BitsSelect.Item>
@@ -87,9 +88,16 @@
     width: 100%;
   }
 
-  :global(.select-text),
+  :global(.select-text) {
+    text-transform: none;
+  }
+
   :global(.selection-label) {
     text-transform: capitalize;
+  }
+
+  :global(.selection-label.literal-label) {
+    text-transform: none;
   }
 
   :global(.select-caret),

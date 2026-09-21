@@ -132,6 +132,7 @@
                 items={setting.options.map((option) => ({
                   value: option.value,
                   label: option.literal ? option.label : $i18n.t(option.label),
+                  labelClass: option.literal ? 'literal-label' : undefined,
                 }))}
                 onValueChange={(value) => {
                   setPreference(key, value as Preferences[typeof key]);

@@ -48,7 +48,13 @@
       image.dataset.mediaHandled = '';
 
       const source = image.dataset.sableMxcSrc ?? image.getAttribute('src') ?? '';
-      const emoticon = image.dataset.mxEmoticon !== undefined;
+      const emoticon =
+        image.dataset.mxEmoticon !== undefined ||
+        (source.startsWith('mxc:') &&
+          (image.getAttribute('alt')?.startsWith(':') === true ||
+            image.getAttribute('title')?.startsWith(':') === true ||
+            (image.hasAttribute('height') && image.hasAttribute('title'))));
+      if (emoticon) image.dataset.mxEmoticon = '';
       const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
       if (scheme === 'http:' || scheme === 'https:') {
         image.onerror = () => {
@@ -606,7 +612,7 @@
   }
 
   .formatted-body :global(img[data-mx-emoticon]) {
-    height: 1em;
+    height: var(--timeline-emote-size, 1em);
   }
 
   .formatted-body :global(table) {

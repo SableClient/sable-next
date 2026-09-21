@@ -451,6 +451,21 @@ export const settingsCategories: SettingsCategory[] = [
     icon: ChatsCircleIcon,
     items: [
       {
+        key: 'timelineEmoteSize',
+        icon: SmileyIcon,
+        name: 'settings.timelineEmoteSize',
+        description: 'settings.timelineEmoteSizeHint',
+        type: 'select',
+        options: [
+          { value: 'default', label: 'settings.timelineEmoteSizeDefault' },
+          { value: '20', label: '20 px', literal: true },
+          { value: '24', label: '24 px', literal: true },
+          { value: '32', label: '32 px', literal: true },
+          { value: '48', label: '48 px', literal: true },
+          { value: '64', label: '64 px', literal: true },
+        ],
+      },
+      {
         key: 'hideMembershipEvents',
         icon: UsersIcon,
         name: 'settings.hideMembershipEvents',

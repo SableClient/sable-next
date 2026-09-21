@@ -194,6 +194,20 @@ test('resolves an mxc emoticon through the core media command', async () => {
   await unmount(instance);
 });
 
+test('recognises a sanitised custom emote from its Matrix image attributes', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: {
+      html: '<img src="mxc://example.org/emoji" alt=":party:" title=":party:" height="32">',
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('img')?.dataset.mxEmoticon).toBe('');
+  await unmount(instance);
+});
+
 test('defers an mxc emoticon source until its Blob URL is ready', async () => {
   core.fetchMedia.mockReturnValue(new Promise(() => {}));
   const instance = mount(FormattedBody, {

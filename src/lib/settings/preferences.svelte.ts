@@ -5,6 +5,7 @@ import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
+export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
@@ -22,6 +23,7 @@ export interface Preferences {
   layout: TimelineLayout;
   alignOwnMessages: boolean;
   messageSpacing: MessageSpacing;
+  timelineEmoteSize: TimelineEmoteSize;
   theme: ThemeMode;
   underlineLinks: boolean;
   reducedMotion: boolean;
@@ -157,6 +159,7 @@ const ENUMS = {
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
   messageSpacing: ['compact', 'cozy', 'roomy'],
+  timelineEmoteSize: ['default', '20', '24', '32', '48', '64'],
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
@@ -189,6 +192,7 @@ const DEFAULTS: Preferences = {
   layout: 'modern',
   alignOwnMessages: true,
   messageSpacing: 'cozy',
+  timelineEmoteSize: 'default',
   theme: 'system',
   underlineLinks: true,
   reducedMotion: prefersReducedMotion(),
