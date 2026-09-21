@@ -15,6 +15,17 @@
   }
 
   let { personas, selected, scope, onScope, onChoose }: Props = $props();
+  let query = $state('');
+  let filteredPersonas = $derived(
+    personas.filter((persona) => {
+      const needle = query.trim().toLocaleLowerCase();
+      return (
+        needle === '' ||
+        persona.display_name.toLocaleLowerCase().includes(needle) ||
+        persona.id.toLocaleLowerCase().includes(needle)
+      );
+    })
+  );
 
   const scopes = [
     { id: 'room', label: 'personas.scopeRoom' },
@@ -39,6 +50,15 @@
     {/each}
   </div>
 
+  <input
+    class="persona-search"
+    bind:value={query}
+    type="search"
+    autocomplete="off"
+    placeholder={$i18n.t('search.placeholder')}
+    aria-label={$i18n.t('search.title')}
+  />
+
   <ul class="persona-options">
     <li>
       <button
@@ -53,7 +73,7 @@
         {#if !selected}<CheckIcon />{/if}
       </button>
     </li>
-    {#each personas as persona (persona.id)}
+    {#each filteredPersonas as persona (persona.id)}
       <li>
         <button
           type="button"
@@ -106,6 +126,16 @@
     max-height: 18rem;
     overflow-y: auto;
     padding: 0;
+  }
+
+  .persona-search {
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
+    color: inherit;
+    font: inherit;
+    margin-inline: var(--space-200);
+    padding: var(--space-200) var(--space-300);
   }
 
   .persona-option {

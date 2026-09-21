@@ -26,7 +26,7 @@
 
   let desktop = $derived(appLayout.matches);
   let open = $state(false);
-  let scope = $state<'room' | 'account'>('room');
+  let scope = $state<'room' | 'account'>('account');
 
   let selected = $derived(personas.selectionFor(scope === 'room' ? roomId : null));
   let active = $derived(
@@ -42,7 +42,10 @@
 
   function handleOpenChange(next: boolean): void {
     open = next;
-    if (next) void personas.load();
+    if (next) {
+      scope = 'account';
+      void personas.load();
+    }
   }
 
   function openSheet(): void {
