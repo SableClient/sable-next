@@ -108,8 +108,12 @@
     flex: 0 0 auto;
     gap: var(--space-300);
     justify-content: flex-end;
-    pointer-events: auto;
+    pointer-events: none;
     width: 100%;
+  }
+
+  .actions :global(.btn) {
+    pointer-events: auto;
   }
 
   @media (width >= 42rem) {

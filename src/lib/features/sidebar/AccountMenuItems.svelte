@@ -185,7 +185,7 @@
 
   .account-row[data-active='true'] .account-identity small {
     color: inherit;
-    opacity: var(--opacity-secondary);
+    opacity: var(--opacity-p500);
   }
 
   :global(.active-account) {
