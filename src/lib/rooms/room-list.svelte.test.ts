@@ -277,6 +277,33 @@ test('persists the live room list for the next launch', async () => {
   vi.useRealTimers();
 });
 
+test('defers room-list snapshot writes until presentation resumes', async () => {
+  vi.useFakeTimers();
+  const stored = stubLocalStorage();
+  const room = { room_id: '!live:example.org', name: 'Live' } as RoomSummary;
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  roomList.setPresentationActive(false);
+  await roomList.start();
+  vi.advanceTimersByTime(1_000);
+  expect(stored.has('sable.room-list.acct')).toBe(false);
+
+  roomList.setPresentationActive(true);
+  expect(JSON.parse(stored.get('sable.room-list.acct') ?? '[]')).toEqual([room]);
+
+  roomList.stop();
+  vi.useRealTimers();
+});
+
 test('a muted room that drops out of a reset and returns stays muted', async () => {
   const muted = {
     room_id: '!muted:example.org',

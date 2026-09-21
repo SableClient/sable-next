@@ -68,9 +68,16 @@ export class RoomList {
   private publishedLoadingModes = $state.raw<ReadonlySet<string>>(new Set());
   private snapshotAccountId: string | null = null;
   private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
+  private snapshotDirty = false;
+  private presentationActive = true;
   private live = false;
 
   constructor(private readonly core: CoreClient) {}
+
+  setPresentationActive(active: boolean): void {
+    this.presentationActive = active;
+    if (active) this.flushSnapshot();
+  }
 
   typingUserIds(roomId: string): readonly string[] {
     return this.typingUsers.get(roomId) ?? NOBODY_TYPING;
@@ -118,7 +125,7 @@ export class RoomList {
     this.generation += 1;
     this.startPromise = null;
     untrack(() => {
-      this.flushSnapshot();
+      this.flushSnapshot(true);
     });
     this.live = false;
     this.snapshotAccountId = null;
@@ -200,17 +207,30 @@ export class RoomList {
   }
 
   private scheduleSnapshotWrite(): void {
-    if (this.snapshotAccountId === null || this.snapshotWriteTimer !== undefined) return;
+    this.snapshotDirty = true;
+    if (
+      !this.presentationActive ||
+      this.snapshotAccountId === null ||
+      this.snapshotWriteTimer !== undefined
+    )
+      return;
     this.snapshotWriteTimer = setTimeout(() => {
       this.flushSnapshot();
     }, SNAPSHOT_WRITE_DELAY_MS);
   }
 
-  private flushSnapshot(): void {
+  private flushSnapshot(force = false): void {
     if (this.snapshotWriteTimer !== undefined) clearTimeout(this.snapshotWriteTimer);
     this.snapshotWriteTimer = undefined;
-    if (this.snapshotAccountId === null || !this.live) return;
+    if (
+      !this.snapshotDirty ||
+      this.snapshotAccountId === null ||
+      !this.live ||
+      (!force && !this.presentationActive)
+    )
+      return;
     writeRoomListSnapshot(this.snapshotAccountId, this.rooms);
+    this.snapshotDirty = false;
   }
 
   private setRooms(rooms: RoomSummary[]): void {

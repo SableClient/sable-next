@@ -87,6 +87,13 @@ export async function watchMaximized(onChange: (maximized: boolean) => void): Pr
   });
 }
 
+export async function watchWindowFocus(onChange: (focused: boolean) => void): Promise<() => void> {
+  if (!supportsDesktopWindow()) return () => {};
+  return (await currentWindow()).onFocusChanged((event) => {
+    onChange(event.payload);
+  });
+}
+
 export async function watchHiddenToTray(onHidden: () => void): Promise<() => void> {
   if (!supportsDesktopWindow()) return () => {};
 

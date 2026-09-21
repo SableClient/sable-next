@@ -31,6 +31,7 @@
   } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
+  import { watchWindowFocus } from '#lib/platform/window-decorations.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
   import idleFavicon from '#lib/assets/favicon.png';
@@ -468,14 +469,35 @@
     notifications.retireRead(roomList.rooms, roomList.notificationsFor);
   });
 
-  let visible = $state(true);
+  let documentVisible = $state(true);
+  let windowFocused = $state(true);
+  let visible = $derived(documentVisible && windowFocused);
 
   $effect(() => {
     const read = () => {
-      visible = document.visibilityState === 'visible';
+      documentVisible = document.visibilityState === 'visible';
     };
     read();
     return on(document, 'visibilitychange', read);
+  });
+
+  $effect(() => {
+    let stopped = false;
+    let unlisten = () => {};
+    void watchWindowFocus((focused) => {
+      windowFocused = focused;
+    }).then((stop) => {
+      if (stopped) stop();
+      else unlisten = stop;
+    });
+    return () => {
+      stopped = true;
+      unlisten();
+    };
+  });
+
+  $effect(() => {
+    roomList.setPresentationActive(visible);
   });
 
   $effect(() => {

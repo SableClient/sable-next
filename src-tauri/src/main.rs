@@ -121,7 +121,6 @@ fn cef_command_line_args() -> Vec<(String, Option<String>)> {
         ("use-angle".into(), Some("vulkan".into())),
         ("--disable-font-subpixel-positioning".into(), None),
         ("--enable-font-antialiasing".into(), None),
-        ("--disable-background-timer-throttling".into(), None),
         ("--skia-resource-cache-limit-mb".into(), Some("64".into())),
         ("--renderer-process-limit".into(), Some("2".into())),
         (
@@ -132,7 +131,7 @@ fn cef_command_line_args() -> Vec<(String, Option<String>)> {
         (
             "disable-features".into(),
             Some(
-                "SpareRendererForSitePerProcess,IntensiveWakeUpThrottling,AutofillActorMode,\
+                "SpareRendererForSitePerProcess,AutofillActorMode,\
                  GlicActorUi,LensOverlay,LocalNetworkAccessChecks,\
                  LocalNetworkAccessChecksWebSocket,LocalNetworkAccessChecksWebRTC"
                     .into(),
@@ -297,4 +296,25 @@ fn main() {
     let _deep_link_socket = app_lib::deep_link_ipc::bind_and_listen();
 
     app_lib::run();
+}
+
+#[cfg(all(test, feature = "cef", target_os = "linux"))]
+mod tests {
+    use super::cef_command_line_args;
+
+    #[test]
+    fn cef_keeps_background_throttling_enabled() {
+        let args = cef_command_line_args();
+
+        assert!(
+            args.iter()
+                .all(|(name, _)| name != "--disable-background-timer-throttling")
+        );
+        assert!(args.iter().all(|(name, value)| {
+            name != "disable-features"
+                || !value
+                    .as_deref()
+                    .is_some_and(|features| features.contains("IntensiveWakeUpThrottling"))
+        }));
+    }
 }
