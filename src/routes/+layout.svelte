@@ -35,6 +35,7 @@
     applyTheme,
     resolveTheme,
   } from '#lib/settings/theme.js';
+  import { shouldReduceMotion } from '#lib/ui/motion.js';
 
   interface Props {
     children: Snippet;
@@ -89,7 +90,7 @@
   $effect(() => {
     document.documentElement.dataset.fontScale = preferences.fontScale;
     document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
-    document.documentElement.dataset.reducedMotion = preferences.reducedMotion ? 'on' : 'off';
+    document.documentElement.dataset.reducedMotion = shouldReduceMotion() ? 'on' : 'off';
     document.documentElement.dataset.twitterEmoji = preferences.twitterEmoji ? 'on' : 'off';
     document.documentElement.dataset.blurMedia = preferences.blurMedia ? 'on' : 'off';
     document.documentElement.dataset.blurAvatars = preferences.blurAvatars ? 'on' : 'off';
