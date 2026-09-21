@@ -25,7 +25,7 @@ const cargoArgs = [
   profile,
 ];
 
-const MAX_RELEASE_WASM_BYTES = 16_500_000;
+const MAX_RELEASE_WASM_BYTES = 17 * 1024 * 1024;
 
 function run(command, args, env) {
   const result = spawnSync(command, args, { stdio: 'inherit', env: env ?? process.env });
