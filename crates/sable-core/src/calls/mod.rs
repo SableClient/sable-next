@@ -10,17 +10,20 @@ mod sticky;
 use std::sync::Arc;
 use std::time::Duration;
 
+use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::delayed_events::{
     DelayParameters, delayed_state_event, update_delayed_event,
 };
 use matrix_sdk::ruma::api::client::rtc::RtcTransport;
+use matrix_sdk::ruma::api::client::state::get_state_event_for_key;
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::StateEventType;
 use matrix_sdk::ruma::events::call::member::{CallMemberEventContent, CallMemberStateKey};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{Client, Room};
+use serde_json::Value;
 
 use crate::protocol::{
     CallMemberView, CallMode, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
@@ -51,11 +54,7 @@ fn pick_focus(
         .or_else(|| configured.filter(|url| !url.trim().is_empty()))
 }
 
-async fn discovered_service_urls(client: &Client) -> Vec<String> {
-    let Ok(Some(transports)) = client.discover_rtc_transports().await else {
-        return Vec::new();
-    };
-
+fn livekit_service_urls(transports: Vec<RtcTransport>) -> Vec<String> {
     transports
         .into_iter()
         .filter_map(|transport| match transport {
@@ -64,6 +63,108 @@ async fn discovered_service_urls(client: &Client) -> Vec<String> {
         })
         .filter(|url| !url.trim().is_empty())
         .collect()
+}
+
+async fn discovered_service_urls(client: &Client) -> Vec<String> {
+    let endpoint = client
+        .discover_rtc_transports()
+        .await
+        .ok()
+        .flatten()
+        .map(livekit_service_urls)
+        .unwrap_or_default();
+    if !endpoint.is_empty() {
+        return endpoint;
+    }
+
+    client
+        .well_known_rtc_transports()
+        .await
+        .map(livekit_service_urls)
+        .unwrap_or_default()
+}
+
+const SLOT_ID: &str = crate::view::CALL_SLOT_ID;
+const SLOT_TYPES: [&str; 2] = [crate::view::RTC_SLOT_TYPE, "m.rtc.slot"];
+
+fn slot_is_open(content: &Value) -> bool {
+    content.get("status").and_then(Value::as_str) == Some("open")
+        && content
+            .get("application")
+            .and_then(|application| application.get("type"))
+            .and_then(Value::as_str)
+            == Some(APPLICATION_SUFFIX)
+}
+
+async fn stored_slot(room: &Room, event_type: &str) -> Option<Value> {
+    let raw = room
+        .get_state_event(event_type.into(), SLOT_ID)
+        .await
+        .ok()
+        .flatten()?;
+    let content = match raw {
+        RawAnySyncOrStrippedState::Sync(event) => event.get_field("content"),
+        RawAnySyncOrStrippedState::Stripped(event) => event.get_field("content"),
+    };
+    content.ok().flatten()
+}
+
+async fn fetched_slot(room: &Room, event_type: &str) -> Option<Value> {
+    let response = room
+        .client()
+        .send(get_state_event_for_key::v3::Request::new(
+            room.room_id().to_owned(),
+            event_type.into(),
+            SLOT_ID.to_owned(),
+        ))
+        .await
+        .ok()?;
+    let value = serde_json::from_str::<Value>(response.event_or_content.get()).ok()?;
+    Some(value.get("content").cloned().unwrap_or(value))
+}
+
+async fn has_open_slot(room: &Room) -> bool {
+    for event_type in SLOT_TYPES {
+        let content = match stored_slot(room, event_type).await {
+            Some(content) => Some(content),
+            None => fetched_slot(room, event_type).await,
+        };
+        if content.is_some_and(|content| slot_is_open(&content)) {
+            return true;
+        }
+    }
+    false
+}
+
+pub(super) async fn ensure_open_slot(room: &Room, encrypted: bool) -> bool {
+    if has_open_slot(room).await {
+        return true;
+    }
+    let client = room.client();
+    let Some(user_id) = client.user_id() else {
+        return false;
+    };
+    if !room
+        .power_levels_or_default()
+        .await
+        .user_can_send_state(user_id, crate::view::RTC_SLOT_TYPE.into())
+    {
+        return false;
+    }
+    let mut content =
+        serde_json::json!({"status": "open", "application": {"type": APPLICATION_SUFFIX}});
+    if encrypted && let Some(slot) = content.as_object_mut() {
+        slot.insert(
+            "encryption".to_owned(),
+            serde_json::json!({"type": "m.per_member"}),
+        );
+    }
+    let Ok(raw) = Raw::new(&content) else {
+        return false;
+    };
+    room.send_state_event_raw(crate::view::RTC_SLOT_TYPE, SLOT_ID, raw.cast_unchecked())
+        .await
+        .is_ok()
 }
 
 const fn can_join_call(state_allowed: bool, sticky_available: bool, message_allowed: bool) -> bool {

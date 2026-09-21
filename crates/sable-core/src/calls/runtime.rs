@@ -292,9 +292,13 @@ async fn publish(
     room: &Room,
     own: &CallMember,
     service: &str,
+    encrypted: bool,
 ) -> Result<Published, CommandErr> {
     let state_key = state_key(room, own);
     let delay = if own.mode == CallMode::Matrix2 {
+        if !super::ensure_open_slot(room, encrypted).await {
+            tracing::warn!("no open rtc slot and none could be opened");
+        }
         if core.delayed_events_supported().await.unwrap_or(false) {
             sticky::send_delayed(
                 &room.client(),
@@ -391,7 +395,7 @@ pub(super) async fn join(
         provision,
         delay,
         postpone,
-    } = publish(core, &room, &own, &service).await?;
+    } = publish(core, &room, &own, &service, encrypt_media).await?;
     let state_key = state_key(&room, &own);
     if core.session_generation.load(Ordering::SeqCst) != generation {
         drop(postpone);
