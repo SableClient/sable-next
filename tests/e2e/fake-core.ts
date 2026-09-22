@@ -171,15 +171,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       unread: 0,
       highlight: 0,
       latest_event: null,
-      space_children: [
-        {
-          room_id: '!room:example.test',
-          via: [],
-          order: null,
-          origin_server_ts: 0,
-          suggested: false,
-        },
-      ],
     };
     const betaSpace: RoomSummary = { ...alphaSpace, room_id: '!beta:example.test', name: 'Beta' };
     const gammaSpace: RoomSummary = {
@@ -853,10 +844,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'room_state_event',
         content:
           command.event_type === 'moe.sable.room.abbreviations'
-            ? (abbreviations.get(command.room_id) ??
-              (command.room_id === '!alpha:example.test'
-                ? { entries: [{ term: 'TBD', definition: 'To be determined' }] }
-                : null))
+            ? (abbreviations.get(command.room_id) ?? null)
             : command.event_type === 'm.room.tombstone' &&
                 command.room_id === tombstonedRoom.room_id
               ? { replacement_room: successorRoom.room_id, body: null }
