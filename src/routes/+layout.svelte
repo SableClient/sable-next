@@ -20,6 +20,7 @@
   import favicon from '#lib/assets/favicon.png';
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { trackInspectorShortcut } from '#lib/platform/devtools.js';
+  import { suppressNativeContextMenu } from '#lib/platform/context-menu.js';
   import { registerServiceWorker } from '#lib/platform/service-worker.js';
   import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import {
@@ -62,6 +63,7 @@
     const stopTrackingKeyboard = trackKeyboardInset();
     const stopGuardingClicks = guardTouchClicks();
     const stopInspectorShortcut = trackInspectorShortcut();
+    const stopSuppressingContextMenu = suppressNativeContextMenu();
     void registerServiceWorker();
     void core.start();
     return () => {
@@ -69,6 +71,7 @@
       stopTrackingKeyboard();
       stopGuardingClicks();
       stopInspectorShortcut();
+      stopSuppressingContextMenu();
       core.stop();
     };
   });
