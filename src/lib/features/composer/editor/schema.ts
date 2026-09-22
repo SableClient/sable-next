@@ -44,6 +44,13 @@ export const composerSchema = new Schema({
       parseDOM: HEADING_LEVELS.map((level) => ({ tag: `h${String(level)}`, attrs: { level } })),
       toDOM: (node) => [`h${String(node.attrs.level as number)}`, 0],
     },
+    subtext: {
+      content: 'inline*',
+      group: 'block',
+      defining: true,
+      parseDOM: [{ tag: 'sub[data-md="-#"]', priority: 60 }],
+      toDOM: () => ['sub', { 'data-md': '-#' }, 0],
+    },
     blockquote: {
       content: 'block+',
       group: 'block',

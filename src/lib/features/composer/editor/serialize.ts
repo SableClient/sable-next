@@ -69,6 +69,11 @@ const markdown = new MarkdownSerializer(
       state.write('---');
       state.closeBlock(node);
     },
+    subtext: (state, node) => {
+      state.write('-# ');
+      state.renderInline(node, false);
+      state.closeBlock(node);
+    },
     details: (state, node) => {
       state.renderContent(node);
     },
@@ -308,6 +313,28 @@ export function mentionsOf(doc: ProseMirrorNode): OutgoingMentions {
 
 const tokenizer = MarkdownIt('commonmark', { html: false }).enable(['strikethrough', 'table']);
 
+tokenizer.block.ruler.before(
+  'heading',
+  'subtext',
+  (state, startLine, _endLine, silent) => {
+    if (state.sCount[startLine] - state.blkIndent >= 4) return false;
+    const start = state.bMarks[startLine] + state.tShift[startLine];
+    const max = state.eMarks[startLine];
+    const match = /^-#[ \t]+(\S.*)$/.exec(state.src.slice(start, max));
+    if (!match) return false;
+    if (silent) return true;
+
+    state.line = startLine + 1;
+    state.push('subtext_open', 'sub', 1);
+    const inline = state.push('inline', '', 0);
+    inline.content = match[1].trim();
+    inline.children = [];
+    state.push('subtext_close', 'sub', -1);
+    return true;
+  },
+  { alt: ['paragraph', 'reference', 'blockquote'] }
+);
+
 const PARSE_TOKENS: Record<string, ParseSpec> = {
   paragraph: { block: 'paragraph' },
   blockquote: { block: 'blockquote' },
@@ -321,6 +348,7 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
     block: 'heading',
     getAttrs: (token) => ({ level: Math.min(6, Number(token.tag.slice(1))) }),
   },
+  subtext: { block: 'subtext' },
   code_block: { block: 'code_block', noCloseToken: true },
   fence: {
     block: 'code_block',

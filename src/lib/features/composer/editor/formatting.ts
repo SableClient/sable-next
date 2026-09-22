@@ -119,6 +119,7 @@ export const formattingInputRules: readonly InputRule[] = [
   lineTextblockRule(/(?:^|\uFFFC)(#{1,3})\s$/, nodes.heading, (match) => ({
     level: match[1].length,
   })),
+  lineTextblockRule(/(?:^|\uFFFC)-#\s$/, nodes.subtext, () => ({})),
   lineWrappingRule(/(?:^|\uFFFC)\s*>\s$/, nodes.blockquote),
   lineWrappingRule(/(?:^|\uFFFC)\s*([-+*])\s$/, nodes.bullet_list),
   lineWrappingRule(

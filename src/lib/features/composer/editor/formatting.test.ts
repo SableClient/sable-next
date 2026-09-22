@@ -84,6 +84,14 @@ test('a heading marker at the line start becomes a heading', () => {
   expect(view?.state.doc.textContent).toBe('Title');
 });
 
+test('a subtext marker at the line start becomes subtext', () => {
+  open();
+  type('-# small print');
+
+  expect(view?.state.doc.firstChild?.type.name).toBe('subtext');
+  expect(view?.state.doc.textContent).toBe('small print');
+});
+
 test('a bullet marker opens a list', () => {
   open();
   type('- item');

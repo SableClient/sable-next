@@ -73,6 +73,12 @@
     font-size: inherit;
   }
 
+  .editor :global(sub[data-md='-#']) {
+    color: var(--surface-var-on-container);
+    display: block;
+    font-size: var(--font-size-small);
+  }
+
   .editor :global(blockquote) {
     border-inline-start: calc(var(--border-width) * 3) solid var(--primary-main);
     margin: 0;

@@ -77,6 +77,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
             ]),
         ),
         ("div", HashSet::from(["data-mx-maths"])),
+        ("sub", HashSet::from(["data-md"])),
         (
             "img",
             HashSet::from(["src", "alt", "title", "width", "height", "data-mx-emoticon"]),
@@ -137,6 +138,7 @@ fn sanitizer() -> Builder<'static> {
                 .ok()
                 .map(|number| number.to_string().into()),
             (_, "class") => is_language_class(value).then(|| value.into()),
+            ("sub", "data-md") => (value == "-#").then(|| value.into()),
             (_, "data-mx-color" | "data-mx-bg-color") => {
                 is_matrix_hex_color(value).then(|| value.into())
             }
@@ -172,6 +174,10 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
                 PropertiesNames {
                     parent: "pre",
                     properties: &["class"],
+                },
+                PropertiesNames {
+                    parent: "sub",
+                    properties: &["data-md"],
                 },
             ],
             ListBehavior::Add,
@@ -730,6 +736,18 @@ mod tests {
         assert!(html.contains("data-mx-color=\"#ff0000\""));
         assert!(!html.contains("\"red\""));
         assert!(html.contains("class=\"language-rust\""));
+    }
+
+    #[test]
+    fn keeps_only_the_subtext_marker_on_sub() {
+        assert_eq!(
+            display_html("", Some("<sub data-md=\"-#\">caption</sub>")),
+            "<sub data-md=\"-#\">caption</sub>"
+        );
+        assert_eq!(
+            display_html("", Some("<sub data-md=\"x\">2</sub>")),
+            "<sub>2</sub>"
+        );
     }
 
     #[test]

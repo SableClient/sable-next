@@ -160,6 +160,19 @@ test('a line break mid-heading stays in the heading', () => {
   expect(tx(model)).toBe('<h2>Ti<br>|tle</h2>');
 });
 
+test('subtext exits into a paragraph on a line break', () => {
+  const model = cm('<sub data-md="-#">note|</sub>');
+  softBreak(model);
+  replaceText(model, 'body');
+  expect(tx(model)).toBe('<sub data-md="-#">note</sub><p>body|</p>');
+});
+
+test('backspace at the start of subtext turns it into a paragraph', () => {
+  const model = cm('<sub data-md="-#">|note</sub>');
+  backspace(model);
+  expect(tx(model)).toBe('<p>|note</p>');
+});
+
 test('the code block toggle turns prose into code and back', () => {
   const model = cm('<p>ab|c</p>');
   codeBlock(model);

@@ -123,6 +123,37 @@ test('a heading keeps its level', () => {
   expect(message.formatted).toBe('<h2>Hello</h2>');
 });
 
+test('subtext sends the v1 markup and keeps its marker in the body', () => {
+  const message = serializeComposer(
+    docOf(
+      para(composerSchema.text('hello')),
+      composerSchema.nodes.subtext.create(null, composerSchema.text('edited'))
+    )
+  );
+
+  expect(message.body).toBe('hello\n\n-# edited');
+  expect(message.formatted).toBe('<p>hello</p><sub data-md="-#">edited</sub>');
+});
+
+test('a literal subtext marker in a formatted paragraph is escaped', () => {
+  const message = serializeComposer(
+    docOf(para([composerSchema.text('-# not small '), composerSchema.text('b', [strong.create()])]))
+  );
+
+  expect(message.body).toBe('\\-# not small **b**');
+});
+
+test('plain mode parses subtext on its own line and below text', () => {
+  expect(serializePlain(textDoc('-# caption')).formatted).toBe('<sub data-md="-#">caption</sub>');
+  expect(serializePlain(textDoc('test\n-# **caption**')).formatted).toBe(
+    '<p>test</p><sub data-md="-#"><strong>caption</strong></sub>'
+  );
+  expect(serializePlain(textDoc('-#nospace')).formatted).toBeNull();
+  expect(serializePlain(textDoc('```\n-# code\n```')).formatted).toBe(
+    '<pre><code>-# code</code></pre>'
+  );
+});
+
 test('a bullet list survives both ways', () => {
   const message = serializeComposer(
     docOf(
@@ -444,6 +475,13 @@ describe('markup the renderer accepts survives an edit', () => {
 
   test('only a trailing empty paragraph is dropped, not one between blocks', () => {
     expect(roundTrip('<h2>a</h2><p></p><h2>b</h2>')).toBe('<h2>a</h2><p></p><h2>b</h2>');
+  });
+
+  test('subtext stays subtext and a subscript stays a subscript', () => {
+    expect(roundTrip('<p>a</p><sub data-md="-#">b</sub>')).toBe(
+      '<p>a</p><sub data-md="-#">b</sub>'
+    );
+    expect(roundTrip('<p>H<sub>2</sub>O</p>')).toBe('H<sub>2</sub>O');
   });
 
   test('a heading below the toolbar keeps its level', () => {

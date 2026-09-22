@@ -451,6 +451,12 @@
     font-size: inherit;
   }
 
+  .formatted-body :global(sub[data-md='-#']) {
+    color: var(--surface-var-on-container);
+    display: block;
+    font-size: var(--font-size-small);
+  }
+
   .formatted-body :global(:first-child) {
     margin-top: 0;
   }

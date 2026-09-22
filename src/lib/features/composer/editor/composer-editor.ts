@@ -127,9 +127,13 @@ const deleteInlineAtomBackward: Command = (state, dispatch) => {
   return true;
 };
 
+function isHeadingLike(node: ProseMirrorNode): boolean {
+  return node.type === composerSchema.nodes.heading || node.type === composerSchema.nodes.subtext;
+}
+
 const headingToParagraphBackward: Command = (state, dispatch) => {
   const { $from, empty } = state.selection;
-  if (!empty || $from.parent.type !== composerSchema.nodes.heading || $from.parentOffset !== 0) {
+  if (!empty || !isHeadingLike($from.parent) || $from.parentOffset !== 0) {
     return false;
   }
   dispatch?.(state.tr.setBlockType($from.before(), $from.after(), composerSchema.nodes.paragraph));
@@ -269,7 +273,7 @@ function enterCodeBlock(direction: -1 | 1): Command {
 
 const exitHeadingOnSoftBreak: Command = (state, dispatch) => {
   const { $from, empty } = state.selection;
-  if (!empty || $from.parent.type !== composerSchema.nodes.heading) return false;
+  if (!empty || !isHeadingLike($from.parent)) return false;
   if ($from.parentOffset !== $from.parent.content.size) return false;
   return splitBlock(state, dispatch);
 };
