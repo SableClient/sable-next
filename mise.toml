@@ -18,7 +18,7 @@ includes = ["scripts"]
 [tools]
 "ubi:rustwasm/wasm-bindgen" = { version = "0.2.128", extract_all = true }
 "aqua:WebAssembly/binaryen" = "132"
-"aqua:watchexec/watchexec" = "2.7.2"
+"aqua:watchexec/watchexec" = "2.7.3"
 "aqua:evilmartians/lefthook" = "2.1.14"
 
 [tasks.setup]
