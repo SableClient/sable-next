@@ -66,7 +66,7 @@ test('a profile change separates a rename from an avatar change', () => {
         kind: 'profile_change',
         user_id: '@bob:example.org',
         display_name: displayName,
-        avatar_changed: displayName === null,
+        avatar: displayName === null ? { old: 'mxc://a/b', new: null } : null,
       },
     }) as TimelineItemView;
 

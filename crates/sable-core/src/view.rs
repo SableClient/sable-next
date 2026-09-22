@@ -53,11 +53,11 @@ use crate::matrix_html::{
 };
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
-    DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView, MembershipChangeView,
-    MembershipView, MentionView, PerMessageProfileView, PollAnswerView, PollView, PublicRoomView,
-    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
-    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView, SendStateView,
-    SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    AvatarChangeView, DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView,
+    MembershipChangeView, MembershipView, MentionView, PerMessageProfileView, PollAnswerView,
+    PollView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
+    RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView,
+    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
     TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
     VectorDiff,
 };
@@ -1552,7 +1552,10 @@ fn content(
                     old: change.old.clone(),
                     new: change.new.clone(),
                 }),
-            avatar_changed: change.avatar_url_change().is_some(),
+            avatar: change.avatar_url_change().map(|change| AvatarChangeView {
+                old: change.old.as_ref().map(ToString::to_string),
+                new: change.new.as_ref().map(ToString::to_string),
+            }),
         },
 
         TimelineItemContent::OtherState(state) => TimelineItemContentView::StateEvent {

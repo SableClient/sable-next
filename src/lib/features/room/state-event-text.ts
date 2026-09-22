@@ -18,17 +18,53 @@ function stateChangeText(change: StateChangeView, user: string, t: Translate): s
         ? t('timeline.roomAvatarRemoved', { user })
         : t('timeline.roomAvatarChanged', { user });
     case 'pinned_events': {
-      if (change.added.length > 0 && change.removed.length === 0) {
+      if (change.added.length > 0 && change.removed.length > 0) {
+        return t('timeline.pinnedBoth', {
+          user,
+          added: t('timeline.pinnedAddedPart', { count: change.added.length }),
+          removed: t('timeline.pinnedRemovedPart', { count: change.removed.length }),
+        });
+      }
+      if (change.added.length > 0) {
         return t('timeline.pinnedAdded', { user, count: change.added.length });
       }
-      if (change.removed.length > 0 && change.added.length === 0) {
+      if (change.removed.length > 0) {
         return t('timeline.pinnedRemoved', { user, count: change.removed.length });
       }
-      return t('timeline.pinnedChanged', { user, count: change.total });
+      return t('timeline.pinnedUnchanged', { user });
     }
     case 'call_membership':
       return change.joined ? t('timeline.callJoined', { user }) : t('timeline.callLeft', { user });
   }
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+}
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+export function reactionKey(content: unknown): string | null {
+  const body = record(content);
+  if (!body) return null;
+  const shortcode = text(body.shortcode) ?? text(body['com.beeper.reaction.shortcode']);
+  if (shortcode) return `:${shortcode}:`;
+  return text(record(body['m.relates_to'])?.key);
+}
+
+function hiddenEventText(
+  content: Extract<TimelineItemView['content'], { kind: 'hidden_event' }>,
+  user: string,
+  t: Translate
+): string {
+  if (content.event_type === 'm.reaction') {
+    const key = reactionKey(content.content);
+    if (key) return t('timeline.hiddenReaction', { user, key });
+  }
+  if (content.event_type === 'm.room.redaction') return t('timeline.hiddenRedaction', { user });
+  return t('timeline.hiddenEvent', { user, type: content.event_type });
 }
 
 const MODERATED: ReadonlySet<string> = new Set([
@@ -78,15 +114,21 @@ export function stateEventText(item: TimelineItemView, t: Translate): string {
         return t(`timeline.${key}`, { user, name: content.display_name.new });
       }
       if (content.display_name) return t('timeline.profileNameRemoved', { user });
-      return t('timeline.profileAvatarChanged', { user });
+      return content.avatar && content.avatar.new === null
+        ? t('timeline.profileAvatarRemoved', { user })
+        : t('timeline.profileAvatarChanged', { user });
     }
     case 'state_event': {
       const user = item.sender_name ?? item.sender ?? t('timeline.unknownSender');
       if (content.change) return stateChangeText(content.change, user, t);
-      return t('timeline.stateEvent', { user, type: content.event_type });
+      return t('timeline.hiddenStateEvent', { user, type: content.event_type });
     }
     case 'hidden_event':
-      return t('timeline.hiddenEvent', { type: content.event_type });
+      return hiddenEventText(
+        content,
+        item.sender_name ?? item.sender ?? t('timeline.unknownSender'),
+        t
+      );
     case 'unsupported':
       return t('timeline.unsupported', { description: content.description });
     default:

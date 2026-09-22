@@ -110,7 +110,7 @@ function hiddenItem(id: string): TimelineItemView {
       kind: 'profile_change',
       user_id: '@alice:example.org',
       display_name: { old: 'Alice', new: id },
-      avatar_changed: false,
+      avatar: null,
     },
   };
 }

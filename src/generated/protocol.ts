@@ -17,6 +17,11 @@ export type AttachmentInfoView = {
 
 export type AuthIntent = "login" | "register";
 
+export type AvatarChangeView = {
+	old: string | null,
+	new: string | null,
+};
+
 export type BookmarkView = {
 	bookmark_id: string,
 	room_id: string,
@@ -149,9 +154,7 @@ set: boolean } | { type: "set_pusher"; pusher: PusherView } | { type: "remove_pu
 /**  The homeserver's web push support: a VAPID key means server delivery. */
 { type: "web_pusher_support" } | { type: "set_web_pusher"; pusher: WebPusherView } | { type: "web_pushers" } | { type: "ack_web_pusher"; app_id: string; ack_token: string } |
 /**  Mirrors the reader's choice so a native shell can apply it too. */
-{ type: "set_notification_content"; visible: boolean; encrypted: boolean } | { type: "set_notification_sounds"; enabled: boolean } |
-/**  Adds to a room's standing alert instead of raising a new one. */
-{ type: "set_notify_once"; enabled: boolean } | { type: "set_notifications_enabled"; enabled: boolean } | { type: "set_read_room"; room_id: string | null } | { type: "set_presence"; presence: PresenceView; status_message: string | null } |
+{ type: "set_notification_content"; visible: boolean; encrypted: boolean } | { type: "set_notification_sounds"; enabled: boolean } | { type: "set_notify_once"; enabled: boolean } | { type: "set_notifications_enabled"; enabled: boolean } | { type: "set_read_room"; room_id: string | null } | { type: "set_presence"; presence: PresenceView; status_message: string | null } |
 /**  Fills in users the presence poll has not pushed yet. */
 { type: "fetch_presence"; user_ids: string[] } | { type: "set_room_notification_mode"; room_id: string;
 /**  `null` drops the room's own rules so it follows the default again. */
@@ -970,7 +973,12 @@ display_name: string | null; reason: string | null } |
  *  A display name or avatar change on an already-joined member. Separate
  *  from `Membership` because clients hide these by default.
  */
-{ kind: "profile_change"; user_id: string; display_name: DisplayNameChangeView | null; avatar_changed: boolean } |
+{ kind: "profile_change"; user_id: string; display_name: DisplayNameChangeView | null;
+/**
+ *  `new` is `None` when the member cleared their avatar rather than
+ *  replacing it, which is a different sentence.
+ */
+avatar: AvatarChangeView | null } |
 /**
  *  Any other state event. Reported rather than dropped so the UI can decide
  *  what to render and what to keep behind a "show hidden events" setting.

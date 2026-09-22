@@ -9,7 +9,7 @@ import type {
 import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 import type { TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
-import { stateEventSubject, stateEventText } from './state-event-text';
+import { stateEventSubject, stateEventText, type Translate } from './state-event-text';
 import {
   formatDate,
   formatMessageTimestamp,
@@ -137,7 +137,7 @@ const renamed = item({
   kind: 'profile_change',
   user_id: '@a:b',
   display_name: { old: 'a', new: 'b' },
-  avatar_changed: false,
+  avatar: null,
 });
 const topic = item({
   kind: 'state_event',
@@ -429,8 +429,23 @@ test('distinguishes pinning, unpinning and a mixed pin change', () => {
     'timeline.pinnedRemoved'
   );
   expect(key({ kind: 'pinned_events', added: ['$b'], removed: ['$a'], total: 1 })).toBe(
-    'timeline.pinnedChanged'
+    'timeline.pinnedBoth'
   );
+  expect(key({ kind: 'pinned_events', added: [], removed: [], total: 1 })).toBe(
+    'timeline.pinnedUnchanged'
+  );
+});
+
+test('a mixed pin change reports both counts, as v1 does', () => {
+  const t: Translate = (key, values) =>
+    key === 'timeline.pinnedBoth' ? `${String(values?.added)} / ${String(values?.removed)}` : key;
+
+  expect(
+    stateEventText(
+      stateChange({ kind: 'pinned_events', added: ['$a', '$b'], removed: ['$c'], total: 2 }),
+      t
+    )
+  ).toBe('timeline.pinnedAddedPart / timeline.pinnedRemovedPart');
 });
 
 test('an unworded state event keeps its raw type and stays behind the dev toggles', () => {
@@ -442,7 +457,7 @@ test('an unworded state event keeps its raw type and stays behind the dev toggle
     change: null,
   });
 
-  expect(stateEventText(raw, (k) => k)).toBe('timeline.stateEvent');
+  expect(stateEventText(raw, (k) => k)).toBe('timeline.hiddenStateEvent');
   expect(visibleTimelineItems([raw], defaults)).toEqual([]);
   expect(
     visibleTimelineItems([stateChange({ kind: 'room_topic', topic: 'hi' })], defaults)
@@ -632,4 +647,54 @@ test('formatMessageTimestamp includes the year for messages from another year', 
   expect(formatMessageTimestamp(lastYear.getTime())).toBe('August 24, 2025 09:15');
 
   vi.useRealTimers();
+});
+
+test('a hidden event names its sender, as v1 does', () => {
+  const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
+  const hidden = (eventType: string, content: unknown): TimelineItemView => ({
+    ...item({ kind: 'hidden_event', event_type: eventType, content }),
+    sender: '@alice:example.org',
+    sender_name: 'Alice',
+  });
+
+  expect(stateEventText(hidden('m.key.verification.start', null), t)).toBe(
+    'timeline.hiddenEvent:{"user":"Alice","type":"m.key.verification.start"}'
+  );
+  expect(stateEventText(hidden('m.room.redaction', null), t)).toBe(
+    'timeline.hiddenRedaction:{"user":"Alice"}'
+  );
+});
+
+test('a hidden reaction reports the key it carries', () => {
+  const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
+  const reaction = (content: unknown): TimelineItemView => ({
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content }),
+    sender: '@alice:example.org',
+    sender_name: 'Alice',
+  });
+
+  expect(stateEventText(reaction({ 'm.relates_to': { key: '👍' } }), t)).toBe(
+    'timeline.hiddenReaction:{"user":"Alice","key":"👍"}'
+  );
+  expect(stateEventText(reaction({ shortcode: 'party', 'm.relates_to': { key: 'x' } }), t)).toBe(
+    'timeline.hiddenReaction:{"user":"Alice","key":":party:"}'
+  );
+  expect(stateEventText(reaction({ 'm.relates_to': {} }), t)).toBe(
+    'timeline.hiddenEvent:{"user":"Alice","type":"m.reaction"}'
+  );
+});
+
+test('a cleared avatar is not the same sentence as a replaced one', () => {
+  const avatarChange = (newUrl: string | null): TimelineItemView =>
+    item({
+      kind: 'profile_change',
+      user_id: '@bob:example.org',
+      display_name: null,
+      avatar: { old: 'mxc://example.org/old', new: newUrl },
+    });
+
+  expect(stateEventText(avatarChange('mxc://example.org/new'), (k) => k)).toBe(
+    'timeline.profileAvatarChanged'
+  );
+  expect(stateEventText(avatarChange(null), (k) => k)).toBe('timeline.profileAvatarRemoved');
 });

@@ -2458,7 +2458,9 @@ pub enum TimelineItemContentView {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
         display_name: Option<DisplayNameChangeView>,
-        avatar_changed: bool,
+        /// `new` is `None` when the member cleared their avatar rather than
+        /// replacing it, which is a different sentence.
+        avatar: Option<AvatarChangeView>,
     },
     /// Any other state event. Reported rather than dropped so the UI can decide
     /// what to render and what to keep behind a "show hidden events" setting.
@@ -2661,6 +2663,13 @@ pub enum MembershipChangeView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct DisplayNameChangeView {
+    pub old: Option<String>,
+    pub new: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct AvatarChangeView {
     pub old: Option<String>,
     pub new: Option<String>,
 }
