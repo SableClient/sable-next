@@ -47,7 +47,7 @@
     margin: 0 auto;
     max-width: 52rem;
     overflow: auto;
-    padding: var(--page-gutter);
+    padding: var(--space-400);
     width: 100%;
   }
 
@@ -93,10 +93,6 @@
     align-items: center;
   }
 
-  .app-page-shell-compact {
-    padding: var(--space-400);
-  }
-
   .app-page-shell-compact .app-page-header {
     align-items: center;
     flex-direction: row;
@@ -109,7 +105,7 @@
       flex-direction: row;
     }
 
-    .app-page-shell-compact {
+    .app-page-shell {
       padding: var(--space-500);
     }
   }

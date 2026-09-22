@@ -210,7 +210,7 @@
   }
 
   .settings-search {
-    padding: 0 var(--space-400) var(--space-300);
+    padding: 0 var(--space-200) var(--space-300);
   }
 
   .search-field {
@@ -302,7 +302,7 @@
   :global(.settings-logout) {
     flex: 0 0 auto;
     justify-content: flex-start;
-    margin: auto var(--space-400) 0;
+    margin: auto var(--space-200) 0;
     min-height: var(--control-height-medium);
     width: auto;
   }

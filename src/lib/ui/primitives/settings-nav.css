@@ -20,7 +20,6 @@
 .settings-nav-header {
   align-items: center;
   background: var(--surface-container);
-  border-bottom: var(--border-width) solid var(--surface-container-line);
   display: flex;
   flex: 0 0 auto;
   gap: var(--space-300);
