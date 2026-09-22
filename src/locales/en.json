@@ -987,6 +987,7 @@
     "matrixId": "Matrix ID",
     "avatar": "Avatar",
     "changeAvatar": "Change avatar",
+    "uploadAvatar": "Upload avatar",
     "removeAvatar": "Remove avatar",
     "displayName": "Display name",
     "copy": "Copy",

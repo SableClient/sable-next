@@ -145,34 +145,37 @@
               onSaved={refreshProfile}
               section="banner"
             />{/if}
-          <div class="avatar-row">
-            <Avatar id={userId} src={avatarUrl} name={displayName || userId} size="large" />
-            <div class="avatar-actions">
-              <label class="file-button btn btn-secondary btn-small">
-                <input
-                  type="file"
-                  accept="image/*"
-                  disabled={savingAvatar}
-                  onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-                    setAvatar(event.currentTarget.files?.[0] ?? null);
-                  }}
-                />
-                {$i18n.t(profile?.avatar_url ? 'settings.changeAvatar' : 'settings.avatar')}
-              </label>
-              {#if avatarFile}
-                <Button size="small" loading={savingAvatar} onclick={() => void saveAvatar()}>
-                  {$i18n.t('settings.save')}
-                </Button>
-              {:else if profile?.avatar_url}
-                <Button
-                  variant="danger"
-                  size="small"
-                  loading={savingAvatar}
-                  onclick={() => void removeAvatar()}
-                >
-                  {$i18n.t('settings.removeAvatar')}
-                </Button>
-              {/if}
+          <div class="avatar-setting">
+            <span class="setting-label">{$i18n.t('settings.avatar')}</span>
+            <div class="avatar-row">
+              <div class="avatar-actions">
+                <label class="file-button btn btn-secondary btn-small">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={savingAvatar}
+                    onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+                      setAvatar(event.currentTarget.files?.[0] ?? null);
+                    }}
+                  />
+                  {$i18n.t(profile?.avatar_url ? 'settings.changeAvatar' : 'settings.uploadAvatar')}
+                </label>
+                {#if avatarFile}
+                  <Button size="small" loading={savingAvatar} onclick={() => void saveAvatar()}>
+                    {$i18n.t('settings.save')}
+                  </Button>
+                {:else if profile?.avatar_url}
+                  <Button
+                    variant="danger"
+                    size="small"
+                    loading={savingAvatar}
+                    onclick={() => void removeAvatar()}
+                  >
+                    {$i18n.t('settings.removeAvatar')}
+                  </Button>
+                {/if}
+              </div>
+              <Avatar id={userId} src={avatarUrl} name={displayName || userId} size="large" />
             </div>
           </div>
           <form
@@ -242,6 +245,19 @@
     align-items: center;
     display: flex;
     gap: var(--space-300);
+  }
+
+  .avatar-setting {
+    display: grid;
+    gap: var(--space-200);
+  }
+
+  .avatar-setting .setting-label {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .avatar-row {
+    justify-content: space-between;
   }
 
   .avatar-actions,
