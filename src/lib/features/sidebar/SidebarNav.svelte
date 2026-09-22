@@ -228,6 +228,7 @@
     <ActiveCallBar
       session={call}
       roomName={callRoom?.name ?? $i18n.t('call.title')}
+      collapsed={!mobile && collapsed}
       onReturn={() => {
         if (call.roomId === null) return;
         void goto(roomSectionPath(roomList.rooms, call.roomId));

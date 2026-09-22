@@ -9,10 +9,11 @@
   interface Props {
     session: CallSession;
     roomName: string;
+    collapsed?: boolean;
     onReturn: () => void;
   }
 
-  let { session, roomName, onReturn }: Props = $props();
+  let { session, roomName, collapsed = false, onReturn }: Props = $props();
 
   let statusLabel = $derived(
     $i18n.t(
@@ -25,11 +26,19 @@
   );
 </script>
 
-<section class="call-bar" aria-label={$i18n.t('call.title')}>
-  <button class="call-room" type="button" onclick={onReturn}>
+<section class="call-bar" class:collapsed aria-label={$i18n.t('call.title')}>
+  <button
+    class="call-room"
+    type="button"
+    aria-label={collapsed ? `${statusLabel}, ${roomName}` : undefined}
+    title={collapsed ? roomName : undefined}
+    onclick={onReturn}
+  >
     <WaveformIcon weight="bold" />
-    <span class="status">{statusLabel}</span>
-    <span class="room">{roomName}</span>
+    {#if !collapsed}
+      <span class="status">{statusLabel}</span>
+      <span class="room">{roomName}</span>
+    {/if}
   </button>
   <CallControls
     compact
@@ -98,6 +107,19 @@
   .call-room:hover .room {
     color: var(--bg-on-container);
     text-decoration: underline;
+  }
+
+  .collapsed .call-room {
+    justify-content: center;
+  }
+
+  .collapsed :global(.controls) {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .collapsed :global(.hang-up) {
+    margin-inline-start: 0;
   }
 
   .call-room:focus-visible {
