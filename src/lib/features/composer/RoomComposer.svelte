@@ -1160,6 +1160,7 @@
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
+    min-width: 0;
     position: relative;
     width: 100%;
   }

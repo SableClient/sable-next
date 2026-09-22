@@ -95,6 +95,7 @@
     border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-050);
+    min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     padding: var(--space-150) var(--space-200);

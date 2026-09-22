@@ -200,6 +200,7 @@
 
   .thread-composer {
     border-top: var(--border-width) solid var(--surface-container-line);
+    min-width: 0;
     padding: 0 var(--space-400);
   }
 </style>
