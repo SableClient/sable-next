@@ -97,9 +97,9 @@ test('a space the user has not joined does not claim its children', () => {
   expect(roomSectionPath(rooms, '!inner:example.org')).toBe('/rooms/!inner%3Aexample.org');
 });
 
-test('a space itself opens as a space', () => {
+test('a space itself opens at its lobby', () => {
   const rooms = [room('!space:example.org', { is_space: true })];
-  expect(roomSectionPath(rooms, '!space:example.org')).toBe('/space/!space%3Aexample.org');
+  expect(roomSectionPath(rooms, '!space:example.org')).toBe('/space/!space%3Aexample.org/lobby');
 });
 
 test('the canonical alias wins over the room id, matching the sidebar links', () => {
@@ -120,7 +120,9 @@ test('a focused event rides along as a query param', () => {
 
 test('a space drops a focused event, having no timeline to focus it in', () => {
   const rooms = [room('!space:example.org', { is_space: true })];
-  expect(roomSectionPath(rooms, '!space:example.org', '$abc')).toBe('/space/!space%3Aexample.org');
+  expect(roomSectionPath(rooms, '!space:example.org', '$abc')).toBe(
+    '/space/!space%3Aexample.org/lobby'
+  );
 });
 
 test('a permalink fragment resolves through the same sectioning', () => {

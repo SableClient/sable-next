@@ -36,7 +36,7 @@ function sectionPath(
   room: RoomSummary | undefined,
   roomParam: string
 ): string {
-  if (room?.is_space) return resolve('/(app)/space/[spaceId]', { spaceId: roomParam });
+  if (room?.is_space) return resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomParam });
   if (room?.is_direct) return resolve('/(app)/direct/[roomId]', { roomId: roomParam });
 
   const parentSpace = room ? rootSpaceOf(rooms, room.room_id) : undefined;
