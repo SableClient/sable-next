@@ -44,10 +44,14 @@
       var(--surface-container) var(--progress),
       var(--surface-container) 100%
     );
+    background-clip: content-box;
+    background-origin: content-box;
     border: var(--border-width-300) solid var(--surface-container-line);
     border-radius: var(--radius);
+    box-sizing: content-box;
     cursor: pointer;
     height: var(--space-300);
+    padding-block: calc((var(--target-hit) - var(--space-300)) / 2);
     width: 100%;
   }
 
