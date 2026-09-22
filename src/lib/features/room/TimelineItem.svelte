@@ -231,13 +231,8 @@
       ? (jumboEmojiLevel(item.content.body) ?? jumboEmoticonLevel(item.content.html))
       : null
   );
-  let stalled = $derived(
-    item.send_state?.status === 'failed' && !item.send_state.recoverable ? item.send_state : null
-  );
-  let pending = $derived(
-    item.send_state?.status === 'sending' ||
-      (item.send_state?.status === 'failed' && item.send_state.recoverable)
-  );
+  let stalled = $derived(item.send_state?.status === 'failed' ? item.send_state : null);
+  let pending = $derived(item.send_state?.status === 'sending');
   let upload = $derived(
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
   );
