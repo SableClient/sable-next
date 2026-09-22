@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Popover } from 'bits-ui';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -8,6 +7,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -20,7 +20,6 @@
   } from './pin-marker';
   import { formatMessageTimestamp } from './timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import { memberAvatar, memberName } from './members.js';
 
   interface Props {
@@ -178,108 +177,103 @@
   }
 </script>
 
-<Popover.Root
+{#snippet pinTrigger({ props }: { props: Record<string, unknown> })}
+  <IconButton
+    {...props}
+    class="pin-button selection-open"
+    variant="ghost"
+    size="small"
+    label={$i18n.t('room.pinsTitle')}
+  >
+    <PushPinIcon weight={open ? 'fill' : 'regular'} />
+    {#if unreadCount > 0}
+      <span class="pin-badge" aria-hidden="true">{unreadCount}</span>
+    {/if}
+  </IconButton>
+{/snippet}
+
+<ActionMenu
   bind:open
+  label={$i18n.t('room.pinsTitle')}
+  class="pin-menu"
+  side="bottom"
+  align="center"
+  sideOffset={4}
+  preventScroll={false}
+  trigger={pinTrigger}
   onOpenChange={(next) => {
     if (next) void load();
     else void refreshCount();
   }}
 >
-  <Popover.Trigger>
-    {#snippet child({ props })}
+  <IconContext values={{ 'aria-hidden': 'true' }}>
+    <header class="pin-header">
+      <h2>{$i18n.t('room.pinsTitle')}</h2>
       <IconButton
-        {...props}
-        class="pin-button selection-open"
         variant="ghost"
         size="small"
-        label={$i18n.t('room.pinsTitle')}
+        label={$i18n.t('room.pinsClose')}
+        onclick={() => {
+          open = false;
+        }}
       >
-        <PushPinIcon weight={open ? 'fill' : 'regular'} />
-        {#if unreadCount > 0}
-          <span class="pin-badge" aria-hidden="true">{unreadCount}</span>
-        {/if}
+        <XIcon />
       </IconButton>
-    {/snippet}
-  </Popover.Trigger>
+    </header>
 
-  <Popover.Portal>
-    <Popover.Content
-      class="menu-surface pin-menu"
-      {...overlayLayer()}
-      side="bottom"
-      align="center"
-      sideOffset={4}
-    >
-      <IconContext values={{ 'aria-hidden': 'true' }}>
-        <header class="pin-header">
-          <h2>{$i18n.t('room.pinsTitle')}</h2>
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={$i18n.t('room.pinsClose')}
-            onclick={() => {
-              open = false;
-            }}
-          >
-            <XIcon />
-          </IconButton>
-        </header>
-
-        {#if loading && ordered.length === 0}
-          <p class="pin-status" role="status"><Spinner small /></p>
-        {:else if ordered.length === 0}
-          <div class="pin-empty">
-            <PushPinIcon />
-            <p class="pin-empty-title">{$i18n.t('room.pinsEmpty')}</p>
-            <p class="pin-empty-hint">{$i18n.t('room.pinsEmptyHint')}</p>
-          </div>
-        {:else}
-          <ul class="pin-list">
-            {#each ordered as entry (entry.eventId)}
-              <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, entry.eventId)}>
-                <button
-                  class="pin-open selection-layer"
-                  type="button"
-                  onclick={() => {
-                    jump(entry.eventId);
-                  }}
-                >
-                  <Avatar
-                    id={entry.sender}
-                    src={senderAvatar(entry.sender)}
-                    name={senderName(entry.sender)}
-                    size="small"
-                  />
-                  <span class="pin-text">
-                    <span class="pin-meta">
-                      <span class="pin-sender">{senderName(entry.sender)}</span>
-                      {#if entry.timestamp !== null}
-                        <span class="pin-time">{formatMessageTimestamp(entry.timestamp)}</span>
-                      {/if}
-                    </span>
-                    <span class="pin-body">{entry.body ?? $i18n.t('room.pinsUnreadable')}</span>
-                  </span>
-                </button>
-                {#if canPin}
-                  <IconButton
-                    variant="ghost"
-                    size="small"
-                    label={$i18n.t('timeline.unpinMessage')}
-                    onclick={() => {
-                      void unpin(entry.eventId);
-                    }}
-                  >
-                    <PushPinSlashIcon />
-                  </IconButton>
-                {/if}
-              </li>
-            {/each}
-          </ul>
-        {/if}
-      </IconContext>
-    </Popover.Content>
-  </Popover.Portal>
-</Popover.Root>
+    {#if loading && ordered.length === 0}
+      <p class="pin-status" role="status"><Spinner small /></p>
+    {:else if ordered.length === 0}
+      <div class="pin-empty">
+        <PushPinIcon />
+        <p class="pin-empty-title">{$i18n.t('room.pinsEmpty')}</p>
+        <p class="pin-empty-hint">{$i18n.t('room.pinsEmptyHint')}</p>
+      </div>
+    {:else}
+      <ul class="pin-list">
+        {#each ordered as entry (entry.eventId)}
+          <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, entry.eventId)}>
+            <button
+              class="pin-open selection-layer"
+              type="button"
+              onclick={() => {
+                jump(entry.eventId);
+              }}
+            >
+              <Avatar
+                id={entry.sender}
+                src={senderAvatar(entry.sender)}
+                name={senderName(entry.sender)}
+                size="small"
+              />
+              <span class="pin-text">
+                <span class="pin-meta">
+                  <span class="pin-sender">{senderName(entry.sender)}</span>
+                  {#if entry.timestamp !== null}
+                    <span class="pin-time">{formatMessageTimestamp(entry.timestamp)}</span>
+                  {/if}
+                </span>
+                <span class="pin-body">{entry.body ?? $i18n.t('room.pinsUnreadable')}</span>
+              </span>
+            </button>
+            {#if canPin}
+              <IconButton
+                variant="ghost"
+                size="small"
+                label={$i18n.t('timeline.unpinMessage')}
+                onclick={() => {
+                  void unpin(entry.eventId);
+                }}
+              >
+                <PushPinSlashIcon />
+              </IconButton>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </IconContext>
+</ActionMenu>
 
 <style>
   :global(.menu-surface.pin-menu) {
