@@ -284,7 +284,9 @@
     font-size: var(--font-size-body);
     line-height: var(--line-height-body);
     margin: 0 0 var(--space-200);
-    max-height: calc(var(--line-height-body) * 3em);
+    max-height: calc(
+      var(--line-height-body) * 3em + 2 * var(--space-200) + 2 * var(--border-width)
+    );
     min-width: 0;
     overflow-wrap: anywhere;
     overflow-y: auto;
