@@ -477,6 +477,20 @@
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'message'
   );
   let nonTextContent = $derived(item.content.kind !== 'message');
+  let previewUrl = $derived(
+    item.content.kind === 'message' ? firstPreviewableLink(item.content.html) : null
+  );
+  let receiptWidth = $state(0);
+  let receiptsInline = $derived(
+    !nonTextContent &&
+      item.reactions.length === 0 &&
+      !threadSummary &&
+      !item.thread_root &&
+      item.bundled_link_previews.length === 0 &&
+      previewUrl === null &&
+      upload === null &&
+      stalled === null
+  );
 
   const rowPress = new LongPress({
     enabled: () => actionable,
@@ -550,6 +564,19 @@
     if (item.sender && target) onSenderProfile?.(item.sender, target);
   }
 </script>
+
+{#snippet receiptSlot()}
+  <span class="receipt-slot" bind:clientWidth={receiptWidth}>
+    <ReadReceiptStack
+      readers={receiptReaders}
+      {members}
+      expanded={receiptsOpen}
+      onOpen={() => {
+        receiptsOpen = true;
+      }}
+    />
+  </span>
+{/snippet}
 
 {#snippet actionLayer()}
   {#if actionable && (engaged || actionsPinned)}
@@ -847,28 +874,41 @@
           </button>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
-          <div class="emote">
+          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
+          <div
+            class={['emote', { 'has-receipts': inlineReceipts }]}
+            style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+          >
             <span
               class={['sender', 'sender-identity-name', { tinted: senderColors.tinted }]}
               style:color={senderColors.tinted ? undefined : senderColors.nameColor}
               >* {senderName}</span
             >
             <FormattedBody html={item.content.html} {onMatrixLink} />
+            {#if inlineReceipts}
+              <span class="receipt-space" aria-hidden="true"></span>
+              {@render receiptSlot()}
+            {/if}
           </div>
         {:else if item.content.kind === 'message'}
+          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
           <div
             class={[
               jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
-              { notice, 'has-edited': item.content.edited },
+              { notice, 'has-edited': item.content.edited, 'has-receipts': inlineReceipts },
             ]}
+            style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
           >
             <FormattedBody html={item.content.html} {onMatrixLink} />
             <!-- Trails the body, where the edit happened, not the header. -->
             {#if item.content.edited}
               <span class="edited">{$i18n.t('timeline.edited')}</span>
             {/if}
+            {#if inlineReceipts}
+              <span class="receipt-space" aria-hidden="true"></span>
+              {@render receiptSlot()}
+            {/if}
           </div>
-          {@const previewUrl = firstPreviewableLink(item.content.html)}
           {#if item.bundled_link_previews.length > 0}
             {#each item.bundled_link_previews as preview (preview.url)}
               <LinkPreviewCard url={preview.url} bundled={preview} {encrypted} />
@@ -972,15 +1012,8 @@
           </p>
         {/if}
       </div>
-      {#if actionable && showReceiptBadge}
-        <ReadReceiptStack
-          readers={receiptReaders}
-          {members}
-          expanded={receiptsOpen}
-          onOpen={() => {
-            receiptsOpen = true;
-          }}
-        />
+      {#if actionable && showReceiptBadge && !receiptsInline}
+        {@render receiptSlot()}
       {/if}
     </div>
   </article>
@@ -1332,6 +1365,7 @@
     flex: 1;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
+    position: relative;
   }
 
   .message-content > header {
@@ -1343,9 +1377,24 @@
     min-width: 0;
   }
 
-  .message-content > :global(.read-receipt-stack) {
-    align-self: end;
+  .message-content > .receipt-slot {
     grid-column: 1;
+    place-self: end;
+  }
+
+  .has-receipts :global(.formatted-body) {
+    display: inline;
+  }
+
+  .has-receipts .receipt-slot {
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    position: absolute;
+  }
+
+  .receipt-space {
+    display: inline-block;
+    inline-size: calc(var(--receipt-reserve) + var(--space-200));
   }
 
   .message header {
@@ -1745,6 +1794,15 @@
     display: inline-block;
   }
 
+  .message.layout-bubble .has-receipts :global(.formatted-body) {
+    display: inline-block;
+    max-width: min(50rem, calc(100% - var(--receipt-reserve) - var(--space-200)));
+  }
+
+  .message.layout-bubble .receipt-space {
+    display: none;
+  }
+
   .message.layout-bubble.own.align-own .has-edited {
     align-items: flex-end;
     display: flex;
@@ -1771,12 +1829,6 @@
   .message.layout-bubble.own.align-own .message-main {
     align-items: flex-end;
     grid-column: 1 / -1;
-  }
-
-  .message.layout-bubble.own.align-own .message-content > :global(.read-receipt-stack) {
-    grid-column: 1 / -1;
-    justify-self: end;
-    margin-inline-start: 0;
   }
 
   .message.layout-bubble.own.align-own .reply-preview {

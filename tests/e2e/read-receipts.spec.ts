@@ -8,6 +8,7 @@ const WRAPPED = `Receipted ${'and wrapped '.repeat(12)}`;
 interface RowBox {
   badge: { top: number; bottom: number; left: number; right: number; height: number } | null;
   body: { bottom: number; right: number };
+  lastLine: { right: number };
   time: { right: number } | null;
   content: { right: number; bottom: number };
 }
@@ -33,6 +34,7 @@ async function measure(page: import('@playwright/test').Page, itemId: string): P
           }
         : null,
       body: { bottom: box(body).bottom, right: box(body).right },
+      lastLine: { right: [...body.getClientRects()].at(-1)?.right ?? box(body).right },
       time: time ? { right: box(time).right } : null,
       content: { right: box(content).right, bottom: box(content).bottom },
     };
@@ -91,7 +93,7 @@ for (const layout of ['bubble', 'compact'] as const) {
     if (!badge) throw new Error('no badge');
 
     expect(Math.abs(badge.right - receipted.content.right)).toBeLessThanOrEqual(1);
-    expect(receipted.body.right).toBeLessThanOrEqual(badge.left);
+    expect(receipted.lastLine.right).toBeLessThanOrEqual(badge.left);
     expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
     expect(receipted.content.bottom - receipted.body.bottom).toBeLessThanOrEqual(2);
   });
@@ -134,7 +136,7 @@ test('a receipt badge sits beside the last line and leaves the timestamp on the 
 
   expect(badge.height).toBeGreaterThan(0);
   expect(Math.abs(badge.right - receipted.content.right)).toBeLessThanOrEqual(1);
-  expect(receipted.body.right).toBeLessThanOrEqual(badge.left);
+  expect(receipted.lastLine.right).toBeLessThanOrEqual(badge.left);
 
   if (plain.time && receipted.time) {
     expect(Math.abs(receipted.time.right - plain.time.right)).toBeLessThanOrEqual(1);
