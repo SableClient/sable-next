@@ -10,7 +10,7 @@ type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::
 const RENDERED_PROFILE_FIELDS: [&str; 21] = [
     "displayname",
     "avatar_url",
-    "chat.commet.profile_bio",
+    "m.biography",
     "gay.fomx.biography",
     "chat.commet.profile_color_scheme",
     "chat.commet.profile_banner",
@@ -58,7 +58,8 @@ use crate::matrix_html::display_html;
 /// A bio is arbitrary remote text, so it goes through the same sanitiser as a
 /// message body and reaches the UI as display HTML.
 fn profile_bio(response: &ProfileResponse) -> Option<String> {
-    let texts = profile_field(response, "gay.fomx.biography")
+    let texts = profile_field(response, "m.biography")
+        .or_else(|| profile_field(response, "gay.fomx.biography"))
         .and_then(|value| value.get("m.text"))
         .and_then(serde_json::Value::as_array);
     // `m.text` carries one entry per representation; only the HTML one may keep
@@ -72,17 +73,8 @@ fn profile_bio(response: &ProfileResponse) -> Option<String> {
         })
     };
 
-    let legacy = profile_text(profile_field(response, "moe.sable.app.bio"))
-        .or_else(|| profile_text(profile_field(response, "chat.commet.profile_bio")));
-    let (legacy_plain, legacy_html) = match legacy {
-        Some(bio) if bio.contains('<') => (None, Some(bio)),
-        other => (other, None),
-    };
-
-    let plain = legacy_plain
-        .or_else(|| representation(None))
-        .or_else(|| representation(Some("text/plain")));
-    let html = legacy_html.or_else(|| representation(Some("text/html")));
+    let plain = representation(None).or_else(|| representation(Some("text/plain")));
+    let html = representation(Some("text/html"));
 
     (plain.is_some() || html.is_some())
         .then(|| display_html(plain.as_deref().unwrap_or_default(), html.as_deref()))
