@@ -397,7 +397,7 @@ jobs:
     name: Build nightly Flatpak ${{ matrix.arch }}
     needs: [setup-release, linux]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    timeout-minutes: 90
     if: ${{ needs.setup-release.outputs.nightly == 'true' }}
     strategy:
       fail-fast: false
@@ -427,7 +427,7 @@ jobs:
         run: |
           tarball="sable-next-${VERSION}-linux-${ARCH}.tar.gz"
           if ! node scripts/ci/forgejo-release.mjs wait-assets \
-                 --names "$tarball" --attempts 40 --interval 30; then
+                 --names "$tarball" --attempts 140 --interval 30; then
             echo "::warning::$tarball never appeared; skipping the $ARCH Flatpak."
             exit 0
           fi
