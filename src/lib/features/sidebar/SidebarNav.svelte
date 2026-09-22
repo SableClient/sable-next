@@ -352,7 +352,7 @@
       position: fixed;
       top: 0;
       width: calc(var(--navigation-rail-width) + var(--room-nav-width));
-      z-index: 1;
+      z-index: 2;
     }
 
     .desktop-navigation {
