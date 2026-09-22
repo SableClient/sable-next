@@ -212,6 +212,8 @@
     "notifyMentions": "Mentions and keywords",
     "notifyMute": "Mute",
     "menuSettings": "Settings",
+    "menuMoveUp": "Move up",
+    "menuMoveDown": "Move down",
     "menuAddToSpace": "Add to space",
     "menuRemoveFromSpace": "Remove from {{space}}",
     "menuLeave": "Leave room",

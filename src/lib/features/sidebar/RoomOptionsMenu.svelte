@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
+  import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
+  import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -42,6 +44,8 @@
     side?: 'bottom' | 'right';
     onSettings: (room: RoomSummary) => void;
     onLeave: (room: RoomSummary) => void;
+    onMoveUp?: () => void;
+    onMoveDown?: () => void;
   }
 
   let {
@@ -53,6 +57,8 @@
     side = 'bottom',
     onSettings,
     onLeave,
+    onMoveUp,
+    onMoveDown,
   }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -271,6 +277,19 @@
       {$i18n.t('room.menuSettings')}
     </ActionMenuItem>
 
+    {#if onMoveUp}
+      <ActionMenuItem onSelect={onMoveUp}>
+        <ArrowUpIcon />
+        {$i18n.t('room.menuMoveUp')}
+      </ActionMenuItem>
+    {/if}
+    {#if onMoveDown}
+      <ActionMenuItem onSelect={onMoveDown}>
+        <ArrowDownIcon />
+        {$i18n.t('room.menuMoveDown')}
+      </ActionMenuItem>
+    {/if}
+
     {#if !room.is_space}
       <RoomNotificationSubmenu roomId={room.room_id} active={opened} />
     {/if}
@@ -336,6 +355,8 @@
   }
 
   :global(.room-options-trigger) {
+    --target: 1.5rem;
+
     align-items: center;
     background: transparent;
     border: 0;
@@ -344,10 +365,18 @@
     cursor: pointer;
     display: inline-flex;
     flex: none;
-    height: 1.5rem;
+    height: var(--target);
     justify-content: center;
     padding: 0;
-    width: 1.5rem;
+    position: relative;
+    width: var(--target);
+  }
+
+  :global(.room-options-trigger)::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   :global(.room-options-trigger:hover) {

@@ -264,6 +264,30 @@
     contextOpen = true;
   }
 
+  function entryRef(item: SidebarItem): LayoutRef {
+    return item.kind === 'space'
+      ? { kind: 'space', roomId: item.room_id }
+      : { kind: 'folder', folderId: item.id };
+  }
+
+  let contextIndex = $derived.by(() => {
+    const space = contextSpace;
+    if (space === null) return -1;
+    return entries.findIndex((entry) => entry.kind === 'space' && entry.room_id === space.room_id);
+  });
+
+  function moveContextSpace(direction: 'up' | 'down'): void {
+    if (contextSpace === null || contextIndex === -1) return;
+    const targetIndex = direction === 'up' ? contextIndex - 1 : contextIndex + 1;
+    if (targetIndex < 0 || targetIndex >= entries.length) return;
+
+    onReorder?.(
+      { kind: 'space', roomId: contextSpace.room_id },
+      entryRef(entries[targetIndex]),
+      direction === 'up' ? 'above' : 'below'
+    );
+  }
+
   function openSectionMenu(event: MouseEvent, item: RailItem, section: RailSection): void {
     event.preventDefault();
     event.stopPropagation();
@@ -805,6 +829,16 @@
     onLeave={(room: RoomSummary) => {
       leaveRoomId = room.room_id;
     }}
+    onMoveUp={mobile && contextIndex > 0
+      ? () => {
+          moveContextSpace('up');
+        }
+      : undefined}
+    onMoveDown={mobile && contextIndex !== -1 && contextIndex < entries.length - 1
+      ? () => {
+          moveContextSpace('down');
+        }
+      : undefined}
   />
 {/if}
 
