@@ -18,6 +18,8 @@
 
 <style>
   .auth-info-box {
+    --form-control-padding-block: var(--space-200);
+
     align-items: center;
     display: flex;
     gap: var(--space-100);
