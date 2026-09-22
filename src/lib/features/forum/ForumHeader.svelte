@@ -21,7 +21,7 @@
   <IconButton
     class="back-button"
     variant="ghost"
-    size="small"
+    size="medium"
     label={$i18n.t('timeline.back')}
     onclick={onBack}
   >
@@ -32,7 +32,7 @@
   <IconButton
     class="search-button"
     variant="ghost"
-    size="small"
+    size="medium"
     label={$i18n.t('search.open')}
     onclick={onSearch}
   >

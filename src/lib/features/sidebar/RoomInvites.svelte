@@ -29,28 +29,30 @@
         <li>
           <Avatar class="invite-icon" id={invite.room_id} src={invite.avatar_url} {name} />
           <span class="invite-name" title={name}>{name}</span>
-          <IconButton
-            variant="ghost"
-            size="small"
-            disabled={busy}
-            label={$i18n.t('room.inviteAccept')}
-            onclick={() => {
-              void answers.accept(invite);
-            }}
-          >
-            <CheckIcon />
-          </IconButton>
-          <IconButton
-            variant="ghost"
-            size="small"
-            disabled={busy}
-            label={$i18n.t('room.inviteDecline')}
-            onclick={() => {
-              void answers.decline(invite);
-            }}
-          >
-            <XIcon />
-          </IconButton>
+          <div class="invite-actions">
+            <IconButton
+              variant="ghost"
+              size="medium"
+              disabled={busy}
+              label={$i18n.t('room.inviteAccept')}
+              onclick={() => {
+                void answers.accept(invite);
+              }}
+            >
+              <CheckIcon />
+            </IconButton>
+            <IconButton
+              variant="ghost"
+              size="medium"
+              disabled={busy}
+              label={$i18n.t('room.inviteDecline')}
+              onclick={() => {
+                void answers.decline(invite);
+              }}
+            >
+              <XIcon />
+            </IconButton>
+          </div>
         </li>
       {/each}
     </ul>
@@ -90,6 +92,12 @@
 
   li:hover {
     background: var(--bg-container-hover);
+  }
+
+  .invite-actions {
+    display: flex;
+    flex: none;
+    gap: var(--space-200);
   }
 
   :global(.avatar-root.invite-icon) {

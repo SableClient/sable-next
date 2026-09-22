@@ -115,7 +115,7 @@
     <IconButton
       class="search-button"
       variant="ghost"
-      size="small"
+      size="medium"
       label={$i18n.t('search.open')}
       onclick={onSearch}
     >
@@ -126,7 +126,7 @@
       <IconButton
         class="chat-toggle"
         variant="ghost"
-        size="small"
+        size="medium"
         label={chatOpen ? $i18n.t('call.showCall') : $i18n.t('call.showChat')}
         aria-pressed={chatOpen}
         onclick={onToggleChat}
@@ -142,7 +142,7 @@
       <IconButton
         class="call-button"
         variant="ghost"
-        size="small"
+        size="medium"
         label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
         onclick={onCall}
       >
@@ -153,7 +153,7 @@
     <IconButton
       class="members-button selection-open"
       variant="ghost"
-      size="small"
+      size="medium"
       label={$i18n.t('timeline.members')}
       aria-pressed={membersOpen}
       data-state={membersOpen ? 'open' : 'closed'}
