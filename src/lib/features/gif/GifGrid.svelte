@@ -174,6 +174,8 @@
   }
 
   .gif-star {
+    --star-size: calc(var(--icon-size-small) + var(--space-100) * 2);
+
     align-items: center;
     background: var(--surface-container);
     border: 0;
@@ -181,11 +183,19 @@
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
+    height: var(--star-size);
     justify-content: center;
-    padding: var(--space-100);
     position: absolute;
     right: 0.25rem;
     top: 0.25rem;
+    width: var(--star-size);
+  }
+
+  .gif-star::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--star-size) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   .gif-star :global(svg) {
