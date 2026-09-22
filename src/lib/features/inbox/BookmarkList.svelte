@@ -159,8 +159,10 @@
     border-top: var(--border-width) solid var(--bg-container-line);
   }
 
-  li:hover {
-    background: var(--bg-container-hover);
+  @media (hover: hover) and (pointer: fine) {
+    li:hover {
+      background: var(--bg-container-hover);
+    }
   }
 
   .row {

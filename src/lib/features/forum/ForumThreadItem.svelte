@@ -80,8 +80,10 @@
     width: 100%;
   }
 
-  .forum-thread-button:hover {
-    background: var(--surface-container-hover);
+  @media (hover: hover) and (pointer: fine) {
+    .forum-thread-button:hover {
+      background: var(--surface-container-hover);
+    }
   }
 
   .forum-thread-body {

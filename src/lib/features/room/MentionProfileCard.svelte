@@ -702,8 +702,10 @@
     flex: none;
   }
 
-  :global(.profile-action:hover:not([aria-expanded='true'])) {
-    background: color-mix(in oklab, var(--bg-on-container) 7%, transparent);
+  @media (hover: hover) and (pointer: fine) {
+    :global(.profile-action:hover:not([aria-expanded='true'])) {
+      background: color-mix(in oklab, var(--bg-on-container) 7%, transparent);
+    }
   }
 
   :global(.profile-action:focus-visible) {
