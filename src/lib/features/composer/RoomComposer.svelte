@@ -21,7 +21,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
-  import { LongPress } from '#lib/features/room/long-press.svelte.js';
+  import { LongPress } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
   import { pickFiles } from '#lib/platform/files.js';

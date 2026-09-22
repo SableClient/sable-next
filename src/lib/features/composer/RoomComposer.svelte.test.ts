@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { ImagePackView, MemberView } from '#src/generated/protocol';
+import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import { mount, tick, unmount } from 'svelte';
@@ -976,7 +977,7 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   button.dispatchEvent(
     new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
   );
-  await vi.advanceTimersByTimeAsync(450);
+  await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
 
   expect(document.body.textContent).toContain('Schedule this message');

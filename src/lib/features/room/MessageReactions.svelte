@@ -9,7 +9,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { LongPress } from './long-press.svelte.js';
+  import { LongPress } from '#lib/ui/long-press.svelte.js';
   import ReactionPicker from './ReactionPicker.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {

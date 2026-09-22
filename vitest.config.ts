@@ -29,7 +29,7 @@ export default mergeConfig(
             include: ['src/**/*.test.ts'],
             exclude: [
               'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
-              'src/lib/features/room/long-press.svelte.test.ts',
+              'src/lib/ui/long-press.svelte.test.ts',
               'src/lib/features/room/message-swipe.svelte.test.ts',
               'src/lib/core/attachment-info.test.ts',
               'src/lib/ui/shortcuts/binding.test.ts',
@@ -49,7 +49,7 @@ export default mergeConfig(
             environment: 'happy-dom',
             include: [
               'src/lib/features/room/TimelineReadReceipt.svelte.test.ts',
-              'src/lib/features/room/long-press.svelte.test.ts',
+              'src/lib/ui/long-press.svelte.test.ts',
               'src/lib/features/room/message-swipe.svelte.test.ts',
               'src/lib/core/attachment-info.test.ts',
               'src/lib/ui/shortcuts/binding.test.ts',

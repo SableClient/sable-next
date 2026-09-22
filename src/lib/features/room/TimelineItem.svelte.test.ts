@@ -7,6 +7,7 @@ import type { TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
+import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
@@ -738,7 +739,7 @@ test('long pressing a reaction opens its people list without toggling it', async
   if (!reaction) throw new Error('reaction was not rendered');
 
   reaction.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
-  await vi.advanceTimersByTimeAsync(450);
+  await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
   reaction.click();
 

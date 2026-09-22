@@ -1,13 +1,33 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { armTrailingClickSwallow } from '#lib/ui/trailing-click.js';
 
-const LONG_PRESS_MS = 450;
+export const LONG_PRESS_MS = 600;
 const LONG_PRESS_SLOP_PX = 10;
 
 export interface LongPressOptions {
   enabled?: () => boolean;
   stopPropagation?: boolean;
-  onPress: () => void;
+  onPress: (event: PointerEvent) => void;
+}
+
+export function longPress(options: LongPressOptions): (node: Element) => () => void {
+  return (node) => {
+    const press = new LongPress(options);
+    const listeners = [
+      ['pointerdown', press.start],
+      ['pointermove', press.move],
+      ['pointerup', press.end],
+      ['pointercancel', press.end],
+      ['pointerleave', press.end],
+    ] as const;
+    for (const [type, handler] of listeners) node.addEventListener(type, handler as EventListener);
+    return () => {
+      press.cancel();
+      for (const [type, handler] of listeners) {
+        node.removeEventListener(type, handler as EventListener);
+      }
+    };
+  };
 }
 
 export class LongPress {
@@ -33,7 +53,7 @@ export class LongPress {
       this.fired = true;
       hapticFeedback('medium');
       armTrailingClickSwallow();
-      this.options.onPress();
+      this.options.onPress(event);
     }, LONG_PRESS_MS);
   };
 

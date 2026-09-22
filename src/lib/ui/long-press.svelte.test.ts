@@ -1,7 +1,7 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import { LongPress } from './long-press.svelte.js';
+import { LONG_PRESS_MS, LongPress } from './long-press.svelte.js';
 
 vi.mock('#lib/platform/haptics.js', () => ({ hapticFeedback: vi.fn() }));
 
@@ -26,7 +26,7 @@ test('a held press fires once the delay elapses', () => {
   expect(onPress).not.toHaveBeenCalled();
   expect(hapticFeedback).not.toHaveBeenCalled();
 
-  vi.advanceTimersByTime(450);
+  vi.advanceTimersByTime(LONG_PRESS_MS);
 
   expect(onPress).toHaveBeenCalledOnce();
   expect(hapticFeedback).toHaveBeenCalledExactlyOnceWith('medium');
@@ -69,7 +69,7 @@ test('staying within the slop keeps the press alive', () => {
 
   press.start(pointer());
   press.move(pointer({ clientX: 4 }));
-  vi.advanceTimersByTime(450);
+  vi.advanceTimersByTime(LONG_PRESS_MS);
 
   expect(onPress).toHaveBeenCalledOnce();
   expect(hapticFeedback).toHaveBeenCalledExactlyOnceWith('medium');
@@ -124,7 +124,7 @@ test('the trailing click a fired press produces is swallowed once', () => {
   document.body.append(item);
 
   press.start(pointer());
-  vi.advanceTimersByTime(450);
+  vi.advanceTimersByTime(LONG_PRESS_MS);
   press.end(pointer());
   item.click();
 

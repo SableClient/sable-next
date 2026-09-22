@@ -13,7 +13,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
-  import { LongPress } from './long-press.svelte.js';
+  import { LongPress } from '#lib/ui/long-press.svelte.js';
   import {
     findMember,
     personaWithColor,
