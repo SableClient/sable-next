@@ -15,6 +15,7 @@ import {
   formatMessageTimestamp,
   formatTime,
   canRedact,
+  cumulativeReadBy,
   eventBefore,
   isCollapsed,
   isMessageRow,
@@ -37,6 +38,28 @@ const scrolledPast = {
 test('marks the newest event scrolled past', () => {
   expect(readReceiptEventId(items, scrolledPast)).toBe('$latest');
   expect(readReceiptEventId(items, { ...scrolledPast, visibleEventId: '$older' })).toBe('$older');
+});
+
+test('an old message lists everyone who read it or anything after it', () => {
+  const timeline = [
+    { id: 'old', read_by: [] },
+    { id: 'middle', read_by: ['@bob:example.org'] },
+    { id: 'new', read_by: ['@carol:example.org'] },
+  ] as TimelineItemView[];
+  const readers = cumulativeReadBy(timeline);
+
+  expect(readers.get('old')).toEqual(['@bob:example.org', '@carol:example.org']);
+  expect(readers.get('middle')).toEqual(['@bob:example.org', '@carol:example.org']);
+  expect(readers.get('new')).toEqual(['@carol:example.org']);
+});
+
+test('a message keeps its own readers alongside later ones', () => {
+  const timeline = [
+    { id: 'a', read_by: ['@bob:example.org'] },
+    { id: 'b', read_by: ['@bob:example.org', '@carol:example.org'] },
+  ] as TimelineItemView[];
+
+  expect(cumulativeReadBy(timeline).get('a')).toEqual(['@bob:example.org', '@carol:example.org']);
 });
 
 test('the read marker for a marked-unread message is the event before it', () => {

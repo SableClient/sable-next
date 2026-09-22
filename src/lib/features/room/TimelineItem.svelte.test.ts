@@ -272,6 +272,74 @@ test('badges a message with its own readers, and only in that placement', async 
   await unmount(instance);
 });
 
+test('the receipt dialog lists readers of later messages, not only the badge', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: true,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  const members = [
+    {
+      user_id: '@bob:example.org',
+      display_name: 'Bob',
+      avatar_url: null,
+      power_level: 0,
+      membership: 'join' as const,
+      member_ts: null,
+      kicked: false,
+      service: false,
+    },
+    {
+      user_id: '@carol:example.org',
+      display_name: 'Carol',
+      avatar_url: null,
+      power_level: 0,
+      membership: 'join' as const,
+      member_ts: null,
+      kicked: false,
+      service: false,
+    },
+  ];
+  const read = { ...item(false), read_by: [] };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: {
+        item: read,
+        collapsed: false,
+        members,
+        currentUserId: '@alice:example.org',
+        readersForDialog: ['@bob:example.org', '@carol:example.org'],
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.read-receipt-stack')).toBeNull();
+
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+
+  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find((row) =>
+    row.textContent.includes('Read receipts')
+  );
+  if (!entry) throw new Error('read receipts entry was not rendered');
+  (entry as HTMLElement).click();
+  await tick();
+
+  const listed = [...document.querySelectorAll('.receipts-dialog li')].map((row) =>
+    row.textContent.trim()
+  );
+  expect(listed.some((row) => row.includes('Bob'))).toBe(true);
+  expect(listed.some((row) => row.includes('Carol'))).toBe(true);
+
+  await unmount(instance);
+  vi.unstubAllGlobals();
+});
+
 test('keeps the sender header for an ordinary message', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

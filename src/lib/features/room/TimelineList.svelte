@@ -28,6 +28,7 @@
   import TypingIndicator from './TypingIndicator.svelte';
   import type { MatrixLink } from './matrix-link';
   import {
+    cumulativeReadBy,
     isCollapsed,
     latestEventId,
     mergeAggregations,
@@ -189,6 +190,7 @@
   let focusNavigation: AbortController | null = null;
   let visibleItemCount = 0;
   let personas = $derived(personaLookup(timeline.items));
+  let readersByItem = $derived(cumulativeReadBy(timeline.items));
   let personaOpen = $state(false);
   let noHistory = $derived(
     visibleItems.length === 0 && (historyExhausted || timeline.backwardPagination === 'end')
@@ -654,6 +656,7 @@
                   {canRedactOthers}
                   {encrypted}
                   {members}
+                  readersForDialog={readersByItem.get(item.id) ?? item.read_by}
                   layout={preferences.layout}
                   alignOwn={preferences.alignOwnMessages}
                   {onJumpToEvent}

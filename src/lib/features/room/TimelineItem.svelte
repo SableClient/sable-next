@@ -103,6 +103,7 @@
     layout?: TimelineLayout;
     alignOwn?: boolean;
     members?: readonly MemberView[];
+    readersForDialog?: readonly string[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
     onPersonaAvatarClick?: (source: string, displayName: string) => void;
@@ -140,6 +141,7 @@
     layout = 'modern',
     alignOwn = true,
     members = [],
+    readersForDialog,
     onJumpToEvent,
     onOpenMedia,
     onPersonaAvatarClick,
@@ -473,6 +475,9 @@
   let receiptsOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
   let receiptReaders = $derived(item.read_by.filter((readerId) => readerId !== currentUserId));
+  let dialogReaders = $derived(
+    (readersForDialog ?? item.read_by).filter((readerId) => readerId !== currentUserId)
+  );
   let showReceiptBadge = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'message'
   );
@@ -644,7 +649,7 @@
     {#if receiptsOpen}
       <ReceiptsDialog
         bind:open={receiptsOpen}
-        readers={receiptReaders}
+        readers={dialogReaders}
         {members}
         onMemberProfile={onSenderProfile}
       />

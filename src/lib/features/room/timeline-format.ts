@@ -280,6 +280,25 @@ export function isCollapsed(
   );
 }
 
+/**
+ * Readers whose latest receipt is on this item or a later one. The SDK moves a
+ * receipt to its newest event, so an old message otherwise loses its readers.
+ */
+export function cumulativeReadBy(
+  items: readonly TimelineItemView[]
+): Map<string, readonly string[]> {
+  const readers = new Map<string, readonly string[]>();
+  const seen = new Set<string>();
+  let cumulative: string[] = [];
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const fresh = items[index].read_by.filter((userId) => !seen.has(userId));
+    for (const userId of fresh) seen.add(userId);
+    if (fresh.length > 0) cumulative = [...fresh, ...cumulative];
+    readers.set(items[index].id, cumulative);
+  }
+  return readers;
+}
+
 export function latestEventId(items: readonly TimelineItemView[]): string | null {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const eventId = items[index].event_id;
