@@ -127,7 +127,15 @@
   --button-icon-size: var(--size-x400);
   --button-padding-inline: 0;
 
+  position: relative;
   width: var(--button-height);
+}
+
+.icon-button::after {
+  border-radius: inherit;
+  content: '';
+  inset: calc((var(--button-height) - var(--target-hit)) / 2);
+  position: absolute;
 }
 
 .icon-button-small {
