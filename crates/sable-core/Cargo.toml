@@ -67,8 +67,8 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
-matrix-sdk-test = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb" }
-matrix-sdk-test-utils = { version = "0.18.0", git = "https://github.com/eleboucher/matrix-rust-sdk", rev = "0202eb52b6b9aa03bad41e100c90f10741816bdb" }
+matrix-sdk-test = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83" }
+matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
