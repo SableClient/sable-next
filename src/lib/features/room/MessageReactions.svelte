@@ -211,6 +211,7 @@
   }
 
   .reaction-key em {
+    display: block;
     font-size: var(--font-size-body);
     font-style: normal;
     line-height: 1;
