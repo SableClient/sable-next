@@ -67,7 +67,7 @@
   .inbox-sheet {
     display: grid;
     gap: var(--space-500);
-    padding: 0 var(--space-300) var(--space-400) var(--space-400);
+    padding: var(--space-400);
   }
 
   .inbox-sheet header {

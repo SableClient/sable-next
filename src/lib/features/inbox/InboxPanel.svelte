@@ -42,6 +42,7 @@
         side="top"
         align="end"
         sideOffset={8}
+        collisionPadding={12}
       >
         <InboxView variant="sheet" />
       </Popover.Content>
