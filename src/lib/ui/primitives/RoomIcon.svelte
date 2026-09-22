@@ -55,7 +55,7 @@
   .room-icon-badge {
     align-items: center;
     aspect-ratio: 1;
-    background: var(--bg-container);
+    background: var(--room-icon-plate, var(--bg-container));
     box-sizing: border-box;
     display: flex;
     justify-content: center;

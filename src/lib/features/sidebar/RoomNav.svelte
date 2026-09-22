@@ -1301,11 +1301,15 @@
   }
 
   .room-row-wrap:focus-within {
+    --room-icon-plate: var(--bg-container-hover);
+
     background: var(--bg-container-hover);
   }
 
   @media (hover: hover) and (pointer: fine) {
     .room-row-wrap:hover {
+      --room-icon-plate: var(--bg-container-hover);
+
       background: var(--bg-container-hover);
     }
   }
@@ -1342,11 +1346,15 @@
   }
 
   .room-row[aria-current='page'] {
+    --room-icon-plate: var(--surface-container-active);
+
     background: var(--surface-container-active);
     color: var(--surface-on-container);
   }
 
   .room-row[aria-current='page']:hover {
+    --room-icon-plate: var(--surface-container-hover);
+
     background: var(--surface-container-hover);
     color: var(--surface-on-container);
   }
@@ -1517,11 +1525,13 @@
   .voice-badge {
     align-items: center;
     background: var(--primary-main);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radii-300);
     color: var(--primary-on-main);
     display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
+    justify-content: center;
+    line-height: 1;
     min-width: 1.25rem;
     padding: var(--space-050) var(--space-150);
   }
@@ -1542,6 +1552,10 @@
     gap: var(--space-200);
     min-width: 0;
     padding: var(--space-050) var(--space-200);
+  }
+
+  .call-participant-list :global(.avatar-root) {
+    --avatar-size: var(--avatar-size-200);
   }
 
   .call-participant-list li span {
