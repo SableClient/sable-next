@@ -259,6 +259,18 @@
     }
   }
 
+  @media (prefers-reduced-motion: no-preference) and (width >= 42rem) {
+    :global(html:not([data-reduced-motion='on']) .dialog-content-verification[data-state='open']) {
+      animation: dialog-in var(--duration-fast) var(--ease-smooth-out);
+    }
+
+    :global(
+      html:not([data-reduced-motion='on']) .dialog-content-verification[data-state='closed']
+    ) {
+      animation: dialog-out var(--motion-normal) var(--ease-smooth-out);
+    }
+  }
+
   @media (prefers-reduced-motion: no-preference) and (width >= 48rem) {
     :global(html:not([data-reduced-motion='on']) .dialog-content-settings[data-state='open']) {
       animation: dialog-in var(--duration-fast) var(--ease-smooth-out);
