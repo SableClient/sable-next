@@ -5,6 +5,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
 
+const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
+
+vi.mock('$app/state', () => ({
+  page: { url: { pathname: '/settings' }, params: {}, state: history.state },
+}));
+vi.mock('$app/navigation', () => ({
+  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
+    Object.assign(history.state, options?.state);
+    return Promise.resolve();
+  },
+}));
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -14,6 +25,7 @@ const core = Object.assign(baseCore, {
   devices: vi.fn<() => Promise<{ devices: DeviceView[]; accountManagement: boolean }>>(),
   deleteDevice: vi.fn<(deviceId: string, password: string | null) => Promise<string | null>>(),
   renameDevice: vi.fn<(deviceId: string, displayName: string) => Promise<void>>(),
+  resetRecoveryKey: vi.fn<() => Promise<string>>(),
 });
 
 import DevicesSettings from './DevicesSettings.svelte';
@@ -52,6 +64,7 @@ const other2: DeviceView = {
 };
 
 afterEach(() => {
+  history.state.overlay = undefined;
   document.body.replaceChildren();
 });
 
@@ -128,6 +141,30 @@ test('renames the current device', async () => {
   await vi.waitFor(() => {
     expect(core.renameDevice).toHaveBeenCalledWith('OWN', 'Laptop');
   });
+
+  await unmount(instance);
+});
+
+test('asks for confirmation before resetting the recovery key', async () => {
+  core.encryptionStatus.mockResolvedValue(status);
+  core.devices.mockResolvedValue({ devices: [own], accountManagement: false });
+  core.resetRecoveryKey.mockResolvedValue('NEW KEY');
+  const instance = mount(DevicesSettings, { target: document.body });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.setting-row .btn')).not.toBeNull();
+  });
+
+  document.querySelector<HTMLButtonElement>('.setting-row .btn')?.click();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.confirm')).not.toBeNull();
+  });
+  expect(core.resetRecoveryKey).not.toHaveBeenCalled();
+
+  document.querySelector<HTMLButtonElement>('.confirm .btn-danger')?.click();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.recovery-key code')?.textContent).toBe('NEW KEY');
+  });
+  expect(core.resetRecoveryKey).toHaveBeenCalledOnce();
 
   await unmount(instance);
 });

@@ -1034,6 +1034,8 @@
     "resetRecoveryKey": "Reset recovery key",
     "resetRecoveryKeyDescription": "Create a new recovery key if you lost yours.",
     "saveRecoveryKey": "Save your recovery key",
+    "resetRecoveryKeyConfirmTitle": "Reset recovery key?",
+    "resetRecoveryKeyConfirmDescription": "Your current key will stop working.",
     "saveRecoveryKeyDescription": "Store this key somewhere safe. It will not be shown again.",
     "savedRecoveryKey": "I have saved this key",
     "loadingEncryption": "Loading encryption status…",

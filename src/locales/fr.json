@@ -1043,6 +1043,8 @@
     "resetRecoveryKey": "Réinitialiser la clé de récupération",
     "resetRecoveryKeyDescription": "Créez une nouvelle clé de récupération si vous avez perdu la vôtre.",
     "saveRecoveryKey": "Enregistrez votre clé de récupération",
+    "resetRecoveryKeyConfirmTitle": "Réinitialiser la clé de récupération ?",
+    "resetRecoveryKeyConfirmDescription": "Votre clé actuelle ne fonctionnera plus.",
     "saveRecoveryKeyDescription": "Conservez cette clé dans un endroit sûr. Elle ne sera plus affichée.",
     "savedRecoveryKey": "J’ai enregistré cette clé",
     "loadingEncryption": "Chargement de l’état du chiffrement…",

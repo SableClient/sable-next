@@ -23,6 +23,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -44,6 +45,7 @@
   let password = $state('');
   let managingRecovery = $state(false);
   let newRecoveryKey = $state<string | null>(null);
+  let confirmingReset = $state(false);
   let deleting = $state<string | null>(null);
   let verificationOpen = $state(false);
   let verifying = $state<string | null>(null);
@@ -248,6 +250,11 @@
     }
   }
 
+  async function confirmReset(): Promise<void> {
+    await manageRecovery(true);
+    confirmingReset = false;
+  }
+
   $effect(() => {
     void refresh();
     const unsubscribe = core.subscribeEvents((event) => {
@@ -367,7 +374,10 @@
             <Button
               variant={status.recovery === 'enabled' ? 'secondary' : 'primary'}
               loading={managingRecovery}
-              onclick={() => void manageRecovery(status?.recovery === 'enabled')}
+              onclick={() => {
+                if (status?.recovery === 'enabled') confirmingReset = true;
+                else void manageRecovery();
+              }}
             >
               {$i18n.t(
                 status.recovery === 'enabled'
@@ -571,6 +581,15 @@
     </SettingsSection>
   </div>
 </AppPageShell>
+
+<ConfirmDialog
+  bind:open={confirmingReset}
+  title={$i18n.t('settings.resetRecoveryKeyConfirmTitle')}
+  description={$i18n.t('settings.resetRecoveryKeyConfirmDescription')}
+  confirmLabel={$i18n.t('settings.resetRecoveryKey')}
+  busy={managingRecovery}
+  onConfirm={() => void confirmReset()}
+/>
 
 {#if status}
   <VerifyDeviceDialog
