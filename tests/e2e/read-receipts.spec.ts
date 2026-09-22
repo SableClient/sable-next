@@ -157,3 +157,44 @@ test('a receipt badge sits beside the last line and leaves the timestamp on the 
   await trigger.click();
   await expect(page.getByRole('heading', { name: 'Read receipts' })).toBeVisible();
 });
+
+test('an emote-only message keeps the badge on its bottom edge', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.setViewportSize({ width: 390, height: 780 });
+  await app.openRoom(ROOM_ID);
+  await timeline.expectAtLatest(LATEST);
+
+  const base = timelineItem('receipted', ':party:');
+  const subscription = await core.subscription(0);
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...base,
+        content: {
+          ...base.content,
+          html: '<img src="mxc://example.test/emote" alt=":party:" title=":party:" />',
+        },
+        sender: '@bob:example.test',
+        sender_name: 'Bob',
+        read_by: ['@bob:example.test', '@carol:example.test'],
+      },
+    },
+  ]);
+
+  await expect(timeline.container.locator('[data-item-id="receipted"]')).toBeVisible();
+  await expect.poll(async () => (await measure(page, 'receipted')).badge !== null).toBe(true);
+
+  const receipted = await measure(page, 'receipted');
+  const badge = receipted.badge;
+  if (!badge) throw new Error('no badge');
+
+  expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
+  expect(badge.height).toBeLessThanOrEqual(30);
+});

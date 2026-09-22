@@ -1381,6 +1381,10 @@
     min-width: 0;
   }
 
+  .receipt-slot {
+    display: flex;
+  }
+
   .message-content > .receipt-slot {
     grid-column: 1;
     place-self: end;
