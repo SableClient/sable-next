@@ -56,6 +56,26 @@ export function imageUsageContent(
   return sameUsage(image, pack) ? undefined : image;
 }
 
+export function togglePackUsage(
+  draft: PackDraft,
+  usage: ImageUsageView,
+  on: boolean
+): PackDraft | null {
+  const next = on
+    ? ALL_USAGES.filter((entry) => draft.usage.includes(entry) || entry === usage)
+    : draft.usage.filter((entry) => entry !== usage);
+  if (next.length === 0) return null;
+
+  return {
+    ...draft,
+    usage: next,
+    // images that followed the pack usage move with it, declared exceptions stay
+    images: draft.images.map((image) =>
+      sameUsage(image.usage, draft.usage) ? { ...image, usage: next } : image
+    ),
+  };
+}
+
 export interface PackImageInfoContent {
   w?: number;
   h?: number;

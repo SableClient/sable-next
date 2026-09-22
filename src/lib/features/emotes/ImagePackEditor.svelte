@@ -26,6 +26,7 @@
     normalizeShortcode,
     packDraft,
     shortcodeWithoutExtension,
+    togglePackUsage,
     uniqueShortcode,
     type PackDraft,
     type PackImageDraft,
@@ -70,12 +71,8 @@
   }
 
   function toggleUsage(usage: ImageUsageView, on: boolean): void {
-    const next = on
-      ? ALL_USAGES.filter((entry) => current.usage.includes(entry) || entry === usage)
-      : current.usage.filter((entry) => entry !== usage);
-    if (next.length === 0) return;
-
-    edit({ ...current, usage: next });
+    const next = togglePackUsage(current, usage, on);
+    if (next !== null) edit(next);
   }
 
   function removeImage(target: PackImageDraft): void {
@@ -107,6 +104,8 @@
     busy = true;
     failed = false;
     try {
+      // pack usage so the per-image usage key is omitted on the wire
+      const packUsage = current.usage;
       const added: PackImageDraft[] = [];
       const requested = normalizeShortcode(shortcode);
       for (const file of files) {
@@ -124,7 +123,7 @@
           shortcode: name,
           url,
           body: null,
-          usage: ALL_USAGES,
+          usage: packUsage,
           info: await readImageInfo(file),
         });
       }

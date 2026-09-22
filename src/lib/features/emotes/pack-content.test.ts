@@ -9,6 +9,7 @@ import {
   packEventContent,
   shortcodeWithoutExtension,
   suffixRename,
+  togglePackUsage,
   uniqueShortcode,
 } from './pack-content';
 
@@ -85,6 +86,69 @@ test('an image usage matching the pack is left to the pack', () => {
   ).wave;
 
   expect(images.usage).toEqual(['emoticon', 'sticker']);
+});
+
+test('an image following a sticker-only pack inherits the pack usage', () => {
+  const draft = packDraft(
+    pack({
+      usage: ['sticker'],
+      images: [
+        {
+          shortcode: 'wave',
+          url: 'mxc://a/b',
+          body: null,
+          usage: ['sticker'],
+          info: null,
+          source_pack: null,
+        },
+      ],
+    })
+  );
+
+  expect((packEventContent(draft).pack as Record<string, unknown>).usage).toEqual(['sticker']);
+  expect(
+    (packEventContent(draft).images as Record<string, Record<string, unknown>>).wave.usage
+  ).toBeUndefined();
+});
+
+test('a toggle moves the images that follow the pack usage and keeps the exceptions', () => {
+  const draft = packDraft(
+    pack({
+      usage: ['emoticon', 'sticker'],
+      images: [
+        {
+          shortcode: 'wave',
+          url: 'mxc://a/b',
+          body: null,
+          usage: ['emoticon', 'sticker'],
+          info: null,
+          source_pack: null,
+        },
+        {
+          shortcode: 'party',
+          url: 'mxc://a/c',
+          body: null,
+          usage: ['emoticon'],
+          info: null,
+          source_pack: null,
+        },
+      ],
+    })
+  );
+
+  const next = togglePackUsage(draft, 'emoticon', false);
+
+  expect(next?.usage).toEqual(['sticker']);
+  expect(next?.images.map((image) => [image.shortcode, image.usage])).toEqual([
+    ['wave', ['sticker']],
+    ['party', ['emoticon']],
+  ]);
+});
+
+test('a toggle that would leave no usage is refused', () => {
+  const draft = packDraft(pack({ usage: ['sticker'] }));
+
+  expect(togglePackUsage(draft, 'sticker', false)).toBeNull();
 });
 
 test('the meta round-trips', () => {
