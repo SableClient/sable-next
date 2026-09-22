@@ -246,8 +246,7 @@ export class RoomList {
     const generation = this.generation;
     const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
     for (const room of pending) this.loadingNotificationModes.add(room.room_id);
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedLoadingModes = new Set(this.loadingNotificationModes);
+    this.publishLoadingModes();
     const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
     for (let index = 0; index < pending.length; index += NOTIFICATION_MODE_BATCH) {
       const batch = pending
@@ -265,13 +264,34 @@ export class RoomList {
       }
     }
     for (const room of pending) this.loadingNotificationModes.delete(room.room_id);
-    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
-    this.publishedLoadingModes = new Set(this.loadingNotificationModes);
+    this.publishLoadingModes();
     if (generation !== this.generation) return;
 
-    for (const { roomId, mode } of modes) this.notificationModes.set(roomId, mode);
+    let changed = false;
+    for (const { roomId, mode } of modes) {
+      const previous = this.notificationModes.get(roomId);
+      if (previous?.room === mode.room && previous.fallback === mode.fallback) continue;
+
+      this.notificationModes.set(roomId, mode);
+      changed = true;
+    }
+    if (!changed) return;
+
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
     this.publishedModes = new Map(this.notificationModes);
+  }
+
+  private publishLoadingModes(): void {
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
+    const firstRead = new Set<string>();
+    for (const roomId of this.loadingNotificationModes) {
+      if (!this.notificationModes.has(roomId)) firstRead.add(roomId);
+    }
+    const published = this.publishedLoadingModes;
+    if (firstRead.size === published.size && [...firstRead].every((id) => published.has(id)))
+      return;
+
+    this.publishedLoadingModes = firstRead;
   }
 
   private notificationModeIsLoading(roomId: string): boolean {
