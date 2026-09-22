@@ -71,6 +71,7 @@
   import IncomingCallDialog from '#lib/features/call/IncomingCallDialog.svelte';
   import { IncomingCalls, type IncomingCall } from '#lib/features/call/incoming-calls.svelte.js';
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
+  import { effectiveVolume } from '#lib/features/call/participant-volumes.svelte.js';
   import { ringtoneVolume, startRingback } from '#lib/features/call/ringtone.js';
   import { putPushContentPolicy, RoomNameWriter } from '#lib/features/notifications/room-names.js';
   import {
@@ -109,6 +110,12 @@
   const incomingCalls = new IncomingCalls(core);
   const callSession = new CallSession(core);
   provideCallSession(callSession);
+
+  let callUserIds = $derived(
+    new Map(callSession.members.map((member) => [member.identity, member.user_id]))
+  );
+  const callVolumeOf = (identity: string): number =>
+    effectiveVolume(callUserIds.get(identity) ?? identity);
   const shareInbox = new ShareInbox();
 
   let openRoomId = $derived(findRoomByPathId(roomList.rooms, page.params.roomId)?.room_id ?? null);
@@ -660,6 +667,7 @@
             room={entry.room}
             telemetry={callSession.telemetry}
             deafened={callSession.deafened}
+            volumeOf={callVolumeOf}
           />
         {/each}
       {/await}

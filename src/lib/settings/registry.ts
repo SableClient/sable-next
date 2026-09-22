@@ -845,6 +845,43 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.clearNotificationsOnReadHint',
         type: 'boolean',
       },
+    ],
+  },
+  {
+    id: 'calls',
+    name: 'settings.callsTitle',
+    description: 'settings.callsDescription',
+    icon: PhoneIcon,
+    items: [
+      {
+        key: 'noiseSuppression',
+        icon: MicrophoneIcon,
+        name: 'settings.noiseSuppression',
+        description: 'settings.noiseSuppressionHint',
+        type: 'boolean',
+      },
+      {
+        key: 'voiceIsolation',
+        icon: MicrophoneIcon,
+        name: 'settings.voiceIsolation',
+        description: 'settings.voiceIsolationHint',
+        type: 'boolean',
+        gatedBy: 'noiseSuppression',
+      },
+      {
+        key: 'echoCancellation',
+        icon: MicrophoneIcon,
+        name: 'settings.echoCancellation',
+        description: 'settings.echoCancellationHint',
+        type: 'boolean',
+      },
+      {
+        key: 'autoGainControl',
+        icon: MicrophoneIcon,
+        name: 'settings.autoGainControl',
+        description: 'settings.autoGainControlHint',
+        type: 'boolean',
+      },
       {
         key: 'incomingCallSound',
         icon: PhoneIcon,

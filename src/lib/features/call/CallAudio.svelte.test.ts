@@ -35,6 +35,7 @@ function fakeRoom(initialTrack?: RemoteTrack): FakeRoom {
       [
         'participant',
         {
+          identity: 'participant',
           audioTrackPublications: new Map([['publication', { track: initialTrack }]]),
         },
       ],
@@ -93,7 +94,7 @@ test('attaches existing and newly subscribed remote audio and reports playback s
     'audio.playback_allowed': true,
   });
 
-  room.emit(RoomEvent.TrackSubscribed, next);
+  room.emit(RoomEvent.TrackSubscribed, next, undefined, { identity: 'next' });
   expect(next.attach).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('audio')).toHaveLength(2);
 
@@ -109,6 +110,26 @@ test('attaches existing and newly subscribed remote audio and reports playback s
   expect(room.listenerCount(RoomEvent.TrackSubscribed)).toBe(0);
   expect(room.listenerCount(RoomEvent.TrackUnsubscribed)).toBe(0);
   expect(room.listenerCount(RoomEvent.AudioPlaybackStatusChanged)).toBe(0);
+});
+
+test('applies a per-participant volume to attached audio', async () => {
+  const initial = fakeTrack('initial');
+  const room = fakeRoom(initial);
+  const volumes: Record<string, number> = { participant: 0.4, next: 0 };
+
+  const instance = mount(CallAudio, {
+    target: document.body,
+    props: { room: room.room, volumeOf: (identity: string) => volumes[identity] ?? 1 },
+  });
+  await tick();
+
+  const elements = () => [...document.querySelectorAll('audio')];
+  expect(elements()[0].volume).toBe(0.4);
+
+  room.emit(RoomEvent.TrackSubscribed, fakeTrack('next'), undefined, { identity: 'next' });
+  expect(elements()[1].volume).toBe(0);
+
+  await unmount(instance);
 });
 
 test('replaces room listeners and tracks with the current room', async () => {

@@ -113,6 +113,13 @@ export interface Preferences {
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callRingtoneVolume: CallRingtoneVolume;
+  noiseSuppression: boolean;
+  voiceIsolation: boolean;
+  echoCancellation: boolean;
+  autoGainControl: boolean;
+  audioInputDevice: string;
+  audioOutputDevice: string;
+  videoInputDevice: string;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -187,6 +194,9 @@ const ENUMS = {
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
+  'audioInputDevice',
+  'audioOutputDevice',
+  'videoInputDevice',
   'presenceStatusMessage',
   'loadingAnimal',
   'pushGatewayUrl',
@@ -285,6 +295,13 @@ const DEFAULTS: Preferences = {
   incomingCallSound: true,
   outgoingRingback: true,
   callRingtoneVolume: 'normal',
+  noiseSuppression: true,
+  voiceIsolation: false,
+  echoCancellation: true,
+  autoGainControl: true,
+  audioInputDevice: '',
+  audioOutputDevice: '',
+  videoInputDevice: '',
 
   pushGatewayUrl: '',
   pushVapidKey: '',

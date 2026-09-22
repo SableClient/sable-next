@@ -2,12 +2,22 @@
   interface Props {
     min?: number;
     max: number;
+    step?: number;
     disabled?: boolean;
     label: string;
     value: number;
+    oninput?: (value: number) => void;
   }
 
-  let { min = 1, max = 2, disabled = false, label, value = $bindable(1) }: Props = $props();
+  let {
+    min = 1,
+    max = 2,
+    step = 1,
+    disabled = false,
+    label,
+    value = $bindable(1),
+    oninput,
+  }: Props = $props();
   let progress = $derived(((value - min) / (max - min)) * 100);
 </script>
 
@@ -15,8 +25,10 @@
   type="range"
   {min}
   {max}
+  {step}
   class="max-selection-slider"
   bind:value
+  oninput={() => oninput?.(value)}
   style={`--progress: ${progress}%`}
   {disabled}
   aria-label={label}

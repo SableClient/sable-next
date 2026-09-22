@@ -4,6 +4,7 @@ import { ConnectionState, RoomEvent, type Room } from 'livekit-client';
 import { createLivekitTransport } from './livekit-transport';
 import type { CallTelemetry } from './call-telemetry';
 import { MatrixKeyProvider } from './key-provider';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 function roomFixture() {
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
@@ -306,4 +307,28 @@ test('emits per-receiver health without the participant identity', async () => {
   ]);
   expect(JSON.stringify(receiver)).not.toContain('sensitive-participant-identity');
   await transport.disconnect();
+});
+
+test('carries the microphone processing preferences into the room options', () => {
+  preferences.noiseSuppression = false;
+  preferences.echoCancellation = false;
+  preferences.autoGainControl = true;
+
+  let options: ConstructorParameters<typeof Room>[0];
+  createLivekitTransport({
+    encryptMedia: false,
+    createRoom: (config) => {
+      options = config;
+      return roomFixture().room;
+    },
+  });
+
+  expect(options?.audioCaptureDefaults).toEqual({
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: true,
+  });
+
+  preferences.noiseSuppression = true;
+  preferences.echoCancellation = true;
 });

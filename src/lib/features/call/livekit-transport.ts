@@ -8,6 +8,8 @@ import {
   type TrackPublication,
 } from 'livekit-client';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import type {
   CallConnectionQuality,
   CallEncryptionKey,
@@ -76,6 +78,19 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({
     adaptiveStream: true,
     dynacast: false,
+    audioCaptureDefaults: {
+      echoCancellation: preferences.echoCancellation,
+      noiseSuppression: preferences.noiseSuppression,
+      autoGainControl: preferences.autoGainControl,
+      ...(preferences.voiceIsolation ? { voiceIsolation: true } : {}),
+      ...(preferences.audioInputDevice ? { deviceId: preferences.audioInputDevice } : {}),
+    },
+    ...(preferences.videoInputDevice
+      ? { videoCaptureDefaults: { deviceId: preferences.videoInputDevice } }
+      : {}),
+    ...(preferences.audioOutputDevice
+      ? { audioOutput: { deviceId: preferences.audioOutputDevice } }
+      : {}),
     ...(keyProvider && worker ? { encryption: { keyProvider, worker } } : {}),
   });
 
