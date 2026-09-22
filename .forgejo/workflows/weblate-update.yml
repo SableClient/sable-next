@@ -11,7 +11,7 @@ permissions: {}
 jobs:
   sync:
     name: Sync translations with Weblate
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 5
     permissions: {}
     steps:

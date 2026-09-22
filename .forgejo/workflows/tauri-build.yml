@@ -28,7 +28,7 @@ env:
 jobs:
   setup-release:
     name: Resolve release target
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write
@@ -387,7 +387,7 @@ jobs:
   github-bundles:
     name: Wait for GitHub bundles
     needs: setup-release
-    runs-on: ubuntu-latest
+    runs-on: light
     # github-bundles.json is published by the GitHub-side handoff job, which
     # waits on the whole desktop/linux/ios matrix.
     timeout-minutes: 120
@@ -406,7 +406,7 @@ jobs:
   obtainium:
     name: Publish Obtainium config
     needs: [setup-release, android, github-bundles]
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write
@@ -426,7 +426,7 @@ jobs:
   altstore:
     name: Publish AltStore source
     needs: [setup-release, github-bundles]
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write
@@ -481,7 +481,7 @@ jobs:
     name: Publish updater manifest
     needs: [setup-release, linux, github-bundles]
     if: ${{ always() && needs.setup-release.result == 'success' && needs.linux.result == 'success' && needs.github-bundles.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write
@@ -503,7 +503,7 @@ jobs:
     name: Refresh latest tag
     needs: [setup-release, updater-manifest, altstore]
     if: ${{ needs.setup-release.outputs.nightly != 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write
@@ -543,7 +543,7 @@ jobs:
     name: Refresh nightly channel metadata
     needs: [setup-release, updater-manifest, obtainium, altstore]
     if: ${{ always() && needs.setup-release.outputs.nightly == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: light
     timeout-minutes: 10
     permissions:
       contents: write

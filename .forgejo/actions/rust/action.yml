@@ -44,6 +44,7 @@ runs:
       with:
         shared-key: ${{ inputs.cache-key }}
         cache-on-failure: true
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Set up mise
       if: ${{ inputs.mise == 'true' }}

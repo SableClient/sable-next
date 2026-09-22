@@ -44,26 +44,6 @@ env:
   SCCACHE_S3_USE_SSL: 'true'
 
 jobs:
-  format:
-    name: Rust format
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Set up Rust
-        uses: https://github.com/dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
-        with:
-          toolchain: 1.98.1
-          components: rustfmt
-
-      - name: Check Rust formatting
-        run: cargo fmt --all -- --check
-
   # Grouped by dependency tree, not by command: the workspace at --all-features
   # and the app crate share almost no compiled artifacts, so a job spanning both
   # builds two trees and pays for each again in every other such job.
@@ -186,7 +166,7 @@ jobs:
         run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
 
   policy:
-    name: Dependency policy
+    name: Format and dependency policy
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -202,6 +182,7 @@ jobs:
         uses: https://github.com/dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
         with:
           toolchain: 1.98.1
+          components: rustfmt
 
       - name: Set up mise
         uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -218,3 +199,7 @@ jobs:
       # Prebuilt, rather than a `cargo install` that compiles it every run.
       - name: Check dependency policy
         run: mise exec aqua:EmbarkStudios/cargo-deny@0.20.2 -- cargo-deny check
+
+      - name: Check Rust formatting
+        if: ${{ !cancelled() }}
+        run: cargo fmt --all -- --check

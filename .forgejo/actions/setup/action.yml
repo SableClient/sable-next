@@ -75,6 +75,7 @@ runs:
       with:
         shared-key: ${{ inputs.rust-cache-key }}
         cache-on-failure: true
+        save-if: ${{ github.ref == 'refs/heads/main' }}
 
     - name: Install JavaScript dependencies
       shell: bash

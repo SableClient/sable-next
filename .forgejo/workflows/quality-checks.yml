@@ -55,7 +55,7 @@ jobs:
           retention-days: 7
 
   format:
-    name: Format check
+    name: Format and Stylelint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -75,33 +75,16 @@ jobs:
       - name: Check Oxfmt formatting
         run: pnpm fmt:check
 
-  stylelint:
-    name: Stylelint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up app
-        uses: ./.forgejo/actions/setup
-        with:
-          build: 'false'
-          install-mise-tools: 'false'
-
       - name: Run Stylelint
+        if: ${{ !cancelled() }}
         run: pnpm stylelint
 
-  lint:
-    name: Lint
+  checks:
+    name: Lint, typecheck and tests
     # ESLint runs with projectService, so it needs the generated WASM bindings.
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -133,58 +116,12 @@ jobs:
       - name: Run ESLint
         run: pnpm lint
 
-  typecheck:
-    name: Typecheck
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download web assets
-        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
-        with:
-          name: web-assets
-
-      - name: Set up app
-        uses: ./.forgejo/actions/setup
-        with:
-          build: 'false'
-          install-mise-tools: 'false'
-
       - name: Run svelte-check
+        if: ${{ !cancelled() }}
         run: pnpm check
 
-  tests:
-    name: Tests
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Download web assets
-        uses: https://code.forgejo.org/forgejo/download-artifact@769f970437aa3291b13f35dc23fc87967d7fb19f # v7
-        with:
-          name: web-assets
-
-      - name: Set up app
-        uses: ./.forgejo/actions/setup
-        with:
-          build: 'false'
-          install-mise-tools: 'false'
-
       - name: Run Vitest with coverage thresholds
+        if: ${{ !cancelled() }}
         run: pnpm test:coverage
 
       - name: Upload coverage report
