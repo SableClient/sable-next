@@ -127,7 +127,7 @@
       label={$i18n.t('nav.switchAccount')}
       class="account-popover"
       side={mode === 'compact' ? 'right' : 'top'}
-      align="center"
+      align={mode === 'compact' ? 'center' : 'start'}
       sideOffset={8}
     >
       {#snippet trigger({ props })}

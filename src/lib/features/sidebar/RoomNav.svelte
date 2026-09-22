@@ -851,9 +851,6 @@
                           >
                         {/if}
                       </span>
-                      {#if typing}
-                        <span class="room-typing"><TypingDots /></span>
-                      {/if}
                       {#if live > 0}
                         <span
                           class="voice-badge"
@@ -861,16 +858,20 @@
                         >
                       {/if}
                       <span class="room-status">
-                        <UnreadBadge
-                          {counts}
-                          dm={room?.is_direct ?? false}
-                          role="img"
-                          aria-label={mentions > 0
-                            ? $i18n.t('nav.unreadMentions', { count: mentions })
-                            : unread > 0
-                              ? $i18n.t('nav.unreadMessages', { count: unread })
-                              : $i18n.t('nav.markedUnread')}
-                        />
+                        {#if typing}
+                          <span class="room-typing"><TypingDots /></span>
+                        {:else}
+                          <UnreadBadge
+                            {counts}
+                            dm={room?.is_direct ?? false}
+                            role="img"
+                            aria-label={mentions > 0
+                              ? $i18n.t('nav.unreadMentions', { count: mentions })
+                              : unread > 0
+                                ? $i18n.t('nav.unreadMessages', { count: unread })
+                                : $i18n.t('nav.markedUnread')}
+                          />
+                        {/if}
                         {#if notifyMode}
                           {@const chip = notificationChip(notifyMode)}
                           <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
@@ -1020,10 +1021,10 @@
   .room-nav-header {
     align-items: center;
     display: flex;
-    flex: 0 0 2.875rem;
+    flex: 0 0 3.5rem;
     gap: var(--space-100);
     justify-content: space-between;
-    min-height: 2.875rem;
+    min-height: 3.5rem;
     padding: 0 var(--space-300) 0 var(--space-400);
   }
 
@@ -1195,16 +1196,18 @@
     align-items: center;
     background: transparent;
     border: 0;
+    border-radius: var(--radius);
     color: inherit;
     cursor: pointer;
     display: flex;
     font: inherit;
     gap: var(--space-100);
     height: var(--control-height-medium);
+    margin-inline: var(--space-200);
     opacity: var(--opacity-p300);
     padding: 0 var(--space-200);
     text-align: left;
-    width: 100%;
+    width: calc(100% - var(--space-200) * 2);
   }
 
   .rooms-heading:focus-visible {
