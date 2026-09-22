@@ -44,6 +44,12 @@
   }
 
   let busy = $derived(session.lifecycle === 'joining' || session.lifecycle === 'connecting');
+
+  let tiles = $derived(
+    session.transport.self
+      ? [session.transport.self, ...session.transport.participants]
+      : session.transport.participants
+  );
 </script>
 
 <section class="call" aria-label={$i18n.t('call.title')}>
@@ -66,11 +72,11 @@
 
   <CallPlayback rooms={session.rooms} telemetry={session.telemetry} />
 
-  {#if session.transport.participants.length === 0}
+  {#if tiles.length === 0}
     <p class="empty">{$i18n.t('call.noParticipants')}</p>
   {:else}
     <ul class="grid">
-      {#each session.transport.participants as participant (`${participant.backendId ?? 'legacy'}:${participant.identity}`)}
+      {#each tiles as participant (`${participant.backendId ?? 'legacy'}:${participant.identity}`)}
         {@const profile = profileOf(participant.identity)}
         <CallParticipantTile
           {participant}

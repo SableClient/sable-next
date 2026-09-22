@@ -367,3 +367,17 @@ test('connects listen-only when the microphone permission was refused', async ()
   expect(fixture.camera).toHaveBeenCalledOnce();
   await transport.disconnect();
 });
+
+test('publishes the local participant so the call can render a self view', async () => {
+  const fixture = roomFixture();
+  const transport = createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => fixture.room,
+  });
+
+  await transport.connect({ ...connectOptions, cameraEnabled: true });
+
+  expect(transport.getState().self).toMatchObject({ local: true });
+  expect(transport.getState().participants).toHaveLength(0);
+  await transport.disconnect();
+});

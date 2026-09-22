@@ -19,6 +19,7 @@ finish-args:
   - --device=dri
   - --share=network
   - --socket=pulseaudio
+  - --filesystem=xdg-run/pipewire-0
   - --device=all
   - --talk-name=org.freedesktop.secrets
   - --talk-name=org.freedesktop.Notifications

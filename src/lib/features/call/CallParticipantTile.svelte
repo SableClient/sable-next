@@ -6,7 +6,7 @@
   import WifiLowIcon from 'phosphor-svelte/lib/WifiLowIcon';
   import WifiSlashIcon from 'phosphor-svelte/lib/WifiSlashIcon';
   import { untrack } from 'svelte';
-  import type { RemoteParticipant, Room as LivekitRoom } from 'livekit-client';
+  import type { Participant, Room as LivekitRoom } from 'livekit-client';
   import { Track } from 'livekit-client';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -36,8 +36,16 @@
     onVolumeChange?.(participant.identity, next);
   }
 
+  let screenShareOn = $derived(
+    participant.screenShare !== undefined &&
+      !participant.screenShare.muted &&
+      (participant.local === true || participant.screenShare.subscribed)
+  );
   let cameraOn = $derived(
-    participant.camera !== undefined && !participant.camera.muted && participant.camera.subscribed
+    screenShareOn ||
+      (participant.camera !== undefined &&
+        !participant.camera.muted &&
+        (participant.local === true || participant.camera.subscribed))
   );
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
@@ -56,8 +64,11 @@
 
   function attachVideo(node: HTMLVideoElement) {
     const identity = untrack(() => participant.identity);
-    const remote: RemoteParticipant | undefined = room?.remoteParticipants.get(identity);
-    const track = remote?.getTrackPublication(Track.Source.Camera)?.track;
+    const source = untrack(() => (screenShareOn ? Track.Source.ScreenShare : Track.Source.Camera));
+    const owner: Participant | undefined = untrack(() => participant.local)
+      ? room?.localParticipant
+      : room?.remoteParticipants.get(identity);
+    const track = owner?.getTrackPublication(source)?.track;
     track?.attach(node);
 
     return () => {
@@ -66,9 +77,16 @@
   }
 </script>
 
-<li class="tile" class:live={!muted}>
+<li class="tile" class:live={!muted} class:self={participant.local}>
   {#if cameraOn}
-    <video class="video" autoplay muted playsinline {@attach attachVideo}></video>
+    <video
+      class="video"
+      class:mirrored={participant.local && !screenShareOn}
+      autoplay
+      muted
+      playsinline
+      {@attach attachVideo}
+    ></video>
   {:else}
     <div class="placeholder">
       <Avatar src={avatar} {name} id={userId} size="large" />
@@ -94,20 +112,22 @@
         <span class="visually-hidden">{$i18n.t('call.connectionLost')}</span>
       </span>
     {/if}
-    <IconButton
-      variant="ghost"
-      size="small"
-      class="volume-toggle"
-      label={$i18n.t('call.participantVolume', { name })}
-      aria-expanded={volumeOpen}
-      onclick={() => (volumeOpen = !volumeOpen)}
-    >
-      {#if volume === 0}
-        <SpeakerSlashIcon />
-      {:else}
-        <SpeakerHighIcon />
-      {/if}
-    </IconButton>
+    {#if !participant.local}
+      <IconButton
+        variant="ghost"
+        size="small"
+        class="volume-toggle"
+        label={$i18n.t('call.participantVolume', { name })}
+        aria-expanded={volumeOpen}
+        onclick={() => (volumeOpen = !volumeOpen)}
+      >
+        {#if volume === 0}
+          <SpeakerSlashIcon />
+        {:else}
+          <SpeakerHighIcon />
+        {/if}
+      </IconButton>
+    {/if}
   </div>
 
   {#if volumeOpen}
@@ -156,6 +176,10 @@
     block-size: 100%;
     inline-size: 100%;
     object-fit: cover;
+  }
+
+  .video.mirrored {
+    transform: scaleX(-1);
   }
 
   .placeholder {

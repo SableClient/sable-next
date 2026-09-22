@@ -16,6 +16,7 @@ export type CallConnectionQuality = 'lost' | 'poor' | 'good' | 'excellent' | 'un
 export type CallParticipant = {
   backendId?: string;
   identity: string;
+  local?: boolean;
   camera?: CallTrack;
   screenShare?: CallTrack;
   microphone?: CallTrack;
@@ -27,6 +28,7 @@ export type CallTransportConnection = 'connecting' | 'connected' | 'reconnecting
 export type CallTransportState = {
   connection: CallTransportConnection;
   participants: CallParticipant[];
+  self?: CallParticipant;
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
   screenShareEnabled: boolean;

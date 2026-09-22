@@ -2,6 +2,7 @@ import {
   ConnectionQuality,
   ConnectionState,
   Room as LivekitRoom,
+  type LocalParticipant,
   type RemoteParticipant,
   RoomEvent,
   Track,
@@ -44,6 +45,15 @@ const trackOf = (publication: TrackPublication | undefined): CallTrack | undefin
     muted: publication.isMuted,
     subscribed: publication.isSubscribed,
   };
+
+const selfOf = (participant: LocalParticipant): CallParticipant => ({
+  identity: participant.identity,
+  local: true,
+  camera: trackOf(participant.getTrackPublication(Track.Source.Camera)),
+  screenShare: trackOf(participant.getTrackPublication(Track.Source.ScreenShare)),
+  microphone: trackOf(participant.getTrackPublication(Track.Source.Microphone)),
+  connectionQuality: qualityOf(participant.connectionQuality),
+});
 
 const participantOf = (participant: RemoteParticipant): CallParticipant => ({
   identity: participant.identity,
@@ -267,6 +277,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       microphoneEnabled: room.localParticipant.isMicrophoneEnabled,
       cameraEnabled: room.localParticipant.isCameraEnabled,
       screenShareEnabled: room.localParticipant.isScreenShareEnabled,
+      self: selfOf(room.localParticipant),
     });
   };
 
@@ -282,6 +293,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.ConnectionQualityChanged, syncParticipants)
     .on(RoomEvent.LocalTrackPublished, syncLocal)
     .on(RoomEvent.LocalTrackUnpublished, syncLocal)
+    .on(RoomEvent.TrackMuted, syncLocal)
+    .on(RoomEvent.TrackUnmuted, syncLocal)
     .on(RoomEvent.Reconnecting, () => {
       publish({ connection: 'reconnecting' });
       event('call.connection.reconnecting');
