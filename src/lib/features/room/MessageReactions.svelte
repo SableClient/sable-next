@@ -161,7 +161,7 @@
     align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radii-400);
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
@@ -174,7 +174,7 @@
     align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radii-400);
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: grid;
