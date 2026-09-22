@@ -95,6 +95,8 @@
               id="registration-email-token"
               value={emailToken}
               autocomplete="one-time-code"
+              inputmode="numeric"
+              enterkeyhint="done"
               required
               oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
                 emailToken = event.currentTarget.value;

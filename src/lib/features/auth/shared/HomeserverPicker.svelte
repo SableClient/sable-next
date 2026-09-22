@@ -35,6 +35,7 @@
     autocapitalize="off"
     autocorrect="off"
     autocomplete="url"
+    inputmode="url"
     {disabled}
     placeholder={homeservers.default}
     spellcheck={false}

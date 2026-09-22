@@ -24,6 +24,7 @@
     autocapitalize?: BitsCombobox.InputProps['autocapitalize'];
     autocorrect?: BitsCombobox.InputProps['autocorrect'];
     spellcheck?: BitsCombobox.InputProps['spellcheck'];
+    inputmode?: HTMLInputAttributes['inputmode'];
     placeholder?: string;
     disabled?: boolean;
     ariaInvalid?: boolean;
@@ -41,6 +42,7 @@
     autocapitalize,
     autocorrect,
     spellcheck,
+    inputmode,
     disabled = false,
     placeholder,
     ariaInvalid = false,
@@ -86,6 +88,7 @@
       {autocapitalize}
       {autocorrect}
       {spellcheck}
+      {inputmode}
       {placeholder}
       {required}
       {disabled}
