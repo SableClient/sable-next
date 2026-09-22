@@ -119,6 +119,14 @@ const exitEmptyCodeLine: Command = (state, dispatch) => {
   return true;
 };
 
+const deleteInlineAtomBackward: Command = (state, dispatch) => {
+  const cursor = state.selection instanceof TextSelection ? state.selection.$cursor : null;
+  const before = cursor?.nodeBefore;
+  if (!cursor || !before?.isInline || before.type.spec.atom !== true) return false;
+  dispatch?.(state.tr.delete(cursor.pos - before.nodeSize, cursor.pos).scrollIntoView());
+  return true;
+};
+
 const headingToParagraphBackward: Command = (state, dispatch) => {
   const { $from, empty } = state.selection;
   if (!empty || $from.parent.type !== composerSchema.nodes.heading || $from.parentOffset !== 0) {
@@ -507,6 +515,7 @@ export class ComposerEditor {
         Backspace: chainCommands(
           deleteEmptyCodeBlock,
           undoBlockRule,
+          deleteInlineAtomBackward,
           joinListItemBackward,
           headingToParagraphBackward
         ),
@@ -594,7 +603,7 @@ export class ComposerEditor {
               if (event.inputType === 'deleteContentBackward') {
                 if (
                   event.cancelable &&
-                  deleteEmptyCodeBlock(
+                  chainCommands(deleteEmptyCodeBlock, deleteInlineAtomBackward)(
                     view.state,
                     (tr) => {
                       view.dispatch(tr);

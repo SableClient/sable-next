@@ -227,6 +227,21 @@ describe('setHtml', () => {
   });
 });
 
+function caretAfterMention(editorView: EditorView): void {
+  const { doc } = editorView.state;
+  editorView.dispatch(
+    editorView.state.tr.setSelection(TextSelection.create(doc, doc.content.size - 2))
+  );
+}
+
+function hasMention(editor: ComposerEditor): boolean {
+  let found = false;
+  editor.doc()?.descendants((node) => {
+    if (node.type === composerSchema.nodes.mention) found = true;
+  });
+  return found;
+}
+
 describe('Android backspace fallback', () => {
   const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 
@@ -258,6 +273,21 @@ describe('Android backspace fallback', () => {
     vi.advanceTimersByTime(50);
 
     expect(editor.doc()?.textContent).toBe('h');
+  });
+
+  test('deletes a mention instead of selecting it', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setText('hi ');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+    const editorView = view(editor);
+    caretAfterMention(editorView);
+
+    const event = beforeInput(surface(), 'deleteContentBackward');
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(hasMention(editor)).toBe(false);
+    expect(editorView.state.selection).toBeInstanceOf(TextSelection);
   });
 
   test('removes an empty code block before the IME can mutate its DOM', () => {
@@ -1201,6 +1231,18 @@ describe('markers on a soft line inside a container', () => {
       '<ol><li><p>a</p></li><li><p>b</p></li></ol>'
     );
   });
+});
+
+test('backspace removes a mention rather than selecting it', () => {
+  const editor = open();
+  editor.setText('hi ');
+  editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+
+  caretAfterMention(view(editor));
+  press(editor, 'Backspace');
+
+  expect(hasMention(editor)).toBe(false);
+  expect(view(editor).state.selection).toBeInstanceOf(TextSelection);
 });
 
 describe('backspace undoes a block rule even when the block ends the document', () => {
