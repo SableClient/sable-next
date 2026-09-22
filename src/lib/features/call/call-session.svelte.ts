@@ -298,6 +298,10 @@ export class CallSession {
     await this.#media?.setMicrophoneEnabled(enabled);
   }
 
+  async setParticipantVolume(identity: string, volume: number): Promise<void> {
+    await this.#media?.setParticipantVolume?.(identity, volume);
+  }
+
   setDeafened(deafened: boolean): void {
     this.deafened = deafened;
   }

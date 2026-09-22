@@ -4,6 +4,7 @@ import type {
 } from '@sableclient/tauri-plugin-livekit-mobile';
 
 import { loadNativeCalls } from '#lib/platform/calls.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import type {
   CallConnectionQuality,
@@ -114,6 +115,11 @@ export async function createNativeTransport(callId: string): Promise<NativeTrans
           url: options.url,
           token: options.token,
           microphoneEnabled: options.microphoneEnabled,
+          audioProcessing: {
+            echoCancellation: preferences.echoCancellation,
+            noiseSuppression: preferences.noiseSuppression,
+            autoGainControl: preferences.autoGainControl,
+          },
           encryptionKeys: options.encryptionKeys.map((key) => ({
             identity: key.identity,
             keyIndex: key.keyIndex,
@@ -148,6 +154,9 @@ export async function createNativeTransport(callId: string): Promise<NativeTrans
     },
     setCameraEnabled: async (enabled) => {
       adopt(await plugin.setNativeCallCameraEnabled({ callId, enabled }));
+    },
+    setParticipantVolume: async (identity, volume) => {
+      adopt(await plugin.setNativeCallParticipantVolume({ callId, identity, volume }));
     },
     setEncryptionKey: async (key) => {
       if (!connected) {

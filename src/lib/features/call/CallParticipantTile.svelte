@@ -26,9 +26,15 @@
     name: string;
     userId: string;
     avatar: string | null;
+    onVolumeChange?: (identity: string, volume: number) => void;
   }
 
-  let { participant, room, name, userId, avatar }: Props = $props();
+  let { participant, room, name, userId, avatar, onVolumeChange }: Props = $props();
+
+  function applyVolume(next: number): void {
+    setParticipantVolume(userId, next);
+    onVolumeChange?.(participant.identity, next);
+  }
 
   let cameraOn = $derived(
     participant.camera !== undefined && !participant.camera.muted && participant.camera.subscribed
@@ -41,11 +47,11 @@
 
   function toggleMute(): void {
     if (volume === 0) {
-      setParticipantVolume(userId, unmutedVolume);
+      applyVolume(unmutedVolume);
       return;
     }
     unmutedVolume = volume;
-    setParticipantVolume(userId, 0);
+    applyVolume(0);
   }
 
   function attachVideo(node: HTMLVideoElement) {
@@ -112,7 +118,7 @@
         step={0.05}
         label={$i18n.t('call.participantVolume', { name })}
         value={volume}
-        oninput={(next: number) => setParticipantVolume(userId, next)}
+        oninput={applyVolume}
       />
       <span class="reading">{Math.round(volume * 100)}%</span>
       <IconButton

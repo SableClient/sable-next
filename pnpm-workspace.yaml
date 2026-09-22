@@ -10,3 +10,5 @@ allowBuilds:
   workerd: true
 onlyBuiltDependencies:
   - esbuild
+minimumReleaseAgeExclude:
+  - '@sableclient/tauri-plugin-livekit-mobile@0.4.0'

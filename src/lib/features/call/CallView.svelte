@@ -78,6 +78,7 @@
           name={profile.name}
           userId={profile.userId}
           avatar={profile.avatar}
+          onVolumeChange={(identity, volume) => void session.setParticipantVolume(identity, volume)}
         />
       {/each}
     </ul>
