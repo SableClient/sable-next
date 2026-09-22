@@ -867,6 +867,65 @@ test('shows every pronoun set from the sender account profile', async () => {
   await unmount(instance);
 });
 
+test('lifts trailing pronouns out of the display name into a pill', async () => {
+  core.userProfile.mockResolvedValue({ pronouns: [] });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
+    },
+  });
+  await vi.waitFor(() => {
+    const name = document.querySelector('header .sender-identity-name');
+    expect(name?.textContent).toBe('sugary');
+    const pills = document.querySelectorAll('header .sender-identity-pronoun');
+    expect(pills).toHaveLength(1);
+    expect(pills[0].textContent).toBe('she/it');
+  });
+  await unmount(instance);
+});
+
+test('prefers structured pronoun sets over the display name suffix', async () => {
+  core.userProfile.mockResolvedValue({
+    pronouns: [{ summary: 'they/them', language: null }],
+  });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
+    },
+  });
+  await vi.waitFor(() => {
+    const name = document.querySelector('header .sender-identity-name');
+    expect(name?.textContent).toBe('sugary');
+    const pills = document.querySelectorAll('header .sender-identity-pronoun');
+    expect(pills).toHaveLength(1);
+    expect(pills[0].textContent).toBe('they/them');
+  });
+  await unmount(instance);
+});
+
+test('keeps the display name suffix when pronoun pills are hidden', async () => {
+  setPreference('showPronouns', false);
+  core.userProfile.mockResolvedValue({ pronouns: [] });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
+    },
+  });
+  await tick();
+  expect(document.querySelector('header .sender-identity-name')?.textContent).toBe(
+    'sugary (she/it)'
+  );
+  expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(0);
+  await unmount(instance);
+  setPreference('showPronouns', true);
+});
+
 test('shows only the sets tagged with the reader language', async () => {
   core.userProfile.mockResolvedValue({
     pronouns: [

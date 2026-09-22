@@ -16,6 +16,22 @@ export function parsePronouns(input: string): PronounView[] {
     });
 }
 
+const TRAILING_PARENTHETICAL = /\s*\(([^()]*)\)$/;
+const MAX_DISPLAY_NAME_PRONOUNS = 40;
+
+export function splitDisplayNamePronouns(name: string): {
+  name: string;
+  pronouns: PronounView[];
+} {
+  const match = TRAILING_PARENTHETICAL.exec(name);
+  if (match === null || match.index === 0) return { name, pronouns: [] };
+  const summary = match[1].trim();
+  if (summary === '' || summary.length > MAX_DISPLAY_NAME_PRONOUNS || /\d/.test(summary)) {
+    return { name, pronouns: [] };
+  }
+  return { name: name.slice(0, match.index).trim(), pronouns: [{ summary, language: null }] };
+}
+
 export function formatPronouns(pronouns: readonly PronounView[]): string {
   return pronouns
     .map(({ summary, language }) => (language ? `${summary} (${language})` : summary))
