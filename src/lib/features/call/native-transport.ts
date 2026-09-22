@@ -127,7 +127,11 @@ export async function createNativeTransport(callId: string): Promise<NativeTrans
       for (const key of pending) await pushKey(key);
 
       if (options.cameraEnabled) {
-        adopt(await plugin.setNativeCallCameraEnabled({ callId, enabled: true }));
+        try {
+          adopt(await plugin.setNativeCallCameraEnabled({ callId, enabled: true }));
+        } catch {
+          ignoreError();
+        }
       }
     },
     disconnect: async () => {

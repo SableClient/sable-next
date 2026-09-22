@@ -350,14 +350,12 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       await checkConnection();
 
       if (options.publishMedia !== false) {
-        await step('call.microphone.set', () =>
+        await publishTrack('call.microphone.set', () =>
           room.localParticipant.setMicrophoneEnabled(connectOptions.microphoneEnabled)
         );
-        await checkConnection();
-        await step('call.camera.set', () =>
+        await publishTrack('call.camera.set', () =>
           room.localParticipant.setCameraEnabled(connectOptions.cameraEnabled)
         );
-        await checkConnection();
       }
 
       if (room.state !== ConnectionState.Connected) throw new Error('transport-not-connected');
@@ -378,6 +376,15 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       });
       throw error;
     }
+  };
+
+  const publishTrack = async (stage: string, enable: () => Promise<unknown>): Promise<void> => {
+    try {
+      await step(stage, enable);
+    } catch (error) {
+      fail(stage, error);
+    }
+    await checkConnection();
   };
 
   const checkConnection = async (): Promise<void> => {

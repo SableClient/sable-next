@@ -77,7 +77,7 @@ function roomFixture() {
     emit: (event: RoomEvent, ...args: unknown[]) => void;
     setState: (state: ConnectionState) => void;
   };
-  return { room, mic, localParticipant };
+  return { room, mic, camera, localParticipant };
 }
 
 const connectOptions = {
@@ -331,4 +331,39 @@ test('carries the microphone processing preferences into the room options', () =
 
   preferences.noiseSuppression = true;
   preferences.echoCancellation = true;
+});
+
+test('connects audio-only when the camera permission was refused', async () => {
+  const fixture = roomFixture();
+  const denied = new Error('NotAllowedError');
+  fixture.camera.mockRejectedValue(denied);
+  const failure = vi.fn();
+  const transport = createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => fixture.room,
+    telemetry: { step: (_stage, action) => action(), event: vi.fn(), failure },
+  });
+
+  await transport.connect({ ...connectOptions, cameraEnabled: true });
+
+  expect(transport.getState().connection).toBe('connected');
+  expect(transport.getState().error).toBeUndefined();
+  expect(fixture.mic).toHaveBeenCalledWith(true);
+  expect(failure).toHaveBeenCalledWith('call.camera.set', denied, expect.anything());
+  await transport.disconnect();
+});
+
+test('connects listen-only when the microphone permission was refused', async () => {
+  const fixture = roomFixture();
+  fixture.mic.mockRejectedValue(new Error('NotAllowedError'));
+  const transport = createLivekitTransport({
+    encryptMedia: false,
+    createRoom: () => fixture.room,
+  });
+
+  await transport.connect(connectOptions);
+
+  expect(transport.getState().connection).toBe('connected');
+  expect(fixture.camera).toHaveBeenCalledOnce();
+  await transport.disconnect();
 });
