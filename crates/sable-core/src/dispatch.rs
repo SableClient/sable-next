@@ -2607,10 +2607,7 @@ fn message_content(
         (MessageKind::Notice, None) => RoomMessageEventContent::notice_plain(body),
     };
 
-    match outgoing_mentions(mentions, room) {
-        Some(mentions) => content.add_mentions(mentions),
-        None => content,
-    }
+    content.add_mentions(outgoing_mentions(mentions, room))
 }
 
 const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
@@ -2683,7 +2680,7 @@ fn edit_content(
             caption: (!body.is_empty()).then_some(body),
             formatted_caption: formatted
                 .map(matrix_sdk::ruma::events::room::message::FormattedBody::html),
-            mentions: Some(outgoing_mentions(mentions, room).unwrap_or_default()),
+            mentions: Some(outgoing_mentions(mentions, room)),
         }
     } else {
         EditedContent::RoomMessage(message_content(body, formatted, kind, mentions, room).into())
@@ -2952,7 +2949,7 @@ mod tests {
     use matrix_sdk::ruma::owned_user_id;
 
     #[test]
-    fn a_message_without_pills_carries_no_mentions() {
+    fn a_message_without_pills_sends_an_empty_m_mentions() {
         let content = message_content(
             "hello".to_owned(),
             None,
@@ -2961,7 +2958,10 @@ mod tests {
             false,
         );
 
-        assert!(content.mentions.is_none());
+        assert_eq!(
+            serde_json::to_value(&content).unwrap()["m.mentions"],
+            serde_json::json!({})
+        );
     }
 
     #[test]

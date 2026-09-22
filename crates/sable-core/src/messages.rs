@@ -10,14 +10,10 @@ use crate::Core;
 use crate::personas::PER_MESSAGE_PROFILE;
 use crate::protocol::CommandErr;
 
-pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Option<Mentions> {
-    if user_ids.is_empty() && !room {
-        return None;
-    }
-
+pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Mentions {
     let mut mentions = Mentions::with_user_ids(user_ids);
     mentions.room = room;
-    Some(mentions)
+    mentions
 }
 
 impl Core {
@@ -245,7 +241,7 @@ impl Core {
         };
 
         object.remove("m.relates_to");
-        object.remove("m.mentions");
+        object.insert("m.mentions".to_owned(), serde_json::json!({}));
         object.remove(PER_MESSAGE_PROFILE);
 
         let private = !matches!(source.join_rule(), Some(JoinRule::Public));

@@ -183,7 +183,7 @@ impl Core {
 
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
-            mentions: outgoing_mentions(mentions, mentions_room),
+            mentions: Some(outgoing_mentions(mentions, mentions_room)),
             in_reply_to,
             info: Some(attachment_info(
                 &mime,
@@ -244,7 +244,7 @@ impl Core {
 
         let mut gallery = GalleryConfig::new()
             .caption(attachment_caption(caption, formatted_caption))
-            .mentions(outgoing_mentions(mentions, mentions_room))
+            .mentions(Some(outgoing_mentions(mentions, mentions_room)))
             .in_reply_to(in_reply_to);
         for item in attachments {
             let mime: Mime = item.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
@@ -580,10 +580,10 @@ mod tests {
                 Some("Hello @Ada :wave:".to_owned()),
                 Some("Hello <a href=\"https://matrix.to/#/@ada:example.org\">@Ada</a> <img data-mx-emoticon />".to_owned()),
             ),
-            mentions: outgoing_mentions(
+            mentions: Some(outgoing_mentions(
                 vec![OwnedUserId::try_from("@ada:example.org").expect("a user ID")],
                 true,
-            ),
+            )),
             ..AttachmentConfig::default()
         };
 
