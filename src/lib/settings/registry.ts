@@ -4,6 +4,7 @@ import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVertical
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
 import BellSimpleIcon from 'phosphor-svelte/lib/BellSimpleIcon';
+import BrowserIcon from 'phosphor-svelte/lib/BrowserIcon';
 import BugIcon from 'phosphor-svelte/lib/BugIcon';
 import CalendarBlankIcon from 'phosphor-svelte/lib/CalendarBlankIcon';
 import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
@@ -50,6 +51,7 @@ import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
+import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
@@ -761,6 +763,29 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.encryptedUrlPreviews',
         description: 'settings.encryptedUrlPreviewsHint',
         type: 'boolean',
+      },
+      {
+        key: 'clientEmbeds',
+        icon: BrowserIcon,
+        name: 'settings.clientEmbeds',
+        description: 'settings.clientEmbedsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'encryptedClientEmbeds',
+        icon: BrowserIcon,
+        name: 'settings.encryptedClientEmbeds',
+        description: 'settings.encryptedClientEmbedsHint',
+        type: 'boolean',
+        gatedBy: 'clientEmbeds',
+      },
+      {
+        key: 'youtubeEmbeds',
+        icon: YoutubeLogoIcon,
+        name: 'settings.youtubeEmbeds',
+        description: 'settings.youtubeEmbedsHint',
+        type: 'boolean',
+        gatedBy: 'clientEmbeds',
       },
     ],
   },

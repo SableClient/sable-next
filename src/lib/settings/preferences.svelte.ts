@@ -97,6 +97,9 @@ export interface Preferences {
   gifProvider: GifProviderChoice;
   urlPreviews: boolean;
   encryptedUrlPreviews: boolean;
+  clientEmbeds: boolean;
+  encryptedClientEmbeds: boolean;
+  youtubeEmbeds: boolean;
 
   systemNotifications: boolean;
   notificationSounds: boolean;
@@ -279,6 +282,9 @@ const DEFAULTS: Preferences = {
   gifProvider: 'default',
   urlPreviews: false,
   encryptedUrlPreviews: false,
+  clientEmbeds: false,
+  encryptedClientEmbeds: false,
+  youtubeEmbeds: false,
 
   systemNotifications: true,
   notificationSounds: true,

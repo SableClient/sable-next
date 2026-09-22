@@ -13,7 +13,7 @@
 
   import { firstPreviewableLink } from './link-preview.js';
   import FormattedBody from './FormattedBody.svelte';
-  import LinkPreviewCard from './LinkPreviewCard.svelte';
+  import LinkEmbed from './embeds/LinkEmbed.svelte';
   import TimelineGallery from './TimelineGallery.svelte';
   import TimelineLocation from './TimelineLocation.svelte';
   import TimelineLiveLocation from './TimelineLiveLocation.svelte';
@@ -159,7 +159,7 @@
   {/if}
 {/if}
 {#if previewLink}
-  <LinkPreviewCard url={previewLink} {encrypted} />
+  <LinkEmbed url={previewLink} {encrypted} />
 {/if}
 
 <style>

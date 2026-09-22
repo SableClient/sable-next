@@ -21,7 +21,7 @@
     stripReplyFallback,
   } from './members.js';
   import { firstPreviewableLink } from './link-preview.js';
-  import LinkPreviewCard from './LinkPreviewCard.svelte';
+  import LinkEmbed from './embeds/LinkEmbed.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { projectPersona } from '#lib/personas/persona.js';
@@ -927,10 +927,10 @@
           </div>
           {#if item.bundled_link_previews.length > 0}
             {#each item.bundled_link_previews as preview (preview.url)}
-              <LinkPreviewCard url={preview.url} bundled={preview} {encrypted} />
+              <LinkEmbed url={preview.url} bundled={preview} {encrypted} />
             {/each}
           {:else if previewUrl}
-            <LinkPreviewCard url={previewUrl} {encrypted} />
+            <LinkEmbed url={previewUrl} {encrypted} />
           {/if}
         {:else}
           <div class:content-bubble={layout === 'bubble' && nonTextContent}>
