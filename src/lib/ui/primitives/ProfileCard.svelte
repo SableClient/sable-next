@@ -1,7 +1,10 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import CopySimpleIcon from 'phosphor-svelte/lib/CopySimpleIcon';
 
+  import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import Avatar from './Avatar.svelte';
@@ -61,6 +64,15 @@
   let canOpenAvatar = $derived(Boolean(avatarUrl && onAvatarClick));
   function openAvatar(): void {
     if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
+  }
+
+  let copied = $state(false);
+  async function copyUserId(): Promise<void> {
+    await navigator.clipboard.writeText(userId);
+    copied = true;
+    setTimeout(() => {
+      copied = false;
+    }, 2000);
   }
 </script>
 
@@ -124,7 +136,19 @@
     >
       {displayName}
     </h2>
-    <p class="profile-card-user-id">{userId}</p>
+    <button
+      class="profile-card-user-id"
+      type="button"
+      title={$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
+      onclick={() => void copyUserId()}
+    >
+      {userId}
+      {#if copied}
+        <CheckIcon size="1em" aria-hidden="true" />
+      {:else}
+        <CopySimpleIcon size="1em" aria-hidden="true" />
+      {/if}
+    </button>
     {#if meta}
       <div class="profile-card-meta">{@render meta()}</div>
     {/if}
@@ -296,10 +320,29 @@
   }
 
   .profile-card-user-id {
+    align-items: center;
+    background: none;
+    border: 0;
+    border-radius: var(--radii-200);
     color: var(--profile-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
     font-size: var(--font-size-small);
+    gap: var(--space-100);
     margin-top: var(--space-050);
     overflow-wrap: anywhere;
+    padding: 0;
+    text-align: start;
+  }
+
+  .profile-card-user-id :global(svg) {
+    flex: none;
+  }
+
+  .profile-card-user-id:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   /* Items sit next to each other and wrap. Equal grid columns left a short fact

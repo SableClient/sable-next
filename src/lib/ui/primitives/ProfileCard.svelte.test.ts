@@ -59,3 +59,20 @@ test('paints the flat colour when there is no avatar either', async () => {
   expect(cover()).toBeNull();
   await unmount(instance);
 });
+
+test('copies the user id when it is clicked', async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  vi.spyOn(navigator, 'clipboard', 'get').mockReturnValue({ writeText } as unknown as Clipboard);
+  const instance = mount(ProfileCard, {
+    target: document.body,
+    props: { displayName: 'Ana', userId: '@ana:example.org', color: '#abcdef' },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('.profile-card-user-id')?.click();
+  await tick();
+
+  expect(writeText).toHaveBeenCalledWith('@ana:example.org');
+  await unmount(instance);
+  vi.restoreAllMocks();
+});
