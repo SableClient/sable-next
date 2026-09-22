@@ -1156,6 +1156,11 @@
     position: relative;
   }
 
+  .message:not(.layout-compact) > :global(.avatar-button),
+  .message:not(.layout-compact) > :global(.avatar-root.message-avatar) {
+    translate: 0 var(--space-100);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .message {
       transition: transform var(--duration-fast) var(--ease-smooth-out);
@@ -1164,7 +1169,7 @@
 
   .message.event-row {
     display: block;
-    padding: 0;
+    padding-block: 0;
   }
 
   .message.event-row :global(.message-actions) {
@@ -1175,12 +1180,11 @@
 
   .event-reactions {
     display: flex;
-    gap: var(--space-200);
+    gap: var(--timeline-row-gap);
   }
 
   .event-rail {
-    flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
-    margin-inline-start: var(--space-300);
+    flex: 0 0 var(--avatar-size-small);
   }
 
   .swipe-action {
@@ -1621,6 +1625,7 @@
     min-height: var(--space-500);
     overflow: visible;
     padding-block: 0;
+    padding-inline: 0;
     position: relative;
   }
 

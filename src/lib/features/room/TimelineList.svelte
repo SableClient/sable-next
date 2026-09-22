@@ -718,7 +718,7 @@
     --timeline-foot-height: var(--space-600);
     --timeline-indicator-size: var(--target-hit);
     --timeline-group-gap: var(--space-200);
-    --timeline-row-gap: var(--space-250);
+    --timeline-row-gap: var(--space-300);
     --timeline-row-padding: var(--space-100);
 
     display: flex;

@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
 
   import StateEventText from './StateEventText.svelte';
+  import { stateEventIcon } from './state-event-icon';
   import { formatDate } from './timeline-format';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
 
@@ -17,11 +18,16 @@
 
   let { item, unreadCount, onSenderProfile }: Props = $props();
   let peekOpen = $state(false);
+  let StateIcon = $derived(stateEventIcon(item));
 </script>
+
+{#snippet stateGutter()}
+  <span class="state-icon" aria-hidden="true"><StateIcon /></span>
+{/snippet}
 
 {#if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
   <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
+    {@render stateGutter()}
     <StateEventText {item} {onSenderProfile} />
   </p>
 {:else if item.content.kind === 'state_event' || item.content.kind === 'hidden_event'}
@@ -46,12 +52,12 @@
   <UndecryptableNotice id={item.id} cause={item.content.reason} />
 {:else if item.content.kind === 'call_invite' || item.content.kind === 'malformed'}
   <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
+    {@render stateGutter()}
     <StateEventText {item} {onSenderProfile} />
   </p>
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
-    <span class="state-rail" aria-hidden="true"></span>
+    {@render stateGutter()}
     {$i18n.t('timeline.unsupported', { description: item.content.description })}
   </p>
 {:else if item.content.kind === 'date_divider'}
@@ -68,7 +74,7 @@
   {/if}
 {:else}
   <p class="state redacted">
-    <span class="state-rail" aria-hidden="true"></span>
+    {@render stateGutter()}
     <span class="redacted-label">
       {item.content.kind === 'redacted' && item.content.reason
         ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
@@ -98,15 +104,22 @@
     color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-body);
-    gap: var(--space-200);
+    gap: var(--timeline-row-gap);
     line-height: var(--line-height-body);
+    opacity: var(--opacity-p300);
     padding: 0;
   }
 
-  .state-rail {
-    border-top: var(--border-width) dashed var(--surface-var-container-line);
-    flex: 0 0 calc(var(--avatar-size-small) - 0.75rem);
-    margin-inline-start: var(--space-300);
+  .state-icon {
+    align-items: center;
+    display: flex;
+    flex: 0 0 var(--avatar-size-small);
+    justify-content: center;
+  }
+
+  .state-icon :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .redacted-label {
@@ -182,12 +195,8 @@
   }
 
   .date-divider span {
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius-pill);
-    font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-500);
     letter-spacing: 0.06em;
-    padding: var(--space-050) var(--space-300);
     text-transform: uppercase;
   }
 
