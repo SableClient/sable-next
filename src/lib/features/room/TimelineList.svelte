@@ -727,6 +727,7 @@
     display: flex;
     flex: 1;
     flex-direction: column;
+    isolation: isolate;
     min-height: 0;
     min-width: 0;
     position: relative;
@@ -925,12 +926,6 @@
 
   .foot-trailing {
     flex: none;
-  }
-
-  @media (width < 48rem) {
-    .timeline-foot {
-      z-index: 0;
-    }
   }
 
   :global(button.jump-to-latest) {
