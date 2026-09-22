@@ -647,6 +647,13 @@
                 variant="ghost"
                 onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
               >
+              <IconButton
+                class="mobile-control"
+                label={$i18n.t('viewer.rotate')}
+                size="medium"
+                variant="ghost"
+                onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
+              >
               <button
                 class="pixel-toggle desktop-control choice"
                 type="button"
@@ -1048,6 +1055,10 @@
     .bottom-bar p,
     .reset {
       display: initial;
+    }
+
+    :global(.mobile-control) {
+      display: none;
     }
 
     .zoom-controls {
