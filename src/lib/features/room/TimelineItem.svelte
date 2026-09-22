@@ -1211,8 +1211,11 @@
 
   .message.mention-silent,
   .message.mention-loud {
+    --mention-gutter: calc(var(--space-200) + var(--border-width) * 4);
+
     border-inline-start: calc(var(--border-width) * 4) solid;
     border-radius: 0 var(--radius) var(--radius) 0;
+    margin-inline: calc(-1 * var(--mention-gutter)) calc(-1 * var(--space-200));
     padding-inline: var(--space-200);
   }
 
@@ -1244,6 +1247,11 @@
   .message.collapsed {
     padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
     padding-top: 0;
+  }
+
+  .message.collapsed.mention-silent,
+  .message.collapsed.mention-loud {
+    padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap) + var(--space-200));
   }
 
   .message.pending {
@@ -1337,6 +1345,7 @@
        negative margin assumes survives. */
     .message.mention-silent,
     .message.mention-loud {
+      margin-inline: calc(-1 * var(--page-gutter));
       padding-inline: calc(var(--page-gutter) - var(--space-100)) var(--page-gutter);
     }
 
