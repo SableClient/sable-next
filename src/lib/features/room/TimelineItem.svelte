@@ -1286,7 +1286,7 @@
     --jumbo-size-4: 1.25rem;
   }
 
-  .jumbo :global(img) {
+  .jumbo :global(.formatted-body img) {
     height: 1em;
   }
 
