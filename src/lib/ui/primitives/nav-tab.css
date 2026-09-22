@@ -139,6 +139,15 @@
       transform: translateX(0.125rem);
     }
 
+    html:not([data-reduced-motion='on']) .nav-tab-side:hover::before {
+      transform: translateX(-0.125rem) scaleY(0.67);
+    }
+
+    html:not([data-reduced-motion='on']) .nav-tab-side[aria-current='page']:hover::before,
+    html:not([data-reduced-motion='on']) .nav-tab-side[data-current='true']:hover::before {
+      transform: translateX(-0.125rem) scaleX(1.4) scaleY(1);
+    }
+
     html:not([data-reduced-motion='on']) .nav-tab-bottom:hover {
       transform: translateY(-0.1875rem);
     }
