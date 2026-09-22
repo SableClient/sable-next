@@ -27,6 +27,7 @@
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import ListMagnifyingGlassIcon from 'phosphor-svelte/lib/ListMagnifyingGlassIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -576,7 +577,7 @@
             aria-label={$i18n.t('shortcuts.openRoomSearch')}
             onclick={() => (paletteState.open = true)}
           >
-            <MagnifyingGlassIcon />
+            <ListMagnifyingGlassIcon />
           </button>
           <ActionMenu label={$i18n.t('nav.listOptions')}>
             {#snippet trigger({ props })}

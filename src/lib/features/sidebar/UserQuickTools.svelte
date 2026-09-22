@@ -41,6 +41,7 @@
 
   const mobileTools = [
     { href: '/rooms', icon: ChatsIcon, label: 'nav.messages' },
+    { href: null, icon: ListMagnifyingGlassIcon, label: 'shortcuts.openRoomSearch' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
   const mobileSlotCount = mobileTools.length + 1;
@@ -87,7 +88,7 @@
   }
 
   /** The badge is decorative, so the count has to reach the accessible name. */
-  function toolLabel(item: { href: string; label: string }): string {
+  function toolLabel(item: { href: string | null; label: string }): string {
     if (item.href !== '/inbox' || inboxCount === 0) return $i18n.t(item.label);
     return $i18n.t('inbox.navLabel', { count: inboxCount });
   }
@@ -97,7 +98,9 @@
     return page.url.pathname.startsWith(href);
   }
 
-  let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));
+  let mobileSelectedIndex = $derived(
+    mobileTools.findIndex((item) => item.href !== null && isToolActive(item.href))
+  );
 </script>
 
 {#snippet roomSwitcher(toolClass: string, side: 'top' | 'right')}
@@ -123,25 +126,37 @@
     style:--mobile-slot-count={String(mobileSlotCount)}
     aria-label={$i18n.t('nav.quickTools')}
   >
-    {#each mobileTools as item (item.href)}
-      {@const toolActive = isToolActive(item.href)}
+    {#each mobileTools as item (item.label)}
+      {@const toolActive = item.href !== null && isToolActive(item.href)}
       <div class="mobile-tool-slot">
-        <a
-          class="quick-tool mobile-tool"
-          href={item.href}
-          onclick={(event) => {
-            activateTool(event, item.href);
-          }}
-          aria-label={toolLabel(item)}
-          aria-current={toolActive ? 'page' : undefined}
-        >
-          <span class="mobile-icon" aria-hidden="true"
-            ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
+        {#if item.href === null}
+          <button
+            type="button"
+            class="quick-tool mobile-tool"
+            aria-label={$i18n.t(item.label)}
+            onclick={() => (paletteState.open = true)}
           >
-          {#if item.href === '/inbox'}
-            <UnreadBadge counts={inboxCounts} aria-hidden="true" />
-          {/if}
-        </a>
+            <span class="mobile-icon" aria-hidden="true"><item.icon /></span>
+          </button>
+        {:else}
+          {@const href = item.href}
+          <a
+            class="quick-tool mobile-tool"
+            {href}
+            onclick={(event) => {
+              activateTool(event, href);
+            }}
+            aria-label={toolLabel(item)}
+            aria-current={toolActive ? 'page' : undefined}
+          >
+            <span class="mobile-icon" aria-hidden="true"
+              ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
+            >
+            {#if item.href === '/inbox'}
+              <UnreadBadge counts={inboxCounts} aria-hidden="true" />
+            {/if}
+          </a>
+        {/if}
       </div>
     {/each}
     <div class="mobile-tool-slot">
@@ -260,7 +275,7 @@
     box-sizing: border-box;
     container-type: inline-size;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--mobile-slot-count), minmax(0, 1fr));
     min-height: 4.25rem;
     padding: var(--space-100) 0;
     position: relative;
