@@ -141,17 +141,16 @@ pub async fn maintain_background_push(
     root: &std::path::Path,
     operation: BackgroundPush,
 ) -> Result<(), CommandErr> {
-    use sable_core::protocol::{PusherView, WebPushKeys};
     let _guard = PUSH_REGISTRATION_LOCK.lock().await;
-    let Some(current) = registered_pushers(root)?.last().cloned() else {
-        return Err(CommandErr::Unavailable);
-    };
-    let client = pusher_client(root, &current).await?;
+    let pushers = registered_pushers(root)?;
     match operation {
         BackgroundPush::Activate { app_id, ack_token } => {
-            if app_id != current.app_id {
-                return Err(CommandErr::Unavailable);
-            }
+            let current = pushers
+                .iter()
+                .rev()
+                .find(|pusher| pusher.app_id == app_id)
+                .ok_or(CommandErr::Unavailable)?;
+            let client = pusher_client(root, current).await?;
             sable_core::webpush::ack(&client, app_id, ack_token)
                 .await
                 .map_err(|_| CommandErr::Unavailable)
@@ -163,10 +162,10 @@ pub async fn maintain_background_push(
             p256dh,
             auth,
         } => {
-            if user_id != current.user_id
-                || device_id != current.device_id
-                || !is_unified_push_endpoint(&endpoint)
-            {
+            let known = pushers
+                .iter()
+                .any(|pusher| pusher.user_id == user_id && pusher.device_id == device_id);
+            if !known || !is_unified_push_endpoint(&endpoint) {
                 return Err(CommandErr::Unavailable);
             }
             let registration = Registration {
@@ -174,57 +173,71 @@ pub async fn maintain_background_push(
                 p256dh,
                 auth,
             };
-            let pushkey = if let Some(gateway) = &current.gateway {
-                let key = registration
-                    .p256dh
-                    .clone()
-                    .unwrap_or_else(|| registration.token.clone());
-                let web_push = match (&registration.p256dh, &registration.auth) {
-                    (Some(p256dh), Some(auth)) => Some(WebPushKeys {
-                        endpoint: registration.token.clone(),
-                        p256dh: p256dh.clone(),
-                        auth: auth.clone(),
-                    }),
-                    (None, None) => None,
-                    _ => return Err(CommandErr::Unavailable),
-                };
-                sable_core::notifications::set_pusher(
-                    &client,
-                    PusherView {
-                        pushkey: key.clone(),
-                        app_id: current.app_id.clone(),
-                        url: gateway.clone(),
-                        device_display_name: "Sable on Android".into(),
-                        web_push,
-                        event_id_only: current.event_id_only,
-                        append: false,
-                    },
-                )
-                .await
-                .map_err(|_| CommandErr::Unavailable)?;
-                key
-            } else {
-                let pusher =
-                    server_web_pusher(&registration, &current.app_id, current.event_id_only)
-                        .ok_or(CommandErr::Unavailable)?;
-                let key = pusher.pushkey.clone();
-                sable_core::webpush::set_pusher(&client, pusher)
-                    .await
-                    .map_err(|_| CommandErr::Unavailable)?;
-                key
-            };
-            remember_pusher(
-                root,
-                &(user_id, device_id),
-                pushkey,
-                current.app_id,
-                current.gateway,
-                current.event_id_only,
-            )?;
-            retire_old_pushers(root).await;
+            for pusher in pushers {
+                rotate_pusher(root, &pusher, &registration).await?;
+            }
             Ok(())
         }
     }
+}
+
+#[cfg(target_os = "android")]
+async fn rotate_pusher(
+    root: &std::path::Path,
+    pusher: &RegisteredPusher,
+    registration: &Registration,
+) -> Result<(), CommandErr> {
+    use sable_core::protocol::{PusherView, WebPushKeys};
+    let client = pusher_client(root, pusher).await?;
+    let pushkey = if let Some(gateway) = &pusher.gateway {
+        let key = registration
+            .p256dh
+            .clone()
+            .unwrap_or_else(|| registration.token.clone());
+        let web_push = match (&registration.p256dh, &registration.auth) {
+            (Some(p256dh), Some(auth)) => Some(WebPushKeys {
+                endpoint: registration.token.clone(),
+                p256dh: p256dh.clone(),
+                auth: auth.clone(),
+            }),
+            (None, None) => None,
+            _ => return Err(CommandErr::Unavailable),
+        };
+        sable_core::notifications::set_pusher(
+            &client,
+            PusherView {
+                pushkey: key.clone(),
+                app_id: pusher.app_id.clone(),
+                url: gateway.clone(),
+                device_display_name: "Sable on Android".into(),
+                web_push,
+                event_id_only: pusher.event_id_only,
+                append: false,
+            },
+        )
+        .await
+        .map_err(|_| CommandErr::Unavailable)?;
+        key
+    } else {
+        let rotated = server_web_pusher(registration, &pusher.app_id, pusher.event_id_only)
+            .ok_or(CommandErr::Unavailable)?;
+        let key = rotated.pushkey.clone();
+        sable_core::webpush::set_pusher(&client, rotated)
+            .await
+            .map_err(|_| CommandErr::Unavailable)?;
+        key
+    };
+    let identity = (pusher.user_id.clone(), pusher.device_id.clone());
+    remember_pusher(
+        root,
+        &identity,
+        pushkey,
+        pusher.app_id.clone(),
+        pusher.gateway.clone(),
+        pusher.event_id_only,
+    )?;
+    retire_old_pushers(root, &identity).await;
+    Ok(())
 }
 
 fn now_ms() -> i64 {
@@ -702,7 +715,7 @@ pub async fn register_push<R: Runtime>(
                 None,
                 config.event_id_only,
             )?;
-            retire_old_pushers(&root).await;
+            retire_old_pushers(&root, &identity).await;
             return Ok(());
         }
     }
@@ -747,7 +760,7 @@ pub async fn register_push<R: Runtime>(
         Some(gateway_url),
         config.event_id_only,
     )?;
-    retire_old_pushers(&root).await;
+    retire_old_pushers(&root, &identity).await;
     Ok(())
 }
 
@@ -789,18 +802,31 @@ fn remember_pusher(
 }
 
 #[cfg(any(mobile, test))]
-async fn retire_old_pushers(root: &std::path::Path) {
+fn stale_pusher(pushers: &[RegisteredPusher], identity: &(String, String)) -> Option<usize> {
+    let mut mine = pushers
+        .iter()
+        .enumerate()
+        .filter(|(_, pusher)| pusher.user_id == identity.0 && pusher.device_id == identity.1)
+        .map(|(index, _)| index);
+    let first = mine.next()?;
+    mine.next().map(|_| first)
+}
+
+#[cfg(any(mobile, test))]
+async fn retire_old_pushers(root: &std::path::Path, identity: &(String, String)) {
     let Ok(mut pushers) = registered_pushers(root) else {
         return;
     };
-    while pushers.len() > 1 {
-        let Some(pusher) = pushers.first() else {
+    loop {
+        let Some((index, stale)) = stale_pusher(&pushers, identity)
+            .and_then(|index| Some((index, pushers.get(index)?.clone())))
+        else {
             return;
         };
-        if remove_saved_pusher(root, pusher).await.is_err() {
+        if remove_saved_pusher(root, &stale).await.is_err() {
             return;
         }
-        pushers.remove(0);
+        pushers.remove(index);
         if save_pushers(root, &pushers).is_err() {
             return;
         }
@@ -905,7 +931,7 @@ mod tests {
         assert_eq!(saved.len(), 2);
         assert_eq!(saved.last().expect("current pusher").pushkey, "new");
         // No session: deletion must fail without discarding its retry identity.
-        super::retire_old_pushers(&root).await;
+        super::retire_old_pushers(&root, &identity).await;
         assert_eq!(
             super::registered_pushers(&root)
                 .expect("retained ledger")
@@ -913,6 +939,21 @@ mod tests {
             2
         );
         std::fs::remove_dir_all(root).expect("remove test ledger");
+    }
+
+    #[test]
+    fn a_second_account_keeps_its_pusher() {
+        let pushers: Vec<super::RegisteredPusher> = serde_json::from_value(serde_json::json!([
+            { "user_id": "@alice:example.org", "device_id": "A", "pushkey": "old", "app_id": "app" },
+            { "user_id": "@bob:example.org", "device_id": "B", "pushkey": "new", "app_id": "app" },
+            { "user_id": "@alice:example.org", "device_id": "A", "pushkey": "new", "app_id": "app" }
+        ]))
+        .expect("a pusher ledger");
+        let alice = ("@alice:example.org".to_owned(), "A".to_owned());
+        let bob = ("@bob:example.org".to_owned(), "B".to_owned());
+        assert_eq!(super::stale_pusher(&pushers, &alice), Some(0));
+        assert_eq!(super::stale_pusher(&pushers, &bob), None);
+        assert_eq!(super::stale_pusher(&pushers[1..], &alice), None);
     }
 
     fn view(is_direct: bool) -> NotificationView {
