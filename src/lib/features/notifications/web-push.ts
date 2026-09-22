@@ -1,7 +1,7 @@
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
-import { activeServiceWorker } from '#lib/platform/service-worker.js';
+import { activeServiceWorker, hostsServiceWorker } from '#lib/platform/service-worker.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { unregisterNativePush } from './native-push';
@@ -10,10 +10,10 @@ import { hasCompleteOverride, pushConfig, type PushOverride, trimmed } from './p
 const REGISTERED_ENDPOINT = 'sable-push-endpoint';
 
 /** For a deployment that ships no gateway configuration at all. */
-const WEBPUSH_APP_ID = 'moe.sable.webpush';
+export const WEBPUSH_APP_ID = 'moe.sable.webpush';
 
 /** The pusher kind the MSC4174 handshake lives under. */
-const SERVER_PUSHER_KIND = 'org.matrix.msc4174.webpush';
+export const SERVER_PUSHER_KIND = 'org.matrix.msc4174.webpush';
 const GATEWAY_PUSHER_KIND = 'http';
 
 /** A `null` gateway is MSC4174: the homeserver is the delivery. */
@@ -199,6 +199,15 @@ export async function syncPushSubscription(
     event_id_only: eventIdOnly,
   });
   localStorage.setItem(REGISTERED_ENDPOINT, marker);
+}
+
+/** The p256dh of this browser's live subscription, which is the pushkey its
+    own pushers carry; `null` where no service worker hosts a subscription. */
+export async function currentPushKey(): Promise<string | null> {
+  if (!hostsServiceWorker()) return null;
+  const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
+  const subscription = (await registration?.pushManager.getSubscription()) ?? null;
+  return subscription?.toJSON().keys?.p256dh ?? null;
 }
 
 /** Leaving a pusher behind keeps a signed-out browser on the server's push list. */

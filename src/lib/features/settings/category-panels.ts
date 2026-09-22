@@ -10,6 +10,7 @@ import NotificationDefaults from '#lib/features/notifications/NotificationDefaul
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
+import PushersSettings from '#lib/features/notifications/PushersSettings.svelte';
 import SettingsSyncStatus from '#lib/features/settings/SettingsSyncStatus.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
@@ -45,6 +46,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: NotificationDefaults },
     { component: MentionNotifications },
     { component: NotificationKeywords },
+    { component: PushersSettings },
     { component: PushGateway },
   ],
   personas: [{ component: PersonaSettings, class: 'personas-card' }],
