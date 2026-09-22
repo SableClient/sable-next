@@ -281,16 +281,13 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
     font-size: var(--font-size-body);
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
     line-height: var(--line-height-body);
     margin: 0 0 var(--space-200);
+    max-height: calc(var(--line-height-body) * 3em);
     min-width: 0;
-    overflow: hidden;
     overflow-wrap: anywhere;
+    overflow-y: auto;
     padding: var(--space-200) var(--space-300);
   }
 
