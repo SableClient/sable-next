@@ -229,6 +229,20 @@ test("keeps a persona message out of the account's collapsed run", () => {
   expect(isCollapsed(items, 1)).toBe(false);
 });
 
+test('groups media with the messages around it', () => {
+  const picture = {
+    ...item({ kind: 'image' } as TimelineItemView['content'], 'picture'),
+    sender: '@a:b',
+    timestamp: 0,
+  } as TimelineItemView;
+  const text = { ...message, id: 'text', sender: '@a:b', timestamp: 1000 } as TimelineItemView;
+  const later = { ...picture, id: 'later', timestamp: 2000 };
+
+  expect(isCollapsed([picture, text], 1)).toBe(true);
+  expect(isCollapsed([text, later], 1)).toBe(true);
+  expect(isCollapsed([picture, later], 1)).toBe(true);
+});
+
 test('only a connected reply preview starts a new message group', () => {
   const first = {
     ...message,

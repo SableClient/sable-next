@@ -198,6 +198,11 @@
     width: var(--timeline-sticker-width);
   }
 
+  :global(:is(.image, .sticker, .media)) + .body,
+  :global(:is(.image, .sticker, .media) + .formatted-body) {
+    margin-top: var(--space-200);
+  }
+
   :global(.media) {
     max-width: 100%;
     width: min(var(--timeline-media-fill), var(--timeline-media-max));

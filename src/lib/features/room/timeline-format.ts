@@ -271,8 +271,8 @@ export function isCollapsed(
   const previous = items[index - 1];
   if (replyPreviewStyle === 'connected' && current.in_reply_to) return false;
   return (
-    current.content.kind === 'message' &&
-    previous.content.kind === 'message' &&
+    isMessageRow(current.content) &&
+    isMessageRow(previous.content) &&
     current.sender !== null &&
     current.sender === previous.sender &&
     personaKey(current) === personaKey(previous) &&
