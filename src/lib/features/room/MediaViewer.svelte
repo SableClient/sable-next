@@ -23,6 +23,8 @@
     sharesNatively,
     supportsPhotoLibrary,
   } from '#lib/platform/files.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -39,6 +41,8 @@
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import ImageSquareIcon from 'phosphor-svelte/lib/ImageSquareIcon';
+  import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
+  import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
   export type MediaItem = Extract<
@@ -563,6 +567,12 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
+{#snippet saveTrigger({ props }: { props: Record<string, unknown> })}
+  <IconButton {...props} label={downloadLabel} size="medium" variant="ghost">
+    <DownloadSimpleIcon />
+  </IconButton>
+{/snippet}
+
 {#if item}
   <Dialog.Root
     open
@@ -610,18 +620,23 @@
                 }}><ShareNetworkIcon /></IconButton
               >
             {/if}
-            <IconButton
-              label={downloadLabel}
-              size="medium"
-              variant="ghost"
-              onclick={() => void download()}><DownloadSimpleIcon /></IconButton
-            >
             {#if canSaveToPhotos && isImage}
+              <ActionMenu label={downloadLabel} trigger={saveTrigger}>
+                <ActionMenuItem onSelect={() => void download()}>
+                  <FileArrowDownIcon />
+                  {$i18n.t('viewer.saveToFiles')}
+                </ActionMenuItem>
+                <ActionMenuItem onSelect={() => void saveToPhotos()}>
+                  <ImagesIcon />
+                  {$i18n.t('viewer.saveToPhotos')}
+                </ActionMenuItem>
+              </ActionMenu>
+            {:else}
               <IconButton
-                label={$i18n.t('viewer.saveToPhotos')}
+                label={downloadLabel}
                 size="medium"
                 variant="ghost"
-                onclick={() => void saveToPhotos()}><DownloadSimpleIcon /></IconButton
+                onclick={() => void download()}><DownloadSimpleIcon /></IconButton
               >
             {/if}
             {#if isImage}
