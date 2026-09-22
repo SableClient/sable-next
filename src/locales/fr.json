@@ -563,6 +563,8 @@
     "loadingHistory": "Chargement des messages plus anciens…",
     "loadingNewer": "Chargement des messages plus récents…",
     "loadFailed": "Impossible de charger les messages. Réessayez.",
+    "focusFailed": "Impossible de charger ce message",
+    "focusFailedHint": "Il a peut-être été supprimé, ou vous n’avez pas l’autorisation de le voir.",
     "messagePlaceholder": "Envoyer un message…",
     "sendMessage": "Envoyer le message",
     "sendAttachment": "Envoyer une pièce jointe",

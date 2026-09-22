@@ -481,6 +481,64 @@ test('an empty room reports it once the start is reached', async () => {
   await unmount(instance);
 });
 
+test('a permalink that fails to load says so and offers the way back', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.hasSnapshot = false;
+  roomTimeline.mode = { kind: 'focused', eventId: '$missing' };
+  roomTimeline.error = 'load_failed';
+  const jumpToLive = vi.fn();
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$missing',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        onJumpToLive: jumpToLive,
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  const empty = document.querySelector('.timeline-empty');
+  expect(empty?.textContent).toContain('This message could not be loaded');
+  expect(document.querySelector('.timeline-error')).toBeNull();
+  empty?.querySelector('button')?.click();
+  expect(jumpToLive).toHaveBeenCalledOnce();
+  await unmount(instance);
+});
+
+test('a live timeline that fails to load does not read as an empty room', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.hasSnapshot = false;
+  roomTimeline.error = 'load_failed';
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  const empty = document.querySelector('.timeline-empty');
+  expect(empty?.textContent).toContain('Unable to load messages');
+  expect(document.querySelector('.timeline-error')).toBeNull();
+  await unmount(instance);
+});
+
 test('reveals a short timeline at once and pads it out behind the reader', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];

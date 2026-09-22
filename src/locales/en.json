@@ -559,6 +559,8 @@
     "loadingHistory": "Loading older messages…",
     "loadingNewer": "Loading newer messages…",
     "loadFailed": "Unable to load messages. Please try again.",
+    "focusFailed": "This message could not be loaded",
+    "focusFailedHint": "It may have been deleted, or you may not have permission to see it.",
     "messagePlaceholder": "Send a message…",
     "sendMessage": "Send message",
     "sendAttachment": "Send attachment",

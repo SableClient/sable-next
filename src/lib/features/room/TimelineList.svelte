@@ -16,6 +16,7 @@
     type TimelineWindowState,
   } from '#lib/timeline/timeline-window.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -198,6 +199,7 @@
   let awaitingContent = $derived(
     visibleItems.length === 0 && timeline.error === null && !noHistory
   );
+  let emptyFailure = $derived(visibleItems.length === 0 && timeline.error !== null);
   let readEventId = $derived.by(() => {
     if (!revealed || !viewport) return null;
     if (windowState.pinned) return latestEventId(rows.map((row) => row.value.item));
@@ -566,7 +568,7 @@
 <TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu />
 
-{#if timeline.error}
+{#if timeline.error && !emptyFailure}
   <Alert class="timeline-error" variant="critical" role="alert"
     >{$i18n.t('timeline.loadFailed')}</Alert
   >
@@ -676,6 +678,20 @@
 
     {#if (!revealed || (awaitingContent && rows.length === 0)) && !noHistory}
       <TimelineSkeleton layout={preferences.layout} />
+    {:else if emptyFailure && timeline.mode.kind === 'focused'}
+      <EmptyState
+        class="timeline-empty"
+        title={$i18n.t('timeline.focusFailed')}
+        description={$i18n.t('timeline.focusFailedHint')}
+      >
+        {#snippet actions()}
+          {#if onJumpToLive}
+            <Button type="button" onclick={onJumpToLive}>{$i18n.t('timeline.jumpToLatest')}</Button>
+          {/if}
+        {/snippet}
+      </EmptyState>
+    {:else if emptyFailure}
+      <EmptyState class="timeline-empty" title={$i18n.t('timeline.loadFailed')} />
     {:else if visibleItems.length === 0}
       <EmptyState
         class="timeline-empty"
