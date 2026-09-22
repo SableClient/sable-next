@@ -108,7 +108,7 @@
     color: inherit;
     display: flex;
     font-size: var(--font-size-label);
-    gap: var(--space-250);
+    gap: var(--space-300);
     min-width: 0;
     text-align: left;
     width: 100%;
