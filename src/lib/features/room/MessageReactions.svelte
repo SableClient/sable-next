@@ -10,7 +10,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { LongPress } from '#lib/ui/long-press.svelte.js';
-  import ReactionPicker from './ReactionPicker.svelte';
+  import ReactionSheet from './ReactionSheet.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {
     isCustomReaction,
@@ -52,6 +52,8 @@
   let pressIndex = 0;
   const core = useCoreClient();
   let imagePacks = $state.raw<ImagePackView[]>([]);
+  let addReactionButton = $state<HTMLElement | null>(null);
+  let addReactionOpen = $state(false);
   const press = new LongPress({
     stopPropagation: true,
     onPress: () => onViewReactions?.(pressIndex),
@@ -138,14 +140,23 @@
   {/each}
   {#if actionable && onReact}
     {@const react = onReact}
-    <ReactionPicker
-      label={$i18n.t('timeline.addReaction')}
-      triggerClass="add-reaction"
-      {roomId}
-      onPick={react}
+    <button
+      type="button"
+      class="add-reaction"
+      aria-label={$i18n.t('timeline.addReaction')}
+      bind:this={addReactionButton}
+      onclick={() => (addReactionOpen = true)}
     >
       <PlusIcon />
-    </ReactionPicker>
+    </button>
+    {#if addReactionOpen}
+      <ReactionSheet
+        bind:open={addReactionOpen}
+        {roomId}
+        anchor={addReactionButton}
+        onPick={react}
+      />
+    {/if}
   {/if}
 </div>
 
@@ -157,7 +168,9 @@
     margin-top: var(--space-150);
   }
 
-  .reactions :global(.add-reaction) {
+  .add-reaction {
+    --target: 1.5rem;
+
     align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
@@ -166,11 +179,21 @@
     cursor: pointer;
     display: inline-flex;
     justify-content: center;
-    min-height: 1.5rem;
+    min-height: var(--target);
     padding: var(--space-050) var(--space-200);
+    position: relative;
+  }
+
+  .add-reaction::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   .reaction {
+    --target: 1.5rem;
+
     align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
@@ -185,7 +208,7 @@
     gap: var(--space-100);
     grid-template-columns: minmax(0, 1fr) auto;
     max-width: 100%;
-    min-height: 1.5rem;
+    min-height: var(--target);
     min-width: 0;
     padding: var(--space-050) var(--space-200) var(--space-050) var(--space-150);
     position: relative;
@@ -194,7 +217,7 @@
   .reaction::after {
     border-radius: inherit;
     content: '';
-    inset: -0.375rem -2px;
+    inset: calc((var(--target) - var(--target-hit)) / 2);
     position: absolute;
   }
 
