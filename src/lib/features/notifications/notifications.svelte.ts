@@ -126,7 +126,7 @@ export class NotificationCenter {
     this.presented.get(roomId)?.close();
     this.presented.delete(roomId);
 
-    const userId = this.client?.session?.account_id;
+    const userId = this.client?.session?.user_id;
     if (userId === undefined) return;
     void retireRoomAlerts(userId, roomId).catch(() => undefined);
   }

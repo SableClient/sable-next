@@ -52,7 +52,7 @@ function center(): NotificationCenter {
   const notifications = new NotificationCenter();
   notifications.start(
     {
-      session: { account_id: '@me:example.org' },
+      session: { account_id: 'a1', user_id: '@me:example.org' },
       commands: { setReadRoom: mocks.setReadRoom, ackWebPusher: mocks.ackWebPusher },
       subscribeEvents: () => () => {},
     } as unknown as CoreClient,
