@@ -176,6 +176,7 @@
   <Tooltip
     label={$i18n.t('nav.switchAccount')}
     side={mode === 'compact' ? 'right' : 'top'}
+    align={mode === 'compact' ? 'center' : 'start'}
     trigger={profileTrigger}
   />
 {/if}
