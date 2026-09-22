@@ -1669,7 +1669,7 @@
     pointer-events: none;
     position: absolute;
     top: calc(50% - var(--border-width-300));
-    width: calc(var(--timeline-row-gap) + var(--avatar-size-small) / 2 + var(--space-100));
+    width: calc(var(--timeline-row-gap) / 2 + var(--avatar-size-small) / 2);
   }
 
   .reply-connected:is(:hover, :focus-visible)::before {
