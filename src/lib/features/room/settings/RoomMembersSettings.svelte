@@ -335,7 +335,7 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-600);
   }
 
   .tabs {

@@ -12,7 +12,6 @@
   interface Props {
     title: string;
     description?: string | Snippet;
-    icon?: Component;
     disabled?: boolean;
     highlighted?: boolean;
     wide?: boolean;
@@ -28,7 +27,6 @@
   let {
     title,
     description,
-    icon: Icon,
     disabled = false,
     highlighted = false,
     wide = false,
@@ -48,7 +46,6 @@
   class={['setting-row', { disabled, highlighted }, className]}
 >
   {#if before}<span class="row-before">{@render before()}</span>{/if}
-  {#if Icon}<span class="row-icon" aria-hidden="true"><Icon /></span>{/if}
   <div class="row-copy">
     <div class="row-name">
       <span class="name">{title}</span>
@@ -97,23 +94,6 @@
     flex: 0 0 auto;
   }
 
-  .row-icon {
-    align-items: center;
-    background: var(--surface-container);
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
-    display: flex;
-    flex: 0 0 auto;
-    height: var(--control-height-small);
-    justify-content: center;
-    width: var(--control-height-small);
-  }
-
-  .row-icon :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
   .row-copy {
     flex: 1;
     min-width: 0;
@@ -137,7 +117,6 @@
     max-width: 60ch;
   }
 
-  .setting-row.disabled .row-icon,
   .setting-row.disabled .row-copy {
     opacity: 0.65;
   }
@@ -192,7 +171,6 @@
     justify-content: flex-start;
     max-width: 100%;
     min-width: 0;
-    padding-left: calc(var(--control-height-small) + var(--space-400));
     width: auto;
   }
 

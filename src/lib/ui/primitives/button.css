@@ -58,6 +58,14 @@
   --button-on-container: var(--bg-on-container);
 }
 
+.btn-subtle {
+  --button-container: var(--bg-container);
+  --button-container-hover: var(--bg-container-hover);
+  --button-container-active: var(--bg-container-active);
+  --button-line: var(--bg-container-line);
+  --button-on-container: var(--bg-on-container);
+}
+
 .btn-danger {
   --button-container: var(--crit-container);
   --button-container-hover: var(--crit-container-hover);

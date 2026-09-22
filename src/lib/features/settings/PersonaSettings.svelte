@@ -162,7 +162,7 @@
               {/if}
             </div>
             <IconButton
-              variant="ghost"
+              variant="subtle"
               size="small"
               label={$i18n.t('personas.edit', { name: persona.display_name })}
               onclick={() => {
@@ -172,7 +172,7 @@
               <PencilSimpleIcon />
             </IconButton>
             <IconButton
-              variant="ghost"
+              variant="subtle"
               size="small"
               disabled={index === 0}
               label={$i18n.t('personas.moveUp', { name: persona.display_name })}
@@ -181,7 +181,7 @@
               <ArrowUpIcon />
             </IconButton>
             <IconButton
-              variant="ghost"
+              variant="subtle"
               size="small"
               disabled={index === personas.personas.length - 1}
               label={$i18n.t('personas.moveDown', { name: persona.display_name })}
@@ -190,7 +190,7 @@
               <ArrowDownIcon />
             </IconButton>
             <IconButton
-              variant="ghost"
+              variant="subtle"
               size="small"
               disabled={removing === persona.id}
               label={$i18n.t('personas.remove', { name: persona.display_name })}

@@ -111,7 +111,6 @@
             data-settings-focus={anchor}
             title={$i18n.t(setting.name)}
             description={setting.description ? $i18n.t(setting.description) : undefined}
-            icon={setting.icon}
             {disabled}
             badge={setting.unavailable ? $i18n.t('settings.notAvailableYet') : undefined}
             highlighted={highlighted === anchor}

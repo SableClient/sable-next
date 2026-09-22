@@ -1,6 +1,4 @@
 <script lang="ts">
-  import CloudArrowUpIcon from 'phosphor-svelte/lib/CloudArrowUpIcon';
-
   import { i18n } from '#lib/i18n.js';
   import { formatTime } from '#lib/features/room/timeline-format.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
@@ -23,11 +21,7 @@
 </script>
 
 <ul class="settings">
-  <SettingsRow
-    title={$i18n.t('settings.syncStatusTitle')}
-    description={status}
-    icon={CloudArrowUpIcon}
-  />
+  <SettingsRow title={$i18n.t('settings.syncStatusTitle')} description={status} />
 </ul>
 
 <style>

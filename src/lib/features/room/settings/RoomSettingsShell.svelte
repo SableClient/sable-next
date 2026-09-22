@@ -131,7 +131,7 @@
 
   .page-body {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-600);
     margin-inline: auto;
     max-width: 56rem;
     padding: var(--space-400);

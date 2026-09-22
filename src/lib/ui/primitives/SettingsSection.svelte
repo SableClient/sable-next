@@ -95,6 +95,7 @@
 
   .settings-section-content {
     background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
   }
 

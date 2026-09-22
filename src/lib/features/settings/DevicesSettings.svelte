@@ -261,7 +261,7 @@
 
 {#snippet refreshAction()}
   <IconButton
-    variant="ghost"
+    variant="subtle"
     size="small"
     label={$i18n.t('settings.refresh')}
     onclick={refresh}
@@ -273,7 +273,7 @@
 
 {#snippet devicesActions()}
   <IconButton
-    variant="ghost"
+    variant="subtle"
     size="small"
     label={$i18n.t(linkCopied ? 'settings.linkCopied' : 'settings.copyLink')}
     onclick={() => void copyDevicesLink()}

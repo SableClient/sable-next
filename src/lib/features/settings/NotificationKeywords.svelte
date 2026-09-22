@@ -117,7 +117,7 @@
         <li>
           <span class="keyword-text">{keyword}</span>
           <IconButton
-            variant="ghost"
+            variant="subtle"
             size="large"
             disabled={removingKeyword === keyword}
             label={$i18n.t('settings.notificationKeywordsRemove', { keyword })}

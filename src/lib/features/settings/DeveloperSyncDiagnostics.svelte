@@ -2,11 +2,6 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
-  import ChatsCircleIcon from 'phosphor-svelte/lib/ChatsCircleIcon';
-  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
-  import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
-  import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
@@ -29,22 +24,22 @@
 
 <div class="diagnostics">
   <ul class="settings">
-    <SettingsRow title={$i18n.t('settings.developerSyncState')} icon={PulseIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncState')}>
       <StatusBadge label={syncLabel} variant={badgeVariant} />
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncCoreStatus')} icon={CodeIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncCoreStatus')}>
       <code>{core.status}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncRooms')} icon={ChatsCircleIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncRooms')}>
       <code>{roomList.rooms.length}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncAccount')} icon={UserCircleIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncAccount')}>
       <code>{core.session?.account_id ?? '-'}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncRevision')} icon={ArrowsOutLineVerticalIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncRevision')}>
       <code>{core.accountRevision}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncUnresponsive')} icon={PulseIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSyncUnresponsive')}>
       <code>
         {core.unresponsive ? $i18n.t('settings.developerYes') : $i18n.t('settings.developerNo')}
       </code>

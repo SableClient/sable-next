@@ -1,7 +1,6 @@
 <script lang="ts">
   import { formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
-  import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -53,7 +52,6 @@
     <SettingsRow
       title={$i18n.t('settings.developerLogsStatus')}
       description={$i18n.t('settings.developerLogsDescription')}
-      icon={BugIcon}
     >
       <Switch
         label={$i18n.t('settings.developerLogsEnable')}

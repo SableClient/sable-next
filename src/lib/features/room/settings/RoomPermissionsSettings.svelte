@@ -276,7 +276,7 @@
                 {/if}
                 {#if canEdit && level <= ownLevel}
                   <IconButton
-                    variant="ghost"
+                    variant="subtle"
                     size="small"
                     label={$i18n.t('room.permRoleEdit')}
                     disabled={saving}
@@ -392,7 +392,7 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-600);
   }
 
   .status {

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import BellIcon from 'phosphor-svelte/lib/BellIcon';
-
   import type { NotificationView } from '#src/generated/protocol';
 
   import { useNotificationCenter } from '#lib/features/notifications/notifications.svelte.js';
@@ -74,7 +72,6 @@
   <SettingsRow
     title={$i18n.t('settings.developerNotificationsTitle')}
     description={$i18n.t('settings.developerNotificationsDescription')}
-    icon={BellIcon}
   >
     <Button variant="secondary" size="small" onclick={() => void alert()}>
       {$i18n.t('settings.developerNotificationsSend')}
@@ -84,7 +81,6 @@
     <SettingsRow
       title={$i18n.t('settings.developerPushOutcomesTitle')}
       description={$i18n.t('settings.developerPushOutcomesDescription')}
-      icon={BellIcon}
     >
       <Button variant="secondary" size="small" onclick={() => void readOutcomes()}>
         {$i18n.t('settings.developerPushOutcomesRead')}

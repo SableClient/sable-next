@@ -1,7 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -31,7 +30,6 @@
   <SettingsRow
     title={$i18n.t('settings.developerAccessTokenTitle')}
     description={$i18n.t('settings.developerAccessTokenDescription')}
-    icon={KeyIcon}
   >
     <Button
       variant="secondary"

@@ -11,11 +11,8 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
-  import BugIcon from 'phosphor-svelte/lib/BugIcon';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
-  import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
-  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   const core = useCoreClient();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
@@ -85,16 +82,15 @@
         <SettingsRow
           title={$i18n.t('settings.aboutHomeserverUrl')}
           description={$i18n.t('settings.aboutHomeserverUrlHint')}
-          icon={InfoIcon}
         >
           <span class="value">{info.homeserver.replace(/\/+$/, '')}</span>
         </SettingsRow>
-        <SettingsRow title={$i18n.t('settings.aboutHomeserverSoftware')} icon={InfoIcon}>
+        <SettingsRow title={$i18n.t('settings.aboutHomeserverSoftware')}>
           <span class="value"
             >{info.server?.name ?? $i18n.t('settings.aboutHomeserverUnknown')}</span
           >
         </SettingsRow>
-        <SettingsRow title={$i18n.t('settings.aboutHomeserverVersion')} icon={InfoIcon}>
+        <SettingsRow title={$i18n.t('settings.aboutHomeserverVersion')}>
           <span class="value"
             >{info.server?.version ?? $i18n.t('settings.aboutHomeserverUnknown')}</span
           >
@@ -108,7 +104,6 @@
       <SettingsRow
         title={$i18n.t('settings.aboutReportIssue')}
         description={$i18n.t('settings.aboutReportIssueHint')}
-        icon={BugIcon}
       >
         <LinkButton href={resolve('bugreport')} size="small">
           {$i18n.t('settings.aboutReport')}
@@ -118,7 +113,6 @@
         <SettingsRow
           title={$i18n.t('settings.aboutResetCache')}
           description={$i18n.t('settings.aboutResetCacheHint')}
-          icon={TrashIcon}
         >
           <Button size="small" loading={resetting} onclick={resetCaches}>
             {$i18n.t('settings.aboutReset')}

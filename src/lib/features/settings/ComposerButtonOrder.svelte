@@ -44,14 +44,14 @@
       <span>{$i18n.t(labels[button])}</span>
       <div>
         <IconButton
-          variant="ghost"
+          variant="subtle"
           size="small"
           disabled={index === 0}
           label={$i18n.t('personas.moveUp', { name: $i18n.t(labels[button]) })}
           onclick={() => move(button, index, -1)}><ArrowUpIcon /></IconButton
         >
         <IconButton
-          variant="ghost"
+          variant="subtle"
           size="small"
           disabled={index === shown.length - 1}
           label={$i18n.t('personas.moveDown', { name: $i18n.t(labels[button]) })}

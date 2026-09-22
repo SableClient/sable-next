@@ -1,9 +1,5 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import BugIcon from 'phosphor-svelte/lib/BugIcon';
-  import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
-  import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
-  import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
@@ -33,7 +29,7 @@
 
 <div class="sentry">
   <ul class="settings">
-    <SettingsRow title={$i18n.t('settings.developerSentryConfigured')} icon={BugIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSentryConfigured')}>
       <StatusBadge
         label={configured
           ? $i18n.t('settings.developerSentryConfiguredYes')
@@ -41,24 +37,24 @@
         variant={configured ? 'success' : 'warning'}
       />
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryEnvironment')} icon={CodeIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSentryEnvironment')}>
       <code>{import.meta.env.MODE}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryReporting')} icon={BugIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSentryReporting')}>
       <code>
         {preferences.errorReporting
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
       </code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryReplay')} icon={FilmStripIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSentryReplay')}>
       <code>
         {preferences.sessionReplay
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
       </code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryActivity')} icon={PulseIcon}>
+    <SettingsRow title={$i18n.t('settings.developerSentryActivity')}>
       <code>
         {errors}
         {$i18n.t('settings.developerSentryErrors')}, {warnings}
@@ -69,7 +65,7 @@
   <p>{$i18n.t('settings.developerSentryDescription')}</p>
   <ul class="categories">
     {#each categories as category (category)}
-      <SettingsRow title={`${category} breadcrumbs`} icon={BugIcon}>
+      <SettingsRow title={`${category} breadcrumbs`}>
         <Switch
           label={`${category} breadcrumbs`}
           checked={!debugLog.disabledCategories.has(category)}

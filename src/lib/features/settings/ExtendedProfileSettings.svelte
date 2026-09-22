@@ -14,7 +14,6 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ColorSetting from './ColorSetting.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
-  import TestTubeIcon from 'phosphor-svelte/lib/TestTubeIcon';
 
   interface Props {
     profile: ProfileView;
@@ -370,7 +369,7 @@
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
-      <SettingsRow title={$i18n.t('settings.otherProfileFieldsTitle')} icon={TestTubeIcon}>
+      <SettingsRow title={$i18n.t('settings.otherProfileFieldsTitle')}>
         {#snippet description()}
           <span>{$i18n.t('settings.otherProfileFieldsDescription')}</span>
           <span aria-label={$i18n.t('settings.otherProfileFieldsKaomojiTranslation')}

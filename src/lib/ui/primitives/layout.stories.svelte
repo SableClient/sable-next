@@ -76,10 +76,8 @@
     >
       {#snippet icon()}<BellIcon />{/snippet}
       <ul class="settings-rows">
-        <SettingsRow title="Play a sound" icon={BellIcon}
-          ><Switch label="Play a sound" checked /></SettingsRow
-        >
-        <SettingsRow title="Show message previews" icon={BellIcon}
+        <SettingsRow title="Play a sound"><Switch label="Play a sound" checked /></SettingsRow>
+        <SettingsRow title="Show message previews"
           ><Switch label="Show message previews" /></SettingsRow
         >
       </ul>

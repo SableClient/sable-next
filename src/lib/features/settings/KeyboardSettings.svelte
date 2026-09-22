@@ -100,6 +100,7 @@
                 </Button>
                 {#if isRebound(shortcut.id)}
                   <IconButton
+                    variant="subtle"
                     label={$i18n.t('shortcuts.resetOne')}
                     size="small"
                     onclick={() => {

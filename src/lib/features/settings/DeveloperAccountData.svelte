@@ -1,7 +1,6 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
@@ -97,7 +96,6 @@
     <SettingsRow
       title={$i18n.t('settings.developerAccountDataAdd')}
       description={$i18n.t('settings.developerAccountDataDescription')}
-      icon={DatabaseIcon}
     >
       <Button variant="secondary" size="small" onclick={() => void open(null)}>
         {$i18n.t('settings.developerAccountDataAdd')}

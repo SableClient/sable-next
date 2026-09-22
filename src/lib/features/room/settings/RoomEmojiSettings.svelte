@@ -224,7 +224,7 @@
               </Button>
               {#if canEdit}
                 <IconButton
-                  variant="ghost"
+                  variant="subtle"
                   size="small"
                   label={$i18n.t('room.emojisDeletePack', { name: pack.name ?? pack.id })}
                   disabled={busy}
@@ -260,7 +260,7 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-600);
   }
 
   .viewer-header {

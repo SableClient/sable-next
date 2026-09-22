@@ -210,7 +210,7 @@
             }}
           />
           <IconButton
-            variant="ghost"
+            variant="subtle"
             size="small"
             label={$i18n.t('personas.triggerRemove')}
             onclick={() => {

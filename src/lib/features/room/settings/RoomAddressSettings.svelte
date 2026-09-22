@@ -181,7 +181,7 @@
             {/if}
             {#if canEdit}
               <IconButton
-                variant="ghost"
+                variant="subtle"
                 size="small"
                 label={$i18n.t('room.addressesRemove', { alias })}
                 disabled={busy}

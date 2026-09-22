@@ -328,7 +328,7 @@
               {#if canEdit}
                 <div class="settings-row-control">
                   <IconButton
-                    variant="ghost"
+                    variant="subtle"
                     size="small"
                     label={$i18n.t('room.abbreviationsCancel')}
                     disabled={busy}
@@ -349,7 +349,7 @@
               {#if canEdit}
                 <div class="settings-row-control">
                   <IconButton
-                    variant="ghost"
+                    variant="subtle"
                     size="small"
                     label={$i18n.t('room.abbreviationsEdit', { term: entry.term })}
                     disabled={busy}
@@ -358,7 +358,7 @@
                     <PencilIcon />
                   </IconButton>
                   <IconButton
-                    variant="ghost"
+                    variant="subtle"
                     size="small"
                     label={$i18n.t('room.abbreviationsRemove', { term: entry.term })}
                     disabled={busy}
@@ -407,7 +407,7 @@
 <style>
   .section {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-600);
   }
 
   .status {
