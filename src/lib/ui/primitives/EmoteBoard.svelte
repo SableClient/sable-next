@@ -19,6 +19,7 @@
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import { SvelteSet } from 'svelte/reactivity';
+  import { on } from 'svelte/events';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.svelte.js';
@@ -55,7 +56,21 @@
   }: Props = $props();
   const core = useCoreClient();
 
-  const emojiColumns = 8;
+  let narrowSheet = $state(false);
+
+  $effect(() => {
+    if (variant !== 'sheet') {
+      narrowSheet = false;
+      return;
+    }
+    const mql = window.matchMedia('(width < 24rem)');
+    narrowSheet = mql.matches;
+    return on(mql, 'change', (event) => {
+      narrowSheet = event.matches;
+    });
+  });
+
+  const emojiColumns = $derived(narrowSheet ? 6 : 8);
 
   let packs = $state.raw<ImagePackView[]>([]);
   const loadedPacks = new SvelteSet<string>();
@@ -505,7 +520,11 @@
               }}
             >
               {#each emojiRows(section.emojis) as row, rowIndex (rowIndex)}
-                <div class="row" role="row">
+                <div
+                  class="row"
+                  role="row"
+                  style={`grid-template-columns: repeat(${emojiColumns}, minmax(0, 1fr))`}
+                >
                   {#each row as emoji, columnIndex (columnIndex)}
                     {@const index = rowIndex * emojiColumns + columnIndex}
                     <button
@@ -811,11 +830,9 @@
     margin-bottom: var(--space-300);
   }
 
-  /* Column count must match emojiColumns, or the arrow keys walk another grid. */
   .grids .unicode .row {
     display: grid;
     gap: var(--space-100);
-    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
   /* Matches the pack avatars beside it, so the rail reads as one column. */
