@@ -70,6 +70,7 @@
   import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
 
+  const MAX_VOICE_FACES = 3;
   let contextRoom = $state<RoomSummary | null>(null);
   let contextParentSpaceId = $state<string | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
@@ -851,11 +852,29 @@
                           >
                         {/if}
                       </span>
-                      {#if live > 0}
+                      {#if room && live > 0}
+                        {@const faces = room.call_participants.slice(0, MAX_VOICE_FACES)}
                         <span
-                          class="voice-badge"
-                          aria-label={$i18n.t('nav.voiceLive', { count: live })}>{live}</span
+                          class="voice-live"
+                          role="img"
+                          aria-label={$i18n.t('nav.voiceLive', { count: live })}
+                          {@attach whenVisible(() => {
+                            for (const userId of faces) requestPeerProfile(userId);
+                          })}
                         >
+                          <span class="voice-faces">
+                            {#each faces as userId (userId)}
+                              {@const profile = peerProfiles.get(userId)}
+                              <Avatar
+                                class="voice-face"
+                                src={profile?.avatar_url ?? null}
+                                name={profile?.display_name ?? userId}
+                                id={userId}
+                              />
+                            {/each}
+                          </span>
+                          <span class="voice-badge">{live}</span>
+                        </span>
                       {/if}
                       <span class="room-status">
                         {#if typing}
@@ -1520,6 +1539,27 @@
 
   :global(.room-avatar-icon.voice) {
     font-size: var(--font-size-body);
+  }
+
+  .voice-live {
+    align-items: center;
+    display: flex;
+    flex: none;
+    gap: var(--space-100);
+  }
+
+  .voice-faces {
+    display: flex;
+  }
+
+  .voice-faces :global(.avatar-root.voice-face) {
+    --avatar-size: 1.25rem;
+
+    border: var(--border-width) solid var(--bg-container);
+  }
+
+  .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {
+    margin-left: calc(-1 * var(--space-150));
   }
 
   .voice-badge {
