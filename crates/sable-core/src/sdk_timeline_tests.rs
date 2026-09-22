@@ -392,6 +392,7 @@ async fn timeline_subscriptions_remain_active_until_each_is_unsubscribed() {
     .unwrap();
     assert!(!core.subscriptions.lock().await.contains_key(&first));
     assert!(core.subscriptions.lock().await.contains_key(&second));
+    assert!(core.timelines.lock().await.contains_key(first_room_id));
 
     core.dispatch(Command::Unsubscribe {
         subscription: second,

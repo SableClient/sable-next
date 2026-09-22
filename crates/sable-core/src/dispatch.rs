@@ -311,32 +311,14 @@ impl Core {
             } => self.subscribe_timeline(room_id, focus, hidden_events).await,
 
             Command::Unsubscribe { subscription } => {
-                let _update = self.room_subscription_lock.lock().await;
+                let mut subscribed = self.room_subscriptions.lock().await;
                 let Some(removed) = self.subscriptions.lock().await.remove(&subscription) else {
                     return Err(CommandErr::UnknownSubscription);
-                };
-                let live_room = match &removed.kind {
-                    SubscriptionKind::LiveTimeline(room_id) => Some(room_id.clone()),
-                    SubscriptionKind::Other | SubscriptionKind::FocusedTimeline(_) => None,
                 };
                 let has_room = !matches!(removed.kind, SubscriptionKind::Other);
                 drop(removed);
                 if has_room {
-                    self.sync_timeline_rooms_locked().await?;
-                }
-
-                if let Some(room_id) = live_room {
-                    let subscriptions = self.subscriptions.lock().await;
-                    let watched = subscriptions.values().any(|subscription| {
-                        matches!(
-                            &subscription.kind,
-                            SubscriptionKind::LiveTimeline(id) if *id == room_id
-                        )
-                    });
-                    drop(subscriptions);
-                    if !watched {
-                        self.timelines.lock().await.remove(&room_id);
-                    }
+                    self.sync_timeline_rooms_locked(&mut subscribed).await?;
                 }
 
                 Ok(CommandOk::Unsubscribe)

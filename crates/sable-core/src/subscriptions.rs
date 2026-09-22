@@ -132,7 +132,7 @@ impl Core {
         let relays = Arc::new(room.service_members().unwrap_or_default());
 
         // The SDK replaces its explicit-room set wholesale. Register before
-        let _update = self.room_subscription_lock.lock().await;
+        let mut subscribed = self.room_subscriptions.lock().await;
         self.subscriptions.lock().await.insert(
             subscription,
             Subscription {
@@ -149,7 +149,7 @@ impl Core {
                 },
             },
         );
-        if let Err(error) = self.sync_timeline_rooms_locked().await {
+        if let Err(error) = self.sync_timeline_rooms_locked(&mut subscribed).await {
             self.subscriptions.lock().await.remove(&subscription);
             return Err(error);
         }
@@ -302,7 +302,10 @@ impl Core {
         (items, Some(task))
     }
 
-    pub(crate) async fn sync_timeline_rooms_locked(&self) -> Result<(), CommandErr> {
+    pub(crate) async fn sync_timeline_rooms_locked(
+        &self,
+        subscribed: &mut std::collections::BTreeSet<OwnedRoomId>,
+    ) -> Result<(), CommandErr> {
         let subscriptions = self.subscriptions.lock().await;
         let room_ids = subscriptions
             .values()
@@ -311,14 +314,19 @@ impl Core {
                 | SubscriptionKind::FocusedTimeline(room_id) => Some(room_id.clone()),
                 SubscriptionKind::Other => None,
             })
-            .collect::<std::collections::HashSet<_>>();
+            .collect::<std::collections::BTreeSet<_>>();
         drop(subscriptions);
+        if room_ids.is_empty() || room_ids == *subscribed {
+            return Ok(());
+        }
+
         let room_refs = room_ids.iter().map(OwnedRoomId::as_ref).collect::<Vec<_>>();
         self.sync_service()
             .await?
             .room_list_service()
             .set_room_subscriptions(&room_refs)
             .await;
+        *subscribed = room_ids;
         Ok(())
     }
 }

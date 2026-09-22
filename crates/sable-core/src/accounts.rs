@@ -514,6 +514,7 @@ impl Core {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
         self.subscriptions.lock().await.clear();
+        self.room_subscriptions.lock().await.clear();
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
