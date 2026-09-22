@@ -654,16 +654,12 @@
 
 <style>
   .profile-meta-item {
-    align-items: start;
+    align-items: center;
     display: inline-flex;
     gap: var(--space-100);
     max-width: 100%;
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-
-  .profile-meta-item :global(svg) {
-    margin-top: var(--space-050);
   }
 
   .profile-meta-aside {
