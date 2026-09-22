@@ -628,6 +628,11 @@
     top: calc(100% + 0.25rem);
   }
 
+  .search-autocomplete :global(.menu-item) {
+    --menu-item-height: var(--control-height-500);
+    --menu-item-gap: var(--space-300);
+  }
+
   .empty ul {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
