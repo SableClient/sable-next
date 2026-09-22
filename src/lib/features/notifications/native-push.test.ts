@@ -36,6 +36,14 @@ const session = {
   homeserver: 'https://example.org',
   needs_reauth: false,
 };
+const other = {
+  account_id: 'other',
+  user_id: '@bob:example.org',
+  device_id: 'OTHER',
+  homeserver: 'https://example.org',
+  needs_reauth: false,
+};
+const accounts = [session, other];
 const override = { pushGatewayUrl: '', pushVapidKey: '', pushAppId: '' };
 const config = {
   resolved: { gateway: 'https://push.example/_matrix/push/v1/notify', vapid: 'key', appId: 'web' },
@@ -67,7 +75,7 @@ beforeEach(() => {
 });
 
 test('registers the built-in gateway and preserves native and UnifiedPush routing', async () => {
-  await registerNativePush(override, session);
+  await registerNativePush(override, session, accounts);
   expect(mocks.register).toHaveBeenCalledWith(
     expect.objectContaining({
       embeddedGatewayUrl: 'https://ntfy.sh',
@@ -82,9 +90,23 @@ test('registers the built-in gateway and preserves native and UnifiedPush routin
   expect(mocks.select).not.toHaveBeenCalled();
 });
 
+test('declares every signed-in account, not only the active one', async () => {
+  const reauth = {
+    ...other,
+    account_id: 'stale',
+    user_id: '@carol:example.org',
+    needs_reauth: true,
+  };
+  await registerNativePush(override, session, [...accounts, reauth]);
+  expect(mocks.register.mock.calls[0][0].accounts).toEqual([
+    { userId: session.user_id, deviceId: session.device_id },
+    { userId: other.user_id, deviceId: other.device_id },
+  ]);
+});
+
 test('passes the selected native provider to the plugin', async () => {
   localStorage.setItem('sable.push.provider', 'fcm');
-  await registerNativePush(override, session);
+  await registerNativePush(override, session, accounts);
   expect(mocks.register.mock.calls[0][0].provider).toBe('fcm');
 });
 
@@ -98,7 +120,7 @@ test('uses an explicit gateway app ID for iOS', async () => {
     ...config,
     resolved: { gateway: custom.pushGatewayUrl, vapid: 'key', appId: custom.pushAppId },
   });
-  await registerNativePush(custom, session);
+  await registerNativePush(custom, session, accounts);
   expect(mocks.register).toHaveBeenCalledWith(
     expect.objectContaining({
       gatewayOverride: true,
@@ -109,7 +131,7 @@ test('uses an explicit gateway app ID for iOS', async () => {
 });
 
 test('switches to UnifiedPush and selects an installed distributor', async () => {
-  await switchPushProvider('unifiedpush', override, session);
+  await switchPushProvider('unifiedpush', override, session, accounts);
   expect(mocks.select).toHaveBeenCalledWith('io.heckel.ntfy');
   expect(mocks.register.mock.calls[0][0].provider).toBe('unifiedpush');
   expect(selectedPushDistributor()).toBe('io.heckel.ntfy');
@@ -120,7 +142,7 @@ test('uses a deployment-provided built-in server', async () => {
     ...config,
     details: { ...config.details, unifiedPushEmbeddedServerUrl: 'https://ntfy.example' },
   });
-  await registerNativePush(override, session);
+  await registerNativePush(override, session, accounts);
   expect(mocks.register.mock.calls[0][0].embeddedGatewayUrl).toBe('https://ntfy.example');
 });
 
@@ -132,17 +154,17 @@ test.each(['embedded-websocket', 'io.heckel.ntfy', 'org.example.sunup'])(
       expect(selectedPushDistributor()).toBe('');
       return Promise.resolve();
     });
-    await switchPushDistributor(name, override, session);
+    await switchPushDistributor(name, override, session, accounts);
     expect(selectedPushDistributor()).toBe(name);
   }
 );
 
 test('restores the previous distributor and pusher when switching fails', async () => {
-  await switchPushDistributor('io.heckel.ntfy', override, session);
+  await switchPushDistributor('io.heckel.ntfy', override, session, accounts);
   mocks.register.mockRejectedValueOnce(new Error('gateway offline'));
-  await expect(switchPushDistributor('embedded-websocket', override, session)).rejects.toThrow(
-    'gateway offline'
-  );
+  await expect(
+    switchPushDistributor('embedded-websocket', override, session, accounts)
+  ).rejects.toThrow('gateway offline');
   expect(mocks.select.mock.calls.map(([name]) => name)).toEqual([
     'io.heckel.ntfy',
     'embedded-websocket',
@@ -153,7 +175,7 @@ test('restores the previous distributor and pusher when switching fails', async 
 });
 
 test('rejects unavailable distributors without changing registration', async () => {
-  await expect(switchPushDistributor('missing', override, session)).rejects.toThrow(
+  await expect(switchPushDistributor('missing', override, session, accounts)).rejects.toThrow(
     'not available'
   );
   expect(mocks.select).not.toHaveBeenCalled();
@@ -161,13 +183,13 @@ test('rejects unavailable distributors without changing registration', async () 
 });
 
 test('does not change distributors without a gateway or signed-in session', async () => {
-  await expect(switchPushDistributor('embedded-websocket', override, null)).rejects.toThrow(
-    'Sign in'
-  );
+  await expect(
+    switchPushDistributor('embedded-websocket', override, null, accounts)
+  ).rejects.toThrow('Sign in');
   mocks.config.mockResolvedValue({ resolved: null, details: null });
-  await expect(switchPushDistributor('embedded-websocket', override, session)).rejects.toThrow(
-    'not configured'
-  );
+  await expect(
+    switchPushDistributor('embedded-websocket', override, session, accounts)
+  ).rejects.toThrow('not configured');
   expect(mocks.select).not.toHaveBeenCalled();
 });
 
@@ -179,11 +201,11 @@ test('waits for startup registration before switching distributors', async () =>
         release = resolve;
       })
   );
-  const startup = registerNativePush(override, session);
+  const startup = registerNativePush(override, session, accounts);
   await vi.waitFor(() => {
     expect(mocks.register).toHaveBeenCalledTimes(1);
   });
-  const switching = switchPushDistributor('io.heckel.ntfy', override, session);
+  const switching = switchPushDistributor('io.heckel.ntfy', override, session, accounts);
   await Promise.resolve();
   expect(mocks.select).not.toHaveBeenCalled();
   release();
@@ -193,25 +215,25 @@ test('waits for startup registration before switching distributors', async () =>
 
 test('a failed switch does not block a later retry', async () => {
   mocks.register.mockRejectedValueOnce(new Error('offline'));
-  await expect(switchPushDistributor('io.heckel.ntfy', override, session)).rejects.toThrow(
-    'offline'
-  );
+  await expect(
+    switchPushDistributor('io.heckel.ntfy', override, session, accounts)
+  ).rejects.toThrow('offline');
   expect(selectedPushDistributor()).toBe('');
-  await switchPushDistributor('io.heckel.ntfy', override, session);
+  await switchPushDistributor('io.heckel.ntfy', override, session, accounts);
   expect(selectedPushDistributor()).toBe('io.heckel.ntfy');
 });
 
 test('does not register native push in the browser', async () => {
   mocks.native.mockResolvedValue(false);
-  await registerNativePush(override, session);
+  await registerNativePush(override, session, accounts);
   expect(mocks.register).not.toHaveBeenCalled();
 });
 
 test('does not display a saved distributor when restoring it also fails', async () => {
-  await switchPushDistributor('io.heckel.ntfy', override, session);
+  await switchPushDistributor('io.heckel.ntfy', override, session, accounts);
   mocks.register.mockRejectedValue(new Error('offline'));
-  await expect(switchPushDistributor('embedded-websocket', override, session)).rejects.toThrow(
-    'offline'
-  );
+  await expect(
+    switchPushDistributor('embedded-websocket', override, session, accounts)
+  ).rejects.toThrow('offline');
   expect(selectedPushDistributor()).toBe('');
 });

@@ -89,7 +89,7 @@
     switching = true;
     distributorError = false;
     try {
-      await switchPushDistributor(name, pushOverride(), core.session);
+      await switchPushDistributor(name, pushOverride(), core.session, core.accounts);
       selected = name;
     } catch {
       distributorError = true;
@@ -104,7 +104,7 @@
     switching = true;
     distributorError = false;
     try {
-      await switchPushProvider(next as PushProvider, pushOverride(), core.session);
+      await switchPushProvider(next as PushProvider, pushOverride(), core.session, core.accounts);
       provider = next as PushProvider;
       selected = selectedPushDistributor();
     } catch {

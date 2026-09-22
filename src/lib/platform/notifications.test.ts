@@ -96,6 +96,7 @@ test('forwards the built-in server and account through the native command', asyn
     eventIdOnly: false,
     userId: '@alice:example.org',
     deviceId: 'DEVICE',
+    accounts: [{ userId: '@bob:example.org', deviceId: 'OTHER' }],
   });
   expect(mocks.invoke).toHaveBeenLastCalledWith('register_push', {
     config: {
@@ -111,6 +112,7 @@ test('forwards the built-in server and account through the native command', asyn
       user_id: '@alice:example.org',
       device_id: 'DEVICE',
       event_id_only: false,
+      accounts: [{ user_id: '@bob:example.org', device_id: 'OTHER' }],
     },
   });
 });

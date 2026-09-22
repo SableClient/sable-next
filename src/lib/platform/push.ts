@@ -15,6 +15,7 @@ export interface NativePushConfig {
   eventIdOnly: boolean;
   userId: string | null;
   deviceId: string | null;
+  accounts: readonly { userId: string; deviceId: string }[];
 }
 
 export async function registerNativePushConfig(config: NativePushConfig): Promise<void> {
@@ -34,6 +35,10 @@ export async function registerNativePushConfig(config: NativePushConfig): Promis
       event_id_only: config.eventIdOnly,
       user_id: config.userId,
       device_id: config.deviceId,
+      accounts: config.accounts.map((account) => ({
+        user_id: account.userId,
+        device_id: account.deviceId,
+      })),
     },
   });
 }

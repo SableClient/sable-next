@@ -16,6 +16,7 @@ export type PushProvider = 'auto' | 'fcm' | 'unifiedpush' | 'embedded';
 async function register(
   override: PushOverride,
   session: SessionInfo | null,
+  accounts: readonly SessionInfo[],
   provider: PushProvider = selectedPushProvider()
 ): Promise<void> {
   if (!(await deliversNativePush())) return;
@@ -43,6 +44,9 @@ async function register(
     eventIdOnly: !preferences.richPushPayloads,
     userId: session?.user_id ?? null,
     deviceId: session?.device_id ?? null,
+    accounts: accounts
+      .filter((account) => !account.needs_reauth)
+      .map((account) => ({ userId: account.user_id, deviceId: account.device_id })),
   });
 }
 
@@ -69,9 +73,10 @@ function enqueue(operation: () => Promise<void>): Promise<void> {
 
 export function registerNativePush(
   override: PushOverride,
-  session: SessionInfo | null
+  session: SessionInfo | null,
+  accounts: readonly SessionInfo[]
 ): Promise<void> {
-  return enqueue(() => register(override, session));
+  return enqueue(() => register(override, session, accounts));
 }
 
 export function unregisterNativePush(): Promise<void> {
@@ -81,7 +86,8 @@ export function unregisterNativePush(): Promise<void> {
 export function switchPushProvider(
   provider: PushProvider,
   override: PushOverride,
-  session: SessionInfo | null
+  session: SessionInfo | null,
+  accounts: readonly SessionInfo[]
 ): Promise<void> {
   return enqueue(async () => {
     if (!session) throw new Error('Sign in before changing the transport');
@@ -107,13 +113,13 @@ export function switchPushProvider(
         if (!distributor) throw new Error('No UnifiedPush distributor is available');
         await setPushDistributor(distributor);
       }
-      await register(override, session, provider);
+      await register(override, session, accounts, provider);
       localStorage.setItem(PROVIDER_KEY, provider);
       if (distributor) localStorage.setItem(DISTRIBUTOR_KEY, distributor);
     } catch (error) {
       try {
         if (previousDistributor) await setPushDistributor(previousDistributor);
-        await register(override, session, previousProvider);
+        await register(override, session, accounts, previousProvider);
       } catch {
         localStorage.removeItem(PROVIDER_KEY);
       }
@@ -125,7 +131,8 @@ export function switchPushProvider(
 export function switchPushDistributor(
   name: string,
   override: PushOverride,
-  session: SessionInfo | null
+  session: SessionInfo | null,
+  accounts: readonly SessionInfo[]
 ): Promise<void> {
   return enqueue(async () => {
     if (!session) throw new Error('Sign in before changing the distributor');
@@ -136,13 +143,13 @@ export function switchPushDistributor(
     const previous = selectedPushDistributor();
     try {
       await setPushDistributor(name);
-      await register(override, session);
+      await register(override, session, accounts);
       localStorage.setItem(DISTRIBUTOR_KEY, name);
     } catch (error) {
       if (previous && available.includes(previous)) {
         try {
           await setPushDistributor(previous);
-          await register(override, session);
+          await register(override, session, accounts);
         } catch (restoreError) {
           localStorage.removeItem(DISTRIBUTOR_KEY);
           throw restoreError;

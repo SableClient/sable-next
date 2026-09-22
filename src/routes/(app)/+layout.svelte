@@ -368,7 +368,7 @@
       return;
     }
 
-    void registerNativePush(pushOverride(), core.session).catch((error: unknown) => {
+    void registerNativePush(pushOverride(), core.session, core.accounts).catch((error: unknown) => {
       console.debug('[sable notifications] native push not registered', error);
     });
   });
@@ -378,9 +378,11 @@
     let stop: (() => void) | undefined;
     void watchNativePushTokens(() => {
       if (core.status === 'ready' && preferences.systemNotifications) {
-        void registerNativePush(pushOverride(), core.session).catch((error: unknown) => {
-          console.debug('[sable notifications] rotated token not registered', error);
-        });
+        void registerNativePush(pushOverride(), core.session, core.accounts).catch(
+          (error: unknown) => {
+            console.debug('[sable notifications] rotated token not registered', error);
+          }
+        );
       }
     })
       .then((unlisten) => {

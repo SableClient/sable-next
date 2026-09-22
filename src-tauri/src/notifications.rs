@@ -526,6 +526,16 @@ pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &st
     }
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(
+    not(mobile),
+    expect(dead_code, reason = "only a mobile build registers a pusher")
+)]
+pub struct PushAccount {
+    pub user_id: String,
+    pub device_id: String,
+}
+
 /// Resolved by the webview, so the binary bakes no gateway of its own.
 #[derive(serde::Deserialize)]
 #[cfg_attr(
@@ -541,6 +551,8 @@ pub struct PushConfig {
     pub event_id_only: bool,
     pub user_id: Option<String>,
     pub device_id: Option<String>,
+    #[serde(default)]
+    pub accounts: Vec<PushAccount>,
     /// Absent when the reader has retargeted the gateway: a token distributor
     /// needs an app id that gateway serves, and only the deployment names one.
     pub native_app_id: Option<String>,
@@ -663,6 +675,17 @@ pub async fn register_push<R: Runtime>(
         config.user_id.clone().ok_or(CommandErr::Unavailable)?,
         config.device_id.clone().ok_or(CommandErr::Unavailable)?,
     );
+    let accounts = config
+        .accounts
+        .iter()
+        .map(|account| (account.user_id.clone(), account.device_id.clone()))
+        .chain(std::iter::once(identity.clone()))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if let Err(error) = app.notifications().set_push_accounts(accounts).await {
+        log::warn!("could not declare the signed-in accounts: {error}");
+    }
 
     // MSC4174 makes the homeserver the push gateway. Query before creating the
     // subscription because the distributor must bind it to the server's VAPID key.
