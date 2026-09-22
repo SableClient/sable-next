@@ -198,3 +198,59 @@ test('an emote-only message keeps the badge on its bottom edge', async ({
   expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
   expect(badge.height).toBeLessThanOrEqual(30);
 });
+
+test('a short receipted bubble keeps its text on one line', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ layout: 'bubble' }));
+  });
+  await page.setViewportSize({ width: 390, height: 780 });
+  await app.openRoom(ROOM_ID);
+  await timeline.expectAtLatest(LATEST);
+
+  const subscription = await core.subscription(0);
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('receipted', 'miam miam'),
+        sender: '@bob:example.test',
+        sender_name: 'Bob',
+        read_by: ['@bob:example.test', '@carol:example.test'],
+      },
+    },
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('own-receipted', 'miam miam'),
+        is_own: true,
+        read_by: ['@bob:example.test', '@carol:example.test'],
+      },
+    },
+  ]);
+
+  for (const id of ['receipted', 'own-receipted']) {
+    await expect(timeline.container.locator(`[data-item-id="${id}"]`)).toBeVisible();
+    await expect.poll(async () => (await measure(page, id)).badge !== null).toBe(true);
+
+    const lines = await page.evaluate((itemId) => {
+      const body = document.querySelector(`[data-item-id="${itemId}"] .formatted-body`);
+      if (!body) return null;
+      const range = document.createRange();
+      range.selectNodeContents(body);
+      return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+    }, id);
+    const receipted = await measure(page, id);
+    const badge = receipted.badge;
+    if (!badge) throw new Error('no badge');
+
+    expect(lines).toBe(1);
+    expect(receipted.lastLine.right).toBeLessThanOrEqual(badge.left);
+  }
+});

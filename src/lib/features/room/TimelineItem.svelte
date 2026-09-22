@@ -1828,9 +1828,12 @@
     display: inline-block;
   }
 
+  .message.layout-bubble .has-receipts {
+    padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
+  }
+
   .message.layout-bubble .has-receipts :global(.formatted-body) {
     display: inline-block;
-    max-width: min(50rem, calc(100% - var(--receipt-reserve) - var(--space-200)));
   }
 
   .message.layout-bubble .receipt-space {
