@@ -208,10 +208,7 @@
     if (event.key === 'Escape') {
       event.preventDefault();
       if (suggestions.length > 0) suggestionsOpen = false;
-      else if (search.query !== '') {
-        search.query = '';
-        runSearch();
-      }
+      else clearQuery();
       return;
     }
     if (event.altKey && event.key === 'ArrowDown') {
@@ -270,6 +267,13 @@
   function runSearch(): void {
     search.schedule();
     syncUrl();
+  }
+
+  function clearQuery(): void {
+    if (search.query === '') return;
+    search.query = '';
+    runSearch();
+    input?.focus();
   }
 
   function syncUrl(): void {
@@ -412,6 +416,16 @@
             showOperatorList = false;
           }}
         />
+        {#if search.query !== ''}
+          <button
+            class="query-clear"
+            type="button"
+            aria-label={$i18n.t('search.clear')}
+            onclick={clearQuery}
+          >
+            <XIcon />
+          </button>
+        {/if}
       </div>
 
       {#if suggestions.length > 0}
@@ -557,9 +571,46 @@
     color: inherit;
     flex: 1 1 8rem;
     font: inherit;
+    font-size: max(var(--font-size-label), var(--font-size-input-min));
     min-width: 0;
     outline: none;
     padding: 0;
+  }
+
+  .query-clear {
+    --target: 1.5rem;
+
+    align-items: center;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-pill);
+    color: var(--surface-var-on-container);
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 auto;
+    height: var(--target);
+    justify-content: center;
+    padding: 0;
+    position: relative;
+    width: var(--target);
+  }
+
+  .query-clear::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .query-clear:hover {
+      background: var(--bg-container-hover);
+    }
+  }
+
+  .query-clear:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   .chips {
@@ -601,6 +652,8 @@
   }
 
   .chip-remove {
+    --target: 1.25rem;
+
     align-items: center;
     background: none;
     border: 0;
@@ -610,7 +663,18 @@
     display: flex;
     flex: 0 0 auto;
     font-size: inherit;
-    padding: var(--space-050);
+    height: var(--target);
+    justify-content: center;
+    padding: 0;
+    position: relative;
+    width: var(--target);
+  }
+
+  .chip-remove::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   .chip-remove:hover,
@@ -773,9 +837,14 @@
     width: 100%;
   }
 
-  .hit-row:hover,
   .hit-row:focus-visible {
     background: var(--surface-var-container);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hit-row:hover {
+      background: var(--surface-var-container);
+    }
   }
 
   .hit-text {

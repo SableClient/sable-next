@@ -2051,6 +2051,7 @@
     "title": "Search messages",
     "open": "Search messages",
     "close": "Close search",
+    "clear": "Clear search",
     "placeholder": "Search messages, eg. from:ada in:#general has:image",
     "hint": "Search messages this device has already loaded. Use from:, in:, mentions:, has:, before:, after:, during:, \"exact phrase\" and -exclude. Quote a value with spaces, like in:\"Design crew\".",
     "searching": "Searching…",
