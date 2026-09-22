@@ -1654,7 +1654,7 @@
     min-height: var(--space-500);
     overflow: visible;
     padding-block: 0;
-    padding-inline: var(--space-200) 0;
+    padding-inline: 0;
     position: relative;
   }
 
@@ -1791,7 +1791,7 @@
 
   .message.layout-compact .reply-connected::before {
     left: calc(-1 * var(--space-400));
-    width: calc(var(--space-400) + var(--space-100));
+    width: calc(var(--space-400) - var(--space-100));
   }
 
   .message.layout-bubble .message-main {
@@ -1877,7 +1877,6 @@
   }
 
   .message.layout-bubble.own.align-own .reply-connected {
-    padding-inline: 0 var(--space-200);
     text-align: end;
   }
 
