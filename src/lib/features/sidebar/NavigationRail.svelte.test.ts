@@ -52,6 +52,7 @@ core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
 import NavigationRail from './NavigationRail.svelte';
+import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
@@ -570,6 +571,33 @@ test('right-clicking a top-level space opens its options menu', async () => {
   );
   expect(labels).toContain('room.menuMarkRead');
   expect(labels).not.toContain('settings.showUnreadCounts');
+
+  await unmount(instance);
+});
+
+test('long-pressing a top-level space opens its options menu', async () => {
+  vi.useFakeTimers();
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
+  });
+  await tick();
+
+  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
+    element.querySelector('.rail-slot')
+  );
+  anchor?.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: 8, clientY: 8 })
+  );
+  vi.advanceTimersByTime(LONG_PRESS_MS);
+  vi.useRealTimers();
+  await tick();
+  await tick();
+
+  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
+    element.textContent.trim()
+  );
+  expect(labels).toContain('room.menuMarkRead');
 
   await unmount(instance);
 });

@@ -4,7 +4,6 @@
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
-  import { ContextMenu } from 'bits-ui';
   import type { RoomSummary } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
   import { afterNavigate } from '$app/navigation';
@@ -31,13 +30,13 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
+  import { longPress } from '#lib/ui/long-press.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { toInitials } from '#lib/ui/primitives/initials.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
-  import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
   import '#lib/ui/primitives/nav-tab.css';
@@ -238,6 +237,17 @@
   let contextSpace = $state<RoomSummary | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
   let contextOpen = $state(false);
+  let sectionMenu = $state.raw<{ section: RailSection; unread: UnreadCount; dm: boolean } | null>(
+    null
+  );
+  let sectionAnchor = $state.raw<CursorAnchor | null>(null);
+  let sectionOpen = $state(false);
+  let folderMenu = $state.raw<SidebarFolder | null>(null);
+  let folderAnchor = $state.raw<CursorAnchor | null>(null);
+  let folderOptionsOpen = $state(false);
+  let removeTarget = $state.raw<{ roomId: string; folderId: string } | null>(null);
+  let removeAnchor = $state.raw<CursorAnchor | null>(null);
+  let removeOpen = $state(false);
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
 
@@ -252,6 +262,30 @@
     contextSpace = space;
     contextAnchor = cursorAnchor(event);
     contextOpen = true;
+  }
+
+  function openSectionMenu(event: MouseEvent, item: RailItem, section: RailSection): void {
+    event.preventDefault();
+    event.stopPropagation();
+    sectionMenu = { section, unread: item.unread ?? NO_UNREAD, dm: item.dm ?? false };
+    sectionAnchor = cursorAnchor(event);
+    sectionOpen = true;
+  }
+
+  function openFolderMenu(event: MouseEvent, folder: SidebarFolder): void {
+    event.preventDefault();
+    event.stopPropagation();
+    folderMenu = folder;
+    folderAnchor = cursorAnchor(event);
+    folderOptionsOpen = true;
+  }
+
+  function openRemoveMenu(event: MouseEvent, roomId: string, folderId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    removeTarget = { roomId, folderId };
+    removeAnchor = cursorAnchor(event);
+    removeOpen = true;
   }
 
   function spaceItem(roomId: string): RailItem | null {
@@ -439,29 +473,20 @@
 {/snippet}
 
 {#snippet sectionItem(item: RailItem, section: RailSection)}
-  <ContextMenu.Root>
-    <ContextMenu.Trigger>
-      {#snippet child({ props })}
-        <div {...props} class="rail-menu-anchor rail-section-anchor">
-          {@render railItem(item, false)}
-        </div>
-      {/snippet}
-    </ContextMenu.Trigger>
-    <ContextMenu.Portal>
-      <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
-        <ContextMenu.Item
-          class="menu-item"
-          disabled={resolveUnreadBadge(item.unread, preferences, item.dm ?? false) === null}
-          onSelect={() => {
-            onMarkSectionRead?.(section);
-          }}
-        >
-          <ChecksIcon />
-          {$i18n.t('nav.markSectionRead')}
-        </ContextMenu.Item>
-      </ContextMenu.Content>
-    </ContextMenu.Portal>
-  </ContextMenu.Root>
+  <div
+    class="rail-menu-anchor rail-section-anchor"
+    role="presentation"
+    oncontextmenu={(event) => {
+      openSectionMenu(event, item, section);
+    }}
+    {@attach longPress({
+      onPress: (event) => {
+        openSectionMenu(event, item, section);
+      },
+    })}
+  >
+    {@render railItem(item, false)}
+  </div>
 {/snippet}
 
 {#snippet spaceSlotBody(item: RailItem, ref: LayoutRef, folderId?: string)}
@@ -490,55 +515,31 @@
           openSpaceContextMenu(event, roomId);
         }}
         role="presentation"
+        {@attach longPress({
+          onPress: (event) => {
+            openSpaceContextMenu(event, roomId);
+          },
+        })}
       >
         {@render spaceSlotBody(item, ref)}
       </div>
     {:else}
-      <ContextMenu.Root>
-        <ContextMenu.Trigger>
-          {#snippet child({ props })}
-            <div {...props} class="rail-menu-anchor">
-              {@render spaceSlotBody(item, ref, folderId)}
-            </div>
-          {/snippet}
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
-            <ContextMenu.Item
-              class="menu-item"
-              onSelect={() => {
-                onRemoveFromFolder?.(roomId, folderId);
-              }}
-            >
-              <ArrowLineUpIcon />
-              {$i18n.t('nav.folderRemoveSpace')}
-            </ContextMenu.Item>
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+      <div
+        class="rail-menu-anchor"
+        role="presentation"
+        oncontextmenu={(event) => {
+          openRemoveMenu(event, roomId, folderId);
+        }}
+        {@attach longPress({
+          onPress: (event) => {
+            openRemoveMenu(event, roomId, folderId);
+          },
+        })}
+      >
+        {@render spaceSlotBody(item, ref, folderId)}
+      </div>
     {/if}
   {/if}
-{/snippet}
-
-{#snippet folderMenuItems(folder: SidebarFolder)}
-  <ContextMenu.Item
-    class="menu-item"
-    onSelect={() => {
-      onRenameFolder?.(folder);
-    }}
-  >
-    <PencilSimpleIcon />
-    {$i18n.t('nav.folderRename')}
-  </ContextMenu.Item>
-  <ContextMenu.Item
-    class="menu-item"
-    onSelect={() => {
-      onUngroupFolder?.(folder.id);
-    }}
-  >
-    <FolderOpenIcon />
-    {$i18n.t('nav.folderUngroup')}
-  </ContextMenu.Item>
 {/snippet}
 
 {#snippet folderTiles(folder: SidebarFolder)}
@@ -575,37 +576,34 @@
 
 {#snippet closedFolder(folder: SidebarFolder)}
   {@const ref = { kind: 'folder', folderId: folder.id } satisfies LayoutRef}
-  <ContextMenu.Root>
-    <ContextMenu.Trigger>
-      {#snippet child({ props })}
-        <div
-          {...props}
-          class="rail-slot"
-          class:drop-above={dropping(ref, 'above')}
-          class:drop-below={dropping(ref, 'below')}
-          class:drop-into={dropping(ref, 'into')}
-          class:dragged={isDragged(ref)}
-          {@attach dragSource(ref)}
-          {@attach dropTarget(ref, true)}
-        >
-          {#if mobile}
-            {@render folderButton(folder, {})}
-          {:else}
-            {@const label = folderLabel(folder)}
-            {#snippet trigger({ props: triggerProps }: { props: Record<string, unknown> })}
-              {@render folderButton(folder, triggerProps)}
-            {/snippet}
-            <Tooltip {label} side="right" {trigger} />
-          {/if}
-        </div>
+  <div
+    class="rail-slot"
+    class:drop-above={dropping(ref, 'above')}
+    class:drop-below={dropping(ref, 'below')}
+    class:drop-into={dropping(ref, 'into')}
+    class:dragged={isDragged(ref)}
+    role="presentation"
+    oncontextmenu={(event) => {
+      openFolderMenu(event, folder);
+    }}
+    {@attach dragSource(ref)}
+    {@attach dropTarget(ref, true)}
+    {@attach longPress({
+      onPress: (event) => {
+        openFolderMenu(event, folder);
+      },
+    })}
+  >
+    {#if mobile}
+      {@render folderButton(folder, {})}
+    {:else}
+      {@const label = folderLabel(folder)}
+      {#snippet trigger({ props: triggerProps }: { props: Record<string, unknown> })}
+        {@render folderButton(folder, triggerProps)}
       {/snippet}
-    </ContextMenu.Trigger>
-    <ContextMenu.Portal>
-      <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
-        {@render folderMenuItems(folder)}
-      </ContextMenu.Content>
-    </ContextMenu.Portal>
-  </ContextMenu.Root>
+      <Tooltip {label} side="right" {trigger} />
+    {/if}
+  </div>
 {/snippet}
 
 {#snippet openFolder(folder: SidebarFolder)}
@@ -617,29 +615,25 @@
     {@attach dropTarget(ref, false)}
   >
     <div class="folder-card">
-      <ContextMenu.Root>
-        <ContextMenu.Trigger>
-          {#snippet child({ props })}
-            <button
-              {...props}
-              type="button"
-              class="folder-collapse"
-              aria-expanded="true"
-              aria-label={$i18n.t('nav.folderCollapse', { name: folderLabel(folder) })}
-              onclick={() => {
-                onToggleFolder?.(folder.id);
-              }}
-            >
-              <CaretUpIcon weight="fill" />
-            </button>
-          {/snippet}
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content class="menu-surface" {...overlayLayer()}>
-            {@render folderMenuItems(folder)}
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+      <button
+        type="button"
+        class="folder-collapse"
+        aria-expanded="true"
+        aria-label={$i18n.t('nav.folderCollapse', { name: folderLabel(folder) })}
+        onclick={() => {
+          onToggleFolder?.(folder.id);
+        }}
+        oncontextmenu={(event) => {
+          openFolderMenu(event, folder);
+        }}
+        {@attach longPress({
+          onPress: (event) => {
+            openFolderMenu(event, folder);
+          },
+        })}
+      >
+        <CaretUpIcon weight="fill" />
+      </button>
       {#each folder.content as roomId (roomId)}
         {@render spaceSlot(roomId, folder.id)}
       {/each}
@@ -729,6 +723,75 @@
   </ActionMenu>
 {/if}
 
+{#if sectionMenu}
+  {@const menu = sectionMenu}
+  <ActionMenu
+    bind:open={sectionOpen}
+    label={$i18n.t('nav.listOptions')}
+    anchor={sectionAnchor}
+    side="right"
+    align="start"
+  >
+    <ActionMenuItem
+      disabled={resolveUnreadBadge(menu.unread, preferences, menu.dm) === null}
+      onSelect={() => {
+        onMarkSectionRead?.(menu.section);
+      }}
+    >
+      <ChecksIcon />
+      {$i18n.t('nav.markSectionRead')}
+    </ActionMenuItem>
+  </ActionMenu>
+{/if}
+
+{#if folderMenu}
+  {@const folder = folderMenu}
+  <ActionMenu
+    bind:open={folderOptionsOpen}
+    label={$i18n.t('nav.listOptions')}
+    anchor={folderAnchor}
+    side="right"
+    align="start"
+  >
+    <ActionMenuItem
+      onSelect={() => {
+        onRenameFolder?.(folder);
+      }}
+    >
+      <PencilSimpleIcon />
+      {$i18n.t('nav.folderRename')}
+    </ActionMenuItem>
+    <ActionMenuItem
+      onSelect={() => {
+        onUngroupFolder?.(folder.id);
+      }}
+    >
+      <FolderOpenIcon />
+      {$i18n.t('nav.folderUngroup')}
+    </ActionMenuItem>
+  </ActionMenu>
+{/if}
+
+{#if removeTarget}
+  {@const target = removeTarget}
+  <ActionMenu
+    bind:open={removeOpen}
+    label={$i18n.t('nav.listOptions')}
+    anchor={removeAnchor}
+    side="right"
+    align="start"
+  >
+    <ActionMenuItem
+      onSelect={() => {
+        onRemoveFromFolder?.(target.roomId, target.folderId);
+      }}
+    >
+      <ArrowLineUpIcon />
+      {$i18n.t('nav.folderRemoveSpace')}
+    </ActionMenuItem>
+  </ActionMenu>
+{/if}
+
 {#if contextSpace}
   <RoomOptionsMenu
     room={contextSpace}
@@ -795,6 +858,8 @@
     flex: 0 0 var(--navigation-rail-width);
     flex-direction: column;
     min-height: 0;
+    -webkit-touch-callout: none;
+    user-select: none;
     width: var(--navigation-rail-width);
   }
 
