@@ -18,6 +18,7 @@
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
+  import { AccountDirectory } from './account-directory.svelte.js';
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
 
@@ -30,6 +31,7 @@
   let { mode }: Props = $props();
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
+  const accountProfiles = new AccountDirectory(core);
   let switching = $state(false);
   let logoutAccountId = $state<string | null>(null);
   let accountToLogout = $derived(
@@ -160,6 +162,7 @@
       />
       <AccountMenuItems
         accounts={core.accounts}
+        profiles={accountProfiles}
         currentAccountId={core.session?.account_id}
         {switching}
         onSwitch={switchAccount}

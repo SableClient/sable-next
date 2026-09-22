@@ -17,6 +17,9 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({
 }));
 
 import AccountMenuItemsHarness from './AccountMenuItemsHarness.test.svelte';
+import { AccountDirectory } from './account-directory.svelte.js';
+
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 const accounts = [
   {
@@ -58,6 +61,14 @@ async function press(element: Element): Promise<void> {
   await tick();
 }
 
+function directoryWith(userProfile: (userId: string) => Promise<unknown>): AccountDirectory {
+  const core = {
+    session: { account_id: 'current' },
+    userProfile: vi.fn(userProfile),
+  } as unknown as CoreClient;
+  return new AccountDirectory(core);
+}
+
 test('opens account choices in the switch-account submenu', async () => {
   const onSwitch = vi.fn();
   const onLogoutAccount = vi.fn();
@@ -65,6 +76,7 @@ test('opens account choices in the switch-account submenu', async () => {
     target: document.body,
     props: {
       accounts,
+      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
       onSwitch,
       onLogoutAccount,
     },
@@ -96,5 +108,40 @@ test('opens account choices in the switch-account submenu', async () => {
   const otherAccount = document.querySelectorAll('.account-row').item(1);
   await press(otherAccount.querySelector('.account-select') as HTMLButtonElement);
   expect(onSwitch).toHaveBeenCalledWith('other');
+  await unmount(instance);
+});
+
+test('loads the profile avatar of every account', async () => {
+  const userProfile = vi.fn((userId: string) => {
+    if (userId === '@other:example.net') {
+      return Promise.resolve({ display_name: 'Zed', avatar_url: 'https://example.net/pic.png' });
+    }
+    return Promise.resolve({ display_name: null, avatar_url: null });
+  });
+  const profiles = directoryWith(userProfile);
+  const instance = mount(AccountMenuItemsHarness, {
+    target: document.body,
+    props: { accounts, profiles, onSwitch: vi.fn(), onLogoutAccount: vi.fn() },
+  });
+  await tick();
+
+  const outerMenu = document.querySelector('.account-menu-trigger');
+  expect(outerMenu).not.toBeNull();
+  if (outerMenu) await press(outerMenu);
+  const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
+    item.textContent.includes('nav.switchAccount')
+  );
+  expect(switcher).not.toBeUndefined();
+  if (switcher) await press(switcher);
+
+  await vi.waitFor(() => {
+    expect(userProfile.mock.calls.map(([userId]) => userId)).toEqual(
+      expect.arrayContaining(['@current:example.org', '@other:example.net'])
+    );
+  });
+
+  const otherRow = document.querySelectorAll('.account-row').item(1);
+  const avatar = otherRow.querySelector('.avatar-fallback');
+  expect(avatar?.textContent).toBe('Z');
   await unmount(instance);
 });

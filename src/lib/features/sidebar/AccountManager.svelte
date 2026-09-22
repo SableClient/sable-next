@@ -19,9 +19,11 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import SettingsSheet from '#lib/features/settings/SettingsSheet.svelte';
+  import { AccountDirectory } from './account-directory.svelte.js';
 
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
+  const accountProfiles = new AccountDirectory(core);
   let switching = $state(false);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
@@ -172,6 +174,7 @@
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
     {#each core.accounts as account (account.account_id)}
       {@const active = account.account_id === activeAccountId}
+      {@const identity = accountProfiles.identity(account.user_id)}
       <article class="account-row choice" data-selected={active ? 'true' : undefined}>
         <button
           class="account-select"
@@ -182,7 +185,12 @@
               ? reauthenticate(account.homeserver, account.account_id)
               : switchAccount(account.account_id))}
         >
-          <Avatar size="medium" id={account.user_id} name={account.user_id} />
+          <Avatar
+            size="medium"
+            id={account.user_id}
+            name={identity.displayName}
+            src={identity.avatarUrl}
+          />
           <span class="account-identity">
             <strong>{account.user_id}</strong>
             <small>

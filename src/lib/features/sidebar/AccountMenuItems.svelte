@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PresenceView, SessionInfo } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
+  import type { AccountDirectory } from './account-directory.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
@@ -16,6 +17,7 @@
 
   interface Props {
     accounts: readonly SessionInfo[];
+    profiles: AccountDirectory;
     currentAccountId?: string;
     switching: boolean;
     onSwitch: (accountId: string) => void;
@@ -27,6 +29,7 @@
 
   let {
     accounts,
+    profiles,
     currentAccountId,
     switching,
     onSwitch,
@@ -67,6 +70,7 @@
   <div class="account-list" role="group">
     {#each accounts as account (account.account_id)}
       {@const active = account.account_id === currentAccountId}
+      {@const identity = profiles.identity(account.user_id)}
       <div class="account-row" data-active={active ? 'true' : undefined}>
         <button
           class="account-select"
@@ -79,7 +83,12 @@
             surface.close();
           }}
         >
-          <Avatar size="small" id={account.user_id} name={account.user_id} />
+          <Avatar
+            size="small"
+            id={account.user_id}
+            name={identity.displayName}
+            src={identity.avatarUrl}
+          />
           <span class="account-identity">
             <strong>{account.user_id}</strong>
             <small>{active ? $i18n.t('nav.currentAccount') : account.homeserver}</small>

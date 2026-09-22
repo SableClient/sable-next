@@ -2,14 +2,16 @@
   import type { SessionInfo } from '#src/generated/protocol';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
+  import { AccountDirectory } from './account-directory.svelte.js';
 
   interface Props {
     accounts: SessionInfo[];
+    profiles: AccountDirectory;
     onSwitch: (accountId: string) => void;
     onLogoutAccount: (accountId: string) => void;
   }
 
-  let { accounts, onSwitch, onLogoutAccount }: Props = $props();
+  let { accounts, profiles, onSwitch, onLogoutAccount }: Props = $props();
 </script>
 
 <ActionMenu label="Account options">
@@ -18,6 +20,7 @@
   {/snippet}
   <AccountMenuItems
     {accounts}
+    {profiles}
     currentAccountId="current"
     switching={false}
     {onSwitch}
