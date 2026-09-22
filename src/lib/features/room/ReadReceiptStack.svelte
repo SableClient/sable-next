@@ -74,7 +74,7 @@
     flex: none;
     font: inherit;
     gap: var(--space-150);
-    height: 1.375rem;
+    height: var(--size-x300);
     max-width: 100%;
     padding: 0 var(--space-150);
     position: relative;

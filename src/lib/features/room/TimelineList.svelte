@@ -715,7 +715,7 @@
   }
 
   .timeline-content {
-    --timeline-foot-height: var(--space-600);
+    --timeline-foot-height: var(--size-x300);
     --timeline-indicator-size: var(--target-hit);
     --timeline-group-gap: var(--space-200);
     --timeline-row-gap: var(--space-300);
