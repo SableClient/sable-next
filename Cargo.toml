@@ -13,7 +13,6 @@ tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
 matrix-sdk-common = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83" }
 matrix-sdk = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83", default-features = false, features = [
   "e2e-encryption",
-  "automatic-room-key-forwarding",
   "unstable-msc4274",
   "experimental-send-custom-to-device",
   "federation-api",
