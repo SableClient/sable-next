@@ -171,6 +171,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       unread: 0,
       highlight: 0,
       latest_event: null,
+      space_children: [
+        {
+          room_id: '!room:example.test',
+          via: [],
+          order: null,
+          origin_server_ts: 0,
+          suggested: false,
+        },
+      ],
     };
     const betaSpace: RoomSummary = { ...alphaSpace, room_id: '!beta:example.test', name: 'Beta' };
     const gammaSpace: RoomSummary = {
@@ -297,6 +306,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
 
     const WIDGET_STATE_KEY = 'dashboard';
+    const abbreviations = new Map<string, { entries: unknown[] }>();
     const roomWidgets = new Map<string, Record<string, unknown> | null>([
       [
         room.room_id,
@@ -842,9 +852,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       room_state_event: (command) => ({
         type: 'room_state_event',
         content:
-          command.event_type === 'm.room.tombstone' && command.room_id === tombstonedRoom.room_id
-            ? { replacement_room: successorRoom.room_id, body: null }
-            : null,
+          command.event_type === 'moe.sable.room.abbreviations'
+            ? (abbreviations.get(command.room_id) ??
+              (command.room_id === '!alpha:example.test'
+                ? { entries: [{ term: 'TBD', definition: 'To be determined' }] }
+                : null))
+            : command.event_type === 'm.room.tombstone' &&
+                command.room_id === tombstonedRoom.room_id
+              ? { replacement_room: successorRoom.room_id, body: null }
+              : null,
       }),
       room_state_events: (command) => {
         const content =
@@ -1026,6 +1042,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       send_state_event: (command) => {
         if (command.event_type === 'im.vector.modular.widgets')
           roomWidgets.set(command.room_id, null);
+        if (command.event_type === 'moe.sable.room.abbreviations')
+          abbreviations.set(command.room_id, command.content as { entries: unknown[] });
         return { type: 'send_state_event' };
       },
       set_space_child_order: (command) => {

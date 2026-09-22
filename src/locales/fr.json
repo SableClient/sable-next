@@ -432,13 +432,21 @@
     "publishOff": "Non publié",
     "abbreviationsHint": "Les termes définis ici sont expliqués dans ce salon.",
     "abbreviationsEmpty": "Aucune abréviation pour le moment.",
+    "abbreviationsEmptyForm": "Aucune abréviation pour le moment. Ajoutez-en une avec le formulaire ci-dessus.",
     "abbreviationsTerm": "Terme",
     "abbreviationsTermPlaceholder": "MSC",
     "abbreviationsDefinition": "Définition",
     "abbreviationsDefinitionPlaceholder": "Proposition d’évolution de la spécification Matrix",
     "abbreviationsAdd": "Ajouter une abréviation",
+    "abbreviationsSave": "Enregistrer l’abréviation",
+    "abbreviationsEdit": "Modifier {{term}}",
+    "abbreviationsCancel": "Annuler",
+    "abbreviationsCased": "Respecter la casse",
     "abbreviationsRemove": "Retirer {{term}}",
     "abbreviationsFailed": "Impossible d’enregistrer cette abréviation.",
+    "abbreviationsDuplicate": "Cette abréviation existe déjà.",
+    "abbreviationsCount": "Abréviations ({{count}})",
+    "abbreviationsSpaceTag": "Espace - {{space}}",
     "appearanceVisualTweaks": "Ajustements visuels",
     "appearanceHint": "Ces réglages ne s’appliquent qu’à vous dans cet espace.",
     "appearanceIconTitle": "Afficher les icônes des salons dans la barre latérale",
@@ -476,7 +484,14 @@
     "emojisDeletePack": "Supprimer {{name}}",
     "emojisUseEverywhere": "Utiliser dans tous les salons",
     "emojisUseEverywhereHint": "Ajoute ce pack à votre sélecteur hors de ce salon.",
-    "emojisPacks": "Packs"
+    "emojisPacks": "Packs",
+    "remove": "Retirer",
+    "permRoleRemoveConfirm": "Retirer ce rôle ?",
+    "permRoleRemoveHint": "Les membres à ce niveau afficheront à nouveau un simple numéro.",
+    "emojisDeletePackConfirm": "Supprimer {{name}} ?",
+    "emojisDeletePackHint": "Les émojis de ce pack ne seront plus disponibles dans ce salon.",
+    "addressesRemoveConfirm": "Retirer {{alias}} ?",
+    "abbreviationsRemoveConfirm": "Retirer {{term}} ?"
   },
   "join": {
     "action": "Rejoindre",
@@ -1553,7 +1568,8 @@
       "lesbian": "Lesbien",
       "mlm": "MLM",
       "pride": "Fiertés"
-    }
+    },
+    "notificationKeywordsConfirm": "Retirer le mot-clé {{keyword}} ?"
   },
   "errors": {
     "pageTitle": "Un problème est survenu",
@@ -2082,7 +2098,8 @@
     "scopeLatchRoom": "Conserver dans ce salon",
     "scopeLatchAccount": "Conserver partout",
     "sendingAs": "Envoi sous le nom de {{name}}",
-    "clearSelection": "Envoyer de nouveau par défaut"
+    "clearSelection": "Envoyer de nouveau par défaut",
+    "removeTitle": "Supprimer {{name}} ?"
   },
   "call": {
     "start": "Démarrer l’appel",
@@ -2178,7 +2195,9 @@
     "capabilityReceiveState": "Lire les paramètres de ce salon",
     "capabilitySendToDevice": "Envoyer des données directement à vos autres appareils",
     "capabilityReceiveToDevice": "Recevoir des données de vos autres appareils",
-    "capabilityOther": "{{capability}}"
+    "capabilityOther": "{{capability}}",
+    "removeConfirm": "Retirer {{name}} ?",
+    "removeHint": "Le widget est retiré pour tout le salon."
   },
   "pdf": {
     "documentLabel": "{{name}}, page {{page}} sur {{pages}}",

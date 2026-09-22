@@ -2,7 +2,7 @@ import { createContext } from 'svelte';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
-import { abbreviationPattern, buildAbbreviationMap } from './abbreviations';
+import { abbreviationPattern, buildAbbreviationMap, type AbbreviationMap } from './abbreviations';
 import {
   ABBREVIATIONS_EVENT_TYPE,
   readAbbreviations,
@@ -16,14 +16,14 @@ export function abbreviationsChanged(): void {
 }
 
 export class RoomAbbreviations {
-  #map = $state.raw<ReadonlyMap<string, string>>(buildAbbreviationMap([]));
+  #map = $state.raw<AbbreviationMap>(buildAbbreviationMap([]));
   #pattern = $derived(abbreviationPattern(this.#map));
   #roomId: string | null = null;
   #generation = 0;
 
   constructor(private readonly commands: Pick<CoreCommands, 'roomStateEvent'>) {}
 
-  get map(): ReadonlyMap<string, string> {
+  get map(): AbbreviationMap {
     return this.#map;
   }
 

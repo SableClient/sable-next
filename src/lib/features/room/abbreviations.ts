@@ -6,22 +6,50 @@ const MAX_SPACE_DEPTH = 4;
 
 const SKIP_SELECTOR = 'a, abbr, code, pre, [data-mx-maths], [data-mx-spoiler]';
 
-export function buildAbbreviationMap(entries: readonly AbbreviationEntry[]): Map<string, string> {
-  const map = new Map<string, string>();
+export interface AbbreviationMatch {
+  term: string;
+  definition: string;
+  cased: boolean;
+}
+
+export type AbbreviationMap = ReadonlyMap<string, readonly AbbreviationMatch[]>;
+
+export function buildAbbreviationMap(
+  entries: readonly AbbreviationEntry[]
+): Map<string, AbbreviationMatch[]> {
+  const map = new Map<string, AbbreviationMatch[]>();
   for (const entry of entries) {
-    const key = entry.term.trim().toLowerCase();
-    if (key !== '') map.set(key, entry.definition);
+    const term = entry.term.trim();
+    if (term === '') continue;
+    const match: AbbreviationMatch = {
+      term,
+      definition: entry.definition,
+      cased: entry.cased === true,
+    };
+    const key = term.toLowerCase();
+    const bucket = map.get(key);
+    if (bucket) bucket.push(match);
+    else map.set(key, [match]);
   }
   return map;
 }
 
-export function abbreviationPattern(map: ReadonlyMap<string, string>): RegExp | null {
+export function abbreviationPattern(map: AbbreviationMap): RegExp | null {
   if (map.size === 0) return null;
 
   const terms = [...map.keys()]
     .sort((left, right) => right.length - left.length)
     .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   return new RegExp(`\\b(?:${terms.join('|')})\\b`, 'gi');
+}
+
+function resolveMatch(map: AbbreviationMap, text: string): AbbreviationMatch | undefined {
+  const bucket = map.get(text.toLowerCase());
+  if (!bucket) return undefined;
+  return (
+    bucket.find((match) => match.cased && match.term === text) ??
+    bucket.find((match) => !match.cased)
+  );
 }
 
 export function ancestorSpaceIds(rooms: readonly RoomSummary[], roomId: string): string[] {
@@ -45,11 +73,7 @@ export function ancestorSpaceIds(rooms: readonly RoomSummary[], roomId: string):
   return levels.slice().reverse().flat();
 }
 
-export function markAbbreviations(
-  root: HTMLElement,
-  map: ReadonlyMap<string, string>,
-  pattern: RegExp
-): void {
+export function markAbbreviations(root: HTMLElement, map: AbbreviationMap, pattern: RegExp): void {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
   while (walker.nextNode()) {
@@ -64,21 +88,17 @@ export function markAbbreviations(
   }
 }
 
-function markText(
-  text: string,
-  map: ReadonlyMap<string, string>,
-  pattern: RegExp
-): DocumentFragment | null {
+function markText(text: string, map: AbbreviationMap, pattern: RegExp): DocumentFragment | null {
   const fragment = document.createDocumentFragment();
   let last = 0;
 
   for (const match of text.matchAll(pattern)) {
-    const definition = map.get(match[0].toLowerCase());
-    if (definition === undefined) continue;
+    const resolved = resolveMatch(map, match[0]);
+    if (resolved === undefined) continue;
 
     if (match.index > last) fragment.append(text.slice(last, match.index));
     const abbr = document.createElement('abbr');
-    abbr.dataset.abbrDefinition = definition;
+    abbr.dataset.abbrDefinition = resolved.definition;
     abbr.tabIndex = 0;
     abbr.textContent = match[0];
     fragment.append(abbr);

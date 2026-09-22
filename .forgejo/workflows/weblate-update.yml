@@ -1,0 +1,29 @@
+name: Weblate update
+
+on:
+  schedule:
+    # 03:00/04:00 in Europe/Paris depending on DST.
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sync:
+    name: Sync translations with Weblate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Commit, push and pull on Weblate
+        env:
+          WEBLATE_URL: 'https://translate.ow-ops.eu'
+          WEBLATE_COMPONENT: 'sable-next/app'
+          WEBLATE_TOKEN: ${{ secrets.WEBLATE_API_TOKEN }}
+        run: |
+          for operation in commit push pull; do
+            curl --fail --silent --show-error \
+              --header "Authorization: Token $WEBLATE_TOKEN" \
+              --json "{\"operation\": \"$operation\"}" \
+              "$WEBLATE_URL/api/components/$WEBLATE_COMPONENT/repository/"
+          done

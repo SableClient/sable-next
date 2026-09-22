@@ -43,6 +43,18 @@ test('lists the account keywords and lets one be removed', async () => {
 
   document.querySelector<HTMLButtonElement>('[aria-label="Remove keyword erwan"]')?.click();
 
+  const dialog = await vi.waitFor(() => {
+    const dialog = required('[role="dialog"]', HTMLElement);
+    expect(dialog.textContent).toContain('Remove keyword erwan?');
+    return dialog;
+  });
+  expect(core.removeNotificationKeyword).not.toHaveBeenCalled();
+
+  const confirm = [...dialog.querySelectorAll('button')].find(
+    (button) => button.textContent.trim() === 'Remove'
+  );
+  confirm?.click();
+
   await vi.waitFor(() => {
     expect(core.removeNotificationKeyword).toHaveBeenCalledWith('erwan');
     expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
@@ -182,6 +194,19 @@ test('a removal survives a load that was already in flight', async () => {
   });
 
   document.querySelector<HTMLButtonElement>('[aria-label="Remove keyword sable"]')?.click();
+
+  const confirm = await vi.waitFor(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    const confirm = dialog
+      ? [...dialog.querySelectorAll('button')].find(
+          (button) => button.textContent.trim() === 'Remove'
+        )
+      : null;
+    expect(confirm).not.toBeNull();
+    return confirm as HTMLButtonElement;
+  });
+  confirm.click();
 
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.keyword-list li').length).toBe(0);

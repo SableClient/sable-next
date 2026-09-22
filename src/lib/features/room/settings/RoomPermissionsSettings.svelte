@@ -10,6 +10,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -69,6 +70,7 @@
   let roleColorDraft = $state('');
   let roleSaving = $state(false);
   let roleFailed = $state(false);
+  let roleRemoveConfirm = $state(false);
 
   let roomId = $derived(room?.room_id ?? null);
   let groups = $derived(permissionGroups(room?.is_space ?? false));
@@ -232,6 +234,11 @@
       roleSaving = false;
     }
   }
+
+  async function confirmRemoveRole(): Promise<void> {
+    await removeRole();
+    roleRemoveConfirm = false;
+  }
 </script>
 
 <div class="section">
@@ -349,7 +356,14 @@
           </div>
           <div class="actions">
             {#if editingHasTag}
-              <Button type="button" variant="danger" onclick={removeRole} disabled={roleSaving}>
+              <Button
+                type="button"
+                variant="danger"
+                onclick={() => {
+                  roleRemoveConfirm = true;
+                }}
+                disabled={roleSaving}
+              >
                 {$i18n.t('room.permRoleRemove')}
               </Button>
             {/if}
@@ -365,6 +379,15 @@
     {/if}
   {/if}
 </div>
+
+<ConfirmDialog
+  bind:open={roleRemoveConfirm}
+  title={$i18n.t('room.permRoleRemoveConfirm')}
+  description={$i18n.t('room.permRoleRemoveHint')}
+  confirmLabel={$i18n.t('room.permRoleRemove')}
+  busy={roleSaving}
+  onConfirm={() => void confirmRemoveRole()}
+/>
 
 <style>
   .section {

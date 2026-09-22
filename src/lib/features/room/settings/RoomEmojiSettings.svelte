@@ -23,6 +23,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -48,6 +49,7 @@
   let busy = $state(false);
   let newPackName = $state('');
   let viewing = $state<string | null>(null);
+  let packToRemove = $state<ImagePackView | null>(null);
   let run = 0;
 
   let roomId = $derived(room?.room_id ?? null);
@@ -126,6 +128,13 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function confirmRemoval(): Promise<void> {
+    const pack = packToRemove;
+    if (!pack) return;
+    await deletePack(pack);
+    packToRemove = null;
   }
 
   async function applyDraft(pack: ImagePackView, draft: PackDraft): Promise<void> {
@@ -220,7 +229,7 @@
                   label={$i18n.t('room.emojisDeletePack', { name: pack.name ?? pack.id })}
                   disabled={busy}
                   onclick={() => {
-                    void deletePack(pack);
+                    packToRemove = pack;
                   }}
                 >
                   <TrashIcon />
@@ -233,6 +242,20 @@
     {/if}
   {/if}
 </div>
+
+<ConfirmDialog
+  open={packToRemove !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next && busy === false) packToRemove = null;
+  }}
+  title={$i18n.t('room.emojisDeletePackConfirm', {
+    name: packToRemove?.name ?? packToRemove?.id ?? '',
+  })}
+  description={$i18n.t('room.emojisDeletePackHint')}
+  confirmLabel={$i18n.t('room.remove')}
+  {busy}
+  onConfirm={() => void confirmRemoval()}
+/>
 
 <style>
   .section {

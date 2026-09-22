@@ -73,6 +73,10 @@ test.describe('against the homeserver', () => {
 
     await removeButton(page, word).click();
 
+    const dialog = page.getByRole('dialog', { name: `Remove keyword ${word}?` });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+
     await expect(keyword(page, word)).toHaveCount(0);
     await expect
       .poll(() =>
@@ -116,6 +120,10 @@ test.describe('when the server refuses', () => {
 
     homeserverProxy.fail(new RegExp(`DELETE /_matrix/client/v3/pushrules/global/content/${word}`));
     await removeButton(page, word).click();
+
+    const dialog = page.getByRole('dialog', { name: `Remove keyword ${word}?` });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
 
     await expect(page.getByText('That keyword could not be removed.')).toBeVisible();
     await expect(keyword(page, word)).toBeVisible();

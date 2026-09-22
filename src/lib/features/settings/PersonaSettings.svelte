@@ -23,6 +23,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -36,6 +37,7 @@
   let editorOpen = $state(false);
   let editing = $state<PersonaView | null>(null);
   let removing = $state<string | null>(null);
+  let personaToRemove = $state<PersonaView | null>(null);
   let error = $state<string | null>(null);
 
   let systemInput = $state('');
@@ -58,7 +60,6 @@
   }
 
   async function remove(persona: PersonaView): Promise<void> {
-    if (!confirm($i18n.t('personas.removeConfirm'))) return;
     removing = persona.id;
     error = null;
     try {
@@ -69,6 +70,13 @@
     } finally {
       removing = null;
     }
+  }
+
+  async function confirmRemoval(): Promise<void> {
+    const persona = personaToRemove;
+    if (!persona) return;
+    await remove(persona);
+    personaToRemove = null;
   }
 
   async function avatarFor(member: PluralkitMember, existing: PersonaView | undefined) {
@@ -186,7 +194,9 @@
               size="small"
               disabled={removing === persona.id}
               label={$i18n.t('personas.remove', { name: persona.display_name })}
-              onclick={() => void remove(persona)}
+              onclick={() => {
+                personaToRemove = persona;
+              }}
             >
               <TrashIcon />
             </IconButton>
@@ -246,6 +256,18 @@
     editorOpen = next;
     if (!next) editing = null;
   }}
+/>
+
+<ConfirmDialog
+  open={personaToRemove !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next && removing === null) personaToRemove = null;
+  }}
+  title={$i18n.t('personas.removeTitle', { name: personaToRemove?.display_name ?? '' })}
+  description={$i18n.t('personas.removeConfirm')}
+  confirmLabel={$i18n.t('personas.remove', { name: personaToRemove?.display_name ?? '' })}
+  busy={removing !== null}
+  onConfirm={() => void confirmRemoval()}
 />
 
 <style>

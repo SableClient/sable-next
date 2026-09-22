@@ -10,9 +10,17 @@ import {
   buildAbbreviationMap,
   markAbbreviations,
 } from './abbreviations';
+import type { AbbreviationEntry } from './settings/abbreviations';
 
 function mark(html: string, entries: [string, string][]): string {
-  const map = buildAbbreviationMap(entries.map(([term, definition]) => ({ term, definition })));
+  return markEntries(
+    html,
+    entries.map(([term, definition]) => ({ term, definition }))
+  );
+}
+
+function markEntries(html: string, entries: AbbreviationEntry[]): string {
+  const map = buildAbbreviationMap(entries);
   const pattern = abbreviationPattern(map);
   const root = document.createElement('div');
   root.innerHTML = html;
@@ -37,6 +45,40 @@ test('marks a term whole-word and case-insensitively, keeping its casing', () =>
 
 test('leaves a term embedded in a longer word alone', () => {
   expect(mark('<p>fossil</p>', [['foss', 'Free software']])).toBe('<p>fossil</p>');
+});
+
+test('a cased term only matches its exact casing', () => {
+  expect(
+    markEntries('<p>DO do Do</p>', [{ term: 'DO', definition: 'Digital Ocean', cased: true }])
+  ).toBe('<p><abbr data-abbr-definition="Digital Ocean" tabindex="0">DO</abbr> do Do</p>');
+});
+
+test('a cased term and a case-insensitive term can share the same letters', () => {
+  expect(
+    markEntries('<p>DO do</p>', [
+      { term: 'DO', definition: 'Digital Ocean', cased: true },
+      { term: 'do', definition: 'to do' },
+    ])
+  ).toBe(
+    '<p><abbr data-abbr-definition="Digital Ocean" tabindex="0">DO</abbr> <abbr data-abbr-definition="to do" tabindex="0">do</abbr></p>'
+  );
+});
+
+test('a cased term and an uncased term with the same lowercased letters both match', () => {
+  expect(
+    markEntries('<p>DO do</p>', [
+      { term: 'DO', definition: 'to do' },
+      { term: 'do', definition: 'to do, cased', cased: true },
+    ])
+  ).toBe(
+    '<p><abbr data-abbr-definition="to do" tabindex="0">DO</abbr> <abbr data-abbr-definition="to do, cased" tabindex="0">do</abbr></p>'
+  );
+});
+
+test('an uncased term still matches any casing', () => {
+  expect(markEntries('<p>DO</p>', [{ term: 'do', definition: 'to do' }])).toBe(
+    '<p><abbr data-abbr-definition="to do" tabindex="0">DO</abbr></p>'
+  );
 });
 
 test('prefers the longest term', () => {

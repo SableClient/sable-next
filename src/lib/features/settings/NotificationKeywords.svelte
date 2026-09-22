@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -19,6 +20,7 @@
   let draft = $state('');
   let adding = $state(false);
   let removingKeyword = $state<string | null>(null);
+  let pendingRemoval = $state<string | null>(null);
   let error = $state<string | null>(null);
 
   const trimmedDraft = $derived(draft.trim());
@@ -86,6 +88,13 @@
       if (alive) removingKeyword = null;
     }
   }
+
+  async function confirmRemoval(): Promise<void> {
+    const keyword = pendingRemoval;
+    if (keyword === null) return;
+    await removeKeyword(keyword);
+    pendingRemoval = null;
+  }
 </script>
 
 <section class="keywords" aria-labelledby="notification-keywords">
@@ -112,7 +121,9 @@
             size="large"
             disabled={removingKeyword === keyword}
             label={$i18n.t('settings.notificationKeywordsRemove', { keyword })}
-            onclick={() => void removeKeyword(keyword)}
+            onclick={() => {
+              pendingRemoval = keyword;
+            }}
           >
             <TrashIcon />
           </IconButton>
@@ -145,6 +156,17 @@
     </label>
   </form>
 </section>
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next && removingKeyword === null) pendingRemoval = null;
+  }}
+  title={$i18n.t('settings.notificationKeywordsConfirm', { keyword: pendingRemoval ?? '' })}
+  confirmLabel={$i18n.t('settings.removeButton')}
+  busy={removingKeyword !== null}
+  onConfirm={() => void confirmRemoval()}
+/>
 
 <style>
   .keywords {

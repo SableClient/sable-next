@@ -2,6 +2,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import type { RoomWidget } from './widget-content.js';
@@ -34,6 +35,7 @@
   }: Props = $props();
 
   let activeId = $state<string | null>(null);
+  let pendingRemoval = $state<RoomWidget | null>(null);
 
   interface PendingApproval {
     widgetName: string;
@@ -100,7 +102,9 @@
               variant="ghost"
               size="small"
               label={$i18n.t('widgets.remove', { name: widget.name })}
-              onclick={() => onRemove?.(widget.id)}
+              onclick={() => {
+                pendingRemoval = widget;
+              }}
             >
               <XIcon />
             </IconButton>
@@ -134,6 +138,20 @@
     onDecide={pending.settle}
   />
 {/if}
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next) pendingRemoval = null;
+  }}
+  title={$i18n.t('widgets.removeConfirm', { name: pendingRemoval?.name ?? '' })}
+  description={$i18n.t('widgets.removeHint')}
+  confirmLabel={$i18n.t('widgets.remove', { name: pendingRemoval?.name ?? '' })}
+  onConfirm={() => {
+    onRemove?.(pendingRemoval?.id ?? '');
+    pendingRemoval = null;
+  }}
+/>
 
 <style>
   .widgets-panel {

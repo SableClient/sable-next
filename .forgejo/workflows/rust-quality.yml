@@ -41,7 +41,7 @@ env:
   SCCACHE_S3_KEY_PREFIX: sable-next
   SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
   SCCACHE_REGION: us-east-1
-  SCCACHE_S3_USE_SSL: "true"
+  SCCACHE_S3_USE_SSL: 'true'
 
 jobs:
   format:

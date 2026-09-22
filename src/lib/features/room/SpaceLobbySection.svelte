@@ -17,6 +17,7 @@
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
   import type { HierarchyRoom, HierarchyRoomView, HierarchySection } from './space-hierarchy';
@@ -85,9 +86,16 @@
     });
   }
 
+  let pendingRemoval = $state<{ room: HierarchyRoom; label: string } | null>(null);
+
   function removeEntry(entry: HierarchyRoom): void {
-    if (!confirm($i18n.t('room.lobbyRemoveConfirm', { room: label(entry.room) }))) return;
-    onRemove(section, entry);
+    pendingRemoval = { room: entry, label: label(entry.room) };
+  }
+
+  function confirmRemoval(): void {
+    const pending = pendingRemoval;
+    pendingRemoval = null;
+    if (pending) onRemove(section, pending.room);
   }
 </script>
 
@@ -284,6 +292,16 @@
     </div>
   {/if}
 </div>
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next) pendingRemoval = null;
+  }}
+  title={$i18n.t('room.lobbyRemoveConfirm', { room: pendingRemoval?.label ?? '' })}
+  confirmLabel={$i18n.t('room.lobbyRemove')}
+  onConfirm={confirmRemoval}
+/>
 
 <style>
   .section {

@@ -95,6 +95,22 @@ test('shows a remove action only when the caller can manage widgets', async () =
   await tick();
 
   document.querySelectorAll('.widgets-tab')[0].querySelectorAll('button')[1].click();
+  expect(onRemove).not.toHaveBeenCalled();
+
+  const confirm = await vi.waitFor(() => {
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    const confirm = dialog
+      ? [...dialog.querySelectorAll('button')].find(
+          (button) => button.textContent.trim() === 'Remove Jitsi'
+        )
+      : null;
+    expect(confirm).not.toBeNull();
+    return confirm as HTMLButtonElement;
+  });
+  confirm.click();
+  await tick();
+
   expect(onRemove).toHaveBeenCalledWith('widget-1');
   await unmount(instance);
 });

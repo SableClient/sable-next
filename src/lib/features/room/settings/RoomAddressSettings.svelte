@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
@@ -31,6 +32,7 @@
   let alternatives = $state.raw<string[]>([]);
   let draft = $state('');
   let busy = $state(false);
+  let pendingRemoval = $state<string | null>(null);
   let outcome = $state<'invalid' | 'failed' | null>(null);
   let run = 0;
 
@@ -113,6 +115,13 @@
     }
   }
 
+  async function confirmRemoval(): Promise<void> {
+    const alias = pendingRemoval;
+    if (alias === null) return;
+    await remove(alias);
+    pendingRemoval = null;
+  }
+
   async function publish(alias: string | null): Promise<void> {
     const target = roomId;
     if (!target) return;
@@ -177,7 +186,7 @@
                 label={$i18n.t('room.addressesRemove', { alias })}
                 disabled={busy}
                 onclick={() => {
-                  void remove(alias);
+                  pendingRemoval = alias;
                 }}
               >
                 <TrashIcon />
@@ -221,6 +230,17 @@
     </div>
   {/if}
 </SettingsSection>
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next && busy === false) pendingRemoval = null;
+  }}
+  title={$i18n.t('room.addressesRemoveConfirm', { alias: pendingRemoval ?? '' })}
+  confirmLabel={$i18n.t('room.remove')}
+  {busy}
+  onConfirm={() => void confirmRemoval()}
+/>
 
 <style>
   .status {
