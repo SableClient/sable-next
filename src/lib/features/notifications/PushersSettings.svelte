@@ -13,6 +13,7 @@
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
 
   import { currentPushKey, SERVER_PUSHER_KIND, WEBPUSH_APP_ID } from './web-push';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
 
@@ -118,7 +119,7 @@
   }
 </script>
 
-<section class="pushers" aria-labelledby="pushers-heading">
+<section class="pushers settings-form" aria-labelledby="pushers-heading">
   <div class="pushers-head">
     <h3 id="pushers-heading">{$i18n.t('settings.pushers')}</h3>
     <IconButton
@@ -257,7 +258,6 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   .pushers-head {

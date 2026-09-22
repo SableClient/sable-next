@@ -28,6 +28,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   import PersonaEditor from './PersonaEditor.svelte';
 
@@ -135,87 +136,89 @@
     description={$i18n.t('personas.manageDescription')}
     headingId="settings-personas"
   >
-    {#if personas.loading && personas.personas.length === 0}
-      <p class="persona-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
-    {:else if personas.personas.length === 0}
-      <p class="persona-empty">{$i18n.t('personas.empty')}</p>
-    {:else}
-      <ul class="persona-list">
-        {#each personas.personas as persona (persona.id)}
-          {@const index = personas.personas.indexOf(persona)}
-          <li>
-            <Avatar
-              id={persona.id}
-              src={persona.avatar_url}
-              name={persona.display_name}
-              size="small"
-            />
-            <div class="persona-copy">
-              <span class="persona-name">{persona.display_name}</span>
-              {#if persona.pronouns.length > 0}
-                <span class="persona-meta">{formatPronouns(persona.pronouns)}</span>
-              {/if}
-              {#if persona.triggers.length > 0}
-                <span class="persona-meta">
-                  {persona.triggers.map(triggerLabel).join(' · ')}
-                </span>
-              {/if}
-            </div>
-            <IconButton
-              variant="subtle"
-              size="small"
-              label={$i18n.t('personas.edit', { name: persona.display_name })}
-              onclick={() => {
-                openEditor(persona);
-              }}
-            >
-              <PencilSimpleIcon />
-            </IconButton>
-            <IconButton
-              variant="subtle"
-              size="small"
-              disabled={index === 0}
-              label={$i18n.t('personas.moveUp', { name: persona.display_name })}
-              onclick={() => void personas.reorder(index, index - 1)}
-            >
-              <ArrowUpIcon />
-            </IconButton>
-            <IconButton
-              variant="subtle"
-              size="small"
-              disabled={index === personas.personas.length - 1}
-              label={$i18n.t('personas.moveDown', { name: persona.display_name })}
-              onclick={() => void personas.reorder(index, index + 1)}
-            >
-              <ArrowDownIcon />
-            </IconButton>
-            <IconButton
-              variant="subtle"
-              size="small"
-              disabled={removing === persona.id}
-              label={$i18n.t('personas.remove', { name: persona.display_name })}
-              onclick={() => {
-                personaToRemove = persona;
-              }}
-            >
-              <TrashIcon />
-            </IconButton>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <div class="settings-form">
+      {#if personas.loading && personas.personas.length === 0}
+        <p class="persona-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
+      {:else if personas.personas.length === 0}
+        <p class="persona-empty">{$i18n.t('personas.empty')}</p>
+      {:else}
+        <ul class="persona-list">
+          {#each personas.personas as persona (persona.id)}
+            {@const index = personas.personas.indexOf(persona)}
+            <li>
+              <Avatar
+                id={persona.id}
+                src={persona.avatar_url}
+                name={persona.display_name}
+                size="small"
+              />
+              <div class="persona-copy">
+                <span class="persona-name">{persona.display_name}</span>
+                {#if persona.pronouns.length > 0}
+                  <span class="persona-meta">{formatPronouns(persona.pronouns)}</span>
+                {/if}
+                {#if persona.triggers.length > 0}
+                  <span class="persona-meta">
+                    {persona.triggers.map(triggerLabel).join(' · ')}
+                  </span>
+                {/if}
+              </div>
+              <IconButton
+                variant="subtle"
+                size="small"
+                label={$i18n.t('personas.edit', { name: persona.display_name })}
+                onclick={() => {
+                  openEditor(persona);
+                }}
+              >
+                <PencilSimpleIcon />
+              </IconButton>
+              <IconButton
+                variant="subtle"
+                size="small"
+                disabled={index === 0}
+                label={$i18n.t('personas.moveUp', { name: persona.display_name })}
+                onclick={() => void personas.reorder(index, index - 1)}
+              >
+                <ArrowUpIcon />
+              </IconButton>
+              <IconButton
+                variant="subtle"
+                size="small"
+                disabled={index === personas.personas.length - 1}
+                label={$i18n.t('personas.moveDown', { name: persona.display_name })}
+                onclick={() => void personas.reorder(index, index + 1)}
+              >
+                <ArrowDownIcon />
+              </IconButton>
+              <IconButton
+                variant="subtle"
+                size="small"
+                disabled={removing === persona.id}
+                label={$i18n.t('personas.remove', { name: persona.display_name })}
+                onclick={() => {
+                  personaToRemove = persona;
+                }}
+              >
+                <TrashIcon />
+              </IconButton>
+            </li>
+          {/each}
+        </ul>
+      {/if}
 
-    <div class="persona-actions">
-      <Button
-        variant="secondary"
-        size="small"
-        onclick={() => {
-          openEditor(null);
-        }}
-      >
-        <PlusIcon />
-        {$i18n.t('personas.add')}
-      </Button>
+      <div class="persona-actions">
+        <Button
+          variant="secondary"
+          size="small"
+          onclick={() => {
+            openEditor(null);
+          }}
+        >
+          <PlusIcon />
+          {$i18n.t('personas.add')}
+        </Button>
+      </div>
     </div>
   </SettingsSection>
 
@@ -224,7 +227,7 @@
     description={$i18n.t('personas.importDescription')}
     headingId="settings-personas-pluralkit"
   >
-    <form class="import-form" onsubmit={(event) => void runImport(event)}>
+    <form class="settings-form import-form" onsubmit={(event) => void runImport(event)}>
       {#if importNotice}<Alert variant="info" aria-live="polite">{importNotice}</Alert>{/if}
       <label class="field">
         <span>{$i18n.t('personas.importSystem')}</span>
@@ -281,7 +284,7 @@
     gap: var(--space-200);
     list-style: none;
     margin: 0;
-    padding: var(--space-300);
+    padding: 0;
   }
 
   .persona-list li {
@@ -314,19 +317,15 @@
   .persona-empty {
     color: var(--surface-var-on-container);
     margin: 0;
-    padding: var(--space-400);
   }
 
   .persona-actions {
     display: flex;
     justify-content: flex-end;
-    padding: 0 var(--space-400) var(--space-400);
   }
 
   .import-form {
-    display: grid;
     gap: var(--space-300);
-    padding: var(--space-400) var(--space-400) 0;
   }
 
   .field {

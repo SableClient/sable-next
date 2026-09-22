@@ -29,6 +29,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
 
@@ -377,7 +378,7 @@
           </div>
         {/if}
       {:else if loading}
-        <div class="loading-state" role="status">
+        <div class="settings-form loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingEncryption')}</span>
         </div>
       {/if}
@@ -389,11 +390,11 @@
       titleActions={devicesActions}
     >
       {#if loading}
-        <div class="loading-state" role="status">
+        <div class="settings-form loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingDevices')}</span>
         </div>
       {:else if devices.length === 0}
-        <div class="empty-state">
+        <div class="settings-form empty-state">
           <DesktopTowerIcon />
           <p>{$i18n.t('settings.noDevices')}</p>
         </div>
@@ -772,7 +773,6 @@
     gap: var(--space-300);
     justify-content: center;
     min-height: 5rem;
-    padding: var(--space-400);
   }
 
   .empty-state {

@@ -9,6 +9,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
 
@@ -93,7 +94,7 @@
   }
 </script>
 
-<section class="mentions" aria-labelledby="mention-notifications">
+<section class="mentions settings-form" aria-labelledby="mention-notifications">
   <h3 id="mention-notifications">{$i18n.t('settings.mentions')}</h3>
   <p class="hint">{$i18n.t('settings.mentionsHint')}</p>
 
@@ -131,7 +132,6 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   h3 {

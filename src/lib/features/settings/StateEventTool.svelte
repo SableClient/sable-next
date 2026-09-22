@@ -8,6 +8,7 @@
   import Select from '#lib/ui/primitives/Select.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -56,7 +57,7 @@
   }
 </script>
 
-<form class="state-event" onsubmit={send}>
+<form class="state-event settings-form" onsubmit={send}>
   <p class="hint">{$i18n.t('settings.stateEventDescription')}</p>
 
   <div class="field">

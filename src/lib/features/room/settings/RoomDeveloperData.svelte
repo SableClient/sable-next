@@ -12,6 +12,7 @@
   import Label from '#lib/ui/primitives/Label.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
+  import '#lib/ui/primitives/settings-row.css';
   import { collectRoomDebugData } from './room-debug-data.js';
 
   let {
@@ -83,7 +84,7 @@
   title={$i18n.t(room.is_space ? 'room.devSpaceDataTitle' : 'room.devRoomDataTitle')}
   description={$i18n.t('room.devDataDescription')}
 >
-  <div class="data">
+  <div class="data settings-form">
     {#if data}
       <Label for="room-dev-data">{$i18n.t('room.devDataJson')}</Label>
       <TextArea id="room-dev-data" value={data} readonly rows={12} spellcheck="false" />

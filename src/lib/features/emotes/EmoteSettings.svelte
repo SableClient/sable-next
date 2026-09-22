@@ -197,9 +197,9 @@
         description={$i18n.t('emotes.roomPacksHint')}
       >
         {#if loading}
-          <p class="status" role="status"><Spinner small /></p>
+          <p class="status settings-form" role="status"><Spinner small /></p>
         {:else if byRoom.length === 0}
-          <p class="status">{$i18n.t('emotes.noRoomPacks')}</p>
+          <p class="status settings-form">{$i18n.t('emotes.noRoomPacks')}</p>
         {:else}
           {#each byRoom as [roomId, roomsPacks] (roomId)}
             <div class="room-group">
@@ -296,7 +296,7 @@
     font-size: var(--font-size-small);
     gap: var(--space-200);
     justify-content: space-between;
-    padding: var(--space-200) var(--space-300) 0;
+    padding: var(--space-200) var(--space-400) 0;
   }
 
   .room-actions {
@@ -307,7 +307,6 @@
   .status {
     color: var(--surface-var-on-container);
     margin: 0;
-    padding: var(--space-400) 0;
     text-align: center;
   }
 </style>

@@ -7,6 +7,7 @@
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   let types = $state<string[]>([]);
@@ -103,86 +104,85 @@
     </SettingsRow>
   </ul>
 
-  {#if types.length === 0}
-    <p class="empty">{$i18n.t('settings.developerAccountDataEmpty')}</p>
-  {:else}
-    <ul class="event-list">
-      {#each [...types].sort() as type (type)}
-        <li>
-          <Button
-            variant={selected === type ? 'primary' : 'ghost'}
-            size="small"
-            class="choice"
-            aria-pressed={selected === type}
-            block
-            onclick={() => void open(type)}
-          >
-            {type}
-          </Button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+  <div class="settings-form account-data-body">
+    {#if types.length === 0}
+      <p class="empty">{$i18n.t('settings.developerAccountDataEmpty')}</p>
+    {:else}
+      <ul class="event-list">
+        {#each [...types].sort() as type (type)}
+          <li>
+            <Button
+              variant={selected === type ? 'primary' : 'ghost'}
+              size="small"
+              class="choice"
+              aria-pressed={selected === type}
+              block
+              onclick={() => void open(type)}
+            >
+              {type}
+            </Button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
 
-  {#if selected !== undefined}
-    <form class="editor" onsubmit={save}>
-      <div class="field">
-        <Label for="developer-account-data-type"
-          >{$i18n.t('settings.developerAccountDataType')}</Label
-        >
-        <TextInput
-          id="developer-account-data-type"
-          bind:value={eventType}
-          disabled={selected !== null}
-          autocomplete="off"
-          spellcheck={false}
-        />
-      </div>
-      <div class="field">
-        <Label for="developer-account-data-content"
-          >{$i18n.t('settings.developerAccountDataContent')}</Label
-        >
-        <TextArea
-          id="developer-account-data-content"
-          bind:value={content}
-          disabled={loading}
-          error={error === 'json'}
-          spellcheck={false}
-          class="account-data-content"
-        />
-      </div>
-      {#if error === 'json'}
-        <Alert variant="critical">{$i18n.t('settings.developerAccountDataInvalidJson')}</Alert>
-      {:else if error === 'failed'}
-        <Alert variant="critical">{$i18n.t('settings.developerAccountDataFailed')}</Alert>
-      {:else if saved}
-        <Alert variant="success">{$i18n.t('settings.developerAccountDataSaved')}</Alert>
-      {/if}
-      <div class="editor-actions">
-        <Button variant="ghost" size="small" onclick={() => (selected = undefined)}>
-          {$i18n.t('settings.developerAccountDataClose')}
-        </Button>
-        <Button type="submit" variant="primary" size="small" loading={saving}>
-          {$i18n.t('settings.developerAccountDataSave')}
-        </Button>
-      </div>
-    </form>
-  {/if}
+    {#if selected !== undefined}
+      <form class="editor" onsubmit={save}>
+        <div class="field">
+          <Label for="developer-account-data-type"
+            >{$i18n.t('settings.developerAccountDataType')}</Label
+          >
+          <TextInput
+            id="developer-account-data-type"
+            bind:value={eventType}
+            disabled={selected !== null}
+            autocomplete="off"
+            spellcheck={false}
+          />
+        </div>
+        <div class="field">
+          <Label for="developer-account-data-content"
+            >{$i18n.t('settings.developerAccountDataContent')}</Label
+          >
+          <TextArea
+            id="developer-account-data-content"
+            bind:value={content}
+            disabled={loading}
+            error={error === 'json'}
+            spellcheck={false}
+            class="account-data-content"
+          />
+        </div>
+        {#if error === 'json'}
+          <Alert variant="critical">{$i18n.t('settings.developerAccountDataInvalidJson')}</Alert>
+        {:else if error === 'failed'}
+          <Alert variant="critical">{$i18n.t('settings.developerAccountDataFailed')}</Alert>
+        {:else if saved}
+          <Alert variant="success">{$i18n.t('settings.developerAccountDataSaved')}</Alert>
+        {/if}
+        <div class="editor-actions">
+          <Button variant="ghost" size="small" onclick={() => (selected = undefined)}>
+            {$i18n.t('settings.developerAccountDataClose')}
+          </Button>
+          <Button type="submit" variant="primary" size="small" loading={saving}>
+            {$i18n.t('settings.developerAccountDataSave')}
+          </Button>
+        </div>
+      </form>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .account-data,
+  .account-data-body,
   .editor {
     display: grid;
     gap: var(--space-300);
   }
 
-  .account-data > :not(.settings) {
-    margin-inline: var(--space-400);
-  }
-
   .empty {
     font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .settings {

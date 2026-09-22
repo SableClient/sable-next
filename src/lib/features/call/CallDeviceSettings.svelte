@@ -14,6 +14,7 @@
 
   import { outputVolume, setOutputVolume } from './participant-volumes.svelte.js';
   import { supportsDeviceSelection, listCallDevices, type CallDevice } from './devices.js';
+  import '#lib/ui/primitives/settings-row.css';
 
   let devices = $state<CallDevice[]>([]);
   let denied = $state(false);
@@ -76,89 +77,91 @@
   }
 </script>
 
-{#if !supported}
-  <Alert variant="info">{$i18n.t('settings.callDevicesUnsupported')}</Alert>
-{:else}
-  {#if denied}
-    <Alert variant="info">{$i18n.t('settings.callDevicesPermission')}</Alert>
-  {/if}
+<div class="settings-form">
+  {#if !supported}
+    <Alert variant="info">{$i18n.t('settings.callDevicesUnsupported')}</Alert>
+  {:else}
+    {#if denied}
+      <Alert variant="info">{$i18n.t('settings.callDevicesPermission')}</Alert>
+    {/if}
 
-  <div class="device-rows">
-    <label class="row">
-      <span class="label"
-        ><MicrophoneIcon aria-hidden="true" />{$i18n.t('settings.callInputDevice')}</span
-      >
-      <Select
-        items={optionsFor('audioinput')}
-        value={preferences.audioInputDevice}
-        aria-label={$i18n.t('settings.callInputDevice')}
-        onValueChange={(value) => setPreference('audioInputDevice', value)}
-      />
-    </label>
-
-    <label class="row">
-      <span class="label"
-        ><SpeakerHighIcon aria-hidden="true" />{$i18n.t('settings.callOutputDevice')}</span
-      >
-      <Select
-        items={optionsFor('audiooutput')}
-        value={preferences.audioOutputDevice}
-        aria-label={$i18n.t('settings.callOutputDevice')}
-        onValueChange={(value) => setPreference('audioOutputDevice', value)}
-      />
-    </label>
-
-    <label class="row">
-      <span class="label"
-        ><VideoCameraIcon aria-hidden="true" />{$i18n.t('settings.callCameraDevice')}</span
-      >
-      <Select
-        items={optionsFor('videoinput')}
-        value={preferences.videoInputDevice}
-        aria-label={$i18n.t('settings.callCameraDevice')}
-        onValueChange={(value) => setPreference('videoInputDevice', value)}
-      />
-    </label>
-
-    <div class="row">
-      <span class="label"
-        ><SpeakerHighIcon aria-hidden="true" />{$i18n.t('settings.callOutputVolume')}</span
-      >
-      <div class="control">
-        <Slider
-          min={0}
-          max={1}
-          step={0.05}
-          label={$i18n.t('settings.callOutputVolume')}
-          value={outputVolume()}
-          oninput={setOutputVolume}
-        />
-        <span class="reading">{Math.round(outputVolume() * 100)}%</span>
-      </div>
-    </div>
-
-    <div class="row">
-      <span class="label"
-        ><MicrophoneIcon aria-hidden="true" />{$i18n.t('settings.callMicTestLevel')}</span
-      >
-      <div class="control">
-        <div
-          class="meter"
-          role="meter"
-          aria-valuenow={Math.round(level * 100)}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={$i18n.t('settings.callMicTestLevel')}
+    <div class="device-rows">
+      <label class="row">
+        <span class="label"
+          ><MicrophoneIcon aria-hidden="true" />{$i18n.t('settings.callInputDevice')}</span
         >
-          <div class="fill" style={`inline-size: ${String(Math.round(level * 100))}%`}></div>
+        <Select
+          items={optionsFor('audioinput')}
+          value={preferences.audioInputDevice}
+          aria-label={$i18n.t('settings.callInputDevice')}
+          onValueChange={(value) => setPreference('audioInputDevice', value)}
+        />
+      </label>
+
+      <label class="row">
+        <span class="label"
+          ><SpeakerHighIcon aria-hidden="true" />{$i18n.t('settings.callOutputDevice')}</span
+        >
+        <Select
+          items={optionsFor('audiooutput')}
+          value={preferences.audioOutputDevice}
+          aria-label={$i18n.t('settings.callOutputDevice')}
+          onValueChange={(value) => setPreference('audioOutputDevice', value)}
+        />
+      </label>
+
+      <label class="row">
+        <span class="label"
+          ><VideoCameraIcon aria-hidden="true" />{$i18n.t('settings.callCameraDevice')}</span
+        >
+        <Select
+          items={optionsFor('videoinput')}
+          value={preferences.videoInputDevice}
+          aria-label={$i18n.t('settings.callCameraDevice')}
+          onValueChange={(value) => setPreference('videoInputDevice', value)}
+        />
+      </label>
+
+      <div class="row">
+        <span class="label"
+          ><SpeakerHighIcon aria-hidden="true" />{$i18n.t('settings.callOutputVolume')}</span
+        >
+        <div class="control">
+          <Slider
+            min={0}
+            max={1}
+            step={0.05}
+            label={$i18n.t('settings.callOutputVolume')}
+            value={outputVolume()}
+            oninput={setOutputVolume}
+          />
+          <span class="reading">{Math.round(outputVolume() * 100)}%</span>
         </div>
-        <Button variant="secondary" size="small" onclick={() => void toggleTest()}>
-          {$i18n.t(testing ? 'settings.callMicTestStop' : 'settings.callMicTest')}
-        </Button>
+      </div>
+
+      <div class="row">
+        <span class="label"
+          ><MicrophoneIcon aria-hidden="true" />{$i18n.t('settings.callMicTestLevel')}</span
+        >
+        <div class="control">
+          <div
+            class="meter"
+            role="meter"
+            aria-valuenow={Math.round(level * 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={$i18n.t('settings.callMicTestLevel')}
+          >
+            <div class="fill" style={`inline-size: ${String(Math.round(level * 100))}%`}></div>
+          </div>
+          <Button variant="secondary" size="small" onclick={() => void toggleTest()}>
+            {$i18n.t(testing ? 'settings.callMicTestStop' : 'settings.callMicTest')}
+          </Button>
+        </div>
       </div>
     </div>
-  </div>
-{/if}
+  {/if}
+</div>
 
 <style>
   .device-rows {

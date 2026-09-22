@@ -12,6 +12,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
 
   const core = useCoreClient();
@@ -139,7 +140,7 @@
       <div class="loading" role="status"><Spinner /></div>
     {:else}
       <SettingsSection title={$i18n.t('settings.profile')} headingId="account-profile">
-        <div class="profile-settings">
+        <div class="settings-form">
           {#if profile}<ExtendedProfileSettings
               {profile}
               onSaved={refreshProfile}
@@ -206,7 +207,7 @@
           section="profile"
         />{/if}
       <SettingsSection title={$i18n.t('settings.matrixId')} headingId="account-matrix-id">
-        <div class="matrix-id">
+        <div class="settings-form matrix-id">
           <code>{userId}</code>
           <Button variant="secondary" size="small" onclick={() => void copyUserId()}>
             {$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
@@ -227,15 +228,9 @@
     max-width: 56rem;
   }
 
-  .settings-stack,
-  .profile-settings {
+  .settings-stack {
     display: grid;
     gap: var(--space-400);
-  }
-
-  .profile-settings,
-  .matrix-id {
-    padding: var(--space-400);
   }
 
   .avatar-row,

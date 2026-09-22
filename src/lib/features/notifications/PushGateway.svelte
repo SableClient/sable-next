@@ -26,6 +26,7 @@
     type PushOverride,
     pushOverride,
   } from './push-config';
+  import '#lib/ui/primitives/settings-row.css';
 
   const problemLabels: Record<OverrideProblem, string> = {
     incomplete: 'settings.pushGatewayIncomplete',
@@ -153,7 +154,7 @@
 />
 
 {#if android}
-  <section class="gateway" aria-labelledby="push-distributor">
+  <section class="gateway settings-form" aria-labelledby="push-distributor">
     <h3 id="push-distributor">{$i18n.t('settings.pushTransport')}</h3>
     <p class="hint">{$i18n.t('settings.pushTransportHint')}</p>
     <Select
@@ -191,7 +192,7 @@
   </section>
 {/if}
 
-<section class="gateway" aria-labelledby="push-gateway">
+<section class="gateway settings-form" aria-labelledby="push-gateway">
   <h3 id="push-gateway">{$i18n.t('settings.pushGateway')}</h3>
   <p class="hint">{$i18n.t('settings.pushGatewayHint')}</p>
 
@@ -266,7 +267,6 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   h3 {

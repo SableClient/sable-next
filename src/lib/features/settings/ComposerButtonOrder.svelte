@@ -75,7 +75,7 @@
     display: flex;
     justify-content: space-between;
     min-height: var(--control-height-medium);
-    padding: var(--space-100) var(--space-300);
+    padding: var(--space-100) var(--space-400);
   }
 
   li:last-child {

@@ -9,6 +9,7 @@
 
   import { settingsChanges } from './notifications.svelte';
   import { grantPermission, permissionGranted } from './present';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   const modes: NotificationModeView[] = ['all', 'mentions', 'mute'];
@@ -89,7 +90,7 @@
   }
 </script>
 
-<section class="defaults" aria-labelledby="notification-defaults">
+<section class="defaults settings-form" aria-labelledby="notification-defaults">
   <h3 id="notification-defaults">{$i18n.t('settings.notificationDefaults')}</h3>
   <p class="hint">{$i18n.t('settings.notificationDefaultsHint')}</p>
 
@@ -139,7 +140,6 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   h3 {

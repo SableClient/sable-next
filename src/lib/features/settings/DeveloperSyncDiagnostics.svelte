@@ -4,6 +4,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -45,17 +46,24 @@
       </code>
     </SettingsRow>
   </ul>
-  {#if core.sync?.state === 'error'}
-    <p class="error">{core.sync.message}</p>
-  {/if}
-  {#if core.crashed}
-    <p class="error">{core.crashed}</p>
+  {#if core.sync?.state === 'error' || core.crashed}
+    <div class="settings-form errors">
+      {#if core.sync?.state === 'error'}
+        <p class="error">{core.sync.message}</p>
+      {/if}
+      {#if core.crashed}
+        <p class="error">{core.crashed}</p>
+      {/if}
+    </div>
   {/if}
 </div>
 
 <style>
   .diagnostics {
     display: grid;
+  }
+
+  .errors {
     gap: var(--space-300);
   }
 

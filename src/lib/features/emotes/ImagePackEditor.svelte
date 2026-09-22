@@ -383,7 +383,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="status">{$i18n.t('emotes.noImages')}</p>
+      <p class="status settings-form">{$i18n.t('emotes.noImages')}</p>
     {/if}
 
     {#if canEdit}
@@ -419,7 +419,7 @@
     title={$i18n.t('emotes.transfer')}
     description={$i18n.t('emotes.transferHint')}
   >
-    <div class="transfer">
+    <div class="transfer settings-form">
       <Button
         size="small"
         disabled={busy || current.images.length === 0}
@@ -510,7 +510,6 @@
   .status {
     color: var(--surface-var-on-container);
     margin: 0;
-    padding: var(--space-400) 0;
     text-align: center;
   }
 

@@ -10,6 +10,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import { parseJoinAddress } from './join-address';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   let address = $state('');
@@ -39,7 +40,7 @@
   }
 </script>
 
-<form class="join-address" onsubmit={submit}>
+<form class="join-address settings-form" onsubmit={submit}>
   <div class="examples">
     <p>{$i18n.t('room.joinExamplesLabel')}</p>
     <ul>

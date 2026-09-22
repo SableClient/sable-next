@@ -191,18 +191,9 @@
     overflow: hidden;
   }
 
-  .custom-themes-card,
-  .personas-card {
-    padding: var(--space-400);
-  }
-
   .settings {
     list-style: none;
     margin: 0;
     padding: 0;
-  }
-
-  :global(.state-event-section .settings-section-content) {
-    padding: var(--space-400);
   }
 </style>

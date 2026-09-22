@@ -14,6 +14,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ColorSetting from './ColorSetting.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   interface Props {
     profile: ProfileView;
@@ -163,7 +164,7 @@
 
   {#if section === 'banner'}<div class="banner-setting">
       <span class="setting-label">{$i18n.t('settings.banner')}</span>
-      <div class="setting-row">
+      <div class="banner-row">
         {#if banner}<MediaImage
             class="banner"
             source={banner}
@@ -201,7 +202,7 @@
       headingId="profile-status"
     >
       <form
-        class="form-row"
+        class="settings-form form-row"
         onsubmit={(event) => {
           event.preventDefault();
           void save('status', [['m.status', status ? { text: status } : null]]);
@@ -219,7 +220,7 @@
 
     <SettingsSection title={$i18n.t('settings.profileColors')} headingId="profile-colors">
       <form
-        class="form-stack"
+        class="settings-form form-stack"
         onsubmit={(event) => {
           event.preventDefault();
           void save('colors', [
@@ -276,7 +277,7 @@
 
     <SettingsSection title={$i18n.t('settings.pronounsAndTimezone')} headingId="profile-identity">
       <form
-        class="form-stack"
+        class="settings-form form-stack"
         onsubmit={(event) => {
           event.preventDefault();
           void save('identity', [
@@ -308,7 +309,7 @@
     <!-- very sloppy fix, WILL NEED A PROPER IMPLEMENTATION LATER i just cba to figure it out rnrn -->
     <SettingsSection title={$i18n.t('settings.biography')} headingId="profile-bio">
       <form
-        class="form-stack"
+        class="settings-form form-stack"
         onsubmit={(event) => {
           event.preventDefault();
           void save('bio', [
@@ -335,7 +336,7 @@
 
     <SettingsSection title={$i18n.t('settings.animalIdentity')} headingId="profile-animal">
       <form
-        class="form-stack"
+        class="settings-form form-stack"
         onsubmit={(event) => {
           event.preventDefault();
           void save('animal', [
@@ -386,7 +387,7 @@
           {$i18n.t('settings.addButton')}
         </Button>
       </SettingsRow>
-      <div class="extra-fields">
+      <div class="settings-form extra-fields">
         {#if profile.extra.length || editKey}
           <div class="extra-list">
             {#each profile.extra as field, i (i)}
@@ -473,7 +474,7 @@
       title={$i18n.t('settings.contactInformation')}
       headingId="account-contact"
     >
-      <div class="setting-row">
+      <div class="settings-form form-row">
         {#if emails.length}{#each emails as email (email)}<code>{email}</code>{/each}{:else}<span
             >{$i18n.t('settings.contactInformationNoEmail')}</span
           >{/if}
@@ -481,47 +482,48 @@
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.blockedUsers')} headingId="account-blocked">
-      <form
-        class="form-row"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void block();
-        }}
-      >
-        <TextInput
-          bind:value={userToBlock}
-          placeholder={$i18n.t('settings.blockedUsersPlaceholder')}
-        />
-        <Button type="submit" loading={saving === 'block'}>{$i18n.t('settings.blockButton')}</Button
+      <div class="settings-form">
+        <form
+          class="form-row"
+          onsubmit={(event) => {
+            event.preventDefault();
+            void block();
+          }}
         >
-      </form>
-      {#if ignored.length}<ul class="ignored-users">
-          {#each ignored as userId (userId)}<li>
-              <code>{userId}</code><Button
-                variant="danger"
-                size="small"
-                loading={saving === userId}
-                onclick={() => void unblock(userId)}>{$i18n.t('settings.unblockButton')}</Button
-              >
-            </li>{/each}
-        </ul>{/if}
+          <TextInput
+            bind:value={userToBlock}
+            placeholder={$i18n.t('settings.blockedUsersPlaceholder')}
+          />
+          <Button type="submit" loading={saving === 'block'}
+            >{$i18n.t('settings.blockButton')}</Button
+          >
+        </form>
+        {#if ignored.length}<ul class="ignored-users">
+            {#each ignored as userId (userId)}<li>
+                <code>{userId}</code><Button
+                  variant="danger"
+                  size="small"
+                  loading={saving === userId}
+                  onclick={() => void unblock(userId)}>{$i18n.t('settings.unblockButton')}</Button
+                >
+              </li>{/each}
+          </ul>{/if}
+      </div>
     </SettingsSection>{/if}
 </div>
 
 <style>
-  .profile-stack,
-  .form-stack {
+  .profile-stack {
     display: grid;
     gap: var(--space-400);
   }
 
-  .setting-row,
+  .banner-row,
   .form-row {
     align-items: center;
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   .banner-setting {
@@ -531,11 +533,6 @@
 
   .setting-label {
     font-weight: var(--font-weight-medium);
-  }
-
-  .form-stack,
-  .form-row {
-    padding: var(--space-400);
   }
 
   .form-row :global(.text-input) {
@@ -572,7 +569,7 @@
     gap: var(--space-300);
     list-style: none;
     margin: 0;
-    padding: 0 var(--space-400) var(--space-400);
+    padding: 0;
   }
 
   .ignored-users li {
@@ -586,7 +583,6 @@
     display: grid;
     gap: var(--space-300);
     margin: 0;
-    padding: var(--space-400);
   }
 
   .extra-list {

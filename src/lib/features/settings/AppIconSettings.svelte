@@ -17,6 +17,7 @@
   import lesbian from './app-icons/lesbian.svg';
   import mlm from './app-icons/mlm.svg';
   import pride from './app-icons/pride.svg';
+  import '#lib/ui/primitives/settings-row.css';
 
   const previews: Record<string, string> = {
     primary: defaultIcon,
@@ -99,8 +100,9 @@
       {/key}
     </SettingsRow>
   </ul>
-  {#if failed}<Alert variant="critical" role="alert">{$i18n.t('settings.appIconFailed')}</Alert
-    >{/if}
+  {#if failed}<div class="settings-form">
+      <Alert variant="critical" role="alert">{$i18n.t('settings.appIconFailed')}</Alert>
+    </div>{/if}
 {/if}
 
 <style>

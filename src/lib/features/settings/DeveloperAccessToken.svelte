@@ -4,6 +4,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
   let copied = $state(false);
@@ -43,7 +44,9 @@
     </Button>
   </SettingsRow>
 </ul>
-{#if error}<Alert variant="critical">{$i18n.t('settings.developerAccessTokenFailed')}</Alert>{/if}
+{#if error}<div class="settings-form">
+    <Alert variant="critical">{$i18n.t('settings.developerAccessTokenFailed')}</Alert>
+  </div>{/if}
 
 <style>
   .settings {

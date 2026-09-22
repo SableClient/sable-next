@@ -13,7 +13,6 @@
   <RoomDirectory />
 
   <SettingsSection
-    class="join-address-section"
     headingId="explore-join-by-address"
     title={$i18n.t('room.directoryJoinByAddress')}
     description={$i18n.t('room.joinDescription')}
@@ -21,9 +20,3 @@
     <JoinAddressForm />
   </SettingsSection>
 </AppPageShell>
-
-<style>
-  :global(.join-address-section .settings-section-content) {
-    padding: var(--space-400);
-  }
-</style>

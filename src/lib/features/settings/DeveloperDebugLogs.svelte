@@ -14,6 +14,7 @@
     type DebugLogLevel,
   } from '#lib/observability/debug-log.svelte.js';
   import { exportDiagnosticsBundle } from '#lib/observability/export-diagnostics.js';
+  import '#lib/ui/primitives/settings-row.css';
 
   const categories: DebugLogCategory[] = [
     'sync',
@@ -61,67 +62,69 @@
     </SettingsRow>
   </ul>
 
-  <div class="filters">
-    <Select
-      aria-label={$i18n.t('settings.developerLogsLevel')}
-      value={level}
-      items={levels.map((value) => ({ value, label: value }))}
-      onValueChange={(value) => (level = value as DebugLogLevel | 'all')}
-    />
-    <Select
-      aria-label={$i18n.t('settings.developerLogsCategory')}
-      value={category}
-      items={[
-        { value: 'all', label: 'all' },
-        ...categories.map((value) => ({ value, label: value })),
-      ]}
-      onValueChange={(value) => (category = value as DebugLogCategory | 'all')}
-    />
-  </div>
-
-  <div class="actions">
-    <Button variant="ghost" size="small" onclick={clearDebugLogs}
-      >{$i18n.t('settings.developerLogsClear')}</Button
-    >
-    <Button variant="secondary" size="small" onclick={() => void copy()}
-      >{$i18n.t('settings.developerLogsCopy')}</Button
-    >
-    <Button variant="secondary" size="small" onclick={() => void download()}
-      >{$i18n.t('settings.developerLogsExport')}</Button
-    >
-  </div>
-
-  {#if filtered.length === 0}
-    <p class="empty">{$i18n.t('settings.developerLogsEmpty')}</p>
-  {:else}
-    <div class="entries" aria-live="polite">
-      {#each filtered.slice(-200).reverse() as entry (entry.id)}
-        <details class={`entry level-${entry.level}`}>
-          <summary>
-            <span>{entry.level.toUpperCase()}</span>
-            <span>{entry.category}</span>
-            <time datetime={new Date(entry.timestamp).toISOString()}
-              >{formatTime(entry.timestamp)}</time
-            >
-            <span>{entry.namespace}</span>
-          </summary>
-          <p>{entry.message}</p>
-          {#if entry.data}<pre>{JSON.stringify(entry.data, null, 2)}</pre>{/if}
-        </details>
-      {/each}
+  <div class="settings-form logs-body">
+    <div class="filters">
+      <Select
+        aria-label={$i18n.t('settings.developerLogsLevel')}
+        value={level}
+        items={levels.map((value) => ({ value, label: value }))}
+        onValueChange={(value) => (level = value as DebugLogLevel | 'all')}
+      />
+      <Select
+        aria-label={$i18n.t('settings.developerLogsCategory')}
+        value={category}
+        items={[
+          { value: 'all', label: 'all' },
+          ...categories.map((value) => ({ value, label: value })),
+        ]}
+        onValueChange={(value) => (category = value as DebugLogCategory | 'all')}
+      />
     </div>
-  {/if}
+
+    <div class="actions">
+      <Button variant="ghost" size="small" onclick={clearDebugLogs}
+        >{$i18n.t('settings.developerLogsClear')}</Button
+      >
+      <Button variant="secondary" size="small" onclick={() => void copy()}
+        >{$i18n.t('settings.developerLogsCopy')}</Button
+      >
+      <Button variant="secondary" size="small" onclick={() => void download()}
+        >{$i18n.t('settings.developerLogsExport')}</Button
+      >
+    </div>
+
+    {#if filtered.length === 0}
+      <p class="empty">{$i18n.t('settings.developerLogsEmpty')}</p>
+    {:else}
+      <div class="entries" aria-live="polite">
+        {#each filtered.slice(-200).reverse() as entry (entry.id)}
+          <details class={`entry level-${entry.level}`}>
+            <summary>
+              <span>{entry.level.toUpperCase()}</span>
+              <span>{entry.category}</span>
+              <time datetime={new Date(entry.timestamp).toISOString()}
+                >{formatTime(entry.timestamp)}</time
+              >
+              <span>{entry.namespace}</span>
+            </summary>
+            <p>{entry.message}</p>
+            {#if entry.data}<pre>{JSON.stringify(entry.data, null, 2)}</pre>{/if}
+          </details>
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .logs,
+  .logs {
+    display: grid;
+  }
+
+  .logs-body,
   .entries {
     display: grid;
     gap: var(--space-300);
-  }
-
-  .logs > :not(.settings) {
-    margin-inline: var(--space-400);
   }
 
   .filters,

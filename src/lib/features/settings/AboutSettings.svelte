@@ -11,6 +11,7 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import '#lib/ui/primitives/settings-row.css';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
 
@@ -119,7 +120,7 @@
           </Button>
         </SettingsRow>
         {#if resetFailed}
-          <li class="error" role="alert">{$i18n.t('settings.aboutResetFailed')}</li>
+          <li class="settings-form error" role="alert">{$i18n.t('settings.aboutResetFailed')}</li>
         {/if}
       {/if}
     </ul>

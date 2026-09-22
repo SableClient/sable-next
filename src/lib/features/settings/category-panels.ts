@@ -32,10 +32,7 @@ export type CategoryPanel =
   | (BasePanel & { title: string; headingId: string });
 
 export const categoryPanels: Record<string, CategoryPanel[]> = {
-  appearance: [
-    { component: CustomThemes, class: 'custom-themes-card' },
-    { component: AppIconSettings },
-  ],
+  appearance: [{ component: CustomThemes }, { component: AppIconSettings }],
   composer: [
     {
       component: ComposerButtonOrder,
@@ -57,7 +54,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
       headingId: 'call-devices',
     },
   ],
-  personas: [{ component: PersonaSettings, class: 'personas-card' }],
+  personas: [{ component: PersonaSettings }],
   sync: [{ component: SettingsSyncStatus, when: () => preferences.settingsSync }],
   developer: [
     {
@@ -99,7 +96,6 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
       when: () => preferences.developerTools,
       title: 'settings.stateEventTitle',
       headingId: 'settings-state-event',
-      class: 'state-event-section',
     },
   ],
 };

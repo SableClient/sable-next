@@ -197,7 +197,7 @@
       {/each}
     </ul>
   {:else}
-    <p class="status">{$i18n.t('room.addressesEmpty')}</p>
+    <p class="status settings-form">{$i18n.t('room.addressesEmpty')}</p>
   {/if}
 
   {#if canEdit}
@@ -247,7 +247,6 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-300) var(--space-400);
   }
 
   .inline {

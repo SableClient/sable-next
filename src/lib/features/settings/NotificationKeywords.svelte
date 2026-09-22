@@ -10,6 +10,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
 
@@ -97,7 +98,7 @@
   }
 </script>
 
-<section class="keywords" aria-labelledby="notification-keywords">
+<section class="keywords settings-form" aria-labelledby="notification-keywords">
   <h3 id="notification-keywords">{$i18n.t('settings.notificationKeywords')}</h3>
   <p class="hint">{$i18n.t('settings.notificationKeywordsHint')}</p>
 
@@ -174,7 +175,6 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
-    padding: var(--space-400);
   }
 
   h3 {

@@ -9,6 +9,7 @@
     type DebugLogCategory,
   } from '#lib/observability/debug-log.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import '#lib/ui/primitives/settings-row.css';
 
   const categories: DebugLogCategory[] = [
     'sync',
@@ -62,7 +63,9 @@
       </code>
     </SettingsRow>
   </ul>
-  <p>{$i18n.t('settings.developerSentryDescription')}</p>
+  <div class="settings-form">
+    <p>{$i18n.t('settings.developerSentryDescription')}</p>
+  </div>
   <ul class="categories">
     {#each categories as category (category)}
       <SettingsRow title={`${category} breadcrumbs`}>
@@ -77,7 +80,6 @@
 </div>
 
 <style>
-  .sentry,
   .settings,
   .categories {
     display: grid;

@@ -386,7 +386,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="status">
+      <p class="status settings-form">
         {$i18n.t(canEdit ? 'room.abbreviationsEmptyForm' : 'room.abbreviationsEmpty')}
       </p>
     {/if}
@@ -414,7 +414,6 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-    padding: var(--space-300) var(--space-400);
   }
 
   .settings-row.editing {

@@ -12,6 +12,7 @@
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import { i18n } from '#lib/i18n.js';
+  import '#lib/ui/primitives/settings-row.css';
 
   type CatalogEntry = { basename: string; fullUrl: string };
 
@@ -122,7 +123,7 @@
   }
 </script>
 
-<section class="custom-themes" aria-labelledby="custom-themes-title">
+<section class="custom-themes settings-form" aria-labelledby="custom-themes-title">
   <div>
     <h3 id="custom-themes-title">{$i18n.t('settings.customThemes')}</h3>
     <p>{$i18n.t('settings.customThemesHint')}</p>

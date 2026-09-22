@@ -13,6 +13,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import '#lib/ui/primitives/settings-row.css';
 
   const notifications = useNotificationCenter();
 
@@ -68,7 +69,7 @@
   let outcomes = $derived(Object.entries(diagnostics?.counts ?? {}).sort());
 </script>
 
-<ul class="settings">
+<ul class="settings settings-rows">
   <SettingsRow
     title={$i18n.t('settings.developerNotificationsTitle')}
     description={$i18n.t('settings.developerNotificationsDescription')}
@@ -88,22 +89,30 @@
     </SettingsRow>
   {/if}
 </ul>
-{#if diagnostics}
-  {#if outcomes.length === 0}
-    <Alert variant="info">{$i18n.t('settings.developerPushOutcomesEmpty')}</Alert>
-  {:else}
-    <ul class="outcomes">
-      {#each outcomes as [outcome, count] (outcome)}
-        <li class:last={outcome === diagnostics.lastOutcome}>{outcome}: {count}</li>
-      {/each}
-    </ul>
-  {/if}
-{/if}
-{#if failed}
-  <Alert variant="critical">{$i18n.t('settings.developerNotificationsFailed')}</Alert>
+{#if diagnostics || failed}
+  <div class="settings-form notes">
+    {#if diagnostics}
+      {#if outcomes.length === 0}
+        <Alert variant="info">{$i18n.t('settings.developerPushOutcomesEmpty')}</Alert>
+      {:else}
+        <ul class="outcomes">
+          {#each outcomes as [outcome, count] (outcome)}
+            <li class:last={outcome === diagnostics.lastOutcome}>{outcome}: {count}</li>
+          {/each}
+        </ul>
+      {/if}
+    {/if}
+    {#if failed}
+      <Alert variant="critical">{$i18n.t('settings.developerNotificationsFailed')}</Alert>
+    {/if}
+  </div>
 {/if}
 
 <style>
+  .notes {
+    gap: var(--space-300);
+  }
+
   .outcomes {
     display: grid;
     font-family: var(--font-family-mono);
