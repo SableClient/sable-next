@@ -115,7 +115,6 @@
     {#if !participant.local}
       <IconButton
         variant="ghost"
-        size="small"
         class="volume-toggle"
         label={$i18n.t('call.participantVolume', { name })}
         aria-expanded={volumeOpen}

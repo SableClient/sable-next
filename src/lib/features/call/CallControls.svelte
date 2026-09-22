@@ -129,12 +129,12 @@
   }
 
   .controls.compact {
-    gap: var(--space-050);
+    gap: var(--space-150);
     justify-content: space-between;
     padding: 0;
   }
 
   .controls.compact :global(.hang-up) {
-    margin-inline-start: var(--space-100);
+    margin-inline-start: var(--space-300);
   }
 </style>
