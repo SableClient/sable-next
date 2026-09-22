@@ -1025,6 +1025,7 @@
                 {$i18n.t('timeline.cancelSend')}
               </button>
             {/if}
+            <span class="send-failure-reason">{stalled.error}</span>
           </p>
         {/if}
       </div>
@@ -1570,9 +1571,16 @@
     align-items: baseline;
     color: var(--crit-main);
     display: flex;
+    flex-wrap: wrap;
     font-size: var(--font-size-small);
-    gap: var(--space-200);
+    gap: var(--space-050) var(--space-200);
     margin-top: var(--space-050);
+  }
+
+  .send-failure-reason {
+    color: var(--surface-var-on-container);
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
   }
 
   .send-failure button {
