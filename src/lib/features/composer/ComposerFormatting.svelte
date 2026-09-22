@@ -112,7 +112,15 @@
     flex: 0 0 auto;
     height: var(--target);
     min-height: var(--target);
+    position: relative;
     width: var(--target);
+  }
+
+  :global(.format-button)::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   :global(.format-button svg) {
