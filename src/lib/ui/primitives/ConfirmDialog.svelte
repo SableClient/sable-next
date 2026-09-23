@@ -1,7 +1,11 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
+
   import { i18n } from '#lib/i18n.js';
 
+  import Alert from './Alert.svelte';
   import Button from './Button.svelte';
+  import type { ButtonVariant } from './button-types';
   import DialogFrame from './DialogFrame.svelte';
 
   interface Props {
@@ -9,10 +13,13 @@
     title: string;
     description?: string | null;
     confirmLabel: string;
+    confirmVariant?: ButtonVariant;
     cancelLabel?: string;
     busy?: boolean;
+    error?: string | null;
     onConfirm?: () => void;
     onOpenChange?: (open: boolean) => void;
+    children?: Snippet;
   }
 
   let {
@@ -20,10 +27,13 @@
     title,
     description = null,
     confirmLabel,
+    confirmVariant = 'danger',
     cancelLabel = $i18n.t('settings.cancel'),
     busy = false,
+    error = null,
     onConfirm,
     onOpenChange,
+    children,
   }: Props = $props();
 
   function cancel(): void {
@@ -43,11 +53,15 @@
     {#if description}
       <p class="explain">{description}</p>
     {/if}
+    {@render children?.()}
+    {#if error}
+      <Alert variant="critical" role="alert">{error}</Alert>
+    {/if}
     <div class="actions">
       <Button type="button" variant="ghost" disabled={busy} onclick={cancel}>
         {cancelLabel}
       </Button>
-      <Button type="submit" variant="danger" loading={busy} disabled={busy}>
+      <Button type="submit" variant={confirmVariant} loading={busy} disabled={busy}>
         {confirmLabel}
       </Button>
     </div>
