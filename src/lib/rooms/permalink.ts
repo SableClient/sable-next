@@ -2,6 +2,8 @@ import { resolve } from '$app/paths';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
+import type { CoreClient } from '#lib/core/client.svelte.js';
+
 import { splitVia } from '#lib/features/room/join-address.js';
 import { parseMatrixLink } from '#lib/features/room/matrix-link.js';
 
@@ -99,6 +101,23 @@ export function matrixToUrl(
     viaFor(address, via).map((server) => ['via', server])
   ).toString();
   return `https://matrix.to/#/${path}${query === '' ? '' : `?${query}`}`;
+}
+
+export async function copyRoomLink(
+  core: Pick<CoreClient, 'commands'>,
+  room: Pick<RoomSummary, 'room_id' | 'canonical_alias'>,
+  eventId?: string | null
+): Promise<boolean> {
+  try {
+    const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
+    await navigator.clipboard.writeText(
+      matrixToUrl(room.canonical_alias ?? room.room_id, via, eventId)
+    );
+    return true;
+  } catch (error) {
+    console.debug('[sable room] copy link failed', error);
+    return false;
+  }
 }
 
 /** A room link resolves to a route; a user link has no route of its own. */

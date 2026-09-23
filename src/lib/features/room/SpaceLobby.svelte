@@ -15,7 +15,7 @@
   import { i18n } from '#lib/i18n.js';
   import type { DropEdge } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
-  import { matrixToUrl, viaFor } from '#lib/rooms/permalink.js';
+  import { copyRoomLink, viaFor } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -327,15 +327,6 @@
     reorder(section, roomId, neighbour.room.room_id, delta < 0 ? 'above' : 'below');
   }
 
-  async function copyLink(child: HierarchyRoomView): Promise<void> {
-    try {
-      const via = child.canonical_alias ? [] : await core.commands.roomViaServers(child.room_id);
-      await navigator.clipboard.writeText(matrixToUrl(child.canonical_alias ?? child.room_id, via));
-    } catch (error) {
-      console.debug('[sable lobby] clipboard unavailable', error);
-    }
-  }
-
   function toggle(key: string): void {
     if (closed.has(key)) closed.delete(key);
     else closed.add(key);
@@ -466,7 +457,7 @@
           void join(child, via, parentId);
         }}
         onCopyLink={(child: HierarchyRoomView) => {
-          void copyLink(child);
+          void copyRoomLink(core, child);
         }}
         onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
           void remove(section, entry);

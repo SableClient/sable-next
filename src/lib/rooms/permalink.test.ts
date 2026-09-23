@@ -1,10 +1,10 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
 import { parseMatrixLink } from '#lib/features/room/matrix-link.js';
 
-import { matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
+import { copyRoomLink, matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
 
 function room(roomId: string, overrides: Partial<RoomSummary> = {}): RoomSummary {
   return {
@@ -220,4 +220,48 @@ test('a fragment that names nothing resolvable is rejected', () => {
 test('only a room id is given routing help; an alias resolves itself', () => {
   expect(viaFor('!somewhere:example.org', ['a.example'])).toEqual(['a.example']);
   expect(viaFor('#lobby:example.org', ['a.example'])).toEqual([]);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function linkCore(via: string[] | Error) {
+  const roomViaServers = vi.fn(() =>
+    via instanceof Error ? Promise.reject(via) : Promise.resolve(via)
+  );
+  return { core: { commands: { roomViaServers } } as never, roomViaServers };
+}
+
+test('copying a room id link asks for via servers and carries the event', async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  const { core, roomViaServers } = linkCore(['a.example']);
+
+  await expect(
+    copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: null }, '$event')
+  ).resolves.toBe(true);
+
+  expect(roomViaServers).toHaveBeenCalledWith('!room:example.org');
+  expect(writeText).toHaveBeenCalledWith(matrixToUrl('!room:example.org', ['a.example'], '$event'));
+});
+
+test('copying an aliased room link skips the via lookup', async () => {
+  const writeText = vi.fn(() => Promise.resolve());
+  vi.stubGlobal('navigator', { clipboard: { writeText } });
+  const { core, roomViaServers } = linkCore(['a.example']);
+
+  await copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: '#lobby:example.org' });
+
+  expect(roomViaServers).not.toHaveBeenCalled();
+  expect(writeText).toHaveBeenCalledWith('https://matrix.to/#/%23lobby%3Aexample.org');
+});
+
+test('a failed room link copy reports false instead of throwing', async () => {
+  vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn() } });
+  const { core } = linkCore(new Error('offline'));
+
+  await expect(
+    copyRoomLink(core, { room_id: '!room:example.org', canonical_alias: null })
+  ).resolves.toBe(false);
 });

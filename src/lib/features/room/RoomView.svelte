@@ -34,7 +34,7 @@
   import { i18n } from '#lib/i18n.js';
   import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
-  import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
+  import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import { leaveRoomView, searchInRoom } from './room-navigation.js';
   import {
     findRoomByPathId,
@@ -529,14 +529,11 @@
   }
 
   async function writeEventLink(eventId: string): Promise<void> {
-    try {
-      const alias = resolvedRoom?.canonical_alias ?? null;
-      const via = alias ? [] : await core.commands.roomViaServers(resolvedRoomId);
-      await navigator.clipboard.writeText(matrixToUrl(alias ?? resolvedRoomId, via, eventId));
-    } catch (error) {
-      console.debug('[sable room] copy link failed', error);
-      toasts.error($i18n.t('errors.copyFailed'));
-    }
+    const room = {
+      room_id: resolvedRoomId,
+      canonical_alias: resolvedRoom?.canonical_alias ?? null,
+    };
+    if (!(await copyRoomLink(core, room, eventId))) toasts.error($i18n.t('errors.copyFailed'));
   }
 
   function memberDisplayName(userId: string): string | null {

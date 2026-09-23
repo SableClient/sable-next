@@ -14,7 +14,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { matrixToUrl } from '#lib/rooms/permalink.js';
+  import { copyRoomLink } from '#lib/rooms/permalink.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
@@ -57,13 +57,7 @@
 
   async function copyLink(): Promise<void> {
     if (!room) return;
-    try {
-      const via = room.canonical_alias ? [] : await core.commands.roomViaServers(room.room_id);
-      await navigator.clipboard.writeText(matrixToUrl(room.canonical_alias ?? room.room_id, via));
-    } catch (error) {
-      console.debug('[sable room] clipboard unavailable', error);
-      toasts.error($i18n.t('errors.copyFailed'));
-    }
+    if (!(await copyRoomLink(core, room))) toasts.error($i18n.t('errors.copyFailed'));
   }
 </script>
 
