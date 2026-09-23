@@ -47,7 +47,7 @@
   gap: var(--space-050);
   height: 1rem;
   line-height: 1rem;
-  overflow-y: hidden;
+  overflow-y: clip;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
