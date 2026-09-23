@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Slider } from 'bits-ui';
+
   interface Props {
     min?: number;
     max: number;
@@ -7,6 +9,7 @@
     label: string;
     value: number;
     oninput?: (value: number) => void;
+    oncommit?: (value: number) => void;
   }
 
   let {
@@ -17,78 +20,85 @@
     label,
     value = $bindable(1),
     oninput,
+    oncommit,
   }: Props = $props();
-  let progress = $derived(((value - min) / (max - min)) * 100);
 </script>
 
-<input
-  type="range"
+<Slider.Root
+  type="single"
+  bind:value
   {min}
   {max}
   {step}
-  class="max-selection-slider"
-  bind:value
-  oninput={() => oninput?.(value)}
-  style={`--progress: ${progress}%`}
   {disabled}
-  aria-label={label}
-/>
+  class="slider"
+  onValueChange={(next) => oninput?.(next)}
+  onValueCommit={(next) => oncommit?.(next)}
+>
+  <span class="slider-track">
+    <Slider.Range class="slider-range" />
+  </span>
+  <Slider.Thumb index={0} class="slider-thumb" aria-label={label} />
+</Slider.Root>
 
 <style>
-  :global(.max-selection-slider) {
-    appearance: none;
-    background: linear-gradient(
-      to right,
-      var(--primary-container) 0%,
-      var(--primary-container) var(--progress),
-      var(--surface-container) var(--progress),
-      var(--surface-container) 100%
-    );
-    background-clip: content-box;
-    background-origin: content-box;
-    border: var(--border-width-300) solid var(--surface-container-line);
-    border-radius: var(--radius);
-    box-sizing: content-box;
+  :global(.slider) {
+    align-items: center;
     cursor: pointer;
-    height: var(--space-300);
-    padding-block: calc((var(--target-hit) - var(--space-300)) / 2);
+    display: flex;
+    min-height: var(--target-hit);
+    position: relative;
+    touch-action: none;
+    user-select: none;
     width: 100%;
   }
 
-  :global(.max-selection-slider:hover) {
-    background: linear-gradient(
-      to right,
-      var(--primary-container-hover) 0%,
-      var(--primary-container-hover) var(--progress),
-      var(--surface-container-hover) var(--progress),
-      var(--surface-container-hover) 100%
-    );
-  }
-
-  :global(.max-selection-slider:disabled) {
+  :global(.slider[data-disabled]) {
+    cursor: default;
     filter: grayscale(0.3);
     opacity: 0.8;
   }
 
-  :global(.max-selection-slider::-webkit-slider-runnable-track),
-  :global(.max-selection-slider::-moz-range-track) {
-    background: transparent;
+  .slider-track {
+    background: var(--surface-container);
+    border: var(--border-width-300) solid var(--surface-container-line);
     border-radius: var(--radius);
+    flex: 1;
+    height: var(--space-300);
+    overflow: hidden;
+    position: relative;
   }
 
-  :global(.max-selection-slider::-webkit-slider-thumb),
-  :global(.max-selection-slider::-moz-range-thumb) {
-    appearance: none;
+  :global(.slider:hover) .slider-track {
+    background: var(--surface-container-hover);
+  }
+
+  :global(.slider-range) {
+    background: var(--primary-container);
+    height: 100%;
+    position: absolute;
+  }
+
+  :global(.slider:hover .slider-range) {
+    background: var(--primary-container-hover);
+  }
+
+  :global(.slider-thumb) {
     background: var(--primary-main-line);
     border: var(--border-width-300) solid var(--surface-container-line);
     border-radius: 100%;
-    cursor: pointer;
+    display: block;
     height: var(--space-500);
     width: var(--space-500);
   }
 
-  :global(.max-selection-slider:hover::-webkit-slider-thumb),
-  :global(.max-selection-slider:hover::-moz-range-thumb) {
+  :global(.slider:hover .slider-thumb),
+  :global(.slider-thumb[data-active]) {
     background: var(--primary-main-active);
+  }
+
+  :global(.slider-thumb:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-width);
   }
 </style>
