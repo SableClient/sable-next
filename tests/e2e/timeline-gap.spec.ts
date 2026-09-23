@@ -63,7 +63,9 @@ test('a held touch keeps a shrunken bounded latest window at the composer', asyn
     if (!last || !dock) throw new Error('timeline layout boundary missing');
     const lastBottom = last.getBoundingClientRect().bottom;
     const footerRect = footer?.getBoundingClientRect();
-    const dockTop = dock.getBoundingClientRect().top;
+    const dockTop =
+      dock.getBoundingClientRect().top +
+      Number.parseFloat(getComputedStyle(dock).paddingBlockStart);
     return {
       gap: dockTop - lastBottom,
       footerToDock: footerRect ? dockTop - footerRect.bottom : 0,
