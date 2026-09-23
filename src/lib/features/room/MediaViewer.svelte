@@ -22,6 +22,7 @@
     shareFile,
     sharesNatively,
     supportsPhotoLibrary,
+    type SaveOutcome,
   } from '#lib/platform/files.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -37,13 +38,14 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PdfViewer from '#lib/ui/PdfViewer.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
   import ImageSquareIcon from 'phosphor-svelte/lib/ImageSquareIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
-  import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
+  import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
 
   export type MediaItem = Extract<
     TimelineItemView['content'],
@@ -550,7 +552,7 @@
     if (!url || !item) return;
     const filename = fileName || 'image';
     if (savesNatively()) {
-      await saveFile(url, filename);
+      reportSave(await saveFile(url, filename));
       return;
     }
     const anchor = document.createElement('a');
@@ -561,7 +563,12 @@
 
   async function saveToPhotos(): Promise<void> {
     if (!url || !item) return;
-    await saveImageToPhotos(url, fileName || 'image', item.mime ?? undefined);
+    reportSave(await saveImageToPhotos(url, fileName || 'image', item.mime ?? undefined));
+  }
+
+  function reportSave(outcome: SaveOutcome): void {
+    if (outcome === 'saved') toasts.info($i18n.t('viewer.saved'));
+    if (outcome === 'failed') toasts.error($i18n.t('errors.actionFailed'));
   }
 </script>
 
@@ -641,18 +648,10 @@
             {/if}
             {#if isImage}
               <IconButton
-                class="desktop-control"
                 label={$i18n.t('viewer.rotate')}
                 size="medium"
                 variant="ghost"
-                onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
-              >
-              <IconButton
-                class="mobile-control"
-                label={$i18n.t('viewer.rotate')}
-                size="medium"
-                variant="ghost"
-                onclick={() => rotateBy(90)}><ArrowCounterClockwiseIcon /></IconButton
+                onclick={() => rotateBy(90)}><ArrowClockwiseIcon /></IconButton
               >
               <button
                 class="pixel-toggle desktop-control choice"
@@ -668,6 +667,7 @@
 
         <main
           class="stage"
+          class:has-nav={items.length > 1}
           bind:this={stageEl}
           onwheel={handleWheel}
           onpointerdown={startPan}
@@ -926,7 +926,6 @@
     gap: var(--space-100);
   }
 
-  .desktop-control,
   .zoom-controls,
   .bottom-bar p,
   .reset {
@@ -965,6 +964,13 @@
     padding: var(--space-200);
     position: relative;
     touch-action: none;
+  }
+
+  .stage.has-nav {
+    padding-inline: calc(
+        max(var(--space-100), var(--safe-left)) + var(--control-height-500) + var(--space-200)
+      )
+      calc(max(var(--space-100), var(--safe-right)) + var(--control-height-500) + var(--space-200));
   }
 
   .stage :global(.pdf-viewer) {
@@ -1027,6 +1033,12 @@
     right: max(0.25rem, var(--safe-right));
   }
 
+  @media (width < 48rem) {
+    .actions :global(.desktop-control) {
+      display: none;
+    }
+  }
+
   .error {
     color: var(--crit-on-container);
     display: grid;
@@ -1051,14 +1063,9 @@
         calc(var(--space-300) + var(--safe-bottom));
     }
 
-    .desktop-control,
     .bottom-bar p,
     .reset {
       display: initial;
-    }
-
-    :global(.mobile-control) {
-      display: none;
     }
 
     .zoom-controls {
@@ -1067,6 +1074,10 @@
 
     .stage {
       padding: var(--space-400);
+    }
+
+    .stage.has-nav {
+      padding-inline: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
     }
 
     :global(.previous) {

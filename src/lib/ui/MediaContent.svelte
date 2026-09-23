@@ -16,6 +16,7 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import {
@@ -146,7 +147,10 @@
   function download(event: MouseEvent): void {
     if (url === null || !savesNatively()) return;
     event.preventDefault();
-    void saveFile(url, mediaLabel);
+    void saveFile(url, mediaLabel).then((outcome) => {
+      if (outcome === 'saved') toasts.info($i18n.t('viewer.saved'));
+      if (outcome === 'failed') toasts.error($i18n.t('errors.actionFailed'));
+    });
   }
 
   $effect(() => {

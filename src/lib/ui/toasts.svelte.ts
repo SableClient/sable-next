@@ -29,6 +29,10 @@ export class ToastStore {
     return this.#push({ message, tone: 'error' }, DISMISS_AFTER_MS);
   }
 
+  info(message: string): number {
+    return this.#push({ message, tone: 'info' }, DISMISS_AFTER_MS);
+  }
+
   undoable(message: string, { label, onUndo, onClose }: UndoOptions): number {
     const id = this.#push(
       {
