@@ -4,6 +4,7 @@
 
   import { markVoiceRecording } from '#lib/core/attachment-info.js';
   import { i18n } from '#lib/i18n.js';
+  import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { downsampleWaveform } from './voice-waveform';
@@ -136,13 +137,6 @@
     announcement = send ? $i18n.t('composer.voiceStopped') : $i18n.t('composer.voiceCancelled');
     activeRecorder.stop();
   }
-
-  function formatElapsed(ms: number): string {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes)}:${String(seconds).padStart(2, '0')}`;
-  }
 </script>
 
 <div class="voice-recorder" role="group" aria-label={$i18n.t('composer.voiceRecording')}>
@@ -178,7 +172,7 @@
       <span class="voice-dot"></span>
       <span class="voice-level" style:transform={`scaleY(${String(0.15 + level * 0.85)})`}></span>
     </div>
-    <span class="voice-time">{formatElapsed(elapsedMs)}</span>
+    <span class="voice-time">{formatClockDuration(Math.floor(elapsedMs / 1000))}</span>
     <IconButton
       variant="ghost"
       size="small"

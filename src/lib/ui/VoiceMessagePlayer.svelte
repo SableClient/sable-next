@@ -3,6 +3,7 @@
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   const SCRUB_RESOLUTION = 1000;
@@ -41,10 +42,7 @@
   }
 
   function formatTime(seconds: number): string {
-    const total = Math.max(0, Math.round(seconds));
-    const minutes = Math.floor(total / 60);
-    const secs = total % 60;
-    return `${String(minutes)}:${String(secs).padStart(2, '0')}`;
+    return formatClockDuration(Math.max(0, Math.round(seconds)));
   }
 </script>
 
