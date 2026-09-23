@@ -126,3 +126,13 @@ export function formatCompactTimestamp(timestamp: number, now: number = Date.now
     ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
   });
 }
+
+export function focusRowAt(
+  section: HTMLElement | undefined,
+  heading: HTMLElement | undefined,
+  index: number
+): void {
+  const rows = section?.querySelectorAll<HTMLElement>('a.row');
+  const target = rows?.item(Math.min(index, rows.length - 1)) ?? heading;
+  target?.focus();
+}

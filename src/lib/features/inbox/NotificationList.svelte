@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { InboxItemView, RoomSummary } from '#src/generated/protocol';
+  import type { InboxItemView } from '#src/generated/protocol';
   import { onMount, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AtIcon from 'phosphor-svelte/lib/AtIcon';
@@ -9,13 +9,13 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
-  import { formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
+  import { focusRowAt, formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
+  import InboxFeedRow from './InboxFeedRow.svelte';
+  import InboxSectionHeader from './InboxSectionHeader.svelte';
   import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
-  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
@@ -74,12 +74,8 @@
       .filter((item) => includeRead || !item.read)
   );
 
-  function roomOf(item: InboxItemView): RoomSummary | undefined {
-    return roomList.rooms.find((room) => room.room_id === item.room_id);
-  }
-
   function roomName(item: InboxItemView): string {
-    return roomOf(item)?.name ?? item.room_id;
+    return roomList.rooms.find((room) => room.room_id === item.room_id)?.name ?? item.room_id;
   }
 
   function sender(item: InboxItemView): string {
@@ -113,12 +109,6 @@
     pageSize += PAGE_SIZE;
   }
 
-  function focusRowAt(index: number): void {
-    const links = section?.querySelectorAll<HTMLElement>('a.row') ?? [];
-    const target = links[Math.min(index, links.length - 1)] ?? heading;
-    target?.focus();
-  }
-
   async function markRead(item: InboxItemView, element: HTMLElement): Promise<void> {
     if (marking.has(item.event_id)) return;
     const index = rows.findIndex((row) => row.event_id === item.event_id);
@@ -131,7 +121,8 @@
       await core.commands.markRead(item.room_id, item.event_id, readReceiptIsPrivate());
       for (const candidate of covered) readNow.add(candidate.event_id);
       await tick();
-      if (hadFocus) focusRowAt(includeRead ? index : Math.min(index, rows.length - 1));
+      if (hadFocus)
+        focusRowAt(section, heading, includeRead ? index : Math.min(index, rows.length - 1));
       toasts.undoable($i18n.t('inbox.markedRead', { room: roomName(item) }), {
         label: $i18n.t('inbox.undo'),
         onUndo: () => {
@@ -149,8 +140,7 @@
 </script>
 
 <section aria-labelledby={headingId} aria-busy={feed.backfilling} bind:this={section}>
-  <div class="header">
-    <h2 id={headingId} tabindex="-1" bind:this={heading}>{$i18n.t('inbox.notifications')}</h2>
+  <InboxSectionHeader id={headingId} title={$i18n.t('inbox.notifications')} bind:heading>
     <div class="filters" role="group" aria-label={$i18n.t('inbox.filterLabel')}>
       {#each filters as value (value)}
         <Button
@@ -177,7 +167,7 @@
         </Button>
       {/if}
     </div>
-  </div>
+  </InboxSectionHeader>
 
   <p class="screen-reader-only" role="status">{announcement}</p>
 
@@ -201,51 +191,50 @@
   {:else}
     <ul class="feed">
       {#each rows as item (item.event_id)}
-        {@const room = roomOf(item)}
         {@const where = item.is_direct ? null : roomName(item)}
-        <li class={{ read: item.read }}>
-          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
-          <a class="row" href={roomSectionPath(roomList.rooms, item.room_id, item.event_id)}>
-            <Avatar id={item.room_id} src={room?.avatar_url ?? null} name={roomName(item)} />
-            <span class="body">
-              <span class="head">
-                <span class="name">{sender(item)}</span>
-                {#if where}<span class="where">{where}</span>{/if}
-                <time
-                  class="when"
-                  datetime={new Date(item.ts).toISOString()}
-                  title={formatMessageTimestamp(item.ts)}>{formatCompactTimestamp(item.ts)}</time
-                >
-              </span>
-              <span class="foot">
-                <span class={['preview', { placeholder: item.body === null }]}>{preview(item)}</span
-                >
-                {#if item.highlight}
-                  <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
-                    <AtIcon aria-hidden="true" />
-                  </span>
-                {/if}
-              </span>
-            </span>
-          </a>
-          {#if item.read}
-            <span class="mark-read-spacer" aria-hidden="true"></span>
-          {:else}
-            <IconButton
-              class="mark-read"
-              variant="ghost"
-              size="small"
-              disabled={marking.has(item.event_id)}
-              label={$i18n.t('inbox.markRead', { room: roomName(item) })}
-              onclick={(event) => {
-                const element = event.currentTarget.closest('li');
-                if (element) void markRead(item, element);
-              }}
+        <InboxFeedRow
+          roomId={item.room_id}
+          eventId={item.event_id}
+          name={roomName(item)}
+          class={{ read: item.read }}
+        >
+          <span class="head">
+            <span class="name">{sender(item)}</span>
+            {#if where}<span class="where">{where}</span>{/if}
+            <time
+              class="when"
+              datetime={new Date(item.ts).toISOString()}
+              title={formatMessageTimestamp(item.ts)}>{formatCompactTimestamp(item.ts)}</time
             >
-              <ChecksIcon />
-            </IconButton>
-          {/if}
-        </li>
+          </span>
+          <span class="foot">
+            <span class={['preview', { placeholder: item.body === null }]}>{preview(item)}</span>
+            {#if item.highlight}
+              <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
+                <AtIcon aria-hidden="true" />
+              </span>
+            {/if}
+          </span>
+          {#snippet trailing()}
+            {#if item.read}
+              <span class="mark-read-spacer" aria-hidden="true"></span>
+            {:else}
+              <IconButton
+                class="mark-read"
+                variant="ghost"
+                size="small"
+                disabled={marking.has(item.event_id)}
+                label={$i18n.t('inbox.markRead', { room: roomName(item) })}
+                onclick={(event) => {
+                  const element = event.currentTarget.closest('li');
+                  if (element) void markRead(item, element);
+                }}
+              >
+                <ChecksIcon />
+              </IconButton>
+            {/if}
+          {/snippet}
+        </InboxFeedRow>
       {/each}
     </ul>
     {#if !compact && (feed.hasMore || includeRead)}
@@ -267,28 +256,6 @@
 <style>
   section {
     display: grid;
-  }
-
-  .header {
-    align-items: baseline;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-200) var(--space-400);
-    justify-content: space-between;
-    margin-bottom: var(--space-300);
-  }
-
-  h2 {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-500);
-    letter-spacing: 0.08em;
-    margin: 0;
-    text-transform: uppercase;
-  }
-
-  h2:focus {
-    outline: none;
   }
 
   .filters {
@@ -319,46 +286,6 @@
     margin: 0;
     overflow: hidden;
     padding: 0;
-  }
-
-  li {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    padding-right: var(--space-300);
-  }
-
-  li + li {
-    border-top: var(--border-width) solid var(--bg-container-line);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    li:hover {
-      background: var(--bg-container-hover);
-    }
-  }
-
-  .row {
-    align-items: center;
-    color: inherit;
-    display: flex;
-    flex: 1;
-    gap: var(--space-300);
-    min-width: 0;
-    padding: var(--space-300) var(--space-400);
-    text-decoration: none;
-  }
-
-  .row:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: calc(var(--focus-ring-width) * -1);
-  }
-
-  .body {
-    display: grid;
-    flex: 1;
-    gap: var(--space-100);
-    min-width: 0;
   }
 
   .head,
@@ -438,12 +365,12 @@
     }
   }
 
-  .read .name {
+  :global(.read) .name {
     color: var(--surface-var-on-container);
     font-weight: var(--font-weight-normal);
   }
 
-  .read .mention {
+  :global(.read) .mention {
     color: var(--surface-var-on-container);
   }
 
@@ -470,7 +397,6 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .row,
     :global(.filter) {
       transition: background var(--motion-fast) var(--motion-easing-standard);
     }
@@ -479,11 +405,6 @@
   @media (pointer: coarse) {
     :global(.filter) {
       min-height: 2.75rem;
-    }
-
-    li :global(.icon-button) {
-      min-height: 2.75rem;
-      min-width: 2.75rem;
     }
   }
 </style>
