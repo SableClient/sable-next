@@ -613,6 +613,7 @@ impl Core {
                     core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
                     if running {
                         core.reconcile_memberships().await;
+                        core.fill_own_members().await;
                     }
 
                     if stalled {

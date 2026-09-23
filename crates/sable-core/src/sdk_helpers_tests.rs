@@ -453,3 +453,47 @@ async fn memberships_follow_the_server_joined_rooms() {
     assert_eq!(membership(accepted), RoomState::Joined);
     assert_eq!(membership(pending), RoomState::Invited);
 }
+
+#[tokio::test]
+async fn our_own_membership_is_fetched_for_small_rooms_that_lack_it() {
+    use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let own = client.user_id().unwrap().to_owned();
+    let direct = room_id!("!direct:example.org");
+    let large = room_id!("!large:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_joined_room(JoinedRoomBuilder::new(direct).set_joined_members_count(2))
+                .add_joined_room(JoinedRoomBuilder::new(large).set_joined_members_count(500));
+        })
+        .await;
+    let member: Raw<matrix_sdk::ruma::events::AnyStateEvent> = EventFactory::new()
+        .room(direct)
+        .event(RoomMemberEventContent::new(MembershipState::Join))
+        .sender(&own)
+        .state_key(own.as_str())
+        .into_raw();
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{direct}/members")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [member] })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{large}/members")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "chunk": [] })))
+        .expect(0)
+        .mount(server.server())
+        .await;
+
+    crate::rooms::fill_own_members(&client).await.unwrap();
+    crate::rooms::fill_own_members(&client).await.unwrap();
+
+    let room = client.get_room(direct).unwrap();
+    assert!(room.get_member_no_sync(&own).await.unwrap().is_some());
+}

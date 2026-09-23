@@ -20,6 +20,7 @@ use crate::view;
 const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
+const OWN_MEMBER_FILL_MAX_MEMBERS: u64 = 50;
 
 pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_sdk::Error> {
     let joined = client
@@ -45,7 +46,33 @@ pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_
     Ok(())
 }
 
+pub(crate) async fn fill_own_members(client: &Client) -> Result<(), matrix_sdk::Error> {
+    let Some(own) = client.user_id() else {
+        return Ok(());
+    };
+    for room in client.joined_rooms() {
+        if room.joined_members_count() > OWN_MEMBER_FILL_MAX_MEMBERS
+            || room.get_member_no_sync(own).await?.is_some()
+        {
+            continue;
+        }
+        if let Err(error) = room.sync_members().await {
+            tracing::warn!(room_id = %room.room_id(), "could not fetch our own membership: {error}");
+        }
+    }
+    Ok(())
+}
+
 impl Core {
+    pub(crate) async fn fill_own_members(&self) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        if let Err(error) = fill_own_members(&client).await {
+            tracing::warn!("could not fill in our own room memberships: {error}");
+        }
+    }
+
     pub(crate) async fn reconcile_memberships(&self) {
         let Ok(client) = self.client().await else {
             return;
