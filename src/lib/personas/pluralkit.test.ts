@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { PersonaView } from '#src/generated/protocol';
 
-import { matchImported, personaFromPluralkit, systemIdFromInput } from './pluralkit';
+import {
+  matchImported,
+  parsePluralkitExport,
+  personaFromPluralkit,
+  systemIdFromInput,
+} from './pluralkit';
 
 const member = {
   id: 'abcde',
@@ -30,6 +35,28 @@ describe('systemIdFromInput', () => {
 
   it('drops a pk; prefix', () => {
     expect(systemIdFromInput('pk;abcde')).toBe('abcde');
+  });
+});
+
+describe('parsePluralkitExport', () => {
+  it('reads the members of a pk;export file', () => {
+    const exported = { version: 2, id: 'sysid', name: 'System', members: [member], groups: [] };
+    expect(parsePluralkitExport(JSON.stringify(exported))).toEqual([member]);
+  });
+
+  it('reads a bare member list', () => {
+    expect(parsePluralkitExport(JSON.stringify([member]))).toEqual([member]);
+  });
+
+  it.each([
+    ['malformed JSON', '{'],
+    ['an object without members', JSON.stringify({ id: 'sysid' })],
+    ['a member without a name', JSON.stringify([{ id: 'abcde' }])],
+    ['a member with a numeric id', JSON.stringify({ members: [{ id: 1, name: 'kris' }] })],
+    ['a null member', JSON.stringify([null])],
+    ['a string', JSON.stringify('kris')],
+  ])('rejects %s', (_, text) => {
+    expect(() => parsePluralkitExport(text)).toThrow();
   });
 });
 

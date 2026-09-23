@@ -186,6 +186,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   heif: 'image/heif',
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
+  json: 'application/json',
   m4a: 'audio/mp4',
   m4v: 'video/mp4',
   mov: 'video/quicktime',

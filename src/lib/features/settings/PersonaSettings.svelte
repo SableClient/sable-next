@@ -8,12 +8,15 @@
   import type { PersonaView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { pickFiles, saveBytes } from '#lib/platform/files.js';
   import { importPersonaAvatar } from '#lib/platform/persona-avatar.js';
   import { i18n } from '#lib/i18n.js';
+  import { backupFileName, backupJson, CATALOG_EVENT, parseBackup } from '#lib/personas/backup.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import {
     fetchPluralkitMembers,
     matchImported,
+    parsePluralkitExport,
     personaFromPluralkit,
     systemIdFromInput,
     type PluralkitMember,
@@ -45,6 +48,12 @@
   let token = $state('');
   let importing = $state(false);
   let importNotice = $state<string | null>(null);
+  let exportInput = $state<HTMLInputElement>();
+
+  let backingUp = $state(false);
+  let backupInput = $state<HTMLInputElement>();
+  let restoreContent = $state.raw<Record<string, unknown> | null>(null);
+  let restoring = $state(false);
 
   $effect(() => {
     void personas.load();
@@ -94,16 +103,15 @@
     }
   }
 
-  async function runImport(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    const systemId = systemIdFromInput(systemInput);
-    if (systemId === '') return;
-
+  async function importMembers(
+    load: () => Promise<PluralkitMember[]>,
+    failure: string
+  ): Promise<boolean> {
     importing = true;
     error = null;
     importNotice = null;
     try {
-      const members = await fetchPluralkitMembers(systemId, token.trim() || null);
+      const members = await load();
       let pictures = 0;
 
       for (const member of members) {
@@ -117,12 +125,91 @@
         pictures === 0
           ? $i18n.t('personas.importDone', { count: members.length })
           : $i18n.t('personas.importAvatarFailed', { count: pictures });
-      token = '';
+      return true;
     } catch (cause) {
       console.warn('[sable personas] the PluralKit import failed', cause);
-      error = $i18n.t('personas.importFailed');
+      error = $i18n.t(failure);
+      return false;
     } finally {
       importing = false;
+    }
+  }
+
+  async function runImport(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    const systemId = systemIdFromInput(systemInput);
+    if (systemId === '') return;
+
+    const imported = await importMembers(
+      () => fetchPluralkitMembers(systemId, token.trim() || null),
+      'personas.importFailed'
+    );
+    if (imported) token = '';
+  }
+
+  async function importExport(files: File[]): Promise<void> {
+    const [file] = files;
+    if (!file || importing) return;
+    await importMembers(
+      async () => parsePluralkitExport(await file.text()),
+      'personas.importFileFailed'
+    );
+  }
+
+  async function chooseExport(): Promise<void> {
+    const picked = await pickFiles('*/*');
+    if (picked === null) exportInput?.click();
+    else await importExport(picked);
+  }
+
+  async function backUp(): Promise<void> {
+    backingUp = true;
+    error = null;
+    try {
+      const content = await core.commands.accountData(CATALOG_EVENT);
+      const bytes = new TextEncoder().encode(backupJson(content));
+      if ((await saveBytes(bytes, backupFileName(), 'application/json')) === 'failed') {
+        error = $i18n.t('personas.backupFailed');
+      }
+    } catch (cause) {
+      console.warn('[sable personas] the backup failed', cause);
+      error = $i18n.t('personas.backupFailed');
+    } finally {
+      backingUp = false;
+    }
+  }
+
+  async function readBackup(files: File[]): Promise<void> {
+    const [file] = files;
+    if (!file) return;
+    error = null;
+    try {
+      restoreContent = parseBackup(await file.text());
+    } catch (cause) {
+      console.warn('[sable personas] the backup file could not be read', cause);
+      error = $i18n.t('personas.restoreInvalid');
+    }
+  }
+
+  async function chooseBackup(): Promise<void> {
+    const picked = await pickFiles('*/*');
+    if (picked === null) backupInput?.click();
+    else await readBackup(picked);
+  }
+
+  async function confirmRestore(): Promise<void> {
+    const content = restoreContent;
+    if (!content) return;
+    restoring = true;
+    try {
+      await core.commands.setAccountData(CATALOG_EVENT, content);
+      await personas.load(true);
+    } catch (cause) {
+      console.warn('[sable personas] the restore failed', cause);
+      error = $i18n.t('personas.restoreFailed');
+    } finally {
+      restoring = false;
+      restoreContent = null;
     }
   }
 </script>
@@ -243,11 +330,73 @@
         <small>{$i18n.t('personas.importTokenHint')}</small>
       </label>
       <div class="persona-actions">
+        <Button
+          variant="secondary"
+          size="small"
+          disabled={importing}
+          onclick={() => void chooseExport()}
+        >
+          {$i18n.t('personas.importFile')}
+        </Button>
         <Button type="submit" size="small" loading={importing}>
           {$i18n.t('personas.importAction')}
         </Button>
       </div>
+      <input
+        bind:this={exportInput}
+        class="screen-reader-only"
+        type="file"
+        accept=".json,application/json"
+        tabindex="-1"
+        aria-hidden="true"
+        onchange={(event) => {
+          const files = [...(event.currentTarget.files ?? [])];
+          event.currentTarget.value = '';
+          void importExport(files);
+        }}
+      />
     </form>
+  </SettingsSection>
+
+  <SettingsSection
+    title={$i18n.t('personas.backupTitle')}
+    description={$i18n.t('personas.backupDescription')}
+    headingId="settings-personas-backup"
+  >
+    <div class="settings-form">
+      <div class="persona-actions">
+        <Button
+          variant="secondary"
+          size="small"
+          disabled={importing || restoring}
+          onclick={() => void chooseBackup()}
+        >
+          {$i18n.t('personas.restore')}
+        </Button>
+        <Button
+          variant="secondary"
+          size="small"
+          loading={backingUp}
+          disabled={personas.personas.length === 0}
+          onclick={() => void backUp()}
+        >
+          {$i18n.t('personas.backup')}
+        </Button>
+      </div>
+      <input
+        bind:this={backupInput}
+        class="screen-reader-only"
+        type="file"
+        accept=".json,application/json"
+        tabindex="-1"
+        aria-hidden="true"
+        onchange={(event) => {
+          const files = [...(event.currentTarget.files ?? [])];
+          event.currentTarget.value = '';
+          void readBackup(files);
+        }}
+      />
+    </div>
   </SettingsSection>
 </div>
 
@@ -271,6 +420,18 @@
   confirmLabel={$i18n.t('personas.remove', { name: personaToRemove?.display_name ?? '' })}
   busy={removing !== null}
   onConfirm={() => void confirmRemoval()}
+/>
+
+<ConfirmDialog
+  open={restoreContent !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next && !restoring) restoreContent = null;
+  }}
+  title={$i18n.t('personas.restoreTitle')}
+  description={$i18n.t('personas.restoreConfirm')}
+  confirmLabel={$i18n.t('personas.restore')}
+  busy={restoring}
+  onConfirm={() => void confirmRestore()}
 />
 
 <style>
@@ -321,6 +482,8 @@
 
   .persona-actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
     justify-content: flex-end;
   }
 

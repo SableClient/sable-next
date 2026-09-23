@@ -35,6 +35,24 @@ export async function fetchPluralkitMembers(
   return members as PluralkitMember[];
 }
 
+function isMember(value: unknown): value is PluralkitMember {
+  if (typeof value !== 'object' || value === null) return false;
+  const { id, name } = value as Record<string, unknown>;
+  return typeof id === 'string' && typeof name === 'string';
+}
+
+export function parsePluralkitExport(text: string): PluralkitMember[] {
+  const parsed: unknown = JSON.parse(text);
+  const members: unknown =
+    typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as { members?: unknown }).members
+      : parsed;
+  if (!Array.isArray(members) || !members.every(isMember)) {
+    throw new Error('not a PluralKit member list');
+  }
+  return members;
+}
+
 function colors(
   color: string | null | undefined
 ): Pick<PersonaView, 'color_on_light' | 'color_on_dark'> {
