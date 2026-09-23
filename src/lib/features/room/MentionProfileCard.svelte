@@ -5,6 +5,7 @@
     RoomPermissionsView,
     MutualRoomView,
   } from '#src/generated/protocol';
+  import { Collapsible } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -24,7 +25,6 @@
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
-  import { SvelteSet } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -202,7 +202,6 @@
   let ignored = $state(false);
   let shared = $state<'rooms' | 'spaces' | null>(null);
   let miscOpen = $state(false);
-  const openFieldMaps = new SvelteSet<string>();
   let sharedRooms = $derived(mutualRooms.filter((room) => !room.is_space));
   let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
   let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
@@ -599,43 +598,39 @@
         : $i18n.t('timeline.profileMiscData', { count: extra.length })}
     </summary>
     <dl>
-      {#each extra as field, index (field.key)}
+      {#each extra as field (field.key)}
         {@const map = profileFieldMap(field.value)}
-        {@const mapOpen = openFieldMaps.has(field.key)}
-        <div>
-          {#if map}
+        {#if map}
+          <Collapsible.Root>
             <dt>
-              <button
-                type="button"
-                class="profile-extra-toggle"
-                aria-expanded={mapOpen}
-                aria-controls="{moderationFieldId}-extra-{index}"
-                onclick={() => {
-                  if (mapOpen) openFieldMaps.delete(field.key);
-                  else openFieldMaps.add(field.key);
-                }}
-              >
+              <Collapsible.Trigger class="profile-extra-toggle">
                 <CaretRightIcon />
                 {field.key}
-              </button>
+              </Collapsible.Trigger>
             </dt>
-            <dd id="{moderationFieldId}-extra-{index}" hidden={!mapOpen}>
-              <table>
-                <tbody>
-                  {#each map as [key, value] (key)}
-                    <tr>
-                      <th scope="row">{key}</th>
-                      <td>{value}</td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </dd>
-          {:else}
+            <Collapsible.Content>
+              {#snippet child({ props })}
+                <dd {...props}>
+                  <table>
+                    <tbody>
+                      {#each map as [key, value] (key)}
+                        <tr>
+                          <th scope="row">{key}</th>
+                          <td>{value}</td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </dd>
+              {/snippet}
+            </Collapsible.Content>
+          </Collapsible.Root>
+        {:else}
+          <div>
             <dt>{field.key}</dt>
             <dd>{field.value}</dd>
-          {/if}
-        </div>
+          </div>
+        {/if}
       {/each}
     </dl>
   </details>
@@ -872,7 +867,7 @@
     overflow-wrap: anywhere;
   }
 
-  .profile-extra dl > div {
+  .profile-extra dl > :global(div) {
     display: grid;
     gap: var(--space-050);
   }
@@ -882,7 +877,7 @@
     overflow-wrap: anywhere;
   }
 
-  .profile-extra-toggle {
+  .profile-extra :global(.profile-extra-toggle) {
     align-items: center;
     background: none;
     border: 0;
@@ -896,21 +891,21 @@
     text-align: start;
   }
 
-  .profile-extra-toggle:hover {
+  .profile-extra :global(.profile-extra-toggle:hover) {
     color: var(--bg-on-container);
   }
 
-  .profile-extra-toggle:focus-visible {
+  .profile-extra :global(.profile-extra-toggle:focus-visible) {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
   }
 
-  .profile-extra-toggle[aria-expanded='true'] :global(svg) {
+  .profile-extra :global(.profile-extra-toggle[data-state='open'] svg) {
     transform: rotate(90deg);
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .profile-extra-toggle :global(svg) {
+    .profile-extra :global(.profile-extra-toggle svg) {
       transition: transform var(--motion-fast) var(--motion-easing-standard);
     }
   }
