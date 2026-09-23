@@ -9,7 +9,12 @@ vi.mock('@tauri-apps/plugin-os', () => ({ type: mocks.osType }));
 
 import { listPushDistributors, registerNativePushConfig } from './push';
 
-import { deliversNativePush, deliversWebPush, presentsInApp } from './notifications';
+import {
+  deliversNativePush,
+  deliversWebPush,
+  presentsInApp,
+  usesPushGateway,
+} from './notifications';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,6 +74,18 @@ test('only a mobile Tauri build registers a native pusher', async () => {
 test('a plain browser registers no native pusher', async () => {
   mocks.isTauri.mockReturnValue(false);
   await expect(deliversNativePush()).resolves.toBe(false);
+});
+
+test('only the desktop shell has no push gateway to configure', () => {
+  mocks.isTauri.mockReturnValue(false);
+  expect(usesPushGateway()).toBe(true);
+
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  expect(usesPushGateway()).toBe(true);
+
+  mocks.osType.mockReturnValue('linux');
+  expect(usesPushGateway()).toBe(false);
 });
 
 test('distributor discovery is limited to Android', async () => {

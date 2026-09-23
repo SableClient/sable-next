@@ -1,5 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 
+import { isNativeMobile } from './os.js';
 import { hostsServiceWorker } from './service-worker.js';
 
 /** Under Tauri the Rust side alerts through the OS, so a webview
@@ -19,4 +20,8 @@ export async function deliversNativePush(): Promise<boolean> {
   const { type } = await import('@tauri-apps/plugin-os');
   const os = type();
   return os === 'android' || os === 'ios';
+}
+
+export function usesPushGateway(): boolean {
+  return !isTauri() || isNativeMobile();
 }

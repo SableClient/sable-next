@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 
+import { usesPushGateway } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
@@ -46,7 +47,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: MentionNotifications },
     { component: NotificationKeywords },
     { component: PushersSettings },
-    { component: PushGateway },
+    { component: PushGateway, when: usesPushGateway },
   ],
   calls: [
     {
