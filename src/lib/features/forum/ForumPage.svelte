@@ -8,6 +8,7 @@
   import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
   import { Conversation } from '#lib/features/room/conversation.svelte.js';
   import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
+  import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -17,6 +18,7 @@
     useRoomList,
   } from '#lib/rooms/room-list.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
+  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
 
@@ -48,6 +50,9 @@
   let desktop = $derived(sidePanels.matches);
   let threadRootId = $state<string | null>(null);
   let permissions = $state<RoomPermissionsView | null>(null);
+  let latestEventId = $derived(
+    forumThreads.roomTimeline.items.findLast((item) => item.event_id !== null)?.event_id ?? null
+  );
   let autoFills = 0;
 
   const conversation = new Conversation({
@@ -104,6 +109,16 @@
       current = false;
     };
   });
+
+  async function markRead(eventId: string): Promise<void> {
+    await core.commands.markRead(
+      resolvedRoomId,
+      eventId,
+      readReceiptIsPrivate(),
+      null,
+      forumThreads.roomTimeline.subscriptionId
+    );
+  }
 
   function goBack(): void {
     if (page.url.pathname.startsWith('/direct/')) {
@@ -177,6 +192,12 @@
 <svelte:head>
   <title>{roomName}</title>
 </svelte:head>
+
+<TimelineReadReceipt
+  timeline={forumThreads.roomTimeline}
+  visibleEventId={latestEventId}
+  onRead={markRead}
+/>
 
 <main class="forum-page" aria-label={$i18n.t('forum.label')}>
   <div class="forum-main">
