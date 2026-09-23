@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/protocol';
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -14,6 +14,15 @@
 
   import { Conversation } from './conversation.svelte.js';
   import TimelineList from './TimelineList.svelte';
+  import {
+    clampThreadPanelWidth,
+    MAX_THREAD_PANEL_WIDTH,
+    MIN_THREAD_PANEL_WIDTH,
+    remFromPointerDelta,
+    THREAD_PANEL_WIDTH_STEP,
+  } from './thread-panel-width.js';
+
+  const WIDTH_STORAGE_KEY = 'sable-thread-panel-width';
 
   interface Props {
     roomId: string;
@@ -48,6 +57,9 @@
   }: Props = $props();
 
   let composer = $state<RoomComposer>();
+  let width = $state(27.5);
+  let dragging = $state(false);
+  let drag: { pointerId: number; startX: number; startWidth: number } | null = null;
 
   const core = useCoreClient();
   const personas = usePersonaStore();
@@ -69,9 +81,48 @@
     conversation.fetchMissingReplyDetails();
   });
 
+  onMount(() => {
+    const stored = Number.parseFloat(localStorage.getItem(WIDTH_STORAGE_KEY) ?? '');
+    if (Number.isFinite(stored)) width = clampThreadPanelWidth(stored);
+  });
+
   onDestroy(() => {
     void timeline.stop();
   });
+
+  function startResize(event: PointerEvent): void {
+    if (event.button !== 0) return;
+    const handle = event.currentTarget;
+    if (!(handle instanceof HTMLElement)) return;
+
+    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: width };
+    dragging = true;
+    handle.setPointerCapture(event.pointerId);
+  }
+
+  function resize(event: PointerEvent): void {
+    if (drag === null || event.pointerId !== drag.pointerId) return;
+    const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+    width = clampThreadPanelWidth(
+      drag.startWidth + remFromPointerDelta(drag.startX - event.clientX, rootFontSize)
+    );
+  }
+
+  function finishResize(event: PointerEvent): void {
+    if (drag === null || event.pointerId !== drag.pointerId) return;
+    drag = null;
+    dragging = false;
+    localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+  }
+
+  function resizeWithKeyboard(event: KeyboardEvent): void {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    width = clampThreadPanelWidth(
+      width + (event.key === 'ArrowLeft' ? THREAD_PANEL_WIDTH_STEP : -THREAD_PANEL_WIDTH_STEP)
+    );
+    localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+  }
 
   function requestHistory(): Promise<boolean> {
     return timeline.paginateBackward(25);
@@ -92,7 +143,30 @@
   }
 </script>
 
-<aside class="thread-panel" class:modal aria-label={$i18n.t('timeline.thread')}>
+<aside
+  class="thread-panel"
+  class:modal
+  style:width={modal ? null : `${width}rem`}
+  aria-label={$i18n.t('timeline.thread')}
+>
+  {#if !modal}
+    <button
+      type="button"
+      class="resize-handle"
+      class:dragging
+      role="slider"
+      aria-orientation="horizontal"
+      aria-valuemin={MIN_THREAD_PANEL_WIDTH}
+      aria-valuemax={MAX_THREAD_PANEL_WIDTH}
+      aria-valuenow={width}
+      aria-label={$i18n.t('timeline.thread')}
+      onpointerdown={startResize}
+      onpointermove={resize}
+      onpointerup={finishResize}
+      onpointercancel={finishResize}
+      onkeydown={resizeWithKeyboard}
+    ></button>
+  {/if}
   <header class="thread-header">
     <div class="thread-title">
       <ChatsIcon aria-hidden="true" />
@@ -163,16 +237,45 @@
     background: var(--surface-container);
     border-left: var(--border-width) solid var(--surface-container-line);
     display: grid;
+    flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr) auto;
     min-height: 0;
     min-width: 0;
-    width: 100%;
+    position: relative;
   }
 
   .thread-panel.modal {
+    background-color: var(--bg-container);
+    background-image: linear-gradient(var(--surface-container), var(--surface-container));
     border-left: none;
     height: 100%;
     width: 100%;
+  }
+
+  .resize-handle {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    cursor: col-resize;
+    height: 100%;
+    left: -0.25rem;
+    padding: 0;
+    position: absolute;
+    touch-action: none;
+    user-select: none;
+    width: 0.5rem;
+    z-index: 1;
+  }
+
+  .resize-handle:hover,
+  .resize-handle.dragging,
+  .resize-handle:focus-visible {
+    background: var(--primary-main);
+  }
+
+  .resize-handle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: -0.1875rem;
   }
 
   .thread-header {
