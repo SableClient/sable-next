@@ -30,13 +30,16 @@ body:
     id: platforms
     attributes:
       label: Platforms
-      description: Select Web for the browser app, or the operating systems where this would help. Select all that apply.
+      description: Select All for every platform, Desktop or Mobile for those groups, or specific platforms. Select all that apply.
       multiple: true
       options:
+        - All
         - Web
+        - Desktop
         - Windows
         - macOS
         - Linux
+        - Mobile
         - iOS
         - Android
 

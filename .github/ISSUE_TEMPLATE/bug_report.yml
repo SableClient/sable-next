@@ -35,28 +35,30 @@ body:
   - type: dropdown
     id: platforms
     attributes:
-      label: Platforms
-      description: Select Web for the browser app, or the operating systems where this happens. Select all that apply.
+      label: What platforms have you experienced this issue on?
+      description: Select specific platforms, or Desktop, Mobile, or All only if the issue occurs across that entire group.
       multiple: true
       options:
         - Web
+        - Desktop
         - Windows
         - macOS
         - Linux
+        - Mobile
         - iOS
         - Android
+        - All
 
   - type: textarea
     id: info
     attributes:
       label: Environment and versions
-      description: 'Provide the build you are using, your OS version, and your homeserver.'
+      description: 'Provide the build and Sable version you are using, your browser if applicable, and your homeserver.'
       placeholder: |
         1. Build: [e.g. next.sable.moe, or the desktop/mobile app]
-        2. OS: [e.g. Windows 11, macOS 15, Android 15]
+        2. Sable version: [e.g. 0.1.0]
         3. Browser: [e.g. Chrome 140, Firefox 142 — web builds only]
-        4. Sable version: [e.g. 0.1.0]
-        5. Matrix homeserver: [e.g. matrix.org]
+        4. Matrix homeserver: [e.g. matrix.org]
     validations:
       required: true
 

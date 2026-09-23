@@ -2,26 +2,47 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const platformLabels = new Map([
-  ['Web', 'web'],
-  ['Windows', 'windows'],
-  ['macOS', 'macos'],
-  ['Linux', 'linux'],
-  ['iOS', 'ios'],
-  ['Android', 'android'],
+const platformOptions = new Map([
+  ['Web', ['web']],
+  ['Desktop', ['windows', 'macos', 'linux']],
+  ['Windows', ['windows']],
+  ['macOS', ['macos']],
+  ['Linux', ['linux']],
+  ['Mobile', ['ios', 'android']],
+  ['iOS', ['ios']],
+  ['Android', ['android']],
+  ['All', ['web', 'windows', 'macos', 'linux', 'ios', 'android']],
+]);
+const desktopLabels = ['windows', 'macos', 'linux'];
+const mobileLabels = ['ios', 'android'];
+const scopeLabels = new Map([
+  ['web', 'platform/web'],
+  ['desktop', 'platform/desktop'],
+  ['mobile', 'platform/mobile'],
+  ['web+desktop', 'platform/web-desktop'],
+  ['web+mobile', 'platform/web-mobile'],
+  ['desktop+mobile', 'platform/native'],
+  ['web+desktop+mobile', 'platform/all'],
 ]);
 
 export function selectedPlatformLabels(body) {
-  const section = body.split(/^### /m).find((part) => /^Platforms\r?\n/.test(part));
+  const heading = /^(?:Platforms|What platforms have you experienced this issue on\?)\r?\n/;
+  const section = body.split(/^### /m).find((part) => heading.test(part));
   if (!section) return [];
 
-  const choices = section.replace(/^Platforms\r?\n/, '')
+  const choices = section.replace(heading, '')
     .split(/[,\r\n]/)
     .map((choice) => choice.trim().replace(/^[-*]\s*/, ''));
-  return [...new Set(choices)].flatMap((choice) => {
-    const label = platformLabels.get(choice);
-    return label ? [label] : [];
-  });
+  const selected = new Set(choices.flatMap((choice) => platformOptions.get(choice) ?? []));
+  if (selected.size === 0) return [];
+
+  const categories = [
+    selected.has('web') && 'web',
+    desktopLabels.some((label) => selected.has(label)) && 'desktop',
+    mobileLabels.some((label) => selected.has(label)) && 'mobile',
+  ].filter(Boolean);
+  const scope = scopeLabels.get(categories.join('+'));
+  return scope ? [scope] : [];
 }
 
 export async function main() {
@@ -65,7 +86,7 @@ export async function main() {
   const existing = new Map();
   for (let page = 1; ; page += 1) {
     const labels = await api('GET', `${repoPath}/labels?limit=100&page=${page}`);
-    for (const label of labels) existing.set(label.name, label.id);
+    for (const label of labels) existing.set(label.name, label);
     if (labels.length < 100) break;
   }
 
@@ -74,7 +95,12 @@ export async function main() {
     throw new Error(`Create these Forgejo labels before using the platform picker: ${missing.join(', ')}`);
   }
 
-  const ids = wanted.map((label) => existing.get(label));
+  const scope = wanted.find((label) => label.startsWith('platform/'));
+  if (scope && existing.get(scope).exclusive !== true) {
+    throw new Error(`Configure Forgejo label ${scope} as exclusive`);
+  }
+
+  const ids = wanted.map((label) => existing.get(label).id);
   await api('POST', `${repoPath}/issues/${issueNumber}/labels`, { labels: ids });
   console.log(`Applied ${wanted.join(', ')} to issue #${issueNumber}`);
 }
