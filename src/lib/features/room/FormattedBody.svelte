@@ -645,7 +645,7 @@
   }
 
   /* Inline code had no rule at all, so it read as prose. */
-  .formatted-body :global(:not(pre) > code) {
+  .formatted-body :global(code:not(pre code)) {
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-300);
