@@ -30,7 +30,8 @@ export function selectedPlatformLabels(body) {
   const section = body.split(/^### /m).find((part) => heading.test(part));
   if (!section) return [];
 
-  const choices = section.replace(heading, '')
+  const choices = section
+    .replace(heading, '')
     .split(/[,\r\n]/)
     .map((choice) => choice.trim().replace(/^[-*]\s*/, ''));
   const selected = new Set(choices.flatMap((choice) => platformOptions.get(choice) ?? []));
@@ -46,8 +47,12 @@ export function selectedPlatformLabels(body) {
 }
 
 export async function main() {
-  const { FORGEJO_EVENT_PATH: eventPath, FORGEJO_API_URL: apiUrl,
-    FORGEJO_REPOSITORY: repository, FORGEJO_TOKEN: token } = process.env;
+  const {
+    FORGEJO_EVENT_PATH: eventPath,
+    FORGEJO_API_URL: apiUrl,
+    FORGEJO_REPOSITORY: repository,
+    FORGEJO_TOKEN: token,
+  } = process.env;
   if (!eventPath || !apiUrl || !repository || !token) {
     throw new Error('Missing Forgejo issue event or API environment');
   }
@@ -92,7 +97,9 @@ export async function main() {
 
   const missing = wanted.filter((label) => !existing.has(label));
   if (missing.length > 0) {
-    throw new Error(`Create these Forgejo labels before using the platform picker: ${missing.join(', ')}`);
+    throw new Error(
+      `Create these Forgejo labels before using the platform picker: ${missing.join(', ')}`
+    );
   }
 
   const scope = wanted.find((label) => label.startsWith('platform/'));
