@@ -1,5 +1,6 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
-import { type as osType } from '@tauri-apps/plugin-os';
+import { invoke } from '@tauri-apps/api/core';
+
+import { isNativeMobile } from './os';
 
 export function hapticFeedback(style: 'light' | 'medium' = 'light'): void {
   const strong = style === 'medium';
@@ -12,7 +13,7 @@ export function hapticFeedback(style: 'light' | 'medium' = 'light'): void {
       return;
     }
   };
-  if (isTauri() && (osType() === 'ios' || osType() === 'android')) {
+  if (isNativeMobile()) {
     void invoke('haptic_feedback', { strong }).catch(vibrate);
   } else {
     vibrate();

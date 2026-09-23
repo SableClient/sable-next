@@ -1,9 +1,10 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
-import { type as osType } from '@tauri-apps/plugin-os';
 import { on } from 'svelte/events';
 
+import { isNativeMobile } from './os';
+
 export function trackInspectorShortcut(): () => void {
-  if (!isTauri() || osType() === 'android' || osType() === 'ios') return () => {};
+  if (!isTauri() || isNativeMobile()) return () => {};
 
   return on(window, 'keydown', (event) => {
     if (event.key !== 'F12' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {

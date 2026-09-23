@@ -1,6 +1,8 @@
 import { isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 
+import { isNativeMobile } from './os';
+
 export type WindowEdge =
   | 'North'
   | 'NorthEast'
@@ -24,10 +26,7 @@ export interface DesktopWindowState {
 }
 
 export function supportsDesktopWindow(): boolean {
-  if (!isTauri()) return false;
-
-  const os = osType();
-  return os !== 'android' && os !== 'ios';
+  return isTauri() && !isNativeMobile();
 }
 
 export function supportsTray(): boolean {

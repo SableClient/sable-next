@@ -1,12 +1,10 @@
-import { isTauri } from '@tauri-apps/api/core';
-import { type as osType } from '@tauri-apps/plugin-os';
 import type { NativeCallCapabilities } from '@sableclient/tauri-plugin-livekit-mobile';
 
+import { isNativeMobile } from './os';
+
 export function hasNativeCalls(): boolean {
-  if (!isTauri()) return false;
   try {
-    const platform = osType();
-    return platform === 'android' || platform === 'ios';
+    return isNativeMobile();
   } catch {
     return false;
   }

@@ -4,7 +4,8 @@ import {
   getCurrentPosition,
   requestPermissions,
 } from '@tauri-apps/plugin-geolocation';
-import { type as osType } from '@tauri-apps/plugin-os';
+
+import { isNativeMobile } from './os';
 
 export type Fix = { latitude: number; longitude: number };
 
@@ -14,12 +15,8 @@ export type FixResult =
   | { kind: 'unavailable' }
   | { kind: 'unsupported' };
 
-function nativeLocates(): boolean {
-  return isTauri() && (osType() === 'ios' || osType() === 'android');
-}
-
 export function locates(): boolean {
-  if (isTauri()) return nativeLocates();
+  if (isTauri()) return isNativeMobile();
   return typeof navigator !== 'undefined' && 'geolocation' in navigator;
 }
 
@@ -58,7 +55,7 @@ function webFix(timeoutMs: number): Promise<FixResult> {
 }
 
 export function currentFix(timeoutMs = 10_000): Promise<FixResult> {
-  if (nativeLocates()) return nativeFix(timeoutMs);
+  if (isNativeMobile()) return nativeFix(timeoutMs);
   if (!locates()) return Promise.resolve({ kind: 'unsupported' });
 
   return webFix(timeoutMs);
