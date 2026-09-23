@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import {
   findMember,
   memberAvatar,
+  memberIdentity,
   memberName,
   personaWithColor,
   stripReplyFallback,
@@ -44,6 +45,19 @@ test('findMember treats a null user id as no member rather than searching', () =
 test('memberAvatar returns null rather than the id when there is no avatar', () => {
   expect(memberAvatar(members, '@erwan:example.org')).toBe('mxc://a');
   expect(memberAvatar(members, '@bob:example.org')).toBeNull();
+});
+
+test('memberIdentity projects the id, name and avatar with the same fallbacks', () => {
+  expect(memberIdentity(members, '@erwan:example.org')).toEqual({
+    userId: '@erwan:example.org',
+    name: 'Erwan',
+    avatar: 'mxc://a',
+  });
+  expect(memberIdentity(members, '@nobody:example.org')).toEqual({
+    userId: '@nobody:example.org',
+    name: '@nobody:example.org',
+    avatar: null,
+  });
 });
 
 test('a persona counts as tinted only when it carries a colour', () => {

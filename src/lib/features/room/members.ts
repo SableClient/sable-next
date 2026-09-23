@@ -43,6 +43,18 @@ export function memberAvatar(members: readonly MemberView[], userId: string): st
   return findMember(members, userId)?.avatar_url ?? null;
 }
 
+export interface MemberIdentity {
+  userId: string;
+  name: string;
+  avatar: string | null;
+}
+
+export function memberIdentity(members: readonly MemberView[], userId: string): MemberIdentity {
+  const member = findMember(members, userId);
+
+  return { userId, name: member?.display_name ?? userId, avatar: member?.avatar_url ?? null };
+}
+
 export function personaWithColor(
   profile: PerMessageProfileView | null
 ): PerMessageProfileView | null {

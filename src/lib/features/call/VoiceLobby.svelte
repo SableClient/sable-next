@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import type { MemberView } from '#src/generated/protocol';
 
+  import { memberIdentity } from '#lib/features/room/members.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import CallDevicePreview from './CallDevicePreview.svelte';
@@ -21,12 +22,7 @@
   let { participants, members, media, joining, canJoin, hasPermission, onChange, onJoin }: Props =
     $props();
 
-  let inVoice = $derived(
-    participants.map((userId) => {
-      const member = members.find((entry) => entry.user_id === userId);
-      return { userId, name: member?.display_name ?? userId, avatar: member?.avatar_url ?? null };
-    })
-  );
+  let inVoice = $derived(participants.map((userId) => memberIdentity(members, userId)));
 </script>
 
 <section class="lobby" aria-label={$i18n.t('call.title')}>

@@ -3,6 +3,7 @@
   import LockIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import type { MemberView } from '#src/generated/protocol';
 
+  import { memberIdentity, type MemberIdentity } from '#lib/features/room/members.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -33,14 +34,8 @@
     new Map(session.members.map((member) => [member.identity, member.user_id]))
   );
 
-  function profileOf(identity: string): { userId: string; name: string; avatar: string | null } {
-    const userId = byIdentity.get(identity) ?? identity;
-    const member = members.find((entry) => entry.user_id === userId);
-    return {
-      userId,
-      name: member?.display_name ?? userId,
-      avatar: member?.avatar_url ?? null,
-    };
+  function profileOf(identity: string): MemberIdentity {
+    return memberIdentity(members, byIdentity.get(identity) ?? identity);
   }
 
   let busy = $derived(session.lifecycle === 'joining' || session.lifecycle === 'connecting');

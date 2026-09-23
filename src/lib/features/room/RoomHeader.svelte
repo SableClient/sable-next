@@ -12,6 +12,8 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
+  import { memberIdentity } from './members.js';
+
   const MAX_FACES = 3;
 
   interface Props {
@@ -56,12 +58,7 @@
     menu,
   }: Props = $props();
 
-  let inVoice = $derived(
-    callParticipants.map((userId) => {
-      const member = members.find((entry) => entry.user_id === userId);
-      return { userId, name: member?.display_name ?? userId, avatar: member?.avatar_url ?? null };
-    })
-  );
+  let inVoice = $derived(callParticipants.map((userId) => memberIdentity(members, userId)));
   let voiceLabel = $derived(
     inVoice.length > 0
       ? $i18n.t('timeline.inVoiceNames', { names: inVoice.map((entry) => entry.name).join(', ') })
