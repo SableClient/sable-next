@@ -6,6 +6,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { settingsChanges } from '#lib/features/notifications/notifications.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
 
@@ -16,6 +17,7 @@
 
   let { roomId, active = true }: Props = $props();
   const core = useCoreClient();
+  const roomList = useRoomList();
 
   const modes: readonly { mode: NotificationModeView | null; label: string }[] = [
     { mode: null, label: 'room.notifyDefault' },
@@ -50,9 +52,14 @@
 
   function select(next: NotificationModeView | null): void {
     mode = next;
-    void core.commands.setRoomNotificationMode(roomId, next).catch((error: unknown) => {
-      console.warn('[sable room] notification mode failed', error);
-    });
+    void core.commands.setRoomNotificationMode(roomId, next).then(
+      () => {
+        roomList.setNotificationOverride(roomId, next);
+      },
+      (error: unknown) => {
+        console.warn('[sable room] notification mode failed', error);
+      }
+    );
   }
 </script>
 

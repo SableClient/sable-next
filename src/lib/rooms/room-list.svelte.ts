@@ -281,6 +281,14 @@ export class RoomList {
     this.publishedModes = new Map(this.notificationModes);
   }
 
+  setNotificationOverride(roomId: string, room: NotificationModeView | null): void {
+    const previous = this.notificationModes.get(roomId);
+    if (!previous || previous.room === room) return;
+    this.notificationModes.set(roomId, { ...previous, room });
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
+    this.publishedModes = new Map(this.notificationModes);
+  }
+
   private publishLoadingModes(): void {
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
     const firstRead = new Set<string>();

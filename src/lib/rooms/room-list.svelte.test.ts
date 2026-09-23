@@ -65,6 +65,36 @@ test('resolves notification modes for the whole list in one command', async () =
   roomList.stop();
 });
 
+test('a room override set here shows before the push rules echo back', async () => {
+  const rooms = [{ room_id: '!room:example.org' }] as RoomSummary[];
+  const core = {
+    subscribeEvents: vi.fn(() => {
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms })),
+      roomNotificationModes: vi.fn(() =>
+        Promise.resolve([{ room_id: '!room:example.org', room: null, default: 'all' as const }])
+      ),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode('!room:example.org')).toBe('all');
+  });
+
+  roomList.setNotificationOverride('!room:example.org', 'mentions');
+  expect(roomList.notificationOverride('!room:example.org')).toBe('mentions');
+  expect(roomList.notificationMode('!room:example.org')).toBe('mentions');
+
+  roomList.setNotificationOverride('!room:example.org', null);
+  expect(roomList.notificationMode('!room:example.org')).toBe('all');
+  roomList.stop();
+});
+
 test('inbox counts follow room overrides and default changes', async () => {
   const rooms = [
     { room_id: '!inherited', state: 'joined', unread: 2, highlight: 0 },
