@@ -109,7 +109,7 @@
       presence={ownPresence}
       label={$i18n.t(`presence.${ownPresence}`)}
       class="account-presence"
-      size="large"
+      size="medium"
     />
   {/if}
 {/snippet}
