@@ -409,6 +409,16 @@ pub enum Command {
         valid_until: Option<u64>,
     },
     Bookmarks,
+    InboxNotifications {
+        filter: InboxFilter,
+        include_read: bool,
+        limit: u32,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        before_ts: Option<u64>,
+    },
+    BackfillInbox {
+        include_read: bool,
+    },
     SetBookmark {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1165,6 +1175,13 @@ pub enum CommandOk {
     Bookmarks {
         bookmarks: Vec<BookmarkView>,
     },
+    InboxNotifications {
+        items: Vec<InboxItemView>,
+        has_more: bool,
+    },
+    BackfillInbox {
+        recorded: u32,
+    },
     SetBookmark {
         bookmarked: bool,
     },
@@ -1487,6 +1504,8 @@ pub enum CoreEvent {
     },
 
     NotificationSettingsChanged,
+
+    InboxChanged,
 
     AccountDataChanged {
         event_type: String,
@@ -3073,6 +3092,32 @@ pub enum SyncStatus {
     Syncing,
     Live,
     Error { message: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum InboxFilter {
+    All,
+    Mentions,
+    Direct,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[allow(clippy::struct_excessive_bools)]
+pub struct InboxItemView {
+    pub room_id: String,
+    pub event_id: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub ts: u64,
+    pub sender: String,
+    pub sender_name: Option<String>,
+    pub body: Option<String>,
+    pub highlight: bool,
+    pub is_direct: bool,
+    pub encrypted: bool,
+    pub read: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]

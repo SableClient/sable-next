@@ -1193,6 +1193,22 @@ impl Core {
                 bookmarks: self.bookmarks().await?,
             }),
 
+            Command::InboxNotifications {
+                filter,
+                include_read,
+                limit,
+                before_ts,
+            } => {
+                let (items, has_more) = self
+                    .inbox_notifications(filter, include_read, limit, before_ts)
+                    .await?;
+                Ok(CommandOk::InboxNotifications { items, has_more })
+            }
+
+            Command::BackfillInbox { include_read } => Ok(CommandOk::BackfillInbox {
+                recorded: self.backfill_inbox(include_read).await?,
+            }),
+
             Command::SetBookmark {
                 room_id,
                 event_id,

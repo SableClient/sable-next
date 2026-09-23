@@ -894,6 +894,41 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       save_persona: () => ({ type: 'save_persona', personas: [] }),
       remove_persona: () => ({ type: 'remove_persona', personas: [] }),
       reorder_personas: () => ({ type: 'reorder_personas', personas: [] }),
+      inbox_notifications: (command) => {
+        const items = [
+          {
+            room_id: room.room_id,
+            event_id: '$general-19:example.test',
+            ts: 1_700_000_000_019,
+            sender: '@alice:example.test',
+            sender_name: 'Alice',
+            body: 'General message 19',
+            highlight: true,
+            is_direct: false,
+            encrypted: true,
+            read: false,
+          },
+          {
+            room_id: secondRoom.room_id,
+            event_id: '$random-3:example.test',
+            ts: 1_700_000_000_010,
+            sender: '@a-very-long-localpart-for-a-bot-account:example.test',
+            sender_name: null,
+            body: null,
+            highlight: false,
+            is_direct: false,
+            encrypted: true,
+            read: true,
+          },
+        ].filter(
+          (item) =>
+            (command.include_read || !item.read) &&
+            (command.filter !== 'mentions' || item.highlight) &&
+            (command.filter !== 'direct' || item.is_direct)
+        );
+        return { type: 'inbox_notifications', items, has_more: false };
+      },
+      backfill_inbox: () => ({ type: 'backfill_inbox', recorded: 0 }),
       bookmarks: () => ({ type: 'bookmarks', bookmarks: readBookmarks() }),
       set_bookmark: (command) => {
         const entries = readBookmarks().filter(

@@ -661,7 +661,7 @@ fn body(event: &NotificationEvent) -> String {
 
 const FALLBACK_BODY: &str = "sent a message";
 
-fn timeline_body(event: &AnySyncTimelineEvent) -> String {
+pub(crate) fn timeline_body(event: &AnySyncTimelineEvent) -> String {
     let AnySyncTimelineEvent::MessageLike(message) = event else {
         return FALLBACK_BODY.to_owned();
     };

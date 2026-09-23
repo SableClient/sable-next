@@ -7,6 +7,7 @@ mod calls;
 mod dispatch;
 mod errors;
 pub mod image_packs;
+mod inbox;
 pub mod matrix_html;
 mod media;
 pub use media::GalleryAttachment;
@@ -87,6 +88,7 @@ pub struct Core {
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
     account_data_lock: Mutex<()>,
+    inbox_lock: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
@@ -208,6 +210,7 @@ impl Core {
             subscriptions: Mutex::new(HashMap::new()),
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
             account_data_lock: Mutex::new(()),
+            inbox_lock: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),
             timelines: Mutex::new(HashMap::new()),
             thread_timelines: Mutex::new(HashMap::new()),

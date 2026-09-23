@@ -182,6 +182,10 @@ impl Core {
                 let mut alerted_events = std::collections::HashSet::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
+                    if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event {
+                        core.record_live_inbox(&room, raw, &actions, generation)
+                            .await;
+                    }
                     if !notifications::notifies(&actions) || core.is_read_room(room.room_id()) {
                         continue;
                     }

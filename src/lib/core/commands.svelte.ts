@@ -1,5 +1,7 @@
 import type {
   BookmarkView,
+  InboxFilter,
+  InboxItemView,
   ImageSourcePackView,
   ImageSourcePackReferenceView,
   PackImageInfoView,
@@ -876,6 +878,30 @@ export function createCommands(transport: () => Transport) {
     async bookmarks(): Promise<BookmarkView[]> {
       const response = await transport().send({ type: 'bookmarks' });
       return response.bookmarks;
+    },
+
+    async inboxNotifications(
+      filter: InboxFilter,
+      includeRead: boolean,
+      limit: number,
+      beforeTs: number | null = null
+    ): Promise<{ items: InboxItemView[]; hasMore: boolean }> {
+      const response = await transport().send({
+        type: 'inbox_notifications',
+        filter,
+        include_read: includeRead,
+        limit,
+        before_ts: beforeTs,
+      });
+      return { items: response.items, hasMore: response.has_more };
+    },
+
+    async backfillInbox(includeRead: boolean): Promise<number> {
+      const response = await transport().send({
+        type: 'backfill_inbox',
+        include_read: includeRead,
+      });
+      return response.recorded;
     },
 
     async setBookmark(roomId: string, eventId: string, bookmarked: boolean): Promise<boolean> {
