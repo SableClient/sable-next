@@ -13,6 +13,7 @@ export type WorkerRequest =
   | { id: number; reset: true }
   | { debugLogs: boolean }
   | { id: number; media: { source: string; width: number; height: number } }
+  | { id: number; forget: { source: string } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; gallery: GalleryRequest }
   | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };
@@ -24,7 +25,7 @@ export type WorkerMessage =
   | { id: number; err: CommandErr }
   // Transferred, not copied, so a thumbnail crosses once.
   | { id: number; bytes: Uint8Array<ArrayBuffer> }
-  /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment`. */
+  /** An `mxc:` URI from `uploadMedia`, or nothing from `sendAttachment` and `forgetMedia`. */
   | { id: number; uri: string | null }
   | { events: CoreEvent[] }
   | { logs: string[] }

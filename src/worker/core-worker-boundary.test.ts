@@ -24,6 +24,7 @@ function fakeCore(submitCommand: WorkerCore['submitCommand']): WorkerCore {
   return {
     submitCommand,
     fetchMedia: () => Promise.resolve(new Uint8Array(new ArrayBuffer())),
+    forgetMedia: () => Promise.resolve(),
     sendAttachment: () => Promise.resolve(),
     sendGallery: () => Promise.resolve(),
     uploadMedia: () => Promise.resolve(''),
@@ -74,6 +75,20 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
     null,
     true
   );
+  expect(port.messages).toEqual([{ id: 1, uri: null }]);
+});
+
+test('asks the WASM core to forget a media source', async () => {
+  const core = fakeCore(() => Promise.resolve(''));
+  const forgetMedia = vi.fn(() => Promise.resolve());
+  core.forgetMedia = forgetMedia;
+  const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+  const port = new FakePort();
+  boundary.connect(port);
+
+  await port.send({ id: 1, forget: { source: 'mxc://example.org/broken' } });
+
+  expect(forgetMedia).toHaveBeenCalledWith('mxc://example.org/broken');
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
 });
 

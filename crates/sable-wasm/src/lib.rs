@@ -238,6 +238,19 @@ impl SableCore {
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
 
+    /// Resolves once every stored copy of the source is gone.
+    ///
+    /// # Errors
+    ///
+    /// Returns a JSON-encoded command error when the media store cannot be written.
+    #[wasm_bindgen(js_name = forgetMedia)]
+    pub async fn forget_media(&self, source: String) -> Result<(), String> {
+        self.core
+            .forget_media(source)
+            .await
+            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+    }
+
     /// Resolves once the event is queued, not once the upload completes.
     ///
     /// # Errors

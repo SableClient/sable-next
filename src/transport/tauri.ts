@@ -63,6 +63,14 @@ export function createTauriTransport(): Transport {
       }
     },
 
+    async forgetMedia(source) {
+      try {
+        await invoke('forget_media', { source });
+      } catch (error) {
+        throw new CoreError(error as CommandErr);
+      }
+    },
+
     async videoStreamMime() {
       try {
         return await invoke<string>('video_stream_mime');

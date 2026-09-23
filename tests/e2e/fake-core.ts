@@ -419,6 +419,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
     const servedBytes = new Map<string, Promise<Uint8Array>>();
     function servedPng(source: string): Promise<Uint8Array> {
+      if (source.includes('undecodable-')) return Promise.resolve(new Uint8Array([0, 1, 2, 3]));
       const [width, height] = source.includes('wide-') ? [1000, 400] : [80, 60];
       const key = `${String(width)}x${String(height)}`;
       let bytes = servedBytes.get(key);
@@ -1117,7 +1118,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       postMessage(request: {
         id: number;
         command?: Command;
-        media?: { source: string };
+        media?: { source: string; width: number; height: number };
+        forget?: { source: string };
         reset?: true;
       }): void {
         if (request.reset) {
@@ -1126,8 +1128,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           });
           return;
         }
+        if (request.forget) {
+          commandLog.push('forget_media');
+          window.setTimeout(() => {
+            this.onmessage?.({ data: { id: request.id, uri: null } } as MessageEvent);
+          });
+          return;
+        }
         if (request.media) {
-          const { source } = request.media;
+          const { source, width, height } = request.media;
+          commandLog.push(`fetch_media ${String(width)}x${String(height)}`);
           window.setTimeout(
             () => {
               void servedPng(source).then((bytes) => {

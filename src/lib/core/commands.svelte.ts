@@ -1172,6 +1172,10 @@ export function createCommands(transport: () => Transport) {
       return transport().fetchMedia(source, width, height);
     },
 
+    forgetMedia(source: string): Promise<void> {
+      return transport().forgetMedia(source);
+    },
+
     videoStreamMime(): Promise<string> {
       return transport().videoStreamMime();
     },

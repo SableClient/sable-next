@@ -31,6 +31,17 @@ function picture(width: number, height: number) {
   };
 }
 
+function undecodablePicture() {
+  const item = picture(800, 600);
+  return {
+    ...item,
+    content: {
+      ...item.content,
+      source: JSON.stringify({ Plain: 'mxc://example.test/undecodable-shot' }),
+    },
+  };
+}
+
 function mediaBox(page: Page, selector = '.media-image') {
   return page.evaluate((target: string) => {
     const node = document.querySelector(`.timeline-viewport ${target}`);
@@ -287,4 +298,32 @@ test('a video takes the same box as the picture it shares dimensions with', asyn
   expect(asVideo.width).toBeCloseTo(asPicture.width, 0);
   expect(asVideo.height).toBeCloseTo(asPicture.height, 0);
   expect(asVideo.sideways).toBe(0);
+});
+
+test('a picture that will not decode falls back to the original once, then stops asking', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await core.setTimelineItemById(await core.subscription(), 'general-19', undecodablePicture());
+  const media = timeline.image.first();
+
+  await expect(media).toContainText('Media unavailable');
+  const fetches = await core.mediaFetches();
+  expect(fetches.at(-1)).toBe('fetch_media 0x0');
+  expect(fetches.filter((fetch) => fetch === 'fetch_media 0x0')).toHaveLength(1);
+
+  await page.waitForTimeout(3_000);
+  expect(await core.mediaFetches()).toEqual(fetches);
+  await expect(media.locator('img')).toHaveCount(0);
+
+  await media.getByRole('button', { name: 'Retry' }).click();
+  await expect.poll(() => core.commands()).toContain('forget_media');
+  await expect.poll(async () => (await core.mediaFetches()).length).toBeGreaterThan(fetches.length);
 });

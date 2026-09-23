@@ -305,6 +305,10 @@ export function createWebTransport(): Transport {
       }));
     },
 
+    async forgetMedia(source) {
+      await request<null>((id) => ({ id, forget: { source } }));
+    },
+
     // A browser decodes what it advertises, so nothing here should ask.
     videoStreamMime() {
       return Promise.reject(new CoreError({ code: 'unsupported' }));

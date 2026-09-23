@@ -28,6 +28,14 @@ function releaseSlot(): void {
   else inflight -= 1;
 }
 
+function markUnavailable(key: string): void {
+  unavailable.set(key, Date.now() + MEDIA_FAILURE_TTL_MS);
+  if (unavailable.size > MAX_MEDIA_METADATA) {
+    const oldest = unavailable.keys().next().value;
+    if (oldest !== undefined) unavailable.delete(oldest);
+  }
+}
+
 function cacheKey(
   accountId: string | undefined,
   source: string,
@@ -102,6 +110,12 @@ export function holdMediaUrl(
 ): () => void {
   const key = cacheKey(core.session?.account_id, source, width, height);
   holds.set(key, (holds.get(key) ?? 0) + 1);
+  const cached = objectUrls.get(key);
+  if (cached !== undefined) {
+    // Re-inserted so the map's own order is the eviction order.
+    objectUrls.delete(key);
+    objectUrls.set(key, cached);
+  }
   return () => {
     const remaining = (holds.get(key) ?? 1) - 1;
     if (remaining > 0) holds.set(key, remaining);
@@ -116,13 +130,23 @@ export function cachedMediaUrl(
   width: number,
   height: number
 ): string | undefined {
+  return objectUrls.get(cacheKey(core.session?.account_id, source, width, height))?.url;
+}
+
+export function discardMediaUrl(
+  core: Pick<CoreClient, 'session'>,
+  source: string,
+  width: number,
+  height: number,
+  url: string
+): void {
   const key = cacheKey(core.session?.account_id, source, width, height);
   const cached = objectUrls.get(key);
-  if (cached === undefined) return undefined;
-  // Re-inserted so the map's own order is the eviction order.
+  if (cached?.url !== url) return;
+  URL.revokeObjectURL(cached.url);
   objectUrls.delete(key);
-  objectUrls.set(key, cached);
-  return cached.url;
+  objectUrlBytes -= cached.bytes;
+  markUnavailable(key);
 }
 
 /**
@@ -205,11 +229,7 @@ export function loadMediaUrl(
       });
   pending.set(key, request);
   void request.catch(() => {
-    unavailable.set(key, Date.now() + MEDIA_FAILURE_TTL_MS);
-    if (unavailable.size > MAX_MEDIA_METADATA) {
-      const oldest = unavailable.keys().next().value;
-      if (oldest !== undefined) unavailable.delete(oldest);
-    }
+    markUnavailable(key);
   });
   return request;
 }

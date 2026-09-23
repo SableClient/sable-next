@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { holdMediaUrl, loadMediaUrl } from './media-url.js';
+import { cachedMediaUrl, discardMediaUrl, holdMediaUrl, loadMediaUrl } from './media-url.js';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -30,6 +30,41 @@ test('evicts object URLs when cached media exceeds the byte budget', async () =>
   await loadMediaUrl(core, 'mxc://example.org/second', 800, 600);
 
   expect(revoke).toHaveBeenCalledWith('blob:media-0');
+});
+
+test('a discarded URL is revoked and not served again until the failure expires', async () => {
+  vi.useFakeTimers();
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:undecodable');
+  const source = 'mxc://example.org/undecodable';
+  const core = {
+    session: session('account-discard', '@a:example.org', 'device-a'),
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+
+  await loadMediaUrl(core, source, 96, 96);
+  discardMediaUrl(core, source, 96, 96, 'blob:undecodable');
+
+  expect(revoke).toHaveBeenCalledWith('blob:undecodable');
+  expect(cachedMediaUrl(core, source, 96, 96)).toBeUndefined();
+  await expect(loadMediaUrl(core, source, 96, 96)).rejects.toThrow('Media unavailable');
+  expect(core.commands.fetchMedia).toHaveBeenCalledOnce();
+});
+
+test('does not discard a URL that has since been replaced', async () => {
+  let nextUrl = 0;
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:replaced-${String(nextUrl++)}`);
+  const source = 'mxc://example.org/replaced';
+  const core = {
+    session: session('account-replaced', '@a:example.org', 'device-a'),
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+
+  await loadMediaUrl(core, source, 96, 96);
+  await loadMediaUrl(core, source, 96, 96);
+  discardMediaUrl(core, source, 96, 96, 'blob:replaced-0');
+
+  expect(cachedMediaUrl(core, source, 96, 96)).toBe('blob:replaced-1');
 });
 
 test('does not share a media URL between accounts', async () => {
@@ -69,6 +104,30 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   await loadMediaUrl(core, 'mxc://example.org/later', 800, 600);
 
   expect(revoke).toHaveBeenCalledWith(held);
+});
+
+test('a cached URL that is held again is evicted after older ones', async () => {
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(
+    (blob) => `blob:recent-${String((blob as Blob).size)}`
+  );
+  const core = {
+    session: session('account-recent', '@a:example.org', 'device-a'),
+    commands: {
+      fetchMedia: vi.fn((source: string) =>
+        Promise.resolve(new Uint8Array(10 * 1024 * 1024 + Number(source.slice(-1))))
+      ),
+    },
+  };
+
+  const first = await loadMediaUrl(core, 'mxc://example.org/recent-1', 800, 600);
+  const second = await loadMediaUrl(core, 'mxc://example.org/recent-2', 800, 600);
+  await loadMediaUrl(core, 'mxc://example.org/recent-3', 800, 600);
+  holdMediaUrl(core, 'mxc://example.org/recent-1', 800, 600)();
+  await loadMediaUrl(core, 'mxc://example.org/recent-4', 800, 600);
+
+  expect(revoke).toHaveBeenCalledWith(second);
+  expect(revoke).not.toHaveBeenCalledWith(first);
 });
 
 test('revokes the URL it replaces when a key is fetched twice', async () => {

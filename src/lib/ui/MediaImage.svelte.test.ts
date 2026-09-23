@@ -12,6 +12,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
+  core.forgetMedia.mockClear();
   preferences.autoplayGifs = true;
   preferences.pauseAnimationsWhenInactive = false;
   document.body.replaceChildren();
@@ -627,17 +628,103 @@ test('an undecodable file falls back instead of spinning forever', async () => {
     },
   });
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img.media-image-content')).not.toBeNull();
-  });
-  document
-    .querySelector<HTMLImageElement>('img.media-image-content')
-    ?.dispatchEvent(new Event('error'));
-  await tick();
+  for (const request of ['thumbnail', 'original']) {
+    await vi.waitFor(() => {
+      expect(document.querySelector('img.media-image-content'), request).not.toBeNull();
+    });
+    document
+      .querySelector<HTMLImageElement>('img.media-image-content')
+      ?.dispatchEvent(new Event('error'));
+    await tick();
+  }
 
   expect(onfailed).toHaveBeenCalledOnce();
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
   expect(document.querySelector('.media-image-progress')).toBeNull();
+  await unmount(instance);
+});
+
+test('an undecodable thumbnail falls back to the original, then stops', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const onfailed = vi.fn();
+  const source = 'mxc://example.org/undecodable-thumbnail';
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: { source, alt: 'photo', width: 800, height: 600, onfailed },
+  });
+  const image = (): HTMLImageElement | null =>
+    document.querySelector<HTMLImageElement>('img.media-image-content');
+
+  await vi.advanceTimersByTimeAsync(0);
+  image()?.dispatchEvent(new Event('error'));
+  await vi.advanceTimersByTimeAsync(0);
+
+  expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 0, 0);
+  expect(onfailed).not.toHaveBeenCalled();
+
+  image()?.dispatchEvent(new Event('error'));
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(onfailed).toHaveBeenCalledOnce();
+  expect(image()).toBeNull();
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
+test('an effect re-run after an undecodable original does not bring the retries back', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const props = $state({
+    source: 'mxc://example.org/undecodable-rerun',
+    alt: 'photo',
+    width: 800,
+    height: 600,
+    mime: 'image/png',
+  });
+  const instance = mount(MediaImage, { target: document.body, props });
+  const image = (): HTMLImageElement | null =>
+    document.querySelector<HTMLImageElement>('img.media-image-content');
+
+  for (let step = 0; step < 2; step += 1) {
+    await vi.advanceTimersByTimeAsync(0);
+    image()?.dispatchEvent(new Event('error'));
+  }
+  props.mime = 'image/jpeg';
+  await vi.advanceTimersByTimeAsync(120_000);
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
+test('a manual retry of an undecodable image drops the stored copy first', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  const source = 'mxc://example.org/undecodable-retried';
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: { source, alt: 'photo', width: 800, height: 600, retryable: true },
+  });
+  const breakImage = async (): Promise<void> => {
+    await vi.waitFor(() => {
+      expect(document.querySelector('img.media-image-content')).not.toBeNull();
+    });
+    document.querySelector('img.media-image-content')?.dispatchEvent(new Event('error'));
+    await tick();
+  };
+
+  await breakImage();
+  await breakImage();
+  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+
+  await vi.waitFor(() => {
+    expect(core.fetchMedia).toHaveBeenCalledTimes(3);
+  });
+  expect(core.forgetMedia).toHaveBeenCalledWith(source);
+  expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 800, 600);
   await unmount(instance);
 });
 

@@ -51,6 +51,9 @@ export interface Transport {
   /** Thumbnail bytes for an `mxc://` URI. */
   fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>>;
 
+  /** Drops every stored copy of a source, so the next fetch asks the homeserver. */
+  forgetMedia(source: string): Promise<void>;
+
   /** The MIME type {@link streamVideo} delivers. */
   videoStreamMime(): Promise<string>;
 

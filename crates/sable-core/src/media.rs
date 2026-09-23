@@ -109,6 +109,30 @@ impl Core {
         }
     }
 
+    /// Drops every stored copy of a source, so the next fetch asks the homeserver.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the media URI is invalid, the user is logged out,
+    /// or the media store cannot be written.
+    pub async fn forget_media(&self, source: String) -> Result<(), CommandErr> {
+        let source: MediaSource = serde_json::from_str(&source)
+            .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(source)));
+        let uri = match source {
+            MediaSource::Plain(uri) => uri,
+            MediaSource::Encrypted(file) => file.url,
+        };
+        if uri.parts().is_err() {
+            return Err(CommandErr::InvalidMedia);
+        }
+        let client = self.client().await?;
+        client
+            .media()
+            .remove_media_content_for_uri(&uri)
+            .await
+            .map_err(|error| self.failed("forget_media", error))
+    }
+
     async fn original_media(
         &self,
         client: &MatrixClient,

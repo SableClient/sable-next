@@ -106,6 +106,11 @@ async fn fetch_media(
     Ok(Response::new(bytes))
 }
 
+#[tauri::command]
+async fn forget_media(state: State<'_, AppState>, source: String) -> Result<(), CommandErr> {
+    state.core.forget_media(source).await
+}
+
 /// The MIME type [`stream_video`] delivers.
 #[cfg(all(feature = "cef", target_os = "linux"))]
 #[tauri::command]
@@ -638,6 +643,7 @@ pub fn run() {
             submit_command,
             subscribe_events,
             fetch_media,
+            forget_media,
             #[cfg(all(feature = "cef", target_os = "linux"))]
             stream_video,
             #[cfg(all(feature = "cef", target_os = "linux"))]

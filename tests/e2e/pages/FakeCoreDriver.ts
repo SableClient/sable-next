@@ -29,6 +29,12 @@ export class FakeCoreDriver {
     );
   }
 
+  mediaFetches(): Promise<string[]> {
+    return this.page.evaluate(() =>
+      window.__e2eCommands.filter((command) => command.startsWith('fetch_media'))
+    );
+  }
+
   subscription(index = 0): Promise<number> {
     return this.page.evaluate((at) => window.__e2eTimelineSubscriptions[at], index);
   }

@@ -8,6 +8,7 @@ const logBufferLimit = 500;
 export type WorkerCore = {
   submitCommand(command: string): Promise<string>;
   fetchMedia(source: string, width: number, height: number): Promise<Uint8Array>;
+  forgetMedia(source: string): Promise<void>;
   sendAttachment(
     roomId: string,
     filename: string,
@@ -196,6 +197,11 @@ export function createCoreWorkerBoundary(
             height
           )) as Uint8Array<ArrayBuffer>;
           port.postMessage({ id, bytes } satisfies WorkerMessage, [bytes.buffer]);
+          return;
+        }
+        if ('forget' in request) {
+          await instance.forgetMedia(request.forget.source);
+          port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;
         }
         if ('attachment' in request) {

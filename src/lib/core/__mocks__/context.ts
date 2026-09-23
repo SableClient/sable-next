@@ -8,6 +8,7 @@ export function createCoreStub<T extends Record<string, unknown>>(overrides = {}
   const stub = {
     session: null as unknown,
     fetchMedia: vi.fn<(...args: never[]) => Promise<Uint8Array<ArrayBuffer>>>(pending),
+    forgetMedia: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
     userProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>
       Promise.reject(new Error('profile unavailable'))
     ),

@@ -10,6 +10,7 @@
   import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import {
     cachedMediaUrl,
+    discardMediaUrl,
     holdMediaUrl,
     loadMediaUrl,
     mediaAspectRatio,
@@ -71,47 +72,25 @@
     autoplay = null,
   }: Props = $props();
   const core = useCoreClient();
-  let url = $state<string | null>(null);
-  let failed = $state(false);
-  let retryCount = $state(0);
-  let retryAt = $state(0);
+  let outcome = $state.raw<{ key: string; url: string | null; undecodable?: true } | null>(null);
+  let backoff = $derived({ source, attempt: 0, manual: 0, automatic: 0, at: 0 });
+  let attempt = $derived(backoff.attempt);
   let clock = $state(Date.now());
-  let loadGeneration = $state(0);
-  let retryNextLoad = false;
-  let backoffSource: string | null = null;
-  let autoRetries = $state(0);
   let gifPreview = $state<HTMLCanvasElement>();
   let gifImage = $state<HTMLImageElement>();
-  let gifPreviewReady = $state(false);
-  let gifPlaying = $state(false);
+  let previewUrl = $state<string | null>(null);
+  let playingUrl = $state<string | null>(null);
   let gifFrames = $state<GifPlayback | null>(null);
   /* Not `$state`: the loop would restart on every step if it tracked these. */
   let gifFrameIndex = 0;
   let gifFrameMs = DEFAULT_FRAME_MS;
   let paintedCanvas: HTMLCanvasElement | undefined;
   let paintedIndex = -1;
-  let fileRatio = $state<number | null>(null);
   let blurhashCanvas = $state<HTMLCanvasElement>();
-  let imageLoaded = $state(false);
+  let loadedUrl = $state<string | null>(null);
   let imageElement = $state<HTMLImageElement>();
-  let stillImage = $state<{ url: string; still: string } | null>(null);
-  let plate = $derived.by(() => {
-    if (!uniform || !preferences.uniformIcons || !imageLoaded) return null;
-    const image = imageElement;
-    if (!image?.complete) return null;
-    return dominantColor(image);
-  });
-  let animated = $derived(
-    ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
-  );
-  let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
-  let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
-  let paused = $derived((animated || original) && animationsPaused());
-  let heldUrl = $derived(paused && stillImage?.url === url ? stillImage.still : url);
-  let steppedGif = $derived(gifFrames !== null);
-  let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
-  let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);
-  let showCanvas = $derived(manualGif && gifPreviewReady && (steppedGif || !gifPlaying));
+  let sidewaysSource = $state<string | null>(null);
+  let undecodableThumbnail = $state<string | null>(null);
   let eventRatio = $derived.by(() => {
     const hasIntrinsicSize =
       intrinsicWidth !== null &&
@@ -122,12 +101,56 @@
       intrinsicHeight > 0;
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
+  let animated = $derived(
+    ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
+  );
+  let servedSideways = $derived(
+    sidewaysSource === source || sideways(mediaAspectRatio(core, source, width, height))
+  );
+  let asIs = $derived(
+    original ||
+      mime === 'image/svg+xml' ||
+      animated ||
+      servedSideways ||
+      undecodableThumbnail === source
+  );
+  let requestedWidth = $derived(asIs ? 0 : width);
+  let requestedHeight = $derived(asIs ? 0 : height);
+  let requestKey = $derived(
+    `${String(attempt)}:${String(requestedWidth)}x${String(requestedHeight)}:${source}`
+  );
+  let url = $derived(
+    outcome?.key === requestKey
+      ? outcome.url
+      : (cachedMediaUrl(core, source, requestedWidth, requestedHeight) ?? null)
+  );
+  let failed = $derived(outcome?.key === requestKey && outcome.url === null);
+  let undecodable = $derived(failed && outcome?.undecodable === true);
+  let fileRatio = $derived(
+    url === null && !failed ? null : mediaAspectRatio(core, source, requestedWidth, requestedHeight)
+  );
+  let imageLoaded = $derived(url !== null && loadedUrl === url);
+  let gifPreviewReady = $derived(url !== null && previewUrl === url);
+  let gifPlaying = $derived(url !== null && playingUrl === url);
+  let plate = $derived.by(() => {
+    if (!uniform || !preferences.uniformIcons || !imageLoaded) return null;
+    const image = imageElement;
+    if (!image?.complete) return null;
+    return dominantColor(image);
+  });
+  let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
+  let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
+  let paused = $derived((animated || original) && animationsPaused());
+  let heldFrame = $derived(paused && imageLoaded && imageElement ? stillFrame(imageElement) : null);
+  let heldUrl = $derived(heldFrame ?? url);
+  let steppedGif = $derived(gifFrames !== null);
+  let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
+  let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);
+  let showCanvas = $derived(manualGif && gifPreviewReady && (steppedGif || !gifPlaying));
   /* The event's dimensions reserve the row and are never revised: the served file
      is a thumbnail whose shape need not match. The decoded shape covers an event
      carrying none, and is known before the `<img>` mounts. */
   let aspectRatio = $derived(eventRatio ?? fileRatio ?? width / height);
-  let sidewaysSource = $state<string | null>(null);
-  let servedSideways = $derived(sidewaysSource === source);
   let blurhashDecodeHeight = $derived(Math.max(1, Math.round(BLURHASH_DECODE_WIDTH / aspectRatio)));
   let blurhashPixels = $derived(
     blurhash === null
@@ -137,7 +160,7 @@
   let unavailableLabel = $derived(
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
-  let retryWait = $derived(Math.max(0, retryAt - clock));
+  let retryWait = $derived(Math.max(0, backoff.at - clock));
   const loading = mediaProgress(core, () => (!url && !failed ? source : null));
   let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
   let mediaLabel = $derived(
@@ -156,11 +179,10 @@
   });
 
   $effect(() => {
-    const delay = automaticMediaRetryDelay(autoRetries);
-    if (!failed || delay === null) return;
+    const delay = automaticMediaRetryDelay(backoff.automatic);
+    if (!failed || undecodable || delay === null) return;
     const timeout = setTimeout(() => {
-      retryNextLoad = true;
-      loadGeneration += 1;
+      backoff = { ...backoff, attempt: backoff.attempt + 1 };
     }, delay);
     return () => {
       clearTimeout(timeout);
@@ -181,59 +203,33 @@
   });
 
   $effect(() => {
-    let active = true;
-    const retry = loadGeneration > 0 && retryNextLoad;
-    retryNextLoad = false;
-    if (source !== backoffSource) {
-      backoffSource = source;
-      retryCount = 0;
-      retryAt = 0;
-      autoRetries = 0;
-    }
-    const asIs = original || mime === 'image/svg+xml' || animated || servedSideways;
-    const requestWidth = asIs ? 0 : width;
-    const requestHeight = asIs ? 0 : height;
+    const key = requestKey;
+    const requestWidth = requestedWidth;
+    const requestHeight = requestedHeight;
     const release = holdMediaUrl(core, source, requestWidth, requestHeight);
-    const cached = cachedMediaUrl(core, source, requestWidth, requestHeight);
-    if (cached !== undefined) {
-      measured(requestWidth, requestHeight);
-      if (url !== cached) {
-        imageLoaded = false;
-        gifPreviewReady = false;
-        gifPlaying = false;
-      }
-      url = cached;
-      failed = false;
+    if (
+      outcome?.key === key ||
+      cachedMediaUrl(core, source, requestWidth, requestHeight) !== undefined
+    ) {
       return release;
     }
 
-    url = null;
-    failed = false;
-    fileRatio = null;
-    gifPreviewReady = false;
-    gifPlaying = false;
-    imageLoaded = false;
-    const load = retry ? retryMediaUrl : loadMediaUrl;
+    let active = true;
+    const load = attempt > 0 ? retryMediaUrl : loadMediaUrl;
     void load(core, source, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
-        measured(requestWidth, requestHeight);
-        gifPreviewReady = false;
-        gifPlaying = false;
-        url = nextUrl;
-        retryCount = 0;
-        retryAt = 0;
-        autoRetries = 0;
+        if (sideways(mediaAspectRatio(core, source, requestWidth, requestHeight))) {
+          sidewaysSource = source;
+        }
+        outcome = { key, url: nextUrl };
       })
       .catch(() => {
         if (!active) return;
-        failed = true;
-        if (retryable && retryCount > 0) {
-          retryAt = Date.now() + mediaRetryDelay(retryCount);
-          clock = Date.now();
-        }
-        autoRetries += 1;
-        if (automaticMediaRetryDelay(autoRetries) === null) onfailed?.();
+        outcome = { key, url: null };
+        const automatic = backoff.automatic + 1;
+        backoff = { ...backoff, automatic, at: manualRetryDeadline() };
+        if (automaticMediaRetryDelay(automatic) === null) onfailed?.();
       });
 
     return () => {
@@ -280,12 +276,6 @@
     };
   });
 
-  $effect(() => {
-    if (!paused || !url || !imageLoaded || !imageElement || stillImage?.url === url) return;
-    const still = stillFrame(imageElement);
-    if (still) stillImage = { url, still };
-  });
-
   // A canvas Svelte re-creates comes back blank, so the held frame is re-painted.
   $effect(() => {
     const playback = gifFrames;
@@ -319,11 +309,9 @@
     return Math.abs(a - b) <= ORIENTATION_TOLERANCE * b;
   }
 
-  function measured(requestWidth: number, requestHeight: number): void {
-    const ratio = mediaAspectRatio(core, source, requestWidth, requestHeight);
-    fileRatio = ratio;
-    if (ratio === null || eventRatio === null) return;
-    if (!sameRatio(ratio, eventRatio) && sameRatio(ratio, 1 / eventRatio)) sidewaysSource = source;
+  function sideways(ratio: number | null): boolean {
+    if (ratio === null || eventRatio === null) return false;
+    return !sameRatio(ratio, eventRatio) && sameRatio(ratio, 1 / eventRatio);
   }
 
   async function paintFrame(playback: GifPlayback, index: number): Promise<void> {
@@ -339,21 +327,25 @@
     paintedIndex = index;
     gifFrameIndex = index;
     gifFrameMs = frame.durationMs;
-    gifPreviewReady = true;
+    previewUrl = url;
   }
 
   function stopTimelinePress(event: PointerEvent): void {
     event.stopPropagation();
   }
 
-  function retry(event: MouseEvent): void {
+  function manualRetryDeadline(): number {
+    if (!retryable || backoff.manual === 0) return backoff.at;
+    clock = Date.now();
+    return clock + mediaRetryDelay(backoff.manual);
+  }
+
+  async function retry(event: MouseEvent): Promise<void> {
     event.stopPropagation();
     if (retryWait > 0) return;
-    retryCount += 1;
-    retryAt = 0;
-    failed = false;
-    retryNextLoad = true;
-    loadGeneration += 1;
+    if (undecodable) await core.commands.forgetMedia(source).catch(() => undefined);
+    undecodableThumbnail = null;
+    backoff = { ...backoff, attempt: backoff.attempt + 1, manual: backoff.manual + 1, at: 0 };
   }
 
   /* The fallback where frames cannot be decoded. `drawImage` copies an animated
@@ -368,13 +360,23 @@
   }
 
   function freezeFrame(): void {
-    gifPreviewReady = drawFrame();
+    backoff = { ...backoff, manual: 0, automatic: 0, at: 0 };
+    previewUrl = drawFrame() ? url : null;
+  }
+
+  function imageShown(): void {
+    backoff = { ...backoff, manual: 0, automatic: 0, at: 0 };
+    loadedUrl = url;
   }
 
   function brokenImage(): void {
-    url = null;
-    failed = true;
-    autoRetries = 0;
+    if (url) discardMediaUrl(core, source, requestedWidth, requestedHeight, url);
+    if (!asIs) {
+      undecodableThumbnail = source;
+      return;
+    }
+    outcome = { key: requestKey, url: null, undecodable: true };
+    backoff = { ...backoff, at: manualRetryDeadline() };
     onfailed?.();
   }
 
@@ -386,9 +388,9 @@
       return;
     }
     if (!gifPlaying) {
-      gifPlaying = true;
+      playingUrl = url;
     } else if (steppedGif || drawFrame()) {
-      gifPlaying = false;
+      playingUrl = null;
     }
   }
 </script>
@@ -437,10 +439,10 @@
       {title}
       {width}
       {height}
-      onload={() => (imageLoaded = true)}
+      onload={imageShown}
       onerror={brokenImage}
       {@attach (node) => {
-        if (node instanceof HTMLImageElement && node.complete) imageLoaded = true;
+        if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
       }}
     />
   {:else if failed}

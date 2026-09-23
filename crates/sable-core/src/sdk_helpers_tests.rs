@@ -16,7 +16,7 @@ use wiremock::{
 
 use crate::{
     Core,
-    protocol::{Command, CommandOk, CoreEvent},
+    protocol::{Command, CommandErr, CommandOk, CoreEvent},
     session::Session,
     store::MemorySessionStore,
 };
@@ -603,4 +603,40 @@ async fn an_original_streams_with_progress_and_is_cached() {
     }
     let length = u64::try_from(bytes.len()).unwrap();
     assert_eq!(last, Some((length, length)));
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn forgotten_media_is_fetched_again() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/forgotten",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![1_u8; 16]))
+        .expect(2)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = "mxc://example.org/forgotten".to_owned();
+
+    core.media_thumbnail(source.clone(), 0, 0).await.unwrap();
+    core.media_thumbnail(source.clone(), 0, 0).await.unwrap();
+    core.forget_media(source.clone()).await.unwrap();
+    core.media_thumbnail(source, 0, 0).await.unwrap();
+}
+
+#[tokio::test]
+async fn forgetting_an_invalid_uri_is_refused() {
+    let (core, _events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
+
+    assert!(matches!(
+        core.forget_media("not-a-uri".to_owned()).await,
+        Err(CommandErr::InvalidMedia)
+    ));
 }
