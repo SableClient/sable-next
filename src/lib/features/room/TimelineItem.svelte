@@ -13,7 +13,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
-  import { LongPress } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import {
     findMember,
     personaWithColor,
@@ -536,8 +536,9 @@
   }
 
   function openContextMenu(event: MouseEvent): void {
-    if (rowPress.touch) {
+    if (rowPress.touch || touchContextMenu(event)) {
       event.preventDefault();
+      if (actionable && !rowPress.pending && !sheetOpen) rowPress.fire(event);
       return;
     }
     if (!actionable) return;

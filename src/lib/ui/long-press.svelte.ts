@@ -7,15 +7,19 @@ const LONG_PRESS_SLOP_PX = 10;
 export interface LongPressOptions {
   enabled?: () => boolean;
   stopPropagation?: boolean;
-  onPress: (event: PointerEvent) => void;
+  onPress: (event: MouseEvent) => void;
+}
+
+export function touchContextMenu(event: MouseEvent): boolean {
+  const kind = (event as Partial<PointerEvent>).pointerType;
+  return kind === 'touch' || kind === 'pen' || (kind === undefined && touchActive());
 }
 
 export function mouseContextMenu<E extends MouseEvent>(
   handler: (event: E) => void
 ): (event: E) => void {
   return (event) => {
-    const kind = (event as Partial<PointerEvent>).pointerType;
-    if (kind === 'touch' || kind === 'pen' || (kind === undefined && touchActive())) {
+    if (touchContextMenu(event)) {
       event.preventDefault();
       return;
     }
@@ -52,6 +56,10 @@ export class LongPress {
 
   constructor(private readonly options: LongPressOptions) {}
 
+  get pending(): boolean {
+    return this.#timer !== undefined;
+  }
+
   start = (event: PointerEvent): void => {
     this.touch = event.pointerType !== 'mouse';
     if (this.options.stopPropagation) event.stopPropagation();
@@ -63,12 +71,16 @@ export class LongPress {
     this.#timer = setTimeout(() => {
       this.#timer = undefined;
       this.#origin = null;
-      this.fired = true;
-      hapticFeedback('medium');
-      armTrailingClickSwallow();
-      this.options.onPress(event);
+      this.fire(event);
     }, LONG_PRESS_MS);
   };
+
+  fire(event: MouseEvent): void {
+    this.fired = true;
+    hapticFeedback('medium');
+    armTrailingClickSwallow();
+    this.options.onPress(event);
+  }
 
   move = (event: PointerEvent): void => {
     if (this.options.stopPropagation) event.stopPropagation();

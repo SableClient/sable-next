@@ -1018,6 +1018,28 @@ test('a touch long press opens the sheet without also opening the context menu',
   vi.useRealTimers();
 });
 
+test('a touch context menu the row never saw pressed opens the sheet', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+
+  const native = new PointerEvent('contextmenu', {
+    pointerType: 'touch',
+    bubbles: true,
+    cancelable: true,
+  });
+  document.querySelector('article.message')?.dispatchEvent(native);
+  await tick();
+
+  expect(native.defaultPrevented).toBe(true);
+  expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
+  expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
+
+  await unmount(instance);
+});
+
 test('a deleted message keeps its sender, its time and its menu', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
