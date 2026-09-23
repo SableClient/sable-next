@@ -8,10 +8,8 @@
   import Button from './Button.svelte';
   import DialogFrame from './DialogFrame.svelte';
   import FormField from './FormField.svelte';
-  import IdentityRow from './IdentityRow.svelte';
   import SettingsSection from './SettingsSection.svelte';
   import SettingsRow from './SettingsRow.svelte';
-  import StatusBadge from './StatusBadge.svelte';
   import Switch from './Switch.svelte';
   import TextInput from './TextInput.svelte';
 
@@ -46,24 +44,6 @@
         <Button variant="primary" size="small">Restart</Button>
       {/snippet}
     </Banner>
-  </div>
-</Story>
-
-<Story name="Identity row" asChild>
-  <div class="stack">
-    <IdentityRow displayName="Erwan Leboucher" initials="EL" />
-    <IdentityRow displayName="Sable" initials="S" size="medium">
-      {#snippet meta()}
-        <StatusBadge variant="success" label="Verified" />
-      {/snippet}
-    </IdentityRow>
-    <IdentityRow
-      displayName="Someone else"
-      initials="SE"
-      size="large"
-      onclick={() => {}}
-      ariaLabel="Open profile"
-    />
   </div>
 </Story>
 
