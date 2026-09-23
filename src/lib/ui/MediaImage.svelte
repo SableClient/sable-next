@@ -6,6 +6,7 @@
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
+  import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import {
     cachedMediaUrl,
@@ -137,6 +138,7 @@
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
   let retryWait = $derived(Math.max(0, retryAt - clock));
+  const loading = mediaProgress(core, () => (!url && !failed ? source : null));
   let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
   let mediaLabel = $derived(
     manualGif
@@ -462,7 +464,11 @@
   {/if}
   {#if !failed && !url}
     <span class="media-image-progress"><Spinner small /></span>
-    {#if sizeLabel}<span class="media-image-size">{sizeLabel}</span>{/if}
+    {#if loading.percent !== null}
+      <span class="media-image-size">
+        {$i18n.t('timeline.downloadProgress', { percent: loading.percent })}
+      </span>
+    {:else if sizeLabel}<span class="media-image-size">{sizeLabel}</span>{/if}
   {/if}
 {/snippet}
 

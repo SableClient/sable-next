@@ -591,6 +591,7 @@ impl Core {
         self.watch_ignored_users(&client);
         sync_service.start().await;
 
+        client.send_queue().enable_upload_progress(true);
         client
             .send_queue()
             .respawn_tasks_for_rooms_with_unsent_requests()

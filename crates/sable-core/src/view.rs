@@ -863,6 +863,7 @@ fn send_state(state: &EventSendState) -> SendStateView {
     match state {
         EventSendState::NotSentYet { progress } => SendStateView::Sending {
             progress: progress.as_ref().map(|progress| UploadProgressView {
+                index: progress.index,
                 current: progress.progress.current,
                 total: progress.progress.total,
             }),

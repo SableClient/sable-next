@@ -10,6 +10,7 @@
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import { mediaRetryDelay } from '#lib/ui/media-retry.js';
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -125,6 +126,7 @@
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
+  const loading = mediaProgress(core, () => (!url && !failed ? source : null));
   let retryLabel = $derived(
     retryWait === 0
       ? $i18n.t('timeline.retryMedia')
@@ -332,6 +334,10 @@
         <Spinner small />
         {#if transcode}
           <span class="media-loading-label">{$i18n.t('timeline.videoConverting')}</span>
+        {:else if loading.percent !== null}
+          <span class="media-loading-label">
+            {$i18n.t('timeline.downloadProgress', { percent: loading.percent })}
+          </span>
         {/if}
       </span>
     </span>

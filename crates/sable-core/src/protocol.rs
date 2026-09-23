@@ -1575,6 +1575,14 @@ pub enum CoreEvent {
         notification_event_id: String,
     },
 
+    MediaProgress {
+        source: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        current: u64,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        total: u64,
+    },
+
     /// Never arrives on a homeserver with presence disabled.
     Presence {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -2352,6 +2360,8 @@ pub enum SendStateView {
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct UploadProgressView {
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub index: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub current: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

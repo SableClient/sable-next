@@ -1,25 +1,32 @@
+use std::io::Read;
 use std::time::Duration;
+
+use futures_util::StreamExt;
 
 use matrix_sdk::attachment::{
     AttachmentInfo, BaseAudioInfo, BaseFileInfo, BaseImageInfo, BaseVideoInfo,
 };
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
+use matrix_sdk::ruma::api::Metadata;
+use matrix_sdk::ruma::api::client::authenticated_media;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::{
     OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, UInt,
     events::room::message::TextMessageEventContent,
 };
+use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
 use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource, GalleryConfig, GalleryItemInfo};
 use mime::Mime;
 
 use crate::messages::outgoing_mentions;
 use crate::personas::profile_extra_content;
-use crate::protocol::{AttachmentInfoView, CommandErr, PerMessageProfileView};
+use crate::protocol::{AttachmentInfoView, CommandErr, CoreEvent, PerMessageProfileView};
 use crate::view::SPOILER_PROPERTY;
 
-use crate::Core;
+use crate::{Core, MatrixClient};
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
+const MEDIA_DOWNLOAD_TIMEOUT: Duration = Duration::from_hours(1);
 
 #[derive(serde::Deserialize)]
 pub struct GalleryAttachment {
@@ -54,40 +61,41 @@ impl Core {
         width: u32,
         height: u32,
     ) -> Result<Vec<u8>, CommandErr> {
-        let source: MediaSource = serde_json::from_str(&source)
-            .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(source)));
+        let key = source;
+        let source: MediaSource = serde_json::from_str(&key)
+            .unwrap_or_else(|_| MediaSource::Plain(OwnedMxcUri::from(key.clone())));
         if let MediaSource::Plain(uri) = &source
             && uri.parts().is_err()
         {
             return Err(CommandErr::InvalidMedia);
         }
 
-        let format = if width == 0 || height == 0 {
-            MediaFormat::File
-        } else {
-            MediaFormat::Thumbnail(MediaThumbnailSettings::new(width.into(), height.into()))
-        };
         let client = self.client().await?;
+        let media = media_label(&source);
+
+        if width == 0 || height == 0 {
+            return self
+                .original_media(&client, &key, source)
+                .await
+                .map_err(|error| {
+                    tracing::warn!(%media, "media unavailable: {error}");
+                    CommandErr::Unavailable
+                });
+        }
+
         let request = MediaRequestParameters {
             source: source.clone(),
-            format,
+            format: MediaFormat::Thumbnail(MediaThumbnailSettings::new(
+                width.into(),
+                height.into(),
+            )),
         };
-
-        let media = media_label(&source);
 
         match client.media().get_media_content(&request, true).await {
             Ok(bytes) => Ok(bytes),
-            Err(error) if width != 0 && height != 0 && answered_by_server(&error) => {
+            Err(error) if answered_by_server(&error) => {
                 tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
-                client
-                    .media()
-                    .get_media_content(
-                        &MediaRequestParameters {
-                            source,
-                            format: MediaFormat::File,
-                        },
-                        true,
-                    )
+                self.original_media(&client, &key, source)
                     .await
                     .map_err(|error| {
                         tracing::warn!(%media, "the original is unavailable too: {error}");
@@ -99,6 +107,107 @@ impl Core {
                 Err(CommandErr::Unavailable)
             }
         }
+    }
+
+    async fn original_media(
+        &self,
+        client: &MatrixClient,
+        key: &str,
+        source: MediaSource,
+    ) -> matrix_sdk::Result<Vec<u8>> {
+        let request = MediaRequestParameters {
+            source,
+            format: MediaFormat::File,
+        };
+        if let Some(content) = client
+            .media_store()
+            .lock()
+            .await?
+            .get_media_content(&request)
+            .await?
+        {
+            return Ok(content);
+        }
+
+        let uri = match &request.source {
+            MediaSource::Plain(uri) => uri,
+            MediaSource::Encrypted(file) => &file.url,
+        };
+        let authenticated = authenticated_media::get_content::v1::Request::PATH_BUILDER
+            .is_supported(&client.supported_versions().await?);
+        let (Some(token), Ok((server, media_id)), true) =
+            (client.access_token(), uri.parts(), authenticated)
+        else {
+            return client.media().get_media_content(&request, true).await;
+        };
+        let mut url = client.homeserver();
+        let Ok(mut segments) = url.path_segments_mut() else {
+            return client.media().get_media_content(&request, true).await;
+        };
+        segments.pop_if_empty().extend([
+            "_matrix",
+            "client",
+            "v1",
+            "media",
+            "download",
+            server.as_str(),
+            media_id,
+        ]);
+        drop(segments);
+
+        let response = client
+            .http_client()
+            .get(url)
+            .bearer_auth(token)
+            .timeout(MEDIA_DOWNLOAD_TIMEOUT)
+            .send()
+            .await?;
+        if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            return client.media().get_media_content(&request, true).await;
+        }
+        let response = response.error_for_status()?;
+        let total = response.content_length().unwrap_or(0);
+        let mut content = Vec::with_capacity(
+            usize::try_from(total)
+                .unwrap_or(0)
+                .min(MAX_ATTACHMENT_BYTES),
+        );
+        let mut chunks = response.bytes_stream();
+        let mut reported = 0;
+        while let Some(chunk) = chunks.next().await {
+            content.extend_from_slice(&chunk?);
+            let current = u64::try_from(content.len()).unwrap_or(u64::MAX);
+            let percent = current.saturating_mul(100).checked_div(total).unwrap_or(0);
+            if percent > reported {
+                reported = percent;
+                self.emit(CoreEvent::MediaProgress {
+                    source: key.to_owned(),
+                    current,
+                    total,
+                });
+            }
+        }
+
+        let content = match &request.source {
+            MediaSource::Encrypted(file) => {
+                let mut decrypted = Vec::with_capacity(content.len());
+                let mut cursor = std::io::Cursor::new(content);
+                let mut reader = matrix_sdk_base::crypto::AttachmentDecryptor::new(
+                    &mut cursor,
+                    file.as_ref().clone().into(),
+                )?;
+                reader.read_to_end(&mut decrypted)?;
+                decrypted
+            }
+            MediaSource::Plain(_) => content,
+        };
+        client
+            .media_store()
+            .lock()
+            .await?
+            .add_media_content(&request, content.clone(), IgnoreMediaRetentionPolicy::No)
+            .await?;
+        Ok(content)
     }
 
     /// For the avatar commands. Not for attachments: `send_attachment` keeps the

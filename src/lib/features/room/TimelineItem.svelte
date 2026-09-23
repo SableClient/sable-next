@@ -14,6 +14,7 @@
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import {
     findMember,
     personaWithColor,
@@ -77,6 +78,8 @@
     jumboEmoticonLevel,
     senderColor,
   } from './timeline-format';
+
+  const SAVE_FEEDBACK_DELAY_MS = 300;
 
   interface Props {
     item: TimelineItemView;
@@ -238,6 +241,26 @@
   let upload = $derived(
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
   );
+  let uploading = $derived(
+    pending &&
+      (item.content.kind === 'image' ||
+        item.content.kind === 'video' ||
+        item.content.kind === 'audio' ||
+        item.content.kind === 'file' ||
+        item.content.kind === 'gallery')
+  );
+  let galleryCount = $derived(item.content.kind === 'gallery' ? item.content.items.length : 0);
+  let uploadFraction = $derived.by(() => {
+    if (upload === null) return null;
+    const part = upload.total > 0 ? Math.min(1, upload.current / upload.total) : 0;
+    return galleryCount > 1 ? Math.min(1, (upload.index + part) / galleryCount) : part;
+  });
+  let uploadItem = $derived(
+    upload !== null && galleryCount > 1 ? Math.min(upload.index + 1, galleryCount) : null
+  );
+  let savingSource = $state<string | null>(null);
+  let savingSlow = $state(false);
+  const saving = mediaProgress(core, () => savingSource);
 
   let actionable = $derived(item.event_id !== null && stalled === null && !pending);
   let editable = $derived(
@@ -398,8 +421,17 @@
     filename: string;
     mime: string | null;
   }): Promise<void> {
+    if (savingSource !== null) return;
+    savingSource = media.source;
+    const slow = setTimeout(() => {
+      savingSlow = true;
+    }, SAVE_FEEDBACK_DELAY_MS);
     try {
-      const bytes = await core.commands.fetchMedia(media.source, 0, 0);
+      const bytes = await core.commands.fetchMedia(media.source, 0, 0).finally(() => {
+        clearTimeout(slow);
+        savingSource = null;
+        savingSlow = false;
+      });
       const outcome = await saveBytes(
         bytes,
         media.filename || 'attachment',
@@ -1027,13 +1059,37 @@
             }}
           />
         {/if}
-        {#if upload}
-          <progress
-            class="upload"
-            max={upload.total}
-            value={upload.current}
-            aria-label={$i18n.t('timeline.uploading')}
-          ></progress>
+        {#if uploadFraction !== null}
+          <div class="transfer">
+            <progress
+              class="upload"
+              max="1"
+              value={uploadFraction}
+              aria-label={$i18n.t('timeline.uploading')}
+            ></progress>
+            {#if uploadItem !== null}
+              <span class="transfer-count">
+                {$i18n.t('timeline.uploadingItem', { current: uploadItem, count: galleryCount })}
+              </span>
+            {/if}
+          </div>
+        {:else if uploading}
+          <div class="transfer">
+            <progress class="upload" aria-label={$i18n.t('timeline.uploading')}></progress>
+          </div>
+        {:else if saving.percent !== null}
+          <div class="transfer">
+            <progress
+              class="upload"
+              max="100"
+              value={saving.percent}
+              aria-label={$i18n.t('timeline.downloading')}
+            ></progress>
+          </div>
+        {:else if savingSlow}
+          <div class="transfer">
+            <progress class="upload" aria-label={$i18n.t('timeline.downloading')}></progress>
+          </div>
         {/if}
         {#if stalled}
           <p class="send-failure">
@@ -1647,12 +1703,26 @@
     outline-offset: 0.15rem;
   }
 
+  .transfer {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
+    margin-top: var(--space-100);
+  }
+
   .upload {
     accent-color: var(--primary-main);
     display: block;
+    flex: 0 1 16rem;
     height: 0.25rem;
-    margin-top: var(--space-100);
-    width: min(100%, 16rem);
+    min-width: 0;
+  }
+
+  .transfer-count {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   .reply-preview {

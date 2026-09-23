@@ -6619,6 +6619,7 @@ dependencies = [
  "matrix-sdk-ui",
  "mime",
  "probly-search",
+ "reqwest",
  "ruma",
  "rust-stemmers",
  "rustls",

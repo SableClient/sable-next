@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { TimelineItemView } from '#src/generated/protocol';
+import type { CoreEvent, TimelineItemView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -785,9 +785,30 @@ test('opens message actions on right click', async () => {
   await unmount(instance);
 });
 
-test('downloads an image from its message menu', async () => {
+test('downloads an image from its message menu, with progress on the message', async () => {
   const bytes = new Uint8Array([1, 2, 3]);
-  core.fetchMedia.mockResolvedValueOnce(bytes);
+  const listeners: ((event: CoreEvent) => void)[] = [];
+  const subscribe = vi.mocked(
+    core.subscribeEvents as unknown as (onEvent: (event: CoreEvent) => void) => () => void
+  );
+  subscribe.mockImplementation((onEvent) => {
+    listeners.push(onEvent);
+    return () => {};
+  });
+  let finish: (value: Uint8Array<ArrayBuffer>) => void = () => {};
+  const original = new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
+    finish = resolve;
+  });
+  const fetchMedia = vi.mocked(
+    core.fetchMedia as unknown as (
+      source: string,
+      width: number,
+      height: number
+    ) => Promise<Uint8Array<ArrayBuffer>>
+  );
+  fetchMedia.mockImplementation((_source, width) =>
+    width === 0 ? original : new Promise(() => {})
+  );
   const instance = mount(TimelineItemHarness, {
     target: document.body,
     props: { core, item: { item: imageItem(), collapsed: false, onReply: vi.fn() } },
@@ -803,12 +824,25 @@ test('downloads an image from its message menu', async () => {
   );
   if (!entry) throw new Error('download entry was not rendered');
   (entry as HTMLElement).click();
+  await vi.waitFor(() => {
+    expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/photo', 0, 0);
+  });
+  await tick();
 
+  for (const listener of listeners) {
+    listener({ type: 'media_progress', source: 'mxc://example.org/photo', current: 3, total: 4 });
+  }
+  await tick();
+  expect(document.querySelector<HTMLProgressElement>('progress.upload')?.value).toBe(75);
+
+  finish(bytes);
   await vi.waitFor(() => {
     expect(saveBytes).toHaveBeenCalledWith(bytes, 'photo.png', 'image/png');
   });
-  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/photo', 0, 0);
+  expect(document.querySelector('progress.upload')).toBeNull();
   await unmount(instance);
+  subscribe.mockImplementation(() => () => {});
+  fetchMedia.mockImplementation(() => new Promise(() => {}));
 });
 
 test('offers no download for a text message', async () => {
@@ -1215,5 +1249,53 @@ test('a date divider stays a plain annotation with nothing to act on', async () 
   expect(document.querySelector('article')).toBeNull();
   expect(document.querySelector('.date-divider')).not.toBeNull();
 
+  await unmount(instance);
+});
+
+test('shows an indeterminate upload bar until the core reports progress', async () => {
+  const upload: TimelineItemView = {
+    ...imageItem(),
+    event_id: null,
+    is_own: true,
+    send_state: { status: 'sending', progress: null },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: upload, collapsed: false } },
+  });
+  await tick();
+
+  const bar = document.querySelector<HTMLProgressElement>('progress.upload');
+  expect(bar).not.toBeNull();
+  expect(bar?.hasAttribute('value')).toBe(false);
+  await unmount(instance);
+});
+
+test('fills one bar across a gallery and names the item uploading', async () => {
+  const gallery: TimelineItemView = {
+    ...item(false),
+    event_id: null,
+    is_own: true,
+    send_state: { status: 'sending', progress: { index: 1, current: 50, total: 100 } },
+    content: {
+      kind: 'gallery',
+      body: '',
+      html: '',
+      items: ['a', 'b', 'c', 'd'].map((name) => ({
+        kind: 'file' as const,
+        body: `${name}.zip`,
+        source: `mxc://example.org/${name}`,
+        mime: null,
+      })),
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: gallery, collapsed: false } },
+  });
+  await tick();
+
+  expect(document.querySelector<HTMLProgressElement>('progress.upload')?.value).toBeCloseTo(0.375);
+  expect(document.querySelector('.transfer-count')?.textContent.trim()).toBe('2 of 4');
   await unmount(instance);
 });

@@ -3,6 +3,8 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { CoreEvent } from '#src/generated/protocol';
+
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
@@ -211,4 +213,30 @@ test('labels unavailable attachments', async () => {
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(document.querySelector('.media-error')).toBeNull();
   await unmount(instance);
+});
+
+test('shows the download percentage while the original is fetched', async () => {
+  const listeners: ((event: CoreEvent) => void)[] = [];
+  const subscribe = vi.mocked(
+    core.subscribeEvents as unknown as (onEvent: (event: CoreEvent) => void) => () => void
+  );
+  subscribe.mockImplementation((onEvent) => {
+    listeners.push(onEvent);
+    return () => {};
+  });
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: { kind: 'file', source: 'mxc://example.org/big', mime: null, filename: 'big.zip' },
+  });
+  await settle();
+
+  for (const listener of listeners) {
+    listener({ type: 'media_progress', source: 'mxc://example.org/other', current: 9, total: 10 });
+    listener({ type: 'media_progress', source: 'mxc://example.org/big', current: 2, total: 5 });
+  }
+  await tick();
+
+  expect(document.querySelector('.media-loading-label')?.textContent.trim()).toBe('40%');
+  await unmount(instance);
+  subscribe.mockImplementation(() => () => {});
 });

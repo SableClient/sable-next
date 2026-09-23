@@ -27,6 +27,7 @@ specta = { workspace = true, optional = true }
 specta-serde = { workspace = true, optional = true }
 specta-typescript = { workspace = true, optional = true }
 url = { workspace = true }
+reqwest = { version = "0.13", default-features = false, features = ["stream"] }
 ammonia = "4"
 async-trait = "0.1"
 probly-search = "2.0"

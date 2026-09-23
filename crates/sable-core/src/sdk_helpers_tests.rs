@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use matrix_sdk::{
-    ruma::{room_id, serde::Raw},
+    ruma::{api::MatrixVersion, room_id, serde::Raw},
     test_utils::mocks::MatrixMockServer,
 };
 use matrix_sdk_test::JoinedRoomBuilder;
@@ -16,7 +16,7 @@ use wiremock::{
 
 use crate::{
     Core,
-    protocol::{Command, CommandOk},
+    protocol::{Command, CommandOk, CoreEvent},
     session::Session,
     store::MemorySessionStore,
 };
@@ -549,4 +549,58 @@ async fn a_room_outside_the_list_still_has_a_summary() {
     };
     assert_eq!(room.room_id, room_id);
     assert!(room.is_tombstoned);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn an_original_streams_with_progress_and_is_cached() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let bytes = vec![7_u8; 256 * 1024];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/original",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, mut events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".into(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+    let source = "mxc://example.org/original".to_owned();
+
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        bytes
+    );
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        bytes
+    );
+
+    let mut last = None;
+    while let Ok(event) = events.try_recv() {
+        if let CoreEvent::MediaProgress {
+            source: key,
+            current,
+            total,
+        } = event
+        {
+            assert_eq!(key, source);
+            last = Some((current, total));
+        }
+    }
+    let length = u64::try_from(bytes.len()).unwrap();
+    assert_eq!(last, Some((length, length)));
 }
