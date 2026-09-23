@@ -1,4 +1,4 @@
-import type { CustomTheme, CustomTweak, StoredThemes } from './custom-themes.svelte.js';
+import { readThemes, type StoredThemes } from './custom-themes.svelte.js';
 import { PREFERENCE_KEYS, sanitize } from './preferences.svelte.js';
 import type { Preferences } from './preferences.svelte.js';
 
@@ -155,39 +155,4 @@ function mergeThemes(
       ...current.enabledTweakIds.filter((id) => excluded.has(id) && !remoteTweakIds.has(id)),
     ].filter((id) => heldTweaks.has(id)),
   };
-}
-
-function readThemes(data: unknown): StoredThemes | null {
-  if (data === null || typeof data !== 'object' || Array.isArray(data)) return null;
-  const value = data as Partial<StoredThemes>;
-  if (!Array.isArray(value.themes)) return null;
-
-  return {
-    themes: value.themes.filter(isCustomTheme),
-    tweaks: Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak) : [],
-    lightThemeId: typeof value.lightThemeId === 'string' ? value.lightThemeId : null,
-    darkThemeId: typeof value.darkThemeId === 'string' ? value.darkThemeId : null,
-    enabledTweakIds: Array.isArray(value.enabledTweakIds)
-      ? value.enabledTweakIds.filter((id: unknown): id is string => typeof id === 'string')
-      : [],
-  };
-}
-
-function isCustomTheme(value: unknown): value is CustomTheme {
-  if (value === null || typeof value !== 'object') return false;
-  const theme = value as Partial<CustomTheme>;
-  return (
-    typeof theme.id === 'string' &&
-    typeof theme.name === 'string' &&
-    (theme.kind === 'light' || theme.kind === 'dark') &&
-    typeof theme.css === 'string'
-  );
-}
-
-function isCustomTweak(value: unknown): value is CustomTweak {
-  if (value === null || typeof value !== 'object') return false;
-  const tweak = value as Partial<CustomTweak>;
-  return (
-    typeof tweak.id === 'string' && typeof tweak.name === 'string' && typeof tweak.css === 'string'
-  );
 }
