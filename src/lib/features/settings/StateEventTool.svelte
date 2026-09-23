@@ -4,7 +4,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -60,8 +60,7 @@
 <form class="state-event settings-form" onsubmit={send}>
   <p class="hint">{$i18n.t('settings.stateEventDescription')}</p>
 
-  <div class="field">
-    <Label for="state-event-room">{$i18n.t('settings.stateEventRoom')}</Label>
+  <FormField fieldId="state-event-room" label={$i18n.t('settings.stateEventRoom')}>
     <Select
       id="state-event-room"
       bind:value={roomId}
@@ -70,10 +69,9 @@
         ...rooms.map((room) => ({ value: room.room_id, label: room.name ?? room.room_id })),
       ]}
     />
-  </div>
+  </FormField>
 
-  <div class="field">
-    <Label for="state-event-type">{$i18n.t('settings.stateEventType')}</Label>
+  <FormField fieldId="state-event-type" label={$i18n.t('settings.stateEventType')}>
     <TextInput
       id="state-event-type"
       bind:value={eventType}
@@ -81,15 +79,13 @@
       spellcheck={false}
       placeholder="m.room.topic"
     />
-  </div>
+  </FormField>
 
-  <div class="field">
-    <Label for="state-event-key">{$i18n.t('settings.stateEventStateKey')}</Label>
+  <FormField fieldId="state-event-key" label={$i18n.t('settings.stateEventStateKey')}>
     <TextInput id="state-event-key" bind:value={stateKey} autocomplete="off" spellcheck={false} />
-  </div>
+  </FormField>
 
-  <div class="field">
-    <Label for="state-event-content">{$i18n.t('settings.stateEventContent')}</Label>
+  <FormField fieldId="state-event-content" label={$i18n.t('settings.stateEventContent')}>
     <TextArea
       id="state-event-content"
       bind:value={content}
@@ -97,7 +93,7 @@
       error={error === 'json'}
       class="state-event-content"
     />
-  </div>
+  </FormField>
 
   {#if error === 'json'}
     <Alert variant="critical" role="alert">{$i18n.t('settings.stateEventInvalidJson')}</Alert>
@@ -118,11 +114,6 @@
   .state-event {
     display: grid;
     gap: var(--space-400);
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-200);
   }
 
   .hint {

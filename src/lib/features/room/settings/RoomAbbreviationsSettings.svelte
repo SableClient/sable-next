@@ -15,7 +15,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -238,22 +238,20 @@
             {$i18n.t('room.abbreviationsDuplicate')}
           </Alert>
         {/if}
-        <div class="settings-field">
-          <Label for="room-abbr-term">{$i18n.t('room.abbreviationsTerm')}</Label>
+        <FormField fieldId="room-abbr-term" label={$i18n.t('room.abbreviationsTerm')}>
           <TextInput
             id="room-abbr-term"
             bind:value={term}
             placeholder={$i18n.t('room.abbreviationsTermPlaceholder')}
           />
-        </div>
-        <div class="settings-field">
-          <Label for="room-abbr-definition">{$i18n.t('room.abbreviationsDefinition')}</Label>
+        </FormField>
+        <FormField fieldId="room-abbr-definition" label={$i18n.t('room.abbreviationsDefinition')}>
           <TextInput
             id="room-abbr-definition"
             bind:value={definition}
             placeholder={$i18n.t('room.abbreviationsDefinitionPlaceholder')}
           />
-        </div>
+        </FormField>
         <label class="cased-option">
           <input type="checkbox" bind:checked={cased} />
           {$i18n.t('room.abbreviationsCased')}
@@ -295,24 +293,26 @@
                       {$i18n.t('room.abbreviationsDuplicate')}
                     </Alert>
                   {/if}
-                  <div class="settings-field">
-                    <Label for="room-abbr-edit-term">{$i18n.t('room.abbreviationsTerm')}</Label>
+                  <FormField
+                    fieldId="room-abbr-edit-term"
+                    label={$i18n.t('room.abbreviationsTerm')}
+                  >
                     <TextInput
                       id="room-abbr-edit-term"
                       bind:value={term}
                       placeholder={$i18n.t('room.abbreviationsTermPlaceholder')}
                     />
-                  </div>
-                  <div class="settings-field">
-                    <Label for="room-abbr-edit-definition">
-                      {$i18n.t('room.abbreviationsDefinition')}
-                    </Label>
+                  </FormField>
+                  <FormField
+                    fieldId="room-abbr-edit-definition"
+                    label={$i18n.t('room.abbreviationsDefinition')}
+                  >
                     <TextInput
                       id="room-abbr-edit-definition"
                       bind:value={definition}
                       placeholder={$i18n.t('room.abbreviationsDefinitionPlaceholder')}
                     />
-                  </div>
+                  </FormField>
                   <label class="cased-option">
                     <input type="checkbox" bind:checked={cased} />
                     {$i18n.t('room.abbreviationsCased')}

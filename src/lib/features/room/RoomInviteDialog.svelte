@@ -8,7 +8,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
@@ -119,8 +119,7 @@
         {$i18n.t('room.inviteBody', { name: room?.name ?? room?.room_id ?? '' })}
       </p>
 
-      <div class="field">
-        <Label for="room-invite-user">{$i18n.t('room.createInviteLabel')}</Label>
+      <FormField fieldId="room-invite-user" label={$i18n.t('room.createInviteLabel')}>
         <TextInput
           id="room-invite-user"
           bind:value={draft}
@@ -131,7 +130,7 @@
             void invite();
           }}
         />
-      </div>
+      </FormField>
 
       {#if invalid}
         <Alert variant="critical" role="alert">{$i18n.t('room.createInviteInvalid')}</Alert>
@@ -180,10 +179,5 @@
   .explain {
     color: var(--surface-var-on-container);
     margin: 0;
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-200);
   }
 </style>

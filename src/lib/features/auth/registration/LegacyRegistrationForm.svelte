@@ -6,7 +6,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
-  import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   type Field = 'username' | 'password' | 'confirmPassword' | 'email' | 'registrationToken';
@@ -70,7 +70,7 @@
     onStartRegistration();
   }}
 >
-  <AuthField fieldId="registration-username" label={$i18n.t('auth.username')}>
+  <FormField dense fieldId="registration-username" label={$i18n.t('auth.username')}>
     <TextInput
       id="registration-username"
       value={username}
@@ -84,8 +84,8 @@
         onClearFieldError('username');
       }}
     />
-  </AuthField>
-  <AuthField fieldId="registration-password" label={$i18n.t('auth.password')}>
+  </FormField>
+  <FormField dense fieldId="registration-password" label={$i18n.t('auth.password')}>
     <PasswordField
       id="registration-password"
       value={password}
@@ -98,8 +98,8 @@
         onClearFieldError('password');
       }}
     />
-  </AuthField>
-  <AuthField fieldId="registration-confirm-password" label={$i18n.t('auth.confirmPassword')}>
+  </FormField>
+  <FormField dense fieldId="registration-confirm-password" label={$i18n.t('auth.confirmPassword')}>
     <PasswordField
       id="registration-confirm-password"
       value={confirmPassword}
@@ -112,9 +112,10 @@
         onClearFieldError('confirmPassword');
       }}
     />
-  </AuthField>
+  </FormField>
   {#if emailRequirement !== 'unavailable'}
-    <AuthField
+    <FormField
+      dense
       fieldId="registration-email"
       label={$i18n.t(emailRequirement === 'required' ? 'auth.email' : 'auth.emailOptional')}
     >
@@ -132,10 +133,11 @@
           onClearFieldError('email');
         }}
       />
-    </AuthField>
+    </FormField>
   {/if}
   {#if tokenRequirement !== 'unavailable'}
-    <AuthField
+    <FormField
+      dense
       fieldId="registration-token"
       label={$i18n.t(
         tokenRequirement === 'required'
@@ -165,7 +167,7 @@
           onClearFieldError('registrationToken');
         }}
       />
-    </AuthField>
+    </FormField>
   {/if}
   <div class="submit-area">
     <AuthStatusSlot id={errorId} message={error} />

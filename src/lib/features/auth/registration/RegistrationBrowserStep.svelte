@@ -6,7 +6,7 @@
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
 
   interface Props {
     homeserver: string;
@@ -63,7 +63,7 @@
             onRequestRegistrationEmail(emailAddress);
           }}
         >
-          <AuthField fieldId="registration-email" label={$i18n.t('auth.email')}>
+          <FormField dense fieldId="registration-email" label={$i18n.t('auth.email')}>
             <TextInput
               id="registration-email"
               type="email"
@@ -74,7 +74,7 @@
                 emailAddress = event.currentTarget.value;
               }}
             />
-          </AuthField>
+          </FormField>
           <Button type="submit" disabled={isRegistering} variant="primary">
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.sendVerificationEmail')}
@@ -90,7 +90,7 @@
             onSubmitRegistrationEmail(emailToken);
           }}
         >
-          <AuthField fieldId="registration-email-token" label={$i18n.t('auth.emailCode')}>
+          <FormField dense fieldId="registration-email-token" label={$i18n.t('auth.emailCode')}>
             <TextInput
               id="registration-email-token"
               value={emailToken}
@@ -102,7 +102,7 @@
                 emailToken = event.currentTarget.value;
               }}
             />
-          </AuthField>
+          </FormField>
           <Button type="submit" disabled={isRegistering} variant="primary">
             {#if isRegistering}<Spinner />{/if}
             {$i18n.t('auth.verifyEmail')}

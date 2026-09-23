@@ -12,7 +12,7 @@
   import { debugLog, exportDebugLogs } from '#lib/observability/debug-log.svelte.js';
   import { describePlatform } from '#lib/platform/diagnostics.js';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
@@ -161,8 +161,7 @@
     />
   </fieldset>
 
-  <div class="field">
-    <Label for="bug-report-title">{$i18n.t('bugReport.title')}</Label>
+  <FormField fieldId="bug-report-title" label={$i18n.t('bugReport.title')}>
     <TextInput
       id="bug-report-title"
       bind:value={title}
@@ -171,7 +170,7 @@
       placeholder={$i18n.t('bugReport.titlePlaceholder')}
       autocomplete="off"
     />
-  </div>
+  </FormField>
 
   {#if searching}
     <p class="search-status"><Spinner small /> {$i18n.t('bugReport.searching')}</p>
@@ -187,48 +186,41 @@
   {/if}
 
   {#if type === 'bug'}
-    <div class="field">
-      <Label for="bug-report-description">{$i18n.t('bugReport.description')}</Label>
+    <FormField fieldId="bug-report-description" label={$i18n.t('bugReport.description')}>
       <TextArea
         id="bug-report-description"
         bind:value={description}
         rows={4}
         placeholder={$i18n.t('bugReport.descriptionPlaceholder')}
       />
-    </div>
-    <div class="field">
-      <Label for="bug-report-reproduction">{$i18n.t('bugReport.reproduction')}</Label>
+    </FormField>
+    <FormField fieldId="bug-report-reproduction" label={$i18n.t('bugReport.reproduction')}>
       <TextArea
         id="bug-report-reproduction"
         bind:value={reproduction}
         rows={3}
         placeholder={$i18n.t('bugReport.reproductionPlaceholder')}
       />
-    </div>
-    <div class="field">
-      <Label for="bug-report-expected">{$i18n.t('bugReport.expectedBehavior')}</Label>
+    </FormField>
+    <FormField fieldId="bug-report-expected" label={$i18n.t('bugReport.expectedBehavior')}>
       <TextArea id="bug-report-expected" bind:value={expectedBehavior} rows={2} />
-    </div>
+    </FormField>
     <p class="platform">{$i18n.t('bugReport.platformInfo')}: {version} / {platform}</p>
   {:else}
-    <div class="field">
-      <Label for="bug-report-problem">{$i18n.t('bugReport.problem')}</Label>
+    <FormField fieldId="bug-report-problem" label={$i18n.t('bugReport.problem')}>
       <TextArea id="bug-report-problem" bind:value={problem} rows={4} />
-    </div>
-    <div class="field">
-      <Label for="bug-report-solution">{$i18n.t('bugReport.solution')}</Label>
+    </FormField>
+    <FormField fieldId="bug-report-solution" label={$i18n.t('bugReport.solution')}>
       <TextArea id="bug-report-solution" bind:value={solution} rows={3} />
-    </div>
-    <div class="field">
-      <Label for="bug-report-alternatives">{$i18n.t('bugReport.alternatives')}</Label>
+    </FormField>
+    <FormField fieldId="bug-report-alternatives" label={$i18n.t('bugReport.alternatives')}>
       <TextArea id="bug-report-alternatives" bind:value={alternatives} rows={2} />
-    </div>
+    </FormField>
   {/if}
 
-  <div class="field">
-    <Label for="bug-report-context">{$i18n.t('bugReport.context')}</Label>
+  <FormField fieldId="bug-report-context" label={$i18n.t('bugReport.context')}>
     <TextArea id="bug-report-context" bind:value={context} rows={2} />
-  </div>
+  </FormField>
 
   {#if type === 'bug' && sentryEnabled}
     <fieldset class="options">
@@ -279,12 +271,7 @@
     margin-bottom: var(--space-200);
   }
 
-  .field {
-    display: grid;
-    gap: var(--space-200);
-  }
-
-  .field :global(.form-control) {
+  .bug-report :global(.form-field .form-control) {
     width: 100%;
   }
 

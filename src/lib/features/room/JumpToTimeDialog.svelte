@@ -7,7 +7,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
@@ -78,8 +78,7 @@
     <h2>{$i18n.t('room.jumpTitle')}</h2>
     <p class="explain">{$i18n.t('room.jumpBody')}</p>
 
-    <div class="field">
-      <Label for="room-jump-at">{$i18n.t('room.jumpMoment')}</Label>
+    <FormField fieldId="room-jump-at" label={$i18n.t('room.jumpMoment')}>
       <TextInput
         id="room-jump-at"
         type="datetime-local"
@@ -90,7 +89,7 @@
           void jump();
         }}
       />
-    </div>
+    </FormField>
 
     <div class="shortcuts">
       <Button
@@ -154,11 +153,6 @@
   .explain {
     color: var(--surface-var-on-container);
     margin: 0;
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-200);
   }
 
   .shortcuts {

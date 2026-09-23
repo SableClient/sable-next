@@ -12,7 +12,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -338,18 +338,16 @@
           {#if roleFailed}
             <Alert variant="critical" role="alert">{$i18n.t('room.permFailed')}</Alert>
           {/if}
-          <div class="settings-field">
-            <Label for="room-perm-role-name">{$i18n.t('room.permRoleName')}</Label>
+          <FormField fieldId="room-perm-role-name" label={$i18n.t('room.permRoleName')}>
             <TextInput id="room-perm-role-name" bind:value={roleNameDraft} required />
-          </div>
-          <div class="settings-field">
-            <Label for="room-perm-role-color">{$i18n.t('room.permRoleColor')}</Label>
+          </FormField>
+          <FormField fieldId="room-perm-role-color" label={$i18n.t('room.permRoleColor')}>
             <TextInput
               id="room-perm-role-color"
               bind:value={roleColorDraft}
               placeholder={$i18n.t('room.permRoleColorHint')}
             />
-          </div>
+          </FormField>
           <div class="actions">
             {#if editingHasTag}
               <Button

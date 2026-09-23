@@ -4,7 +4,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
 
@@ -48,7 +48,8 @@
 
   <div class="avatar-picker">
     <Avatar class="avatar-preview" src={avatarPreview} alt="" name={displayName} size="large" />
-    <AuthField
+    <FormField
+      dense
       fieldId="profile-avatar"
       label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}
     >
@@ -73,10 +74,10 @@
           {$i18n.t('auth.removeAvatar')}
         </button>
       {/if}
-    </AuthField>
+    </FormField>
   </div>
 
-  <AuthField fieldId="profile-display-name" label={$i18n.t('auth.displayName')}>
+  <FormField dense fieldId="profile-display-name" label={$i18n.t('auth.displayName')}>
     <TextInput
       id="profile-display-name"
       value={displayName}
@@ -86,7 +87,7 @@
         onDisplayName(event.currentTarget.value);
       }}
     />
-  </AuthField>
+  </FormField>
 
   <details class="more-options" bind:open={moreOpen}>
     <summary>{$i18n.t('auth.moreProfileOptions')}</summary>

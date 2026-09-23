@@ -3,7 +3,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -128,10 +128,10 @@
 
     {#if selected !== undefined}
       <form class="editor" onsubmit={save}>
-        <div class="field">
-          <Label for="developer-account-data-type"
-            >{$i18n.t('settings.developerAccountDataType')}</Label
-          >
+        <FormField
+          fieldId="developer-account-data-type"
+          label={$i18n.t('settings.developerAccountDataType')}
+        >
           <TextInput
             id="developer-account-data-type"
             bind:value={eventType}
@@ -139,11 +139,11 @@
             autocomplete="off"
             spellcheck={false}
           />
-        </div>
-        <div class="field">
-          <Label for="developer-account-data-content"
-            >{$i18n.t('settings.developerAccountDataContent')}</Label
-          >
+        </FormField>
+        <FormField
+          fieldId="developer-account-data-content"
+          label={$i18n.t('settings.developerAccountDataContent')}
+        >
           <TextArea
             id="developer-account-data-content"
             bind:value={content}
@@ -152,7 +152,7 @@
             spellcheck={false}
             class="account-data-content"
           />
-        </div>
+        </FormField>
         {#if error === 'json'}
           <Alert variant="critical">{$i18n.t('settings.developerAccountDataInvalidJson')}</Alert>
         {:else if error === 'failed'}
@@ -199,11 +199,6 @@
     max-height: 14rem;
     overflow: auto;
     padding: 0;
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-200);
   }
 
   :global(.account-data-content) {

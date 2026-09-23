@@ -19,7 +19,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
@@ -204,8 +204,7 @@
 </script>
 
 <form class="create-room" onsubmit={submit}>
-  <div class="field">
-    <Label for="create-room-name">{$i18n.t('room.createNameLabel')}</Label>
+  <FormField fieldId="create-room-name" label={$i18n.t('room.createNameLabel')}>
     <TextInput
       id="create-room-name"
       bind:value={name}
@@ -213,17 +212,16 @@
       autocomplete="off"
       placeholder={$i18n.t('room.createNamePlaceholder')}
     />
-  </div>
+  </FormField>
 
-  <div class="field">
-    <Label for="create-room-topic">{$i18n.t('room.createTopicLabel')}</Label>
+  <FormField fieldId="create-room-topic" label={$i18n.t('room.createTopicLabel')}>
     <TextArea
       id="create-room-topic"
       bind:value={topic}
       placeholder={$i18n.t('room.createTopicPlaceholder')}
     />
     <p class="hint">{$i18n.t('room.createTopicHint')}</p>
-  </div>
+  </FormField>
 
   {#if mode === 'space'}
     <p class="hint">{$i18n.t('room.createSpaceDescription')}</p>
@@ -265,8 +263,7 @@
   {/if}
 
   {#if mode === 'all' && spaces.length > 0}
-    <div class="field">
-      <Label for="create-room-parent">{$i18n.t('room.createParentLabel')}</Label>
+    <FormField fieldId="create-room-parent" label={$i18n.t('room.createParentLabel')}>
       <Select
         id="create-room-parent"
         value={parentSpace}
@@ -278,7 +275,7 @@
           parentChoice = value;
         }}
       />
-    </div>
+    </FormField>
   {/if}
 
   <div class="field">
@@ -345,8 +342,7 @@
   {/if}
 
   {#if access === 'public'}
-    <div class="field">
-      <Label for="create-room-alias">{$i18n.t('room.createAliasLabel')}</Label>
+    <FormField fieldId="create-room-alias" label={$i18n.t('room.createAliasLabel')}>
       <TextInput
         id="create-room-alias"
         bind:value={alias}
@@ -359,7 +355,7 @@
       {:else}
         <p class="hint">{$i18n.t('room.createAliasHint')}</p>
       {/if}
-    </div>
+    </FormField>
   {/if}
 
   <div class="row">
@@ -398,8 +394,7 @@
         />
       </div>
 
-      <div class="field">
-        <Label for="create-room-version">{$i18n.t('room.createVersionLabel')}</Label>
+      <FormField fieldId="create-room-version" label={$i18n.t('room.createVersionLabel')}>
         <Select
           id="create-room-version"
           value={roomVersionChoice}
@@ -408,12 +403,11 @@
             roomVersionChoice = value;
           }}
         />
-      </div>
+      </FormField>
     </div>
   </details>
 
-  <div class="field">
-    <Label for="create-room-invite">{$i18n.t('room.createInviteLabel')}</Label>
+  <FormField fieldId="create-room-invite" label={$i18n.t('room.createInviteLabel')}>
     <div class="invite-row">
       <TextInput
         id="create-room-invite"
@@ -447,7 +441,7 @@
         {/each}
       </ul>
     {/if}
-  </div>
+  </FormField>
 
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('room.createFailed')}</Alert>

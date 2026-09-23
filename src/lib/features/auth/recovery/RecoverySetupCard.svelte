@@ -4,6 +4,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
@@ -52,7 +53,7 @@
       </AuthInfoBox>
     </AuthField>
 
-    <AuthField fieldId="new-account-recovery-key" label={$i18n.t('settings.recoveryKey')}>
+    <FormField dense fieldId="new-account-recovery-key" label={$i18n.t('settings.recoveryKey')}>
       <TextInput
         id="new-account-recovery-key"
         value={recoveryKey}
@@ -62,7 +63,7 @@
         onclick={selectRecoveryKey}
         onfocus={selectRecoveryKey}
       />
-    </AuthField>
+    </FormField>
   {:else}
     <AuthField labelId="recovery-setup-title" label={$i18n.t('auth.setUpRecovery')}>
       <AuthInfoBox>{$i18n.t('auth.recoverySetupDescription')}</AuthInfoBox>

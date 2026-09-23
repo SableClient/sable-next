@@ -6,7 +6,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import PasswordField from '../shared/PasswordField.svelte';
-  import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
 
   interface Props {
     username?: string;
@@ -41,7 +41,7 @@
 </script>
 
 <div class="password-form">
-  <AuthField fieldId="username" label={$i18n.t('auth.username')}>
+  <FormField dense fieldId="username" label={$i18n.t('auth.username')}>
     <TextInput
       id="username"
       bind:value={username}
@@ -54,8 +54,8 @@
         onClearFieldError('username');
       }}
     />
-  </AuthField>
-  <AuthField fieldId="password" label={$i18n.t('auth.password')}>
+  </FormField>
+  <FormField dense fieldId="password" label={$i18n.t('auth.password')}>
     <PasswordField
       bind:value={password}
       bind:showPassword
@@ -66,7 +66,7 @@
         onClearFieldError('password');
       }}
     />
-  </AuthField>
+  </FormField>
   <div class="submit-area">
     <AuthStatusSlot id={errorId} message={error} />
     <FormActions>

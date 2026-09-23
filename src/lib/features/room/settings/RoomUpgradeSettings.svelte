@@ -9,7 +9,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -204,19 +204,17 @@
     <h2>{isSpace ? $i18n.t('room.upgradeSpaceTitle') : $i18n.t('room.upgradeRoomTitle')}</h2>
     <Alert variant="warning" role="status">{$i18n.t('room.upgradeIrreversible')}</Alert>
 
-    <div class="settings-field">
-      <Label for="room-upgrade-version">{$i18n.t('room.upgradeVersion')}</Label>
+    <FormField fieldId="room-upgrade-version" label={$i18n.t('room.upgradeVersion')}>
       <Select
         id="room-upgrade-version"
         bind:value={target}
         items={versionOptions}
         disabled={upgrading || versionOptions.length === 0}
       />
-    </div>
+    </FormField>
 
     {#if allowCreators}
-      <div class="settings-field">
-        <Label for="room-upgrade-creator">{$i18n.t('room.upgradeCreators')}</Label>
+      <FormField fieldId="room-upgrade-creator" label={$i18n.t('room.upgradeCreators')}>
         <p class="hint">{$i18n.t('room.upgradeCreatorsHint')}</p>
         <div class="creator-row">
           <TextInput
@@ -256,7 +254,7 @@
             {/each}
           </ul>
         {/if}
-      </div>
+      </FormField>
     {/if}
 
     {#if failed}

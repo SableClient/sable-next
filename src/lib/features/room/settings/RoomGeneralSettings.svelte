@@ -16,7 +16,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -293,14 +293,12 @@
     </ul>
     {#if canEditGeneral}
       <div class="settings-form">
-        <div class="settings-field">
-          <Label for="room-settings-name">{$i18n.t('room.settingsNameLabel')}</Label>
+        <FormField fieldId="room-settings-name" label={$i18n.t('room.settingsNameLabel')}>
           <TextInput id="room-settings-name" bind:value={name} readonly={!canEditName} />
-        </div>
-        <div class="settings-field">
-          <Label for="room-settings-topic">{$i18n.t('room.settingsTopicLabel')}</Label>
+        </FormField>
+        <FormField fieldId="room-settings-topic" label={$i18n.t('room.settingsTopicLabel')}>
           <TextArea id="room-settings-topic" bind:value={topicDraft} readonly={!canEditTopic} />
-        </div>
+        </FormField>
       </div>
     {:else}
       <ul class="settings-rows">

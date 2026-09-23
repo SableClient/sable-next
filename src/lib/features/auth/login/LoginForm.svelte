@@ -10,7 +10,7 @@
   import PasswordLoginForm from './PasswordLoginForm.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
-  import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import LoginProviderButton from './LoginProviderButton.svelte';
 
   type LoginField = 'homeserver' | 'username' | 'password';
@@ -110,7 +110,7 @@
     void onLogin();
   }}
 >
-  <AuthField fieldId="homeserver" label={$i18n.t('auth.accountProvider')}>
+  <FormField dense fieldId="homeserver" label={$i18n.t('auth.accountProvider')}>
     <HomeserverPicker
       id="homeserver"
       bind:value={homeserver}
@@ -125,7 +125,7 @@
       }}
       onblur={() => void validateHomeserver()}
     />
-  </AuthField>
+  </FormField>
 
   <AuthStatusSlot
     loading={isCheckingHomeserver}

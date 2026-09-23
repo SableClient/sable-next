@@ -8,6 +8,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
@@ -81,7 +82,7 @@
     </AuthField>
 
     {#if status?.recovery !== 'disabled'}
-      <AuthField fieldId="login-recovery-key" label={$i18n.t('settings.recoveryKey')}>
+      <FormField dense fieldId="login-recovery-key" label={$i18n.t('settings.recoveryKey')}>
         <TextInput
           id="login-recovery-key"
           bind:value={verification.recoveryKey}
@@ -92,7 +93,7 @@
           type="password"
           placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
         />
-      </AuthField>
+      </FormField>
     {/if}
 
     <AuthStatusSlot message={verification.error} />

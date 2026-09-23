@@ -9,7 +9,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Label from '#lib/ui/primitives/Label.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
   import { canSendState } from './permission-groups';
@@ -112,8 +112,7 @@
     description={$i18n.t('room.devStateDescription')}
   >
     <form class="settings-form" onsubmit={send}>
-      <div class="settings-field">
-        <Label for="room-dev-type">{$i18n.t('room.devEventType')}</Label>
+      <FormField fieldId="room-dev-type" label={$i18n.t('room.devEventType')}>
         <TextInput
           id="room-dev-type"
           bind:value={eventType}
@@ -121,17 +120,15 @@
           autocomplete="off"
           spellcheck="false"
         />
-      </div>
+      </FormField>
 
-      <div class="settings-field">
-        <Label for="room-dev-key">{$i18n.t('room.devStateKey')}</Label>
+      <FormField fieldId="room-dev-key" label={$i18n.t('room.devStateKey')}>
         <TextInput id="room-dev-key" bind:value={stateKey} autocomplete="off" spellcheck="false" />
-      </div>
+      </FormField>
 
-      <div class="settings-field">
-        <Label for="room-dev-content">{$i18n.t('room.devContent')}</Label>
+      <FormField fieldId="room-dev-content" label={$i18n.t('room.devContent')}>
         <TextArea id="room-dev-content" bind:value={content} rows={10} spellcheck="false" />
-      </div>
+      </FormField>
 
       {#if outcome === 'json'}
         <Alert variant="critical" role="alert">{$i18n.t('room.devInvalidJson')}</Alert>

@@ -8,6 +8,7 @@
   import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AuthField from '../shared/AuthField.svelte';
+  import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
   import { homeservers } from '../shared/homeservers.svelte.js';
@@ -124,7 +125,7 @@
     />
   {:else}
     {#if isEditingHomeserver}
-      <AuthField fieldId="registration-homeserver" label={$i18n.t('auth.accountProvider')}>
+      <FormField dense fieldId="registration-homeserver" label={$i18n.t('auth.accountProvider')}>
         <HomeserverPicker
           id="registration-homeserver"
           value={homeserver}
@@ -139,7 +140,7 @@
           }}
           onblur={onValidateHomeserver}
         />
-      </AuthField>
+      </FormField>
     {/if}
 
     <AuthStatusSlot
