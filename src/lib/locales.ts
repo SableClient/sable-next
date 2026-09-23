@@ -10,7 +10,8 @@ export const languageValues: string[] = [SYSTEM_LANGUAGE, ...availableLocales];
 
 export function localeLabel(code: string): string {
   try {
-    return new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    const name = new Intl.DisplayNames([code], { type: 'language' }).of(code) ?? code;
+    return name.charAt(0).toLocaleUpperCase(code) + name.slice(1);
   } catch {
     return code;
   }
