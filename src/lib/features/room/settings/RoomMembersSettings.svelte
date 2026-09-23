@@ -223,9 +223,9 @@
   {/if}
 
   {#if loading && members.length === 0}
-    <p class="status" role="status"><Spinner small /></p>
+    <p class="settings-status" role="status"><Spinner small /></p>
   {:else if shown.length === 0}
-    <p class="status">{$i18n.t('timeline.noMembersFound')}</p>
+    <p class="settings-status">{$i18n.t('timeline.noMembersFound')}</p>
   {:else}
     <SettingsSection
       headingId="room-settings-members"
@@ -374,13 +374,6 @@
   .tabs button:hover:not(:disabled, [aria-selected='true']) {
     background: var(--surface-var-container-hover);
     color: var(--bg-on-container);
-  }
-
-  .status {
-    color: var(--surface-var-on-container);
-    margin: 0;
-    padding: var(--space-400) 0;
-    text-align: center;
   }
 
   .user-id {

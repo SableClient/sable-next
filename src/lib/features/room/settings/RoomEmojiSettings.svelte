@@ -194,9 +194,9 @@
     {/if}
 
     {#if loading && packs.length === 0}
-      <p class="status" role="status"><Spinner small /></p>
+      <p class="settings-status" role="status"><Spinner small /></p>
     {:else if roomPacks.length === 0}
-      <p class="status">{$i18n.t('room.emojisEmpty')}</p>
+      <p class="settings-status">{$i18n.t('room.emojisEmpty')}</p>
     {:else}
       <SettingsSection headingId="room-emojis-packs" title={$i18n.t('room.emojisPacks')}>
         <ul class="settings-rows">
@@ -265,13 +265,6 @@
 
   .viewer-header {
     display: flex;
-  }
-
-  .status {
-    color: var(--surface-var-on-container);
-    margin: 0;
-    padding: var(--space-400) 0;
-    text-align: center;
   }
 
   .inline {

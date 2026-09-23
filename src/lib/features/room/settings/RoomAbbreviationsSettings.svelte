@@ -380,7 +380,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="status settings-form">
+      <p class="settings-note settings-form">
         {$i18n.t(canEdit ? 'room.abbreviationsEmptyForm' : 'room.abbreviationsEmpty')}
       </p>
     {/if}
@@ -402,12 +402,6 @@
   .section {
     display: grid;
     gap: var(--space-600);
-  }
-
-  .status {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .section :global(.setting-row.editing) {

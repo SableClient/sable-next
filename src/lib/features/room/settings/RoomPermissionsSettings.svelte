@@ -248,7 +248,7 @@
   {/if}
 
   {#if loading && levels === null}
-    <p class="status" role="status"><Spinner small /></p>
+    <p class="settings-status" role="status"><Spinner small /></p>
   {:else if levels}
     {#each groups as group (group.label)}
       <SettingsSection headingId={`room-perm-${group.label}`} title={$i18n.t(group.label)}>
@@ -387,13 +387,6 @@
   .section {
     display: grid;
     gap: var(--space-600);
-  }
-
-  .status {
-    color: var(--surface-var-on-container);
-    margin: 0;
-    padding: var(--space-400) 0;
-    text-align: center;
   }
 
   .level {
