@@ -660,6 +660,8 @@
     "unreadCount_many": "",
     "unreadCount_other": "{{count, number}} nouveaux messages",
     "start": "Début de la chronologie",
+    "predecessor": "Ce salon est la suite d’une autre conversation.",
+    "predecessorOpen": "Voir les messages plus anciens",
     "readMarker": "Messages lus jusqu’ici",
     "edited": "(modifié)",
     "playVideo": "Lire {{title}}",

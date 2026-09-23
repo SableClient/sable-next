@@ -807,7 +807,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           power_level_tags: null,
           widgets: widgets.events,
           pinned_event_ids: [],
+          predecessor: null,
         };
+      },
+      room_summary: () => {
+        throw new FakeCoreError('unknown_room');
       },
       set_pinned: () => ({ type: 'set_pinned', event_ids: [] }),
       room_power_levels: () => ({

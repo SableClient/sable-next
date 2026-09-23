@@ -324,6 +324,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    RoomSummary {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     UrlPreview {
         url: String,
     },
@@ -1122,6 +1126,9 @@ pub enum CommandOk {
         has_space_parent: bool,
     },
     RoomOpen(RoomOpenView),
+    RoomSummary {
+        room: RoomSummary,
+    },
     UrlPreview {
         preview: Option<UrlPreviewView>,
     },
@@ -2113,6 +2120,15 @@ pub struct RoomOpenView {
     pub widgets: Vec<RoomStateEventView>,
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub pinned_event_ids: Vec<OwnedEventId>,
+    pub predecessor: Option<PredecessorRoomView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PredecessorRoomView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub via: Vec<String>,
 }
 
 /// What this account may do in one room, resolved from `m.room.power_levels`.

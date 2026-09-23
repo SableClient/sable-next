@@ -30,3 +30,30 @@ test('a tombstoned room replaces the composer with a banner offering the success
     timeout: 20_000,
   });
 });
+
+test('an upgraded room leads back to the room it replaced', async ({ page, app, admin, guest }) => {
+  test.setTimeout(60_000);
+
+  const roomId = await guest.createRoom({
+    name: `Old Room ${String(Date.now())}`,
+    invite: [admin.userId],
+  });
+  await admin.join(roomId);
+  await guest.sendMessage(roomId, 'Before the upgrade.');
+  const successorId = await guest.upgradeRoom(roomId);
+  await guest.invite(successorId, admin.userId);
+  await admin.join(successorId);
+
+  await app.openRoom(successorId, { settled: false });
+
+  await expect(page.getByText(en.timeline.predecessor)).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: en.timeline.predecessorOpen }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)), {
+    timeout: 20_000,
+  });
+  await expect(page.getByRole('region', { name: 'This room has been replaced' })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByText('Before the upgrade.')).toBeVisible();
+});

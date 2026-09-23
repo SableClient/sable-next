@@ -91,6 +91,7 @@
     typingLabel?: string | null;
     footTrailing?: Snippet;
     footTrailingVisible?: boolean;
+    timelineStart?: Snippet;
   }
 
   let {
@@ -130,6 +131,7 @@
     typingLabel = null,
     footTrailing,
     footTrailingVisible = false,
+    timelineStart,
   }: Props = $props();
 
   interface RowValue {
@@ -638,42 +640,46 @@
                 data-index={row.index}
                 data-timeline-key={row.key}
               >
-                <TimelineItem
-                  {item}
-                  {collapsed}
-                  unreadCount={row.value.unreadCount}
-                  replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
-                  threadPersona={item.thread_summary
-                    ? personas(item.thread_summary.latest_event_id)
-                    : null}
-                  highlighted={focusEventId !== null && item.event_id === focusEventId}
-                  {onMatrixLink}
-                  {onCopyLink}
-                  {onMarkUnread}
-                  {onSenderProfile}
-                  {onMentionUser}
-                  {onRetrySend}
-                  {onCancelSend}
-                  {currentUserId}
-                  {onToggleReaction}
-                  {onReply}
-                  {onOpenThread}
-                  {onEdit}
-                  {onDelete}
-                  {canRedactOthers}
-                  {encrypted}
-                  {members}
-                  readersForDialog={readersByItem.get(item.id) ?? item.read_by}
-                  layout={preferences.layout}
-                  alignOwn={preferences.alignOwnMessages}
-                  {onJumpToEvent}
-                  {onOpenMedia}
-                  {onPersonaAvatarClick}
-                  {onVotePoll}
-                  {onEndPoll}
-                  onPersonaOpenChange={setPersonaOpen}
-                  {roomId}
-                />
+                {#if timelineStart && item.content.kind === 'timeline_start'}
+                  {@render timelineStart()}
+                {:else}
+                  <TimelineItem
+                    {item}
+                    {collapsed}
+                    unreadCount={row.value.unreadCount}
+                    replyPersona={item.in_reply_to ? personas(item.in_reply_to.event_id) : null}
+                    threadPersona={item.thread_summary
+                      ? personas(item.thread_summary.latest_event_id)
+                      : null}
+                    highlighted={focusEventId !== null && item.event_id === focusEventId}
+                    {onMatrixLink}
+                    {onCopyLink}
+                    {onMarkUnread}
+                    {onSenderProfile}
+                    {onMentionUser}
+                    {onRetrySend}
+                    {onCancelSend}
+                    {currentUserId}
+                    {onToggleReaction}
+                    {onReply}
+                    {onOpenThread}
+                    {onEdit}
+                    {onDelete}
+                    {canRedactOthers}
+                    {encrypted}
+                    {members}
+                    readersForDialog={readersByItem.get(item.id) ?? item.read_by}
+                    layout={preferences.layout}
+                    alignOwn={preferences.alignOwnMessages}
+                    {onJumpToEvent}
+                    {onOpenMedia}
+                    {onPersonaAvatarClick}
+                    {onVotePoll}
+                    {onEndPoll}
+                    onPersonaOpenChange={setPersonaOpen}
+                    {roomId}
+                  />
+                {/if}
               </div>
             {/each}
           </div>

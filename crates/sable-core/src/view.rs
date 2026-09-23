@@ -55,11 +55,11 @@ use crate::profiles::pronoun_sets;
 use crate::protocol::{
     AvatarChangeView, DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView,
     MembershipChangeView, MembershipView, MentionView, PerMessageProfileView, PollAnswerView,
-    PollView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView,
-    RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchHitView,
-    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
-    VectorDiff,
+    PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView,
+    RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
+    SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
+    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView,
+    UrlPreviewView, UtdCauseView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -278,6 +278,28 @@ pub async fn enrich_room_fields<S: BuildHasher>(
     for (room_id, info) in futures_util::future::join_all(lookups).await {
         room_cache.insert(room_id, info);
     }
+}
+
+pub async fn listless_room_summary(room: Room) -> RoomSummary {
+    let item = RoomListItem::from(room);
+    let cache = HashMap::from([(item.room_id().to_owned(), room_info(&item).await)]);
+    room_summary(&item, &cache)
+}
+
+#[must_use]
+pub fn predecessor(room: &Room) -> Option<PredecessorRoomView> {
+    let predecessor = room.predecessor_room()?;
+    let mut via = Vec::new();
+    for creator in room.creators().unwrap_or_default() {
+        let server = creator.server_name().to_string();
+        if !via.contains(&server) {
+            via.push(server);
+        }
+    }
+    Some(PredecessorRoomView {
+        room_id: predecessor.room_id,
+        via,
+    })
 }
 
 async fn room_info(room: &Room) -> RoomInfo {

@@ -328,6 +328,11 @@ export function createCommands(transport: () => Transport) {
       return response;
     },
 
+    async roomSummary(roomId: string): Promise<RoomSummary> {
+      const response = await transport().send({ type: 'room_summary', room_id: roomId });
+      return response.room;
+    },
+
     async urlPreview(url: string): Promise<UrlPreviewView | null> {
       const response = await transport().send({ type: 'url_preview', url });
       return response.preview;

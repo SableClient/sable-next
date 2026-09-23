@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { createRawSnippet, mount, tick, unmount } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -478,6 +478,64 @@ test('an empty room reports it once the start is reached', async () => {
   await runAnimationFrames();
 
   expect(document.querySelector('.timeline-empty')).not.toBeNull();
+  await unmount(instance);
+});
+
+test("the timeline start renders the caller's notice in its row", async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [
+    { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
+    item('first'),
+  ];
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+        timelineStart: createRawSnippet(() => ({
+          render: () => '<p class="predecessor-stub">older room</p>',
+        })),
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  const start = document.querySelector('[data-item-id="start"]');
+  expect(start?.querySelector('.predecessor-stub')).not.toBeNull();
+  expect(start?.querySelector('.separator')).toBeNull();
+  expect(document.querySelectorAll('.predecessor-stub')).toHaveLength(1);
+  await unmount(instance);
+});
+
+test('the timeline start keeps its separator without a notice', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [
+    { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
+    item('first'),
+  ];
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('[data-item-id="start"] .separator')).not.toBeNull();
   await unmount(instance);
 });
 

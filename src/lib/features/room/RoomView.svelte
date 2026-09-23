@@ -3,10 +3,12 @@
   import type {
     MemberView,
     MembershipView,
+    PredecessorRoomView,
     ProfileView,
     RoomPowerLevelsView,
     RoomPermissionsView,
     RoomStateEventView,
+    RoomSummary,
     CallSupportView,
   } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
@@ -62,6 +64,7 @@
   import RoomInviteDialog from './RoomInviteDialog.svelte';
   import { canSendState } from './settings/permission-groups';
   import RoomPinMenu from './RoomPinMenu.svelte';
+  import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomTopicViewer from './RoomTopicViewer.svelte';
   import RoomReadReceipts from './RoomReadReceipts.svelte';
@@ -78,9 +81,10 @@
   interface Props {
     roomId: string;
     eventId?: string | null;
+    room?: RoomSummary;
   }
 
-  let { roomId, eventId = null }: Props = $props();
+  let { roomId, eventId = null, room }: Props = $props();
   const core = useCoreClient();
   const personas = usePersonaStore();
   const roomList = useRoomList();
@@ -131,6 +135,7 @@
   let tombstoneChecked = $state(false);
   let tombstoneJoining = $state(false);
   let tombstoneJoinFailed = $state(false);
+  let predecessor = $state.raw<PredecessorRoomView | null>(null);
 
   let ownMember = $derived(
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
@@ -222,7 +227,7 @@
     void activeTimeline.stop(timelineOwner);
   });
 
-  let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
+  let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId) ?? room);
   let callParticipants = $derived(resolvedRoom?.call_participants ?? []);
   let callable = $derived(
     !call.active &&
@@ -306,12 +311,14 @@
     powerLevels = null;
     powerTags = {};
     widgets = [];
+    predecessor = null;
     let current = true;
     void core.commands
       .roomOpen(activeRoomId)
       .then((opened) => {
         if (!current) return;
         permissions = opened.permissions;
+        predecessor = opened.predecessor;
         powerTags = parsePowerLevelTags(opened.power_level_tags);
         widgets = parseRoomWidgets(opened.widgets);
         pinnedEvents.set(activeRoomId, opened.pinned_event_ids);
@@ -682,6 +689,11 @@
     }
   }
 
+  function openPredecessor(): void {
+    if (!predecessor) return;
+    void goto(roomSectionPath(roomList.rooms, predecessor.room_id, null, predecessor.via));
+  }
+
   function openPrescreen(): void {
     call.clearFailure();
     prescreenMedia = { microphone: true, camera: resolvedRoom?.is_voice === false };
@@ -701,6 +713,10 @@
 <svelte:head>
   <title>{pageTitle}</title>
 </svelte:head>
+
+{#snippet predecessorNotice()}
+  <RoomPredecessorNotice onOpen={openPredecessor} />
+{/snippet}
 
 <main class="room-view" aria-label={$i18n.t('timeline.label')}>
   <div class="timeline">
@@ -814,6 +830,7 @@
           footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
           bind:nearLatest={timelineAtBottom}
           bind:followingLive={timelineFollowingLive}
+          timelineStart={predecessor ? predecessorNotice : undefined}
         >
           {#snippet footTrailing()}
             {#if showReceiptFooter}

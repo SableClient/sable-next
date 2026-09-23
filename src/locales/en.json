@@ -658,6 +658,8 @@
     "unreadCount_one": "{{count, number}} new message",
     "unreadCount_other": "{{count, number}} new messages",
     "start": "Beginning of timeline",
+    "predecessor": "This room is a continuation of another conversation.",
+    "predecessorOpen": "View older messages",
     "readMarker": "Messages read up to here",
     "edited": "(edited)",
     "playVideo": "Play {{title}}",

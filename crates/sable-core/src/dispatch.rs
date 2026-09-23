@@ -1049,6 +1049,11 @@ impl Core {
                     self.room_state_events(&room_id, WIDGETS_EVENT_TYPE),
                     self.pinned_events(&room_id),
                 );
+                let predecessor = self
+                    .client()
+                    .await?
+                    .get_room(&room_id)
+                    .and_then(|room| view::predecessor(&room));
                 Ok(CommandOk::RoomOpen(RoomOpenView {
                     permissions: permissions?,
                     power_level_tags: power_level_tags.unwrap_or_else(|error| {
@@ -1063,7 +1068,16 @@ impl Core {
                         tracing::warn!(?error, "pinned events unavailable");
                         Vec::new()
                     }),
+                    predecessor,
                 }))
+            }
+
+            Command::RoomSummary { room_id } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                Ok(CommandOk::RoomSummary {
+                    room: view::listless_room_summary(room).await,
+                })
             }
 
             Command::TimestampToEvent {

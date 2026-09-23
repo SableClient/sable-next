@@ -497,3 +497,56 @@ async fn our_own_membership_is_fetched_for_small_rooms_that_lack_it() {
     let room = client.get_room(direct).unwrap();
     assert!(room.get_member_no_sync(&own).await.unwrap().is_some());
 }
+
+#[tokio::test]
+async fn an_upgraded_room_names_its_predecessor_and_the_creators_servers() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!new:example.org");
+    server.sync_room(&client, JoinedRoomBuilder::new(room_id).add_state_event(
+        Raw::new(&json!({"type": "m.room.create", "state_key": "", "sender": "@alice:example.org", "event_id": "$create", "origin_server_ts": 1,
+            "content": {"room_version": "12", "additional_creators": ["@bob:other.org", "@carol:example.org"],
+                "predecessor": {"room_id": "!old:example.org"}}})).unwrap().cast_unchecked()
+    )).await;
+
+    let predecessor = crate::view::predecessor(&client.get_room(room_id).unwrap()).unwrap();
+    assert_eq!(predecessor.room_id, "!old:example.org");
+    assert_eq!(predecessor.via, ["example.org", "other.org"]);
+}
+
+#[tokio::test]
+async fn a_room_without_a_predecessor_names_none() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!fresh:example.org");
+    server.sync_room(&client, JoinedRoomBuilder::new(room_id).add_state_event(
+        Raw::new(&json!({"type": "m.room.create", "state_key": "", "sender": "@alice:example.org", "event_id": "$create", "origin_server_ts": 1,
+            "content": {"room_version": "10", "creator": "@alice:example.org"}})).unwrap().cast_unchecked()
+    )).await;
+
+    assert!(crate::view::predecessor(&client.get_room(room_id).unwrap()).is_none());
+}
+
+#[tokio::test]
+async fn a_room_outside_the_list_still_has_a_summary() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!old:example.org");
+    server.sync_room(&client, JoinedRoomBuilder::new(room_id).add_state_event(
+        Raw::new(&json!({"type": "m.room.tombstone", "state_key": "", "sender": "@alice:example.org", "event_id": "$grave", "origin_server_ts": 1,
+            "content": {"body": "moved", "replacement_room": "!new:example.org"}})).unwrap().cast_unchecked()
+    )).await;
+    let core = core(&server, client).await;
+
+    let CommandOk::RoomSummary { room } = core
+        .dispatch(Command::RoomSummary {
+            room_id: room_id.to_owned(),
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("wrong response")
+    };
+    assert_eq!(room.room_id, room_id);
+    assert!(room.is_tombstoned);
+}
