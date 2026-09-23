@@ -386,6 +386,8 @@
   }
 
   let banner = $state<string | null>(null);
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a cache nothing renders from
+  const banners = new Map<string, string | null>();
 
   $effect(() => {
     const spaceId = activeSpaceId;
@@ -396,8 +398,9 @@
     }
 
     let current = true;
-    banner = null;
+    banner = banners.get(spaceId) ?? null;
     void readRoomBanner(core, spaceId).then((next) => {
+      banners.set(spaceId, next);
       if (current) banner = next;
     });
     return () => {
