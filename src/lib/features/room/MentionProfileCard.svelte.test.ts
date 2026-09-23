@@ -196,6 +196,54 @@ test('renders the extended profile fields', async () => {
   await unmount(instance);
 });
 
+test('renders a flat map field as a collapsed key/value table and anything else as JSON', async () => {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: {
+        ...emptyProfile,
+        extra: [
+          { key: 'net.example.links', value: '{"site":"<b>x</b>","age":3,"cat":true}' },
+          { key: 'net.example.nested', value: '{"a":{"b":"c"}}' },
+        ],
+      },
+    },
+  });
+  await tick();
+
+  const toggle = document.querySelector<HTMLButtonElement>('.profile-extra-toggle');
+  expect(toggle?.textContent.trim()).toBe('net.example.links');
+  expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  const panel = document.getElementById(toggle?.getAttribute('aria-controls') ?? '');
+  expect(panel?.hidden).toBe(true);
+
+  const rows = [...(panel?.querySelectorAll('tr') ?? [])].map((row) => [
+    row.querySelector('th')?.textContent,
+    row.querySelector('td')?.textContent,
+  ]);
+  expect(rows).toEqual([
+    ['site', '<b>x</b>'],
+    ['age', '3'],
+    ['cat', 'true'],
+  ]);
+  expect(panel?.querySelector('b')).toBeNull();
+
+  toggle?.click();
+  await tick();
+  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+  expect(panel?.hidden).toBe(false);
+
+  expect(document.querySelectorAll('.profile-extra table')).toHaveLength(1);
+  const nested = [...document.querySelectorAll('.profile-extra dt')].find(
+    (term) => term.textContent === 'net.example.nested'
+  );
+  expect(nested?.nextElementSibling?.textContent).toBe('{"a":{"b":"c"}}');
+  await unmount(instance);
+});
+
 test('does not invent an animal need', async () => {
   const instance = mount(MentionProfileCard, {
     target: document.body,

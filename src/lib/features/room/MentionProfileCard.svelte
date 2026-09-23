@@ -24,6 +24,7 @@
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
+  import { SvelteSet } from 'svelte/reactivity';
   import { goto } from '$app/navigation';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -50,6 +51,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
   import MutualRoomsPanel from './MutualRoomsPanel.svelte';
+  import { profileFieldMap } from './profile-field-map';
   import { senderColor } from './timeline-format';
 
   import '#lib/ui/primitives/menu.css';
@@ -200,6 +202,7 @@
   let ignored = $state(false);
   let shared = $state<'rooms' | 'spaces' | null>(null);
   let miscOpen = $state(false);
+  const openFieldMaps = new SvelteSet<string>();
   let sharedRooms = $derived(mutualRooms.filter((room) => !room.is_space));
   let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
   let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
@@ -596,9 +599,43 @@
         : $i18n.t('timeline.profileMiscData', { count: extra.length })}
     </summary>
     <dl>
-      {#each extra as field (field.key)}
-        <dt>{field.key}</dt>
-        <dd>{field.value}</dd>
+      {#each extra as field, index (field.key)}
+        {@const map = profileFieldMap(field.value)}
+        {@const mapOpen = openFieldMaps.has(field.key)}
+        <div>
+          {#if map}
+            <dt>
+              <button
+                type="button"
+                class="profile-extra-toggle"
+                aria-expanded={mapOpen}
+                aria-controls="{moderationFieldId}-extra-{index}"
+                onclick={() => {
+                  if (mapOpen) openFieldMaps.delete(field.key);
+                  else openFieldMaps.add(field.key);
+                }}
+              >
+                <CaretRightIcon />
+                {field.key}
+              </button>
+            </dt>
+            <dd id="{moderationFieldId}-extra-{index}" hidden={!mapOpen}>
+              <table>
+                <tbody>
+                  {#each map as [key, value] (key)}
+                    <tr>
+                      <th scope="row">{key}</th>
+                      <td>{value}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </dd>
+          {:else}
+            <dt>{field.key}</dt>
+            <dd>{field.value}</dd>
+          {/if}
+        </div>
       {/each}
     </dl>
   </details>
@@ -835,9 +872,67 @@
     overflow-wrap: anywhere;
   }
 
+  .profile-extra dl > div {
+    display: grid;
+    gap: var(--space-050);
+  }
+
   .profile-extra dd {
     margin: 0 0 var(--space-200);
     overflow-wrap: anywhere;
+  }
+
+  .profile-extra-toggle {
+    align-items: center;
+    background: none;
+    border: 0;
+    color: var(--sec-main);
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-weight: var(--font-weight-medium);
+    gap: var(--space-100);
+    padding: 0;
+    text-align: start;
+  }
+
+  .profile-extra-toggle:hover {
+    color: var(--bg-on-container);
+  }
+
+  .profile-extra-toggle:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .profile-extra-toggle[aria-expanded='true'] :global(svg) {
+    transform: rotate(90deg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .profile-extra-toggle :global(svg) {
+      transition: transform var(--motion-fast) var(--motion-easing-standard);
+    }
+  }
+
+  .profile-extra table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .profile-extra th,
+  .profile-extra td {
+    border-top: var(--border-width) solid var(--bg-container-line);
+    overflow-wrap: anywhere;
+    padding: var(--space-100) var(--space-200) var(--space-100) 0;
+    text-align: start;
+    vertical-align: top;
+  }
+
+  .profile-extra th {
+    color: var(--sec-main);
+    font-weight: var(--font-weight-medium);
+    width: 40%;
   }
 
   .moderation {
