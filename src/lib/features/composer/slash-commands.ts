@@ -13,6 +13,7 @@ export type SlashCommandApi = Pick<
   | 'banUser'
   | 'bulkRedact'
   | 'createDm'
+  | 'disableRoomPersonas'
   | 'ignoreUser'
   | 'inviteUser'
   | 'joinRoom'
@@ -807,6 +808,10 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       const id = parts[0];
       if (id === 'reset') {
         await commands.setPersonaSelection(roomId, null);
+        return { kind: 'done' };
+      }
+      if (id === 'off') {
+        await commands.disableRoomPersonas(roomId);
         return { kind: 'done' };
       }
 

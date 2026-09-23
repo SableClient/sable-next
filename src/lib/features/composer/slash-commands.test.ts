@@ -37,11 +37,17 @@ function fakeCommands() {
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
     sendStateEvent: vi.fn(() => Promise.resolve()),
     personas: vi.fn(() =>
-      Promise.resolve({ personas: [], account: null, rooms: {} } as PersonaCatalogView)
+      Promise.resolve({
+        personas: [],
+        account: null,
+        rooms: {},
+        disabled_rooms: [],
+      } as PersonaCatalogView)
     ),
     savePersona: vi.fn(() => Promise.resolve<PersonaView[]>([])),
     removePersona: vi.fn(() => Promise.resolve<PersonaView[]>([])),
     setPersonaSelection: vi.fn(() => Promise.resolve()),
+    disableRoomPersonas: vi.fn(() => Promise.resolve()),
     accountData: vi.fn(() => Promise.resolve<unknown>(null)),
     setAccountData: vi.fn(() => Promise.resolve()),
     bulkRedact: vi.fn<
@@ -464,7 +470,12 @@ test('/pmpproxy appends a persona trigger', async () => {
     triggers: [],
     pluralkit: null,
   } satisfies PersonaView;
-  commands.personas.mockResolvedValueOnce({ personas: [persona], account: null, rooms: {} });
+  commands.personas.mockResolvedValueOnce({
+    personas: [persona],
+    account: null,
+    rooms: {},
+    disabled_rooms: [],
+  });
 
   await runSlash('/pmpproxy alt ✨:text', context(commands));
 
@@ -637,6 +648,9 @@ test('/usepmp latches a profile and resets it', async () => {
 
   await runSlash('/usepmp reset', context(commands));
   expect(commands.setPersonaSelection).toHaveBeenLastCalledWith('!room:example.org', null);
+
+  await runSlash('/usepmp off', context(commands));
+  expect(commands.disableRoomPersonas).toHaveBeenCalledWith('!room:example.org');
 });
 
 function member(userId: string, membership: MemberView['membership'] = 'join'): MemberView {

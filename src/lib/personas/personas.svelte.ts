@@ -10,6 +10,7 @@ export class PersonaStore {
   personas = $state.raw<PersonaView[]>([]);
   account = $state<PersonaSelectionView | null>(null);
   rooms = $state<Record<string, PersonaSelectionView>>({});
+  disabledRooms = $state.raw<string[]>([]);
   loading = $state(false);
   error = $state<string | null>(null);
 
@@ -31,6 +32,7 @@ export class PersonaStore {
       this.personas = catalog.personas;
       this.account = catalog.account;
       this.rooms = catalog.rooms;
+      this.disabledRooms = catalog.disabled_rooms;
       this.loaded = true;
       this.error = null;
     } catch (cause) {
@@ -62,6 +64,16 @@ export class PersonaStore {
     return roomId === null ? this.account : (this.rooms[roomId] ?? null);
   }
 
+  disabledIn(roomId: string): boolean {
+    return this.disabledRooms.includes(roomId);
+  }
+
+  async disable(roomId: string): Promise<void> {
+    await this.core.commands.disableRoomPersonas(roomId);
+    this.rooms = Object.fromEntries(Object.entries(this.rooms).filter(([key]) => key !== roomId));
+    if (!this.disabledIn(roomId)) this.disabledRooms = [...this.disabledRooms, roomId];
+  }
+
   async select(
     roomId: string | null,
     personaId: string | null,
@@ -75,6 +87,7 @@ export class PersonaStore {
       this.account = selection;
       return;
     }
+    this.disabledRooms = this.disabledRooms.filter((key) => key !== roomId);
     const rest = Object.fromEntries(Object.entries(this.rooms).filter(([key]) => key !== roomId));
     this.rooms = selection === null ? rest : { ...rest, [roomId]: selection };
   }

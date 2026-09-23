@@ -2039,7 +2039,7 @@
       },
       "usepmp": {
         "description": "Send as a per-message profile in this room",
-        "usage": "/usepmp <id|reset> [expiry]"
+        "usage": "/usepmp <id|reset|off> [expiry]"
       },
       "pmpproxy": {
         "description": "Add a shorthand trigger to a per-message profile",
@@ -2192,6 +2192,7 @@
     "restoreFailed": "Could not restore your profiles.",
     "pickerLabel": "Send as",
     "pickerNone": "Default",
+    "pickerOff": "No profile in this room",
     "pickerHeading": "Send as",
     "scopeRoom": "This room",
     "scopeAccount": "Everywhere",

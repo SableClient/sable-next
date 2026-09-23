@@ -1994,7 +1994,7 @@
       },
       "usepmp": {
         "description": "Envoyer sous un profil par message dans ce salon",
-        "usage": "/usepmp <id|reset> [expiration]"
+        "usage": "/usepmp <id|reset|off> [expiration]"
       },
       "pmpproxy": {
         "description": "Ajouter un déclencheur abrégé à un profil par message",
@@ -2149,6 +2149,7 @@
     "restoreFailed": "Impossible de restaurer vos profils.",
     "pickerLabel": "Envoyer sous le nom de",
     "pickerNone": "Par défaut",
+    "pickerOff": "Aucun profil dans ce salon",
     "pickerHeading": "Envoyer sous le nom de",
     "scopeRoom": "Ce salon",
     "scopeAccount": "Partout",

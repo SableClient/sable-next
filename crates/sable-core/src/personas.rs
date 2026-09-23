@@ -266,6 +266,46 @@ fn selection_to_json(selection: &PersonaSelectionView) -> Value {
     Value::Object(object)
 }
 
+#[derive(Debug, Clone)]
+enum RoomAssociation {
+    Persona(PersonaSelectionView),
+    Disabled,
+}
+
+fn room_associations_from_json(content: &Value) -> BTreeMap<String, RoomAssociation> {
+    content
+        .get("associations")
+        .and_then(Value::as_object)
+        .map(|associations| {
+            associations
+                .iter()
+                .filter_map(|(room_id, association)| {
+                    let association = match association {
+                        Value::Bool(false) => RoomAssociation::Disabled,
+                        association => RoomAssociation::Persona(selection_from_json(association)?),
+                    };
+                    Some((room_id.clone(), association))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn room_associations_to_json(rooms: &BTreeMap<String, RoomAssociation>) -> Value {
+    let associations: Map<String, Value> = rooms
+        .iter()
+        .map(|(room_id, association)| {
+            let value = match association {
+                RoomAssociation::Persona(selection) => selection_to_json(selection),
+                RoomAssociation::Disabled => Value::Bool(false),
+            };
+            (room_id.clone(), value)
+        })
+        .collect();
+
+    json!({ "associations": Value::Object(associations) })
+}
+
 const MAX_FIELD_BYTES: usize = 255;
 
 fn clamp_field(value: &str) -> String {
@@ -569,33 +609,32 @@ impl Core {
             .and_then(selection_from_json))
     }
 
-    async fn room_selections(&self) -> Result<BTreeMap<String, PersonaSelectionView>, CommandErr> {
-        let Some(content) = self
+    async fn room_selections(&self) -> Result<BTreeMap<String, RoomAssociation>, CommandErr> {
+        Ok(self
             .persona_account_data(selection_event("roomassociation"))
             .await?
-        else {
-            return Ok(BTreeMap::new());
-        };
-
-        Ok(content
-            .get("associations")
-            .and_then(Value::as_object)
-            .map(|associations| {
-                associations
-                    .iter()
-                    .filter_map(|(room_id, association)| {
-                        Some((room_id.clone(), selection_from_json(association)?))
-                    })
-                    .collect()
-            })
+            .as_ref()
+            .map(room_associations_from_json)
             .unwrap_or_default())
     }
 
     pub(crate) async fn personas(&self) -> Result<PersonaCatalogView, CommandErr> {
+        let mut rooms = BTreeMap::new();
+        let mut disabled_rooms = Vec::new();
+        for (room_id, association) in self.room_selections().await? {
+            match association {
+                RoomAssociation::Persona(selection) => {
+                    rooms.insert(room_id, selection);
+                }
+                RoomAssociation::Disabled => disabled_rooms.push(room_id),
+            }
+        }
+
         Ok(PersonaCatalogView {
             personas: self.load_personas().await?,
             account: self.account_selection().await?,
-            rooms: self.room_selections().await?,
+            rooms,
+            disabled_rooms,
         })
     }
 
@@ -683,7 +722,9 @@ impl Core {
         let mut rooms = self.room_selections().await?;
         let affected: Vec<String> = rooms
             .iter()
-            .filter(|(_, selection)| selection.persona_id == from)
+            .filter(|(_, association)| {
+                matches!(association, RoomAssociation::Persona(selection) if selection.persona_id == from)
+            })
             .map(|(room_id, _)| room_id.clone())
             .collect();
         if affected.is_empty() {
@@ -693,7 +734,7 @@ impl Core {
         for room_id in affected {
             match to {
                 Some(id) => {
-                    if let Some(selection) = rooms.get_mut(&room_id) {
+                    if let Some(RoomAssociation::Persona(selection)) = rooms.get_mut(&room_id) {
                         id.clone_into(&mut selection.persona_id);
                     }
                 }
@@ -708,16 +749,11 @@ impl Core {
 
     async fn write_room_selections(
         &self,
-        rooms: &BTreeMap<String, PersonaSelectionView>,
+        rooms: &BTreeMap<String, RoomAssociation>,
     ) -> Result<(), CommandErr> {
-        let associations: Map<String, Value> = rooms
-            .iter()
-            .map(|(room_id, selection)| (room_id.clone(), selection_to_json(selection)))
-            .collect();
-
         self.put_global_account_data(
             selection_event("roomassociation"),
-            &json!({ "associations": Value::Object(associations) }),
+            &room_associations_to_json(rooms),
             "personas",
         )
         .await
@@ -748,7 +784,7 @@ impl Core {
         let mut rooms = self.room_selections().await?;
         match selection {
             Some(selection) => {
-                rooms.insert(room_id.to_string(), selection);
+                rooms.insert(room_id.to_string(), RoomAssociation::Persona(selection));
             }
             None => {
                 rooms.remove(room_id.as_str());
@@ -757,13 +793,24 @@ impl Core {
 
         self.write_room_selections(&rooms).await
     }
+
+    pub(crate) async fn disable_room_personas(
+        &self,
+        room_id: OwnedRoomId,
+    ) -> Result<(), CommandErr> {
+        let _guard = self.account_data_lock.lock().await;
+        let mut rooms = self.room_selections().await?;
+        rooms.insert(room_id.to_string(), RoomAssociation::Disabled);
+        self.write_room_selections(&rooms).await
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        fallback_body, outgoing_with_fallback, persona_from_json, personas_from_catalog,
-        profile_to_json, stamp_profile,
+        RoomAssociation, fallback_body, outgoing_with_fallback, persona_from_json,
+        personas_from_catalog, profile_to_json, room_associations_from_json,
+        room_associations_to_json, stamp_profile,
     };
     use crate::protocol::{PerMessageProfileView, PronounView};
     use serde_json::json;
@@ -778,6 +825,37 @@ mod tests {
             color_on_dark: None,
             has_fallback,
         }
+    }
+
+    #[test]
+    fn a_room_with_personas_off_round_trips_as_false() {
+        let content = json!({
+            "associations": {
+                "!off:example.org": false,
+                "!kris:example.org": { "profileId": "kris", "validUntil": 20 },
+            }
+        });
+
+        let rooms = room_associations_from_json(&content);
+
+        assert!(matches!(
+            rooms.get("!off:example.org"),
+            Some(RoomAssociation::Disabled)
+        ));
+        assert!(matches!(
+            rooms.get("!kris:example.org"),
+            Some(RoomAssociation::Persona(selection))
+                if selection.persona_id == "kris" && selection.valid_until == Some(20)
+        ));
+        assert_eq!(
+            room_associations_to_json(&rooms),
+            json!({
+                "associations": {
+                    "!off:example.org": false,
+                    "!kris:example.org": { "profileId": "kris", "validUntil": 20 },
+                }
+            })
+        );
     }
 
     #[test]

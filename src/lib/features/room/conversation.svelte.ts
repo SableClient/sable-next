@@ -420,6 +420,7 @@ export class Conversation {
     formatted: string | null
   ): { body: string; formatted: string | null; persona: PerMessageProfileView | null } {
     const personas = this.#personas;
+    if (personas.disabledIn(targetRoomId)) return { body, formatted, persona: null };
     const proxied = preferences.personaProxying ? resolveProxy(personas.personas, body) : undefined;
     const persona = resolvePersona({
       personas: personas.personas,

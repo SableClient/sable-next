@@ -1,5 +1,6 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
 
   import type { PersonaSelectionView, PersonaView } from '#src/generated/protocol';
 
@@ -9,12 +10,15 @@
   interface Props {
     personas: readonly PersonaView[];
     selected: PersonaSelectionView | null;
+    disabled: boolean;
     scope: 'room' | 'account';
     onScope: (scope: 'room' | 'account') => void;
     onChoose: (persona: PersonaView | null) => void;
+    onDisable: () => void;
   }
 
-  let { personas, selected, scope, onScope, onChoose }: Props = $props();
+  let { personas, selected, disabled, scope, onScope, onChoose, onDisable }: Props = $props();
+  let off = $derived(scope === 'room' && disabled);
   let query = $state('');
   let filteredPersonas = $derived(
     personas.filter((persona) => {
@@ -70,9 +74,18 @@
       >
         <Avatar initials="?" size="small" />
         <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
-        {#if !selected}<CheckIcon />{/if}
+        {#if !selected && !off}<CheckIcon />{/if}
       </button>
     </li>
+    {#if scope === 'room'}
+      <li>
+        <button type="button" class="persona-option" onclick={onDisable}>
+          <Avatar size="small"><ProhibitIcon /></Avatar>
+          <span class="persona-option-name">{$i18n.t('personas.pickerOff')}</span>
+          {#if off}<CheckIcon />{/if}
+        </button>
+      </li>
+    {/if}
     {#each filteredPersonas as persona (persona.id)}
       <li>
         <button

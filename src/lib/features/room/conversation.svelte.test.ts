@@ -23,7 +23,7 @@ function item(eventId: string, sender: string): TimelineItemView {
   } as unknown as TimelineItemView;
 }
 
-function setup(items: TimelineItemView[], userId: string) {
+function setup(items: TimelineItemView[], userId: string, store: Partial<PersonaStore> = {}) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
   const core = {
@@ -33,7 +33,9 @@ function setup(items: TimelineItemView[], userId: string) {
   const personas = {
     personas: [],
     selectionFor: () => null,
+    disabledIn: () => false,
     select: () => Promise.resolve(),
+    ...store,
   } as unknown as PersonaStore;
   const timeline = { items } as unknown as RoomTimeline;
 
@@ -138,6 +140,36 @@ function encryptedScheduleFailure(): Error {
   return error;
 }
 
+test('personas off in a room ignore the selection and proxy triggers', async () => {
+  setPreference('personaProxying', true);
+  const kris = {
+    id: 'kris',
+    display_name: 'Kris',
+    avatar_url: null,
+    pronouns: [],
+    color_on_light: null,
+    color_on_dark: null,
+    triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false }],
+    pluralkit: null,
+  };
+  const select = vi.fn(() => Promise.resolve());
+  const { conversation, sendMessage } = setup([], '@kris:example.org', {
+    personas: [kris],
+    selectionFor: (roomId) => (roomId === null ? { persona_id: 'kris', valid_until: null } : null),
+    disabledIn: (roomId) => roomId === ROOM,
+    select,
+  });
+
+  await conversation.sendMessage(ROOM, 'k:!help');
+
+  expect(sendMessage).toHaveBeenCalledWith(
+    ROOM,
+    'k:!help',
+    expect.objectContaining({ persona: null })
+  );
+  expect(select).not.toHaveBeenCalled();
+});
+
 function scheduling() {
   const scheduleMessage = vi.fn(() => Promise.reject(encryptedScheduleFailure()));
   const core = {
@@ -157,6 +189,7 @@ function scheduling() {
 afterEach(() => {
   adoptQueue([]);
   setPreference('scheduleInEncryptedRooms', true);
+  setPreference('personaProxying', false);
 });
 
 test('an encrypted room falls back to the local queue while the preference allows it', async () => {

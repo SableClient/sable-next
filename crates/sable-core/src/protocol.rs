@@ -412,6 +412,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         valid_until: Option<u64>,
     },
+    DisableRoomPersonas {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     Bookmarks,
     InboxNotifications {
         filter: InboxFilter,
@@ -1180,6 +1184,7 @@ pub enum CommandOk {
         personas: Vec<PersonaView>,
     },
     SetPersonaSelection,
+    DisableRoomPersonas,
     Bookmarks {
         bookmarks: Vec<BookmarkView>,
     },
@@ -2320,6 +2325,7 @@ pub struct PersonaCatalogView {
     pub personas: Vec<PersonaView>,
     pub account: Option<PersonaSelectionView>,
     pub rooms: std::collections::BTreeMap<String, PersonaSelectionView>,
+    pub disabled_rooms: Vec<String>,
 }
 
 /// The SDK loads the body lazily, so it is absent for an event we have never

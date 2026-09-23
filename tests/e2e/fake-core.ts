@@ -891,7 +891,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       event_source: () => ({ type: 'event_source', source: '{}' }),
       personas: () => ({
         type: 'personas',
-        catalog: { personas: [], account: null, rooms: {} },
+        catalog: { personas: [], account: null, rooms: {}, disabled_rooms: [] },
       }),
       save_persona: () => ({ type: 'save_persona', personas: [] }),
       remove_persona: () => ({ type: 'remove_persona', personas: [] }),

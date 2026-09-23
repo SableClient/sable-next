@@ -29,10 +29,17 @@
   let scope = $state<'room' | 'account'>('account');
 
   let selected = $derived(personas.selectionFor(scope === 'room' ? roomId : null));
+  let disabled = $derived(personas.disabledIn(roomId));
   let active = $derived(
-    personas.personas.find((persona) => persona.id === personas.selectionFor(roomId)?.persona_id) ??
-      personas.personas.find((persona) => persona.id === personas.selectionFor(null)?.persona_id) ??
-      null
+    disabled
+      ? null
+      : (personas.personas.find(
+          (persona) => persona.id === personas.selectionFor(roomId)?.persona_id
+        ) ??
+          personas.personas.find(
+            (persona) => persona.id === personas.selectionFor(null)?.persona_id
+          ) ??
+          null)
   );
   let label = $derived(
     active
@@ -64,6 +71,13 @@
       .catch((cause: unknown) => {
         console.warn('[sable personas] the selection could not be saved', cause);
       });
+  }
+
+  function disable(): void {
+    open = false;
+    personas.disable(roomId).catch((cause: unknown) => {
+      console.warn('[sable personas] the selection could not be saved', cause);
+    });
   }
 </script>
 
@@ -102,9 +116,11 @@
         <PersonaMenu
           personas={personas.personas}
           {selected}
+          {disabled}
           {scope}
           onScope={setScope}
           onChoose={choose}
+          onDisable={disable}
         />
       </Popover.Content>
     </Popover.Portal>
@@ -135,9 +151,11 @@
     <PersonaMenu
       personas={personas.personas}
       {selected}
+      {disabled}
       {scope}
       onScope={setScope}
       onChoose={choose}
+      onDisable={disable}
     />
   </BottomSheet>
 {/if}

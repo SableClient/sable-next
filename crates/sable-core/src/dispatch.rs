@@ -455,6 +455,11 @@ impl Core {
                 Ok(CommandOk::SetPersonaSelection)
             }
 
+            Command::DisableRoomPersonas { room_id } => {
+                self.disable_room_personas(room_id).await?;
+                Ok(CommandOk::DisableRoomPersonas)
+            }
+
             Command::SendSticker {
                 room_id,
                 url,

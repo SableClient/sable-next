@@ -1938,7 +1938,7 @@
       },
       "usepmp": {
         "description": "Trimite sub un profil per-mesaj în camera asta",
-        "usage": "/usepmp <id|reset> [durată]"
+        "usage": "/usepmp <id|reset|off> [durată]"
       },
       "pmpproxy": {
         "description": "Adaugă un cod scurt de activare a unui profil per-mesaj",
@@ -2082,6 +2082,7 @@
     "importAvatarFailed": "Importat, dar {{count, number}} de imagini nu au putut fi obținute.",
     "pickerLabel": "Trimite ca",
     "pickerNone": "Implicit",
+    "pickerOff": "Fără profil în această cameră",
     "pickerHeading": "Trimite ca",
     "scopeRoom": "Această cameră",
     "scopeAccount": "Peste tot",

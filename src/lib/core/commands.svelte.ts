@@ -883,6 +883,10 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async disableRoomPersonas(roomId: string): Promise<void> {
+      await transport().send({ type: 'disable_room_personas', room_id: roomId });
+    },
+
     async bookmarks(): Promise<BookmarkView[]> {
       const response = await transport().send({ type: 'bookmarks' });
       return response.bookmarks;
