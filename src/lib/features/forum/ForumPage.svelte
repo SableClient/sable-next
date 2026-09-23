@@ -1,22 +1,16 @@
 <script lang="ts">
   import type { RoomPermissionsView } from '#src/generated/protocol';
-  import { goto } from '$app/navigation';
-  import { resolve } from '$app/paths';
-  import { page } from '$app/state';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import ConversationComposer from '#lib/features/room/ConversationComposer.svelte';
   import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
   import { Conversation } from '#lib/features/room/conversation.svelte.js';
   import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
+  import { leaveRoomView, searchInRoom } from '#lib/features/room/room-navigation.js';
   import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
-  import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
-  import {
-    findRoomByPathId,
-    roomPathParamFromId,
-    useRoomList,
-  } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -120,29 +114,6 @@
     );
   }
 
-  function goBack(): void {
-    if (page.url.pathname.startsWith('/direct/')) {
-      void goto(resolve('direct'));
-      return;
-    }
-    if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
-      void goto(
-        resolve('/(app)/space/[spaceId]', { spaceId: roomPathParamFromId(page.params.spaceId) })
-      );
-      return;
-    }
-    void goto(resolve('/(app)/rooms'));
-  }
-
-  function openSearch(): void {
-    const label = resolvedRoom?.canonical_alias ?? resolvedRoom?.name ?? resolvedRoomId;
-    const scope = label.includes(' ') ? `"${label}"` : label;
-    const target = `${resolve('/(app)/search')}?q=${encodeURIComponent(`in:${scope} `)}`;
-    goto(target).catch(() => {
-      window.location.assign(target);
-    });
-  }
-
   function openThread(eventId: string): void {
     threadRootId = eventId;
   }
@@ -205,27 +176,18 @@
       roomId={resolvedRoomId}
       {roomName}
       {roomAvatar}
-      onBack={goBack}
-      onSearch={openSearch}
+      onBack={leaveRoomView}
+      onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
     />
     <div class="forum-content">
       <div class="forum-compose-area">
         <p class="forum-composer-hint">{$i18n.t('forum.newThreadHint')}</p>
-        <RoomComposer
+        <ConversationComposer
+          {conversation}
           roomId={resolvedRoomId}
           onSend={sendMessage}
-          onSendAttachment={conversation.sendAttachment}
-          onSendGallery={conversation.sendGallery}
-          onSendSticker={conversation.sendSticker}
-          onSendGif={conversation.sendGif}
-          onCreatePoll={conversation.createPoll}
-          onSendLocation={conversation.sendLocation}
-          onTyping={conversation.setTyping}
           {roomName}
           readOnly={permissions ? !permissions.can_post : false}
-          context={conversation.context}
-          onCancelContext={conversation.clearContext}
-          onToggleSilentReply={conversation.toggleSilentReply}
         />
       </div>
       <ForumThreadList
@@ -238,35 +200,19 @@
     </div>
   </div>
 
-  {#if desktop}
-    {#if threadRootId !== null}
-      {#key threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={threadRootId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          onClose={closeThread}
-        />
-      {/key}
-    {/if}
-  {:else}
-    {#if threadRootId !== null}
-      {#key threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={threadRootId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          modal
-          onClose={closeThread}
-        />
-      {/key}
-    {/if}
+  {#if threadRootId !== null}
+    {#key `${threadRootId}:${String(desktop)}`}
+      <ThreadPanel
+        roomId={resolvedRoomId}
+        rootEventId={threadRootId}
+        {roomName}
+        members={memberLoader.members}
+        readOnly={permissions ? !permissions.can_post : false}
+        canRedactOthers={permissions?.can_redact_others ?? false}
+        modal={!desktop}
+        onClose={closeThread}
+      />
+    {/key}
   {/if}
 </main>
 

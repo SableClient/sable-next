@@ -9,7 +9,6 @@
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
-  import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
@@ -20,6 +19,7 @@
     type SwipeGesture,
   } from '#lib/ui/swipe-gesture.js';
 
+  import ConversationComposer from './ConversationComposer.svelte';
   import { Conversation } from './conversation.svelte.js';
   import { timelineMediaItems } from './media-items.js';
   import MediaViewer from './MediaViewer.svelte';
@@ -64,7 +64,7 @@
     onPersonaAvatarClick,
   }: Props = $props();
 
-  let composer = $state<RoomComposer>();
+  let composer = $state<ConversationComposer>();
   let timelineList = $state<TimelineList>();
   let width = $state(27.5);
   let panel = $state<HTMLElement>();
@@ -237,23 +237,13 @@
     />
 
     <div class="thread-composer" onfocusin={(event) => timelineList?.composerFocused(event)}>
-      <RoomComposer
+      <ConversationComposer
         bind:this={composer}
+        {conversation}
         {roomId}
         threadRoot={rootEventId}
         {roomName}
         {readOnly}
-        onSend={conversation.sendMessage}
-        onSendAttachment={conversation.sendAttachment}
-        onSendGallery={conversation.sendGallery}
-        onSendSticker={conversation.sendSticker}
-        onSendGif={conversation.sendGif}
-        onCreatePoll={conversation.createPoll}
-        onSendLocation={conversation.sendLocation}
-        onTyping={conversation.setTyping}
-        context={conversation.context}
-        onCancelContext={conversation.clearContext}
-        onToggleSilentReply={conversation.toggleSilentReply}
         onDeleteEdited={conversation.redact}
         onEditLast={conversation.editLast}
       />

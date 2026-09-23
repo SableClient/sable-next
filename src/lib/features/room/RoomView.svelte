@@ -28,12 +28,14 @@
   import { provideRoomMemberNames } from './room-member-names.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
+  import ConversationComposer from './ConversationComposer.svelte';
   import { Conversation } from './conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { matrixToUrl, roomSectionPath } from '#lib/rooms/permalink.js';
+  import { leaveRoomView, searchInRoom } from './room-navigation.js';
   import {
     findRoomByPathId,
     roomPathParamFromId,
@@ -41,7 +43,6 @@
   } from '#lib/rooms/room-list.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
-  import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
@@ -97,7 +98,7 @@
   let prescreenMedia = $state<CallMedia>({ microphone: true, camera: false });
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
-  let composer = $state<RoomComposer>();
+  let composer = $state<ConversationComposer>();
   let timelineList = $state<TimelineList>();
   let profileOpen = $state(false);
   let receiptsOpen = $state(false);
@@ -475,16 +476,6 @@
     }
   }
 
-  function openSearch(): void {
-    const label = resolvedRoom?.canonical_alias ?? resolvedRoom?.name ?? resolvedRoomId;
-    const scope = label.includes(' ') ? `"${label}"` : label;
-    const target = `${resolve('/(app)/search')}?q=${encodeURIComponent(`in:${scope} `)}`;
-
-    goto(target).catch(() => {
-      window.location.assign(target);
-    });
-  }
-
   function closeProfile(): void {
     profileRequestId += 1;
     profileOpen = false;
@@ -568,22 +559,6 @@
   // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
     void goto(roomUrl(eventId), { reset: false });
-  }
-
-  function goBack(): void {
-    if (page.url.pathname.startsWith('/direct/')) {
-      void goto(resolve('direct'));
-      return;
-    }
-    if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
-      void goto(
-        resolve('/(app)/space/[spaceId]', {
-          spaceId: roomPathParamFromId(page.params.spaceId),
-        })
-      );
-      return;
-    }
-    void goto(resolve('/(app)/rooms'));
   }
 
   function requestHistory(): Promise<boolean> {
@@ -744,9 +719,9 @@
       onCall={callOffered && !isVoiceRoom ? openPrescreen : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
-      onBack={goBack}
+      onBack={leaveRoomView}
       onMembers={toggleMembers}
-      onSearch={openSearch}
+      onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
       onTopic={() => (topicOpen = true)}
       widgets={widgetsButton}
     >
@@ -861,24 +836,14 @@
         {:else}
           {#key resolvedRoomId}
             <ScheduledMessages roomId={resolvedRoomId} />
-            <RoomComposer
+            <ConversationComposer
               bind:this={composer}
+              {conversation}
               roomId={resolvedRoomId}
-              onSend={conversation.sendMessage}
-              onSendAttachment={conversation.sendAttachment}
-              onSendGallery={conversation.sendGallery}
-              onSendSticker={conversation.sendSticker}
-              onSendGif={conversation.sendGif}
-              onCreatePoll={conversation.createPoll}
-              onSendLocation={conversation.sendLocation}
               onSchedule={conversation.schedule}
-              onTyping={conversation.setTyping}
               {roomName}
               readOnly={permissions ? !permissions.can_post : false}
               encrypted={resolvedRoom?.encrypted ?? null}
-              context={conversation.context}
-              onCancelContext={conversation.clearContext}
-              onToggleSilentReply={conversation.toggleSilentReply}
               onDeleteEdited={conversation.redact}
               onEditLast={conversation.editLast}
             />
@@ -1031,7 +996,7 @@
     onOpenChange={(open: boolean) => {
       leaveOpen = open;
     }}
-    onLeft={goBack}
+    onLeft={leaveRoomView}
   />
 
   <RoomSettingsDialog
