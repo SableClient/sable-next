@@ -425,6 +425,9 @@ html {
   --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
   --keyboard-overlap: var(--keyboard-height, 0px);
+  --edge-inset-top: 0px;
+  --edge-inset-bottom: 0px;
+  --sheet-inset-bottom: 0px;
 }
 
 :root[data-tauri-os='android'] {

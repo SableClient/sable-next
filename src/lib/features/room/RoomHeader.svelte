@@ -170,8 +170,8 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-250);
-    min-height: 3.5rem;
-    padding: 0 var(--page-gutter);
+    min-height: calc(3.5rem + var(--edge-inset-top));
+    padding: var(--edge-inset-top) var(--page-gutter) 0;
   }
 
   .room-identity {

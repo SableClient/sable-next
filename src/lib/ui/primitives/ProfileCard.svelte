@@ -82,6 +82,7 @@
   class:tint-light={heroBrightness === 'light'}
   class:tint-dark={heroBrightness === 'dark'}
   style:--profile-hero={heroColor}
+  data-inset-owner={variant === 'sheet' ? 'bottom' : undefined}
 >
   <div class="profile-card-cover" class:has-banner={banner} style:background={color}>
     {#if cover}
@@ -221,6 +222,8 @@
   .profile-card-sheet {
     --profile-cover-height: 6rem;
     --profile-bio-lines: 6;
+
+    padding-bottom: var(--sheet-inset-bottom);
   }
 
   .profile-card-cover.has-banner {

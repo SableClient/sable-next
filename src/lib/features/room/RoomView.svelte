@@ -690,7 +690,11 @@
   <RoomPredecessorNotice onOpen={openPredecessor} />
 {/snippet}
 
-<main class="room-view" aria-label={$i18n.t('timeline.label')}>
+<main
+  class="room-view"
+  aria-label={$i18n.t('timeline.label')}
+  data-inset-owner={voiceView ? 'top' : 'top bottom'}
+>
   <div class="timeline">
     {#snippet widgetsButton()}
       {#if widgets.length > 0}
@@ -1054,7 +1058,7 @@
 
   .composer-dock {
     flex: 0 0 auto;
-    padding-bottom: var(--space-200);
+    padding-bottom: max(var(--space-200), var(--edge-inset-bottom));
   }
 
   @media (width >= 48rem) {

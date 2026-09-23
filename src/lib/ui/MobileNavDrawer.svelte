@@ -199,7 +199,11 @@
         <SidebarNav mobile />
       {/if}
     </section>
-    <section class="drawer-panel content-panel" inert={open && !appLayout.matches}>
+    <section
+      class="drawer-panel content-panel"
+      class:with-quick-tools={showMobileQuickTools}
+      inert={open && !appLayout.matches}
+    >
       <div id="main-content" class="content" tabindex="-1">
         {@render children()}
       </div>
@@ -229,6 +233,9 @@
   }
 
   .drawer-panel {
+    --edge-inset-top: var(--safe-top);
+    --edge-inset-bottom: max(0px, calc(var(--safe-bottom) - var(--keyboard-overlap)));
+
     display: flex;
     flex: 0 0 50%;
     height: 100%;
@@ -256,6 +263,18 @@
 
   .mobile-quick-tools {
     flex: 0 0 auto;
+  }
+
+  @media (width < 48rem) {
+    .navigation-panel,
+    .content-panel.with-quick-tools,
+    .content-panel:has(> .content > :global([data-inset-owner~='bottom'])) {
+      padding-bottom: calc(var(--safe-bottom) - var(--edge-inset-bottom));
+    }
+
+    .content-panel:has(> .content > :global([data-inset-owner~='top'])) {
+      padding-top: 0;
+    }
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -286,6 +305,9 @@
 
     .drawer-panel,
     .content-panel {
+      --edge-inset-top: 0px;
+      --edge-inset-bottom: 0px;
+
       flex-basis: 100%;
       width: 100%;
     }

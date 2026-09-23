@@ -282,8 +282,8 @@
     container-type: inline-size;
     display: grid;
     grid-template-columns: repeat(var(--mobile-slot-count), minmax(0, 1fr));
-    min-height: 4.25rem;
-    padding: var(--space-100) 0;
+    min-height: calc(4.25rem + var(--edge-inset-bottom));
+    padding: var(--space-100) 0 calc(var(--space-100) + var(--edge-inset-bottom));
     position: relative;
     width: 100%;
   }
@@ -298,7 +298,7 @@
     opacity: 0;
     pointer-events: none;
     position: absolute;
-    top: 50%;
+    top: calc(50% - var(--edge-inset-bottom) / 2);
     translate: calc(
         (var(--mobile-selected-index) + 0.5) * 100cqi / var(--mobile-slot-count) - 50%
       ) -50%;

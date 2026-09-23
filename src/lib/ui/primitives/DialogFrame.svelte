@@ -141,8 +141,14 @@
   }
 
   :global(.dialog-content-sheet) {
+    --sheet-inset-bottom: var(--safe-bottom);
+
     overscroll-behavior: contain;
     padding: 0 0 var(--safe-bottom);
+  }
+
+  :global(.dialog-content-sheet:has(> div > [data-inset-owner~='bottom'])) {
+    padding-bottom: 0;
   }
 
   @media (width >= 42rem) {
