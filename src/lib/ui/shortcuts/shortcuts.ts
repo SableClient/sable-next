@@ -67,12 +67,14 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.previousRoom',
     category: 'navigation',
     binding: 'alt+up',
+    allowInEditable: true,
   },
   {
     id: 'navigation.nextRoom',
     labelKey: 'shortcuts.nextRoom',
     category: 'navigation',
     binding: 'alt+down',
+    allowInEditable: true,
   },
   {
     id: 'navigation.nextUnread',
