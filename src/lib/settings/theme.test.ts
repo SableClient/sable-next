@@ -1,6 +1,8 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it } from 'vitest';
 
-import { renameLegacyThemeIdentifiers, resolveTheme } from './theme';
+import { applyTheme, renameLegacyThemeIdentifiers, resolveTheme } from './theme';
 
 describe('resolveTheme', () => {
   it.each([
@@ -10,6 +12,16 @@ describe('resolveTheme', () => {
     ['dark', false, 'dark'],
   ] as const)('resolves %s with system dark %s as %s', (mode, systemPrefersDark, expected) => {
     expect(resolveTheme(mode, systemPrefersDark)).toBe(expected);
+  });
+});
+
+describe('applyTheme', () => {
+  it.each([
+    ['light', true, 'light'],
+    ['dark', false, 'dark'],
+  ] as const)('sets data-theme for %s with system dark %s', (mode, systemPrefersDark, expected) => {
+    applyTheme(mode, systemPrefersDark);
+    expect(document.documentElement.dataset.theme).toBe(expected);
   });
 });
 
