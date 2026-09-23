@@ -157,6 +157,30 @@ test('tapping a vote count with voters opens the voters dialog', async () => {
   view.cleanup();
 });
 
+test('a voters tab switches the list to that answer', async () => {
+  const answers = poll().answers.map((answer) => ({
+    ...answer,
+    voters: answer.id === '0' ? ['@alice:example.org'] : ['@carol:example.org'],
+  }));
+  const view = render({ poll: poll({ answers }) });
+  await tick();
+
+  view.target.querySelector<HTMLButtonElement>('.count-button')?.click();
+  await tick();
+
+  const tabs = [...document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['true', 'false']);
+
+  tabs[1].click();
+  await tick();
+
+  expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
+  const list = document.body.querySelector('.member-list-dialog ul')?.textContent ?? '';
+  expect(list).toContain('carol');
+  expect(list).not.toContain('alice');
+  view.cleanup();
+});
+
 test('the close button reaches the handler only when allowed', async () => {
   const onEnd = vi.fn();
   const view = render({ canEnd: true, onEnd });

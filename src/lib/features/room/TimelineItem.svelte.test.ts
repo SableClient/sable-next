@@ -553,7 +553,7 @@ test('does not mount hidden message dialogs', async () => {
 
   expect(document.querySelector('.sheet-list')).toBeNull();
   expect(document.querySelector('.delete')).toBeNull();
-  expect(document.querySelector('.reactions-dialog')).toBeNull();
+  expect(document.querySelector('.member-list-dialog')).toBeNull();
   expect(document.querySelector('.receipts-dialog')).toBeNull();
   await unmount(instance);
 });
@@ -863,7 +863,7 @@ test('long pressing a reaction opens its people list without toggling it', async
   await tick();
   reaction.click();
 
-  expect(document.querySelector('.reactions-dialog')?.textContent).toContain('Alice');
+  expect(document.querySelector('.member-list-dialog')?.textContent).toContain('Alice');
   expect(document.querySelector('.sheet-list')).toBeNull();
   expect(onToggleReaction).not.toHaveBeenCalled();
   vi.useRealTimers();
