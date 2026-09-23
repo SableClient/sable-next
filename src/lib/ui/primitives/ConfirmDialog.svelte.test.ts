@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { createRawSnippet, mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import ConfirmDialog from './ConfirmDialog.svelte';
 
@@ -18,6 +18,23 @@ test('confirms with the danger variant by default', async () => {
 
   expect(document.querySelector('button[type="submit"]')?.className).toContain('btn-danger');
   expect(document.querySelector('[role="alert"]')).toBeNull();
+
+  await unmount(instance);
+});
+
+test('reports a cancel', async () => {
+  const onCancel = vi.fn();
+  const onConfirm = vi.fn();
+  const instance = mount(ConfirmDialog, {
+    target: document.body,
+    props: { open: true, title: 'Remove', confirmLabel: 'Remove', onCancel, onConfirm },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('button[type="button"]')?.click();
+
+  expect(onCancel).toHaveBeenCalledOnce();
+  expect(onConfirm).not.toHaveBeenCalled();
 
   await unmount(instance);
 });

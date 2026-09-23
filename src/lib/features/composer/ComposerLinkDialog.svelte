@@ -1,7 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -17,8 +16,7 @@
     draft = '';
   }
 
-  function apply(event: SubmitEvent): void {
-    event.preventDefault();
+  function apply(): void {
     const href = draft.trim();
     if (href === '') return;
 
@@ -26,43 +24,18 @@
     onApply(href);
     reset();
   }
-
-  function cancel(): void {
-    open = false;
-    reset();
-  }
 </script>
 
-<DialogFrame bind:open variant="verification" label={$i18n.t('composer.linkTitle')}>
-  <form class="link-dialog" onsubmit={apply}>
-    <h2>{$i18n.t('composer.linkTitle')}</h2>
-    <FormField fieldId="composer-link-url" label={$i18n.t('composer.linkUrl')}>
-      <TextInput id="composer-link-url" bind:value={draft} type="url" autocomplete="off" />
-    </FormField>
-    <div class="actions">
-      <Button type="button" variant="ghost" onclick={cancel}>
-        {$i18n.t('composer.linkCancel')}
-      </Button>
-      <Button type="submit">{$i18n.t('composer.linkApply')}</Button>
-    </div>
-  </form>
-</DialogFrame>
-
-<style>
-  .link-dialog {
-    display: grid;
-    gap: var(--space-400);
-    width: min(24rem, calc(100vw - 2rem));
-  }
-
-  h2 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
-  }
-</style>
+<ConfirmDialog
+  bind:open
+  title={$i18n.t('composer.linkTitle')}
+  confirmLabel={$i18n.t('composer.linkApply')}
+  confirmVariant="secondary"
+  cancelLabel={$i18n.t('composer.linkCancel')}
+  onConfirm={apply}
+  onCancel={reset}
+>
+  <FormField fieldId="composer-link-url" label={$i18n.t('composer.linkUrl')}>
+    <TextInput id="composer-link-url" bind:value={draft} type="url" autocomplete="off" />
+  </FormField>
+</ConfirmDialog>

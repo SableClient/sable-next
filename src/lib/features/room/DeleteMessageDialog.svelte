@@ -1,7 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -22,56 +21,28 @@
   }
 
   function cancel(): void {
-    open = false;
     reason = '';
   }
 </script>
 
-<DialogFrame
+<ConfirmDialog
   bind:open
-  variant="verification"
-  label={$i18n.t('timeline.deleteTitle')}
+  title={$i18n.t('timeline.deleteTitle')}
+  description={$i18n.t('timeline.deleteExplain')}
+  confirmLabel={$i18n.t('timeline.deleteMessage')}
+  cancelLabel={$i18n.t('timeline.cancel')}
   onConfirm={confirm}
+  onCancel={cancel}
 >
-  <div class="delete">
-    <h2>{$i18n.t('timeline.deleteTitle')}</h2>
-    <p class="explain">{$i18n.t('timeline.deleteExplain')}</p>
-    {#if preview}
-      <p class="preview">{preview}</p>
-    {/if}
-    <div class="field">
-      <FormField fieldId="delete-reason" label={$i18n.t('timeline.deleteReason')}>
-        <TextInput id="delete-reason" bind:value={reason} autocomplete="off" />
-      </FormField>
-    </div>
-    <div class="actions">
-      <Button type="button" variant="ghost" onclick={cancel}>{$i18n.t('timeline.cancel')}</Button>
-      <Button type="submit" variant="danger">{$i18n.t('timeline.deleteMessage')}</Button>
-    </div>
-  </div>
-</DialogFrame>
+  {#if preview}
+    <p class="preview">{preview}</p>
+  {/if}
+  <FormField fieldId="delete-reason" label={$i18n.t('timeline.deleteReason')}>
+    <TextInput id="delete-reason" bind:value={reason} autocomplete="off" />
+  </FormField>
+</ConfirmDialog>
 
 <style>
-  /* `DialogFrame`'s verification variant pads the panel already. */
-  .delete {
-    display: grid;
-    gap: var(--space-300);
-    width: min(27rem, calc(100vw - 2rem));
-  }
-
-  h2 {
-    font-size: var(--font-size-heading);
-    line-height: 1.3;
-    margin: 0;
-  }
-
-  .explain {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    line-height: 1.45;
-    margin: 0;
-  }
-
   .preview {
     border-inline-start: calc(var(--border-width) * 2) solid var(--crit-main);
     -webkit-box-orient: vertical;
@@ -84,18 +55,5 @@
     margin: 0;
     overflow: hidden;
     padding-inline-start: var(--space-300);
-  }
-
-  .field {
-    display: grid;
-    gap: var(--space-100);
-    margin-block-start: var(--space-100);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
-    margin-block-start: var(--space-200);
   }
 </style>

@@ -1,8 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import { FOLDER_NAME_MAX_LENGTH, type SidebarFolder } from '#lib/spaces/sidebar-layout.js';
-  import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -29,8 +28,7 @@
     draft = folder.name ?? shownName;
   });
 
-  function submit(event: SubmitEvent): void {
-    event.preventDefault();
+  function submit(): void {
     if (folder === null) return;
 
     onRename(folder.id, draft);
@@ -38,54 +36,20 @@
   }
 </script>
 
-<DialogFrame
+<ConfirmDialog
   open={folder !== null}
   {onOpenChange}
-  variant="verification"
-  label={$i18n.t('nav.folderRename')}
+  title={$i18n.t('nav.folderRename')}
+  description={$i18n.t('nav.folderRenameDescription')}
+  confirmLabel={$i18n.t('nav.folderSave')}
+  confirmVariant="secondary"
+  cancelLabel={$i18n.t('nav.folderCancel')}
+  onConfirm={submit}
+  onCancel={() => {
+    onOpenChange(false);
+  }}
 >
-  <form class="rename" onsubmit={submit}>
-    <h2>{$i18n.t('nav.folderRename')}</h2>
-    <p class="explain">{$i18n.t('nav.folderRenameDescription')}</p>
-    <FormField {fieldId} label={$i18n.t('nav.folderName')}>
-      <TextInput id={fieldId} bind:value={draft} maxlength={FOLDER_NAME_MAX_LENGTH} /></FormField
-    >
-    <div class="actions">
-      <Button
-        type="button"
-        variant="ghost"
-        onclick={() => {
-          onOpenChange(false);
-        }}
-      >
-        {$i18n.t('nav.folderCancel')}
-      </Button>
-      <Button type="submit">{$i18n.t('nav.folderSave')}</Button>
-    </div>
-  </form>
-</DialogFrame>
-
-<style>
-  .rename {
-    display: grid;
-    gap: var(--space-400);
-    width: min(26rem, calc(100vw - 2rem));
-  }
-
-  h2 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .explain {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
-  }
-</style>
+  <FormField {fieldId} label={$i18n.t('nav.folderName')}>
+    <TextInput id={fieldId} bind:value={draft} maxlength={FOLDER_NAME_MAX_LENGTH} />
+  </FormField>
+</ConfirmDialog>

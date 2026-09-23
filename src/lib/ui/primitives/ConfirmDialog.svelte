@@ -18,6 +18,7 @@
     busy?: boolean;
     error?: string | null;
     onConfirm?: () => void;
+    onCancel?: () => void;
     onOpenChange?: (open: boolean) => void;
     children?: Snippet;
   }
@@ -32,12 +33,14 @@
     busy = false,
     error = null,
     onConfirm,
+    onCancel,
     onOpenChange,
     children,
   }: Props = $props();
 
   function cancel(): void {
     open = false;
+    onCancel?.();
   }
 </script>
 
