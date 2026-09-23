@@ -136,6 +136,24 @@ async fn has_open_slot(room: &Room) -> bool {
     false
 }
 
+pub(super) async fn slot_closed(room: &Room) -> bool {
+    let mut closed = false;
+    for event_type in SLOT_TYPES {
+        let content = match stored_slot(room, event_type).await {
+            Some(content) => Some(content),
+            None => fetched_slot(room, event_type).await,
+        };
+        match content {
+            Some(content) if slot_is_open(&content) => return false,
+            Some(content) => {
+                closed |= content.get("status").and_then(Value::as_str) == Some("closed");
+            }
+            None => {}
+        }
+    }
+    closed
+}
+
 pub(super) async fn ensure_open_slot(room: &Room, encrypted: bool) -> bool {
     if has_open_slot(room).await {
         return true;
@@ -156,7 +174,7 @@ pub(super) async fn ensure_open_slot(room: &Room, encrypted: bool) -> bool {
     if encrypted && let Some(slot) = content.as_object_mut() {
         slot.insert(
             "encryption".to_owned(),
-            serde_json::json!({"type": "m.per_member"}),
+            serde_json::json!({"type": "org.matrix.msc4143.per_member"}),
         );
     }
     let Ok(raw) = Raw::new(&content) else {
@@ -209,8 +227,9 @@ impl Core {
         room_id: OwnedRoomId,
         livekit_service_url: Option<String>,
         mode: Option<CallMode>,
+        intent: Option<crate::protocol::CallIntent>,
     ) -> Result<CommandOk, CommandErr> {
-        runtime::join(self, room_id, livekit_service_url, mode).await
+        runtime::join(self, room_id, livekit_service_url, mode, intent).await
     }
 
     pub(crate) async fn call_support(
@@ -253,7 +272,7 @@ impl Core {
         let can_join = can_join_call(
             state_allowed,
             sticky_available,
-            levels.user_can_send_message(&user_id, "m.rtc.member".into()),
+            levels.user_can_send_message(&user_id, membership::RTC_MEMBER_EVENT_TYPE.into()),
         );
 
         Ok(CommandOk::CallSupport(CallSupportView {

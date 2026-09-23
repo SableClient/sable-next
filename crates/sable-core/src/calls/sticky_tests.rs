@@ -24,7 +24,9 @@ async fn room() -> (MatrixMockServer, matrix_sdk::Room) {
 async fn test_send_includes_sticky_duration_and_raw_content() {
     let (server, room) = room().await;
     Mock::given(method("PUT"))
-        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(path_regex(
+            r"/rooms/.*/send/org\.matrix\.msc4143\.rtc\.member/.*",
+        ))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(json!({"event_id": "$sent:example.org"})),
         )
@@ -46,7 +48,12 @@ async fn test_send_includes_sticky_duration_and_raw_content() {
         .await
         .unwrap_or_default()
         .into_iter()
-        .find(|request| request.url.path().contains("/send/m.rtc.member/"))
+        .find(|request| {
+            request
+                .url
+                .path()
+                .contains("/send/org.matrix.msc4143.rtc.member/")
+        })
         .expect("send request");
     assert_eq!(request.method, "PUT");
     assert_eq!(request.headers.get("authorization").unwrap(), "Bearer 1234");
@@ -57,7 +64,7 @@ async fn test_send_includes_sticky_duration_and_raw_content() {
             .find(|(key, _)| key == "org.matrix.msc4354.sticky_duration_ms")
             .unwrap()
             .1,
-        "900000"
+        "3600000"
     );
     let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
     assert_eq!(body["msc4354_sticky_key"], "call");
@@ -67,7 +74,9 @@ async fn test_send_includes_sticky_duration_and_raw_content() {
 async fn test_delayed_send_includes_delay_and_sticky_duration() {
     let (server, room) = room().await;
     Mock::given(method("PUT"))
-        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(path_regex(
+            r"/rooms/.*/send/org\.matrix\.msc4143\.rtc\.member/.*",
+        ))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"delay_id": "$delay"})))
         .mount(server.server())
         .await;
@@ -86,13 +95,18 @@ async fn test_delayed_send_includes_delay_and_sticky_duration() {
         .await
         .unwrap_or_default()
         .into_iter()
-        .find(|request| request.url.path().contains("/send/m.rtc.member/"))
+        .find(|request| {
+            request
+                .url
+                .path()
+                .contains("/send/org.matrix.msc4143.rtc.member/")
+        })
         .expect("delayed send request");
     let query = request.url.query_pairs().collect::<Vec<_>>();
     assert!(query.contains(&("org.matrix.msc4140.delay".into(), "20000".into())));
     assert!(query.contains(&(
         "org.matrix.msc4354.sticky_duration_ms".into(),
-        "900000".into()
+        "3600000".into()
     )));
     assert_eq!(request.headers.get("authorization").unwrap(), "Bearer 1234");
 }
@@ -284,7 +298,9 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
         .sync_joined_room(&client, room_id!("!sticky:example.org"))
         .await;
     Mock::given(method("PUT"))
-        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(path_regex(
+            r"/rooms/.*/send/org\.matrix\.msc4143\.rtc\.member/.*",
+        ))
         .and(header("authorization", "Bearer expired"))
         .respond_with(ResponseTemplate::new(401).set_body_json(
             json!({"errcode":"M_UNKNOWN_TOKEN", "error":"expired", "soft_logout":true}),
@@ -302,7 +318,9 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
         .mount(server.server())
         .await;
     Mock::given(method("PUT"))
-        .and(path_regex(r"/rooms/.*/send/m\.rtc\.member/.*"))
+        .and(path_regex(
+            r"/rooms/.*/send/org\.matrix\.msc4143\.rtc\.member/.*",
+        ))
         .and(header("authorization", "Bearer fresh"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"delay_id":"cleanup"})))
         .expect(1)
@@ -322,7 +340,12 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
     let requests = server.received_requests().await.unwrap();
     let sends: Vec<_> = requests
         .iter()
-        .filter(|request| request.url.path().contains("/send/m.rtc.member/"))
+        .filter(|request| {
+            request
+                .url
+                .path()
+                .contains("/send/org.matrix.msc4143.rtc.member/")
+        })
         .collect();
     assert_eq!(sends.len(), 2);
     assert_eq!(sends[0].url, sends[1].url);
@@ -330,6 +353,6 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
     assert!(
         sends[1].url.query_pairs().any(|(key, value)| key
             == "org.matrix.msc4354.sticky_duration_ms"
-            && value == "900000")
+            && value == "3600000")
     );
 }

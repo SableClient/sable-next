@@ -81,7 +81,11 @@ fn mode_selection_preserves_legacy_and_selects_sticky_only_when_available() {
 #[test]
 fn compatibility_and_matrix2_membership_shapes_match_deployed_element_call() {
     let compatibility = member(CallMode::Compatibility, 7, &["https://sfu.example.org"]);
-    let compatibility = content(&"!room:example.org".try_into().unwrap(), &compatibility);
+    let compatibility = content(
+        &"!room:example.org".try_into().unwrap(),
+        &compatibility,
+        None,
+    );
     assert_eq!(
         compatibility["focus_active"]["focus_selection"],
         "multi_sfu"
@@ -94,7 +98,7 @@ fn compatibility_and_matrix2_membership_shapes_match_deployed_element_call() {
     let mut sticky = member(CallMode::Matrix2, 8, &["https://sfu.example.org"]);
     sticky.member_id = Some("member".to_owned());
     sticky.identity = "identity".to_owned();
-    let sticky = content(&"!room:example.org".try_into().unwrap(), &sticky);
+    let sticky = content(&"!room:example.org".try_into().unwrap(), &sticky, None);
     assert_eq!(sticky["slot_id"], "m.call#ROOM");
     assert_eq!(sticky["member"]["id"], "member");
     assert_eq!(sticky["transports"]["published"][0]["type"], "livekit");
@@ -105,6 +109,7 @@ fn legacy_content_uses_the_room_call_shape_with_an_empty_call_id() {
     let legacy = content(
         &"!room:example.org".try_into().unwrap(),
         &member(CallMode::Legacy, 7, &["https://sfu.example.org"]),
+        None,
     );
     assert_eq!(legacy["application"], "m.call");
     assert_eq!(legacy["call_id"], "");
@@ -196,16 +201,16 @@ async fn pending_key_with_a_custom_membership_id_is_emitted() {
         },
         received: super::keys::now_ms(),
     };
-    let mut state = State {
-        own: member(CallMode::Compatibility, 1, &[]),
-        sticky: super::StickyMemberships::default(),
+    let mut state = State::new(
+        member(CallMode::Compatibility, 1, &[]),
         members,
-        backends: BTreeMap::new(),
-        pending_keys: vec![pending(3, Some("custom-membership"))],
-        distributor: None,
-        own_observed: false,
-        revision: 0,
-    };
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    );
+    state.pending_keys = vec![pending(3, Some("custom-membership"))];
 
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
 
@@ -314,6 +319,10 @@ async fn an_element_call_peers_key_is_emitted_on_the_oldest_members_focus() {
         distributor: None,
         own_observed: false,
         revision: 0,
+        intent: None,
+        slot_closed: false,
+        slot_checked_ms: 0,
+        publisher_attempt_ms: 0,
     };
 
     super::emit_pending(&core, 1, CallSessionId(1), &room_id, &mut state);
@@ -435,6 +444,10 @@ async fn refresh_fixture(
             distributor: None,
             own_observed: observed,
             revision: 0,
+            intent: None,
+            slot_closed: false,
+            slot_checked_ms: 0,
+            publisher_attempt_ms: 0,
         }),
     )
 }
@@ -503,7 +516,7 @@ fn renewal_extends_membership_beyond_four_hours_without_changing_session_identit
     let now = created + 5 * 60 * 60 * 1000;
     for mode in [CallMode::Legacy, CallMode::Compatibility] {
         let member = member(mode, created, &["https://sfu.example.org"]);
-        let body = super::content_at(&owned_room_id!("!room:example.org"), &member, now);
+        let body = super::content_at(&owned_room_id!("!room:example.org"), &member, None, now);
         assert_eq!(body["created_ts"], created);
         assert_eq!(body["membershipID"], member.identity);
         assert_eq!(
@@ -517,4 +530,120 @@ fn renewal_extends_membership_beyond_four_hours_without_changing_session_identit
             created
         );
     }
+}
+
+#[test]
+fn the_call_intent_rides_where_each_membership_format_reads_it() {
+    let room_id = owned_room_id!("!room:example.org");
+    let legacy = content(
+        &room_id,
+        &member(CallMode::Compatibility, 7, &["https://sfu.example.org"]),
+        Some(crate::protocol::CallIntent::Video),
+    );
+    assert_eq!(legacy["m.call.intent"], "video");
+
+    let mut sticky = member(CallMode::Matrix2, 8, &["https://sfu.example.org"]);
+    sticky.member_id = Some("member".to_owned());
+    let sticky = content(&room_id, &sticky, Some(crate::protocol::CallIntent::Audio));
+    assert_eq!(sticky["application"]["m.call.intent"], "audio");
+    assert!(sticky.get("m.call.intent").is_none());
+}
+
+async fn legacy_move_fixture(
+    can_publish: bool,
+) -> (
+    MatrixMockServer,
+    wiremock::MockServer,
+    matrix_sdk::Room,
+    CallMember,
+    CallMember,
+    Mutex<State>,
+) {
+    use wiremock::matchers::{method, path, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = owned_room_id!("!call:example.org");
+    server.sync_joined_room(&client, &room_id).await;
+    let room = client.get_room(&room_id).unwrap();
+    server
+        .mock_room_send_state()
+        .ok(event_id!("$moved"))
+        .mount()
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/openid/request_token$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "access_token": "openid", "token_type": "Bearer",
+            "matrix_server_name": "example.org", "expires_in": 3600,
+        })))
+        .mount(server.server())
+        .await;
+
+    let mut own = member(CallMode::Legacy, 5, &["https://old.example.org"]);
+    own.user_id = client.user_id().unwrap().to_owned();
+    own.device_id = client.device_id().unwrap().to_owned();
+    own.identity = format!("{}:{}", own.user_id, own.device_id);
+    own.member_id = Some(own.identity.clone());
+
+    let sfu = wiremock::MockServer::start().await;
+    let claims = serde_json::json!({
+        "sub": own.identity, "video": {"room": "r", "canPublish": can_publish},
+    });
+    let jwt = format!(
+        "x.{}.x",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(claims.to_string())
+    );
+    Mock::given(method("POST"))
+        .and(path("/sfu/get"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({"url": "wss://oldest.example.org", "jwt": jwt})),
+        )
+        .mount(&sfu)
+        .await;
+
+    let oldest = CallMember {
+        user_id: owned_user_id!("@oldest:example.org"),
+        identity: "@oldest:example.org:DEVICE".to_owned(),
+        ..member(CallMode::Legacy, 1, &[&sfu.uri()])
+    };
+    let state = Mutex::new(State::new(
+        own.clone(),
+        Vec::new(),
+        super::StickyMemberships::default(),
+        &room_id,
+        false,
+        None,
+        false,
+    ));
+    (server, sfu, room, own, oldest, state)
+}
+
+#[tokio::test]
+async fn a_legacy_publisher_follows_the_oldest_members_focus() {
+    let (_homeserver, sfu, room, own, oldest, state) = legacy_move_fixture(true).await;
+
+    let moved =
+        super::follow_oldest_focus(&room, &state, own.clone(), &[oldest, own.clone()]).await;
+
+    assert_eq!(moved.foci, vec![sfu.uri()]);
+    let state = state.lock().await;
+    assert_eq!(state.own.foci, vec![sfu.uri()]);
+    let backend = &state.backends[&backend_id(&room.room_id().to_owned(), &sfu.uri())];
+    assert_eq!(backend.url, "wss://oldest.example.org");
+    assert_eq!(backend.identity, own.identity);
+}
+
+#[tokio::test]
+async fn a_legacy_publisher_stays_put_when_the_oldest_focus_will_not_let_it_publish() {
+    let (_homeserver, _sfu, room, own, oldest, state) = legacy_move_fixture(false).await;
+
+    let kept = super::follow_oldest_focus(&room, &state, own.clone(), &[oldest, own.clone()]).await;
+
+    assert_eq!(kept.foci, own.foci);
+    let state = state.lock().await;
+    assert_eq!(state.own.foci, own.foci);
+    assert!(state.backends.is_empty());
 }

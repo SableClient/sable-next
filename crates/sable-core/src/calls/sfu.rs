@@ -54,6 +54,7 @@ pub(crate) struct Provisioned {
     pub(crate) url: String,
     pub(crate) jwt: String,
     pub(crate) identity: String,
+    pub(crate) can_publish: bool,
 }
 
 fn http_client() -> Option<matrix_sdk::reqwest::Client> {
@@ -115,12 +116,13 @@ pub(crate) async fn provision(
     if provisioned.url.is_empty() || provisioned.jwt.is_empty() {
         return Err(ProvisionError::MalformedResponse);
     }
-    let identity = jwt_identity(&provisioned.jwt)?;
+    let (identity, can_publish) = jwt_claims(&provisioned.jwt)?;
 
     Ok(Provisioned {
         url: provisioned.url,
         jwt: provisioned.jwt,
         identity,
+        can_publish,
     })
 }
 
@@ -199,11 +201,12 @@ async fn provision_request<T: Serialize>(
     if provisioned.url.is_empty() || provisioned.jwt.is_empty() {
         return Err(ProvisionError::MalformedResponse);
     }
-    let identity = jwt_identity(&provisioned.jwt)?;
+    let (identity, can_publish) = jwt_claims(&provisioned.jwt)?;
     Ok(Provisioned {
         url: provisioned.url,
         jwt: provisioned.jwt,
         identity,
+        can_publish,
     })
 }
 
@@ -214,11 +217,13 @@ struct JwtPayload {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct JwtVideo {
     room: String,
+    can_publish: Option<bool>,
 }
 
-fn jwt_identity(jwt: &str) -> Result<String, ProvisionError> {
+fn jwt_claims(jwt: &str) -> Result<(String, bool), ProvisionError> {
     let Some(payload) = jwt.split('.').nth(1) else {
         return Err(ProvisionError::MalformedResponse);
     };
@@ -231,7 +236,7 @@ fn jwt_identity(jwt: &str) -> Result<String, ProvisionError> {
     if payload.sub.is_empty() || payload.video.room.is_empty() {
         return Err(ProvisionError::MalformedResponse);
     }
-    Ok(payload.sub)
+    Ok((payload.sub, payload.video.can_publish.unwrap_or(true)))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -264,7 +269,7 @@ mod tests {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use super::{
-        OpenIdCredentials, ProvisionError, SfuGetTokenRequest, SfuMember, jwt_identity,
+        OpenIdCredentials, ProvisionError, SfuGetTokenRequest, SfuMember, jwt_claims,
         livekit_identity, provision_request,
     };
 
@@ -287,12 +292,22 @@ mod tests {
     #[test]
     fn token_requires_a_subject_and_room() {
         assert_eq!(
-            jwt_identity("x.eyJzdWIiOiJpZCIsInZpZGVvIjp7InJvb20iOiJyIn19.x"),
-            Ok("id".to_owned())
+            jwt_claims("x.eyJzdWIiOiJpZCIsInZpZGVvIjp7InJvb20iOiJyIn19.x"),
+            Ok(("id".to_owned(), true))
         );
         assert_eq!(
-            jwt_identity("x.eyJzdWIiOiIiLCJ2aWRlbyI6eyJyb29tIjoiciJ9fQ.x"),
+            jwt_claims("x.eyJzdWIiOiIiLCJ2aWRlbyI6eyJyb29tIjoiciJ9fQ.x"),
             Err(ProvisionError::MalformedResponse)
+        );
+    }
+
+    #[test]
+    fn a_restricted_token_cannot_publish() {
+        assert_eq!(
+            jwt_claims(
+                "x.eyJzdWIiOiJpZCIsInZpZGVvIjp7InJvb20iOiJyIiwiY2FuUHVibGlzaCI6ZmFsc2V9fQ.x"
+            ),
+            Ok(("id".to_owned(), false))
         );
     }
 

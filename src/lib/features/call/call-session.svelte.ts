@@ -67,7 +67,9 @@ export class CallSession {
   #connected = false;
   #keyCount = 0;
   #backendsRevision = -1;
-  #latestBackends: { revision: number; backends: CallBackendGrant[] } | undefined;
+  #latestBackends:
+    | { revision: number; publisherId: string; backends: CallBackendGrant[] }
+    | undefined;
   #transportConnection: CallTransportState['connection'] | undefined;
   #teardownPromise: Promise<void> | undefined;
   #attemptGeneration = 0;
@@ -137,7 +139,12 @@ export class CallSession {
 
     try {
       const grant = await telemetry.step('call.signaling.join', () =>
-        this.#client.commands.joinCall(roomId, serviceUrl, hasNativeCalls() ? 'legacy' : null)
+        this.#client.commands.joinCall(
+          roomId,
+          serviceUrl,
+          hasNativeCalls() ? 'legacy' : null,
+          media.camera ? 'video' : 'audio'
+        )
       );
       if (attempt !== this.#attemptGeneration) {
         await this.#client.commands.leaveCall(grant.session).catch(ignoreError);
@@ -235,6 +242,7 @@ export class CallSession {
       this.lifecycle = 'connecting';
       const encryptionKeys = this.#pendingKeys.splice(0, this.#pendingKeys.length);
       const connectBackends = this.#latestBackends?.backends ?? grant.backends;
+      const connectPublisherId = this.#latestBackends?.publisherId ?? grant.publisherId;
       this.#keysAccepted = true;
       await telemetry.step('call.transport.connect', async () => {
         await transport.connect({
@@ -243,7 +251,7 @@ export class CallSession {
           microphoneEnabled: media.microphone,
           cameraEnabled: media.camera,
           encryptionKeys: encryptionKeys.map(({ key }) => key),
-          publisherId: grant.publisherId,
+          publisherId: connectPublisherId,
           backends: connectBackends,
         });
         if (transport.getState().connection !== 'connected') {
@@ -259,7 +267,7 @@ export class CallSession {
       if (this.#latestBackends && this.#latestBackends.revision > this.#backendsRevision) {
         const snapshot = this.#latestBackends;
         this.#backendsRevision = snapshot.revision;
-        await transport.reconcileBackends?.(snapshot.backends);
+        await transport.reconcileBackends?.(snapshot.backends, snapshot.publisherId);
       }
       if (attempt !== this.#attemptGeneration) return;
       if (this.#ownKeyPending) this.#markReady();
@@ -369,12 +377,16 @@ export class CallSession {
         event.revision <= (this.#latestBackends?.revision ?? -1)
       )
         return;
-      this.#latestBackends = { revision: event.revision, backends: event.backends };
+      this.#latestBackends = {
+        revision: event.revision,
+        publisherId: event.publisher_id,
+        backends: event.backends,
+      };
       if (!this.#connected) return;
       this.#backendsRevision = event.revision;
       const telemetry = this.#telemetry;
       void this.#media
-        ?.reconcileBackends?.(event.backends)
+        ?.reconcileBackends?.(event.backends, event.publisher_id)
         .catch((error: unknown) => telemetry?.failure('call.backend.reconcile', error));
       return;
     }

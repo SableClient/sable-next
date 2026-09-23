@@ -14,7 +14,7 @@ export type MultiSfuTransportDeps = {
   createTransport?: (options: Parameters<typeof createLivekitTransport>[0]) => LivekitTransport;
 };
 
-const MAX_KEYS_PER_BACKEND = 128;
+const MAX_CACHED_KEYS = 512;
 
 export function createMultiSfuTransport(
   encryptMedia: boolean,
@@ -24,8 +24,10 @@ export function createMultiSfuTransport(
   const transports = new Map<string, LivekitTransport>();
   const unsubscribes = new Map<string, () => void>();
   const listeners = new Set<(state: CallTransportState) => void>();
-  const keys = new Map<string, Map<string, CallEncryptionKey>>();
+  const keys = new Map<string, CallEncryptionKey>();
   let publisherId: string | undefined;
+  let microphoneEnabled = false;
+  let cameraEnabled = false;
   let connectOptions: CallTransportConnectOptions | undefined;
   let state = idleTransportState();
   let generation = 0;
@@ -33,23 +35,23 @@ export function createMultiSfuTransport(
   let disposed = false;
   let desiredBackends = new Map<string, CallBackendGrant>();
 
-  const cacheKey = (backendId: string, key: CallEncryptionKey): void => {
-    const backendKeys = keys.get(backendId) ?? new Map<string, CallEncryptionKey>();
+  const cacheKey = (key: CallEncryptionKey): void => {
     const keyId = `${key.identity}\u0000${key.keyIndex}`;
-    backendKeys.delete(keyId);
-    backendKeys.set(keyId, key);
-    if (backendKeys.size > MAX_KEYS_PER_BACKEND) {
-      const oldest = backendKeys.keys().next().value;
-      if (oldest !== undefined) backendKeys.delete(oldest);
+    keys.delete(keyId);
+    keys.set(keyId, key);
+    if (keys.size > MAX_CACHED_KEYS) {
+      const oldest = keys.keys().next().value;
+      if (oldest !== undefined) keys.delete(oldest);
     }
-    keys.set(backendId, backendKeys);
   };
 
-  const cacheInitialKeys = (options: CallTransportConnectOptions): void => {
-    for (const key of options.encryptionKeys) {
-      if (key.backendId) cacheKey(key.backendId, key);
-      else if (options.backends?.length === 1) cacheKey(options.backends[0].id, key);
-    }
+  const drop = async (backendId: string): Promise<void> => {
+    const transport = transports.get(backendId);
+    if (!transport) return;
+    transports.delete(backendId);
+    unsubscribes.get(backendId)?.();
+    unsubscribes.delete(backendId);
+    await transport.disconnect().catch(() => undefined);
   };
 
   const removeSubscriber = (backendId: string, transport: LivekitTransport): void => {
@@ -112,9 +114,11 @@ export function createMultiSfuTransport(
       })
     );
     try {
-      const encryptionKeys = [...(keys.get(backend.id)?.values() ?? [])];
+      const encryptionKeys = [...keys.values()];
       await transport.connect({
         ...options,
+        microphoneEnabled,
+        cameraEnabled,
         url: backend.url,
         token: backend.jwt,
         encryptionKeys,
@@ -140,9 +144,23 @@ export function createMultiSfuTransport(
   const reconcile = async (
     backends: CallBackendGrant[],
     options?: CallTransportConnectOptions,
-    expectedGeneration = generation
+    expectedGeneration = generation,
+    nextPublisherId?: string
   ): Promise<void> => {
     if (disposed || expectedGeneration !== generation) return;
+    if (
+      options &&
+      nextPublisherId &&
+      nextPublisherId !== publisherId &&
+      backends.some((backend) => backend.id === nextPublisherId)
+    ) {
+      const previousId = publisherId;
+      publisherId = nextPublisherId;
+      await Promise.all(
+        [nextPublisherId, previousId].filter((id) => id !== undefined).map((id) => drop(id))
+      );
+      if (expectedGeneration !== generation) return;
+    }
     const wanted = new Set(backends.map((backend) => backend.id));
     await Promise.all(
       [...transports.entries()]
@@ -174,7 +192,9 @@ export function createMultiSfuTransport(
       if (disposed) throw new Error('transport-disposed');
       publisherId = options.publisherId;
       connectOptions = options;
-      cacheInitialKeys(options);
+      microphoneEnabled = options.microphoneEnabled;
+      cameraEnabled = options.cameraEnabled;
+      for (const key of options.encryptionKeys) cacheKey(key);
       const backends = options.backends ?? [];
       if (!publisherId || backends.length === 0) throw new Error('transport-not-connected');
       desiredBackends = new Map(backends.map((backend) => [backend.id, backend]));
@@ -204,23 +224,20 @@ export function createMultiSfuTransport(
       );
       if (failure) throw failure.reason;
     },
-    setMicrophoneEnabled: async (enabled) =>
-      transports.get(publisherId ?? '')?.setMicrophoneEnabled(enabled),
-    setCameraEnabled: async (enabled) =>
-      transports.get(publisherId ?? '')?.setCameraEnabled(enabled),
-    setEncryptionKey: async (key: CallEncryptionKey, backendId?: string) => {
+    setMicrophoneEnabled: async (enabled) => {
+      microphoneEnabled = enabled;
+      await transports.get(publisherId ?? '')?.setMicrophoneEnabled(enabled);
+    },
+    setCameraEnabled: async (enabled) => {
+      cameraEnabled = enabled;
+      await transports.get(publisherId ?? '')?.setCameraEnabled(enabled);
+    },
+    setEncryptionKey: async (key: CallEncryptionKey) => {
       if (disposed) return;
-      const targetBackendId = backendId ?? key.backendId;
-      if (targetBackendId) {
-        cacheKey(targetBackendId, key);
-        const transport = transports.get(targetBackendId);
-        if (transport) await transport.setEncryptionKey(key);
-      } else {
-        for (const backendId of desiredBackends.keys()) cacheKey(backendId, key);
-        await Promise.all(
-          [...transports.values()].map((transport) => transport.setEncryptionKey(key))
-        );
-      }
+      cacheKey(key);
+      await Promise.all(
+        [...transports.values()].map((transport) => transport.setEncryptionKey(key))
+      );
     },
     subscribe: (listener) => {
       listeners.add(listener);
@@ -234,13 +251,13 @@ export function createMultiSfuTransport(
           transports.get(publisherId ?? '')?.capabilities.screenShare?.setEnabled(enabled),
       },
     },
-    reconcileBackends: async (backends) => {
+    reconcileBackends: async (backends, nextPublisherId) => {
       if (disposed) return;
       desiredBackends = new Map(backends.map((backend) => [backend.id, backend]));
       const expectedGeneration = ++generation;
       queue = queue
         .catch(() => undefined)
-        .then(() => reconcile(backends, connectOptions, expectedGeneration));
+        .then(() => reconcile(backends, connectOptions, expectedGeneration, nextPublisherId));
       await queue;
     },
     rooms: (): readonly CallTransportRoom[] =>

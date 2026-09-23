@@ -10,16 +10,21 @@ use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId, TransactionId};
 use matrix_sdk::{Client, Room};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify};
 
 use super::keys::{self, KeyDistributor, Rolled};
 use super::membership::{self, CallMember, StickyMemberships};
 use super::{HANGUP_DELAY, USE_KEY_DELAY, sfu, sticky};
-use crate::protocol::{CallBackendView, CallMode, CallSessionId, CommandErr, CommandOk, CoreEvent};
+use crate::protocol::{
+    CallBackendView, CallIntent, CallMode, CallSessionId, CommandErr, CommandOk, CoreEvent,
+};
 use crate::{CallSession, Core};
 
 const UPDATE_INTERVAL: Duration = Duration::from_secs(5);
 const RENEW_INTERVAL_MS: u64 = 600_000;
+const STICKY_RENEW_INTERVAL_MS: u64 = 3_300_000;
+const SLOT_CHECK_INTERVAL_MS: u64 = 30_000;
+const PUBLISHER_RETRY_MS: u64 = 30_000;
 
 struct PendingKey {
     sender: OwnedUserId,
@@ -37,6 +42,10 @@ struct State {
     distributor: Option<Arc<Mutex<KeyDistributor>>>,
     own_observed: bool,
     revision: u64,
+    intent: Option<CallIntent>,
+    slot_closed: bool,
+    slot_checked_ms: u64,
+    publisher_attempt_ms: u64,
 }
 
 impl State {
@@ -46,6 +55,8 @@ impl State {
         sticky: StickyMemberships,
         room_id: &OwnedRoomId,
         encrypt_media: bool,
+        intent: Option<CallIntent>,
+        slot_closed: bool,
     ) -> Self {
         let distributor = encrypt_media.then(|| {
             Arc::new(Mutex::new(KeyDistributor::new(
@@ -67,6 +78,10 @@ impl State {
             pending_keys: Vec::new(),
             revision: 0,
             own_observed: false,
+            intent,
+            slot_closed,
+            slot_checked_ms: keys::now_ms(),
+            publisher_attempt_ms: 0,
         }
     }
 }
@@ -116,12 +131,17 @@ fn select_mode(
     Ok(CallMode::Compatibility)
 }
 
-fn content(room_id: &OwnedRoomId, own: &CallMember) -> Value {
-    content_at(room_id, own, keys::now_ms())
+fn content(room_id: &OwnedRoomId, own: &CallMember, intent: Option<CallIntent>) -> Value {
+    content_at(room_id, own, intent, keys::now_ms())
 }
 
-fn content_at(room_id: &OwnedRoomId, own: &CallMember, now_ms: u64) -> Value {
-    if own.mode == CallMode::Matrix2 {
+fn content_at(
+    room_id: &OwnedRoomId,
+    own: &CallMember,
+    intent: Option<CallIntent>,
+    now_ms: u64,
+) -> Value {
+    let mut content = if own.mode == CallMode::Matrix2 {
         json!({
             "application": {"type": "m.call"}, "slot_id": "m.call#ROOM",
             "member": {"user_id": own.user_id, "device_id": own.device_id, "id": own.member_id},
@@ -135,7 +155,16 @@ fn content_at(room_id: &OwnedRoomId, own: &CallMember, now_ms: u64) -> Value {
             "focus_active":{"type":"livekit", "focus_selection":if own.mode == CallMode::Compatibility {"multi_sfu"} else {"oldest_membership"}},
             "foci_preferred":own.foci.iter().map(|service| json!({"type":"livekit", "livekit_service_url":service, "livekit_alias":room_id})).collect::<Vec<_>>()
         })
+    };
+    let target = if own.mode == CallMode::Matrix2 {
+        content.get_mut("application")
+    } else {
+        Some(&mut content)
+    };
+    if let (Some(intent), Some(Value::Object(target))) = (intent, target) {
+        target.insert("m.call.intent".to_owned(), json!(intent));
     }
+    content
 }
 
 fn state_key(
@@ -154,8 +183,9 @@ fn state_key(
 async fn publish_membership(
     room: &Room,
     own: &CallMember,
+    intent: Option<CallIntent>,
 ) -> Result<matrix_sdk::ruma::OwnedEventId, matrix_sdk::Error> {
-    let body = content(&room.room_id().to_owned(), own);
+    let body = content(&room.room_id().to_owned(), own, intent);
     if own.mode == CallMode::Matrix2 {
         sticky::send(&room.client(), room, body).await
     } else {
@@ -197,15 +227,7 @@ async fn discover(
     session: CallSessionId,
     configured: Option<String>,
     requested: Option<CallMode>,
-) -> Result<
-    (
-        CallMember,
-        Vec<CallMember>,
-        StickyMemberships,
-        Option<sticky::StickySync>,
-    ),
-    CommandErr,
-> {
+) -> Result<Discovered, CommandErr> {
     let client = room.client();
     let user = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
     let device = client
@@ -226,8 +248,11 @@ async fn discover(
             tracing::warn!("sticky call membership sync is unavailable");
         }
     }
+    let slot_closed = sticky_sync.is_some() && super::slot_closed(room).await;
     let mut members = membership::active_members(room).await;
-    merge_sticky(&mut members, sticky_members.members(keys::now_ms()));
+    if !slot_closed {
+        merge_sticky(&mut members, sticky_members.members(keys::now_ms()));
+    }
     let requested = if requested.is_none()
         && sticky_sync.is_some()
         && !room
@@ -277,7 +302,21 @@ async fn discover(
         expires_at_ms: None,
         foci: vec![service],
     };
-    Ok((own, members, sticky_members, sticky_sync))
+    Ok(Discovered {
+        own,
+        members,
+        sticky: sticky_members,
+        sticky_sync,
+        slot_closed,
+    })
+}
+
+struct Discovered {
+    own: CallMember,
+    members: Vec<CallMember>,
+    sticky: StickyMemberships,
+    sticky_sync: Option<sticky::StickySync>,
+    slot_closed: bool,
 }
 
 struct Published {
@@ -293,6 +332,7 @@ async fn publish(
     own: &CallMember,
     service: &str,
     encrypted: bool,
+    intent: Option<CallIntent>,
 ) -> Result<Published, CommandErr> {
     let state_key = state_key(room, own);
     let delay = if own.mode == CallMode::Matrix2 {
@@ -316,7 +356,7 @@ async fn publish(
             .await
     };
     let postpone = delay.clone().map(|id| core.spawn_postpone_loop(id));
-    let membership_event = match publish_membership(room, own).await {
+    let membership_event = match publish_membership(room, own, intent).await {
         Ok(event) => event,
         Err(error) => {
             drop(postpone);
@@ -356,79 +396,202 @@ async fn publish(
     })
 }
 
+async fn publish_elsewhere(
+    core: &Core,
+    room: &Room,
+    own: &CallMember,
+    configured: Option<String>,
+    intent: Option<CallIntent>,
+) -> Option<(CallMember, sfu::Provisioned)> {
+    let service = core.resolve_focus(&[], configured, room).await?;
+    if own
+        .foci
+        .first()
+        .is_some_and(|current| same_service(current, &service))
+    {
+        return None;
+    }
+    let moved = CallMember {
+        mode: CallMode::Compatibility,
+        foci: vec![service.clone()],
+        ..own.clone()
+    };
+    if let Err(error) = publish_membership(room, &moved, intent).await {
+        tracing::warn!(%error, "could not move the call membership to our own focus");
+        return None;
+    }
+    match sfu::provision(room, &service, &moved.device_id).await {
+        Ok(provision) if provision.identity == moved.identity && provision.can_publish => {
+            Some((moved, provision))
+        }
+        Ok(_) => None,
+        Err(error) => {
+            tracing::warn!(%error, "could not provision our own focus");
+            None
+        }
+    }
+}
+
+async fn publish_where_allowed(
+    core: &Arc<Core>,
+    room: &Room,
+    state: &Mutex<State>,
+    encrypted: bool,
+    configured: Option<String>,
+) -> Result<(CallMember, Published), CommandErr> {
+    let (mut own, intent) = {
+        let state = state.lock().await;
+        (state.own.clone(), state.intent)
+    };
+    let service = own.foci.first().cloned().ok_or(CommandErr::NoCallFocus)?;
+    let mut published = publish(core, room, &own, &service, encrypted, intent).await?;
+    if !published.provision.can_publish
+        && own.mode == CallMode::Legacy
+        && let Some((moved, provision)) =
+            publish_elsewhere(core, room, &own, configured, intent).await
+    {
+        own = moved;
+        published.provision = provision;
+    }
+    if !published.provision.can_publish {
+        drop(published.postpone);
+        retract(core, room, &own, published.delay).await;
+        return Err(core.failed(
+            "join_call",
+            "the call's focus does not let this account publish",
+        ));
+    }
+    state.lock().await.own = own.clone();
+    Ok((own, published))
+}
+
+fn join_handlers(
+    core: &Arc<Core>,
+    generation: u64,
+    session: CallSessionId,
+    room: &Room,
+    state: &Arc<Mutex<State>>,
+    encrypt_media: bool,
+) -> (Arc<Notify>, Vec<EventHandlerDropGuard>) {
+    let client = room.client();
+    let room_id = room.room_id().to_owned();
+    let wake = Arc::new(Notify::new());
+    let mut handlers = vec![watch_members(&client, &room_id, wake.clone())];
+    if encrypt_media {
+        handlers.push(watch_keys(
+            core,
+            &client,
+            generation,
+            session,
+            room_id,
+            state.clone(),
+        ));
+    }
+    (wake, handlers)
+}
+
+async fn confirm_join(
+    core: &Arc<Core>,
+    generation: u64,
+    session: CallSessionId,
+    room: &Room,
+    state: &Mutex<State>,
+    provision: &sfu::Provisioned,
+    membership_event: &matrix_sdk::ruma::OwnedEventId,
+) -> Option<(String, Vec<CallBackendView>)> {
+    let own = state.lock().await.own.clone();
+    let publisher_id = backend_id(&room.room_id().to_owned(), own.foci.first()?);
+    state.lock().await.backends.insert(
+        publisher_id.clone(),
+        CallBackendView {
+            id: publisher_id.clone(),
+            url: provision.url.clone(),
+            jwt: provision.jwt.clone(),
+            identity: provision.identity.clone(),
+        },
+    );
+    if !refresh(core, generation, session, room, state).await {
+        return None;
+    }
+    let (backends, was_running) = {
+        let state = state.lock().await;
+        (
+            state.backends.values().cloned().collect(),
+            state
+                .members
+                .iter()
+                .any(|member| !member.is_own(&own.user_id, &own.device_id)),
+        )
+    };
+    if !was_running {
+        core.announce_call(room, membership_event).await;
+    }
+    Some((publisher_id, backends))
+}
+
+fn same_service(left: &str, right: &str) -> bool {
+    left.trim_end_matches('/') == right.trim_end_matches('/')
+}
+
 pub(super) async fn join(
     core: &Arc<Core>,
     room_id: OwnedRoomId,
     configured: Option<String>,
     requested: Option<CallMode>,
+    intent: Option<CallIntent>,
 ) -> Result<CommandOk, CommandErr> {
     let generation = core.session_generation.load(Ordering::SeqCst);
     let room = core.room(&room_id).await?;
     let encrypt_media = core.room_is_encrypted(&room).await?;
-    let client = room.client();
     let session = CallSessionId(core.allocate_subscription().0);
-    let (own, members, sticky_members, sticky_sync) =
-        discover(core, &room, session, configured, requested).await?;
-    let mode = own.mode;
-    let service = own.foci.first().cloned().ok_or(CommandErr::NoCallFocus)?;
+    let Discovered {
+        own,
+        members,
+        sticky,
+        sticky_sync,
+        slot_closed,
+    } = discover(core, &room, session, configured.clone(), requested).await?;
     let state = Arc::new(Mutex::new(State::new(
         own.clone(),
         members,
-        sticky_members,
+        sticky,
         &room_id,
         encrypt_media,
+        intent,
+        slot_closed,
     )));
-    let handlers = if encrypt_media {
-        vec![watch_keys(
-            core,
-            &client,
-            generation,
-            session,
-            room_id.clone(),
-            state.clone(),
-        )]
-    } else {
-        Vec::new()
-    };
-    let Published {
-        event: membership_event,
-        provision,
-        delay,
-        postpone,
-    } = publish(core, &room, &own, &service, encrypt_media).await?;
+    let (wake, handlers) = join_handlers(core, generation, session, &room, &state, encrypt_media);
+    let (
+        own,
+        Published {
+            event: membership_event,
+            provision,
+            delay,
+            postpone,
+        },
+    ) = publish_where_allowed(core, &room, &state, encrypt_media, configured).await?;
+    let mode = own.mode;
     let state_key = state_key(&room, &own);
     if core.session_generation.load(Ordering::SeqCst) != generation {
         drop(postpone);
         retract(core, &room, &own, delay).await;
         return Err(CommandErr::NotLoggedIn);
     }
-    let publisher_id = backend_id(&room_id, &service);
-    let publisher = CallBackendView {
-        id: publisher_id.clone(),
-        url: provision.url.clone(),
-        jwt: provision.jwt.clone(),
-        identity: provision.identity.clone(),
-    };
-    state
-        .lock()
-        .await
-        .backends
-        .insert(publisher_id.clone(), publisher);
-    if !refresh(core, generation, session, &room, &state).await {
+    let Some((publisher_id, backends)) = confirm_join(
+        core,
+        generation,
+        session,
+        &room,
+        &state,
+        &provision,
+        &membership_event,
+    )
+    .await
+    else {
         drop(postpone);
         retract(core, &room, &own, delay).await;
         return Err(core.failed("join_call", "call membership was not confirmed"));
-    }
-    let backends = state.lock().await.backends.values().cloned().collect();
-    let was_running = state
-        .lock()
-        .await
-        .members
-        .iter()
-        .any(|member| !member.is_own(&own.user_id, &own.device_id));
-    if !was_running {
-        core.announce_call(&room, &membership_event).await;
-    }
+    };
     let mut calls = core.call_sessions.lock().await;
     if core.session_generation.load(Ordering::SeqCst) != generation {
         drop(calls);
@@ -436,7 +599,15 @@ pub(super) async fn join(
         retract(core, &room, &own, delay).await;
         return Err(CommandErr::NotLoggedIn);
     }
-    let updates = updates(core.clone(), generation, session, room, state, sticky_sync);
+    let updates = updates(
+        core.clone(),
+        generation,
+        session,
+        room,
+        state,
+        sticky_sync,
+        wake,
+    );
     calls.insert(
         session,
         CallSession {
@@ -483,10 +654,15 @@ async fn refresh(
     room: &Room,
     shared: &Mutex<State>,
 ) -> bool {
+    recheck_slot(room, shared).await;
     let mut members = membership::active_members(room).await;
     let own = {
         let mut state = shared.lock().await;
-        merge_sticky(&mut members, state.sticky.members(keys::now_ms()));
+        let mut sticky = state.sticky.members(keys::now_ms());
+        if state.slot_closed {
+            sticky.retain(|member| member.is_own(&state.own.user_id, &state.own.device_id));
+        }
+        merge_sticky(&mut members, sticky);
         let present = own_is_present(&members, &state.own);
         if !present
             && (state.own_observed || keys::now_ms().saturating_sub(state.own.created_ts) > 30_000)
@@ -514,6 +690,18 @@ async fn refresh(
             verified.push(member);
         }
     }
+    let own = if own.mode == CallMode::Legacy {
+        let own = follow_oldest_focus(room, shared, own, &verified).await;
+        if let Some(entry) = verified
+            .iter_mut()
+            .find(|member| member.is_own(&own.user_id, &own.device_id))
+        {
+            entry.clone_from(&own);
+        }
+        own
+    } else {
+        own
+    };
     let mut wanted = BTreeMap::new();
     for member in &verified {
         if let Some(service) = member_service(member, &verified) {
@@ -542,6 +730,39 @@ async fn refresh(
             .filter(|(id, _)| !state.backends.contains_key(id))
             .collect::<Vec<_>>()
     };
+    provision_missing(core, generation, session, room, shared, &own, missing).await;
+    publish_update(core, generation, session, room, shared).await;
+    true
+}
+
+async fn recheck_slot(room: &Room, shared: &Mutex<State>) {
+    let now = keys::now_ms();
+    let due = {
+        let state = shared.lock().await;
+        now.saturating_sub(state.slot_checked_ms) >= SLOT_CHECK_INTERVAL_MS
+            && state
+                .sticky
+                .members(now)
+                .iter()
+                .any(|member| !member.is_own(&state.own.user_id, &state.own.device_id))
+    };
+    if due {
+        let closed = super::slot_closed(room).await;
+        let mut state = shared.lock().await;
+        state.slot_closed = closed;
+        state.slot_checked_ms = now;
+    }
+}
+
+async fn provision_missing(
+    core: &Arc<Core>,
+    generation: u64,
+    session: CallSessionId,
+    room: &Room,
+    shared: &Mutex<State>,
+    own: &CallMember,
+    missing: Vec<(String, String)>,
+) {
     for (id, service) in missing {
         match sfu::provision_remote(
             room,
@@ -572,8 +793,65 @@ async fn refresh(
             ),
         }
     }
-    publish_update(core, generation, session, room, shared).await;
-    true
+}
+
+async fn follow_oldest_focus(
+    room: &Room,
+    shared: &Mutex<State>,
+    own: CallMember,
+    members: &[CallMember],
+) -> CallMember {
+    let Some(target) = member_service(&own, members).map(ToOwned::to_owned) else {
+        return own;
+    };
+    if own
+        .foci
+        .first()
+        .is_some_and(|current| same_service(current, &target))
+    {
+        return own;
+    }
+    let now = keys::now_ms();
+    let intent = {
+        let mut state = shared.lock().await;
+        if now.saturating_sub(state.publisher_attempt_ms) < PUBLISHER_RETRY_MS {
+            return own;
+        }
+        state.publisher_attempt_ms = now;
+        state.intent
+    };
+    let provision = match sfu::provision(room, &target, &own.device_id).await {
+        Ok(provision) if provision.identity == own.identity && provision.can_publish => provision,
+        Ok(_) => {
+            tracing::warn!("the oldest member's focus will not let this device publish");
+            return own;
+        }
+        Err(error) => {
+            tracing::warn!(%error, "could not provision the oldest member's focus");
+            return own;
+        }
+    };
+    let moved = CallMember {
+        foci: vec![target.clone()],
+        ..own.clone()
+    };
+    if let Err(error) = publish_membership(room, &moved, intent).await {
+        tracing::warn!(%error, "could not move the call membership to the oldest member's focus");
+        return own;
+    }
+    let id = backend_id(&room.room_id().to_owned(), &target);
+    let mut state = shared.lock().await;
+    state.own.foci.clone_from(&moved.foci);
+    state.backends.insert(
+        id.clone(),
+        CallBackendView {
+            id,
+            url: provision.url,
+            jwt: provision.jwt,
+            identity: provision.identity,
+        },
+    );
+    moved
 }
 
 async fn publish_update(
@@ -597,18 +875,19 @@ async fn publish_update(
                 members: views,
             },
         );
+        let publisher_id = backend_id(
+            &room.room_id().to_owned(),
+            state.own.foci.first().map_or("", String::as_str),
+        );
         state.revision = state.revision.saturating_add(1);
         core.emit_if_current(
             generation,
             CoreEvent::CallBackends {
                 session,
                 revision: state.revision,
+                publisher_id: publisher_id.clone(),
                 backends: state.backends.values().cloned().collect(),
             },
-        );
-        let publisher_id = backend_id(
-            &room.room_id().to_owned(),
-            state.own.foci.first().map_or("", String::as_str),
         );
         (
             state.members.clone(),
@@ -774,6 +1053,23 @@ fn watch_keys(
     client.event_handler_drop_guard(handle)
 }
 
+fn watch_members(
+    client: &Client,
+    room_id: &OwnedRoomId,
+    wake: Arc<Notify>,
+) -> EventHandlerDropGuard {
+    let handle = client.add_room_event_handler(
+        room_id,
+        move |_: matrix_sdk::ruma::serde::Raw<
+            matrix_sdk::ruma::events::call::member::SyncCallMemberEvent,
+        >| {
+            let wake = wake.clone();
+            async move { wake.notify_one() }
+        },
+    );
+    client.event_handler_drop_guard(handle)
+}
+
 fn updates(
     core: Arc<Core>,
     generation: u64,
@@ -781,29 +1077,41 @@ fn updates(
     room: Room,
     state: Arc<Mutex<State>>,
     mut sync: Option<sticky::StickySync>,
+    wake: Arc<Notify>,
 ) -> crate::Task {
     spawn(async move {
         let mut renewed = keys::now_ms();
         loop {
             if let Some(sync) = sync.as_mut() {
-                if let Ok(events) = sync.sync(&room, UPDATE_INTERVAL).await {
-                    let mut state = state.lock().await;
-                    for event in events {
-                        state.sticky.apply(&event, keys::now_ms());
+                let synced = tokio::select! {
+                    synced = sync.sync(&room, UPDATE_INTERVAL) => Some(synced),
+                    () = wake.notified() => None,
+                };
+                match synced {
+                    Some(Ok(events)) => {
+                        let mut state = state.lock().await;
+                        for event in events {
+                            state.sticky.apply(&event, keys::now_ms());
+                        }
                     }
-                } else {
-                    core.emit_if_current(
-                        generation,
-                        CoreEvent::CallSignalingError {
-                            session,
-                            stage: crate::protocol::CallSignalingStage::Sync,
-                            fatal: false,
-                        },
-                    );
-                    matrix_sdk::sleep::sleep(UPDATE_INTERVAL).await;
+                    Some(Err(_)) => {
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::CallSignalingError {
+                                session,
+                                stage: crate::protocol::CallSignalingStage::Sync,
+                                fatal: false,
+                            },
+                        );
+                        matrix_sdk::sleep::sleep(UPDATE_INTERVAL).await;
+                    }
+                    None => {}
                 }
             } else {
-                matrix_sdk::sleep::sleep(UPDATE_INTERVAL).await;
+                tokio::select! {
+                    () = matrix_sdk::sleep::sleep(UPDATE_INTERVAL) => {}
+                    () = wake.notified() => {}
+                }
             }
             if core.session_generation.load(Ordering::SeqCst) != generation {
                 return;
@@ -817,9 +1125,17 @@ fn updates(
                 );
                 return;
             }
-            if keys::now_ms().saturating_sub(renewed) >= RENEW_INTERVAL_MS {
-                let own = state.lock().await.own.clone();
-                if publish_membership(&room, &own).await.is_ok() {
+            let (own, intent) = {
+                let state = state.lock().await;
+                (state.own.clone(), state.intent)
+            };
+            let renew_interval = if own.mode == CallMode::Matrix2 {
+                STICKY_RENEW_INTERVAL_MS
+            } else {
+                RENEW_INTERVAL_MS
+            };
+            if keys::now_ms().saturating_sub(renewed) >= renew_interval {
+                if publish_membership(&room, &own, intent).await.is_ok() {
                     renewed = keys::now_ms();
                 } else {
                     terminate(

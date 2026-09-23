@@ -911,6 +911,8 @@ pub enum Command {
         livekit_service_url: Option<String>,
         #[serde(default)]
         mode: Option<CallMode>,
+        #[serde(default)]
+        intent: Option<CallIntent>,
     },
 
     CallSupport {
@@ -1542,6 +1544,7 @@ pub enum CoreEvent {
         session: CallSessionId,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
         revision: u64,
+        publisher_id: String,
         backends: Vec<CallBackendView>,
     },
 
@@ -1737,6 +1740,14 @@ pub enum CallMode {
     Compatibility,
     #[serde(rename = "matrix_2")]
     Matrix2,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum CallIntent {
+    Audio,
+    Video,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

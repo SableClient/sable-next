@@ -4,7 +4,7 @@ import type { LivekitTransport } from './livekit-transport';
 import { createMultiSfuTransport } from './multi-sfu-transport';
 import { idleTransportState, type CallTransportState } from './call-transport';
 
-test('connects each backend while publishing media only on the publisher and routes tagged keys', async () => {
+test('connects each backend while publishing media only on the publisher and shares every key', async () => {
   const created: { publishMedia?: boolean; transport: ReturnType<typeof fakeTransport> }[] = [];
   const transport = createMultiSfuTransport(true, undefined, {
     createTransport: (options) => {
@@ -32,9 +32,10 @@ test('connects each backend while publishing media only on the publisher and rou
     expect.objectContaining({ encryptionKeys: [expect.anything()] })
   );
   expect(created[1]?.transport.connect).toHaveBeenCalledWith(
-    expect.objectContaining({ encryptionKeys: [] })
+    expect.objectContaining({ encryptionKeys: [expect.objectContaining({ backendId: 'publish' })] })
   );
   await transport.setEncryptionKey({ identity: 'x', keyIndex: 2, key: new Uint8Array() }, 'remote');
+  expect(created[0].transport.setEncryptionKey).toHaveBeenCalledOnce();
   expect(created[1].transport.setEncryptionKey).toHaveBeenCalledOnce();
 });
 
@@ -294,7 +295,7 @@ test('keeps a deferred publisher when a newer snapshot still desires it', async 
   expect(created[0].disconnect).not.toHaveBeenCalled();
 });
 
-test('routes a tagged pending key only to its backend when that backend appears', async () => {
+test('seeds a backend that appears later with a key tagged for another backend', async () => {
   let releaseRemote!: () => void;
   const remoteReady = new Promise<void>((resolve) => {
     releaseRemote = resolve;
@@ -323,11 +324,12 @@ test('routes a tagged pending key only to its backend when that backend appears'
     encryptionKeys: [],
   });
   await transport.setEncryptionKey({
-    backendId: 'remote',
+    backendId: 'publish',
     identity: 'r',
     keyIndex: 1,
     key: new Uint8Array(),
   });
+  expect(created[0].transport.setEncryptionKey).toHaveBeenCalledOnce();
   const adding = transport.reconcileBackends?.([publisher, remote]);
   await vi.waitFor(() => {
     expect(created).toHaveLength(2);
@@ -336,12 +338,67 @@ test('routes a tagged pending key only to its backend when that backend appears'
   await adding;
   expect(created[1].transport.connect).toHaveBeenCalledWith(
     expect.objectContaining({
-      encryptionKeys: [expect.objectContaining({ backendId: 'remote', identity: 'r' })],
+      encryptionKeys: [expect.objectContaining({ backendId: 'publish', identity: 'r' })],
     })
   );
-  expect(created[0].transport.connect).toHaveBeenCalledWith(
-    expect.objectContaining({ encryptionKeys: [] })
+});
+
+test('a publisher move republishes on the new backend and demotes the old one', async () => {
+  const created: {
+    publishMedia?: boolean;
+    ownIdentity?: string;
+    transport: ReturnType<typeof fakeTransport>;
+  }[] = [];
+  const transport = createMultiSfuTransport(true, undefined, {
+    createTransport: (options) => {
+      const next = fakeTransport();
+      created.push({
+        publishMedia: options.publishMedia,
+        ownIdentity: options.ownIdentity,
+        transport: next,
+      });
+      return next;
+    },
+  });
+  const oldFocus = { id: 'old', url: 'wss://old', jwt: 'old-publish', identity: 'me' };
+  const newFocus = { id: 'new', url: 'wss://new', jwt: 'new-subscribe', identity: 'me' };
+  await transport.connect({
+    url: '',
+    token: '',
+    microphoneEnabled: true,
+    cameraEnabled: false,
+    publisherId: oldFocus.id,
+    backends: [oldFocus, newFocus],
+    encryptionKeys: [{ identity: 'me', keyIndex: 0, key: new Uint8Array() }],
+  });
+  await transport.setMicrophoneEnabled(false);
+  await transport.setCameraEnabled(true);
+  const [oldPublisher, newSubscriber] = created;
+
+  const regranted = { ...newFocus, jwt: 'new-publish' };
+  const demoted = { ...oldFocus, jwt: 'old-subscribe' };
+  await transport.reconcileBackends?.([demoted, regranted], regranted.id);
+
+  expect(oldPublisher.transport.disconnect).toHaveBeenCalledOnce();
+  expect(newSubscriber.transport.disconnect).toHaveBeenCalledOnce();
+  const [, , publisher, subscriber] = created;
+  expect(publisher).toMatchObject({ publishMedia: true, ownIdentity: 'me' });
+  expect(publisher.transport.connect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      url: 'wss://new',
+      token: 'new-publish',
+      microphoneEnabled: false,
+      cameraEnabled: true,
+      encryptionKeys: [expect.objectContaining({ identity: 'me', keyIndex: 0 })],
+    })
   );
+  expect(subscriber).toMatchObject({ publishMedia: false, ownIdentity: undefined });
+  expect(subscriber.transport.connect).toHaveBeenCalledWith(
+    expect.objectContaining({ url: 'wss://old', token: 'old-subscribe' })
+  );
+  await transport.setMicrophoneEnabled(true);
+  expect(publisher.transport.setMicrophoneEnabled).toHaveBeenCalledWith(true);
+  expect(subscriber.transport.setMicrophoneEnabled).not.toHaveBeenCalled();
 });
 
 test('does not report connected when the publisher is absent', async () => {

@@ -152,7 +152,7 @@ fn rejoined(shared: &CallMember, members: &[CallMember]) -> bool {
     members.iter().any(|member| {
         member.user_id == shared.user_id
             && member.device_id == shared.device_id
-            && member.created_ts != shared.created_ts
+            && !member.same_generation(shared)
     })
 }
 
@@ -442,6 +442,22 @@ mod tests {
                 targets: vec![after]
             },
             "a rejoiner cleared its keys, so it needs the current one again"
+        );
+    }
+
+    #[test]
+    fn test_a_renewed_sticky_membership_is_not_a_rejoin() {
+        let sticky = |created_ts| CallMember {
+            member_id: Some("member".to_owned()),
+            mode: crate::protocol::CallMode::Matrix2,
+            ..member("PHONE", created_ts)
+        };
+        let current = key_shared_with(&[sticky(100)], 1_000);
+
+        assert_eq!(
+            plan_rollout(Some(&current), &[sticky(3_600_100)], 3_600_200, 10_000),
+            Rollout::Unchanged,
+            "a renewal keeps its member id, so it still holds the current key"
         );
     }
 

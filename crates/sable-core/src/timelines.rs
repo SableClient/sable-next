@@ -257,6 +257,7 @@ fn is_signaling_event(event: &AnySyncTimelineEvent) -> bool {
     matches!(
         event_type.as_str(),
         "m.rtc.member"
+            | "org.matrix.msc4143.rtc.member"
             | "io.element.call.encryption_keys"
             | "org.matrix.msc4075.rtc.notification"
             | "org.matrix.msc4310.rtc.decline"
@@ -336,6 +337,7 @@ mod tests {
         let rules = matrix_sdk::ruma::room_version_rules::RoomVersionRules::V11;
         let event_json = [
             ("m.rtc.member", "{}", true),
+            ("org.matrix.msc4143.rtc.member", "{}", true),
             ("io.element.call.encryption_keys", "{}", true),
             (
                 "org.matrix.msc4075.rtc.notification",

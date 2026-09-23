@@ -7,7 +7,7 @@ use ruma::exports::http;
 use ruma::serde::Raw;
 use serde_json::Value;
 
-const STICKY_DURATION_MS: u32 = 900_000;
+const STICKY_DURATION_MS: u32 = 3_600_000;
 
 #[derive(Debug)]
 pub(super) enum StickySyncError {
@@ -92,7 +92,7 @@ pub(super) async fn send(
     let mut request = v3::Request::new_raw(
         room.room_id().to_owned(),
         ruma::TransactionId::new(),
-        MessageLikeEventType::from("m.rtc.member"),
+        MessageLikeEventType::from(super::membership::RTC_MEMBER_EVENT_TYPE),
         Raw::new(&content)?.cast_unchecked(),
     );
     request.sticky_duration_ms = Some(StickyDurationMs::new_clamped(STICKY_DURATION_MS));
@@ -148,7 +148,7 @@ pub(super) async fn send_delayed(
     let request = DelayedRequest::new_raw(
         room.room_id().to_owned(),
         ruma::TransactionId::new(),
-        MessageLikeEventType::from("m.rtc.member"),
+        MessageLikeEventType::from(super::membership::RTC_MEMBER_EVENT_TYPE),
         ruma::api::client::delayed_events::DelayParameters::Timeout { timeout: delay },
         Raw::new(&content)?.cast_unchecked(),
     );

@@ -12,6 +12,12 @@ use sha2::{Digest as _, Sha256};
 
 use crate::protocol::CallMode;
 
+pub(crate) const RTC_MEMBER_EVENT_TYPE: &str = "org.matrix.msc4143.rtc.member";
+
+pub(crate) fn is_rtc_member_type(event_type: &str) -> bool {
+    event_type == RTC_MEMBER_EVENT_TYPE || event_type == "m.rtc.member"
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StickyMember {
     pub(crate) user_id: OwnedUserId,
@@ -229,7 +235,11 @@ impl StickyMemberships {
     pub(crate) fn apply(&mut self, value: &serde_json::Value, now_ms: u64) -> bool {
         use serde_json::Value;
         self.entries.retain(|_, entry| entry.expires_at_ms > now_ms);
-        if value.get("type").and_then(Value::as_str) != Some("m.rtc.member") {
+        if !value
+            .get("type")
+            .and_then(Value::as_str)
+            .is_some_and(is_rtc_member_type)
+        {
             return false;
         }
         let Some(content) = value.get("content").and_then(Value::as_object) else {
@@ -287,9 +297,12 @@ impl StickyMemberships {
         }) {
             return false;
         }
-        let tombstone = content
-            .keys()
-            .all(|field| field == "sticky_key" || field == "msc4354_sticky_key");
+        let tombstone = content.keys().all(|field| {
+            matches!(
+                field.as_str(),
+                "sticky_key" | "msc4354_sticky_key" | "slot_id"
+            )
+        });
         let member = if tombstone {
             None
         } else {
@@ -509,6 +522,18 @@ mod tests {
         assert!(store.members(200).is_empty());
         assert!(!store.apply(&event, 300));
         assert!(store.members(300).is_empty());
+    }
+
+    #[test]
+    fn a_sticky_leave_that_names_its_slot_is_a_tombstone() {
+        let mut store = super::StickyMemberships::default();
+        assert!(store.apply(&sticky_event("$a", 100), 100));
+        let mut leave = sticky_event("$b", 200);
+        leave["type"] = serde_json::json!("org.matrix.msc4143.rtc.member");
+        leave["content"] =
+            serde_json::json!({"slot_id":"m.call#ROOM", "msc4354_sticky_key":"member"});
+        assert!(store.apply(&leave, 200));
+        assert!(store.members(200).is_empty());
     }
 
     #[test]

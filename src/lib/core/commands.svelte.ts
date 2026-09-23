@@ -36,6 +36,7 @@ import type {
   RoomOpenView,
   RoomPermissionsView,
   CallSupportView,
+  CallIntent,
   CallMode,
   RoomPowerLevelsView,
   RoomVersionsView,
@@ -428,13 +429,15 @@ export function createCommands(transport: () => Transport) {
     async joinCall(
       roomId: string,
       livekitServiceUrl: string | null = null,
-      mode: CallMode | null = null
+      mode: CallMode | null = null,
+      intent: CallIntent | null = null
     ): Promise<CallGrant> {
       const response = await transport().send({
         type: 'join_call',
         room_id: roomId,
         livekit_service_url: livekitServiceUrl,
         mode: mode ?? null,
+        intent,
       });
       return {
         session: response.session,

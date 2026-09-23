@@ -656,10 +656,38 @@ test('latest backend snapshot before connect overrides the grant backends', asyn
     type: 'call_backends',
     session: 7,
     revision: 2,
+    publisher_id: 'new',
     backends: [{ id: 'new', url: 'wss://new', jwt: 'jwt', identity: 'new' }],
-  } as unknown as CoreEvent);
+  });
   await joining;
   expect(connect).toHaveBeenCalledWith(
-    expect.objectContaining({ backends: [expect.objectContaining({ id: 'new' })] })
+    expect.objectContaining({
+      publisherId: 'new',
+      backends: [expect.objectContaining({ id: 'new' })],
+    })
   );
+});
+
+test('a join sends the camera intent', async () => {
+  const h = harness();
+  const session = new CallSession(h.client, { createTransport: () => h.transport });
+  await session.join('!room:example.org', { microphone: true, camera: true });
+  expect(h.joinCall).toHaveBeenCalledWith('!room:example.org', null, null, 'video');
+  await session.leave();
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  expect(h.joinCall).toHaveBeenLastCalledWith('!room:example.org', null, null, 'audio');
+});
+
+test('a backend snapshot after connect forwards its publisher id', async () => {
+  const h = harness();
+  const reconcileBackends = vi.fn(() => Promise.resolve());
+  h.transport.reconcileBackends = reconcileBackends;
+  const session = new CallSession(h.client, { createTransport: () => h.transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  const backends = [
+    { id: 'old', url: 'wss://old', jwt: 'old', identity: 'me' },
+    { id: 'new', url: 'wss://new', jwt: 'new', identity: 'me' },
+  ];
+  h.emit({ type: 'call_backends', session: 7, revision: 3, publisher_id: 'new', backends });
+  expect(reconcileBackends).toHaveBeenCalledWith(backends, 'new');
 });

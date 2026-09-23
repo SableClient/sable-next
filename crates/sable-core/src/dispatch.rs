@@ -655,7 +655,11 @@ impl Core {
                 room_id,
                 livekit_service_url,
                 mode,
-            } => self.join_call(room_id, livekit_service_url, mode).await,
+                intent,
+            } => {
+                self.join_call(room_id, livekit_service_url, mode, intent)
+                    .await
+            }
 
             Command::CallSupport {
                 room_id,
@@ -2244,7 +2248,7 @@ impl Core {
                     if encrypted && !public {
                         slot.insert(
                             "encryption".to_owned(),
-                            serde_json::json!({"type": "m.per_member"}),
+                            serde_json::json!({"type": "org.matrix.msc4143.per_member"}),
                         );
                     }
                     request.initial_state.push(
