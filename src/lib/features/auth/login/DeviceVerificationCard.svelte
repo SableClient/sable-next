@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { EncryptionStatusView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
+  import { DeviceVerification } from '#lib/core/device-verification.svelte.js';
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -21,50 +22,30 @@
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
   let recovered = $state(false);
-  let recoveryKey = $state('');
-  let requesting = $state(false);
-  let recovering = $state(false);
-  let error = $state<string | null>(null);
+  const verification = new DeviceVerification(core);
   let verified = $derived(status?.verification === 'verified' || recovered);
 
   async function refresh(): Promise<void> {
     loading = true;
-    error = null;
+    verification.error = null;
     try {
       status = await core.commands.encryptionStatus();
     } catch (cause) {
-      error = verificationErrorMessage(cause);
+      verification.error = verificationErrorMessage(cause);
     } finally {
       loading = false;
     }
   }
 
   async function verify(): Promise<void> {
-    const key = recoveryKey.trim();
-    error = null;
-    if (key) {
-      recovering = true;
-      try {
-        await core.commands.recoverIdentity(key);
-        recoveryKey = '';
+    verification.error = null;
+    if (verification.recoveryKey.trim()) {
+      await verification.recoverIdentity(() => {
         recovered = true;
-      } catch (cause) {
-        error = verificationErrorMessage(cause, { invalidRecoveryKey: true });
-      } finally {
-        recovering = false;
-      }
+      });
       return;
     }
-
-    if (!core.session?.user_id) return;
-    requesting = true;
-    try {
-      await core.requestVerification(core.session.user_id);
-    } catch (cause) {
-      error = verificationErrorMessage(cause);
-    } finally {
-      requesting = false;
-    }
+    await verification.requestVerification();
   }
 
   $effect(() => {
@@ -103,10 +84,10 @@
       <AuthField fieldId="login-recovery-key" label={$i18n.t('settings.recoveryKey')}>
         <TextInput
           id="login-recovery-key"
-          bind:value={recoveryKey}
+          bind:value={verification.recoveryKey}
           autocomplete="off"
           autocapitalize="none"
-          disabled={requesting || recovering}
+          disabled={verification.requesting || verification.recovering}
           spellcheck={false}
           type="password"
           placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
@@ -114,13 +95,13 @@
       </AuthField>
     {/if}
 
-    <AuthStatusSlot message={error} />
+    <AuthStatusSlot message={verification.error} />
 
     <Button
       type="submit"
       variant="primary"
       block
-      loading={requesting || recovering}
+      loading={verification.requesting || verification.recovering}
       disabled={loading || !status}
     >
       {$i18n.t('settings.verify')}

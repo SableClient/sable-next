@@ -5,7 +5,7 @@
 
   import type { RecoveryStateView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
-  import { verificationErrorMessage } from '#lib/core/verification-errors.js';
+  import { DeviceVerification } from '#lib/core/device-verification.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -20,50 +20,21 @@
   }
 
   let { recovery, inputId = 'device-recovery-key', onRequested, onRecovered }: Props = $props();
-  const core = useCoreClient();
-  let recoveryKey = $state('');
-  let recovering = $state(false);
-  let requesting = $state(false);
-  let error = $state<string | null>(null);
+  const verification = new DeviceVerification(useCoreClient());
   let selectedMethod = $state<'recovery' | null>(null);
-
-  async function startVerification(): Promise<void> {
-    if (!core.session?.user_id) return;
-    requesting = true;
-    error = null;
-    try {
-      await core.requestVerification(core.session.user_id);
-      await onRequested?.();
-    } catch (cause) {
-      error = verificationErrorMessage(cause);
-    } finally {
-      requesting = false;
-    }
-  }
-
-  async function recoverIdentity(): Promise<void> {
-    const key = recoveryKey.trim();
-    if (!key) return;
-    recovering = true;
-    error = null;
-    try {
-      await core.commands.recoverIdentity(key);
-      recoveryKey = '';
-      await onRecovered?.();
-    } catch (cause) {
-      error = verificationErrorMessage(cause, { invalidRecoveryKey: true });
-    } finally {
-      recovering = false;
-    }
-  }
 </script>
 
 <div class="verification-methods">
-  {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
+  {#if verification.error}<Alert variant="critical" role="alert">{verification.error}</Alert>{/if}
 
   {#if selectedMethod === null}
     <div class="method-choices">
-      <Button block variant="secondary" loading={requesting} onclick={startVerification}>
+      <Button
+        block
+        variant="secondary"
+        loading={verification.requesting}
+        onclick={() => verification.requestVerification(onRequested)}
+      >
         <DesktopTowerIcon aria-hidden="true" />
         {$i18n.t('settings.anotherSignedInDevice')}
       </Button>
@@ -81,7 +52,7 @@
       size="small"
       onclick={() => {
         selectedMethod = null;
-        error = null;
+        verification.error = null;
       }}
     >
       <ArrowLeftIcon aria-hidden="true" />
@@ -92,23 +63,27 @@
       class="verification-method recovery-method"
       onsubmit={(event) => {
         event.preventDefault();
-        void recoverIdentity();
+        void verification.recoverIdentity(onRecovered);
       }}
     >
       <Label for={inputId}>{$i18n.t('settings.useRecoveryKey')}</Label>
       <div class="recovery-controls">
         <TextInput
           id={inputId}
-          bind:value={recoveryKey}
+          bind:value={verification.recoveryKey}
           autocomplete="off"
           autocapitalize="none"
-          disabled={recovering}
+          disabled={verification.recovering}
           autofocus
           spellcheck={false}
           type="password"
           placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
         />
-        <Button type="submit" loading={recovering} disabled={!recoveryKey.trim()}>
+        <Button
+          type="submit"
+          loading={verification.recovering}
+          disabled={!verification.recoveryKey.trim()}
+        >
           {$i18n.t('settings.verify')}
         </Button>
       </div>
