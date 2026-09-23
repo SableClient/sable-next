@@ -173,7 +173,12 @@ pub(crate) fn unread_counts(item: &RoomListItem, latest_event_id: Option<&EventI
         return local;
     }
 
-    (local.0.max(server.0), local.1.max(server.1))
+    let highlight = if item.encryption_state().is_encrypted() {
+        local.1
+    } else {
+        server.1
+    };
+    (local.0.max(server.0), highlight)
 }
 
 const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {

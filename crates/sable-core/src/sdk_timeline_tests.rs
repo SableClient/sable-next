@@ -746,6 +746,63 @@ async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
 }
 
 #[tokio::test]
+async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!old-mentions:example.org");
+    let me = client
+        .user_id()
+        .expect("the mock client is logged in")
+        .to_owned();
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let mention = |event_id| {
+        factory
+            .text_msg("hey")
+            .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
+                me.clone()
+            ]))
+            .event_id(event_id)
+            .into_raw()
+    };
+    let rules = matrix_sdk::ruma::push::Ruleset::server_default(&me);
+    let joined = JoinedRoomBuilder::new(room_id)
+        .add_state_event(factory.member(&me))
+        .add_state_event(factory.default_power_levels())
+        .add_timeline_bulk([mention(event_id!("$one")), mention(event_id!("$two"))])
+        .add_receipt(
+            factory
+                .read_receipts()
+                .add(
+                    event_id!("$uncached"),
+                    &me,
+                    ReceiptType::Read,
+                    ReceiptThread::Unthreaded,
+                )
+                .into_event(),
+        )
+        .set_unread_notifications_count(json!({
+            "notification_count": 0,
+            "highlight_count": 0,
+        }));
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(factory.push_rules(rules));
+            builder.add_joined_room(joined);
+        })
+        .await;
+    let item =
+        matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
+
+    assert_eq!(item.num_unread_mentions(), 2);
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        (2, 0)
+    );
+}
+
+#[tokio::test]
 async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
