@@ -95,6 +95,37 @@ test('escaped and invalid MFM stay literal', () => {
   }
 });
 
+test('MFM that runs past a spoiler stays literal inside it', () => {
+  const source = '||secret $[fg.color=f00 red|| tail]';
+  const message = serializePlain(textDoc(source));
+
+  expect(message.body).toBe(source);
+  expect(message.formatted).toBe('<span data-mx-spoiler="">secret $[fg.color=f00 red</span> tail]');
+});
+
+test('MFM inside a spoiler colours the hidden text', () => {
+  const plain = serializePlain(textDoc('||a $[fg.color=f00 b]||'));
+  expect(plain.formatted).toBe(
+    '<span data-mx-spoiler="">a </span><span data-mx-color="#ff0000"><span data-mx-spoiler="">b</span></span>'
+  );
+
+  const rich = serializeComposer(
+    docOf(para(composerSchema.text('a $[fg.color=f00 b]', [spoiler.create()])))
+  );
+  expect(rich.body).toBe('[Spoiler]');
+  expect(rich.formatted).toBe(plain.formatted);
+});
+
+test('a spoiler inside MFM stays inside the colour', () => {
+  const source = '$[fg.color=f00 a ||b|| c]';
+  const message = serializePlain(textDoc(source));
+
+  expect(message.body).toBe(source);
+  expect(message.formatted).toBe(
+    '<span data-mx-color="#ff0000">a <span data-mx-spoiler="">b</span> c</span>'
+  );
+});
+
 test('a bold mark serialises to markdown in the body and html in the formatted body', () => {
   const message = serializeComposer(
     docOf(

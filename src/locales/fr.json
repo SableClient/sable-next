@@ -600,6 +600,8 @@
     "today": "Aujourd’hui",
     "yesterday": "Hier",
     "messageTimestamp": "{{date}} {{time}}",
+    "timeMarkupDetail": "Heure locale : {{local}}\nUTC : {{utc}}",
+    "timeMarkupDetailWithSender": "Heure locale : {{local}}\nExpéditeur ({{timezone}}) : {{sender}}\nUTC : {{utc}}",
     "membership": {
       "joined": "{{user}} a rejoint le salon",
       "left": "{{user}} a quitté le salon",

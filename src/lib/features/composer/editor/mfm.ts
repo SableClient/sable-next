@@ -24,7 +24,8 @@ export function mfmTimeInputRule(type: NodeType): InputRule {
 
 export function mfmPlugin(markdown: MarkdownIt): void {
   markdown.inline.ruler.before('emphasis', 'mfm', (state, silent) => {
-    const slice = state.src.slice(state.pos);
+    const start = state.pos;
+    const slice = state.src.slice(start, state.posMax);
     const unix = parseMfmUnixtime(slice);
     if (unix) {
       if (!silent) {
@@ -38,6 +39,9 @@ export function mfmPlugin(markdown: MarkdownIt): void {
     const color = parseMfmColor(slice);
     if (!color) return false;
     if (!silent) {
+      const max = state.posMax;
+      state.pos = start + color.offset;
+      state.posMax = state.pos + color.text.length;
       if (color.args.fg) {
         const open = state.push('mfm_fg_open', 'span', 1);
         open.attrSet('value', color.args.fg);
@@ -46,11 +50,12 @@ export function mfmPlugin(markdown: MarkdownIt): void {
         const open = state.push('mfm_bg_open', 'span', 1);
         open.attrSet('value', color.args.bg);
       }
-      state.md.inline.parse(color.text, state.md, state.env, state.tokens);
+      state.md.inline.tokenize(state);
       if (color.args.bg) state.push('mfm_bg_close', 'span', -1);
       if (color.args.fg) state.push('mfm_fg_close', 'span', -1);
+      state.posMax = max;
     }
-    state.pos += color.raw.length;
+    state.pos = start + color.raw.length;
     return true;
   });
 }

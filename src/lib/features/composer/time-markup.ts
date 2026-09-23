@@ -1,6 +1,6 @@
-import i18next from 'i18next';
+import { currentLocale } from '#lib/i18n.js';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MFM_SPAN_LIMIT = 2048;
 
 const HEX = '[0-9a-fA-F]';
 const COLOR_VALUE = `#?(?:${HEX}{6}|${HEX}{3})(?![0-9a-fA-F])`;
@@ -27,10 +27,6 @@ export function isOpaqueMatrixColor(value: string): boolean {
   return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value);
 }
 
-function locale(): string {
-  return i18next.resolvedLanguage ?? i18next.language;
-}
-
 function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
@@ -47,7 +43,8 @@ export function normalizeMfmHex(value: string): string | undefined {
 
 function mfmCloseIndex(src: string): number {
   let depth = 0;
-  for (let index = 1; index < src.length; index += 1) {
+  const end = Math.min(src.length, MFM_SPAN_LIMIT);
+  for (let index = 1; index < end; index += 1) {
     const character = src[index];
     if (character === '\\') {
       index += 1;
@@ -62,7 +59,7 @@ function mfmCloseIndex(src: string): number {
 
 export function parseMfmColor(
   src: string
-): { raw: string; args: MfmColorArgs; text: string } | null {
+): { raw: string; args: MfmColorArgs; text: string; offset: number } | null {
   if (!src.startsWith('$[fg.color=') && !src.startsWith('$[bg.color=')) return null;
   const close = mfmCloseIndex(src);
   if (close < 0) return null;
@@ -74,7 +71,8 @@ export function parseMfmColor(
   const args = parseMfmColorArgs(match[1].trimEnd());
   const text = match[2].trim();
   if (!args || text === '') return null;
-  return { raw: src.slice(0, close + 1), args, text };
+  const offset = 2 + match[1].length + match[2].length - match[2].trimStart().length;
+  return { raw: src.slice(0, close + 1), args, text, offset };
 }
 
 export function parseMfmColorArgs(argsPart: string): MfmColorArgs | null {
@@ -169,10 +167,22 @@ export function parseZonedDatetime(value: string): ZonedInstant | null {
 export function utcFallbackLabel(datetime: string): string {
   const zoned = parseZonedDatetime(datetime);
   if (!zoned) return datetime;
-  const value = zoned.datetime;
-  const month = MONTHS[Number(value.slice(5, 7)) - 1] ?? '';
-  const offset = value.endsWith('Z') ? 'UTC' : `UTC${value.slice(-6)}`;
-  return `${String(Number(value.slice(8, 10)))} ${month} ${value.slice(0, 4)}, ${value.slice(11, 16)} (${offset})`;
+  const offset = zoned.datetime.endsWith('Z') ? '' : zoned.datetime.slice(-6);
+  const minutes =
+    offset === ''
+      ? 0
+      : (offset.startsWith('-') ? -1 : 1) *
+        (Number(offset.slice(1, 3)) * 60 + Number(offset.slice(4, 6)));
+  const label = new Intl.DateTimeFormat(currentLocale(), {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(zoned.instant + minutes * 60_000));
+  return `${label} (UTC${offset})`;
 }
 
 export function unixSecondsOf(datetime: string): string | null {
@@ -193,7 +203,7 @@ export function formatUtcTime(instant: number, hour24: boolean): string {
 }
 
 function formatClockTime(instant: number, timeZone: string, hour24: boolean): string {
-  return new Intl.DateTimeFormat(locale(), {
+  return new Intl.DateTimeFormat(currentLocale(), {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
@@ -229,7 +239,7 @@ function formatZonedTime(instant: number, timeZone: string, hour24: boolean): st
     return formatClockTime(instant, timeZone, hour24);
   }
 
-  return new Intl.DateTimeFormat(locale(), {
+  return new Intl.DateTimeFormat(currentLocale(), {
     timeZone,
     day: 'numeric',
     month: 'long',
