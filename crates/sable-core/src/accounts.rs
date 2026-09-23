@@ -609,7 +609,11 @@ impl Core {
                         state,
                         SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
                     );
+                    let running = matches!(state, SyncState::Running);
                     core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(state)));
+                    if running {
+                        core.reconcile_memberships().await;
+                    }
 
                     if stalled {
                         failures = failures.saturating_add(1);

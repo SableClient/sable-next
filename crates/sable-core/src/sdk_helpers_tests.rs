@@ -410,3 +410,46 @@ async fn messaging_a_user_reuses_the_dm_that_already_exists() {
     };
     assert_eq!(found, room_id);
 }
+
+#[tokio::test]
+async fn memberships_follow_the_server_joined_rooms() {
+    use matrix_sdk::RoomState;
+    use matrix_sdk_test::{InvitedRoomBuilder, LeftRoomBuilder};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let stale = room_id!("!stale:example.org");
+    let kept = room_id!("!kept:example.org");
+    let rejoined = room_id!("!rejoined:example.org");
+    let accepted = room_id!("!accepted:example.org");
+    let pending = room_id!("!pending:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_joined_room(JoinedRoomBuilder::new(stale))
+                .add_joined_room(JoinedRoomBuilder::new(kept))
+                .add_left_room(LeftRoomBuilder::new(rejoined))
+                .add_invited_room(InvitedRoomBuilder::new(accepted))
+                .add_invited_room(InvitedRoomBuilder::new(pending));
+        })
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/joined_rooms"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"joined_rooms": [kept, rejoined, accepted]})),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    crate::rooms::reconcile_memberships(&client).await.unwrap();
+
+    let membership = |room_id| client.get_room(room_id).unwrap().state();
+    assert_eq!(membership(stale), RoomState::Left);
+    assert_eq!(membership(kept), RoomState::Joined);
+    assert_eq!(membership(rejoined), RoomState::Joined);
+    assert_eq!(membership(accepted), RoomState::Joined);
+    assert_eq!(membership(pending), RoomState::Invited);
+}

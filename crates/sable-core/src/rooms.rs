@@ -3,11 +3,14 @@ use matrix_sdk::deserialized_responses::SyncOrStrippedState;
 use matrix_sdk::room::Room;
 use matrix_sdk::ruma::SpaceChildOrder;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
+use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::directory::Filter;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
+use matrix_sdk::{Client, RoomState};
+use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
 
 use crate::protocol::{CommandErr, CommandOk};
 
@@ -18,7 +21,40 @@ const HIERARCHY_PAGE_SIZE: u32 = 100;
 const HIERARCHY_MAX_DEPTH: u32 = 1;
 const DIRECTORY_PAGE_SIZE: u32 = 30;
 
+pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_sdk::Error> {
+    let joined = client
+        .send(joined_rooms::v3::Request::new())
+        .await?
+        .joined_rooms;
+
+    for room in client.rooms() {
+        let mark: fn(&mut RoomInfo) =
+            match (room.state(), joined.iter().any(|id| id == room.room_id())) {
+                (RoomState::Joined, false) => RoomInfo::mark_as_left,
+                (RoomState::Left | RoomState::Invited | RoomState::Knocked, true) => {
+                    RoomInfo::mark_as_joined
+                }
+                _ => continue,
+            };
+        room.update_and_save_room_info(|mut info| {
+            mark(&mut info);
+            (info, RoomInfoNotableUpdateReasons::MEMBERSHIP)
+        })
+        .await?;
+    }
+    Ok(())
+}
+
 impl Core {
+    pub(crate) async fn reconcile_memberships(&self) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        if let Err(error) = reconcile_memberships(&client).await {
+            tracing::warn!("could not reconcile room memberships: {error}");
+        }
+    }
+
     pub(crate) async fn room_is_encrypted(&self, room: &Room) -> Result<bool, CommandErr> {
         match room
             .latest_encryption_state()
