@@ -62,7 +62,7 @@ function core(): CoreClient {
     commands: {
       personas: () => Promise.resolve({ personas: [], selections: [] }),
       roomMembers: () => Promise.resolve(members),
-      imagePacks: () => Promise.resolve(packs),
+      imagePackListing: () => Promise.resolve({ packs, complete: true }),
       fetchMedia: () => Promise.resolve(new Uint8Array()),
     },
   } as unknown as CoreClient;

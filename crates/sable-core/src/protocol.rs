@@ -1058,6 +1058,7 @@ pub enum CommandOk {
     },
     ImagePacks {
         packs: Vec<ImagePackView>,
+        complete: bool,
     },
     AllImagePacks {
         packs: Vec<ImagePackView>,

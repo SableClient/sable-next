@@ -1113,8 +1113,16 @@ impl Core {
                 content,
             } => {
                 self.remember_account_data_type(event_type.as_str()).await;
-                self.put_global_account_data(event_type.into(), &content, "set_account_data")
-                    .await?;
+                self.put_global_account_data(
+                    event_type.as_str().into(),
+                    &content,
+                    "set_account_data",
+                )
+                .await?;
+                self.pack_cache
+                    .lock()
+                    .await
+                    .forget_account_data(&event_type);
 
                 Ok(CommandOk::SetAccountData)
             }
@@ -1980,6 +1988,10 @@ impl Core {
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
                     .map_err(|error| self.room_error("send_state_event", error))?;
+                self.pack_cache
+                    .lock()
+                    .await
+                    .forget_room(&room_id, &event_type);
 
                 Ok(CommandOk::SendStateEvent)
             }

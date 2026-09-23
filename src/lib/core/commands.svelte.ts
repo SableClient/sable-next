@@ -140,6 +140,18 @@ const EMPTY_SEARCH_FILTER: SearchFilter = {
 };
 
 export function createCommands(transport: () => Transport) {
+  async function imagePackListing(
+    roomId: string,
+    cachedOnly = false
+  ): Promise<{ packs: ImagePackView[]; complete: boolean }> {
+    const response = await transport().send({
+      type: 'image_packs',
+      room_id: roomId,
+      cached_only: cachedOnly,
+    });
+    return { packs: response.packs, complete: response.complete };
+  }
+
   return {
     async requestRegistrationEmail(email: string): Promise<RegistrationResultView> {
       const response = await transport().send({
@@ -464,13 +476,10 @@ export function createCommands(transport: () => Transport) {
     },
 
     async imagePacks(roomId: string, cachedOnly = false): Promise<ImagePackView[]> {
-      const response = await transport().send({
-        type: 'image_packs',
-        room_id: roomId,
-        cached_only: cachedOnly,
-      });
-      return response.packs;
+      return (await imagePackListing(roomId, cachedOnly)).packs;
     },
+
+    imagePackListing,
 
     async allImagePacks(): Promise<ImagePackView[]> {
       const response = await transport().send({ type: 'all_image_packs' });

@@ -81,7 +81,7 @@ async fn image_pack_listing_fetches_complete_state_when_one_pack_is_cached() {
         .mount(server.server())
         .await;
     let core = core(&server, client).await;
-    let CommandOk::ImagePacks { packs } = core
+    let CommandOk::ImagePacks { packs, .. } = core
         .dispatch(Command::ImagePacks {
             room_id: room_id.to_owned(),
             cached_only: false,
@@ -339,7 +339,7 @@ async fn cached_image_packs_return_without_waiting_for_room_state() {
     .await
     .expect("cached emotes do not wait for the server")
     .unwrap();
-    let CommandOk::ImagePacks { packs } = response else {
+    let CommandOk::ImagePacks { packs, .. } = response else {
         panic!("wrong response")
     };
     assert_eq!(packs.len(), 1);
@@ -377,7 +377,7 @@ async fn a_pack_with_no_images_is_still_listed() {
         json!({"type": "image_packs", "room_id": room_id, "cached_only": true}),
     )
     .unwrap();
-    let CommandOk::ImagePacks { packs } = core.dispatch(command).await.unwrap() else {
+    let CommandOk::ImagePacks { packs, .. } = core.dispatch(command).await.unwrap() else {
         panic!("wrong response")
     };
     assert_eq!(packs.len(), 1);

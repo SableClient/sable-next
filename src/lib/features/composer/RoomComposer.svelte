@@ -216,6 +216,7 @@
   let deleteEditTarget = $state.raw<ComposerContext | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let emotes = $state.raw<PackImageView[]>([]);
+  let emotesFor: string | null = null;
 
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
@@ -443,19 +444,21 @@
     if (loadedEmotesFor === roomId) return;
     const target = roomId;
     loadedEmotesFor = target;
-    emotes = [];
+    if (emotesFor !== target) emotes = [];
     try {
-      await loadPacks(
+      const complete = await loadPacks(
         core.commands,
         target,
         (packs) => {
           if (roomId !== target) return;
+          emotesFor = target;
           emotes = packs
             .flatMap((pack) => pack.images)
             .filter((image) => image.usage.includes('emoticon'));
         },
         core.session?.account_id ?? null
       );
+      if (!complete && loadedEmotesFor === target) loadedEmotesFor = null;
     } catch {
       if (roomId === target) loadedEmotesFor = null;
     }

@@ -8,6 +8,7 @@ use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
+use crate::image_packs;
 use crate::search;
 use crate::session;
 use crate::watchers::sync_status;
@@ -518,6 +519,7 @@ impl Core {
         self.timelines.lock().await.clear();
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
+        *self.pack_cache.lock().await = image_packs::PackCache::default();
         self.set_read_room(None);
         self.probed_pinned_rooms
             .lock()

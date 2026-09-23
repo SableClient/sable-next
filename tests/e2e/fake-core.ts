@@ -763,7 +763,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
       notification: () => ({ type: 'notification', notification: null }),
-      image_packs: () => ({ type: 'image_packs', packs: [] }),
+      image_packs: () => ({ type: 'image_packs', packs: [], complete: true }),
       all_image_packs: () => ({ type: 'all_image_packs', packs: [] }),
       user_profile: (command) => {
         const localpart = command.user_id.replace(/^@/, '').split(':')[0];
