@@ -1413,6 +1413,8 @@
     "systemNotificationsHint": "Autorise l’application à afficher une notification système pour un message non lu.",
     "notificationSounds": "Sons de notification",
     "notificationSoundsHint": "Joue un son pour les mentions et conversations privées.",
+    "notificationSoundVolume": "Volume du son de notification",
+    "notificationSoundVolumeHint": "Le volume du son de notification dans l’application.",
     "backgroundNotificationSounds": "Sons en arrière-plan",
     "backgroundNotificationSoundsHint": "Désactivé, un son n’est joué que lorsque la fenêtre est au premier plan.",
     "notificationContent": "Afficher le contenu des messages",

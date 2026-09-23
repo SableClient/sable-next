@@ -1,3 +1,5 @@
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 const SOUND_URL = '/sound/notification.ogg';
 
 let context: AudioContext | undefined;
@@ -18,7 +20,9 @@ export async function playNotificationSound(): Promise<void> {
 
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(audioContext.destination);
+    const gain = audioContext.createGain();
+    gain.gain.value = preferences.notificationSoundVolume;
+    source.connect(gain).connect(audioContext.destination);
     playing = source;
     source.addEventListener('ended', () => {
       if (playing === source) playing = undefined;

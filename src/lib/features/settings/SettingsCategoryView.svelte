@@ -4,6 +4,7 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import Slider from '#lib/ui/primitives/Slider.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import { panelsFor } from './category-panels.js';
   import Switch from '#lib/ui/primitives/Switch.svelte';
@@ -15,7 +16,11 @@
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
-  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import {
+    PREFERENCE_RANGES,
+    preferences,
+    setPreference,
+  } from '#lib/settings/preferences.svelte.js';
   import type { Preferences } from '#lib/settings/preferences.svelte.js';
 
   interface Props {
@@ -114,7 +119,7 @@
             {disabled}
             badge={setting.unavailable ? $i18n.t('settings.notAvailableYet') : undefined}
             highlighted={highlighted === anchor}
-            wide={setting.type === 'select'}
+            wide={setting.type !== 'boolean'}
             class={setting.gatedBy !== undefined ? 'gated' : undefined}
             titleAction={{
               label: $i18n.t(copied === anchor ? 'settings.linkCopied' : 'settings.copyLink'),
@@ -138,6 +143,23 @@
                   setting.onChange?.(value);
                 }}
               />
+            {:else if setting.type === 'range'}
+              {@const key = setting.key}
+              <div class="range">
+                <Slider
+                  {disabled}
+                  min={PREFERENCE_RANGES[key].min}
+                  max={PREFERENCE_RANGES[key].max}
+                  step={setting.step}
+                  label={$i18n.t(setting.name)}
+                  value={preferences[key]}
+                  oninput={(value) => {
+                    setPreference(key, value);
+                  }}
+                  oncommit={(value) => setting.onChange?.(value)}
+                />
+                <span class="range-reading">{Math.round(preferences[key] * 100)}%</span>
+              </div>
             {:else}
               {@const key = setting.key}
               <Switch
@@ -178,6 +200,21 @@
   :global(.settings-scroll .app-page-shell.settings-category) {
     max-width: none;
     overflow: visible;
+  }
+
+  .range {
+    align-items: center;
+    display: flex;
+    gap: var(--space-150);
+    width: 100%;
+  }
+
+  .range-reading {
+    flex: none;
+    font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    inline-size: 2.5rem;
+    text-align: end;
   }
 
   .settings-stack {

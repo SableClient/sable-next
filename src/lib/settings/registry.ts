@@ -54,6 +54,7 @@ import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
+import { playNotificationSound } from '#lib/features/notifications/sound.js';
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -62,7 +63,7 @@ import { supportsAutoUpdate } from '#lib/platform/updates.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import { setPreference } from './preferences.svelte';
-import type { FreeTextPreference, Preferences } from './preferences.svelte';
+import type { FreeTextPreference, Preferences, RangePreference } from './preferences.svelte';
 
 export type BooleanPreference = {
   [K in keyof Preferences]: Preferences[K] extends boolean ? K : never;
@@ -107,7 +108,14 @@ export interface SelectSetting extends BaseSetting {
   onChange?: (value: string) => void;
 }
 
-export type SettingDefinition = BooleanSetting | SelectSetting;
+export interface RangeSetting extends BaseSetting {
+  type: 'range';
+  key: RangePreference;
+  step: number;
+  onChange?: (value: number) => void;
+}
+
+export type SettingDefinition = BooleanSetting | SelectSetting | RangeSetting;
 export type SettingType = SettingDefinition['type'];
 
 export interface SettingsCategory {
@@ -817,6 +825,18 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.notificationSoundsHint',
         type: 'boolean',
         gatedBy: 'systemNotifications',
+      },
+      {
+        key: 'notificationSoundVolume',
+        icon: SpeakerHighIcon,
+        name: 'settings.notificationSoundVolume',
+        description: 'settings.notificationSoundVolumeHint',
+        type: 'range',
+        gatedBy: 'notificationSounds',
+        step: 0.05,
+        onChange: () => {
+          void playNotificationSound().catch(() => undefined);
+        },
       },
       {
         key: 'notifyOnce',

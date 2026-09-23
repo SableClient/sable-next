@@ -104,6 +104,7 @@ export interface Preferences {
 
   systemNotifications: boolean;
   notificationSounds: boolean;
+  notificationSoundVolume: number;
   notifyOnce: boolean;
   backgroundNotificationSounds: boolean;
   notificationContent: boolean;
@@ -210,6 +211,12 @@ const FREE_TEXT = [
 
 export type FreeTextPreference = (typeof FREE_TEXT)[number];
 
+export const PREFERENCE_RANGES = {
+  notificationSoundVolume: { min: 0, max: 1 },
+} as const satisfies Partial<Record<keyof Preferences, { min: number; max: number }>>;
+
+export type RangePreference = keyof typeof PREFERENCE_RANGES;
+
 const DEFAULTS: Preferences = {
   language: SYSTEM_LANGUAGE,
   layout: 'modern',
@@ -290,6 +297,7 @@ const DEFAULTS: Preferences = {
 
   systemNotifications: true,
   notificationSounds: true,
+  notificationSoundVolume: 1,
   notifyOnce: true,
   backgroundNotificationSounds: true,
   notificationContent: false,
@@ -375,6 +383,11 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
           ...unique,
           ...COMPOSER_BUTTONS.filter((entry) => !unique.includes(entry)),
         ];
+      }
+    } else if (key in PREFERENCE_RANGES) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        const { min, max } = PREFERENCE_RANGES[key as RangePreference];
+        (next as Record<string, unknown>)[key] = Math.min(max, Math.max(min, value));
       }
     } else if ((FREE_TEXT as readonly string[]).includes(key)) {
       if (typeof value === 'string') (next as Record<string, unknown>)[key] = value;
