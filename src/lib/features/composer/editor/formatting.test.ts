@@ -75,6 +75,21 @@ test('strike and code round trip mid-sentence', () => {
   expect(marksOn('c')).toEqual(['code']);
 });
 
+test('a spoiler typed between double bars becomes the spoiler mark', () => {
+  open();
+  type('the ||butler|| did it');
+
+  expect(view?.state.doc.textContent).toBe('the butler did it');
+  expect(marksOn('butler')).toEqual(['spoiler']);
+});
+
+test('double bars around spaces stay literal', () => {
+  open();
+  type('a || b || c');
+
+  expect(view?.state.doc.textContent).toBe('a || b || c');
+});
+
 test('a heading marker at the line start becomes a heading', () => {
   open();
   type('## Title');

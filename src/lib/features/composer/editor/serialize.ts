@@ -335,6 +335,38 @@ tokenizer.block.ruler.before(
   { alt: ['paragraph', 'reference', 'blockquote'] }
 );
 
+const TEXT_STOPS = new Set(Array.from('\n!#$%&*+-:<=>@[\\]^_`{}~|', (char) => char.charCodeAt(0)));
+
+tokenizer.inline.ruler.at('text', (state, silent) => {
+  let pos = state.pos;
+  while (pos < state.posMax && !TEXT_STOPS.has(state.src.charCodeAt(pos))) pos++;
+  if (pos === state.pos) return false;
+  if (!silent) state.pending += state.src.slice(state.pos, pos);
+  state.pos = pos;
+  return true;
+});
+
+tokenizer.inline.ruler.before('text', 'spoiler', (state, silent) => {
+  const start = state.pos;
+  if (!state.src.startsWith('||', start)) return false;
+  const close = state.src.indexOf('||', start + 2);
+  if (close < 0 || close + 2 > state.posMax) return false;
+  const inner = state.src.slice(start + 2, close);
+  if (inner === '' || /^\s|\s$/.test(inner)) return false;
+
+  if (!silent) {
+    const max = state.posMax;
+    state.pos = start + 2;
+    state.posMax = close;
+    state.push('spoiler_open', 'span', 1);
+    state.md.inline.tokenize(state);
+    state.push('spoiler_close', 'span', -1);
+    state.posMax = max;
+  }
+  state.pos = close + 2;
+  return true;
+});
+
 const PARSE_TOKENS: Record<string, ParseSpec> = {
   paragraph: { block: 'paragraph' },
   blockquote: { block: 'blockquote' },
@@ -360,6 +392,7 @@ const PARSE_TOKENS: Record<string, ParseSpec> = {
   em: { mark: 'em' },
   strong: { mark: 'strong' },
   s: { mark: 'strike' },
+  spoiler: { mark: 'spoiler' },
   code_inline: { mark: 'code', noCloseToken: true },
   link: { mark: 'link', getAttrs: (token) => ({ href: token.attrGet('href') ?? '' }) },
   hr: { node: 'horizontal_rule' },

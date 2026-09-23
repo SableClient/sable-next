@@ -115,6 +115,7 @@ export const formattingInputRules: readonly InputRule[] = [
   markRule(/(?<!\*)\*([^*\s](?:[^*]*[^*\s])?)\*$/, marks.em),
   markRule(/(?<![\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_$/u, marks.em),
   markRule(/~~([^~\s](?:[^~]*[^~\s])?)~~$/, marks.strike),
+  markRule(/\|\|([^|\s](?:[^|]*[^|\s])?)\|\|$/, marks.spoiler),
   markRule(/`([^`]+)`$/, marks.code),
   lineTextblockRule(/(?:^|\uFFFC)(#{1,3})\s$/, nodes.heading, (match) => ({
     level: match[1].length,

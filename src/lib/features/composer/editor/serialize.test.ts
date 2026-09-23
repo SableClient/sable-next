@@ -7,6 +7,7 @@ import { composerSchema, parseMatrixHtml } from './schema';
 import {
   markdownFromSlice,
   markdownSlice,
+  richFromPlain,
   serializeComposer,
   serializePlain,
   textDoc,
@@ -295,6 +296,21 @@ describe('plain text mode', () => {
   test('strikethrough parses even though commonmark leaves it off', () => {
     const message = serializePlain(docOf(para(composerSchema.text('a ~~b~~ c'))));
     expect(message.formatted).toBe('a <del>b</del> c');
+  });
+
+  test('double bars parse to a Matrix spoiler', () => {
+    const message = serializePlain(docOf(para(composerSchema.text('the ||butler **did**|| it'))));
+
+    expect(message.body).toBe('the ||butler **did**|| it');
+    expect(message.formatted).toBe(
+      'the <span data-mx-spoiler="">butler </span><strong><span data-mx-spoiler="">did</span></strong> it'
+    );
+  });
+
+  test('double bars around spaces or nothing stay text', () => {
+    for (const typed of ['a || b || c', 'a |||| b', 'a || b', 'x|y']) {
+      expect(serializePlain(docOf(para(composerSchema.text(typed)))).formatted, typed).toBeNull();
+    }
   });
 
   test('inline and fenced code produce Matrix HTML', () => {
@@ -635,6 +651,21 @@ describe('image pack references', () => {
 });
 
 describe('clipboard slices', () => {
+  test('a pasted spoiler keeps its mark', () => {
+    const slice = markdownSlice('see ||this||');
+    const marked = slice.content.child(1);
+
+    expect(marked.text).toBe('this');
+    expect(marked.marks.map((mark) => mark.type)).toEqual([spoiler]);
+  });
+
+  test('switching to rich text turns double bars into the spoiler mark', () => {
+    const rich = richFromPlain(textDoc('see ||this||'));
+
+    expect(rich.textContent).toBe('see this');
+    expect(serializeComposer(rich).formatted).toBe('see <span data-mx-spoiler="">this</span>');
+  });
+
   test('several pasted paragraphs become blocks, one becomes inline content', () => {
     const multi = markdownSlice('# Title\n\n- a\n- b');
     expect(multi.content.childCount).toBe(2);
