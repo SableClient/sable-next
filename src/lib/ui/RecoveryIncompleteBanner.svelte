@@ -8,38 +8,28 @@
   import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
   import Banner from '#lib/ui/primitives/Banner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-
-  const STORAGE_KEY = 'sable-recovery-incomplete-dismissed';
+  import { persistedDismissal } from '#lib/ui/persisted-dismissal.svelte.js';
 
   const core = useCoreClient();
-  let dismissedFor = $state(read());
+  const dismissal = persistedDismissal('sable-recovery-incomplete-dismissed');
   const deviceId = $derived(core.session?.device_id ?? null);
   const incomplete = $derived(core.encryption?.recovery === 'incomplete');
   const selfUnverified = $derived(core.encryption?.verification === 'unverified');
   const inAppShell = $derived(page.route.id?.startsWith('/(app)') ?? false);
   const show = $derived(
-    inAppShell && incomplete && !selfUnverified && deviceId !== null && dismissedFor !== deviceId
+    inAppShell &&
+      incomplete &&
+      !selfUnverified &&
+      deviceId !== null &&
+      dismissal.dismissedFor !== deviceId
   );
-
-  function read(): string | null {
-    try {
-      return localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  }
 
   function unlock(event: MouseEvent): void {
     openSettingsOver(event, SETTINGS_DEVICES_SECTION);
   }
 
   function dismiss(): void {
-    dismissedFor = deviceId;
-    try {
-      if (deviceId !== null) localStorage.setItem(STORAGE_KEY, deviceId);
-    } catch (error) {
-      console.debug('[sable settings] dismissal not persisted', error);
-    }
+    dismissal.dismiss(deviceId);
   }
 </script>
 

@@ -8,11 +8,10 @@
   import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
   import Banner from '#lib/ui/primitives/Banner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-
-  const STORAGE_KEY = 'sable-unverified-dismissed';
+  import { persistedDismissal } from '#lib/ui/persisted-dismissal.svelte.js';
 
   const core = useCoreClient();
-  let dismissedFor = $state(read());
+  const dismissal = persistedDismissal('sable-unverified-dismissed');
   const deviceId = $derived(core.session?.device_id ?? null);
   const selfUnverified = $derived(core.encryption?.verification === 'unverified');
   const otherUnverified = $derived(
@@ -28,7 +27,7 @@
     inAppShell &&
       (selfUnverified || otherUnverified > 0) &&
       dismissKey !== null &&
-      dismissedFor !== dismissKey
+      dismissal.dismissedFor !== dismissKey
   );
 
   const bannerTitle = $derived(
@@ -37,25 +36,12 @@
       : $i18n.t('settings.unverifiedOthersTitle', { count: otherUnverified })
   );
 
-  function read(): string | null {
-    try {
-      return localStorage.getItem(STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  }
-
   function verify(event: MouseEvent): void {
     openSettingsOver(event, SETTINGS_DEVICES_SECTION);
   }
 
   function dismiss(): void {
-    dismissedFor = dismissKey;
-    try {
-      if (dismissKey !== null) localStorage.setItem(STORAGE_KEY, dismissKey);
-    } catch (error) {
-      console.debug('[sable settings] dismissal not persisted', error);
-    }
+    dismissal.dismiss(dismissKey);
   }
 </script>
 
