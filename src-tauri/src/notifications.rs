@@ -508,14 +508,31 @@ pub async fn allow_encrypted_content<R: Runtime>(app: &AppHandle<R>, allowed: bo
     }
 }
 
+pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &str) {
+    forget(user_id, room_id);
+    remove_posted(app, vec![room_notification_id(user_id, room_id)]).await;
+}
+
+pub async fn dismiss_read<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_ids: &[String]) {
+    for room_id in room_ids {
+        forget(user_id, room_id);
+    }
+    let ids: Vec<i32> = room_ids
+        .iter()
+        .map(|room_id| room_notification_id(user_id, room_id))
+        .collect();
+    #[cfg(target_os = "android")]
+    let ids = shown_among(app, ids).await;
+    if !ids.is_empty() {
+        remove_posted(app, ids).await;
+    }
+}
+
 #[cfg_attr(
     desktop,
     expect(clippy::unused_async, reason = "the mobile backend awaits the plugin")
 )]
-pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &str) {
-    forget(user_id, room_id);
-    let ids = vec![room_notification_id(user_id, room_id)];
-
+async fn remove_posted<R: Runtime>(app: &AppHandle<R>, ids: Vec<i32>) {
     #[cfg(mobile)]
     let dismissed = app.notifications().remove_active(ids).await;
     #[cfg(desktop)]
@@ -523,6 +540,24 @@ pub async fn dismiss<R: Runtime>(app: &AppHandle<R>, user_id: &str, room_id: &st
 
     if let Err(error) = dismissed {
         log::debug!("could not dismiss a notification: {error}");
+    }
+}
+
+#[cfg(target_os = "android")]
+async fn shown_among<R: Runtime>(app: &AppHandle<R>, mut ids: Vec<i32>) -> Vec<i32> {
+    match app.notifications().active().await {
+        Ok(active) => {
+            let shown: std::collections::HashSet<i32> = active
+                .iter()
+                .map(tauri_plugin_notifications::ActiveNotification::id)
+                .collect();
+            ids.retain(|id| shown.contains(id));
+            ids
+        }
+        Err(error) => {
+            log::debug!("could not list the posted notifications: {error}");
+            Vec::new()
+        }
     }
 }
 

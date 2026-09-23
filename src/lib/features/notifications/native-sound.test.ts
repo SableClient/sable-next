@@ -9,7 +9,7 @@ vi.mock('@tauri-apps/plugin-os', () => ({ type: () => 'linux' }));
 vi.mock('#lib/platform/native-notifications.js', () => ({
   watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
 }));
-vi.mock('./retire', () => ({ retireRoomAlerts: vi.fn() }));
+vi.mock('./retire', () => ({ retireRoomAlerts: vi.fn(), retireReadAlerts: vi.fn() }));
 vi.mock('./sound', () => ({ playNotificationSound: mocks.playNotificationSound }));
 
 import { NotificationCenter } from './notifications.svelte';

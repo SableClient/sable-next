@@ -6,6 +6,7 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 
 const mocks = vi.hoisted(() => ({
   retire: vi.fn().mockResolvedValue(undefined),
+  retireRead: vi.fn().mockResolvedValue(undefined),
   setReadRoom: vi.fn().mockResolvedValue(undefined),
   ackWebPusher: vi.fn().mockResolvedValue(undefined),
   watchNativePushMessages: vi.fn().mockResolvedValue(() => {}),
@@ -16,7 +17,10 @@ vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => false }));
 vi.mock('#lib/platform/native-notifications.js', () => ({
   watchNativePushMessages: mocks.watchNativePushMessages,
 }));
-vi.mock('./retire', () => ({ retireRoomAlerts: mocks.retire }));
+vi.mock('./retire', () => ({
+  retireRoomAlerts: mocks.retire,
+  retireReadAlerts: mocks.retireRead,
+}));
 vi.mock('./sound', () => ({ playNotificationSound: mocks.sound }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -26,6 +30,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 beforeEach(() => {
   mocks.retire.mockClear();
+  mocks.retireRead.mockClear();
   mocks.setReadRoom.mockClear();
   mocks.ackWebPusher.mockClear();
   mocks.watchNativePushMessages.mockClear();
@@ -36,7 +41,10 @@ beforeEach(() => {
   preferences.clearNotificationsOnRead = true;
 });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 function room(unread: number): RoomSummary {
   return {
@@ -266,4 +274,29 @@ test('every message sounds while only notifying once is off', () => {
   notifications.present(message('$two'));
 
   expect(mocks.sound).toHaveBeenCalledTimes(2);
+});
+
+test('alerts posted while the app was away are retired once their room reads as read', () => {
+  vi.useFakeTimers();
+  const notifications = center();
+
+  notifications.retireRead([room(0)]);
+  notifications.retireRead([room(0), { ...room(3), room_id: '!busy:example.org' }]);
+  expect(mocks.retireRead).not.toHaveBeenCalled();
+
+  vi.advanceTimersByTime(1000);
+  expect(mocks.retireRead).toHaveBeenCalledExactlyOnceWith('@me:example.org', [
+    '!room:example.org',
+  ]);
+});
+
+test('posted alerts are left alone while read alerts stay standing', () => {
+  vi.useFakeTimers();
+  preferences.clearNotificationsOnRead = false;
+  const notifications = center();
+
+  notifications.retireRead([room(0)]);
+  vi.advanceTimersByTime(1000);
+
+  expect(mocks.retireRead).not.toHaveBeenCalled();
 });

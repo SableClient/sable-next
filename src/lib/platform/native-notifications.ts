@@ -1,5 +1,7 @@
 import { addPluginListener, invoke, isTauri } from '@tauri-apps/api/core';
 
+import { deliversNativePush } from './notifications.js';
+
 export interface NativeNotificationTarget {
   userId: string;
   roomId: string;
@@ -35,6 +37,14 @@ export async function requestNativeNotificationPermission(): Promise<Notificatio
 export async function dismissNativeRoomNotification(userId: string, roomId: string): Promise<void> {
   if (!isTauri()) return;
   await invoke('dismiss_room_notification', { userId, roomId });
+}
+
+export async function dismissNativeReadRoomNotifications(
+  userId: string,
+  roomIds: readonly string[]
+): Promise<void> {
+  if (!(await deliversNativePush())) return;
+  await invoke('dismiss_read_room_notifications', { userId, roomIds });
 }
 
 export async function setNativeEncryptedContentAllowed(

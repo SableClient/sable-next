@@ -502,6 +502,15 @@ async fn dismiss_room_notification(
     notifications::dismiss(&app, &user_id, &room_id).await;
 }
 
+#[tauri::command]
+async fn dismiss_read_room_notifications(
+    app: AppHandle<BrowserEngine>,
+    user_id: String,
+    room_ids: Vec<String>,
+) {
+    notifications::dismiss_read(&app, &user_id, &room_ids).await;
+}
+
 #[cfg(all(feature = "cef", target_os = "linux"))]
 #[tauri::command]
 fn pending_deep_links() -> Vec<String> {
@@ -669,6 +678,7 @@ pub fn run() {
             register_push,
             unregister_push,
             dismiss_room_notification,
+            dismiss_read_room_notifications,
             notification_permission,
             request_notification_permission,
             test_notification,

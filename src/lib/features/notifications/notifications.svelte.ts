@@ -11,7 +11,7 @@ import { loadMediaUrl } from '#lib/ui/media-url.js';
 import { appendLine, type ConversationLine, summarise } from './conversation';
 import { parsePushPayload, webPushValidation } from './push-payload';
 import { enabled, line, tag, title } from './present';
-import { retireRoomAlerts } from './retire';
+import { retireReadAlerts, retireRoomAlerts } from './retire';
 import { playNotificationSound } from './sound';
 
 export const settingsChanges = $state({ version: 0 });
@@ -20,6 +20,7 @@ export const [useNotificationCenter, provideNotificationCenter] =
   createContext<NotificationCenter>();
 
 const AVATAR_SIZE = 96;
+const POSTED_RETIRE_DELAY_MS = 1000;
 type OpenRoom = (roomId: string) => void;
 
 export class NotificationCenter {
@@ -29,6 +30,8 @@ export class NotificationCenter {
   private client: CoreClient | null = null;
   private open: OpenRoom | null = null;
   private reading: string | null = null;
+  private retirePosted: ReturnType<typeof setTimeout> | undefined;
+  private readRooms: readonly string[] = [];
   /* eslint-disable svelte/prefer-svelte-reactivity -- a write from a notification would subscribe whichever effect is running */
   private readonly unread = new Set<string>();
   private readonly retired = new Set<string>();
@@ -74,6 +77,9 @@ export class NotificationCenter {
     this.stopNativePush?.();
     this.stopNativePush = null;
     this.nativePushGeneration += 1;
+    clearTimeout(this.retirePosted);
+    this.retirePosted = undefined;
+    this.readRooms = [];
     this.client = null;
     this.open = null;
     this.reading = null;
@@ -102,6 +108,7 @@ export class NotificationCenter {
       }
     }
 
+    const read: string[] = [];
     for (const room of rooms) {
       if (room.state === 'invited') continue;
       if (hasUnread(unreadFor(room))) {
@@ -110,10 +117,23 @@ export class NotificationCenter {
         continue;
       }
 
+      read.push(room.room_id);
       this.unread.delete(room.room_id);
       if (this.retired.has(room.room_id)) continue;
       this.settle(room.room_id);
     }
+
+    if (preferences.clearNotificationsOnRead) this.retirePostedAlerts(read);
+  }
+
+  private retirePostedAlerts(roomIds: readonly string[]): void {
+    this.readRooms = roomIds;
+    this.retirePosted ??= setTimeout(() => {
+      this.retirePosted = undefined;
+      const userId = this.client?.session?.user_id;
+      if (userId === undefined) return;
+      void retireReadAlerts(userId, this.readRooms).catch(() => undefined);
+    }, POSTED_RETIRE_DELAY_MS);
   }
 
   private settle(roomId: string): void {
