@@ -15,6 +15,7 @@
     side?: 'top' | 'bottom' | 'left' | 'right';
     align?: 'start' | 'center' | 'end';
     collisionPadding?: number;
+    sticky?: 'partial' | 'always';
     closeOnAnchorHidden?: boolean;
     label: string;
     closeLabel: string;
@@ -34,6 +35,7 @@
     side = 'top',
     align = 'start',
     collisionPadding,
+    sticky,
     closeOnAnchorHidden = false,
     label,
     closeLabel,
@@ -90,6 +92,7 @@
         {side}
         {align}
         {collisionPadding}
+        {sticky}
         {onCloseAutoFocus}
       >
         {@render children(false)}

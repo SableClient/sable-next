@@ -40,6 +40,12 @@
     onOpenChange,
   }: Props = $props();
 
+  let side = $derived.by((): 'left' | 'right' => {
+    if (!anchor) return 'right';
+    const rect = anchor.getBoundingClientRect();
+    return rect.left + rect.width / 2 > window.innerWidth / 2 ? 'left' : 'right';
+  });
+
   function handleCloseAutoFocus(event: Event): void {
     event.preventDefault();
     anchor?.focus({ preventScroll: true });
@@ -49,6 +55,9 @@
 <ResponsivePopover
   bind:open
   {anchor}
+  {side}
+  sticky="always"
+  collisionPadding={12}
   closeOnAnchorHidden
   label={$i18n.t('timeline.userProfile')}
   closeLabel={$i18n.t('timeline.closeProfile')}
