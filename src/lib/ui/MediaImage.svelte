@@ -229,7 +229,7 @@
         outcome = { key, url: null };
         const automatic = backoff.automatic + 1;
         backoff = { ...backoff, automatic, at: manualRetryDeadline() };
-        if (automaticMediaRetryDelay(automatic) === null) onfailed?.();
+        onfailed?.();
       });
 
     return () => {

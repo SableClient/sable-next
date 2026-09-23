@@ -11,6 +11,7 @@ import Avatar from './Avatar.svelte';
 import { identityColor } from './identity-color.js';
 
 afterEach(() => {
+  core.fetchMedia.mockReset();
   vi.useRealTimers();
   document.body.replaceChildren();
 });
@@ -54,7 +55,7 @@ test('tints the picture box until the picture paints, and never the root', () =>
   expect(fallback()?.style.display).toBe('none');
 });
 
-test('a picture the media layer cannot fetch falls back to the initials', async () => {
+test('a picture the media layer cannot fetch falls back to the initials at once', async () => {
   vi.useFakeTimers();
   core.fetchMedia.mockRejectedValue(new Error('gone'));
   mount(Avatar, {
@@ -62,12 +63,12 @@ test('a picture the media layer cannot fetch falls back to the initials', async 
     props: { src: 'mxc://example.org/gone', name: 'Sable', id: '@sable:example.org' },
   });
 
-  await vi.advanceTimersByTimeAsync(30_000);
+  await vi.advanceTimersByTimeAsync(0);
 
   expect(fallback()?.style.display).toBe('');
 });
 
-test('keeps its picture while a transient media failure retries', async () => {
+test('shows the initials while a transient failure retries, then the picture', async () => {
   vi.useFakeTimers();
   core.fetchMedia
     .mockRejectedValueOnce(new Error('temporary failure'))
@@ -78,8 +79,30 @@ test('keeps its picture while a transient media failure retries', async () => {
   });
 
   await vi.advanceTimersByTimeAsync(0);
+  expect(fallback()?.style.display).toBe('');
 
-  expect(fallback()?.style.display).not.toBe('');
+  await vi.advanceTimersByTimeAsync(2_000);
+  document.querySelector('.avatar-image img')?.dispatchEvent(new Event('load'));
+  await tick();
+
+  expect(fallback()?.style.display).toBe('none');
+});
+
+test('an undecodable picture falls back to the initials', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  mount(Avatar, {
+    target: document.body,
+    props: { src: 'mxc://example.org/undecodable-avatar', name: 'Sable' },
+  });
+
+  for (let step = 0; step < 2; step += 1) {
+    await vi.advanceTimersByTimeAsync(0);
+    document.querySelector('.avatar-image img')?.dispatchEvent(new Event('error'));
+  }
+  await vi.advanceTimersByTimeAsync(0);
+
+  expect(fallback()?.style.display).toBe('');
 });
 
 test('leaves a picture on a transparent box, so a transparent png keeps its own shape', () => {

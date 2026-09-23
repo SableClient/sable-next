@@ -130,7 +130,8 @@
     object-position: center;
   }
 
-  :global(.avatar-image .media-image-placeholder) {
+  :global(.avatar-image .media-image-placeholder),
+  :global(.avatar-image .media-image-unavailable) {
     display: none;
   }
 
