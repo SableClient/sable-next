@@ -165,8 +165,8 @@
 <style>
   .room-header {
     align-items: center;
-    background: var(--bg-container);
-    border-bottom: var(--border-width) solid var(--surface-var-container);
+    background: var(--surface-container);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-250);
@@ -210,7 +210,7 @@
   }
 
   .room-topic:hover {
-    color: var(--bg-on-container);
+    color: var(--surface-on-container);
     text-decoration: underline;
   }
 
@@ -258,7 +258,7 @@
   .voice-faces :global(.avatar-root.voice-face) {
     --avatar-size: 1.25rem;
 
-    border: var(--border-width) solid var(--bg-container);
+    border: var(--border-width) solid var(--surface-container);
   }
 
   .voice-faces :global(.avatar-root.voice-face:not(:first-child)) {

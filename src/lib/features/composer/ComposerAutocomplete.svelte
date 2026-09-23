@@ -69,8 +69,8 @@
 
 <style>
   .autocomplete {
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     bottom: calc(100% + 0.5rem);
     box-shadow: var(--shadow-float);

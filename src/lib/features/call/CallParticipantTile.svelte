@@ -160,8 +160,8 @@
 <style>
   .tile {
     aspect-ratio: 4 / 3;
-    background: var(--surface-var-container);
-    border: var(--border-width) solid transparent;
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radii-400);
     overflow: hidden;
     position: relative;

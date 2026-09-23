@@ -4,9 +4,11 @@
   --radius-outer: var(--radii-400);
   --radius-padding: var(--space-100);
   --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+  --menu-item-hover: var(--surface-container-hover);
+  --menu-item-active: var(--surface-container-active);
 
-  background: var(--bg-container);
-  border: var(--border-width) solid var(--bg-container-line);
+  background: var(--surface-container);
+  border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radius-outer);
   box-shadow: var(--shadow-e200);
   display: grid;
@@ -100,12 +102,12 @@
 .menu-item:hover,
 .menu-item:focus-visible,
 .menu-item[data-highlighted] {
-  background: var(--bg-container-hover);
+  background: var(--menu-item-hover, var(--bg-container-hover));
 }
 
 .menu-item:active,
 .menu-item[aria-pressed='true'] {
-  background: var(--bg-container-active);
+  background: var(--menu-item-active, var(--bg-container-active));
 }
 
 .menu-item[aria-checked='true'] {
@@ -142,7 +144,7 @@
 }
 
 .menu-separator {
-  background: var(--bg-container-line);
+  background: var(--surface-container-line);
   block-size: var(--border-width);
   margin: var(--space-100) 0;
 }

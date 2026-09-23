@@ -79,9 +79,9 @@
   }
 
   .toast-info {
-    background: var(--surface-container);
-    border-color: var(--surface-container-line);
-    color: var(--surface-on-container);
+    background: var(--success-container);
+    border-color: var(--success-container-line);
+    color: var(--success-on-container);
   }
 
   .toast span {

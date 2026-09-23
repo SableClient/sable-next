@@ -35,11 +35,11 @@
 }
 
 .btn-primary {
-  --button-container: var(--primary-container);
-  --button-container-hover: var(--primary-container-hover);
-  --button-container-active: var(--primary-container-active);
-  --button-line: var(--primary-container-line);
-  --button-on-container: var(--primary-on-container);
+  --button-container: var(--primary-main);
+  --button-container-hover: var(--primary-main-hover);
+  --button-container-active: var(--primary-main-active);
+  --button-line: var(--primary-main-line);
+  --button-on-container: var(--primary-on-main);
 }
 
 .btn-secondary {
@@ -150,8 +150,8 @@
 
 .icon-button.btn-ghost {
   --button-container: transparent;
-  --button-container-hover: var(--bg-container-hover);
-  --button-container-active: var(--bg-container-active);
+  --button-container-hover: var(--ghost-hover, var(--bg-container-hover));
+  --button-container-active: var(--ghost-active, var(--bg-container-active));
   --button-line: transparent;
   --button-on-container: inherit;
 }

@@ -1155,7 +1155,7 @@
   .composer {
     /* The panel behind is surface-container, so the fill has to be the variant. */
     background: var(--surface-var-container);
-    border: var(--border-width) solid transparent;
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     display: flex;
     flex: 0 0 auto;

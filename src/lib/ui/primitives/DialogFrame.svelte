@@ -104,7 +104,7 @@
   }
 
   :global(.dialog-content-settings) {
-    background: var(--surface-container);
+    background: var(--bg-container);
     border: 0;
     border-radius: 0;
     box-shadow: var(--shadow-dialog);
@@ -120,8 +120,11 @@
 
   :global(.dialog-content-verification),
   :global(.dialog-content-sheet) {
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
+    --ghost-hover: var(--surface-container-hover);
+    --ghost-active: var(--surface-container-active);
+
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);

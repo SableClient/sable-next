@@ -409,7 +409,7 @@
   }
 
   .media-frame-video {
-    background: var(--surface-container);
+    background: var(--surface-var-container);
     border-radius: var(--radius);
     overflow: hidden;
   }

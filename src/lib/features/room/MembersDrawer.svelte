@@ -285,6 +285,9 @@
 
 <style>
   .members-drawer {
+    --ghost-hover: var(--bg-container-hover);
+    --ghost-active: var(--bg-container-active);
+
     background: var(--bg-container);
     box-shadow: var(--shadow-dialog);
     display: flex;
@@ -313,7 +316,7 @@
   header {
     align-items: center;
     background: var(--bg-container);
-    border-bottom: var(--border-width) solid var(--surface-var-container);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     justify-content: space-between;
     min-height: 3.5rem;
@@ -380,7 +383,7 @@
   }
 
   .filters :global(.chip:hover) {
-    background: var(--surface-container);
+    background: var(--bg-container-hover);
     color: var(--bg-on-container);
   }
 

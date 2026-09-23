@@ -999,7 +999,7 @@
 <style>
   .room-nav {
     background: var(--bg-container);
-    border-right: var(--border-width) solid var(--surface-container-line);
+    border-right: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     color: var(--bg-on-container);
     display: flex;
@@ -1151,8 +1151,8 @@
   }
 
   :global(.room-nav-menu:hover) {
-    background: var(--surface-container-hover);
-    color: var(--surface-on-container);
+    background: var(--bg-container-hover);
+    color: var(--bg-on-container);
   }
 
   :global(.room-nav-menu:focus-visible) {
@@ -1382,27 +1382,27 @@
   }
 
   .room-row[aria-current='page'] {
-    --room-icon-plate: var(--surface-container-active);
+    --room-icon-plate: var(--bg-container-active);
 
-    background: var(--surface-container-active);
-    color: var(--surface-on-container);
+    background: var(--bg-container-active);
+    color: var(--bg-on-container);
   }
 
   .room-row[aria-current='page']:hover {
-    --room-icon-plate: var(--surface-container-hover);
+    --room-icon-plate: var(--bg-container-active);
 
-    background: var(--surface-container-hover);
-    color: var(--surface-on-container);
+    background: var(--bg-container-active);
+    color: var(--bg-on-container);
   }
 
   .nav-action[aria-current='page'] {
-    background: var(--surface-container-active);
-    color: var(--surface-on-container);
+    background: var(--bg-container-active);
+    color: var(--bg-on-container);
   }
 
   .nav-action[aria-current='page']:hover {
-    background: var(--surface-container-hover);
-    color: var(--surface-on-container);
+    background: var(--bg-container-active);
+    color: var(--bg-on-container);
   }
 
   .room-row.unread {

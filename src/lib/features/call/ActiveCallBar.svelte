@@ -60,9 +60,9 @@
 
 <style>
   .call-bar {
-    background: var(--surface-container);
-    border-right: var(--border-width) solid var(--surface-container-line);
-    border-top: var(--border-width) solid var(--surface-container-line);
+    background: var(--bg-container);
+    border-right: var(--border-width) solid var(--bg-container-line);
+    border-top: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     display: grid;
     gap: var(--space-100);

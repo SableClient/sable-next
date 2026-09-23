@@ -99,8 +99,8 @@
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
     align-items: center;
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-outer);
     inset-inline-end: var(--space-300);
     bottom: calc(100% - var(--space-200));
@@ -141,8 +141,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     .message-actions :global(button:hover) {
-      background: var(--surface-var-container);
-      color: var(--bg-on-container);
+      background: var(--surface-var-container-hover);
+      color: var(--surface-var-on-container);
     }
   }
 </style>

@@ -843,7 +843,7 @@
 
     .viewport:hover,
     .viewport:focus-within {
-      scrollbar-color: var(--surface-container-line) transparent;
+      scrollbar-color: var(--surface-var-container-line) var(--surface-var-container-active);
     }
   }
 
@@ -868,7 +868,12 @@
 
   .viewport:hover::-webkit-scrollbar-thumb,
   .viewport:focus-within::-webkit-scrollbar-thumb {
-    background: var(--surface-container-line);
+    background: var(--surface-var-container-line);
+  }
+
+  .viewport:hover::-webkit-scrollbar-track,
+  .viewport:focus-within::-webkit-scrollbar-track {
+    background: var(--surface-var-container-active);
   }
 
   .items {
@@ -957,6 +962,11 @@
 
   :global(button.jump-to-latest) {
     --button-height: var(--timeline-indicator-size);
+    --button-container: var(--surface-var-container);
+    --button-container-hover: var(--surface-var-container-hover);
+    --button-container-active: var(--surface-var-container-active);
+    --button-line: var(--surface-var-container-line);
+    --button-on-container: var(--surface-var-on-container);
 
     background-image: none;
     border-radius: 50%;

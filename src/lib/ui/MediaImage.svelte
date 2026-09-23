@@ -544,7 +544,7 @@
 
   .media-image-placeholder {
     align-items: center;
-    background: var(--surface-container);
+    background: var(--surface-var-container);
     color: var(--surface-var-on-container);
     display: flex;
     justify-content: center;
@@ -612,8 +612,8 @@
 
   .media-image-unavailable {
     align-items: center;
-    background: var(--surface-container);
-    color: var(--surface-on-container);
+    background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     display: flex;
     flex-direction: column;
     font-size: var(--font-size-small);

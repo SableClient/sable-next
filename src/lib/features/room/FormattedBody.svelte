@@ -639,7 +639,7 @@
   }
 
   .formatted-body :global(blockquote) {
-    border-left: calc(var(--border-width) * 2) solid var(--primary-main);
+    border-left: calc(var(--border-width) * 2) solid var(--surface-var-container-line);
     margin: var(--space-100) 0;
     padding-left: var(--space-200);
   }
@@ -655,8 +655,8 @@
   }
 
   .formatted-body :global(.code-block) {
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     margin: var(--space-100) 0;
     overflow: hidden;
@@ -665,7 +665,7 @@
 
   .formatted-body :global(.code-head) {
     align-items: center;
-    background: var(--surface-var-container);
+    background: var(--surface-container);
     border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-200);
@@ -753,9 +753,17 @@
 
   .formatted-body :global(th),
   .formatted-body :global(td) {
+    background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-on-container);
     padding: var(--space-050) var(--space-150);
     text-align: left;
+  }
+
+  .formatted-body :global(th) {
+    background: var(--surface-var-container);
+    border-color: var(--surface-var-container-line);
+    color: var(--surface-var-on-container);
   }
 
   .formatted-body :global(summary) {

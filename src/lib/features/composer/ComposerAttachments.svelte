@@ -86,8 +86,8 @@
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
     align-items: center;
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-outer);
     display: flex;
     gap: var(--space-150);

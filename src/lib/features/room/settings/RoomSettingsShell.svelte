@@ -97,6 +97,10 @@
   }
 
   .settings-page {
+    --ghost-hover: var(--surface-container-hover);
+    --ghost-active: var(--surface-container-active);
+
+    background: var(--surface-container);
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -105,6 +109,7 @@
   }
 
   .page-header {
+    background: var(--surface-container);
     flex: 0 0 auto;
   }
 

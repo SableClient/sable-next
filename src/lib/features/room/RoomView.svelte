@@ -1037,6 +1037,10 @@
 
 <style>
   .room-view {
+    --ghost-hover: var(--surface-container-hover);
+    --ghost-active: var(--surface-container-active);
+
+    background: var(--surface-container);
     display: flex;
     flex: 1;
     height: 100%;

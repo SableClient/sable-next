@@ -213,8 +213,8 @@
 
   .search-field {
     align-items: center;
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     display: flex;
     gap: var(--space-300);
@@ -289,7 +289,7 @@
   }
 
   .search-results a:hover {
-    background: var(--surface-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .search-results a :global(svg) {
@@ -306,6 +306,10 @@
   }
 
   .settings-content {
+    --ghost-hover: var(--surface-container-hover);
+    --ghost-active: var(--surface-container-active);
+
+    background: var(--surface-container);
     display: flex;
     flex-direction: column;
     height: 100%;

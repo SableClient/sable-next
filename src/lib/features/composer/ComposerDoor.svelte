@@ -221,8 +221,8 @@
     --radius-padding: var(--space-150);
     --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
 
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--bg-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-outer);
     box-shadow: var(--shadow-float);
     display: grid;

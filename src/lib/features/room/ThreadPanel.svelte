@@ -260,8 +260,11 @@
 
 <style>
   .thread-panel {
-    background: var(--surface-container);
-    border-left: var(--border-width) solid var(--surface-container-line);
+    --ghost-hover: var(--bg-container-hover);
+    --ghost-active: var(--bg-container-active);
+
+    background: var(--bg-container);
+    border-left: var(--border-width) solid var(--bg-container-line);
     display: grid;
     flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -272,7 +275,6 @@
 
   .thread-panel.modal {
     background-color: var(--bg-container);
-    background-image: linear-gradient(var(--surface-container), var(--surface-container));
     border-left: none;
     height: 100%;
     touch-action: pan-y;
@@ -292,7 +294,7 @@
 
   .thread-header {
     align-items: center;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
+    border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;

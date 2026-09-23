@@ -107,7 +107,7 @@
   }
 
   .settings-nav-item:hover {
-    background: var(--surface-container-hover);
+    background: var(--bg-container-hover);
   }
 
   .settings-nav-item:focus-visible {
@@ -117,15 +117,15 @@
 
   .settings-nav-item[aria-current='page'],
   .settings-nav-item[data-current='true'] {
-    background: var(--surface-container-active);
-    color: var(--surface-on-container);
+    background: var(--bg-container-active);
+    color: var(--bg-on-container);
     font-weight: var(--font-weight-medium);
   }
 
   .settings-nav-item[aria-current='page']:hover,
   .settings-nav-item[data-current='true']:hover {
-    background: var(--surface-container-hover);
-    color: var(--surface-on-container);
+    background: var(--bg-container-hover);
+    color: var(--bg-on-container);
   }
 
   .settings-nav-item .icon {

@@ -778,6 +778,7 @@
         'align-own': alignOwn,
         'mention-silent': preferences.highlightMentions && item.mention === 'silent',
         'mention-loud': preferences.highlightMentions && item.mention === 'loud',
+        'menu-open': actionsPinned || openMessageMenu.isOpen(item.id),
       },
     ]}
     data-selected={selected ? 'true' : undefined}
@@ -1331,24 +1332,22 @@
     padding-inline: var(--space-200);
   }
 
-  /* The leading border carries the signal, so the fill stays quiet enough to
-     read a long message on. */
   .message.mention-silent {
-    background: color-mix(in oklab, var(--sec-container) 10%, transparent);
-    border-inline-start-color: var(--sec-main);
+    background: color-mix(in srgb, var(--sec-container) 25%, transparent);
+    border-inline-start-color: var(--sec-container-line);
   }
 
   .message.mention-loud {
-    background: color-mix(in oklab, var(--warn-container) 16%, transparent);
-    border-inline-start-color: var(--warn-main);
+    background: color-mix(in srgb, var(--warn-container) 25%, transparent);
+    border-inline-start-color: var(--warn-container-line);
   }
 
   /* The sheet pairs multi-select with keyboard focus; focus is the half that
      exists today, and it survives on touch where hover does not. */
   .message[data-selected='true'] {
-    background: var(--primary-container);
+    background: var(--surface-container-active);
     border-radius: var(--radius);
-    box-shadow: inset 0 0 0 var(--border-width) var(--primary-container-line);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {
@@ -1470,7 +1469,8 @@
       );
     }
 
-    .message:hover {
+    .message:hover,
+    .message.menu-open {
       background-color: var(--surface-container-hover);
     }
 
@@ -1874,7 +1874,7 @@
 
   .message[data-selected='true'] .body,
   .message[data-selected='true'] time {
-    color: var(--primary-on-container);
+    color: var(--surface-on-container);
   }
 
   /* Layout modes stay in one block at the end: each overrides a base rule
@@ -1919,10 +1919,10 @@
 
   .message.layout-bubble .content-bubble,
   .message.layout-bubble :global(.formatted-body) {
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    background: var(--surface-var-container);
+    border: var(--border-width) solid transparent;
     border-radius: var(--radius);
-    color: var(--surface-on-container);
+    color: var(--surface-var-on-container);
     max-width: min(50rem, 100%);
     padding: var(--space-200) var(--space-300);
   }
@@ -1966,13 +1966,6 @@
 
   .message.layout-bubble.own.align-own .has-edited .edited {
     margin-inline-start: 0;
-  }
-
-  .message.layout-bubble.own .content-bubble,
-  .message.layout-bubble.own :global(.formatted-body) {
-    background: var(--primary-container);
-    border-color: var(--primary-container-line);
-    color: var(--primary-on-container);
   }
 
   /* The one mode where your own side changes. */
