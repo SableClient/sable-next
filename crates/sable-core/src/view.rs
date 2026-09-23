@@ -658,8 +658,14 @@ impl Highlights {
     }
 }
 
+#[derive(Clone)]
+struct LocalFields {
+    profile: Option<PerMessageProfileView>,
+    formatted_body: Option<String>,
+}
+
 #[derive(Default)]
-pub struct LocalContent(HashMap<OwnedTransactionId, serde_json::Value>);
+pub struct LocalContent(HashMap<OwnedTransactionId, LocalFields>);
 
 impl LocalContent {
     #[must_use]
@@ -697,14 +703,19 @@ impl LocalContent {
     }
 
     fn remember(&mut self, transaction_id: &TransactionId, content: &SerializableEventContent) {
-        let content = content
+        let fields = content
             .raw()
             .0
             .deserialize_as_unchecked::<serde_json::Value>()
-            .ok();
-        match content {
-            Some(content) => {
-                self.0.insert(transaction_id.to_owned(), content);
+            .ok()
+            .map(|content| LocalFields {
+                profile: per_message_profile(Some(&content)),
+                formatted_body: raw_formatted_body(Some(&content)).map(ToOwned::to_owned),
+            })
+            .filter(|fields| fields.profile.is_some() || fields.formatted_body.is_some());
+        match fields {
+            Some(fields) => {
+                self.0.insert(transaction_id.to_owned(), fields);
             }
             None => {
                 self.0.remove(transaction_id);
@@ -712,7 +723,7 @@ impl LocalContent {
         }
     }
 
-    fn get(&self, transaction_id: &TransactionId) -> Option<&serde_json::Value> {
+    fn get(&self, transaction_id: &TransactionId) -> Option<&LocalFields> {
         self.0.get(transaction_id)
     }
 
@@ -771,18 +782,19 @@ pub fn timeline_item(
                 _ => None,
             };
             let mut raw = RawFields::read(event);
-            if raw.content.is_none() {
-                raw.content = event
-                    .transaction_id()
-                    .and_then(|transaction_id| local_content.get(transaction_id))
-                    .cloned();
-            }
-            let message_profile = per_message_profile(raw.message_content()).or_else(|| {
-                relays
-                    .contains(event.sender())
-                    .then(|| relay_profile(raw.message_content()))
-                    .flatten()
-            });
+            let local = event
+                .send_state()
+                .and(event.transaction_id())
+                .and_then(|transaction_id| local_content.get(transaction_id));
+            raw.echo_formatted_body = local.and_then(|fields| fields.formatted_body.clone());
+            let message_profile = per_message_profile(raw.content.as_ref())
+                .or_else(|| local?.profile.clone())
+                .or_else(|| {
+                    relays
+                        .contains(event.sender())
+                        .then(|| relay_profile(raw.content.as_ref()))
+                        .flatten()
+                });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
             let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
@@ -936,6 +948,8 @@ fn relay_author(body: &str) -> Option<&str> {
 struct RawFields {
     content: Option<serde_json::Value>,
     unsigned: Option<RawUnsigned>,
+    #[serde(skip)]
+    echo_formatted_body: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -978,18 +992,19 @@ impl RawFields {
             .is_some_and(serde_json::Map::is_empty)
     }
 
-    fn message_content(&self) -> Option<&serde_json::Value> {
-        let content = self.content.as_ref()?;
+    fn formatted_body(&self) -> Option<&str> {
+        let content = self.content.as_ref();
         let replacement = content
-            .get("m.relates_to")
+            .and_then(|content| content.get("m.relates_to"))
             .and_then(|relation| relation.get("rel_type"))
             .and_then(serde_json::Value::as_str)
             == Some("m.replace");
-        if replacement {
-            content.get("m.new_content")
+        let message = if replacement {
+            content.and_then(|content| content.get("m.new_content"))
         } else {
-            Some(content)
-        }
+            content
+        };
+        raw_formatted_body(message).or(self.echo_formatted_body.as_deref())
     }
 
     fn redaction_reason(&self) -> Option<String> {
@@ -1086,7 +1101,7 @@ fn text_message(
     let formatted = formatted_body(message.msgtype());
     let formatted = formatted
         .as_ref()
-        .and_then(|_| raw_formatted_body(raw.message_content()).map(ToOwned::to_owned))
+        .and_then(|_| raw.formatted_body().map(ToOwned::to_owned))
         .or(formatted);
     let known = formatted.as_deref().is_some_and(has_profile_fallback_html)
         || profile.is_some_and(|profile| profile.has_fallback);
@@ -2221,18 +2236,23 @@ mod tests {
             new_content: content,
         });
         assert_eq!(
-            per_message_profile(local_content.get(&transaction_id))
+            local_content
+                .get(&transaction_id)
+                .and_then(|fields| fields.profile.as_ref())
                 .expect("the queued profile")
                 .display_name
                 .as_deref(),
             Some("Kris")
         );
+
         local_content.apply(&RoomSendQueueUpdate::SentEvent {
             transaction_id: transaction_id.clone(),
             event_id: OwnedEventId::try_from("$sent:example.org").expect("an event id"),
         });
         assert_eq!(
-            per_message_profile(local_content.get(&transaction_id))
+            local_content
+                .get(&transaction_id)
+                .and_then(|fields| fields.profile.as_ref())
                 .expect("the profile outlives the send acknowledgement")
                 .display_name
                 .as_deref(),

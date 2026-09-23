@@ -2139,3 +2139,140 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
 
     assert_eq!(mention, crate::protocol::MentionView::Loud);
 }
+
+fn message_htmls(views: &[crate::protocol::TimelineItemView]) -> Vec<String> {
+    contents(views)
+        .into_iter()
+        .filter_map(|content| match content {
+            crate::protocol::TimelineItemContentView::Message { html, .. } => Some(html),
+            _ => None,
+        })
+        .collect()
+}
+
+const TIME_HTML: &str = "<time datetime=\"1970-01-01T00:00:00Z\">1 Jan 1970, 00:00 (UTC)</time>";
+
+#[tokio::test]
+async fn a_time_element_survives_the_sdk_sanitizer() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!time:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .text_html("$[unixtime 0]", TIME_HTML)
+                    .event_id(event_id!("$time")),
+            ),
+        )
+        .await;
+
+    let htmls = message_htmls(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    );
+    assert_eq!(htmls, [TIME_HTML]);
+}
+
+#[tokio::test]
+async fn an_edit_renders_the_formatted_body_of_its_new_content() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!edited-time:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let original = event_id!("$original");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .text_html("before", "<em>before</em>")
+                        .event_id(original),
+                )
+                .add_timeline_event(
+                    factory
+                        .text_html("* fallback", "* <em>fallback</em>")
+                        .edit(
+                            original,
+                            matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation::text_html(
+                                "$[unixtime 0]",
+                                TIME_HTML,
+                            ),
+                        )
+                        .event_id(event_id!("$edit")),
+                ),
+        )
+        .await;
+
+    let htmls = message_htmls(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    );
+    assert_eq!(htmls, [TIME_HTML]);
+}
+
+#[tokio::test]
+async fn a_local_echo_keeps_the_formatted_body_it_was_sent_with() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!echo-time:example.org");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    server.mock_room_send().error500().mount().await;
+    let room = server.sync_joined_room(&client, room_id).await;
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .expect("a timeline for a joined room");
+
+    timeline
+        .send(RoomMessageEventContent::text_html("$[unixtime 0]", TIME_HTML).into())
+        .await
+        .expect("the message is queued");
+    let (echoes, _) = room.send_queue().subscribe().await.expect("the send queue");
+    let local_content = super::view::LocalContent::new(&echoes);
+
+    let items = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let items = timeline.items().await;
+            if items.iter().any(|item| item.as_event().is_some()) {
+                break items;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the local echo reaches the timeline");
+    let views = |local_content: &super::view::LocalContent| {
+        items
+            .iter()
+            .map(|item| {
+                super::view::timeline_item(
+                    item,
+                    client.user_id(),
+                    &BTreeSet::new(),
+                    &super::view::Highlights::default(),
+                    local_content,
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+
+    assert_eq!(message_htmls(&views(&local_content)), [TIME_HTML]);
+    assert_ne!(
+        message_htmls(&views(&super::view::LocalContent::default())),
+        [TIME_HTML],
+        "the SDK's own copy of a local echo drops the time element"
+    );
+}
