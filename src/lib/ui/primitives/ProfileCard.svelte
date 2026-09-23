@@ -82,6 +82,8 @@
   class:tint-light={heroBrightness === 'light'}
   class:tint-dark={heroBrightness === 'dark'}
   style:--profile-hero={heroColor}
+  style:--profile-name-color={nameColor}
+  style:--profile-name-color-dark={nameColorForDark}
   data-inset-owner={variant === 'sheet' ? 'bottom' : undefined}
 >
   <div class="profile-card-cover" class:has-banner={banner} style:background={color}>
@@ -129,12 +131,7 @@
     {/if}
   </div>
   <div class="profile-card-identity">
-    <h2
-      class="profile-card-name"
-      class:tinted={nameColor}
-      style:--profile-name-color={nameColor}
-      style:--profile-name-color-dark={nameColorForDark}
-    >
+    <h2 class="profile-card-name" class:tinted={nameColor}>
       {displayName}
     </h2>
     <button
@@ -317,7 +314,8 @@
     overflow-wrap: anywhere;
   }
 
-  .profile-card-name.tinted {
+  .profile-card-name.tinted,
+  :global(.profile-card-tinted) {
     color: var(--profile-name-color);
   }
 
@@ -421,30 +419,37 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not(.light) .profile-card-name.tinted,
-    :root.dark .profile-card-name.tinted {
+    :root:not(.light) :global(.profile-card-tinted),
+    :root.dark .profile-card-name.tinted,
+    :root.dark :global(.profile-card-tinted) {
       color: var(--profile-name-color-dark);
     }
   }
 
   @supports (color: oklch(from red l c h)) {
-    .profile-card-name.tinted {
+    .profile-card-name.tinted,
+    :global(.profile-card-tinted) {
       color: oklch(from var(--profile-name-color) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
     }
 
     @media (prefers-color-scheme: dark) {
       :root:not(.light) .profile-card-name.tinted,
-      :root.dark .profile-card-name.tinted {
+      :root:not(.light) :global(.profile-card-tinted),
+      :root.dark .profile-card-name.tinted,
+      :root.dark :global(.profile-card-tinted) {
         color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
       }
     }
   }
 
-  :root.dark .profile-card-name.tinted {
+  :root.dark .profile-card-name.tinted,
+  :root.dark :global(.profile-card-tinted) {
     color: var(--profile-name-color-dark);
   }
 
   @supports (color: oklch(from red l c h)) {
-    :root.dark .profile-card-name.tinted {
+    :root.dark .profile-card-name.tinted,
+    :root.dark :global(.profile-card-tinted) {
       color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
     }
   }

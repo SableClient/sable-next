@@ -57,8 +57,9 @@
   {#snippet meta()}
     {#if pronouns}
       <PronounPill
-        style={profile.color_on_light
-          ? `color: ${profile.color_on_light};`
+        class={profile.color_on_light || profile.color_on_dark ? 'profile-card-tinted' : undefined}
+        style={profile.color_on_light || profile.color_on_dark
+          ? undefined
           : `color: ${senderColor(profile.id ?? displayName)};`}>{pronouns}</PronounPill
       >
     {/if}
