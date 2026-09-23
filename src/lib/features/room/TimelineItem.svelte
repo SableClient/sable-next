@@ -1166,6 +1166,13 @@
     white-space: nowrap;
   }
 
+  @media (pointer: coarse) {
+    .message {
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+  }
+
   .message {
     display: flex;
     gap: var(--timeline-row-gap);
