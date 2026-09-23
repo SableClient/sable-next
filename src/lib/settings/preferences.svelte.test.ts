@@ -13,3 +13,8 @@ test('keeps a notification volume inside its range', () => {
     preferences.notificationSoundVolume
   );
 });
+
+test('keeps a resized banner height across a reload', () => {
+  expect(sanitize({ roomBannerHeight: 320 }, preferences).roomBannerHeight).toBe(320);
+  expect(sanitize({ roomBannerHeight: 9000 }, preferences).roomBannerHeight).toBe(500);
+});

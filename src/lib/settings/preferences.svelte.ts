@@ -213,6 +213,7 @@ export type FreeTextPreference = (typeof FREE_TEXT)[number];
 
 export const PREFERENCE_RANGES = {
   notificationSoundVolume: { min: 0, max: 1 },
+  roomBannerHeight: { min: 56, max: 500 },
 } as const satisfies Partial<Record<keyof Preferences, { min: number; max: number }>>;
 
 export type RangePreference = keyof typeof PREFERENCE_RANGES;

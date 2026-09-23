@@ -50,6 +50,7 @@
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
   import {
+    PREFERENCE_RANGES,
     preferences,
     readReceiptIsPrivate,
     setPreference,
@@ -423,9 +424,10 @@
 
   function resizeBanner(event: PointerEvent): void {
     if (!bannerResizing) return;
+    const { min, max } = PREFERENCE_RANGES.roomBannerHeight;
     const height = Math.max(
-      56,
-      Math.min(500, bannerResizeStartHeight + event.clientY - bannerResizeStartY)
+      min,
+      Math.min(max, bannerResizeStartHeight + event.clientY - bannerResizeStartY)
     );
     setPreference('roomBannerHeight', height);
   }
@@ -528,8 +530,8 @@
           class:dragging={bannerResizing}
           role="slider"
           aria-orientation="vertical"
-          aria-valuemin="56"
-          aria-valuemax="500"
+          aria-valuemin={PREFERENCE_RANGES.roomBannerHeight.min}
+          aria-valuemax={PREFERENCE_RANGES.roomBannerHeight.max}
           aria-valuenow={preferences.roomBannerHeight}
           aria-label={$i18n.t('nav.resizeRooms')}
           onpointerdown={startBannerResize}
