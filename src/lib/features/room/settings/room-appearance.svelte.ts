@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import { readJson, writeJson } from '#lib/platform/local-json.js';
 import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
 
 const STORAGE_KEY = 'sable-room-appearance';
@@ -8,13 +9,7 @@ const MODES: readonly ShowRoomIcon[] = ['always', 'sometimes', 'collapsed', 'nev
 const overrides = new SvelteMap<string, ShowRoomIcon>(load());
 
 function load(): [string, ShowRoomIcon][] {
-  if (typeof localStorage === 'undefined') return [];
-
-  try {
-    return parseRoomIconOverrides(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null'));
-  } catch {
-    return [];
-  }
+  return readJson(STORAGE_KEY, parseRoomIconOverrides, []);
 }
 
 export function parseRoomIconOverrides(value: unknown): [string, ShowRoomIcon][] {
@@ -37,13 +32,7 @@ export function adoptRoomIconOverrides(entries: [string, ShowRoomIcon][]): void 
 }
 
 function persist(): void {
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
-  } catch (error) {
-    console.debug('[sable room] appearance not stored', error);
-  }
+  writeJson(STORAGE_KEY, Object.fromEntries(overrides), '[sable room] appearance not stored');
 }
 
 export function roomIconOverride(roomId: string | null): ShowRoomIcon | null {

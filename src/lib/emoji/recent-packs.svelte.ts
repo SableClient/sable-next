@@ -1,16 +1,12 @@
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 const storageKey = 'sable.composer.recentEmotes';
 const limit = 32;
 
 const state = $state<{ shortcodes: string[] }>({ shortcodes: load() });
 
 function load(): string[] {
-  if (typeof localStorage === 'undefined') return [];
-
-  try {
-    return parseShortcodes(JSON.parse(localStorage.getItem(storageKey) ?? '[]'));
-  } catch {
-    return [];
-  }
+  return readJson(storageKey, parseShortcodes, []);
 }
 
 export function parseShortcodes(value: unknown): string[] {
@@ -29,11 +25,5 @@ export function rememberEmote(shortcode: string): void {
 
 export function writeRecent(shortcodes: readonly string[]): void {
   state.shortcodes = shortcodes.slice(0, limit);
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(state.shortcodes));
-  } catch {
-    /* A full or blocked store costs the ordering, not the picker. */
-  }
+  writeJson(storageKey, state.shortcodes);
 }

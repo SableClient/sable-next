@@ -1,3 +1,5 @@
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 export interface BoardSize {
   width: number;
   height: number;
@@ -8,13 +10,7 @@ const storageKey = 'sable.composer.boardSize';
 const state = $state<{ size: BoardSize | null }>({ size: load() });
 
 function load(): BoardSize | null {
-  if (typeof localStorage === 'undefined') return null;
-
-  try {
-    return parse(JSON.parse(localStorage.getItem(storageKey) ?? 'null'));
-  } catch {
-    return null;
-  }
+  return readJson(storageKey, parse, null);
 }
 
 function parse(value: unknown): BoardSize | null {
@@ -30,13 +26,7 @@ export function readBoardSize(): BoardSize | null {
 
 export function writeBoardSize(size: BoardSize): void {
   state.size = size;
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(size));
-  } catch (error) {
-    console.debug('[sable board] size not persisted', error);
-  }
+  writeJson(storageKey, size, '[sable board] size not persisted');
 }
 
 export function trackBoardSize(element: HTMLElement): () => void {

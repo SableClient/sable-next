@@ -1,27 +1,21 @@
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 const STORAGE_KEY = 'sable-call-volumes';
 const OUTPUT_KEY = 'sable-call-output-volume';
 
 export const MAX_PARTICIPANT_VOLUME = 2;
 
-function load(): Record<string, number> {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return {};
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return {};
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(
-        (entry): entry is [string, number] =>
-          typeof entry[1] === 'number' &&
-          Number.isFinite(entry[1]) &&
-          entry[1] >= 0 &&
-          entry[1] <= MAX_PARTICIPANT_VOLUME
-      )
-    );
-  } catch {
-    return {};
-  }
+function parse(parsed: unknown): Record<string, number> {
+  if (typeof parsed !== 'object' || parsed === null) return {};
+  return Object.fromEntries(
+    Object.entries(parsed as Record<string, unknown>).filter(
+      (entry): entry is [string, number] =>
+        typeof entry[1] === 'number' &&
+        Number.isFinite(entry[1]) &&
+        entry[1] >= 0 &&
+        entry[1] <= MAX_PARTICIPANT_VOLUME
+    )
+  );
 }
 
 function loadOutput(): number {
@@ -30,7 +24,7 @@ function loadOutput(): number {
   return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 1;
 }
 
-const volumes = $state<Record<string, number>>(load());
+const volumes = $state<Record<string, number>>(readJson(STORAGE_KEY, parse, {}));
 const output = $state({ volume: loadOutput() });
 
 export function outputVolume(): number {
@@ -61,10 +55,5 @@ export function setParticipantVolume(userId: string, volume: number): void {
 }
 
 function persist(): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(volumes));
-  } catch (error) {
-    console.debug('[sable call] participant volumes not persisted', error);
-  }
+  writeJson(STORAGE_KEY, volumes, '[sable call] participant volumes not persisted');
 }

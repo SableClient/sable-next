@@ -1,3 +1,5 @@
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 import { QUICK_REACTIONS } from './quick-reactions';
 
 export interface RecentReaction {
@@ -12,13 +14,7 @@ const MAX_ENTRIES = 100;
 const state = $state<{ entries: RecentReaction[] }>({ entries: load() });
 
 function load(): RecentReaction[] {
-  if (typeof localStorage === 'undefined') return [];
-
-  try {
-    return parseRecentReactions(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]'));
-  } catch {
-    return [];
-  }
+  return readJson(STORAGE_KEY, parseRecentReactions, []);
 }
 
 export function parseRecentReactions(value: unknown): RecentReaction[] {
@@ -60,11 +56,5 @@ export function adoptRecentReactions(entries: RecentReaction[]): void {
 
 function write(entries: RecentReaction[]): void {
   state.entries = entries.slice(0, MAX_ENTRIES);
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
-  } catch (error) {
-    console.debug('[sable reactions] recents not persisted', error);
-  }
+  writeJson(STORAGE_KEY, state.entries, '[sable reactions] recents not persisted');
 }

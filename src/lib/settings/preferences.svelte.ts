@@ -1,6 +1,7 @@
 import type { PresenceView } from '#src/generated/protocol';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
+import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
@@ -349,16 +350,12 @@ function prefersReducedMotion(): boolean {
 }
 
 function read(key: string): Record<string, unknown> | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return typeof parsed === 'object' && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+  return readJson(
+    key,
+    (parsed) =>
+      typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null,
+    null
+  );
 }
 
 export const PREFERENCE_KEYS = Object.keys(DEFAULTS) as (keyof Preferences)[];
@@ -432,10 +429,5 @@ export function applyPreferences(next: Preferences): void {
 }
 
 function persist(): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(preferences));
-  } catch (error) {
-    console.debug('[sable settings] preferences not persisted', error);
-  }
+  writeJson(STORAGE_KEY, preferences, '[sable settings] preferences not persisted');
 }

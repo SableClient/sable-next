@@ -2,21 +2,19 @@ import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { readJson, writeJson } from '#lib/platform/local-json.js';
 
 import { isFolder, sameLayout, type SidebarItem } from './sidebar-layout.js';
 
 const OPEN_FOLDERS_KEY = 'sable-open-space-folders';
 
 function loadOpenFolders(): string[] {
-  if (typeof localStorage === 'undefined') return [];
-
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(OPEN_FOLDERS_KEY) ?? '[]');
-
-    return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [];
-  } catch {
-    return [];
-  }
+  return readJson(
+    OPEN_FOLDERS_KEY,
+    (value) =>
+      Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string') : [],
+    []
+  );
 }
 
 export class SpaceSidebar {
@@ -125,13 +123,7 @@ export class SpaceSidebar {
   }
 
   private persistOpenFolders(): void {
-    if (typeof localStorage === 'undefined') return;
-
-    try {
-      localStorage.setItem(OPEN_FOLDERS_KEY, JSON.stringify([...this.openFolders]));
-    } catch (error) {
-      console.debug('[sable nav] open folders not persisted', error);
-    }
+    writeJson(OPEN_FOLDERS_KEY, [...this.openFolders], '[sable nav] open folders not persisted');
   }
 }
 

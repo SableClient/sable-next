@@ -1,4 +1,5 @@
 import { isRecord } from '#lib/guards.js';
+import { readJson, writeJson } from '#lib/platform/local-json.js';
 
 import { isAllowedGifMediaUrl, type GifResult } from './providers';
 
@@ -39,13 +40,7 @@ export function parseFavorites(value: unknown): GifResult[] {
 }
 
 function load(key: string): GifResult[] {
-  if (typeof localStorage === 'undefined') return [];
-
-  try {
-    return parseFavorites(JSON.parse(localStorage.getItem(key) ?? '[]'));
-  } catch {
-    return [];
-  }
+  return readJson(key, parseFavorites, []);
 }
 
 const state = $state<{ gifs: GifResult[]; recent: GifResult[] }>({
@@ -75,7 +70,7 @@ export function adoptRecentGifs(gifs: readonly GifResult[]): void {
 
 function writeRecent(gifs: readonly GifResult[]): void {
   state.recent = gifs.slice(0, recentLimit);
-  store(recentKey, state.recent);
+  writeJson(recentKey, state.recent);
 }
 
 export function toggleFavorite(gif: GifResult): void {
@@ -89,15 +84,5 @@ export function adoptFavorites(gifs: readonly GifResult[]): void {
 
 function write(gifs: readonly GifResult[]): void {
   state.gifs = gifs.slice(0, limit);
-  store(storageKey, state.gifs);
-}
-
-function store(key: string, gifs: readonly GifResult[]): void {
-  if (typeof localStorage === 'undefined') return;
-
-  try {
-    localStorage.setItem(key, JSON.stringify(gifs));
-  } catch {
-    /* A full store costs the list, not the picker. */
-  }
+  writeJson(storageKey, state.gifs);
 }

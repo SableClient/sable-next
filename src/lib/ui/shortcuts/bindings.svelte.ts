@@ -1,39 +1,26 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 import { findShortcutConflicts } from './binding.js';
 import { SHORTCUTS, type ShortcutDefinition, type ShortcutId } from './shortcuts.js';
 
 const STORAGE_KEY = 'sable-shortcut-bindings';
 const SHORTCUT_IDS = new Set<string>(SHORTCUTS.map((shortcut) => shortcut.id));
 
-function load(): Array<[string, string]> {
-  if (typeof localStorage === 'undefined') return [];
+function parse(parsed: unknown): Array<[string, string]> {
+  if (typeof parsed !== 'object' || parsed === null) return [];
 
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
-
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return [];
-
-    return Object.entries(parsed as Record<string, unknown>).filter(
-      (entry): entry is [string, string] =>
-        SHORTCUT_IDS.has(entry[0]) && typeof entry[1] === 'string' && entry[1] !== ''
-    );
-  } catch {
-    return [];
-  }
+  return Object.entries(parsed as Record<string, unknown>).filter(
+    (entry): entry is [string, string] =>
+      SHORTCUT_IDS.has(entry[0]) && typeof entry[1] === 'string' && entry[1] !== ''
+  );
 }
 
-const overrides = new SvelteMap<string, string>(load());
+const overrides = new SvelteMap<string, string>(readJson(STORAGE_KEY, parse, []));
 
 function persist(): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(overrides)));
-  } catch (error) {
-    console.debug('[sable shortcuts] bindings not persisted', error);
-  }
+  writeJson(STORAGE_KEY, Object.fromEntries(overrides), '[sable shortcuts] bindings not persisted');
 }
 
 export function effectiveBinding(shortcut: ShortcutDefinition): string {

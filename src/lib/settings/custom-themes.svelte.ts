@@ -1,3 +1,5 @@
+import { readJson, writeJson } from '#lib/platform/local-json.js';
+
 import type { ResolvedTheme } from './theme.js';
 
 const STORAGE_KEY = 'sable-custom-themes';
@@ -23,36 +25,41 @@ export type StoredThemes = {
   enabledTweakIds: string[];
 };
 
+function parse(stored: unknown): StoredThemes {
+  if (!stored || typeof stored !== 'object') throw new Error('missing themes');
+  const value = stored as Partial<StoredThemes>;
+  if (!Array.isArray(value.themes)) throw new Error('invalid themes');
+  const tweaks = Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak) : [];
+  const held = new Set(tweaks.map((tweak) => tweak.id));
+  return {
+    themes: value.themes.filter(
+      (theme: unknown): theme is CustomTheme =>
+        typeof theme === 'object' &&
+        theme !== null &&
+        typeof (theme as CustomTheme).id === 'string' &&
+        typeof (theme as CustomTheme).name === 'string' &&
+        ((theme as CustomTheme).kind === 'light' || (theme as CustomTheme).kind === 'dark') &&
+        typeof (theme as CustomTheme).css === 'string'
+    ),
+    tweaks,
+    lightThemeId: typeof value.lightThemeId === 'string' ? value.lightThemeId : null,
+    darkThemeId: typeof value.darkThemeId === 'string' ? value.darkThemeId : null,
+    enabledTweakIds: Array.isArray(value.enabledTweakIds)
+      ? value.enabledTweakIds.filter(
+          (id: unknown): id is string => typeof id === 'string' && held.has(id)
+        )
+      : [],
+  };
+}
+
 function load(): StoredThemes {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (!stored || typeof stored !== 'object') throw new Error('missing themes');
-    const value = stored as Partial<StoredThemes>;
-    if (!Array.isArray(value.themes)) throw new Error('invalid themes');
-    const tweaks = Array.isArray(value.tweaks) ? value.tweaks.filter(isCustomTweak) : [];
-    const held = new Set(tweaks.map((tweak) => tweak.id));
-    return {
-      themes: value.themes.filter(
-        (theme: unknown): theme is CustomTheme =>
-          typeof theme === 'object' &&
-          theme !== null &&
-          typeof (theme as CustomTheme).id === 'string' &&
-          typeof (theme as CustomTheme).name === 'string' &&
-          ((theme as CustomTheme).kind === 'light' || (theme as CustomTheme).kind === 'dark') &&
-          typeof (theme as CustomTheme).css === 'string'
-      ),
-      tweaks,
-      lightThemeId: typeof value.lightThemeId === 'string' ? value.lightThemeId : null,
-      darkThemeId: typeof value.darkThemeId === 'string' ? value.darkThemeId : null,
-      enabledTweakIds: Array.isArray(value.enabledTweakIds)
-        ? value.enabledTweakIds.filter(
-            (id: unknown): id is string => typeof id === 'string' && held.has(id)
-          )
-        : [],
-    };
-  } catch {
-    return { themes: [], tweaks: [], lightThemeId: null, darkThemeId: null, enabledTweakIds: [] };
-  }
+  return readJson(STORAGE_KEY, parse, {
+    themes: [],
+    tweaks: [],
+    lightThemeId: null,
+    darkThemeId: null,
+    enabledTweakIds: [],
+  });
 }
 
 function isCustomTweak(value: unknown): value is CustomTweak {
@@ -66,11 +73,7 @@ function isCustomTweak(value: unknown): value is CustomTweak {
 export const customThemes = $state<StoredThemes>(load());
 
 function persist(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customThemes));
-  } catch (error) {
-    console.debug('[sable themes] themes not persisted', error);
-  }
+  writeJson(STORAGE_KEY, customThemes, '[sable themes] themes not persisted');
 }
 
 export function installCustomTheme(theme: CustomTheme): void {

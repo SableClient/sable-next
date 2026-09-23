@@ -1,5 +1,7 @@
 import { createSubscriber } from 'svelte/reactivity';
 
+import { readJson } from '#lib/platform/local-json.js';
+
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
 
 export type DebugLogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -38,15 +40,14 @@ function readEnabled(): boolean {
 }
 
 function readDisabledCategories(): DebugLogCategory[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(DISABLED_CATEGORIES_KEY) ?? '[]');
-    return Array.isArray(value)
-      ? (value.filter((item) => typeof item === 'string') as DebugLogCategory[])
-      : [];
-  } catch {
-    return [];
-  }
+  return readJson(
+    DISABLED_CATEGORIES_KEY,
+    (value) =>
+      Array.isArray(value)
+        ? (value.filter((item) => typeof item === 'string') as DebugLogCategory[])
+        : [],
+    []
+  );
 }
 
 const buffer: DebugLogEntry[] = [];
