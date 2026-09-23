@@ -7,6 +7,7 @@ import {
   recoverStaleDynamicImport,
 } from '#lib/observability/dynamic-import-recovery.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
+import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { CoreError } from '#src/transport';
 
@@ -106,6 +107,7 @@ if (dsn && preferences.errorReporting) {
       return event;
     },
   });
+  untrackFetch(window);
 }
 
 // The native process has its own DSN baked in and drops everything until told.
