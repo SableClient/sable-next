@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { on } from 'svelte/events';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -37,12 +38,11 @@
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
   let definition = $derived(
-    definitionAnchor?.dataset.abbrDefinition ?? definitionAnchor?.dataset.timeDetail ?? ''
+    definitionAnchor?.dataset.abbrDefinition ??
+      (definitionAnchor ? timeDetail(definitionAnchor) : null) ??
+      ''
   );
   let renderedHtml = $derived(deferMxcImageSources(html));
-  let timeFormatRevision = $derived(
-    `${preferences.hour24Clock}:${preferences.dateFormat}:${$i18n.resolvedLanguage ?? $i18n.language}`
-  );
 
   function deferMxcImageSources(value: string): string {
     return value.replace(
@@ -147,104 +147,122 @@
     }
   }
 
-  function decorate(html: string, timezone: string | null, formatRevision: string) {
+  function decorate(html: string) {
     return (node: HTMLElement) => {
-      node.innerHTML = html;
-      void formatRevision;
-      for (const anchor of node.querySelectorAll('a')) {
-        anchor.target = '_blank';
-        anchor.rel = 'noopener noreferrer';
+      void html;
+      return untrack(() => {
+        for (const anchor of node.querySelectorAll('a')) {
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
 
-        const link = parseMatrixLink(anchor.href);
-        if (link) {
-          anchor.dataset.matrixLink = link.kind;
-          if (link.kind === 'user') {
-            anchor.textContent = mentionLabel(link.userId, memberNames);
+          const link = parseMatrixLink(anchor.href);
+          if (link) {
+            anchor.dataset.matrixLink = link.kind;
+            if (link.kind === 'user') continue;
+            if (anchor.textContent.trim() === anchor.getAttribute('href')?.trim()) {
+              anchor.textContent = link.roomId;
+              void resolveRoomName(link, anchor);
+            }
             continue;
           }
-          if (anchor.textContent.trim() === anchor.getAttribute('href')?.trim()) {
-            anchor.textContent = link.roomId;
-            void resolveRoomName(link, anchor);
+
+          const settings = parseSettingsLink(anchor.href, location.origin);
+          if (settings) {
+            anchor.dataset.settingsLink = settings.section;
+            if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
+            anchor.textContent = settingsLinkLabel(settings);
           }
-          continue;
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
+          element.style.color = element.dataset.mxColor ?? '';
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
+          element.style.backgroundColor = element.dataset.mxBgColor ?? '';
+        }
+        for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
+          if (element.parentElement?.classList.contains('time-chip')) continue;
+          const zoned = parseZonedDatetime(element.dateTime);
+          if (!zoned) continue;
+
+          const chip = document.createElement(element.closest('a') ? 'span' : 'button');
+          if (chip instanceof HTMLButtonElement) chip.type = 'button';
+          chip.className = 'time-chip';
+          element.dateTime = zoned.datetime;
+          element.replaceWith(chip);
+          chip.append(element);
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')) {
+          element.tabIndex = 0;
+          element.role = 'button';
+          element.ariaPressed = 'true';
+          if (!element.textContent?.trim()) {
+            const image = element.querySelector('img');
+            element.ariaLabel = image?.alt || $i18n.t('timeline.spoilerMedia');
+          }
         }
 
-        const settings = parseSettingsLink(anchor.href, location.origin);
-        if (settings) {
-          anchor.dataset.settingsLink = settings.section;
-          if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
-          anchor.textContent = settingsLinkLabel(settings);
-        }
-      }
-      for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
-        element.style.color = element.dataset.mxColor ?? '';
-      }
-      for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
-        element.style.backgroundColor = element.dataset.mxBgColor ?? '';
-      }
-      for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
-        const zoned = parseZonedDatetime(element.dateTime);
-        if (!zoned) continue;
-        const local = formatTime(zoned.instant);
-        const label = formatMessageTimestamp(zoned.instant);
-        const utc = formatUtcTime(zoned.instant, preferences.hour24Clock);
-        const sender = timezone
-          ? formatTimeInZone(zoned.instant, timezone, preferences.hour24Clock)
-          : null;
-        const detail = sender
-          ? $i18n.t('timeline.timeMarkupDetailWithSender', {
-              local,
-              sender,
-              timezone,
-              utc,
-            })
-          : $i18n.t('timeline.timeMarkupDetail', { local, utc });
+        const releases = resolveImages(node);
+        decorateCodeBlocks(node);
+        const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
+        if (maths.length > 0) void renderMaths(maths);
 
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'time-chip';
-        chip.setAttribute('aria-label', detail);
-        chip.dataset.timeDetail = detail;
-        element.textContent = label;
-        element.dateTime = zoned.datetime;
-        element.replaceWith(chip);
-        chip.append(element);
+        const offClick = on(node, 'click', handleClick);
+        const offKeydown = on(node, 'keydown', handleKeydown);
+        const offPointerOver = on(node, 'pointerover', handleDefinitionOver);
+        const offPointerOut = on(node, 'pointerout', handleDefinitionOut);
+        const offFocusIn = on(node, 'focusin', handleDefinitionOver);
+        const offFocusOut = on(node, 'focusout', handleDefinitionOut);
+        return () => {
+          offClick();
+          offKeydown();
+          offPointerOver();
+          offPointerOut();
+          offFocusIn();
+          offFocusOut();
+          closeDefinition();
+          for (const release of releases) release();
+        };
+      });
+    };
+  }
+
+  function relabel(html: string) {
+    return (node: HTMLElement) => {
+      void html;
+      for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
+        const link = parseMatrixLink(anchor.href);
+        if (link?.kind === 'user') anchor.textContent = mentionLabel(link.userId, memberNames);
       }
-      for (const element of node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')) {
-        element.tabIndex = 0;
-        element.role = 'button';
-        element.ariaPressed = 'true';
-        if (!element.textContent?.trim()) {
-          const image = element.querySelector('img');
-          element.ariaLabel = image?.alt || $i18n.t('timeline.spoilerMedia');
-        }
+      for (const chip of node.querySelectorAll<HTMLElement>('.time-chip')) {
+        const time = chip.querySelector('time');
+        const zoned = time ? parseZonedDatetime(time.dateTime) : null;
+        if (!time || !zoned) continue;
+        time.textContent = formatMessageTimestamp(zoned.instant);
+        if (chip instanceof HTMLButtonElement) chip.ariaLabel = timeDetail(chip);
       }
 
       const pattern = abbreviations?.pattern;
       if (pattern) markAbbreviations(node, abbreviations.map, pattern);
-
-      const releases = resolveImages(node);
-      decorateCodeBlocks(node);
-      const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
-      if (maths.length > 0) void renderMaths(maths);
-
-      const offClick = on(node, 'click', handleClick);
-      const offKeydown = on(node, 'keydown', handleKeydown);
-      const offPointerOver = on(node, 'pointerover', handleDefinitionOver);
-      const offPointerOut = on(node, 'pointerout', handleDefinitionOut);
-      const offFocusIn = on(node, 'focusin', handleDefinitionOver);
-      const offFocusOut = on(node, 'focusout', handleDefinitionOut);
-      return () => {
-        offClick();
-        offKeydown();
-        offPointerOver();
-        offPointerOut();
-        offFocusIn();
-        offFocusOut();
-        closeDefinition();
-        for (const release of releases) release();
-      };
     };
+  }
+
+  function timeDetail(chip: HTMLElement): string | null {
+    const time = chip.classList.contains('time-chip') ? chip.querySelector('time') : null;
+    const zoned = time ? parseZonedDatetime(time.dateTime) : null;
+    if (!zoned) return null;
+    const local = formatTime(zoned.instant);
+    const utc = formatUtcTime(zoned.instant, preferences.hour24Clock);
+    const sender = senderTimezone
+      ? formatTimeInZone(zoned.instant, senderTimezone, preferences.hour24Clock)
+      : null;
+    return sender
+      ? $i18n.t('timeline.timeMarkupDetailWithSender', {
+          local,
+          sender,
+          timezone: senderTimezone,
+          utc,
+        })
+      : $i18n.t('timeline.timeMarkupDetail', { local, utc });
   }
 
   async function resolveRoomName(
@@ -377,9 +395,12 @@
   }
 
   function definitionOf(target: EventTarget | null): HTMLElement | null {
-    return target instanceof Element
-      ? target.closest<HTMLElement>('abbr[data-abbr-definition], button.time-chip')
-      : null;
+    const found =
+      target instanceof Element
+        ? target.closest<HTMLElement>('abbr[data-abbr-definition], .time-chip')
+        : null;
+    const spoiler = found?.closest<HTMLElement>('[data-mx-spoiler]');
+    return spoiler && spoiler.ariaPressed !== 'false' ? null : found;
   }
 
   function closeDefinition(): void {
@@ -403,7 +424,7 @@
     if (!(target instanceof Element)) return;
 
     const abbr = definitionOf(target);
-    if (abbr) {
+    if (abbr && !abbr.closest('a')) {
       event.preventDefault();
       if (definitionPinned && abbr === definitionAnchor) closeDefinition();
       else {
@@ -422,6 +443,7 @@
       event.preventDefault();
       return;
     }
+
     const anchor = target.closest<HTMLAnchorElement>('a');
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
     if (anchor.href.toLowerCase().startsWith('matrix:')) event.preventDefault();
@@ -447,14 +469,18 @@
 
 <div
   class="formatted-body"
-  {@attach decorate(renderedHtml, senderTimezone, timeFormatRevision)}
+  {@attach decorate(renderedHtml)}
+  {@attach relabel(renderedHtml)}
   {@attach holdAnimations}
-></div>
+>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  {@html renderedHtml}
+</div>
 
 {#if definitionAnchor && definition}
   <Tooltip
     label={definition}
-    multiline={definitionAnchor.dataset.timeDetail !== undefined}
+    multiline={definitionAnchor.classList.contains('time-chip')}
     open
     customAnchor={definitionAnchor}
     side="top"

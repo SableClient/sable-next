@@ -7,9 +7,10 @@
   interface Props {
     html: string;
     entries: AbbreviationEntry[];
+    senderTimezone?: string | null;
   }
 
-  let { html, entries }: Props = $props();
+  let { html, entries, senderTimezone = null }: Props = $props();
   const abbreviations = new RoomAbbreviations({
     roomStateEvent: () => Promise.resolve({ entries }),
   });
@@ -18,5 +19,5 @@
 </script>
 
 <TooltipProvider>
-  <FormattedBody {html} />
+  <FormattedBody {html} {senderTimezone} />
 </TooltipProvider>

@@ -4,7 +4,7 @@ import type { AbbreviationEntry } from './settings/abbreviations';
 
 const MAX_SPACE_DEPTH = 4;
 
-const SKIP_SELECTOR = 'a, abbr, code, pre, [data-mx-maths], [data-mx-spoiler]';
+const SKIP_SELECTOR = 'a, abbr, code, pre, time, .code-head, [data-mx-maths], [data-mx-spoiler]';
 
 export interface AbbreviationMatch {
   term: string;

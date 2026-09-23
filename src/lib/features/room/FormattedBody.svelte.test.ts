@@ -481,3 +481,78 @@ test('shows a room abbreviation definition in a tooltip on hover', async () => {
   );
   await unmount(instance);
 });
+
+const TIME = '<time datetime="1970-01-01T00:00:00Z">1 Jan 1970, 00:00 (UTC)</time>';
+
+async function settle(): Promise<void> {
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+test('the sender zone reaches a time chip without rebuilding the body', async () => {
+  const props = $state({
+    html: `<p>${TIME} <span data-mx-spoiler="">secret</span></p>`,
+    entries: [],
+    senderTimezone: null as string | null,
+  });
+  const instance = mount(FormattedBodyHarness, { target: document.body, props });
+  await settle();
+
+  const chip = document.querySelector<HTMLButtonElement>('button.time-chip');
+  const spoiler = document.querySelector<HTMLElement>('[data-mx-spoiler]');
+  spoiler?.click();
+  expect(spoiler?.ariaPressed).toBe('false');
+  expect(chip?.ariaLabel).not.toContain('Asia/Tokyo');
+
+  chip?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  await settle();
+  expect(document.querySelector('.tooltip')?.textContent).toContain('UTC');
+
+  props.senderTimezone = 'Asia/Tokyo';
+  await settle();
+
+  expect(document.querySelector('button.time-chip')).toBe(chip);
+  expect(spoiler?.ariaPressed).toBe('false');
+  expect(chip?.ariaLabel).toContain('Asia/Tokyo');
+  expect(document.querySelector('.tooltip')?.textContent).toContain('Asia/Tokyo');
+  await unmount(instance);
+});
+
+test('a time chip inside a hidden spoiler reveals it instead of its time', async () => {
+  const instance = mount(FormattedBodyHarness, {
+    target: document.body,
+    props: { html: `<span data-mx-spoiler="">${TIME}</span>`, entries: [] },
+  });
+  await settle();
+
+  const chip = document.querySelector<HTMLElement>('.time-chip');
+  const spoiler = document.querySelector<HTMLElement>('[data-mx-spoiler]');
+  chip?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  chip?.click();
+  await settle();
+
+  expect(spoiler?.ariaPressed).toBe('false');
+  expect(document.querySelector('.tooltip')).toBeNull();
+
+  chip?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  await settle();
+  expect(document.querySelector('.tooltip')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a time inside a link stays part of the link', async () => {
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<a href="https://example.org/">${TIME}</a>` },
+  });
+  await tick();
+
+  const chip = document.querySelector<HTMLElement>('a .time-chip');
+  expect(chip?.tagName).toBe('SPAN');
+  expect(document.querySelector('a button')).toBeNull();
+
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  chip?.dispatchEvent(click);
+  expect(click.defaultPrevented).toBe(false);
+  await unmount(instance);
+});
