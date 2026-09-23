@@ -42,6 +42,15 @@ export class RoomMemberLoader {
     }
   }
 
+  setPowerLevel(roomId: string, userId: string, level: number): void {
+    if (this.attemptedRoomId !== roomId) return;
+    const members = this.members.map((member) =>
+      member.user_id === userId ? { ...member, power_level: level } : member
+    );
+    this.members = members;
+    if (this.cache.has(roomId)) this.remember(roomId, members);
+  }
+
   private remember(roomId: string, members: MemberView[]): void {
     this.cache.delete(roomId);
     this.cache.set(roomId, members);

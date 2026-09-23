@@ -132,3 +132,26 @@ test('the member cache is bounded', async () => {
   expect(loader.loading).toBe(false);
   await kept;
 });
+
+test('a power level change patches the loaded members and the cache', async () => {
+  const loader = new RoomMemberLoader();
+  const refetch = deferred<MemberView[]>();
+  let calls = 0;
+  const fetchMembers = () => {
+    calls += 1;
+    return calls === 1 ? Promise.resolve([member('@a:b'), member('@c:d')]) : refetch.promise;
+  };
+
+  await loader.load('!room:example.org', fetchMembers);
+  loader.setPowerLevel('!other:example.org', '@a:b', 50);
+  expect(loader.members.map((entry) => entry.power_level)).toEqual([0, 0]);
+
+  loader.setPowerLevel('!room:example.org', '@a:b', 50);
+  expect(loader.members.map((entry) => entry.power_level)).toEqual([50, 0]);
+
+  loader.reset();
+  const revisit = loader.load('!room:example.org', fetchMembers);
+  expect(loader.members.map((entry) => entry.power_level)).toEqual([50, 0]);
+  refetch.resolve([member('@a:b'), member('@c:d')]);
+  await revisit;
+});

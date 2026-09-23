@@ -111,3 +111,61 @@ test('sends no reason when the moderation reason is left blank', async () => {
 
   await unmount(instance);
 });
+
+async function press(element: Element): Promise<void> {
+  element.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      button: 0,
+      isPrimary: true,
+    })
+  );
+  element.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
+  );
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+  await tick();
+}
+
+test('keeps a changed power level when the reload still returns the old one', async () => {
+  const bob: MemberView = { ...alice, user_id: '@bob:example.org', display_name: 'Bob' };
+  core.roomMembers.mockResolvedValue([alice, bob]);
+  core.setUserPowerLevel.mockResolvedValue(undefined);
+  const instance = mount(RoomMembersSettings, {
+    target: document.body,
+    props: { room, permissions: { ...permissions, can_change_power_levels: true } },
+  });
+  const names = () =>
+    Array.from(document.querySelectorAll('.settings-row'), (row) =>
+      row.textContent.includes('Bob') ? 'Bob' : 'Alice'
+    );
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Alice', 'Bob']);
+  });
+
+  const triggers = document.querySelectorAll<HTMLElement>('.settings-row .select');
+  await press(triggers[1]);
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
+  });
+  const moderator = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+    (option) => option.textContent.includes('Moderator')
+  );
+  if (!moderator) throw new Error('moderator option missing');
+  await press(moderator);
+
+  await vi.waitFor(() => {
+    expect(core.setUserPowerLevel).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bob:example.org',
+      50
+    );
+  });
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Bob', 'Alice']);
+  });
+
+  await unmount(instance);
+});

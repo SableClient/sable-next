@@ -102,11 +102,17 @@
     return member.power_level >= ownPowerLevel;
   }
 
-  async function act(userId: string, action: () => Promise<void>): Promise<void> {
+  async function act(
+    userId: string,
+    action: () => Promise<void>,
+    patch?: (member: MemberView) => MemberView
+  ): Promise<void> {
     busy = userId;
     try {
       await action();
       await load();
+      if (patch)
+        members = members.map((entry) => (entry.user_id === userId ? patch(entry) : entry));
     } catch (error) {
       console.warn('[sable room] member action failed', error);
       failed = true;
@@ -135,7 +141,11 @@
   function setPower(member: MemberView, level: number): void {
     const target = roomId;
     if (!target || level === member.power_level) return;
-    void act(member.user_id, () => core.commands.setUserPowerLevel(target, member.user_id, level));
+    void act(
+      member.user_id,
+      () => core.commands.setUserPowerLevel(target, member.user_id, level),
+      (entry) => ({ ...entry, power_level: level })
+    );
   }
 
   let moderationTarget = $state<{ userId: string; action: 'kick' | 'ban' } | null>(null);

@@ -17,7 +17,11 @@ const core = Object.assign(baseCore, {
   sendMessage: vi.fn<() => Promise<void>>(),
   kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
   banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
+  setUserPowerLevel: vi.fn<(roomId: string, userId: string, level: number) => Promise<void>>(),
 });
+
+const toastError = vi.hoisted(() => vi.fn());
+vi.mock('#lib/ui/toasts.svelte.js', () => ({ toasts: { error: toastError } }));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
@@ -370,4 +374,90 @@ test('sends no reason when the moderation reason is left blank', async () => {
   });
 
   await unmount(instance);
+});
+
+async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<void> {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: false,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: true,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+      onPowerLevelChange,
+    },
+  });
+  await tick();
+
+  document
+    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
+    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  await tick();
+  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
+    if (item.textContent.includes('Change role')) item.click();
+  });
+  await vi.waitFor(() => {
+    const moderator = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+      (item) => item.textContent.includes('Moderator')
+    );
+    if (!moderator) throw new Error('moderator item missing');
+    moderator.click();
+  });
+  await vi.waitFor(() => {
+    expect(core.setUserPowerLevel).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@alice:example.org',
+      50
+    );
+  });
+  await Promise.resolve();
+  await unmount(instance);
+}
+
+test('reports a successful role change so the member list can follow it', async () => {
+  core.setUserPowerLevel.mockReset().mockResolvedValue(undefined);
+  toastError.mockClear();
+  const onPowerLevelChange = vi.fn();
+
+  await changeRoleToModerator(onPowerLevelChange);
+
+  expect(onPowerLevelChange).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', 50);
+  expect(toastError).not.toHaveBeenCalled();
+});
+
+test('toasts a failed role change and reports nothing', async () => {
+  core.setUserPowerLevel.mockReset().mockRejectedValue(new Error('forbidden'));
+  toastError.mockClear();
+  const onPowerLevelChange = vi.fn();
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  await changeRoleToModerator(onPowerLevelChange);
+
+  await vi.waitFor(() => {
+    expect(toastError).toHaveBeenCalled();
+  });
+  expect(onPowerLevelChange).not.toHaveBeenCalled();
 });

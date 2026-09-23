@@ -31,6 +31,7 @@
   import { i18n } from '#lib/i18n.js';
   import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
@@ -62,6 +63,7 @@
     profile: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onPowerLevelChange?: (roomId: string, userId: string, level: number) => void;
     failed?: boolean;
     variant?: 'popover' | 'sheet';
   }
@@ -75,6 +77,7 @@
     profile,
     onAvatarClick,
     onMatrixLink,
+    onPowerLevelChange,
     failed = false,
     variant = 'popover',
   }: Props = $props();
@@ -318,9 +321,15 @@
   }
 
   function setPowerLevel(level: number): void {
-    void core.commands.setUserPowerLevel(roomId, userId, level).catch((error: unknown) => {
-      console.warn('[sable profile] power level change failed', error);
-    });
+    const target = roomId;
+    const user = userId;
+    void core.commands.setUserPowerLevel(target, user, level).then(
+      () => onPowerLevelChange?.(target, user, level),
+      (error: unknown) => {
+        console.warn('[sable profile] power level change failed', error);
+        toasts.error($i18n.t('errors.actionFailed'));
+      }
+    );
   }
 
   function showShared(kind: 'rooms' | 'spaces' | null): void {

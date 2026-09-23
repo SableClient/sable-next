@@ -22,6 +22,7 @@
     profile?: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+    onPowerLevelChange?: (roomId: string, userId: string, level: number) => void;
     failed?: boolean;
     anchor: HTMLElement | null;
     onOpenChange?: (open: boolean) => void;
@@ -37,6 +38,7 @@
     profile = null,
     onAvatarClick,
     onMatrixLink,
+    onPowerLevelChange,
     failed = false,
     anchor,
     onOpenChange,
@@ -86,6 +88,7 @@
             {profile}
             {onAvatarClick}
             {onMatrixLink}
+            {onPowerLevelChange}
             {failed}
           />
         {/if}
@@ -112,6 +115,7 @@
         {profile}
         {onAvatarClick}
         {onMatrixLink}
+        {onPowerLevelChange}
         {failed}
         variant="sheet"
       />
