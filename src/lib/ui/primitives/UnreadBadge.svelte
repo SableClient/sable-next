@@ -51,12 +51,14 @@
   :global(.unread-badge-count) {
     align-items: center;
     border-radius: var(--radii-pill);
+    box-sizing: border-box;
     display: inline-flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
+    height: var(--line-height-small);
     justify-content: center;
     line-height: var(--line-height-small);
-    min-width: 1rem;
-    padding: 0 var(--space-100);
+    min-width: var(--line-height-small);
+    padding: 0 var(--space-050);
   }
 </style>
