@@ -12,6 +12,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import '#lib/ui/primitives/settings-row.css';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
 
@@ -85,9 +86,10 @@
     savingAvatar = true;
     error = null;
     try {
+      const upright = await uprightJpeg(avatarFile);
       const url = await core.uploadAvatar(
-        avatarFile.type || 'image/*',
-        new Uint8Array(await avatarFile.arrayBuffer())
+        upright.type || 'image/*',
+        new Uint8Array(await upright.arrayBuffer())
       );
       if (profile) profile = { ...profile, avatar_url: url };
       setAvatar(null);

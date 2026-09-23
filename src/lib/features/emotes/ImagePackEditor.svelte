@@ -19,6 +19,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import {
     ALL_USAGES,
@@ -145,10 +146,11 @@
     busy = true;
     failed = false;
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
+      const upright = await uprightJpeg(file);
+      const bytes = new Uint8Array(await upright.arrayBuffer());
       edit({
         ...current,
-        avatarUrl: await core.commands.uploadMedia(file.type || 'image/*', bytes),
+        avatarUrl: await core.commands.uploadMedia(upright.type || 'image/*', bytes),
       });
     } catch (error) {
       console.warn('[sable emotes] the pack avatar could not be uploaded', error);

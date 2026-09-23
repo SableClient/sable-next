@@ -15,6 +15,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   interface Props {
     open?: boolean;
@@ -56,9 +57,10 @@
     saving = true;
     error = null;
     try {
+      const upright = await uprightJpeg(file);
       avatarUrl = await core.commands.uploadMedia(
-        file.type || 'image/*',
-        new Uint8Array(await file.arrayBuffer())
+        upright.type || 'image/*',
+        new Uint8Array(await upright.arrayBuffer())
       );
     } catch (cause) {
       console.warn('[sable personas] uploading the picture failed', cause);

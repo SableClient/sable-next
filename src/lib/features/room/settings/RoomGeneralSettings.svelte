@@ -21,6 +21,7 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import '#lib/ui/primitives/settings-row.css';
 
@@ -170,8 +171,9 @@
     if (!file || !target || !canEditAvatar) return;
 
     await run(async () => {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      await core.uploadRoomAvatar(target, file.type || 'image/*', bytes);
+      const upright = await uprightJpeg(file);
+      const bytes = new Uint8Array(await upright.arrayBuffer());
+      await core.uploadRoomAvatar(target, upright.type || 'image/*', bytes);
     });
   }
 

@@ -48,7 +48,7 @@ async function imageSize(file: Blob): Promise<Size | null> {
   if (typeof createImageBitmap !== 'function') return null;
 
   try {
-    const bitmap = await createImageBitmap(file);
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     try {
       let blurhash: string | null = null;
       try {
