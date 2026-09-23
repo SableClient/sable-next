@@ -79,7 +79,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "@sentry/sveltekit": "^10.74.0",
+    "@sentry/sveltekit": "^11.0.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
     "@storybook/addon-svelte-csf": "5.1.3",

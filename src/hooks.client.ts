@@ -26,7 +26,20 @@ if (dsn && preferences.errorReporting) {
     environment,
     release,
 
-    dataCollection: { userInfo: false, httpBodies: [] },
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: {
+        request: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+        response: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      },
+      httpBodies: [],
+      urlQueryParams: { deny: ['forwarded', '-ip', 'remote-', 'via', '-user'] },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      graphQL: { document: false, variables: false },
+    },
 
     integrations: [
       Sentry.consoleLoggingIntegration({ levels: ['error', 'warn'] }),
@@ -47,7 +60,6 @@ if (dsn && preferences.errorReporting) {
     },
     replaysSessionSampleRate: sampleEverything ? 1 : 0.1,
     replaysOnErrorSampleRate: 1,
-    enableLogs: true,
 
     beforeSendLog(log) {
       if (log.level === 'debug' && environment === 'production') return null;
@@ -66,13 +78,10 @@ if (dsn && preferences.errorReporting) {
       return breadcrumb;
     },
 
-    beforeSendTransaction(event) {
-      if (event.transaction) event.transaction = scrubMatrixUrl(event.transaction);
-      for (const span of event.spans ?? []) {
-        if (span.description) span.description = scrubMatrixUrl(span.description);
-        span.data = sanitizePayload(span.data) as typeof span.data;
-      }
-      return event;
+    beforeSendSpan(span) {
+      span.name = scrubMatrixUrl(span.name);
+      span.attributes = sanitizePayload(span.attributes) as typeof span.attributes;
+      return span;
     },
 
     beforeSend(event, hint) {

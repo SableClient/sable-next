@@ -52,7 +52,27 @@ test('fully samples call traces and inherits sampling for every other trace', as
 
   const options = vi.mocked(Sentry.init).mock.calls[0][0];
   const inheritOrSampleWith = vi.fn(() => 0.42);
-  expect(options.tracesSampler?.({ name: 'call.join', inheritOrSampleWith })).toBe(1);
-  expect(options.tracesSampler?.({ name: 'navigation', inheritOrSampleWith })).toBe(0.42);
+  expect(options.tracesSampler?.({ name: 'call.join', attributes: {}, inheritOrSampleWith })).toBe(
+    1
+  );
+  expect(options.tracesSampler?.({ name: 'navigation', attributes: {}, inheritOrSampleWith })).toBe(
+    0.42
+  );
   expect(inheritOrSampleWith).toHaveBeenCalledWith(0.1);
+});
+
+test('scrubs matrix identifiers from every streamed span', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+
+  await import('./hooks.client.js');
+
+  const options = vi.mocked(Sentry.init).mock.calls[0][0];
+  const span = options.beforeSendSpan?.({
+    name: '/rooms/!abc:example.org',
+    attributes: { 'url.path': '/rooms/!abc:example.org', roomId: '!abc:example.org' },
+  } as unknown as Parameters<NonNullable<typeof options.beforeSendSpan>>[0]);
+
+  expect(span?.name).not.toContain('!abc:example.org');
+  expect(span?.attributes).toEqual({ 'url.path': '/rooms/![ROOM_ID]' });
 });
