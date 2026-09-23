@@ -2,13 +2,9 @@
   import type { MemberView, ProfileView, RoomPermissionsView } from '#src/generated/protocol';
 
   import type { MatrixLink } from './matrix-link.js';
-  import { Popover } from 'bits-ui';
 
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { i18n } from '#lib/i18n.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
 
   import MentionProfileCard from './MentionProfileCard.svelte';
 
@@ -43,23 +39,6 @@
     anchor,
     onOpenChange,
   }: Props = $props();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let desktop = $derived(appLayout.matches);
-
-  $effect(() => {
-    if (!open || !desktop || !anchor) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => !entry.isIntersecting)) onOpenChange?.(false);
-    });
-    observer.observe(anchor);
-    return () => {
-      observer.disconnect();
-    };
-  });
-
-  function handleOpenChange(next: boolean): void {
-    onOpenChange?.(next);
-  }
 
   function handleCloseAutoFocus(event: Event): void {
     event.preventDefault();
@@ -67,44 +46,19 @@
   }
 </script>
 
-{#if desktop && anchor}
-  <Popover.Root bind:open onOpenChange={handleOpenChange}>
-    <Popover.Portal>
-      <Popover.Content
-        class="mention-profile-popover"
-        {...overlayLayer()}
-        customAnchor={anchor}
-        side="top"
-        align="start"
-        onCloseAutoFocus={handleCloseAutoFocus}
-      >
-        {#if userId}
-          <MentionProfileCard
-            {userId}
-            {member}
-            {roomId}
-            {ownPowerLevel}
-            {permissions}
-            {profile}
-            {onAvatarClick}
-            {onMatrixLink}
-            {onPowerLevelChange}
-            {failed}
-          />
-        {/if}
-      </Popover.Content>
-    </Popover.Portal>
-  </Popover.Root>
-{:else}
-  <BottomSheet
-    bind:open
-    label={$i18n.t('timeline.userProfile')}
-    closeLabel={$i18n.t('timeline.closeProfile')}
-    handleColor="var(--bg-container)"
-    handleOpacity={1}
-    contentInset={false}
-    onOpenChange={handleOpenChange}
-  >
+<ResponsivePopover
+  bind:open
+  {anchor}
+  closeOnAnchorHidden
+  label={$i18n.t('timeline.userProfile')}
+  closeLabel={$i18n.t('timeline.closeProfile')}
+  handleColor="var(--bg-container)"
+  handleOpacity={1}
+  contentInset={false}
+  {onOpenChange}
+  onCloseAutoFocus={handleCloseAutoFocus}
+>
+  {#snippet children(sheet)}
     {#if userId}
       <MentionProfileCard
         {userId}
@@ -117,16 +71,8 @@
         {onMatrixLink}
         {onPowerLevelChange}
         {failed}
-        variant="sheet"
+        variant={sheet ? 'sheet' : 'popover'}
       />
     {/if}
-  </BottomSheet>
-{/if}
-
-<style>
-  :global(.mention-profile-popover) {
-    box-shadow: var(--shadow-dialog);
-    padding: 0;
-    width: min(22rem, calc(100vw - 2rem));
-  }
-</style>
+  {/snippet}
+</ResponsivePopover>

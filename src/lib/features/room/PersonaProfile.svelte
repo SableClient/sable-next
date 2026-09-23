@@ -1,13 +1,9 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { Popover } from 'bits-ui';
   import type { PerMessageProfileView } from '#src/generated/protocol';
 
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { i18n } from '#lib/i18n.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
-  import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
 
   import PersonaCard from './PersonaCard.svelte';
   import './avatar-button.css';
@@ -31,40 +27,15 @@
     onOpenAccount,
     onAvatarClick,
     onOpenChange,
-    children,
+    children: avatar,
   }: Props = $props();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  let desktop = $derived(appLayout.matches);
   let open = $state(false);
-  let trigger = $state<HTMLElement | null>(null);
-
-  $effect(() => {
-    if (!open || !desktop || !trigger) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => !entry.isIntersecting)) {
-        open = false;
-        onOpenChange?.(false);
-      }
-    });
-    observer.observe(trigger);
-    return () => {
-      observer.disconnect();
-    };
-  });
-
-  function handleOpenChange(next: boolean): void {
-    onOpenChange?.(next);
-  }
-
-  function openSheet(): void {
-    open = true;
-    onOpenChange?.(true);
-  }
+  let anchor = $state<HTMLElement | null>(null);
 
   function openAccount(): void {
     open = false;
     onOpenChange?.(false);
-    onOpenAccount(trigger);
+    onOpenAccount(anchor);
   }
 
   function openAvatar(source: string, displayName: string): void {
@@ -74,66 +45,31 @@
   }
 </script>
 
-{#if desktop}
-  <Popover.Root bind:open onOpenChange={handleOpenChange}>
-    <Popover.Trigger bind:ref={trigger} class="avatar-button selection-open" aria-label={label}>
-      {@render children()}
-    </Popover.Trigger>
-    <Popover.Portal>
-      <Popover.Content
-        class="persona-profile-popover"
-        {...overlayLayer()}
-        side="top"
-        align="start"
-        collisionPadding={12}
-      >
-        <PersonaCard
-          {profile}
-          {accountId}
-          {accountName}
-          onOpenAccount={openAccount}
-          onAvatarClick={openAvatar}
-        />
-      </Popover.Content>
-    </Popover.Portal>
-  </Popover.Root>
-{:else}
-  <button
-    bind:this={trigger}
-    class="avatar-button selection-open"
-    type="button"
-    aria-label={label}
-    aria-haspopup="dialog"
-    aria-expanded={open}
-    data-state={open ? 'open' : 'closed'}
-    onclick={openSheet}
-  >
-    {@render children()}
-  </button>
-  <BottomSheet
-    bind:open
-    label={$i18n.t('timeline.personaSheet')}
-    closeLabel={$i18n.t('timeline.closeProfile')}
-    handleColor="var(--bg-container)"
-    handleOpacity={1}
-    contentInset={false}
-    onOpenChange={handleOpenChange}
-  >
+<ResponsivePopover
+  bind:open
+  {anchor}
+  collisionPadding={12}
+  closeOnAnchorHidden
+  label={$i18n.t('timeline.personaSheet')}
+  closeLabel={$i18n.t('timeline.closeProfile')}
+  handleColor="var(--bg-container)"
+  handleOpacity={1}
+  contentInset={false}
+  {onOpenChange}
+>
+  {#snippet trigger({ props })}
+    <button {...props} bind:this={anchor} class="avatar-button selection-open" aria-label={label}>
+      {@render avatar()}
+    </button>
+  {/snippet}
+  {#snippet children(sheet)}
     <PersonaCard
       {profile}
       {accountId}
       {accountName}
       onOpenAccount={openAccount}
       onAvatarClick={openAvatar}
-      variant="sheet"
+      variant={sheet ? 'sheet' : 'popover'}
     />
-  </BottomSheet>
-{/if}
-
-<style>
-  :global(.persona-profile-popover) {
-    box-shadow: var(--shadow-dialog);
-    padding: 0;
-    width: min(22rem, calc(100vw - 2rem));
-  }
-</style>
+  {/snippet}
+</ResponsivePopover>
