@@ -32,11 +32,11 @@ function tweak(id: string, css: string): StoredThemes['tweaks'][number] {
 describe('prepareSettings', () => {
   it('uploads syncable preferences and withholds device-local ones', () => {
     const { content } = prepareSettings(
-      { ...base, layout: 'compact', developerTools: true, systemNotifications: true },
+      { ...base, dateFormat: 'ymd', developerTools: true, systemNotifications: true },
       noThemes
     );
 
-    expect(content.settings.layout).toBe('compact');
+    expect(content.settings.dateFormat).toBe('ymd');
     expect(content.settings).not.toHaveProperty('developerTools');
     expect(content.settings).not.toHaveProperty('systemNotifications');
     expect(content.settings).not.toHaveProperty('settingsSync');
@@ -67,16 +67,33 @@ describe('prepareSettings', () => {
 
 describe('applySettings', () => {
   it('takes remote preferences and keeps the device-local ones', () => {
-    const local: Preferences = { ...base, layout: 'modern', developerTools: true };
+    const local: Preferences = { ...base, dateFormat: 'dmy', developerTools: true };
     const { content } = prepareSettings(
-      { ...base, layout: 'bubble', developerTools: false },
+      { ...base, dateFormat: 'ymd', developerTools: false },
       noThemes
     );
 
     const applied = applySettings(content, local, noThemes, []);
 
-    expect(applied?.preferences.layout).toBe('bubble');
+    expect(applied?.preferences.dateFormat).toBe('ymd');
     expect(applied?.preferences.developerTools).toBe(true);
+  });
+
+  it('keeps this device’s font scale and media devices over an older upload', () => {
+    const local: Preferences = { ...base, fontScale: 'large', audioInputDevice: 'usb-mic' };
+    const applied = applySettings(
+      {
+        v: 1,
+        settings: { fontScale: 'smallest', audioInputDevice: 'webcam-mic' },
+        themes: noThemes,
+      },
+      local,
+      noThemes,
+      []
+    );
+
+    expect(applied?.preferences.fontScale).toBe('large');
+    expect(applied?.preferences.audioInputDevice).toBe('usb-mic');
   });
 
   it('ignores a value the preference does not accept', () => {
