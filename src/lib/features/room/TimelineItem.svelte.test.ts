@@ -281,6 +281,23 @@ test('badges a message with its own readers, and only in that placement', async 
   await unmount(instance);
 });
 
+test('a deleted message keeps its receipts on the tombstone line', async () => {
+  const deleted = {
+    ...item(false),
+    content: { kind: 'redacted', reason: null } as const,
+    read_by: ['@bob:example.org'],
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: deleted, collapsed: true, currentUserId: '@alice:example.org' } },
+  });
+  await tick();
+
+  expect(document.querySelector('.has-receipts .redacted')).not.toBeNull();
+  expect(document.querySelector('.has-receipts .read-receipt-stack')).not.toBeNull();
+  await unmount(instance);
+});
+
 test('the receipt dialog lists readers of later messages, not only the badge', async () => {
   vi.stubGlobal('matchMedia', () => ({
     matches: true,

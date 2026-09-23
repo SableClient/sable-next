@@ -2197,6 +2197,85 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
     assert_eq!(mention, crate::protocol::MentionView::Loud);
 }
 
+#[tokio::test]
+async fn a_deleted_mention_is_not_highlighted() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let own_user_id = client.user_id().expect("a logged-in user").to_owned();
+    let room_id = room_id!("!deleted-mention:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_bulk([
+                    factory.member(&own_user_id).into_raw(),
+                    factory.member(*ALICE).into_raw(),
+                    factory.default_power_levels().into_raw(),
+                ])
+                .add_timeline_event(
+                    factory
+                        .text_msg("hey")
+                        .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
+                            own_user_id.clone(),
+                        ]))
+                        .event_id(event_id!("$mention")),
+                ),
+        )
+        .await;
+
+    let timeline = build_room_timeline(&room, &TimelineFocusView::Live, false)
+        .await
+        .expect("a timeline");
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .redaction(event_id!("$mention"))
+                    .event_id(event_id!("$redaction")),
+            ),
+        )
+        .await;
+
+    let items = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let items = timeline.items().await;
+            if items.iter().any(|item| {
+                item.as_event()
+                    .is_some_and(|event| event.content().is_redacted())
+            }) {
+                break items;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the redaction reached the timeline");
+
+    let mention = items
+        .iter()
+        .map(|item| {
+            super::view::timeline_item(
+                item,
+                Some(&own_user_id),
+                &BTreeSet::new(),
+                &super::view::Highlights::default(),
+                &super::view::LocalContent::default(),
+            )
+        })
+        .find_map(|view| match &view.content {
+            crate::protocol::TimelineItemContentView::Redacted { .. } => Some(view.mention),
+            _ => None,
+        })
+        .expect("the deleted message");
+
+    assert_eq!(mention, crate::protocol::MentionView::None);
+}
+
 fn message_htmls(views: &[crate::protocol::TimelineItemView]) -> Vec<String> {
     contents(views)
         .into_iter()

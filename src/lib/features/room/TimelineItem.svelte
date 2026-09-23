@@ -560,7 +560,7 @@
   );
   let receiptWidth = $state(0);
   let receiptsInline = $derived(
-    !nonTextContent &&
+    (!nonTextContent || item.content.kind === 'redacted') &&
       item.reactions.length === 0 &&
       !threadSummary &&
       !item.thread_root &&
@@ -996,6 +996,18 @@
           {:else if previewUrl}
             <LinkEmbed url={previewUrl} {encrypted} />
           {/if}
+        {:else if item.content.kind === 'redacted'}
+          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
+          <div
+            class={{ 'content-bubble': layout === 'bubble', 'has-receipts': inlineReceipts }}
+            style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+          >
+            <MessageBody {item} {canRedactOthers} />
+            {#if inlineReceipts}
+              <span class="receipt-space" aria-hidden="true"></span>
+              {@render receiptSlot()}
+            {/if}
+          </div>
         {:else}
           <div class:content-bubble={layout === 'bubble' && nonTextContent}>
             <MessageBody

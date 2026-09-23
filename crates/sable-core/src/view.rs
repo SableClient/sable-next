@@ -889,7 +889,7 @@ fn mention(
     own_user_id: Option<&UserId>,
     highlighted: bool,
 ) -> MentionView {
-    if event.is_own() {
+    if event.is_own() || event.content().is_redacted() {
         return MentionView::None;
     }
     if highlighted {
