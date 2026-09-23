@@ -10,7 +10,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
 
-  import { memberAvatar, memberName, senderDisplayColors } from './members.js';
+  import { findMember, senderDisplayColors } from './members.js';
   import SenderName from './SenderName.svelte';
 
   interface Props {
@@ -33,8 +33,9 @@
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
   let profile = $state<ProfileView | null>(null);
-  let displayName = $derived(memberName(members, userId));
-  let avatarUrl = $derived(memberAvatar(members, userId));
+  let member = $derived(findMember(members, userId));
+  let displayName = $derived(member?.display_name ?? profile?.display_name ?? userId);
+  let avatarUrl = $derived(member?.avatar_url ?? profile?.avatar_url ?? null);
   let colors = $derived(senderDisplayColors(userId, profile));
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.get(userId));
