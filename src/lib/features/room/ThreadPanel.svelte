@@ -10,7 +10,14 @@
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import {
+    finishSwipeGesture,
+    startSwipeGesture,
+    updateSwipeGesture,
+    type SwipeGesture,
+  } from '#lib/ui/swipe-gesture.js';
 
   import { Conversation } from './conversation.svelte.js';
   import TimelineList from './TimelineList.svelte';
@@ -60,6 +67,10 @@
   let width = $state(27.5);
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | null = null;
+  let panel = $state<HTMLElement>();
+  let swipe: SwipeGesture | undefined;
+  let swipeOffset = $state(0);
+  let swiping = $state(false);
 
   const core = useCoreClient();
   const personas = usePersonaStore();
@@ -124,6 +135,33 @@
     localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
   }
 
+  function startSwipe(event: TouchEvent): void {
+    swipe = startSwipeGesture(event, 0);
+  }
+
+  function moveSwipe(event: TouchEvent): void {
+    if (!swipe) return;
+    const update = updateSwipeGesture(swipe, event);
+    if (!update || update.mode !== 'horizontal') return;
+    swiping = true;
+    swipeOffset = Math.max(0, update.distanceX);
+  }
+
+  function finishSwipe(cancelled: boolean): void {
+    const active = swipe;
+    swipe = undefined;
+    swiping = false;
+    if (!active) return;
+    const offset = swipeOffset;
+    swipeOffset = 0;
+    const result = finishSwipeGesture(active, offset, cancelled);
+    if (!result.handled) return;
+    const width = panel?.clientWidth ?? 0;
+    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
+      onClose();
+    }
+  }
+
   function requestHistory(): Promise<boolean> {
     return timeline.paginateBackward(25);
   }
@@ -143,94 +181,117 @@
   }
 </script>
 
-<aside
-  class="thread-panel"
-  class:modal
-  style:width={modal ? null : `${width}rem`}
-  aria-label={$i18n.t('timeline.thread')}
->
-  {#if !modal}
-    <button
-      type="button"
-      class="resize-handle"
-      class:dragging
-      role="slider"
-      aria-orientation="horizontal"
-      aria-valuemin={MIN_THREAD_PANEL_WIDTH}
-      aria-valuemax={MAX_THREAD_PANEL_WIDTH}
-      aria-valuenow={width}
-      aria-label={$i18n.t('timeline.thread')}
-      onpointerdown={startResize}
-      onpointermove={resize}
-      onpointerup={finishResize}
-      onpointercancel={finishResize}
-      onkeydown={resizeWithKeyboard}
-    ></button>
-  {/if}
-  <header class="thread-header">
-    <div class="thread-title">
-      <ChatsIcon aria-hidden="true" />
-      <h2>{$i18n.t('timeline.thread')}</h2>
-    </div>
-    <IconButton
-      variant="ghost"
-      size="small"
-      label={$i18n.t('timeline.threadClose')}
-      onclick={onClose}
-    >
-      <XIcon />
-    </IconButton>
-  </header>
+{#if modal}
+  <DialogFrame
+    open
+    onOpenChange={(open: boolean) => {
+      if (!open) onClose();
+    }}
+    variant="fullscreen"
+    contentClass={swiping ? 'thread-screen swiping' : 'thread-screen'}
+    contentStyle={swipeOffset > 0 ? `transform: translateX(${String(swipeOffset)}px)` : undefined}
+  >
+    {@render body()}
+  </DialogFrame>
+{:else}
+  {@render body()}
+{/if}
 
-  <TimelineList
-    {timeline}
-    {roomId}
-    {members}
-    {readOnly}
-    {canRedactOthers}
-    {encrypted}
-    {onSenderProfile}
-    onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
-    {onCopyLink}
-    {onOpenMedia}
-    {onPersonaAvatarClick}
-    onRequestHistory={requestHistory}
-    onRequestFuture={requestFuture}
-    onRead={markRead}
-    onReply={conversation.reply}
-    onEdit={conversation.edit}
-    onDelete={conversation.redact}
-    onToggleReaction={conversation.toggleReaction}
-    onVotePoll={conversation.votePoll}
-    onEndPoll={conversation.endPoll}
-    onRetrySend={conversation.retrySend}
-    onCancelSend={conversation.cancelSend}
-    currentUserId={core.session?.user_id ?? null}
-  />
+{#snippet body()}
+  <aside
+    bind:this={panel}
+    class="thread-panel"
+    class:modal
+    style:width={modal ? null : `${width}rem`}
+    aria-label={$i18n.t('timeline.thread')}
+    ontouchstart={modal ? startSwipe : undefined}
+    ontouchmove={modal ? moveSwipe : undefined}
+    ontouchend={modal ? () => finishSwipe(false) : undefined}
+    ontouchcancel={modal ? () => finishSwipe(true) : undefined}
+  >
+    {#if !modal}
+      <button
+        type="button"
+        class="resize-handle"
+        class:dragging
+        role="slider"
+        aria-orientation="horizontal"
+        aria-valuemin={MIN_THREAD_PANEL_WIDTH}
+        aria-valuemax={MAX_THREAD_PANEL_WIDTH}
+        aria-valuenow={width}
+        aria-label={$i18n.t('timeline.thread')}
+        onpointerdown={startResize}
+        onpointermove={resize}
+        onpointerup={finishResize}
+        onpointercancel={finishResize}
+        onkeydown={resizeWithKeyboard}
+      ></button>
+    {/if}
+    <header class="thread-header">
+      <div class="thread-title">
+        <ChatsIcon aria-hidden="true" />
+        <h2>{$i18n.t('timeline.thread')}</h2>
+      </div>
+      <IconButton
+        variant="ghost"
+        size="small"
+        label={$i18n.t('timeline.threadClose')}
+        onclick={onClose}
+      >
+        <XIcon />
+      </IconButton>
+    </header>
 
-  <div class="thread-composer">
-    <RoomComposer
-      bind:this={composer}
+    <TimelineList
+      {timeline}
       {roomId}
-      threadRoot={rootEventId}
-      {roomName}
+      {members}
       {readOnly}
-      onSend={conversation.sendMessage}
-      onSendAttachment={conversation.sendAttachment}
-      onSendGallery={conversation.sendGallery}
-      onSendSticker={conversation.sendSticker}
-      onSendGif={conversation.sendGif}
-      onCreatePoll={conversation.createPoll}
-      onSendLocation={conversation.sendLocation}
-      onTyping={conversation.setTyping}
-      context={conversation.context}
-      onCancelContext={conversation.clearContext}
-      onToggleSilentReply={conversation.toggleSilentReply}
-      onDeleteEdited={conversation.redact}
-      onEditLast={conversation.editLast}
+      {canRedactOthers}
+      {encrypted}
+      {onSenderProfile}
+      onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
+      {onCopyLink}
+      {onOpenMedia}
+      {onPersonaAvatarClick}
+      onRequestHistory={requestHistory}
+      onRequestFuture={requestFuture}
+      onRead={markRead}
+      onReply={conversation.reply}
+      onEdit={conversation.edit}
+      onDelete={conversation.redact}
+      onToggleReaction={conversation.toggleReaction}
+      onVotePoll={conversation.votePoll}
+      onEndPoll={conversation.endPoll}
+      onRetrySend={conversation.retrySend}
+      onCancelSend={conversation.cancelSend}
+      currentUserId={core.session?.user_id ?? null}
     />
-  </div>
-</aside>
+
+    <div class="thread-composer">
+      <RoomComposer
+        bind:this={composer}
+        {roomId}
+        threadRoot={rootEventId}
+        {roomName}
+        {readOnly}
+        onSend={conversation.sendMessage}
+        onSendAttachment={conversation.sendAttachment}
+        onSendGallery={conversation.sendGallery}
+        onSendSticker={conversation.sendSticker}
+        onSendGif={conversation.sendGif}
+        onCreatePoll={conversation.createPoll}
+        onSendLocation={conversation.sendLocation}
+        onTyping={conversation.setTyping}
+        context={conversation.context}
+        onCancelContext={conversation.clearContext}
+        onToggleSilentReply={conversation.toggleSilentReply}
+        onDeleteEdited={conversation.redact}
+        onEditLast={conversation.editLast}
+      />
+    </div>
+  </aside>
+{/snippet}
 
 <style>
   .thread-panel {
@@ -249,7 +310,14 @@
     background-image: linear-gradient(var(--surface-container), var(--surface-container));
     border-left: none;
     height: 100%;
+    touch-action: pan-y;
     width: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html:not([data-reduced-motion='on']) .thread-screen:not(.swiping)) {
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
+    }
   }
 
   .resize-handle {

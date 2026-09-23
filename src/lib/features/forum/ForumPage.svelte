@@ -19,7 +19,6 @@
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import { ForumThreads } from './forum-threads.svelte.js';
   import ForumHeader from './ForumHeader.svelte';
@@ -233,28 +232,20 @@
       {/key}
     {/if}
   {:else}
-    <DialogFrame
-      open={threadRootId !== null}
-      onOpenChange={(open: boolean) => {
-        if (!open) closeThread();
-      }}
-      variant="drawer"
-    >
-      {#if threadRootId !== null}
-        {#key threadRootId}
-          <ThreadPanel
-            roomId={resolvedRoomId}
-            rootEventId={threadRootId}
-            {roomName}
-            members={memberLoader.members}
-            readOnly={permissions ? !permissions.can_post : false}
-            canRedactOthers={permissions?.can_redact_others ?? false}
-            modal
-            onClose={closeThread}
-          />
-        {/key}
-      {/if}
-    </DialogFrame>
+    {#if threadRootId !== null}
+      {#key threadRootId}
+        <ThreadPanel
+          roomId={resolvedRoomId}
+          rootEventId={threadRootId}
+          {roomName}
+          members={memberLoader.members}
+          readOnly={permissions ? !permissions.can_post : false}
+          canRedactOthers={permissions?.can_redact_others ?? false}
+          modal
+          onClose={closeThread}
+        />
+      {/key}
+    {/if}
   {/if}
 </main>
 

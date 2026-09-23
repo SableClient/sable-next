@@ -968,33 +968,25 @@
   {/if}
 
   {#if !desktop}
-    <DialogFrame
-      open={threadRootId !== null}
-      onOpenChange={(open: boolean) => {
-        if (!open) closeThread();
-      }}
-      variant="drawer"
-    >
-      {#if threadRootId !== null}
-        {#key threadRootId}
-          <ThreadPanel
-            roomId={resolvedRoomId}
-            rootEventId={threadRootId}
-            {roomName}
-            members={memberLoader.members}
-            readOnly={permissions ? !permissions.can_post : false}
-            canRedactOthers={permissions?.can_redact_others ?? false}
-            encrypted={resolvedRoom?.encrypted ?? null}
-            modal
-            onClose={closeThread}
-            onSenderProfile={openProfile}
-            onCopyLink={copyEventLink}
-            onOpenMedia={openMedia}
-            onPersonaAvatarClick={openProfileAvatar}
-          />
-        {/key}
-      {/if}
-    </DialogFrame>
+    {#if threadRootId !== null}
+      {#key threadRootId}
+        <ThreadPanel
+          roomId={resolvedRoomId}
+          rootEventId={threadRootId}
+          {roomName}
+          members={memberLoader.members}
+          readOnly={permissions ? !permissions.can_post : false}
+          canRedactOthers={permissions?.can_redact_others ?? false}
+          encrypted={resolvedRoom?.encrypted ?? null}
+          modal
+          onClose={closeThread}
+          onSenderProfile={openProfile}
+          onCopyLink={copyEventLink}
+          onOpenMedia={openMedia}
+          onPersonaAvatarClick={openProfileAvatar}
+        />
+      {/key}
+    {/if}
   {/if}
 
   {#if !desktop}
