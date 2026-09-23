@@ -1382,6 +1382,8 @@
     "mediaAutoLoadHint": "Off shows a placeholder you tap to download.",
     "autoplayGifs": "Autoplay GIFs",
     "autoplayGifsHint": "Off shows a preview with a play button.",
+    "pauseAnimationsWhenInactive": "Pause animations when the window is inactive",
+    "pauseAnimationsWhenInactiveHint": "GIFs, stickers and animated emotes hold still while the window is unfocused or hidden.",
     "autoplayStickers": "Autoplay stickers",
     "autoplayStickersHint": "Off holds an animated sticker on its first frame until you play it.",
     "gifProvider": "GIF search provider",

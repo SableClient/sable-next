@@ -14,6 +14,7 @@
     mediaAspectRatio,
     retryMediaUrl,
   } from '#lib/ui/media-url.js';
+  import { animationsPaused, stillFrame } from '#lib/ui/still-frame.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
@@ -92,6 +93,7 @@
   let blurhashCanvas = $state<HTMLCanvasElement>();
   let imageLoaded = $state(false);
   let imageElement = $state<HTMLImageElement>();
+  let stillImage = $state<{ url: string; still: string } | null>(null);
   let plate = $derived.by(() => {
     if (!uniform || !preferences.uniformIcons || !imageLoaded) return null;
     const image = imageElement;
@@ -103,6 +105,8 @@
   );
   let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
   let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
+  let paused = $derived((animated || original) && animationsPaused());
+  let heldUrl = $derived(paused && stillImage?.url === url ? stillImage.still : url);
   let steppedGif = $derived(gifFrames !== null);
   let heldGif = $derived(manualGif && !gifPlaying && gifPreviewReady);
   let painted = $derived(manualGif ? gifPreviewReady : imageLoaded);
@@ -257,7 +261,7 @@
 
   $effect(() => {
     const playback = gifFrames;
-    if (!playback || !gifPlaying) return;
+    if (!playback || !gifPlaying || paused) return;
     let running = true;
     // Read through a call: the flag is cleared from the teardown closure.
     const stopped = (): boolean => !running;
@@ -272,6 +276,12 @@
     return () => {
       running = false;
     };
+  });
+
+  $effect(() => {
+    if (!paused || !url || !imageLoaded || !imageElement || stillImage?.url === url) return;
+    const still = stillFrame(imageElement);
+    if (still) stillImage = { url, still };
   });
 
   // A canvas Svelte re-creates comes back blank, so the held frame is re-painted.
@@ -420,7 +430,7 @@
       bind:this={imageElement}
       class="media-image-content"
       style:background-color={plate ?? undefined}
-      src={url}
+      src={heldUrl}
       {alt}
       {title}
       {width}

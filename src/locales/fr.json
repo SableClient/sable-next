@@ -1387,6 +1387,8 @@
     "mediaAutoLoadHint": "Désactivé, un emplacement à toucher s’affiche pour télécharger.",
     "autoplayGifs": "Jouer automatiquement les GIFs",
     "autoplayGifsHint": "Désactivé, affiche un aperçu avec un bouton de lecture.",
+    "pauseAnimationsWhenInactive": "Mettre les animations en pause quand la fenêtre est inactive",
+    "pauseAnimationsWhenInactiveHint": "Les GIFs, autocollants et émojis animés restent figés tant que la fenêtre n’a pas le focus ou est masquée.",
     "autoplayStickers": "Lire les autocollants automatiquement",
     "autoplayStickersHint": "Désactivé, un autocollant animé reste sur sa première image jusqu’à ce que vous le lanciez.",
     "gifProvider": "Fournisseur de recherche GIF",

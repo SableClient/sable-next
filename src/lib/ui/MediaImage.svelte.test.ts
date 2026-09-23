@@ -13,6 +13,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 afterEach(() => {
   core.fetchMedia.mockReset();
   preferences.autoplayGifs = true;
+  preferences.pauseAnimationsWhenInactive = false;
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -902,4 +903,127 @@ test('retries a failed load on its own, without a retry button', async () => {
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   await unmount(instance);
   vi.useRealTimers();
+});
+
+async function mountLoadedEmote(source: string): Promise<{
+  image: () => HTMLImageElement | null;
+  dispose: () => Promise<void>;
+}> {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue(`blob:${source}`);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: { source, alt: 'party', width: 32, height: 32, original: true },
+  });
+  const image = () => document.querySelector<HTMLImageElement>('img.media-image-content');
+  await vi.waitFor(() => {
+    expect(image()).not.toBeNull();
+  });
+  const loaded = image();
+  if (!loaded) throw new Error('emote was not rendered');
+  Object.defineProperty(loaded, 'complete', { value: true });
+  Object.defineProperty(loaded, 'naturalWidth', { value: 32 });
+  Object.defineProperty(loaded, 'naturalHeight', { value: 32 });
+  loaded.dispatchEvent(new Event('load'));
+  await tick();
+  return { image, dispose: () => unmount(instance) };
+}
+
+test('holds an animated emote on a still frame while the window is inactive', async () => {
+  preferences.pauseAnimationsWhenInactive = true;
+  let focused = true;
+  vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+  const { image, dispose } = await mountLoadedEmote('mxc://example.org/inactive-emote');
+  const element = image();
+  expect(element?.getAttribute('src')).toBe('blob:mxc://example.org/inactive-emote');
+
+  focused = false;
+  window.dispatchEvent(new Event('blur'));
+  await tick();
+  expect(image()).toBe(element);
+  expect(element?.getAttribute('src')).toBe('data:image/png;still');
+
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  await tick();
+  expect(element?.getAttribute('src')).toBe('blob:mxc://example.org/inactive-emote');
+
+  await dispose();
+});
+
+test('keeps animating while the window is inactive when the preference is off', async () => {
+  let focused = true;
+  vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+  const { image, dispose } = await mountLoadedEmote('mxc://example.org/unpaused-emote');
+
+  focused = false;
+  window.dispatchEvent(new Event('blur'));
+  await tick();
+
+  expect(image()?.getAttribute('src')).toBe('blob:mxc://example.org/unpaused-emote');
+  await dispose();
+});
+
+test('a GIF played by hand holds its frame while the window is inactive', async () => {
+  preferences.autoplayGifs = false;
+  preferences.pauseAnimationsWhenInactive = true;
+  let focused = true;
+  vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:held-by-hand');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) }))
+  );
+  const decoded: number[] = [];
+  vi.stubGlobal(
+    'ImageDecoder',
+    class {
+      tracks = { ready: Promise.resolve(), selectedTrack: { animated: true, frameCount: 3 } };
+      completed = Promise.resolve();
+      decode({ frameIndex }: { frameIndex: number }) {
+        decoded.push(frameIndex);
+        return Promise.resolve({
+          image: { displayWidth: 4, displayHeight: 4, duration: 20_000, close: () => {} },
+        });
+      }
+      close() {}
+    }
+  );
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/held-by-hand',
+      alt: 'Animated image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+    },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.play-gif')).not.toBeNull();
+  });
+  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await vi.waitFor(() => {
+    expect(decoded.length).toBeGreaterThan(2);
+  });
+
+  focused = false;
+  window.dispatchEvent(new Event('blur'));
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const held = decoded.length;
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  expect(decoded.length).toBe(held);
+
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  await vi.waitFor(() => {
+    expect(decoded.length).toBeGreaterThan(held);
+  });
+  await unmount(instance);
 });

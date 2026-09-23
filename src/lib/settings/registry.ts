@@ -36,6 +36,7 @@ import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+import PauseIcon from 'phosphor-svelte/lib/PauseIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PulseIcon from 'phosphor-svelte/lib/PulseIcon';
@@ -728,6 +729,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
         description: 'settings.autoplayGifsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'pauseAnimationsWhenInactive',
+        icon: PauseIcon,
+        name: 'settings.pauseAnimationsWhenInactive',
+        description: 'settings.pauseAnimationsWhenInactiveHint',
         type: 'boolean',
       },
       {

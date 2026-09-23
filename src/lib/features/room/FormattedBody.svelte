@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { markAbbreviations } from './abbreviations';
@@ -104,8 +105,16 @@
   }
 
   function paint(image: HTMLImageElement, url: string): void {
+    image.onload = () => {
+      holdStillFrame(image, animationsPaused());
+    };
     image.src = url;
     delete image.dataset.mediaPending;
+  }
+
+  function holdAnimations(node: HTMLElement): void {
+    const paused = animationsPaused();
+    for (const image of node.querySelectorAll('img')) holdStillFrame(image, paused);
   }
 
   function fallbackLabel(image: HTMLImageElement, emoticon: boolean): string {
@@ -394,8 +403,10 @@
   }
 </script>
 
-<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-<div class="formatted-body" {@attach decorate(renderedHtml)}>{@html renderedHtml}</div>
+<div class="formatted-body" {@attach decorate(renderedHtml)} {@attach holdAnimations}>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  {@html renderedHtml}
+</div>
 
 {#if definitionAnchor && definition}
   <Tooltip label={definition} open customAnchor={definitionAnchor} side="top" />

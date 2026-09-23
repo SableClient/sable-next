@@ -93,6 +93,7 @@ export interface Preferences {
 
   mediaAutoLoad: boolean;
   autoplayGifs: boolean;
+  pauseAnimationsWhenInactive: boolean;
   autoplayStickers: boolean;
   gifProvider: GifProviderChoice;
   urlPreviews: boolean;
@@ -278,6 +279,7 @@ const DEFAULTS: Preferences = {
 
   mediaAutoLoad: true,
   autoplayGifs: true,
+  pauseAnimationsWhenInactive: false,
   autoplayStickers: true,
   gifProvider: 'default',
   urlPreviews: false,

@@ -19,6 +19,8 @@ const core = Object.assign(baseCore, {
   roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
 });
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
 
@@ -27,7 +29,9 @@ afterEach(() => {
   core.roomPreview.mockReset();
   core.roomPreview.mockResolvedValue({ name: null });
   roomList.rooms = [];
+  preferences.pauseAnimationsWhenInactive = false;
   document.body.replaceChildren();
+  vi.restoreAllMocks();
 });
 
 test('opens Matrix links through the room-level handler', async () => {
@@ -222,6 +226,61 @@ test('defers an mxc emoticon source until its Blob URL is ready', async () => {
   expect(image?.getAttribute('src')).toBeNull();
   expect(image?.dataset.sableMxcSrc).toBe('mxc://example.org/delayed');
 
+  await unmount(instance);
+});
+
+async function paintedEmote(
+  source: string
+): Promise<{ image: HTMLImageElement; instance: ReturnType<typeof mount> }> {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<img src="${source}" alt="party" data-mx-emoticon="">` },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('img')?.src.startsWith('blob:')).toBe(true);
+  });
+  const image = document.querySelector('img');
+  if (!image) throw new Error('emote was not rendered');
+  Object.defineProperty(image, 'complete', { value: true });
+  Object.defineProperty(image, 'naturalWidth', { value: 32 });
+  Object.defineProperty(image, 'naturalHeight', { value: 32 });
+  return { image, instance };
+}
+
+test('holds inline emotes still while the window is inactive', async () => {
+  preferences.pauseAnimationsWhenInactive = true;
+  let focused = true;
+  vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
+  const { image, instance } = await paintedEmote('mxc://example.org/held-emote');
+  const animated = image.src;
+  image.dispatchEvent(new Event('load'));
+  expect(image.src).toBe(animated);
+
+  focused = false;
+  window.dispatchEvent(new Event('blur'));
+  await tick();
+  expect(image.src).toBe('data:image/png;still');
+
+  focused = true;
+  window.dispatchEvent(new Event('focus'));
+  await tick();
+  expect(image.src).toBe(animated);
+  await unmount(instance);
+});
+
+test('an emote that arrives while the window is inactive loads still', async () => {
+  preferences.pauseAnimationsWhenInactive = true;
+  vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+  const { image, instance } = await paintedEmote('mxc://example.org/late-emote');
+
+  image.dispatchEvent(new Event('load'));
+
+  expect(image.src).toBe('data:image/png;still');
   await unmount(instance);
 });
 
