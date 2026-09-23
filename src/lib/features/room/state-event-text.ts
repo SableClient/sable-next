@@ -1,3 +1,4 @@
+import { isRecord } from '#lib/guards.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
@@ -38,20 +39,16 @@ function stateChangeText(change: StateChangeView, user: string, t: Translate): s
   }
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
-}
-
 function text(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 export function reactionKey(content: unknown): string | null {
-  const body = record(content);
-  if (!body) return null;
-  const shortcode = text(body.shortcode) ?? text(body['com.beeper.reaction.shortcode']);
+  if (!isRecord(content)) return null;
+  const shortcode = text(content.shortcode) ?? text(content['com.beeper.reaction.shortcode']);
   if (shortcode) return `:${shortcode}:`;
-  return text(record(body['m.relates_to'])?.key);
+  const relation = content['m.relates_to'];
+  return isRecord(relation) ? text(relation.key) : null;
 }
 
 function hiddenEventText(

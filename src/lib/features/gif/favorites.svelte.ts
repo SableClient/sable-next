@@ -1,13 +1,11 @@
+import { isRecord } from '#lib/guards.js';
+
 import { isAllowedGifMediaUrl, type GifResult } from './providers';
 
 const storageKey = 'sable.composer.favoriteGifs';
 const recentKey = 'sable.composer.recentGifs';
 const limit = 64;
 const recentLimit = 32;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function count(value: unknown): number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;

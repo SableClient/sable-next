@@ -1,3 +1,4 @@
+import { isRecord } from '#lib/guards.js';
 import type { ImageUsageView } from '#src/generated/protocol';
 
 import {
@@ -86,10 +87,6 @@ export function archivePack(
 
 export function manifestJson(packs: ArchivePack[]): string {
   return JSON.stringify({ version: ARCHIVE_VERSION, packs }, null, 2);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readString(value: unknown): string | undefined {

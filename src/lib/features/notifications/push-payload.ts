@@ -1,3 +1,5 @@
+import { isRecord } from '#lib/guards.js';
+
 import type { ConversationLine } from './conversation';
 import { roomTag } from './tag';
 
@@ -15,10 +17,6 @@ export type PushPayload = {
     counts?: { unread?: number };
   };
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;

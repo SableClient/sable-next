@@ -1,3 +1,5 @@
+import { isRecord } from '#lib/guards.js';
+
 export const gifProviderIds = ['klipy', 'tenor', 'giphy'] as const;
 
 export type GifProviderId = (typeof gifProviderIds)[number];
@@ -36,10 +38,6 @@ const resultLimit = 50;
 const mimetypeByExtension: Record<string, string> = { gif: 'image/gif', webp: 'image/webp' };
 
 const sizeLimit = 3 * 1024 * 1024;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function positiveInt(value: unknown): number | undefined {
   const parsed = typeof value === 'string' ? Number(value) : value;
