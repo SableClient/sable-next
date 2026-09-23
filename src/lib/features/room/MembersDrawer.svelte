@@ -11,6 +11,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
 
@@ -86,7 +87,6 @@
   let hidden = $derived(Math.max(0, searched.length - limit));
   let busy = $derived(filter === 'join' ? loading : fetching);
   let width = $state<number | null>(null);
-  let drag = $state<{ pointerId: number; startX: number; startWidth: number } | null>(null);
 
   const DEFAULT_WIDTH = 266;
   const MIN_WIDTH = 192;
@@ -129,31 +129,6 @@
   function resize(next: number): void {
     width = Math.min(maxWidth, Math.max(MIN_WIDTH, next));
   }
-
-  function startResize(event: PointerEvent): void {
-    if (modal || compact) return;
-    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: currentWidth };
-    (event.currentTarget as HTMLButtonElement).setPointerCapture(event.pointerId);
-  }
-
-  function moveResize(event: PointerEvent): void {
-    if (drag === null || event.pointerId !== drag.pointerId) return;
-    resize(drag.startWidth + drag.startX - event.clientX);
-  }
-
-  function finishResize(event: PointerEvent): void {
-    if (drag?.pointerId === event.pointerId) drag = null;
-  }
-
-  function resizeWithKeyboard(event: KeyboardEvent): void {
-    const step = event.shiftKey ? 64 : 16;
-    if (event.key === 'ArrowLeft') resize(currentWidth + step);
-    else if (event.key === 'ArrowRight') resize(currentWidth - step);
-    else if (event.key === 'Home') resize(MIN_WIDTH);
-    else if (event.key === 'End') resize(maxWidth);
-    else return;
-    event.preventDefault();
-  }
 </script>
 
 <aside
@@ -162,22 +137,17 @@
   style:width={width === null ? undefined : `${width}px`}
 >
   {#if !modal && !compact}
-    <button
-      type="button"
-      class="resize-handle"
-      class:dragging={drag !== null}
-      role="slider"
-      aria-orientation="horizontal"
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={maxWidth}
-      aria-valuenow={currentWidth}
-      aria-label={title}
-      onpointerdown={startResize}
-      onpointermove={moveResize}
-      onpointerup={finishResize}
-      onpointercancel={finishResize}
-      onkeydown={resizeWithKeyboard}
-    ></button>
+    <ResizeHandle
+      value={currentWidth}
+      min={MIN_WIDTH}
+      max={maxWidth}
+      label={title}
+      grow="left"
+      step={16}
+      shiftStep={64}
+      homeEnd
+      onResize={resize}
+    />
   {/if}
   <header>
     <div>
@@ -326,31 +296,10 @@
     z-index: 2;
   }
 
-  .resize-handle {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    cursor: col-resize;
+  .members-drawer :global(.resize-handle) {
     display: none;
-    height: 100%;
     left: 0;
-    padding: 0;
-    position: absolute;
-    top: 0;
-    touch-action: none;
-    width: 0.5rem;
     z-index: 3;
-  }
-
-  .resize-handle:hover,
-  .resize-handle.dragging,
-  .resize-handle:focus-visible {
-    background: var(--primary-main);
-  }
-
-  .resize-handle:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: -3px;
   }
 
   .members-drawer.compact {
@@ -506,7 +455,7 @@
       width: 16.625rem;
     }
 
-    .resize-handle {
+    .members-drawer :global(.resize-handle) {
       display: block;
     }
   }

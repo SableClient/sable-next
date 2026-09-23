@@ -30,6 +30,7 @@
   } from '#lib/spaces/sidebar-layout.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import FolderRenameDialog from './FolderRenameDialog.svelte';
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
@@ -54,8 +55,6 @@
   const call = useCallSession();
   const spaceSidebar = useSpaceSidebar();
   let renamingFolder = $state<SidebarFolder | null>(null);
-  let dragging = $state(false);
-  let drag: { pointerId: number; startX: number; startWidth: number } | undefined;
   let knownSpaceIds = $state.raw<string[]>([]);
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
   let spaces = $derived.by(() => {
@@ -149,41 +148,6 @@
     return clamped;
   }
 
-  function handleResizeStart(event: PointerEvent) {
-    if (event.button !== 0) return;
-
-    const handle = event.currentTarget;
-    if (!(handle instanceof HTMLElement)) return;
-
-    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: roomNavWidth };
-    dragging = true;
-    handle.setPointerCapture(event.pointerId);
-  }
-
-  function handleResizeMove(event: PointerEvent) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-
-    roomNavWidth = clampRoomNavWidth(drag.startWidth + event.clientX - drag.startX);
-  }
-
-  function finishResize(event: PointerEvent) {
-    if (!drag || event.pointerId !== drag.pointerId) return;
-
-    drag = undefined;
-    dragging = false;
-    persistRoomNavWidth();
-  }
-
-  function handleResizeKeydown(event: KeyboardEvent) {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-
-    event.preventDefault();
-    roomNavWidth = clampRoomNavWidth(
-      roomNavWidth + (event.key === 'ArrowLeft' ? -ROOM_NAV_WIDTH_STEP : ROOM_NAV_WIDTH_STEP)
-    );
-    persistRoomNavWidth();
-  }
-
   function persistRoomNavWidth() {
     localStorage.setItem(ROOM_NAV_STORAGE_KEY, String(roomNavWidth));
   }
@@ -275,22 +239,16 @@
           {...railProps}
         />
         <RoomNav width={roomNavWidth} {collapsed} />
-        <button
-          type="button"
-          class="resize-handle"
-          class:dragging
-          role="slider"
-          aria-orientation="horizontal"
-          aria-valuemin={MIN_ROOM_NAV_WIDTH}
-          aria-valuemax={MAX_ROOM_NAV_WIDTH}
-          aria-valuenow={roomNavWidth}
-          aria-label={$i18n.t('nav.resizeRooms')}
-          onpointerdown={handleResizeStart}
-          onpointermove={handleResizeMove}
-          onpointerup={finishResize}
-          onpointercancel={finishResize}
-          onkeydown={handleResizeKeydown}
-        ></button>
+        <ResizeHandle
+          value={roomNavWidth}
+          min={MIN_ROOM_NAV_WIDTH}
+          max={MAX_ROOM_NAV_WIDTH}
+          label={$i18n.t('nav.resizeRooms')}
+          grow="right"
+          step={ROOM_NAV_WIDTH_STEP}
+          onResize={(next) => (roomNavWidth = clampRoomNavWidth(next))}
+          onCommit={persistRoomNavWidth}
+        />
       </div>
       {@render callBar()}
       {#if !collapsed}
@@ -360,30 +318,8 @@
       display: flex;
     }
 
-    .resize-handle {
-      appearance: none;
-      background: transparent;
-      border: 0;
-      cursor: col-resize;
-      height: 100%;
-      padding: 0;
-      position: absolute;
+    .desktop-navigation-main :global(.resize-handle) {
       right: -0.25rem;
-      top: 0;
-      touch-action: none;
-      user-select: none;
-      width: 0.5rem;
-    }
-
-    .resize-handle:hover,
-    .resize-handle.dragging,
-    .resize-handle:focus-visible {
-      background: var(--primary-main);
-    }
-
-    .resize-handle:focus-visible {
-      outline: var(--focus-ring-width) solid var(--focus-ring);
-      outline-offset: -3px;
     }
   }
 </style>

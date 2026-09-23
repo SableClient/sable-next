@@ -12,6 +12,7 @@
   import RoomComposer from '#lib/features/composer/RoomComposer.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import {
     finishSwipeGesture,
     startSwipeGesture,
@@ -66,8 +67,6 @@
   let composer = $state<RoomComposer>();
   let timelineList = $state<TimelineList>();
   let width = $state(27.5);
-  let dragging = $state(false);
-  let drag: { pointerId: number; startX: number; startWidth: number } | null = null;
   let panel = $state<HTMLElement>();
   let swipe: SwipeGesture | undefined;
   let swipeOffset = $state(0);
@@ -103,38 +102,9 @@
     void timeline.stop();
   });
 
-  function startResize(event: PointerEvent): void {
-    if (event.button !== 0) return;
-    const handle = event.currentTarget;
-    if (!(handle instanceof HTMLElement)) return;
-
-    drag = { pointerId: event.pointerId, startX: event.clientX, startWidth: width };
-    dragging = true;
-    handle.setPointerCapture(event.pointerId);
-  }
-
-  function resize(event: PointerEvent): void {
-    if (drag === null || event.pointerId !== drag.pointerId) return;
+  function remFromPixels(pixels: number): number {
     const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-    width = clampThreadPanelWidth(
-      drag.startWidth + remFromPointerDelta(drag.startX - event.clientX, rootFontSize)
-    );
-  }
-
-  function finishResize(event: PointerEvent): void {
-    if (drag === null || event.pointerId !== drag.pointerId) return;
-    drag = null;
-    dragging = false;
-    localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
-  }
-
-  function resizeWithKeyboard(event: KeyboardEvent): void {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    width = clampThreadPanelWidth(
-      width + (event.key === 'ArrowLeft' ? THREAD_PANEL_WIDTH_STEP : -THREAD_PANEL_WIDTH_STEP)
-    );
-    localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+    return remFromPointerDelta(pixels, rootFontSize);
   }
 
   function startSwipe(event: TouchEvent): void {
@@ -212,22 +182,17 @@
     ontouchcancel={modal ? () => finishSwipe(true) : undefined}
   >
     {#if !modal}
-      <button
-        type="button"
-        class="resize-handle"
-        class:dragging
-        role="slider"
-        aria-orientation="horizontal"
-        aria-valuemin={MIN_THREAD_PANEL_WIDTH}
-        aria-valuemax={MAX_THREAD_PANEL_WIDTH}
-        aria-valuenow={width}
-        aria-label={$i18n.t('timeline.thread')}
-        onpointerdown={startResize}
-        onpointermove={resize}
-        onpointerup={finishResize}
-        onpointercancel={finishResize}
-        onkeydown={resizeWithKeyboard}
-      ></button>
+      <ResizeHandle
+        value={width}
+        min={MIN_THREAD_PANEL_WIDTH}
+        max={MAX_THREAD_PANEL_WIDTH}
+        label={$i18n.t('timeline.thread')}
+        grow="left"
+        step={THREAD_PANEL_WIDTH_STEP}
+        fromPixels={remFromPixels}
+        onResize={(next) => (width = clampThreadPanelWidth(next))}
+        onCommit={() => localStorage.setItem(WIDTH_STORAGE_KEY, String(width))}
+      />
     {/if}
     <header class="thread-header">
       <div class="thread-title">
@@ -330,30 +295,9 @@
     }
   }
 
-  .resize-handle {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    cursor: col-resize;
-    height: 100%;
+  .thread-panel :global(.resize-handle) {
     left: -0.25rem;
-    padding: 0;
-    position: absolute;
-    touch-action: none;
-    user-select: none;
-    width: 0.5rem;
     z-index: 1;
-  }
-
-  .resize-handle:hover,
-  .resize-handle.dragging,
-  .resize-handle:focus-visible {
-    background: var(--primary-main);
-  }
-
-  .resize-handle:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: -0.1875rem;
   }
 
   .thread-header {
