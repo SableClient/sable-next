@@ -1,5 +1,7 @@
 import type { BookmarkView, NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
+import { formatTime } from '#lib/features/room/timeline-format.js';
+import { currentLocale } from '#lib/i18n.js';
 import {
   hasUnread,
   type NotificationModeResolver,
@@ -104,4 +106,23 @@ export function filteredBookmarks(
   return bookmarks
     .filter((bookmark) => matchesBookmarkQuery(bookmark, needle))
     .sort((left, right) => right.bookmarked_ts - left.bookmarked_ts);
+}
+
+const DAY_MS = 86_400_000;
+
+function startOfDay(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+export function formatCompactTimestamp(timestamp: number, now: number = Date.now()): string {
+  const date = new Date(timestamp);
+  const today = new Date(now);
+  const days = Math.round((startOfDay(today) - startOfDay(date)) / DAY_MS);
+  if (days <= 0) return formatTime(timestamp);
+  if (days < 7) return date.toLocaleDateString(currentLocale(), { weekday: 'short' });
+  return date.toLocaleDateString(currentLocale(), {
+    day: 'numeric',
+    month: 'short',
+    ...(date.getFullYear() === today.getFullYear() ? {} : { year: 'numeric' }),
+  });
 }

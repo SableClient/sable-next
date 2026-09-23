@@ -1,20 +1,23 @@
 <script lang="ts">
-  import type { RoomSummary } from '#src/generated/protocol';
+  import type { InboxItemView, RoomSummary } from '#src/generated/protocol';
+  import { onMount, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
+  import AtIcon from 'phosphor-svelte/lib/AtIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
-  import { notificationCount, notifications, type NotificationFilter, senderName } from './inbox';
+  import { formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
+  import { InboxFeed } from './inbox-feed.svelte';
+  import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
 
   interface Props {
     filter: NotificationFilter;
@@ -22,54 +25,132 @@
     limit?: number;
   }
 
+  const PAGE_SIZE = 30;
+
   let { filter, onFilter, limit }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const headingId = $props.id();
+  const feed = new InboxFeed(core.commands);
   const marking = new SvelteSet<string>();
+  const readNow = new SvelteSet<string>();
   const filters: readonly NotificationFilter[] = ['all', 'mentions', 'direct'];
   const filterLabels: Record<NotificationFilter, string> = {
     all: 'inbox.filterAll',
     mentions: 'inbox.filterMentions',
     direct: 'inbox.filterDirect',
   };
+  const emptyLabels: Record<NotificationFilter, string> = {
+    all: 'inbox.notificationsEmptyAll',
+    mentions: 'inbox.notificationsEmptyMentions',
+    direct: 'inbox.notificationsEmptyDirect',
+  };
+  let section = $state<HTMLElement>();
+  let heading = $state<HTMLElement>();
+  let announcement = $state('');
+  let includeRead = $state(false);
+  let pageSize = $state(PAGE_SIZE);
+  let size = $derived(limit ?? pageSize);
+  let compact = $derived(limit !== undefined);
 
-  const notificationMode = (roomId: string) => roomList.notificationMode(roomId);
-  let rooms = $derived(notifications(roomList.rooms, filter, notificationMode));
-  let visibleRooms = $derived(limit === undefined ? rooms : rooms.slice(0, limit));
+  $effect(() => {
+    void roomList.rooms;
+    void feed.load(filter, includeRead, size);
+  });
 
-  function roomHref(room: RoomSummary): string {
-    return roomSectionPath(roomList.rooms, room.room_id);
+  $effect(() =>
+    core.subscribeEvents((event) => {
+      if (event.type === 'inbox_changed') void feed.load(filter, includeRead, size);
+    })
+  );
+
+  onMount(() => {
+    void feed.backfill(false);
+  });
+
+  let rows = $derived(
+    feed.items
+      .map((item) => (readNow.has(item.event_id) ? { ...item, read: true } : item))
+      .filter((item) => includeRead || !item.read)
+  );
+
+  function roomOf(item: InboxItemView): RoomSummary | undefined {
+    return roomList.rooms.find((room) => room.room_id === item.room_id);
   }
 
-  function roomName(room: RoomSummary): string {
-    return room.name ?? room.room_id;
+  function roomName(item: InboxItemView): string {
+    return roomOf(item)?.name ?? item.room_id;
   }
 
-  function preview(room: RoomSummary): string | null {
-    const latest = room.latest_event;
-    if (!latest) return null;
-    if (room.is_direct || !latest.sender) return latest.body;
-    return `${senderName(latest.sender)}: ${latest.body}`;
+  function sender(item: InboxItemView): string {
+    return item.sender_name ?? senderName(item.sender);
   }
 
-  async function markRead(room: RoomSummary, eventId: string): Promise<void> {
-    if (marking.has(room.room_id)) return;
-    marking.add(room.room_id);
+  function preview(item: InboxItemView): string {
+    if (item.body !== null) return item.body;
+    return $i18n.t(item.encrypted ? 'inbox.encryptedMessage' : 'inbox.noPreview');
+  }
+
+  function emptyLabel(): string {
+    return $i18n.t(includeRead ? 'inbox.notificationsEmptyHistory' : emptyLabels[filter]);
+  }
+
+  async function selectFilter(value: NotificationFilter): Promise<void> {
+    onFilter(value);
+    await tick();
+    await feed.load(value, includeRead, size);
+    announcement =
+      rows.length === 0 ? emptyLabel() : $i18n.t('inbox.filterResults', { count: rows.length });
+  }
+
+  function toggleRead(): void {
+    includeRead = !includeRead;
+    pageSize = PAGE_SIZE;
+  }
+
+  async function loadOlder(): Promise<void> {
+    if (!feed.hasMore) await feed.backfill(true);
+    pageSize += PAGE_SIZE;
+  }
+
+  function focusRowAt(index: number): void {
+    const links = section?.querySelectorAll<HTMLElement>('a.row') ?? [];
+    const target = links[Math.min(index, links.length - 1)] ?? heading;
+    target?.focus();
+  }
+
+  async function markRead(item: InboxItemView, element: HTMLElement): Promise<void> {
+    if (marking.has(item.event_id)) return;
+    const index = rows.findIndex((row) => row.event_id === item.event_id);
+    const hadFocus = element.contains(document.activeElement);
+    const covered = feed.items.filter(
+      (candidate) => candidate.room_id === item.room_id && candidate.ts <= item.ts
+    );
+    marking.add(item.event_id);
     try {
-      await core.commands.markRead(room.room_id, eventId, readReceiptIsPrivate());
+      await core.commands.markRead(item.room_id, item.event_id, readReceiptIsPrivate());
+      for (const candidate of covered) readNow.add(candidate.event_id);
+      await tick();
+      if (hadFocus) focusRowAt(includeRead ? index : Math.min(index, rows.length - 1));
+      toasts.undoable($i18n.t('inbox.markedRead', { room: roomName(item) }), {
+        label: $i18n.t('inbox.undo'),
+        onUndo: () => {
+          for (const candidate of covered) readNow.delete(candidate.event_id);
+          markRoomUnread(item.room_id, core.commands);
+        },
+      });
     } catch (error) {
       console.warn('[sable inbox] marking the room read failed', error);
       toasts.error($i18n.t('errors.actionFailed'));
     } finally {
-      marking.delete(room.room_id);
+      marking.delete(item.event_id);
     }
   }
 </script>
 
-<section aria-labelledby={headingId}>
+<section aria-labelledby={headingId} aria-busy={feed.backfilling} bind:this={section}>
   <div class="header">
-    <h2 id={headingId}>{$i18n.t('inbox.notifications')}</h2>
+    <h2 id={headingId} tabindex="-1" bind:this={heading}>{$i18n.t('inbox.notifications')}</h2>
     <div class="filters" role="group" aria-label={$i18n.t('inbox.filterLabel')}>
       {#each filters as value (value)}
         <Button
@@ -78,61 +159,87 @@
           class="filter choice"
           aria-pressed={value === filter}
           onclick={() => {
-            onFilter(value);
+            void selectFilter(value);
           }}
         >
           {$i18n.t(filterLabels[value])}
         </Button>
       {/each}
+      {#if !compact}
+        <Button
+          variant="ghost"
+          size="small"
+          class="filter choice"
+          aria-pressed={includeRead}
+          onclick={toggleRead}
+        >
+          {$i18n.t('inbox.showRead')}
+        </Button>
+      {/if}
     </div>
   </div>
 
-  {#if visibleRooms.length === 0}
-    <p class="empty">{$i18n.t('inbox.notificationsEmpty')}</p>
+  <p class="visually-hidden" role="status">{announcement}</p>
+
+  {#if rows.length === 0}
+    {#if feed.failed}
+      <div class="notice">
+        <p>{$i18n.t('inbox.loadFailed')}</p>
+        <Button
+          variant="secondary"
+          size="small"
+          onclick={() => {
+            void feed.backfill(includeRead).then(() => feed.load(filter, includeRead, size));
+          }}>{$i18n.t('inbox.retry')}</Button
+        >
+      </div>
+    {:else if !feed.loaded || feed.backfilling}
+      <p class="empty">{$i18n.t('inbox.checking')}</p>
+    {:else}
+      <p class="empty">{emptyLabel()}</p>
+    {/if}
   {:else}
     <ul class="feed">
-      {#each visibleRooms as room (room.room_id)}
-        {@const name = roomName(room)}
-        {@const count = notificationCount(room, notificationMode(room.room_id))}
-        {@const line = preview(room)}
-        {@const readable = room.latest_event?.event_id ?? null}
-        <li>
-          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomHref resolves the route itself -->
-          <a class="row" href={roomHref(room)}>
-            <Avatar id={room.room_id} src={room.avatar_url} {name} />
+      {#each rows as item (item.event_id)}
+        {@const room = roomOf(item)}
+        {@const where = item.is_direct ? null : roomName(item)}
+        <li class={{ read: item.read }}>
+          <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
+          <a class="row" href={roomSectionPath(roomList.rooms, item.room_id, item.event_id)}>
+            <Avatar id={item.room_id} src={room?.avatar_url ?? null} name={roomName(item)} />
             <span class="body">
               <span class="head">
-                <span class="name">{name}</span>
-                {#if room.latest_event?.timestamp}
-                  <span class="when">{formatMessageTimestamp(room.latest_event.timestamp)}</span>
-                {/if}
+                <span class="name">{sender(item)}</span>
+                {#if where}<span class="where">{where}</span>{/if}
+                <time
+                  class="when"
+                  datetime={new Date(item.ts).toISOString()}
+                  title={formatMessageTimestamp(item.ts)}>{formatCompactTimestamp(item.ts)}</time
+                >
               </span>
               <span class="foot">
-                <span class="preview">{line ?? ''}</span>
-                {#if count > 0}
-                  <span
-                    class={['count', { highlight: room.highlight > 0 }]}
-                    aria-label={$i18n.t('timeline.unreadCount', { count })}>{count}</span
-                  >
-                {:else}
-                  <UnreadBadge
-                    counts={{ unread: 0, highlight: 0, marked: true }}
-                    role="img"
-                    aria-label={$i18n.t('nav.markedUnread')}
-                  />
+                <span class={['preview', { placeholder: item.body === null }]}>{preview(item)}</span
+                >
+                {#if item.highlight}
+                  <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
+                    <AtIcon aria-hidden="true" />
+                  </span>
                 {/if}
               </span>
             </span>
           </a>
-          {#if readable}
+          {#if item.read}
+            <span class="mark-read-spacer" aria-hidden="true"></span>
+          {:else}
             <IconButton
               class="mark-read"
               variant="ghost"
               size="small"
-              disabled={marking.has(room.room_id)}
-              label={$i18n.t('inbox.markRead', { room: name })}
-              onclick={() => {
-                void markRead(room, readable);
+              disabled={marking.has(item.event_id)}
+              label={$i18n.t('inbox.markRead', { room: roomName(item) })}
+              onclick={(event) => {
+                const element = event.currentTarget.closest('li');
+                if (element) void markRead(item, element);
               }}
             >
               <ChecksIcon />
@@ -141,10 +248,27 @@
         </li>
       {/each}
     </ul>
+    {#if !compact && (feed.hasMore || includeRead)}
+      <Button
+        class="load-older"
+        variant="ghost"
+        size="small"
+        disabled={feed.backfilling}
+        onclick={() => {
+          void loadOlder();
+        }}
+      >
+        {$i18n.t(feed.backfilling ? 'inbox.checking' : 'inbox.loadOlder')}
+      </Button>
+    {/if}
   {/if}
 </section>
 
 <style>
+  section {
+    display: grid;
+  }
+
   .header {
     align-items: baseline;
     display: flex;
@@ -161,6 +285,19 @@
     letter-spacing: 0.08em;
     margin: 0;
     text-transform: uppercase;
+  }
+
+  h2:focus {
+    outline: none;
+  }
+
+  .visually-hidden {
+    block-size: 1px;
+    clip-path: inset(50%);
+    inline-size: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
   }
 
   .filters {
@@ -237,16 +374,32 @@
   .foot {
     align-items: baseline;
     display: flex;
-    gap: var(--space-300);
+    gap: var(--space-200);
     min-width: 0;
   }
 
   .name {
-    flex: 1;
+    flex: 0 1 auto;
     font-weight: var(--font-weight-medium);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .where {
+    color: var(--surface-var-on-container);
+    flex: 0 1 auto;
+    font-size: var(--font-size-small);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .where::before {
+    content: '·';
+    padding-right: var(--space-200);
   }
 
   .when {
@@ -254,33 +407,53 @@
     flex: 0 0 auto;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
+    margin-left: auto;
+    padding-left: var(--space-200);
   }
 
   .preview {
     color: var(--surface-var-on-container);
     flex: 1;
     font-size: var(--font-size-small);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .count {
-    background: var(--surface-var-container);
-    border-radius: var(--radius-pill);
-    color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    font-variant-numeric: tabular-nums;
-    font-weight: var(--font-weight-bold);
-    min-width: 1.375rem;
-    padding: 0 var(--space-100);
-    text-align: center;
+  .preview.placeholder {
+    font-style: italic;
   }
 
-  .count.highlight {
-    background: var(--primary-main);
-    color: var(--primary-on-main);
+  .mention {
+    color: var(--primary-main);
+    display: flex;
+    flex: 0 0 auto;
+  }
+
+  .mention :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .mark-read-spacer {
+    flex: 0 0 auto;
+    width: var(--control-height-300);
+  }
+
+  @media (pointer: coarse) {
+    .mark-read-spacer {
+      width: 2.75rem;
+    }
+  }
+
+  .read .name {
+    color: var(--surface-var-on-container);
+    font-weight: var(--font-weight-normal);
+  }
+
+  .read .mention {
+    color: var(--surface-var-on-container);
   }
 
   .empty {
@@ -289,10 +462,37 @@
     text-align: center;
   }
 
+  .notice {
+    color: var(--surface-var-on-container);
+    display: grid;
+    gap: var(--space-200);
+    place-items: center;
+  }
+
+  .notice p {
+    margin: 0;
+  }
+
+  :global(.load-older) {
+    justify-self: center;
+    margin-top: var(--space-300);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .row,
     :global(.filter) {
       transition: background var(--motion-fast) var(--motion-easing-standard);
+    }
+  }
+
+  @media (pointer: coarse) {
+    :global(.filter) {
+      min-height: 2.75rem;
+    }
+
+    li :global(.icon-button) {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
     }
   }
 </style>

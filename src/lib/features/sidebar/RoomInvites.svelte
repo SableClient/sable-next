@@ -47,7 +47,7 @@
               disabled={busy}
               label={$i18n.t('room.inviteDecline')}
               onclick={() => {
-                void answers.decline(invite);
+                answers.decline(invite);
               }}
             >
               <XIcon />

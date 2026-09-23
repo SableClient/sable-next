@@ -5,18 +5,23 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
-  import { InviteActions } from '#lib/rooms/invites.svelte.js';
+  import { InviteActions, isDeclining } from '#lib/rooms/invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
-  import { inviter, pendingInvites, senderName } from './inbox';
+  import { DisplayNames } from './display-names.svelte';
+  import { inviter, pendingInvites } from './inbox';
 
   const roomList = useRoomList();
-  const answers = new InviteActions(useCoreClient());
+  const core = useCoreClient();
+  const answers = new InviteActions(core);
+  const names = new DisplayNames(core);
   const headingId = $props.id();
 
-  let invites = $derived(pendingInvites(roomList.rooms));
+  let invites = $derived(
+    pendingInvites(roomList.rooms).filter((invite) => !isDeclining(invite.room_id))
+  );
 
   function roomName(room: RoomSummary): string {
     return room.name ?? room.canonical_alias ?? room.room_id;
@@ -27,7 +32,7 @@
   <section aria-labelledby={headingId}>
     <h2 id={headingId}>
       {$i18n.t('inbox.invites')}
-      <span class="count">{invites.length}</span>
+      <span class="count" aria-hidden="true">{invites.length}</span>
     </h2>
     <ul>
       {#each invites as invite (invite.room_id)}
@@ -41,7 +46,12 @@
               <p class="name">
                 <span class="name-text">{name}</span>
                 {#if invite.encrypted}
-                  <span class="lock" title={$i18n.t('inbox.inviteEncrypted')}>
+                  <span
+                    class="lock"
+                    role="img"
+                    aria-label={$i18n.t('inbox.inviteEncrypted')}
+                    title={$i18n.t('inbox.inviteEncrypted')}
+                  >
                     <LockSimpleIcon aria-hidden="true" />
                   </span>
                 {/if}
@@ -51,7 +61,7 @@
                   <StatusBadge label={$i18n.t('inbox.inviteSpace')} variant="secondary" />
                 {/if}
                 {#if from}
-                  <span title={from}>{$i18n.t('inbox.invitedBy', { name: senderName(from) })}</span>
+                  <span title={from}>{$i18n.t('inbox.invitedBy', { name: names.name(from) })}</span>
                 {/if}
                 {#if invite.latest_event?.timestamp}
                   <span>{formatDate(invite.latest_event.timestamp)}</span>
@@ -69,17 +79,18 @@
 
           <div class="actions">
             <Button
-              variant="ghost"
-              disabled={busy}
-              onclick={() => {
-                void answers.decline(invite);
-              }}>{$i18n.t('room.inviteDecline')}</Button
-            >
-            <Button
+              variant="primary"
               disabled={busy}
               onclick={() => {
                 void answers.accept(invite);
               }}>{$i18n.t('room.inviteAccept')}</Button
+            >
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onclick={() => {
+                answers.decline(invite);
+              }}>{$i18n.t('room.inviteDecline')}</Button
             >
           </div>
         </li>
@@ -214,12 +225,18 @@
     flex: 1;
   }
 
+  .actions :global(.btn-primary) {
+    flex: 2;
+  }
+
   @media (width >= 32rem) {
     .actions {
-      justify-content: flex-end;
+      flex-direction: row-reverse;
+      justify-content: flex-start;
     }
 
-    .actions :global(.btn) {
+    .actions :global(.btn),
+    .actions :global(.btn-primary) {
       flex: 0 0 auto;
       min-width: 7rem;
     }

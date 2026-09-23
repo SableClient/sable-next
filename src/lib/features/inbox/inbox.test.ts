@@ -6,6 +6,7 @@ import {
   countInvites,
   countNotifications,
   filteredBookmarks,
+  formatCompactTimestamp,
   hasMarkedUnread,
   inviter,
   notifications,
@@ -232,4 +233,13 @@ test('a muted room that was marked unread by hand still reaches the inbox', () =
   expect(notifications([marked], 'all', mode).map((entry) => entry.room_id)).toEqual(['!muted']);
   expect(countNotifications([marked], mode)).toBe(0);
   expect(notifications([marked], 'mentions', mode)).toEqual([]);
+});
+
+test('compact timestamps shrink with age', () => {
+  const now = new Date(2026, 8, 23, 12, 0).getTime();
+
+  expect(formatCompactTimestamp(new Date(2026, 8, 23, 9, 5).getTime(), now)).toMatch(/9|09/);
+  expect(formatCompactTimestamp(new Date(2026, 8, 20, 9, 5).getTime(), now)).not.toMatch(/\d/);
+  expect(formatCompactTimestamp(new Date(2026, 3, 2).getTime(), now)).not.toMatch(/2026/);
+  expect(formatCompactTimestamp(new Date(2023, 10, 14).getTime(), now)).toMatch(/2023/);
 });

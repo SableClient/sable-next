@@ -22,7 +22,7 @@ test('bookmarking a message surfaces it in the inbox and opens the event', async
   });
   await page.getByRole('menuitem', { name: 'Bookmark' }).click();
 
-  await app.openInbox();
+  await app.openBookmarks();
   const bookmarks = page.getByRole('region', { name: 'Bookmarks' });
   const row = bookmarks.getByRole('listitem').filter({ hasText: roomName });
   await expect(row).toBeVisible({ timeout: 15_000 });
@@ -50,7 +50,7 @@ test('removing a bookmark from the inbox takes it out of the list', async ({
   });
   await page.getByRole('menuitem', { name: 'Bookmark' }).click();
 
-  await app.openInbox();
+  await app.openBookmarks();
   const bookmarks = page.getByRole('region', { name: 'Bookmarks' });
   const row = bookmarks.getByRole('listitem').filter({ hasText: roomName });
   await expect(row).toBeVisible({ timeout: 15_000 });

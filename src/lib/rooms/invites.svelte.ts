@@ -9,6 +9,12 @@ import { t } from '#lib/i18n.js';
 import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
+const declining = new SvelteSet<string>();
+
+export function isDeclining(roomId: string): boolean {
+  return declining.has(roomId);
+}
+
 export class InviteActions {
   /** Rendered from, so the set has to be reactive. */
   private readonly answering = new SvelteSet<string>();
@@ -26,8 +32,24 @@ export class InviteActions {
     });
   }
 
-  async decline(room: RoomSummary): Promise<void> {
-    await this.answer(room, () => this.core.commands.leaveRoom(room.room_id));
+  decline(room: RoomSummary): void {
+    const roomId = room.room_id;
+    if (this.answering.has(roomId) || declining.has(roomId)) return;
+    declining.add(roomId);
+    toasts.undoable(
+      t('inbox.inviteDeclined', { room: room.name ?? room.canonical_alias ?? roomId }),
+      {
+        label: t('inbox.undo'),
+        onUndo: () => {
+          declining.delete(roomId);
+        },
+        onClose: () => {
+          void this.answer(room, () => this.core.commands.leaveRoom(roomId)).then(() => {
+            declining.delete(roomId);
+          });
+        },
+      }
+    );
   }
 
   private async answer(room: RoomSummary, run: () => Promise<void>): Promise<void> {

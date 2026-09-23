@@ -603,7 +603,7 @@
         void goto(resolve('search'));
       },
       'app.openBookmarks': () => {
-        void goto(resolve('inbox'));
+        void goto(resolve('bookmarks'));
       },
       'app.createRoom': () => {
         void goto(resolve('create-room'));

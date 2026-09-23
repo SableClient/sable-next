@@ -15,6 +15,7 @@
     contentStyle?: string;
     contentClass?: string;
     onOpenChange?: (open: boolean) => void;
+    onOpenAutoFocus?: (event: Event) => void;
     onConfirm?: () => void;
     children: Snippet;
   }
@@ -27,6 +28,7 @@
     contentStyle,
     contentClass = '',
     onOpenChange,
+    onOpenAutoFocus,
     onConfirm,
     children,
   }: Props = $props();
@@ -53,6 +55,7 @@
       {...overlayLayer()}
       style={contentStyle}
       aria-label={label}
+      {onOpenAutoFocus}
     >
       {#if onConfirm}
         <form class="dialog-form" onsubmit={submit}>{@render children()}</form>

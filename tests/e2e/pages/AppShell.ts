@@ -50,6 +50,10 @@ export class AppShell {
     await this.page.goto('/inbox');
   }
 
+  async openBookmarks(): Promise<void> {
+    await this.page.goto('/bookmarks');
+  }
+
   async openCreateRoom(): Promise<void> {
     await this.page.goto('/create-room');
   }

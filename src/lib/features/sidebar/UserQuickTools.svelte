@@ -7,6 +7,7 @@
     openSettingsOver,
   } from '#lib/features/settings/settings-navigation.js';
   import { countInvites, countNotifications, hasMarkedUnread } from '#lib/features/inbox/inbox.js';
+  import { isDeclining } from '#lib/rooms/invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -31,7 +32,8 @@
 
   const notificationMode = (roomId: string) => roomList.notificationMode(roomId);
   let inboxCount = $derived(
-    countNotifications(roomList.rooms, notificationMode) + countInvites(roomList.rooms)
+    countNotifications(roomList.rooms, notificationMode) +
+      countInvites(roomList.rooms.filter((room) => !isDeclining(room.room_id)))
   );
   let inboxCounts = $derived({
     unread: 0,
@@ -219,7 +221,11 @@
             {/if}
           </a>
         {/snippet}
-        <Tooltip label={$i18n.t(item.label)} {trigger} />
+        <Tooltip
+          label={$i18n.t(item.label)}
+          disabled={item.href === '/inbox' && page.state.inbox === true}
+          {trigger}
+        />
       {/each}
     </div>
   </nav>

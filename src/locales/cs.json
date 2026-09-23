@@ -74,7 +74,6 @@
     "filterMentions": "Zmínky",
     "filterDirect": "Konverzace",
     "viewAll": "Zobrazit všechna oznámení",
-    "notificationsEmpty": "Vše máte vyřízené. Zde se zobrazí nepřečtené zmínky a zprávy.",
     "markRead": "Označit {{room}} jako přečtené",
     "invitedBy": "Pozvánka od {{name}}",
     "inviteEncrypted": "Šifrovaná místnost",

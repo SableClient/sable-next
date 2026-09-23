@@ -10,6 +10,7 @@
   import InboxView from './InboxView.svelte';
 
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  const headingId = $props.id();
   let anchor = $state<HTMLAnchorElement | null>(null);
   let desktop = $derived(appLayout.matches);
 
@@ -24,6 +25,13 @@
 
   function close(): void {
     history.back();
+  }
+
+  function focusHeading(event: Event): void {
+    const heading = document.getElementById(headingId);
+    if (!heading) return;
+    event.preventDefault();
+    heading.focus();
   }
 </script>
 
@@ -43,8 +51,9 @@
         align="end"
         sideOffset={8}
         collisionPadding={12}
+        onOpenAutoFocus={focusHeading}
       >
-        <InboxView variant="sheet" />
+        <InboxView variant="sheet" {headingId} />
       </Popover.Content>
     </Popover.Portal>
   </Popover.Root>
@@ -60,8 +69,9 @@
     onOpenChange={(open) => {
       if (!open) close();
     }}
+    onOpenAutoFocus={focusHeading}
   >
-    <InboxView variant="sheet" />
+    <InboxView variant="sheet" {headingId} />
   </BottomSheet>
 {/if}
 

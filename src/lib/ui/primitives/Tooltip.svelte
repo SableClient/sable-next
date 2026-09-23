@@ -17,6 +17,7 @@
     class?: ClassValue;
     customAnchor?: HTMLElement | null;
     open?: boolean;
+    disabled?: boolean;
     trigger?: TriggerSnippet;
     children?: Snippet;
   }
@@ -29,6 +30,7 @@
     class: className = '',
     customAnchor,
     open,
+    disabled = false,
     trigger,
     children,
   }: Props = $props();
@@ -45,7 +47,7 @@
   </button>
 {/snippet}
 
-<BitsTooltip.Root {open}>
+<BitsTooltip.Root {open} {disabled}>
   {#if customAnchor === undefined}
     <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
   {/if}

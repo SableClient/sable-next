@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { BookmarkView } from '#src/generated/protocol';
+  import { tick } from 'svelte';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -10,13 +12,20 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import { filteredBookmarks, senderName } from './inbox';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
+  import { useCoreClient } from '#lib/core/context.js';
+  import { DisplayNames } from './display-names.svelte';
+  import { filteredBookmarks, formatCompactTimestamp } from './inbox';
 
+  let { standalone = false }: { standalone?: boolean } = $props();
   const bookmarks = useBookmarks();
   const roomList = useRoomList();
+  const names = new DisplayNames(useCoreClient());
   const headingId = $props.id();
 
   let query = $state('');
+  let section = $state<HTMLElement>();
+  let heading = $state<HTMLElement>();
 
   $effect(() => {
     void bookmarks.load();
@@ -32,18 +41,54 @@
     return roomList.rooms.find((room) => room.room_id === roomId)?.avatar_url ?? null;
   }
 
-  function remove(roomId: string, eventId: string): void {
-    void bookmarks.toggle(roomId, eventId);
+  function focusRowAt(index: number): void {
+    const rows = section?.querySelectorAll<HTMLElement>('a.row') ?? [];
+    const target = rows[Math.min(index, rows.length - 1)] ?? heading;
+    target?.focus();
+  }
+
+  async function toggle(bookmark: BookmarkView): Promise<boolean> {
+    try {
+      await bookmarks.toggle(bookmark.room_id, bookmark.event_id);
+      return true;
+    } catch (error) {
+      console.warn('[sable inbox] updating the bookmark failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+      return false;
+    }
+  }
+
+  async function remove(bookmark: BookmarkView, name: string, item: HTMLElement): Promise<void> {
+    const index = visible.indexOf(bookmark);
+    const hadFocus = item.contains(document.activeElement);
+    if (!(await toggle(bookmark))) return;
+    await tick();
+    if (hadFocus) focusRowAt(index);
+    toasts.undoable($i18n.t('inbox.bookmarkRemoved', { room: name }), {
+      label: $i18n.t('inbox.undo'),
+      onUndo: () => {
+        void toggle(bookmark).then((restored) => {
+          if (restored) void bookmarks.load();
+        });
+      },
+    });
   }
 </script>
 
-<section aria-labelledby={headingId}>
+<section aria-labelledby={headingId} bind:this={section}>
   <div class="header">
-    <h2 id={headingId}>{$i18n.t('inbox.bookmarks')}</h2>
+    <h2 id={headingId} class={{ 'visually-hidden': standalone }} tabindex="-1" bind:this={heading}>
+      {$i18n.t('inbox.bookmarks')}
+    </h2>
   </div>
 
-  {#if bookmarks.entries.length > 0}
-    <label class="search">
+  {#if bookmarks.entries.length > 1}
+    <label
+      class="search"
+      {@attach (node) => {
+        if (standalone) node.querySelector('input')?.focus();
+      }}
+    >
       <MagnifyingGlassIcon aria-hidden="true" />
       <span class="visually-hidden">{$i18n.t('inbox.bookmarksSearchLabel')}</span>
       <TextInput
@@ -62,7 +107,7 @@
     <ul class="feed">
       {#each visible as bookmark (bookmark.bookmark_id)}
         {@const name = roomName(bookmark.room_id, bookmark.room_name)}
-        {@const from = bookmark.sender ? senderName(bookmark.sender) : null}
+        {@const from = bookmark.sender ? names.name(bookmark.sender) : null}
         <li>
           <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
           <a
@@ -73,10 +118,15 @@
             <span class="body">
               <span class="head">
                 <span class="name">{name}</span>
-                <span class="when">{formatMessageTimestamp(bookmark.bookmarked_ts)}</span>
+                <time
+                  class="when"
+                  datetime={new Date(bookmark.bookmarked_ts).toISOString()}
+                  title={formatMessageTimestamp(bookmark.bookmarked_ts)}
+                  >{formatCompactTimestamp(bookmark.bookmarked_ts)}</time
+                >
               </span>
               <span class="preview">
-                {#if from}<span class="sender">{from}: </span>{/if}{bookmark.body_preview ??
+                {#if from}<span class="sender">{from}:</span>&nbsp;{/if}{bookmark.body_preview ??
                   $i18n.t('inbox.bookmarkPreviewEmpty')}
               </span>
             </span>
@@ -86,8 +136,9 @@
             variant="ghost"
             size="small"
             label={$i18n.t('inbox.removeBookmark', { room: name })}
-            onclick={() => {
-              remove(bookmark.room_id, bookmark.event_id);
+            onclick={(event) => {
+              const item = event.currentTarget.closest('li');
+              if (item) void remove(bookmark, name, item);
             }}
           >
             <XIcon />
@@ -113,6 +164,10 @@
     letter-spacing: 0.08em;
     margin: 0;
     text-transform: uppercase;
+  }
+
+  h2:focus {
+    outline: none;
   }
 
   .search {
@@ -232,6 +287,13 @@
   @media (prefers-reduced-motion: no-preference) {
     .row {
       transition: background var(--motion-fast) var(--motion-easing-standard);
+    }
+  }
+
+  @media (pointer: coarse) {
+    li :global(.icon-button) {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
     }
   }
 </style>

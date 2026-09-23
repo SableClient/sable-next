@@ -4,6 +4,7 @@
 
   import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
   import { toasts } from './toasts.svelte.js';
+  import Button from './primitives/Button.svelte';
   import IconButton from './primitives/IconButton.svelte';
 
   let { dismissLabel }: { dismissLabel: string } = $props();
@@ -12,12 +13,30 @@
 <div class="toast-region">
   {#each toasts.items as toast (toast.id)}
     <div
-      class="toast"
-      role="alert"
+      class={['toast', `toast-${toast.tone}`]}
+      role={toast.tone === 'error' ? 'alert' : 'status'}
       in:fly={{ y: 8, duration: motionMs(MOTION_MS.slow) }}
       out:fly={{ y: 8, duration: motionMs(MOTION_MS.medium) }}
+      onpointerenter={() => {
+        toasts.hold(toast.id);
+      }}
+      onpointerleave={() => {
+        toasts.release(toast.id);
+      }}
+      onfocusin={() => {
+        toasts.hold(toast.id);
+      }}
+      onfocusout={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          toasts.release(toast.id);
+        }
+      }}
     >
       <span>{toast.message}</span>
+      {#if toast.action}
+        <Button variant="ghost" size="small" onclick={toast.action.run}>{toast.action.label}</Button
+        >
+      {/if}
       <IconButton
         size="small"
         variant="ghost"
@@ -44,15 +63,25 @@
 
   .toast {
     align-items: center;
-    background: var(--crit-container);
-    border: var(--border-width) solid var(--crit-container-line);
+    border: var(--border-width) solid;
     border-radius: var(--radius);
     box-shadow: var(--shadow-e300);
-    color: var(--crit-on-container);
     display: flex;
     gap: var(--space-300);
     padding: var(--space-200) var(--space-200) var(--space-200) var(--space-300);
     pointer-events: auto;
+  }
+
+  .toast-error {
+    background: var(--crit-container);
+    border-color: var(--crit-container-line);
+    color: var(--crit-on-container);
+  }
+
+  .toast-info {
+    background: var(--surface-container);
+    border-color: var(--surface-container-line);
+    color: var(--surface-on-container);
   }
 
   .toast span {

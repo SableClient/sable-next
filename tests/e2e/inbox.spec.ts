@@ -19,7 +19,7 @@ test('lists rooms that named us, and opens one', async ({ page, app, admin, gues
   await expect(inbox.getByRole('heading', { name: 'Notifications' })).toBeVisible();
   await expect(inbox.getByText(body, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
 
-  await inbox.getByRole('link', { name: new RegExp(`^${roomName}`) }).click();
+  await inbox.getByRole('listitem').filter({ hasText: roomName }).getByRole('link').click();
   await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)));
 });
 
@@ -38,7 +38,7 @@ test('filters notifications, and says so when nothing matches', async ({
 
   await app.openInbox();
   const inbox = page.getByRole('main');
-  const row = inbox.getByRole('link', { name: new RegExp(`^${roomName}`) });
+  const row = inbox.getByRole('listitem').filter({ hasText: roomName });
   await expect(row).toBeVisible({ timeout: 15_000 });
 
   await inbox.getByRole('button', { name: 'Mentions' }).click();
@@ -46,7 +46,7 @@ test('filters notifications, and says so when nothing matches', async ({
   await expect(row).toBeVisible();
 
   await inbox.getByRole('button', { name: 'Chats' }).click();
-  await expect(inbox.getByText('Nothing is waiting for you.', { exact: false })).toBeVisible();
+  await expect(inbox.getByRole('paragraph').filter({ hasText: 'No unread chats.' })).toBeVisible();
 });
 
 test('answers a pending invitation above the feed', async ({ page, app, admin, guest }) => {

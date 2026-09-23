@@ -6,7 +6,7 @@ vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { InviteActions } from './invites.svelte.js';
+import { InviteActions, isDeclining } from './invites.svelte.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 
 afterEach(() => {
@@ -28,12 +28,45 @@ test('a join the server rejects raises a toast and releases the room', async () 
   expect(answers.isAnswering(room.room_id)).toBe(false);
 });
 
-test('a decline the server rejects raises a toast', async () => {
+test('a decline waits for its undo toast to close before leaving', async () => {
+  const leaveRoom = vi.fn(() => Promise.resolve());
+  const answers = actions({ leaveRoom });
+
+  answers.decline(room);
+
+  expect(isDeclining(room.room_id)).toBe(true);
+  expect(leaveRoom).not.toHaveBeenCalled();
+
+  toasts.dismiss(toasts.items[0]?.id ?? -1);
+  await vi.waitFor(() => {
+    expect(isDeclining(room.room_id)).toBe(false);
+  });
+  expect(leaveRoom).toHaveBeenCalledWith(room.room_id);
+});
+
+test('undoing a decline never leaves the room', () => {
+  const leaveRoom = vi.fn(() => Promise.resolve());
+  const answers = actions({ leaveRoom });
+
+  answers.decline(room);
+  toasts.items[0]?.action?.run();
+
+  expect(leaveRoom).not.toHaveBeenCalled();
+  expect(isDeclining(room.room_id)).toBe(false);
+  expect(toasts.items).toEqual([]);
+});
+
+test('a decline the server rejects raises a toast and shows the invite again', async () => {
   const answers = actions({ leaveRoom: vi.fn(() => Promise.reject(new Error('gone'))) });
 
-  await answers.decline(room);
+  answers.decline(room);
+  toasts.dismiss(toasts.items[0]?.id ?? -1);
 
-  expect(toasts.items).toHaveLength(1);
+  await vi.waitFor(() => {
+    expect(toasts.items).toHaveLength(1);
+  });
+  expect(toasts.items[0]?.tone).toBe('error');
+  expect(isDeclining(room.room_id)).toBe(false);
 });
 
 test('an accepted invitation raises nothing', async () => {
