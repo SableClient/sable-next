@@ -20,6 +20,8 @@
   } from '#lib/ui/swipe-gesture.js';
 
   import { Conversation } from './conversation.svelte.js';
+  import { timelineMediaItems } from './media-items.js';
+  import MediaViewer from './MediaViewer.svelte';
   import TimelineList from './TimelineList.svelte';
   import {
     clampThreadPanelWidth,
@@ -43,7 +45,6 @@
     onClose: () => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onCopyLink?: (eventId: string) => void;
-    onOpenMedia?: (eventId: string) => void;
     onPersonaAvatarClick?: (source: string, displayName: string) => void;
   }
 
@@ -59,7 +60,6 @@
     onClose,
     onSenderProfile,
     onCopyLink,
-    onOpenMedia,
     onPersonaAvatarClick,
   }: Props = $props();
 
@@ -72,6 +72,7 @@
   let swipe: SwipeGesture | undefined;
   let swipeOffset = $state(0);
   let swiping = $state(false);
+  let mediaEventId = $state<string | null>(null);
 
   const core = useCoreClient();
   const personas = usePersonaStore();
@@ -254,7 +255,7 @@
       {onSenderProfile}
       onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
       {onCopyLink}
-      {onOpenMedia}
+      onOpenMedia={(eventId) => (mediaEventId = eventId)}
       {onPersonaAvatarClick}
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
@@ -293,6 +294,13 @@
       />
     </div>
   </aside>
+  {#if mediaEventId}
+    <MediaViewer
+      items={timelineMediaItems(timeline.items)}
+      selectedEventId={mediaEventId}
+      onClose={() => (mediaEventId = null)}
+    />
+  {/if}
 {/snippet}
 
 <style>

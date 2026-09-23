@@ -38,6 +38,7 @@ export type MessageActions = {
   onPin?: () => void;
   onBookmark?: () => void;
   onForward?: () => void;
+  onDownload?: () => void;
   onStealEmotes?: () => void;
   onDownloadEmotes?: () => void;
   stealCount?: number;
@@ -127,6 +128,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.forwardMessage',
       icon: ForwardIcon,
       run: actions.onForward,
+    });
+  }
+  if (actions.onDownload) {
+    rows.push({
+      key: 'download',
+      label: 'timeline.downloadFile',
+      icon: DownloadIcon,
+      run: actions.onDownload,
     });
   }
   if (actions.onStealEmotes) {

@@ -48,6 +48,7 @@
 
   import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
   import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
+  import { saveBytes, savesNatively } from '#lib/platform/files.js';
 
   import MessageForwardDialog from './MessageForwardDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
@@ -282,6 +283,13 @@
           ? (item.content.caption ?? '')
           : null;
     const html = item.content.kind === 'message' ? item.content.html : null;
+    const media =
+      item.content.kind === 'image' ||
+      item.content.kind === 'video' ||
+      item.content.kind === 'audio' ||
+      item.content.kind === 'file'
+        ? item.content
+        : null;
     return {
       loadImagePacks: core.commands.imagePacks,
       roomId,
@@ -360,6 +368,7 @@
               forwardOpen = true;
             }
           : undefined,
+      onDownload: media ? () => void downloadMedia(media) : undefined,
       stealCount: stealable.length,
       onStealEmotes:
         stealable.length > 0
@@ -382,6 +391,26 @@
           : undefined,
     };
   });
+
+  async function downloadMedia(media: {
+    source: string;
+    filename: string;
+    mime: string | null;
+  }): Promise<void> {
+    try {
+      const bytes = await core.commands.fetchMedia(media.source, 0, 0);
+      const outcome = await saveBytes(
+        bytes,
+        media.filename || 'attachment',
+        media.mime ?? 'application/octet-stream'
+      );
+      if (outcome === 'saved' && savesNatively()) toasts.info($i18n.t('viewer.saved'));
+      if (outcome === 'failed') toasts.error($i18n.t('errors.actionFailed'));
+    } catch (error) {
+      console.warn('[sable timeline] media download failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+    }
+  }
 
   async function downloadEmotes(): Promise<void> {
     try {

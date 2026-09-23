@@ -68,7 +68,7 @@
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
-  import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
+  import { timelineMediaItems } from './media-items.js';
   import { parsePowerLevelTags, type PowerLevelTagMap } from './settings/power-level-tags.js';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
@@ -136,52 +136,9 @@
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
   );
 
-  let mediaItems = $derived.by(() => {
-    const items: MediaItem[] = timeline.items.flatMap((entry) => {
-      const eventId = entry.event_id;
-      if (eventId === null) return [];
-      const content = entry.content;
-      if (content.kind === 'gallery') {
-        return content.items.flatMap((item, index) => {
-          if (item.kind !== 'image') return [];
-
-          return [
-            {
-              kind: 'image',
-              filename: item.body,
-              caption: null,
-              html: null,
-              source: item.source,
-              mime: item.mime,
-              width: item.width,
-              height: item.height,
-              size: null,
-              blurhash: null,
-              spoiler: null,
-              eventId: `${eventId}:gallery:${index}`,
-              sender: entry.sender_name ?? entry.sender ?? 'Unknown sender',
-            },
-          ];
-        });
-      }
-      if (
-        content.kind !== 'image' &&
-        content.kind !== 'sticker' &&
-        !(content.kind === 'file' && isPdfAttachment(content.mime, content.filename))
-      ) {
-        return [];
-      }
-
-      return [
-        {
-          ...content,
-          eventId,
-          sender: entry.sender_name ?? entry.sender ?? 'Unknown sender',
-        },
-      ];
-    });
-    return profileAvatarItem ? [profileAvatarItem] : items;
-  });
+  let mediaItems = $derived(
+    profileAvatarItem ? [profileAvatarItem] : timelineMediaItems(timeline.items)
+  );
 
   $effect(() => {
     void runtimeConfig().then((config) => {
@@ -928,7 +885,6 @@
           onClose={closeThread}
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
-          onOpenMedia={openMedia}
           onPersonaAvatarClick={openProfileAvatar}
         />
       {/key}
@@ -984,7 +940,6 @@
           onClose={closeThread}
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
-          onOpenMedia={openMedia}
           onPersonaAvatarClick={openProfileAvatar}
         />
       {/key}

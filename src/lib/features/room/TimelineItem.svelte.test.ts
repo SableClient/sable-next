@@ -17,6 +17,15 @@ const core = Object.assign(baseCore, {
   setBookmark: vi.fn(() => Promise.resolve(false)),
 });
 
+const { saveBytes } = vi.hoisted(() => ({
+  saveBytes: vi.fn(() => Promise.resolve('saved' as const)),
+}));
+
+vi.mock('#lib/platform/files.js', async () => ({
+  ...(await vi.importActual<typeof import('#lib/platform/files.js')>('#lib/platform/files.js')),
+  saveBytes,
+}));
+
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
 }));
@@ -773,6 +782,49 @@ test('opens message actions on right click', async () => {
   await tick();
 
   expect(document.querySelector('.menu-surface')?.textContent).toContain('Reply');
+  await unmount(instance);
+});
+
+test('downloads an image from its message menu', async () => {
+  const bytes = new Uint8Array([1, 2, 3]);
+  core.fetchMedia.mockResolvedValueOnce(bytes);
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: imageItem(), collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find(
+    (row) => row.textContent.trim() === 'Download'
+  );
+  if (!entry) throw new Error('download entry was not rendered');
+  (entry as HTMLElement).click();
+
+  await vi.waitFor(() => {
+    expect(saveBytes).toHaveBeenCalledWith(bytes, 'photo.png', 'image/png');
+  });
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/photo', 0, 0);
+  await unmount(instance);
+});
+
+test('offers no download for a text message', async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
+  });
+  await tick();
+  const message = document.querySelector('.message');
+  if (!message) throw new Error('message was not rendered');
+
+  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+
+  expect(document.querySelector('.menu-surface')?.textContent).toContain('Reply');
+  expect(document.querySelector('.menu-surface')?.textContent).not.toContain('Download');
   await unmount(instance);
 });
 
