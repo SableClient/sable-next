@@ -26,6 +26,7 @@
   let copied = $state<string | null>(null);
   let ownApps = $state<string[]>([]);
   let ownKey = $state<string | null>(null);
+  let section = $state<HTMLElement>();
 
   function keyOf(pusher: RegisteredPusherView): string {
     return `${pusher.app_id}\u0000${pusher.pushkey}`;
@@ -85,11 +86,18 @@
     };
   });
 
-  function startRemoval(pusher: RegisteredPusherView): void {
+  function holdFocus(event: Event): void {
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) target.closest('li')?.focus({ preventScroll: true });
+  }
+
+  function startRemoval(pusher: RegisteredPusherView, event: Event): void {
+    holdFocus(event);
     confirming = keyOf(pusher);
   }
 
-  function cancelRemoval(): void {
+  function cancelRemoval(event: Event): void {
+    holdFocus(event);
     confirming = null;
   }
 
@@ -108,6 +116,7 @@
     try {
       await core.commands.removePusher(pusher.pushkey, pusher.app_id);
       if (!alive) return;
+      section?.focus({ preventScroll: true });
       confirming = null;
       await reload();
     } catch (cause) {
@@ -119,7 +128,12 @@
   }
 </script>
 
-<section class="pushers settings-form" aria-labelledby="pushers-heading">
+<section
+  bind:this={section}
+  class="pushers settings-form"
+  aria-labelledby="pushers-heading"
+  tabindex="-1"
+>
   <div class="pushers-head">
     <h3 id="pushers-heading">{$i18n.t('settings.pushers')}</h3>
     <IconButton
@@ -149,7 +163,7 @@
       {#each pushers as pusher (keyOf(pusher))}
         {@const key = keyOf(pusher)}
         {@const name = nameOf(pusher)}
-        <li class="pusher">
+        <li class="pusher" tabindex="-1">
           <div class="pusher-summary">
             <div class="pusher-info">
               <div class="pusher-name-line">
@@ -206,8 +220,8 @@
               <Button
                 variant="danger"
                 size="small"
-                onclick={() => {
-                  startRemoval(pusher);
+                onclick={(event) => {
+                  startRemoval(pusher, event);
                 }}
               >
                 {$i18n.t('settings.pushersRemove')}
