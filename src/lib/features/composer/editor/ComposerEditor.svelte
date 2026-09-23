@@ -189,7 +189,8 @@
     top: var(--space-200);
   }
 
-  .editor :global(.composer-mention) {
+  .editor :global(.composer-mention),
+  .editor :global(.composer-time) {
     background: var(--primary-container);
     border-radius: var(--radius-pill);
     color: var(--primary-on-container);
@@ -202,7 +203,8 @@
     outline: 0;
   }
 
-  .editor :global(.composer-mention.selected) {
+  .editor :global(.composer-mention.selected),
+  .editor :global(.composer-time[class~='ProseMirror-selectednode']) {
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 

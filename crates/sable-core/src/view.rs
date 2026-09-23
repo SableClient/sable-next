@@ -659,21 +659,21 @@ impl Highlights {
 }
 
 #[derive(Default)]
-pub struct LocalProfiles(HashMap<OwnedTransactionId, PerMessageProfileView>);
+pub struct LocalContent(HashMap<OwnedTransactionId, serde_json::Value>);
 
-impl LocalProfiles {
+impl LocalContent {
     #[must_use]
     pub fn new(echoes: &[LocalEcho]) -> Self {
-        let mut profiles = Self::default();
+        let mut content = Self::default();
         for echo in echoes {
             if let LocalEchoContent::Event {
                 serialized_event, ..
             } = &echo.content
             {
-                profiles.remember(&echo.transaction_id, serialized_event);
+                content.remember(&echo.transaction_id, serialized_event);
             }
         }
-        profiles
+        content
     }
 
     pub fn apply(&mut self, update: &RoomSendQueueUpdate) {
@@ -692,22 +692,19 @@ impl LocalProfiles {
             RoomSendQueueUpdate::CancelledLocalEvent { transaction_id } => {
                 self.0.remove(transaction_id);
             }
-            // A sent echo still needs its profile until the homeserver's echo
-            // replaces the item, so only a cancellation forgets it.
             _ => {}
         }
     }
 
     fn remember(&mut self, transaction_id: &TransactionId, content: &SerializableEventContent) {
-        let profile = content
+        let content = content
             .raw()
             .0
             .deserialize_as_unchecked::<serde_json::Value>()
-            .ok()
-            .and_then(|content| per_message_profile(Some(&content)));
-        match profile {
-            Some(profile) => {
-                self.0.insert(transaction_id.to_owned(), profile);
+            .ok();
+        match content {
+            Some(content) => {
+                self.0.insert(transaction_id.to_owned(), content);
             }
             None => {
                 self.0.remove(transaction_id);
@@ -715,11 +712,10 @@ impl LocalProfiles {
         }
     }
 
-    fn get(&self, transaction_id: &TransactionId) -> Option<PerMessageProfileView> {
-        self.0.get(transaction_id).cloned()
+    fn get(&self, transaction_id: &TransactionId) -> Option<&serde_json::Value> {
+        self.0.get(transaction_id)
     }
 
-    /// A remote echo carries the profile in its raw content again, so the copy can go.
     pub(crate) fn forget(&mut self, transaction_id: &TransactionId) {
         self.0.remove(transaction_id);
     }
@@ -764,7 +760,7 @@ pub fn timeline_item(
     own_user_id: Option<&UserId>,
     relays: &BTreeSet<OwnedUserId>,
     highlights: &Highlights,
-    local_profiles: &LocalProfiles,
+    local_content: &LocalContent,
 ) -> TimelineItemView {
     let id = item.unique_id().0.clone();
 
@@ -774,22 +770,19 @@ pub fn timeline_item(
                 TimelineDetails::Ready(profile) => Some(profile),
                 _ => None,
             };
-            let raw = RawFields::read(event);
-            let message_profile = per_message_profile(raw.content.as_ref())
-                .or_else(|| {
-                    // A remote event always carries its own profile in the raw
-                    // content; only a local echo (which has none) falls back.
-                    event.send_state()?;
-                    event
-                        .transaction_id()
-                        .and_then(|transaction_id| local_profiles.get(transaction_id))
-                })
-                .or_else(|| {
-                    relays
-                        .contains(event.sender())
-                        .then(|| relay_profile(raw.content.as_ref()))
-                        .flatten()
-                });
+            let mut raw = RawFields::read(event);
+            if raw.content.is_none() {
+                raw.content = event
+                    .transaction_id()
+                    .and_then(|transaction_id| local_content.get(transaction_id))
+                    .cloned();
+            }
+            let message_profile = per_message_profile(raw.message_content()).or_else(|| {
+                relays
+                    .contains(event.sender())
+                    .then(|| relay_profile(raw.message_content()))
+                    .flatten()
+            });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
             let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
@@ -985,6 +978,20 @@ impl RawFields {
             .is_some_and(serde_json::Map::is_empty)
     }
 
+    fn message_content(&self) -> Option<&serde_json::Value> {
+        let content = self.content.as_ref()?;
+        let replacement = content
+            .get("m.relates_to")
+            .and_then(|relation| relation.get("rel_type"))
+            .and_then(serde_json::Value::as_str)
+            == Some("m.replace");
+        if replacement {
+            content.get("m.new_content")
+        } else {
+            Some(content)
+        }
+    }
+
     fn redaction_reason(&self) -> Option<String> {
         self.unsigned
             .as_ref()?
@@ -1074,8 +1081,13 @@ const fn membership_change(change: Option<MembershipChange>) -> MembershipChange
 fn text_message(
     message: &matrix_sdk_ui::timeline::Message,
     profile: Option<&PerMessageProfileView>,
+    raw: &RawFields,
 ) -> TimelineItemContentView {
     let formatted = formatted_body(message.msgtype());
+    let formatted = formatted
+        .as_ref()
+        .and_then(|_| raw_formatted_body(raw.message_content()).map(ToOwned::to_owned))
+        .or(formatted);
     let known = formatted.as_deref().is_some_and(has_profile_fallback_html)
         || profile.is_some_and(|profile| profile.has_fallback);
     let body = strip_profile_fallback_body(
@@ -1490,7 +1502,7 @@ fn message_content(
             body: gallery.body.clone(),
             items: gallery.itemtypes.iter().filter_map(gallery_item).collect(),
         },
-        _ => text_message(message, profile),
+        _ => text_message(message, profile, raw),
     }
 }
 
@@ -1627,6 +1639,14 @@ fn formatted_body(msgtype: &MessageType) -> Option<String> {
         MessageType::Emote(content) => content.formatted.as_ref().map(|f| f.body.clone()),
         _ => None,
     }
+}
+
+fn raw_formatted_body(content: Option<&serde_json::Value>) -> Option<&str> {
+    let content = content?;
+    if content.get("format")?.as_str()? != "org.matrix.custom.html" {
+        return None;
+    }
+    content.get("formatted_body")?.as_str()
 }
 
 const fn msg_like(content: &TimelineItemContent) -> Option<&MsgLikeContent> {
@@ -1877,7 +1897,7 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        LocalProfiles, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
+        LocalContent, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
         call_participants, caption_view, clamp_power_level, geo_coordinates, in_call,
         per_message_profile, relay_author, relay_profile, via_servers,
     };
@@ -2195,36 +2215,32 @@ mod tests {
             "m.room.message".to_owned(),
         );
 
-        let mut profiles = LocalProfiles::default();
-        profiles.apply(&RoomSendQueueUpdate::ReplacedLocalEvent {
+        let mut local_content = LocalContent::default();
+        local_content.apply(&RoomSendQueueUpdate::ReplacedLocalEvent {
             transaction_id: transaction_id.clone(),
             new_content: content,
         });
         assert_eq!(
-            profiles
-                .get(&transaction_id)
+            per_message_profile(local_content.get(&transaction_id))
                 .expect("the queued profile")
                 .display_name
                 .as_deref(),
             Some("Kris")
         );
-
-        profiles.apply(&RoomSendQueueUpdate::SentEvent {
+        local_content.apply(&RoomSendQueueUpdate::SentEvent {
             transaction_id: transaction_id.clone(),
             event_id: OwnedEventId::try_from("$sent:example.org").expect("an event id"),
         });
-        // A sent echo still shows the profile until the homeserver's echo arrives.
         assert_eq!(
-            profiles
-                .get(&transaction_id)
+            per_message_profile(local_content.get(&transaction_id))
                 .expect("the profile outlives the send acknowledgement")
                 .display_name
                 .as_deref(),
             Some("Kris")
         );
 
-        profiles.forget(&transaction_id);
-        assert!(profiles.get(&transaction_id).is_none());
+        local_content.forget(&transaction_id);
+        assert!(local_content.get(&transaction_id).is_none());
     }
 
     #[test]

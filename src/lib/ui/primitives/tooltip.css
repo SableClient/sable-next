@@ -15,6 +15,10 @@
   z-index: var(--layer-tooltip);
 }
 
+.tooltip-multiline {
+  white-space: pre-line;
+}
+
 @keyframes tooltip-in {
   from {
     opacity: 0;

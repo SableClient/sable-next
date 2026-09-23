@@ -11,6 +11,7 @@
 
   interface Props {
     label: string;
+    multiline?: boolean;
     variant?: TooltipVariant;
     side?: TooltipSide;
     align?: 'start' | 'center' | 'end';
@@ -24,6 +25,7 @@
 
   let {
     label,
+    multiline = false,
     variant = 'icon',
     side = 'top',
     align = 'center',
@@ -52,7 +54,13 @@
     <BitsTooltip.Trigger child={trigger ?? defaultTrigger} />
   {/if}
   <BitsTooltip.Portal>
-    <BitsTooltip.Content class="tooltip" {side} {align} sideOffset={8} {customAnchor}>
+    <BitsTooltip.Content
+      class={multiline ? 'tooltip tooltip-multiline' : 'tooltip'}
+      {side}
+      {align}
+      sideOffset={8}
+      {customAnchor}
+    >
       {label}
     </BitsTooltip.Content>
   </BitsTooltip.Portal>

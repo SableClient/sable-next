@@ -596,6 +596,8 @@
     "today": "Today",
     "yesterday": "Yesterday",
     "messageTimestamp": "{{date}} {{time}}",
+    "timeMarkupDetail": "Local: {{local}}\nUTC: {{utc}}",
+    "timeMarkupDetailWithSender": "Local: {{local}}\nSender ({{timezone}}): {{sender}}\nUTC: {{utc}}",
     "membership": {
       "joined": "{{user}} joined the room",
       "left": "{{user}} left the room",

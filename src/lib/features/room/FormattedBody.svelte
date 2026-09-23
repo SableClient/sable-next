@@ -4,11 +4,14 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
+  import { formatTimeInZone, formatUtcTime, parseZonedDatetime } from '../composer/time-markup';
   import { markAbbreviations } from './abbreviations';
+  import { formatMessageTimestamp, formatTime } from './timeline-format';
   import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
   import { hasRoomMemberNames, mentionLabel, useRoomMemberNames } from './room-member-names.js';
 
@@ -20,20 +23,26 @@
 
   interface Props {
     html: string;
+    senderTimezone?: string | null;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
   const INLINE_RETRIES = 2;
 
-  let { html, onMatrixLink }: Props = $props();
+  let { html, senderTimezone = null, onMatrixLink }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
   const memberNames = hasRoomMemberNames() ? useRoomMemberNames() : null;
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
-  let definition = $derived(definitionAnchor?.dataset.abbrDefinition ?? '');
+  let definition = $derived(
+    definitionAnchor?.dataset.abbrDefinition ?? definitionAnchor?.dataset.timeDetail ?? ''
+  );
   let renderedHtml = $derived(deferMxcImageSources(html));
+  let timeFormatRevision = $derived(
+    `${preferences.hour24Clock}:${preferences.dateFormat}:${$i18n.resolvedLanguage ?? $i18n.language}`
+  );
 
   function deferMxcImageSources(value: string): string {
     return value.replace(
@@ -138,9 +147,10 @@
     }
   }
 
-  function decorate(html: string) {
+  function decorate(html: string, timezone: string | null, formatRevision: string) {
     return (node: HTMLElement) => {
-      void html;
+      node.innerHTML = html;
+      void formatRevision;
       for (const anchor of node.querySelectorAll('a')) {
         anchor.target = '_blank';
         anchor.rel = 'noopener noreferrer';
@@ -171,6 +181,34 @@
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
         element.style.backgroundColor = element.dataset.mxBgColor ?? '';
+      }
+      for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
+        const zoned = parseZonedDatetime(element.dateTime);
+        if (!zoned) continue;
+        const local = formatTime(zoned.instant);
+        const label = formatMessageTimestamp(zoned.instant);
+        const utc = formatUtcTime(zoned.instant, preferences.hour24Clock);
+        const sender = timezone
+          ? formatTimeInZone(zoned.instant, timezone, preferences.hour24Clock)
+          : null;
+        const detail = sender
+          ? $i18n.t('timeline.timeMarkupDetailWithSender', {
+              local,
+              sender,
+              timezone,
+              utc,
+            })
+          : $i18n.t('timeline.timeMarkupDetail', { local, utc });
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'time-chip';
+        chip.setAttribute('aria-label', detail);
+        chip.dataset.timeDetail = detail;
+        element.textContent = label;
+        element.dateTime = zoned.datetime;
+        element.replaceWith(chip);
+        chip.append(element);
       }
       for (const element of node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')) {
         element.tabIndex = 0;
@@ -340,7 +378,7 @@
 
   function definitionOf(target: EventTarget | null): HTMLElement | null {
     return target instanceof Element
-      ? target.closest<HTMLElement>('abbr[data-abbr-definition]')
+      ? target.closest<HTMLElement>('abbr[data-abbr-definition], button.time-chip')
       : null;
   }
 
@@ -384,7 +422,6 @@
       event.preventDefault();
       return;
     }
-
     const anchor = target.closest<HTMLAnchorElement>('a');
     if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
     if (anchor.href.toLowerCase().startsWith('matrix:')) event.preventDefault();
@@ -396,6 +433,11 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && definitionPinned) {
+      closeDefinition();
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     const target = event.target;
     if (!(target instanceof Element) || !target.matches('[data-mx-spoiler]')) return;
@@ -403,13 +445,20 @@
   }
 </script>
 
-<div class="formatted-body" {@attach decorate(renderedHtml)} {@attach holdAnimations}>
-  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-  {@html renderedHtml}
-</div>
+<div
+  class="formatted-body"
+  {@attach decorate(renderedHtml, senderTimezone, timeFormatRevision)}
+  {@attach holdAnimations}
+></div>
 
 {#if definitionAnchor && definition}
-  <Tooltip label={definition} open customAnchor={definitionAnchor} side="top" />
+  <Tooltip
+    label={definition}
+    multiline={definitionAnchor.dataset.timeDetail !== undefined}
+    open
+    customAnchor={definitionAnchor}
+    side="top"
+  />
 {/if}
 
 <style>
@@ -422,6 +471,40 @@
   .formatted-body :global(p) {
     line-height: var(--line-height-body);
     margin: 0;
+  }
+
+  .formatted-body :global(.time-chip) {
+    align-items: center;
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    gap: var(--space-100);
+    line-height: inherit;
+    min-height: 1.5em;
+    vertical-align: baseline;
+    white-space: nowrap;
+  }
+
+  .formatted-body :global(.time-chip)::before {
+    background:
+      linear-gradient(currentcolor, currentcolor) 50% 27% / var(--border-width) 34% no-repeat,
+      linear-gradient(currentcolor, currentcolor) 67% 55% / 28% var(--border-width) no-repeat;
+    border: var(--border-width) solid currentcolor;
+    border-radius: 50%;
+    box-sizing: border-box;
+    content: '';
+    flex: 0 0 auto;
+    height: 0.9em;
+    width: 0.9em;
+  }
+
+  .formatted-body :global(.time-chip:hover) {
+    background: var(--sec-container-hover);
+  }
+
+  .formatted-body :global(.time-chip:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
 
   .formatted-body :global(abbr[data-abbr-definition]) {
@@ -498,11 +581,16 @@
 
   .formatted-body :global(a[data-matrix-link]),
   .formatted-body :global(a[data-settings-link]) {
+    display: inline-block;
+  }
+
+  .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global(a[data-settings-link]),
+  .formatted-body :global(.time-chip) {
     background: var(--sec-container);
     border: var(--border-width) solid var(--sec-container-line);
     border-radius: var(--radius);
     color: var(--sec-on-container);
-    display: inline-block;
     font-weight: var(--font-weight-medium);
     padding: 0 var(--space-150);
     text-decoration: none;

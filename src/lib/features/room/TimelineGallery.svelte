@@ -11,11 +11,12 @@
     items: readonly GalleryItemView[];
     body: string;
     html: string;
+    senderTimezone?: string | null;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onOpen?: (index: number) => void;
   }
 
-  let { items, body, html, onMatrixLink, onOpen }: Props = $props();
+  let { items, body, html, senderTimezone = null, onMatrixLink, onOpen }: Props = $props();
   let columns = $derived(items.length > 1 ? 2 : 1);
 </script>
 
@@ -48,7 +49,7 @@
   {/each}
 </div>
 {#if body}
-  <div class="caption"><FormattedBody {html} {onMatrixLink} /></div>
+  <div class="caption"><FormattedBody {html} {senderTimezone} {onMatrixLink} /></div>
 {/if}
 
 <style>

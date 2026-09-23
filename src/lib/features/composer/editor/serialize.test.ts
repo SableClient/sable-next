@@ -68,6 +68,33 @@ test('a lone newline reloads as a line break and a blank line as a paragraph', (
   expect(reloaded.firstChild?.childCount).toBe(3);
 });
 
+test('MFM time and color keep their source body in both composer modes', () => {
+  const source = 'at $[unixtime 0] $[fg.color=abc hi]';
+  for (const serialize of [serializeComposer, serializePlain]) {
+    const message = serialize(textDoc(source));
+    expect(message.body).toBe(source);
+    expect(message.formatted).toContain('datetime="1970-01-01T00:00:00Z"');
+    expect(message.formatted).toContain('<span data-mx-color="#aabbcc">hi</span>');
+  }
+});
+
+test('an existing time element survives a rich-text edit', () => {
+  const message = serializeComposer(
+    parseMatrixHtml('<time datetime="1970-01-01T00:00:00Z">old label</time>')
+  );
+  expect(message.body).toBe('$[unixtime 0]');
+  expect(message.formatted).toContain('datetime="1970-01-01T00:00:00Z"');
+});
+
+test('escaped and invalid MFM stay literal', () => {
+  const source = '\\$[unixtime 0] $[fg.color=red bad]';
+  for (const serialize of [serializeComposer, serializePlain]) {
+    const message = serialize(textDoc(source));
+    expect(message.body).toBe(source);
+    expect(message.formatted).toBeNull();
+  }
+});
+
 test('a bold mark serialises to markdown in the body and html in the formatted body', () => {
   const message = serializeComposer(
     docOf(

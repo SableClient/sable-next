@@ -2,6 +2,8 @@ import { DOMParser, Schema, type ParseRule } from 'prosemirror-model';
 
 import { splitVia } from '#lib/features/room/join-address.js';
 
+import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
+
 export const matrixTo = 'https://matrix.to/#/';
 
 export const ROOM_PING = '@room';
@@ -196,6 +198,29 @@ export const composerSchema = new Schema({
         node.attrs.name as string,
       ],
     },
+    mfm_time: {
+      inline: true,
+      atom: true,
+      group: 'inline',
+      selectable: true,
+      attrs: { datetime: {}, label: {} },
+      parseDOM: [
+        {
+          tag: 'time[datetime]',
+          priority: 60,
+          getAttrs: (dom) => {
+            const datetime = canonicalDatetime(dom.getAttribute('datetime') ?? '');
+            if (datetime === null) return false;
+            return { datetime, label: dom.textContent || utcFallbackLabel(datetime) };
+          },
+        },
+      ],
+      toDOM: (node) => [
+        'time',
+        { class: 'composer-time', datetime: node.attrs.datetime as string },
+        node.attrs.label as string,
+      ],
+    },
     room_ping: {
       inline: true,
       atom: true,
@@ -333,7 +358,7 @@ export const composerSchema = new Schema({
           priority: 60,
           getAttrs: (dom) => {
             const value = dom.getAttribute('data-mx-color') ?? '';
-            return isMatrixColor(value) ? { value } : false;
+            return isOpaqueMatrixColor(value) ? { value } : false;
           },
         },
       ],
@@ -347,7 +372,7 @@ export const composerSchema = new Schema({
           priority: 60,
           getAttrs: (dom) => {
             const value = dom.getAttribute('data-mx-bg-color') ?? '';
-            return isMatrixColor(value) ? { value } : false;
+            return isOpaqueMatrixColor(value) ? { value } : false;
           },
         },
       ],
@@ -371,10 +396,6 @@ export const composerSchema = new Schema({
     },
   },
 });
-
-export function isMatrixColor(value: string): boolean {
-  return /^#(?:[\da-f]{3}|[\da-f]{6})$/i.test(value);
-}
 
 const IGNORED_TAGS: readonly ParseRule[] = [{ tag: 'caption', ignore: true }];
 

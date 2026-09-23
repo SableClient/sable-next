@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
+
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import {
   backspace,
@@ -16,7 +18,16 @@ import {
   unorderedList,
 } from './model-harness';
 
-afterEach(resetModel);
+const defaultRichTextComposer = preferences.richTextComposer;
+
+beforeEach(() => {
+  preferences.richTextComposer = true;
+});
+
+afterEach(() => {
+  resetModel();
+  preferences.richTextComposer = defaultRichTextComposer;
+});
 
 test('creating an ordered list and writing', () => {
   const model = cm('|');

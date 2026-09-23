@@ -817,7 +817,7 @@ async fn timeline_views(
                     client.user_id(),
                     &BTreeSet::new(),
                     &super::view::Highlights::default(),
-                    &super::view::LocalProfiles::default(),
+                    &super::view::LocalContent::default(),
                 )
             })
             .collect(),
@@ -1759,7 +1759,7 @@ async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<
                 None,
                 &BTreeSet::new(),
                 &crate::view::Highlights::default(),
-                &crate::view::LocalProfiles::default(),
+                &crate::view::LocalContent::default(),
             )
             .sender_name
         })
@@ -2125,7 +2125,7 @@ async fn a_mention_is_loud_from_the_ruleset_not_the_stamped_flag() {
                 Some(&own_user_id),
                 &BTreeSet::new(),
                 &highlights,
-                &super::view::LocalProfiles::default(),
+                &super::view::LocalContent::default(),
             )
         })
         .collect::<Vec<_>>();

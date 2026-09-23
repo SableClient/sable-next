@@ -23,6 +23,7 @@
     item: TimelineItemView;
     canRedactOthers: boolean;
     encrypted?: boolean | null;
+    senderTimezone?: string | null;
     members?: readonly MemberView[];
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onOpenMedia?: (eventId: string) => void;
@@ -35,6 +36,7 @@
     item,
     canRedactOthers,
     encrypted = null,
+    senderTimezone = null,
     members = [],
     onMatrixLink,
     onOpenMedia,
@@ -103,7 +105,7 @@
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
   {#if item.content.html}
-    <FormattedBody html={item.content.html} {onMatrixLink} />
+    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
   {:else if item.content.caption}
     <p class="body">{item.content.caption}</p>
   {:else if preferences.alwaysShowAltText}
@@ -114,6 +116,7 @@
     items={item.content.items}
     body={item.content.body}
     html={item.content.html}
+    {senderTimezone}
     {onMatrixLink}
     onOpen={item.event_id
       ? (index) => onOpenMedia?.(`${item.event_id}:gallery:${index}`)
@@ -153,7 +156,7 @@
     onOpen={item.event_id ? () => onOpenMedia?.(item.event_id ?? '') : undefined}
   />
   {#if item.content.html}
-    <FormattedBody html={item.content.html} {onMatrixLink} />
+    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
   {:else if item.content.caption}
     <p class="body">{item.content.caption}</p>
   {/if}

@@ -158,8 +158,8 @@ impl Core {
             Ok((echoes, updates)) => (echoes, Some(updates)),
             Err(_) => (Vec::new(), None),
         };
-        let local_profiles = view::LocalProfiles::new(&echoes);
-        let mut stream_profiles = view::LocalProfiles::new(&echoes);
+        let local_content = view::LocalContent::new(&echoes);
+        let mut stream_content = view::LocalContent::new(&echoes);
         let pagination = timeline.live_back_pagination_status().await;
         let own_user_id = self.client().await?.user_id().map(ToOwned::to_owned);
         let core = self.clone();
@@ -171,7 +171,7 @@ impl Core {
             while let Some(diffs) = stream.next().await {
                 if let Some(updates) = queue_updates.as_mut() {
                     while let Ok(update) = updates.try_recv() {
-                        stream_profiles.apply(&update);
+                        stream_content.apply(&update);
                     }
                 }
                 let push = stream_room.push_context().await.ok().flatten();
@@ -186,15 +186,14 @@ impl Core {
                                     && event.send_state().is_none()
                                     && let Some(transaction_id) = event.transaction_id()
                                 {
-                                    // The remote echo supersedes its local echo's profile.
-                                    stream_profiles.forget(transaction_id);
+                                    stream_content.forget(transaction_id);
                                 }
                                 view::timeline_item(
                                     item,
                                     stream_user_id.as_deref(),
                                     &stream_relays,
                                     &highlights,
-                                    &stream_profiles,
+                                    &stream_content,
                                 )
                             })
                         })
@@ -252,7 +251,7 @@ impl Core {
                         own_user_id.as_deref(),
                         &relays,
                         &highlights,
-                        &local_profiles,
+                        &local_content,
                     )
                 })
                 .collect(),

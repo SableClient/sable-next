@@ -4,6 +4,7 @@
 //! has to decide what is safe.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 use ammonia::{Builder, UrlRelative};
@@ -12,8 +13,9 @@ use matrix_sdk::ruma::html::{
     ElementAttributesSchemes, Html, ListBehavior, PropertiesNames, SanitizerConfig,
 };
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
+use time::OffsetDateTime;
 
-const ALLOWED_TAGS: [&str; 37] = [
+const ALLOWED_TAGS: [&str; 38] = [
     "a",
     "b",
     "blockquote",
@@ -48,6 +50,7 @@ const ALLOWED_TAGS: [&str; 37] = [
     "td",
     "th",
     "thead",
+    "time",
     "tr",
     "u",
     "ul",
@@ -78,6 +81,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
         ),
         ("div", HashSet::from(["data-mx-maths"])),
         ("sub", HashSet::from(["data-md"])),
+        ("time", HashSet::from(["datetime"])),
         (
             "img",
             HashSet::from(["src", "alt", "title", "width", "height", "data-mx-emoticon"]),
@@ -161,6 +165,7 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
         .remove_reply_fallback()
         .remove_elements(["script", "style", "textarea", "option", "noscript"])
+        .allow_elements(["time"], ListBehavior::Add)
         .remove_attributes([PropertiesNames {
             parent: "a",
             properties: &["target"],
@@ -178,6 +183,10 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
                 PropertiesNames {
                     parent: "sub",
                     properties: &["data-md"],
+                },
+                PropertiesNames {
+                    parent: "time",
+                    properties: &["datetime"],
                 },
             ],
             ListBehavior::Add,
@@ -264,8 +273,11 @@ fn anchor(href: &str, text: &str) -> String {
     )
 }
 
-/// Escapes plain text and turns bare URLs, emails and Matrix URIs into links.
-fn linkify_plain_text(text: &str) -> String {
+fn render_plain_text(text: &str) -> String {
+    rewrite_mfm(text)
+}
+
+fn linkify_urls(text: &str) -> String {
     let mut spans: Vec<(usize, usize, bool)> = PLAIN_TEXT_LINKS
         .links(text)
         .map(|link| (link.start(), link.end(), link.kind() == &LinkKind::Email))
@@ -298,8 +310,223 @@ fn linkify_plain_text(text: &str) -> String {
     html
 }
 
-const LINKIFY_SKIP_ELEMENTS: [&str; 8] = [
-    "a", "code", "mx-reply", "noscript", "pre", "script", "style", "textarea",
+fn rewrite_mfm(text: &str) -> String {
+    rewrite_mfm_at_depth(text, 0)
+}
+
+const MAX_MFM_DEPTH: usize = 32;
+
+fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
+    let mut html = String::with_capacity(text.len());
+    let mut plain_start = 0;
+    let mut code_ticks = None;
+    let mut index = 0;
+    while index < text.len() {
+        let Some(rest) = text.get(index..) else {
+            break;
+        };
+        if code_ticks.is_none() && rest.starts_with('\\') {
+            index += 1 + rest
+                .get(1..)
+                .and_then(|tail| tail.chars().next())
+                .map_or(0, char::len_utf8);
+            continue;
+        }
+        if rest.starts_with('`') {
+            let ticks = rest.bytes().take_while(|byte| *byte == b'`').count();
+            match code_ticks {
+                Some(open) if open == ticks => code_ticks = None,
+                None => code_ticks = Some(ticks),
+                _ => {}
+            }
+            index += ticks;
+            continue;
+        }
+        if code_ticks.is_none()
+            && rest.starts_with("$[")
+            && let Some((consumed, element)) = mfm_element(rest, depth)
+        {
+            if let Some(before) = text.get(plain_start..index) {
+                html.push_str(&linkify_urls(before));
+            }
+            html.push_str(&element);
+            index += consumed;
+            plain_start = index;
+            continue;
+        }
+        index += rest.chars().next().map_or(1, char::len_utf8);
+    }
+    if let Some(tail) = text.get(plain_start..) {
+        html.push_str(&linkify_urls(tail));
+    }
+    html
+}
+
+fn mfm_element(src: &str, depth: usize) -> Option<(usize, String)> {
+    mfm_unixtime(src).or_else(|| mfm_color(src, depth))
+}
+
+fn mfm_unixtime(src: &str) -> Option<(usize, String)> {
+    let after_name = src.strip_prefix("$[unixtime")?;
+    if !after_name.starts_with([' ', '\t']) {
+        return None;
+    }
+    let args = after_name.trim_start_matches([' ', '\t']);
+    let close = args.find(']')?;
+    let seconds = args.get(..close)?;
+    if seconds.is_empty() || !seconds.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let (datetime, label) = unix_time(seconds)?;
+    Some((
+        src.len() - args.len() + close + 1,
+        format!("<time datetime=\"{datetime}\">{label}</time>"),
+    ))
+}
+
+struct ColorArgs {
+    fg: Option<String>,
+    bg: Option<String>,
+}
+
+fn mfm_close(src: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut escaped = false;
+    for (index, character) in src.char_indices().skip(1) {
+        if escaped {
+            escaped = false;
+        } else if character == '\\' {
+            escaped = true;
+        } else if character == '[' {
+            depth += 1;
+        } else if character == ']' {
+            depth = depth.checked_sub(1)?;
+            if depth == 0 {
+                return Some(index);
+            }
+        }
+    }
+    None
+}
+
+fn mfm_color(src: &str, depth: usize) -> Option<(usize, String)> {
+    if !src.starts_with("$[fg.color=") && !src.starts_with("$[bg.color=") {
+        return None;
+    }
+    let close = mfm_close(src)?;
+    let inner = src.get(2..close)?;
+    let (args, text_at) = parse_color_args(inner)?;
+    let text = inner.get(text_at..)?.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let mut attrs = String::new();
+    if let Some(fg) = &args.fg {
+        let _ = write!(attrs, " data-mx-color=\"{fg}\"");
+    }
+    if let Some(bg) = &args.bg {
+        let _ = write!(attrs, " data-mx-bg-color=\"{bg}\"");
+    }
+    let content = if depth < MAX_MFM_DEPTH {
+        rewrite_mfm_at_depth(text, depth + 1)
+    } else {
+        linkify_urls(text)
+    };
+    Some((close + 1, format!("<span{attrs}>{content}</span>")))
+}
+
+fn parse_color_args(inner: &str) -> Option<(ColorArgs, usize)> {
+    let mut args = ColorArgs { fg: None, bg: None };
+    let mut rest = inner;
+    let mut consumed = 0;
+    let mut found = false;
+    loop {
+        if found {
+            let spaces = rest.len() - rest.trim_start_matches([' ', '\t']).len();
+            if spaces == 0 {
+                break;
+            }
+            rest = rest.get(spaces..)?;
+            consumed += spaces;
+        }
+        let token_len = rest.find([' ', '\t']).unwrap_or(rest.len());
+        let token = rest.get(..token_len)?;
+        let Some((kind, value)) = token
+            .strip_prefix("fg.color=")
+            .map(|value| ("fg", value))
+            .or_else(|| token.strip_prefix("bg.color=").map(|value| ("bg", value)))
+        else {
+            break;
+        };
+        let normalized = normalize_mfm_hex(value)?;
+        if kind == "fg" {
+            args.fg = Some(normalized);
+        } else {
+            args.bg = Some(normalized);
+        }
+        found = true;
+        rest = rest.get(token_len..)?;
+        consumed += token_len;
+    }
+    (args.fg.is_some() || args.bg.is_some()).then_some((args, consumed))
+}
+
+fn normalize_mfm_hex(value: &str) -> Option<String> {
+    let digits = value.strip_prefix('#').unwrap_or(value);
+    if !matches!(digits.len(), 3 | 6) || !digits.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let expanded = match digits.len() {
+        3 => {
+            let [red, green, blue] = *digits.as_bytes() else {
+                return None;
+            };
+            format!(
+                "{}{}{}{}{}{}",
+                red as char, red as char, green as char, green as char, blue as char, blue as char
+            )
+        }
+        6 => digits.to_owned(),
+        _ => return None,
+    };
+    Some(format!("#{}", expanded.to_ascii_lowercase()))
+}
+
+fn unix_time(seconds: &str) -> Option<(String, String)> {
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let seconds: i64 = seconds.parse().ok()?;
+    if seconds < 0 {
+        return None;
+    }
+    let value = OffsetDateTime::from_unix_timestamp(seconds).ok()?;
+    if !(1..=9999).contains(&value.year()) {
+        return None;
+    }
+    let datetime = format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        value.year(),
+        u8::from(value.month()),
+        value.day(),
+        value.hour(),
+        value.minute(),
+        value.second()
+    );
+    let month = MONTHS.get(usize::from(u8::from(value.month()) - 1))?;
+    let label = format!(
+        "{} {} {}, {:02}:{:02} (UTC)",
+        value.day(),
+        month,
+        value.year(),
+        value.hour(),
+        value.minute()
+    );
+    Some((datetime, label))
+}
+
+const LINKIFY_SKIP_ELEMENTS: [&str; 9] = [
+    "a", "code", "mx-reply", "noscript", "pre", "script", "style", "textarea", "time",
 ];
 
 fn markup_span_end(formatted: &str, start: usize) -> usize {
@@ -337,16 +564,17 @@ fn tag_name(tag: &str) -> Option<(String, bool)> {
     (!name.is_empty()).then_some((name, closing))
 }
 
-fn linkify_text_run(run: &str) -> String {
-    let linkified = linkify_plain_text(&html_escape::decode_html_entities(run));
-    if linkified.contains("<a href=") {
-        linkified
-    } else {
+fn rewrite_text_run(run: &str) -> String {
+    let decoded = html_escape::decode_html_entities(run);
+    let rendered = render_plain_text(&decoded);
+    if rendered == escape_html(&decoded) {
         run.to_owned()
+    } else {
+        rendered
     }
 }
 
-fn linkify_markup(formatted: &str) -> String {
+fn rewrite_markup(formatted: &str) -> String {
     let mut out = String::with_capacity(formatted.len());
     let mut run_start = 0;
     let mut cursor = 0;
@@ -356,7 +584,7 @@ fn linkify_markup(formatted: &str) -> String {
         let start = cursor + offset;
         let run = formatted.get(run_start..start).unwrap_or_default();
         if skip.is_none() {
-            out.push_str(&linkify_text_run(run));
+            out.push_str(&rewrite_text_run(run));
         } else {
             out.push_str(run);
         }
@@ -394,7 +622,7 @@ fn linkify_markup(formatted: &str) -> String {
 
     let tail = formatted.get(run_start..).unwrap_or_default();
     if skip.is_none() {
-        out.push_str(&linkify_text_run(tail));
+        out.push_str(&rewrite_text_run(tail));
     } else {
         out.push_str(tail);
     }
@@ -528,7 +756,7 @@ fn sanitize(formatted: &str) -> String {
     if nests_too_deeply(formatted) {
         return String::new();
     }
-    let html = Html::parse(&linkify_markup(formatted));
+    let html = Html::parse(&rewrite_markup(formatted));
     html.sanitize_with(&MATRIX_POLICY);
     SANITIZER.clean(&html.to_string()).to_string()
 }
@@ -566,14 +794,14 @@ fn render_html(body: &str, formatted: Option<&str>) -> String {
     match sanitized {
         Some(html) if !html.trim().is_empty() => html,
         _ if body.is_empty() => String::new(),
-        _ => format!("<span data-plain-body>{}</span>", linkify_plain_text(body)),
+        _ => format!("<span data-plain-body>{}</span>", render_plain_text(body)),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        display_html, linkify_markup, linkify_plain_text, strip_profile_fallback_body,
+        display_html, render_plain_text, rewrite_markup, strip_profile_fallback_body,
         strip_profile_fallback_html,
     };
 
@@ -813,7 +1041,7 @@ mod tests {
 
     #[test]
     fn linkifies_plain_text_without_interpreting_markup() {
-        let html = linkify_plain_text("Use <b>text</b> at https://example.org/a");
+        let html = render_plain_text("Use <b>text</b> at https://example.org/a");
 
         assert!(html.starts_with("Use &lt;b&gt;text&lt;/b&gt;"));
         assert!(html.contains("href=\"https://example.org/a\""));
@@ -821,8 +1049,8 @@ mod tests {
 
     #[test]
     fn leaves_trailing_punctuation_out_of_links() {
-        assert!(linkify_plain_text("See https://example.org/a.").ends_with("</a>."));
-        assert!(linkify_plain_text("(matrix:u/alice:example.org)").ends_with("</a>)"));
+        assert!(render_plain_text("See https://example.org/a.").ends_with("</a>."));
+        assert!(render_plain_text("(matrix:u/alice:example.org)").ends_with("</a>)"));
     }
 
     #[test]
@@ -887,8 +1115,43 @@ mod tests {
     }
 
     #[test]
+    fn renders_mfm_time_and_nested_colors_in_plain_text() {
+        let html = display_html(
+            "at $[unixtime 0] $[fg.color=abc bg.color=123456 red $[bg.color=f00 hot]]",
+            None,
+        );
+
+        assert!(
+            html.contains("<time datetime=\"1970-01-01T00:00:00Z\">1 Jan 1970, 00:00 (UTC)</time>")
+        );
+        assert!(html.contains(
+            "<span data-mx-color=\"#aabbcc\" data-mx-bg-color=\"#123456\">red <span data-mx-bg-color=\"#ff0000\">hot</span></span>"
+        ));
+    }
+
+    #[test]
+    fn rewrites_mfm_in_formatted_text_but_skips_verbatim_elements() {
+        let html = display_html(
+            "",
+            Some(
+                "<p>$[unixtime 0]</p><code>$[unixtime 0]</code><a href=\"https://example.org\">$[unixtime 0]</a>",
+            ),
+        );
+
+        assert_eq!(html.matches("<time ").count(), 1);
+        assert!(html.contains("<code>$[unixtime 0]</code>"));
+        assert!(html.contains(">$[unixtime 0]</a>"));
+    }
+
+    #[test]
+    fn invalid_and_escaped_mfm_stays_literal() {
+        let source = "\\$[unixtime 0] $[unixtime nope] $[fg.color=red bad]";
+        assert_eq!(render_plain_text(source), source);
+    }
+
+    #[test]
     fn linkifies_matrix_uris_and_emails() {
-        let html = linkify_plain_text("ping matrix:u/alice:example.org or alice@example.org");
+        let html = render_plain_text("ping matrix:u/alice:example.org or alice@example.org");
 
         assert!(html.contains("href=\"matrix:u/alice:example.org\""));
         assert!(html.contains("href=\"mailto:alice@example.org\""));
@@ -974,7 +1237,7 @@ mod tests {
     fn markup_without_a_link_is_left_byte_identical() {
         let markup = "<p>plain <strong>text</strong> &amp; more</p>";
 
-        assert_eq!(linkify_markup(markup), markup);
+        assert_eq!(rewrite_markup(markup), markup);
     }
 
     #[test]
@@ -986,7 +1249,7 @@ mod tests {
             "</code>https://example.org/a",
             "<a/>https://example.org/a",
         ] {
-            let _ = linkify_markup(markup);
+            let _ = rewrite_markup(markup);
         }
     }
 }
