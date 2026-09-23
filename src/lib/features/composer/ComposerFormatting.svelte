@@ -102,6 +102,14 @@
     scrollbar-width: none;
   }
 
+  @media (pointer: coarse) {
+    .formatting {
+      border-bottom: 0;
+      border-top: var(--border-width) solid var(--surface-container-line);
+      order: 1;
+    }
+  }
+
   .formatting::-webkit-scrollbar {
     display: none;
   }
