@@ -64,9 +64,10 @@ export function parseSettingsLink(href: string, origin: string): SettingsLink | 
   } catch {
     return null;
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  const desktopApp = url.protocol === 'tauri:' && url.host === 'localhost';
+  if (url.protocol !== 'http:' && url.protocol !== 'https:' && !desktopApp) return null;
 
-  const sameOrigin = url.origin === origin;
+  const sameOrigin = `${url.protocol}//${url.host}` === origin;
   const direct = parsePath(url.pathname, url.search, sameOrigin);
   if (direct) return direct;
 

@@ -62,7 +62,9 @@ const STRIPPED_CONTENT_TAGS: [&str; 6] = [
     "mx-reply", "script", "style", "textarea", "option", "noscript",
 ];
 
-const URL_SCHEMES: [&str; 6] = ["http", "https", "ftp", "mailto", "matrix", "mxc"];
+const URL_SCHEMES: [&str; 7] = ["http", "https", "ftp", "mailto", "matrix", "mxc", "tauri"];
+
+const DESKTOP_APP_ORIGIN: &str = "tauri://localhost/";
 
 fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
     HashMap::from([
@@ -132,6 +134,9 @@ fn sanitizer() -> Builder<'static> {
                 MatrixUri::parse(value).ok().map(|_| value.into())
             }
             // An `mxc:` link would navigate the webview to bytes it cannot load.
+            ("a", "href") if has_scheme(value, "tauri:") => {
+                has_scheme(value, DESKTOP_APP_ORIGIN).then(|| value.into())
+            }
             ("a", "href") => (!has_scheme(value, "mxc:")).then(|| value.into()),
             ("img", "src") => {
                 (is_mxc_uri(value) || has_scheme(value, "https:") || has_scheme(value, "http:"))
@@ -192,13 +197,22 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
             ListBehavior::Add,
         )
         .allow_schemes(
-            [ElementAttributesSchemes {
-                element: "img",
-                attr_schemes: &[PropertiesNames {
-                    parent: "src",
-                    properties: &["mxc", "http", "https"],
-                }],
-            }],
+            [
+                ElementAttributesSchemes {
+                    element: "img",
+                    attr_schemes: &[PropertiesNames {
+                        parent: "src",
+                        properties: &["mxc", "http", "https"],
+                    }],
+                },
+                ElementAttributesSchemes {
+                    element: "a",
+                    attr_schemes: &[PropertiesNames {
+                        parent: "href",
+                        properties: &["tauri"],
+                    }],
+                },
+            ],
             ListBehavior::Add,
         )
 });
@@ -262,7 +276,7 @@ fn anchor(href: &str, text: &str) -> String {
         URL_SCHEMES
             .iter()
             .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
-    });
+    }) && (!has_scheme(href, "tauri:") || has_scheme(href, DESKTOP_APP_ORIGIN));
     if !allowed {
         return escape_html(text);
     }
@@ -1176,6 +1190,49 @@ mod tests {
 
         assert!(html.contains("href=\"matrix:u/alice:example.org\""));
         assert!(html.contains("href=\"mailto:alice@example.org\""));
+    }
+
+    #[test]
+    fn links_to_the_desktop_app_survive() {
+        let href = "tauri://localhost/settings/notifications?focus=favicon-for-mentions-only&moe.sable.client.action=settings";
+        assert_eq!(
+            href.parse::<http::Uri>().unwrap().scheme_str(),
+            Some("tauri")
+        );
+        let escaped = href.replace('&', "&amp;");
+
+        let markup = format!("<a href=\"{escaped}\">settings</a>");
+        assert!(display_html("", Some(&markup)).contains(&format!("href=\"{escaped}\"")));
+        assert!(display_html(href, None).contains(&format!("href=\"{escaped}\"")));
+        assert!(
+            display_html("", Some(&format!("<p>see {escaped}</p>")))
+                .contains(&format!("href=\"{escaped}\""))
+        );
+
+        for other in [
+            "tauri://evil.example/settings/timeline",
+            "tauri:localhost/settings",
+        ] {
+            assert!(
+                !display_html(other, None).contains("<a "),
+                "{other} became a link"
+            );
+            let markup = format!("<a href=\"{other}\">x</a>");
+            assert!(
+                !display_html("", Some(&markup)).contains("tauri:"),
+                "{other} survived"
+            );
+        }
+    }
+
+    #[test]
+    fn links_to_the_android_app_survive() {
+        let href = "http://tauri.localhost/settings/notifications?focus=favicon-for-mentions-only&moe.sable.client.action=settings";
+        let escaped = href.replace('&', "&amp;");
+
+        assert!(display_html(href, None).contains(&format!("href=\"{escaped}\"")));
+        let markup = format!("<a href=\"{escaped}\">settings</a>");
+        assert!(display_html("", Some(&markup)).contains(&format!("href=\"{escaped}\"")));
     }
 
     #[test]

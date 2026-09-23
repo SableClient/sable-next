@@ -33,6 +33,20 @@ test("reads v1's hash routing", () => {
   ).toEqual({ section: 'privacy', focus: 'send-read-receipts' });
 });
 
+test.each([
+  ['tauri://localhost', 'tauri://localhost'],
+  ['http://tauri.localhost', 'http://tauri.localhost'],
+  ['https://tauri.localhost', 'https://tauri.localhost'],
+])('reads a link copied from the %s app', (appOrigin, linkOrigin) => {
+  const path = '/settings/notifications?focus=favicon-for-mentions-only';
+  const expected = { section: 'notifications', focus: 'favicon-for-mentions-only' };
+  expect(parseSettingsLink(`${linkOrigin}${path}`, appOrigin)).toEqual(expected);
+  expect(parseSettingsLink(`${linkOrigin}${path}`, APP)).toBeNull();
+  expect(parseSettingsLink(`${linkOrigin}${path}&moe.sable.client.action=settings`, APP)).toEqual(
+    expected
+  );
+});
+
 test('a focus id that moved sections resolves to the section that owns it', () => {
   expect(
     parseSettingsLink('https://sable.example/settings/appearance?focus=hide-read-receipts', APP)
@@ -46,6 +60,7 @@ test.each([
   'https://sable.example/settings/timeline?focus=a&focus=b',
   'https://sable.example/settings/timeline?moe.sable.client.action=logout',
   'javascript:alert(1)/settings/timeline',
+  'tauri://evil.example/settings/timeline?moe.sable.client.action=settings',
 ])('rejects %s', (href) => {
   expect(parseSettingsLink(href, APP)).toBeNull();
 });
