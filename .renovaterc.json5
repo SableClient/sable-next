@@ -19,23 +19,19 @@
     {
       matchManagers: ['github-actions'],
       groupName: 'github actions',
-      addLabels: ['github_actions'],
     },
     {
       matchManagers: ['npm'],
       groupName: 'npm',
-      addLabels: ['javascript'],
     },
     {
       matchManagers: ['cargo', 'rust-toolchain'],
       groupName: 'cargo',
-      addLabels: ['rust'],
     },
     {
       description: 'Tauri and its plugins move together',
       matchPackageNames: ['/^tauri(?:-.*)?$/'],
       groupName: 'tauri',
-      addLabels: ['rust'],
     },
     {
       matchManagers: ['terraform'],
@@ -56,7 +52,6 @@
         'https://github.com/ruma/ruma{,.git}',
       ],
       groupName: 'matrix-rust-sdk',
-      addLabels: ['rust'],
     },
     {
       matchDatasources: ['git-refs'],

@@ -1,5 +1,6 @@
-name: 🐞 Bug Report
+name: Bug Report
 description: Report a bug
+labels: [bug/unconfirmed]
 
 body:
   - type: markdown
@@ -10,13 +11,14 @@ body:
         2. Make sure Sable is up to date.
         3. Make sure it's an issue with Sable and not something else you are using.
         4. Remember to be friendly. The [Code of Conduct](https://git.sable.moe/SableClient/sable-next/src/branch/main/CODE_OF_CONDUCT.md) applies in issues too.
+        5. If this is a security vulnerability, email security@sable.moe instead of opening a public issue.
 
   - type: textarea
     id: description
     attributes:
       label: Describe the bug
-      description: A clear description of what the bug is. Include screenshots if applicable.
-      placeholder: Bug description
+      description: Describe what happened and what you expected instead. Include screenshots if applicable.
+      placeholder: What happened? What should have happened?
     validations:
       required: true
 
@@ -24,30 +26,39 @@ body:
     id: reproduction
     attributes:
       label: Reproduction
-      description: Steps to reproduce the behavior.
+      description: Steps to reproduce the behavior, or explain if it happens intermittently and you cannot reproduce it reliably.
       placeholder: |
         1. Go to ...
         2. Click on ...
         3. See error
 
-  - type: textarea
-    id: expected-behavior
+  - type: dropdown
+    id: platforms
     attributes:
-      label: Expected behavior
-      description: A clear description of what you expected to happen.
+      label: What platforms have you experienced this issue on?
+      description: Select specific platforms, or Desktop, Mobile, or All only if the issue occurs across that entire group.
+      multiple: true
+      options:
+        - Web
+        - Desktop
+        - Windows
+        - macOS
+        - Linux
+        - Mobile
+        - iOS
+        - Android
+        - All
 
   - type: textarea
     id: info
     attributes:
-      label: Platform and versions
-      description: 'Provide the build you are using, your OS, and your homeserver.'
+      label: Environment and versions
+      description: 'Provide the build and Sable version you are using, your browser if applicable, and your homeserver.'
       placeholder: |
         1. Build: [e.g. next.sable.moe, or the desktop/mobile app]
-        2. OS: [e.g. Windows 11, macOS 15, Android 15]
+        2. Sable version: [e.g. 0.1.0]
         3. Browser: [e.g. Chrome 140, Firefox 142 — web builds only]
-        4. Sable version: [e.g. 0.1.0]
-        5. Matrix homeserver: [e.g. matrix.org]
-      render: shell
+        4. Matrix homeserver: [e.g. matrix.org]
     validations:
       required: true
 
