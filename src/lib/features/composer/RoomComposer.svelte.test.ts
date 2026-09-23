@@ -987,6 +987,30 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   vi.useRealTimers();
 });
 
+test('a touch contextmenu leaves the schedule dialog to the long press', async () => {
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = render({ roomId: '!room:example.org', onSchedule: async () => {} });
+  await tick();
+
+  const button = document.querySelector('.composer-send');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+  const menu = new PointerEvent('contextmenu', {
+    bubbles: true,
+    cancelable: true,
+    pointerType: 'touch',
+  });
+  button.dispatchEvent(menu);
+  await tick();
+
+  expect(menu.defaultPrevented).toBe(true);
+  expect(document.body.textContent).not.toContain('Schedule this message');
+
+  void unmount(instance);
+});
+
 test('right-clicking the send button opens the schedule dialog', async () => {
   const send = vi.fn(async () => {});
   const draft = composerSchema.node('doc', null, [

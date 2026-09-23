@@ -1,5 +1,5 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
-import { armTrailingClickSwallow } from '#lib/ui/trailing-click.js';
+import { armTrailingClickSwallow, touchActive } from '#lib/ui/trailing-click.js';
 
 export const LONG_PRESS_MS = 600;
 const LONG_PRESS_SLOP_PX = 10;
@@ -8,6 +8,19 @@ export interface LongPressOptions {
   enabled?: () => boolean;
   stopPropagation?: boolean;
   onPress: (event: PointerEvent) => void;
+}
+
+export function mouseContextMenu<E extends MouseEvent>(
+  handler: (event: E) => void
+): (event: E) => void {
+  return (event) => {
+    const kind = (event as Partial<PointerEvent>).pointerType;
+    if (kind === 'touch' || kind === 'pen' || (kind === undefined && touchActive())) {
+      event.preventDefault();
+      return;
+    }
+    handler(event);
+  };
 }
 
 export function longPress(options: LongPressOptions): (node: Element) => () => void {

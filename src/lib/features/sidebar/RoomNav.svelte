@@ -729,9 +729,14 @@
                     type="button"
                     class="room-category selection-layer"
                     class:collapsed
-                    oncontextmenu={(event) => {
+                    oncontextmenu={mouseContextMenu((event) => {
                       openContextMenu(event, item.room, null);
-                    }}
+                    })}
+                    {@attach longPress({
+                      onPress: (event) => {
+                        openContextMenu(event, item.room, null);
+                      },
+                    })}
                     style:--room-depth={collapsed ? 0 : item.depth}
                     aria-label={collapsed ? `${name} (${$i18n.t('nav.space')})` : undefined}
                     aria-expanded={!isClosed}
@@ -785,9 +790,15 @@
                 {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
                   <a
                     {...props}
-                    oncontextmenu={(event) => {
+                    oncontextmenu={mouseContextMenu((event) => {
                       if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
-                    }}
+                    })}
+                    {@attach longPress({
+                      enabled: () => room !== undefined,
+                      onPress: (event) => {
+                        if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
+                      },
+                    })}
                     class="room-row selection-current selection-layer"
                     class:unread={mentions > 0 || unread > 0 || marked}
                     {href}
@@ -1256,6 +1267,8 @@
     display: grid;
     min-width: 0;
     padding: 0 var(--space-200) var(--space-200);
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   .room-row-wrap {

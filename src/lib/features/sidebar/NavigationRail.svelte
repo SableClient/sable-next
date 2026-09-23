@@ -30,7 +30,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { createDragList, type DropState } from '#lib/ui/drag-list.js';
-  import { longPress } from '#lib/ui/long-press.svelte.js';
+  import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
@@ -500,9 +500,9 @@
   <div
     class="rail-menu-anchor rail-section-anchor"
     role="presentation"
-    oncontextmenu={(event) => {
+    oncontextmenu={mouseContextMenu((event) => {
       openSectionMenu(event, item, section);
-    }}
+    })}
     {@attach longPress({
       onPress: (event) => {
         openSectionMenu(event, item, section);
@@ -535,9 +535,9 @@
     {#if folderId === undefined}
       <div
         class="rail-menu-anchor"
-        oncontextmenu={(event) => {
+        oncontextmenu={mouseContextMenu((event) => {
           openSpaceContextMenu(event, roomId);
-        }}
+        })}
         role="presentation"
         {@attach longPress({
           onPress: (event) => {
@@ -551,9 +551,9 @@
       <div
         class="rail-menu-anchor"
         role="presentation"
-        oncontextmenu={(event) => {
+        oncontextmenu={mouseContextMenu((event) => {
           openRemoveMenu(event, roomId, folderId);
-        }}
+        })}
         {@attach longPress({
           onPress: (event) => {
             openRemoveMenu(event, roomId, folderId);
@@ -607,9 +607,9 @@
     class:drop-into={dropping(ref, 'into')}
     class:dragged={isDragged(ref)}
     role="presentation"
-    oncontextmenu={(event) => {
+    oncontextmenu={mouseContextMenu((event) => {
       openFolderMenu(event, folder);
-    }}
+    })}
     {@attach dragSource(ref)}
     {@attach dropTarget(ref, true)}
     {@attach longPress({
@@ -647,9 +647,9 @@
         onclick={() => {
           onToggleFolder?.(folder.id);
         }}
-        oncontextmenu={(event) => {
+        oncontextmenu={mouseContextMenu((event) => {
           openFolderMenu(event, folder);
-        }}
+        })}
         {@attach longPress({
           onPress: (event) => {
             openFolderMenu(event, folder);
@@ -665,7 +665,7 @@
   </div>
 {/snippet}
 
-<div class="rail" role="presentation" oncontextmenu={openDisplayMenu}>
+<div class="rail" role="presentation" oncontextmenu={mouseContextMenu(openDisplayMenu)}>
   <div class="rail-scroll" {@attach mobile ? noAttachment : monitor}>
     <ul class="rail-stack">
       {#each [...items, ...directItems] as item (item.href)}

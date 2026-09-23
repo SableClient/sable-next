@@ -1,7 +1,7 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import { LONG_PRESS_MS, LongPress } from './long-press.svelte.js';
+import { LONG_PRESS_MS, LongPress, mouseContextMenu } from './long-press.svelte.js';
 
 vi.mock('#lib/platform/haptics.js', () => ({ hapticFeedback: vi.fn() }));
 
@@ -115,7 +115,7 @@ test('stopPropagation is opt-in', () => {
   expect(loudStop).toHaveBeenCalled();
 });
 
-test('the trailing click a fired press produces is swallowed once', () => {
+test('the clicks a fired press produces are swallowed until the lift settles', () => {
   vi.useFakeTimers();
   const press = new LongPress({ onPress: vi.fn() });
   const onSheetItem = vi.fn();
@@ -126,13 +126,37 @@ test('the trailing click a fired press produces is swallowed once', () => {
   press.start(pointer());
   vi.advanceTimersByTime(LONG_PRESS_MS);
   press.end(pointer());
+  window.dispatchEvent(new PointerEvent('pointerup'));
+  item.click();
   item.click();
 
   expect(onSheetItem).not.toHaveBeenCalled();
 
+  vi.advanceTimersByTime(500);
   item.click();
   expect(onSheetItem).toHaveBeenCalledOnce();
 
   item.remove();
   vi.useRealTimers();
+});
+
+test('a touch contextmenu is prevented and left to the long press', () => {
+  const handler = vi.fn();
+  const menu = new PointerEvent('contextmenu', { cancelable: true, pointerType: 'touch' });
+
+  mouseContextMenu(handler)(menu);
+
+  expect(handler).not.toHaveBeenCalled();
+  expect(menu.defaultPrevented).toBe(true);
+});
+
+test('a mouse or keyboard contextmenu reaches the handler', () => {
+  const handler = vi.fn();
+  const right = new PointerEvent('contextmenu', { cancelable: true, pointerType: 'mouse' });
+  const key = new MouseEvent('contextmenu', { cancelable: true });
+
+  mouseContextMenu(handler)(right);
+  mouseContextMenu(handler)(key);
+
+  expect(handler).toHaveBeenCalledTimes(2);
 });

@@ -21,6 +21,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
+  import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -355,11 +356,17 @@
   <header
     class="hero"
     role="presentation"
-    oncontextmenu={(event) => {
+    oncontextmenu={mouseContextMenu((event) => {
       if (!space) return;
       event.preventDefault();
       openOptions(cursorAnchor(event));
-    }}
+    })}
+    {@attach longPress({
+      enabled: () => space !== null,
+      onPress: (event) => {
+        openOptions(cursorAnchor(event));
+      },
+    })}
   >
     {#if space}
       <div class="hero-menu">
@@ -541,6 +548,8 @@
     padding: var(--space-500) 0 var(--space-300);
     position: relative;
     text-align: center;
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 
   .hero-menu {

@@ -17,7 +17,6 @@ function disarm(): void {
   if (!armed) return;
   armed = false;
   window.removeEventListener('pointerup', expire, true);
-  window.removeEventListener('pointercancel', expire, true);
   window.removeEventListener('touchend', expire, true);
   window.removeEventListener('touchcancel', expire, true);
 }
@@ -38,7 +37,6 @@ export function armTrailingClickSwallow(): void {
   armed = true;
   hookClick();
   window.addEventListener('pointerup', expire, true);
-  window.addEventListener('pointercancel', expire, true);
   window.addEventListener('touchend', expire, true);
   window.addEventListener('touchcancel', expire, true);
 }
@@ -71,6 +69,10 @@ function forgetPointer(): void {
   touchDown = null;
 }
 
+export function touchActive(): boolean {
+  return touchDown !== null;
+}
+
 function onContextMenu(): void {
   if (touchDown !== null) armTrailingClickSwallow();
 }
@@ -80,7 +82,6 @@ function onClick(event: MouseEvent): void {
   forgetPointer();
   if (armed) {
     swallow(event);
-    disarm();
     return;
   }
   if (from !== null && !related(from, event.target)) swallow(event);
@@ -89,17 +90,15 @@ function onClick(event: MouseEvent): void {
 export function guardTouchClicks(): () => void {
   window.addEventListener('pointerdown', trackPointerDown, true);
   window.addEventListener('pointerup', releasePointer, true);
-  window.addEventListener('pointercancel', forgetPointer, true);
   window.addEventListener('touchend', releasePointer, true);
-  window.addEventListener('touchcancel', forgetPointer, true);
+  window.addEventListener('touchcancel', releasePointer, true);
   window.addEventListener('contextmenu', onContextMenu, true);
   hookClick();
   return () => {
     window.removeEventListener('pointerdown', trackPointerDown, true);
     window.removeEventListener('pointerup', releasePointer, true);
-    window.removeEventListener('pointercancel', forgetPointer, true);
     window.removeEventListener('touchend', releasePointer, true);
-    window.removeEventListener('touchcancel', forgetPointer, true);
+    window.removeEventListener('touchcancel', releasePointer, true);
     window.removeEventListener('contextmenu', onContextMenu, true);
     forgetPointer();
     disarm();

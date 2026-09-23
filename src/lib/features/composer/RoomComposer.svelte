@@ -21,7 +21,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
-  import { LongPress } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
   import { pickFiles } from '#lib/platform/files.js';
@@ -1014,11 +1014,11 @@
                 onpointermove={sendPress.move}
                 onpointerup={sendPress.end}
                 onpointercancel={sendPress.end}
-                oncontextmenu={(event: MouseEvent) => {
+                oncontextmenu={mouseContextMenu((event: MouseEvent) => {
                   if (!canSchedule) return;
                   event.preventDefault();
                   scheduleOpen = true;
-                }}
+                })}
                 onmousedown={(event: MouseEvent) => {
                   if (hasContent) event.preventDefault();
                 }}

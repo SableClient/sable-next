@@ -9,7 +9,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { LongPress } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import ReactionSheet from './ReactionSheet.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {
@@ -104,9 +104,9 @@
           }
           if (eventId) onToggleReaction?.(eventId, reaction.key);
         }}
-        oncontextmenu={(event) => {
+        oncontextmenu={mouseContextMenu((event) => {
           openDetails(event, index);
-        }}
+        })}
         onpointerdown={(event) => {
           pressIndex = index;
           press.start(event);

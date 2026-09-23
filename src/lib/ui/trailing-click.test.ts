@@ -80,8 +80,42 @@ test('a touch context menu swallows the click its own lift produces', () => {
 
   expect(activated).not.toHaveBeenCalled();
 
+  press('touch');
+  lift();
   item.click();
   expect(activated).toHaveBeenCalledOnce();
+});
+
+test('every click before the armed swallow expires is swallowed', () => {
+  stopGuard = guardTouchClicks();
+
+  press('touch');
+  armTrailingClickSwallow();
+  const menu = surface();
+  lift();
+  menu.element.click();
+  vi.advanceTimersByTime(300);
+  menu.element.click();
+
+  expect(menu.activated).not.toHaveBeenCalled();
+});
+
+test('a pointercancel mid-hold does not end the swallow before the finger lifts', () => {
+  stopGuard = guardTouchClicks();
+
+  press('touch');
+  armTrailingClickSwallow();
+  item.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
+  vi.advanceTimersByTime(2000);
+  const sheet = surface();
+  item.dispatchEvent(new Event('touchend', { bubbles: true }));
+  sheet.element.click();
+
+  expect(sheet.activated).not.toHaveBeenCalled();
+
+  vi.advanceTimersByTime(500);
+  sheet.element.click();
+  expect(sheet.activated).toHaveBeenCalledOnce();
 });
 
 test('an armed swallow that no click follows expires after the lift', () => {
