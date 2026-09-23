@@ -158,7 +158,7 @@ set: boolean } | { type: "set_pusher"; pusher: PusherView } | { type: "remove_pu
 /**  Fills in users the presence poll has not pushed yet. */
 { type: "fetch_presence"; user_ids: string[] } | { type: "set_room_notification_mode"; room_id: string;
 /**  `null` drops the room's own rules so it follows the default again. */
-mode: NotificationModeView | null } | { type: "set_default_notification_mode"; direct: boolean; encrypted: boolean; mode: NotificationModeView } | { type: "set_mention_notifications"; rule: MentionRuleView; mode: MentionNotificationModeView } | { type: "set_room_name"; room_id: string; name: string | null } | { type: "set_room_topic"; room_id: string; topic: string } | { type: "set_room_avatar"; room_id: string; url: string | null } | { type: "set_room_join_rule"; room_id: string; rule: JoinRuleView } |
+mode: NotificationModeView | null } | { type: "set_default_notification_mode"; direct: boolean; mode: NotificationModeView } | { type: "set_mention_notifications"; rule: MentionRuleView; mode: MentionNotificationModeView } | { type: "set_room_name"; room_id: string; name: string | null } | { type: "set_room_topic"; room_id: string; topic: string } | { type: "set_room_avatar"; room_id: string; url: string | null } | { type: "set_room_join_rule"; room_id: string; rule: JoinRuleView } |
 /**
  *  Escape hatch for unmodelled state. `content` is validated only by the
  *  server, so prefer a typed command.
@@ -275,9 +275,7 @@ export type CreateRoomKind = "text" | "space" | "voice";
 
 export type DefaultNotificationModesView = {
 	direct: NotificationModeView,
-	direct_encrypted: NotificationModeView,
 	group: NotificationModeView,
-	group_encrypted: NotificationModeView,
 };
 
 export type DeviceView = {

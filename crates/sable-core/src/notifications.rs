@@ -122,40 +122,23 @@ impl From<RoomNotificationMode> for NotificationModeView {
     }
 }
 
-async fn room_kind(room: &matrix_sdk::Room) -> Result<(IsEncrypted, IsOneToOne), String> {
-    let encrypted = if room
-        .latest_encryption_state()
-        .await
-        .map_err(|error| error.to_string())?
-        .is_encrypted()
-    {
-        IsEncrypted::Yes
-    } else {
-        IsEncrypted::No
-    };
-    Ok((
-        encrypted,
-        IsOneToOne::from(room.active_members_count() == 2),
-    ))
+fn one_to_one(room: &matrix_sdk::Room) -> IsOneToOne {
+    IsOneToOne::from(room.active_members_count() == 2)
 }
 
-/// # Errors
-///
-/// When the room encryption state cannot be resolved.
-pub async fn settings(room: &matrix_sdk::Room) -> Result<NotificationSettingsView, String> {
+pub async fn settings(room: &matrix_sdk::Room) -> NotificationSettingsView {
     let settings = room.client().notification_settings().await;
-    let (encrypted, one_to_one) = room_kind(room).await?;
 
-    Ok(NotificationSettingsView {
+    NotificationSettingsView {
         room: settings
             .get_user_defined_room_notification_mode(room.room_id())
             .await
             .map(Into::into),
         default: settings
-            .get_default_room_notification_mode(encrypted, one_to_one)
+            .get_default_room_notification_mode(IsEncrypted::No, one_to_one(room))
             .await
             .into(),
-    })
+    }
 }
 
 pub async fn room_modes(
@@ -167,41 +150,34 @@ pub async fn room_modes(
         let room = client.get_room(&room_id)?;
         let settings = &settings;
         Some(async move {
-            let (encrypted, one_to_one) = room_kind(&room).await.ok()?;
-            Some(RoomNotificationModeView {
+            RoomNotificationModeView {
                 room: settings
                     .get_user_defined_room_notification_mode(&room_id)
                     .await
                     .map(Into::into),
                 default: settings
-                    .get_default_room_notification_mode(encrypted, one_to_one)
+                    .get_default_room_notification_mode(IsEncrypted::No, one_to_one(&room))
                     .await
                     .into(),
                 room_id,
-            })
+            }
         })
     });
-    futures_util::future::join_all(lookups)
-        .await
-        .into_iter()
-        .flatten()
-        .collect()
+    futures_util::future::join_all(lookups).await
 }
 
 pub async fn default_modes(client: &Client) -> DefaultNotificationModesView {
     let settings = client.notification_settings().await;
-    let mode = async |encrypted, one_to_one| {
+    let mode = async |one_to_one| {
         settings
-            .get_default_room_notification_mode(encrypted, one_to_one)
+            .get_default_room_notification_mode(IsEncrypted::No, one_to_one)
             .await
             .into()
     };
 
     DefaultNotificationModesView {
-        direct: mode(IsEncrypted::No, IsOneToOne::Yes).await,
-        direct_encrypted: mode(IsEncrypted::Yes, IsOneToOne::Yes).await,
-        group: mode(IsEncrypted::No, IsOneToOne::No).await,
-        group_encrypted: mode(IsEncrypted::Yes, IsOneToOne::No).await,
+        direct: mode(IsOneToOne::Yes).await,
+        group: mode(IsOneToOne::No).await,
     }
 }
 
@@ -365,23 +341,16 @@ pub async fn set_mention_notifications(
 pub async fn set_default_mode(
     client: &Client,
     direct: bool,
-    encrypted: bool,
     mode: NotificationModeView,
 ) -> Result<(), String> {
-    client
-        .notification_settings()
-        .await
-        .set_default_room_notification_mode(
-            if encrypted {
-                IsEncrypted::Yes
-            } else {
-                IsEncrypted::No
-            },
-            IsOneToOne::from(direct),
-            mode.into(),
-        )
-        .await
-        .map_err(|error| error.to_string())
+    let settings = client.notification_settings().await;
+    for encrypted in [IsEncrypted::Yes, IsEncrypted::No] {
+        settings
+            .set_default_room_notification_mode(encrypted, IsOneToOne::from(direct), mode.into())
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 /// # Errors

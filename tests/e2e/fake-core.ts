@@ -752,9 +752,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'default_notification_modes',
         modes: {
           direct: 'all',
-          direct_encrypted: 'all',
           group: 'mentions',
-          group_encrypted: 'mentions',
         },
       }),
       mention_notifications: () => ({

@@ -797,7 +797,6 @@ pub enum Command {
     },
     SetDefaultNotificationMode {
         direct: bool,
-        encrypted: bool,
         mode: NotificationModeView,
     },
     SetMentionNotifications {
@@ -2790,9 +2789,7 @@ pub enum NotificationModeView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct DefaultNotificationModesView {
     pub direct: NotificationModeView,
-    pub direct_encrypted: NotificationModeView,
     pub group: NotificationModeView,
-    pub group_encrypted: NotificationModeView,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

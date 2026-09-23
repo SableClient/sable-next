@@ -1244,15 +1244,10 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_mention_notifications', rule, mode });
     },
 
-    async setDefaultNotificationMode(
-      direct: boolean,
-      encrypted: boolean,
-      mode: NotificationModeView
-    ): Promise<void> {
+    async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
       await transport().send({
         type: 'set_default_notification_mode',
         direct,
-        encrypted,
         mode,
       });
     },

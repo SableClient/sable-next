@@ -23,22 +23,9 @@
     key: keyof DefaultNotificationModesView;
     label: string;
     direct: boolean;
-    encrypted: boolean;
   }[] = [
-    { key: 'direct', label: 'settings.notificationDefaultDirect', direct: true, encrypted: false },
-    {
-      key: 'direct_encrypted',
-      label: 'settings.notificationDefaultDirectEncrypted',
-      direct: true,
-      encrypted: true,
-    },
-    { key: 'group', label: 'settings.notificationDefaultGroup', direct: false, encrypted: false },
-    {
-      key: 'group_encrypted',
-      label: 'settings.notificationDefaultGroupEncrypted',
-      direct: false,
-      encrypted: true,
-    },
+    { key: 'direct', label: 'settings.notificationDefaultDirect', direct: true },
+    { key: 'group', label: 'settings.notificationDefaultGroup', direct: false },
   ];
 
   let current = $state<DefaultNotificationModesView | null>(null);
@@ -79,12 +66,11 @@
   function save(
     key: keyof DefaultNotificationModesView,
     isDirect: boolean,
-    encrypted: boolean,
     mode: NotificationModeView
   ): void {
     if (current) current = { ...current, [key]: mode };
 
-    void core.commands.setDefaultNotificationMode(isDirect, encrypted, mode).catch(() => {
+    void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
       failed = true;
     });
   }
@@ -116,7 +102,7 @@
   {/if}
 
   <div class="rows">
-    {#each rows as { key, label, direct, encrypted } (key)}
+    {#each rows as { key, label, direct } (key)}
       <label>
         <span>{$i18n.t(label)}</span>
         {#if current}
@@ -125,7 +111,7 @@
             value={current[key]}
             items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
             onValueChange={(value) => {
-              save(key, direct, encrypted, value as NotificationModeView);
+              save(key, direct, value as NotificationModeView);
             }}
           />
         {/if}

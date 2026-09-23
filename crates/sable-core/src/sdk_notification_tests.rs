@@ -337,32 +337,43 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
 }
 
 #[tokio::test]
-async fn notification_settings_resolve_unknown_encryption() {
+async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
+    use matrix_sdk::ruma::push::{PredefinedUnderrideRuleId, RuleKind, Ruleset};
+
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
-    let room = server
-        .sync_joined_room(&client, room_id!("!settings:example.org"))
-        .await;
-    server
-        .mock_room_state_encryption()
-        .encrypted()
-        .expect(1)
-        .mount()
-        .await;
-    assert!(!room.encryption_state().is_encrypted());
-    let result = notifications::settings(&room).await.unwrap();
-    assert!(room.encryption_state().is_encrypted());
-    assert!(result.room.is_none());
-    let expected = client
-        .notification_settings()
-        .await
-        .get_default_room_notification_mode(
-            matrix_sdk::notification_settings::IsEncrypted::Yes,
-            matrix_sdk::notification_settings::IsOneToOne::No,
+    let room_id = room_id!("!settings:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let mut rules = Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .set_actions(
+            RuleKind::Underride,
+            PredefinedUnderrideRuleId::Message.as_str(),
+            vec![],
         )
+        .unwrap();
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(factory.push_rules(rules.clone()));
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id).add_state_event(factory.room_encryption()),
+            );
+        })
         .await;
+    let room = client.get_room(room_id).unwrap();
+    assert!(room.encryption_state().is_encrypted());
+
+    let result = notifications::settings(&room).await;
+    let modes = notifications::room_modes(&client, vec![room_id.to_owned()]).await;
+
+    assert!(result.room.is_none());
     assert_eq!(
         serde_json::to_value(result.default).unwrap(),
-        serde_json::to_value(crate::protocol::NotificationModeView::from(expected)).unwrap()
+        json!("mentions")
+    );
+    assert_eq!(
+        serde_json::to_value(modes[0].default).unwrap(),
+        json!("mentions")
     );
 }
