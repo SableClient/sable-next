@@ -316,6 +316,8 @@ fn rewrite_mfm(text: &str) -> String {
 
 const MAX_MFM_DEPTH: usize = 32;
 
+const MFM_SPAN_LIMIT: usize = 2048;
+
 fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
     let mut html = String::with_capacity(text.len());
     let mut plain_start = 0;
@@ -372,11 +374,11 @@ fn mfm_unixtime(src: &str) -> Option<(usize, String)> {
         return None;
     }
     let args = after_name.trim_start_matches([' ', '\t']);
-    let close = args.find(']')?;
-    let seconds = args.get(..close)?;
-    if seconds.is_empty() || !seconds.bytes().all(|byte| byte.is_ascii_digit()) {
+    let close = args.bytes().take_while(u8::is_ascii_digit).count();
+    if close == 0 || args.as_bytes().get(close) != Some(&b']') {
         return None;
     }
+    let seconds = args.get(..close)?;
     let (datetime, label) = unix_time(seconds)?;
     Some((
         src.len() - args.len() + close + 1,
@@ -392,7 +394,7 @@ struct ColorArgs {
 fn mfm_close(src: &str) -> Option<usize> {
     let mut depth = 0usize;
     let mut escaped = false;
-    for (index, character) in src.char_indices().skip(1) {
+    for (index, character) in src.char_indices().take(MFM_SPAN_LIMIT).skip(1) {
         if escaped {
             escaped = false;
         } else if character == '\\' {
@@ -1147,6 +1149,25 @@ mod tests {
     fn invalid_and_escaped_mfm_stays_literal() {
         let source = "\\$[unixtime 0] $[unixtime nope] $[fg.color=red bad]";
         assert_eq!(render_plain_text(source), source);
+    }
+
+    #[test]
+    fn a_colour_looks_for_its_close_within_a_bounded_span() {
+        let near = format!("$[fg.color=f00 {}]", "a".repeat(100));
+        assert!(render_plain_text(&near).starts_with("<span data-mx-color=\"#ff0000\">"));
+
+        let far = format!("$[fg.color=f00 {}]", "a".repeat(5000));
+        assert_eq!(render_plain_text(&far), far);
+    }
+
+    #[test]
+    fn a_long_run_of_unclosed_mfm_stays_literal() {
+        for source in [
+            "$[fg.color=f00 x ".repeat(20_000),
+            "$[unixtime 1 ".repeat(20_000),
+        ] {
+            assert_eq!(render_plain_text(&source), source);
+        }
     }
 
     #[test]
