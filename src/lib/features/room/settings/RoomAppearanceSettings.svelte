@@ -5,6 +5,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import type { ShowRoomIcon } from '#lib/settings/preferences.svelte.js';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
   import { roomIconOverride, setRoomIconOverride } from './room-appearance.svelte';
@@ -52,20 +53,17 @@
     description={$i18n.t('room.appearanceHint')}
   >
     <ul class="settings-rows">
-      <li class="settings-row">
-        <div class="settings-row-copy">
-          <span class="settings-row-name">{$i18n.t('room.appearanceIconTitle')}</span>
-          <p>{$i18n.t('room.appearanceIconHint')}</p>
-        </div>
-        <div class="settings-row-control">
-          <Select
-            {value}
-            aria-label={$i18n.t('room.appearanceIconTitle')}
-            items={options}
-            onValueChange={select}
-          />
-        </div>
-      </li>
+      <SettingsRow
+        title={$i18n.t('room.appearanceIconTitle')}
+        description={$i18n.t('room.appearanceIconHint')}
+      >
+        <Select
+          {value}
+          aria-label={$i18n.t('room.appearanceIconTitle')}
+          items={options}
+          onValueChange={select}
+        />
+      </SettingsRow>
     </ul>
   </SettingsSection>
 </div>

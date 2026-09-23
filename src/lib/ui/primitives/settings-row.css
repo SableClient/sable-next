@@ -4,52 +4,6 @@
   padding: 0;
 }
 
-.settings-row {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-400);
-  min-height: calc(var(--control-height-medium) + var(--space-300));
-  padding: var(--space-300) var(--space-400);
-}
-
-.settings-row + .settings-row {
-  border-top: var(--border-width) solid var(--surface-container-line);
-}
-
-.settings-row-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.settings-row-name {
-  font-weight: var(--font-weight-medium);
-  overflow-wrap: anywhere;
-}
-
-.settings-row-copy p {
-  color: var(--surface-var-on-container);
-  font-size: var(--font-size-small);
-  margin: var(--space-100) 0 0;
-  max-width: 60ch;
-  overflow-wrap: anywhere;
-}
-
-.settings-row-control {
-  align-items: center;
-  display: flex;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
-  gap: var(--space-300);
-  justify-content: flex-end;
-  margin-left: auto;
-  min-width: 0;
-}
-
-.settings-row-control .select {
-  min-width: min(11rem, 100%);
-}
-
 .settings-form {
   display: grid;
   gap: var(--space-400);

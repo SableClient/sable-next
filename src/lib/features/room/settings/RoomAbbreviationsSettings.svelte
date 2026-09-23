@@ -16,6 +16,7 @@
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -280,108 +281,101 @@
     {#if entries.length > 0 || inheritedGroups.length > 0}
       <ul class="settings-rows">
         {#each entries as entry (abbreviationKey(entry))}
-          <li class="settings-row" class:editing={isEditing(entry)}>
-            {#if isEditing(entry)}
-              <form class="inline-editor" onsubmit={applyEdit}>
-                {#if failed}
-                  <Alert variant="critical" role="alert"
-                    >{$i18n.t('room.abbreviationsFailed')}</Alert
-                  >
-                {/if}
-                {#if duplicate}
-                  <Alert variant="critical" role="alert">
-                    {$i18n.t('room.abbreviationsDuplicate')}
-                  </Alert>
-                {/if}
-                <div class="settings-field">
-                  <Label for="room-abbr-edit-term">{$i18n.t('room.abbreviationsTerm')}</Label>
-                  <TextInput
-                    id="room-abbr-edit-term"
-                    bind:value={term}
-                    placeholder={$i18n.t('room.abbreviationsTermPlaceholder')}
-                  />
-                </div>
-                <div class="settings-field">
-                  <Label for="room-abbr-edit-definition">
-                    {$i18n.t('room.abbreviationsDefinition')}
-                  </Label>
-                  <TextInput
-                    id="room-abbr-edit-definition"
-                    bind:value={definition}
-                    placeholder={$i18n.t('room.abbreviationsDefinitionPlaceholder')}
-                  />
-                </div>
-                <label class="cased-option">
-                  <input type="checkbox" bind:checked={cased} />
-                  {$i18n.t('room.abbreviationsCased')}
-                </label>
-                <div class="actions">
-                  <Button
-                    type="submit"
-                    loading={busy}
-                    disabled={term.trim() === '' || definition.trim() === ''}
-                  >
-                    {$i18n.t('room.abbreviationsSave')}
-                  </Button>
-                </div>
-              </form>
+          {#if isEditing(entry)}
+            <SettingsRow class="editing">
+              {#snippet copy()}
+                <form class="inline-editor" onsubmit={applyEdit}>
+                  {#if failed}
+                    <Alert variant="critical" role="alert"
+                      >{$i18n.t('room.abbreviationsFailed')}</Alert
+                    >
+                  {/if}
+                  {#if duplicate}
+                    <Alert variant="critical" role="alert">
+                      {$i18n.t('room.abbreviationsDuplicate')}
+                    </Alert>
+                  {/if}
+                  <div class="settings-field">
+                    <Label for="room-abbr-edit-term">{$i18n.t('room.abbreviationsTerm')}</Label>
+                    <TextInput
+                      id="room-abbr-edit-term"
+                      bind:value={term}
+                      placeholder={$i18n.t('room.abbreviationsTermPlaceholder')}
+                    />
+                  </div>
+                  <div class="settings-field">
+                    <Label for="room-abbr-edit-definition">
+                      {$i18n.t('room.abbreviationsDefinition')}
+                    </Label>
+                    <TextInput
+                      id="room-abbr-edit-definition"
+                      bind:value={definition}
+                      placeholder={$i18n.t('room.abbreviationsDefinitionPlaceholder')}
+                    />
+                  </div>
+                  <label class="cased-option">
+                    <input type="checkbox" bind:checked={cased} />
+                    {$i18n.t('room.abbreviationsCased')}
+                  </label>
+                  <div class="actions">
+                    <Button
+                      type="submit"
+                      loading={busy}
+                      disabled={term.trim() === '' || definition.trim() === ''}
+                    >
+                      {$i18n.t('room.abbreviationsSave')}
+                    </Button>
+                  </div>
+                </form>
+              {/snippet}
               {#if canEdit}
-                <div class="settings-row-control">
-                  <IconButton
-                    variant="subtle"
-                    size="small"
-                    label={$i18n.t('room.abbreviationsCancel')}
-                    disabled={busy}
-                    onclick={resetForm}
-                  >
-                    <XIcon />
-                  </IconButton>
-                </div>
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  label={$i18n.t('room.abbreviationsCancel')}
+                  disabled={busy}
+                  onclick={resetForm}
+                >
+                  <XIcon />
+                </IconButton>
               {/if}
-            {:else}
-              <div class="settings-row-copy">
-                <span class="settings-row-name">{entry.term}</span>
-                {#if entry.cased}
-                  <span class="tag">{$i18n.t('room.abbreviationsCased')}</span>
-                {/if}
-                <p>{entry.definition}</p>
-              </div>
+            </SettingsRow>
+          {:else}
+            <SettingsRow
+              title={entry.term}
+              description={entry.definition}
+              badge={entry.cased ? $i18n.t('room.abbreviationsCased') : undefined}
+            >
               {#if canEdit}
-                <div class="settings-row-control">
-                  <IconButton
-                    variant="subtle"
-                    size="small"
-                    label={$i18n.t('room.abbreviationsEdit', { term: entry.term })}
-                    disabled={busy}
-                    onclick={() => startEdit(entry)}
-                  >
-                    <PencilIcon />
-                  </IconButton>
-                  <IconButton
-                    variant="subtle"
-                    size="small"
-                    label={$i18n.t('room.abbreviationsRemove', { term: entry.term })}
-                    disabled={busy}
-                    onclick={() => requestRemoval(entry)}
-                  >
-                    <TrashIcon />
-                  </IconButton>
-                </div>
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  label={$i18n.t('room.abbreviationsEdit', { term: entry.term })}
+                  disabled={busy}
+                  onclick={() => startEdit(entry)}
+                >
+                  <PencilIcon />
+                </IconButton>
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  label={$i18n.t('room.abbreviationsRemove', { term: entry.term })}
+                  disabled={busy}
+                  onclick={() => requestRemoval(entry)}
+                >
+                  <TrashIcon />
+                </IconButton>
               {/if}
-            {/if}
-          </li>
+            </SettingsRow>
+          {/if}
         {/each}
         {#each inheritedGroups as group (group.spaceId)}
           {#each group.entries as entry (`${group.spaceId}:${entry.term}`)}
-            <li class="settings-row">
-              <div class="settings-row-copy">
-                <span class="settings-row-name">{entry.term}</span>
-                <span class="tag">
-                  {$i18n.t('room.abbreviationsSpaceTag', { space: group.spaceName })}
-                </span>
-                <p>{entry.definition}</p>
-              </div>
-            </li>
+            <SettingsRow
+              title={entry.term}
+              description={entry.definition}
+              badge={$i18n.t('room.abbreviationsSpaceTag', { space: group.spaceName })}
+            />
           {/each}
         {/each}
       </ul>
@@ -416,7 +410,7 @@
     margin: 0;
   }
 
-  .settings-row.editing {
+  .section :global(.setting-row.editing) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
   }
@@ -431,15 +425,6 @@
     align-items: center;
     display: flex;
     gap: var(--space-200);
-  }
-
-  .tag {
-    background: var(--surface-container-active);
-    border-radius: var(--radii-pill);
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-x-small);
-    margin-left: var(--space-200);
-    padding: var(--space-100) var(--space-200);
   }
 
   .actions {

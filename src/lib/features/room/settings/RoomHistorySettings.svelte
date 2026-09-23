@@ -4,6 +4,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 
   import { canSendState } from './permission-groups';
 
@@ -71,27 +72,21 @@
   }
 </script>
 
-<li class="settings-row">
-  <div class="settings-row-copy">
-    <span class="settings-row-name">{$i18n.t('room.historyTitle')}</span>
-    <p>{$i18n.t('room.historyHint')}</p>
-  </div>
-  <div class="settings-row-control">
-    {#if canEdit}
-      <Select
-        value={visibility}
-        aria-label={$i18n.t('room.historyTitle')}
-        disabled={saving}
-        items={options}
-        onValueChange={(next: string) => {
-          void select(next);
-        }}
-      />
-    {:else}
-      <span class="value">{$i18n.t(`room.historyVisibility.${visibility}`)}</span>
-    {/if}
-  </div>
-</li>
+<SettingsRow title={$i18n.t('room.historyTitle')} description={$i18n.t('room.historyHint')}>
+  {#if canEdit}
+    <Select
+      value={visibility}
+      aria-label={$i18n.t('room.historyTitle')}
+      disabled={saving}
+      items={options}
+      onValueChange={(next: string) => {
+        void select(next);
+      }}
+    />
+  {:else}
+    <span class="value">{$i18n.t(`room.historyVisibility.${visibility}`)}</span>
+  {/if}
+</SettingsRow>
 
 <style>
   .value {

@@ -62,10 +62,10 @@ test('collects an optional reason before kicking a member', async () => {
     props: { room, permissions },
   });
   await vi.waitFor(() => {
-    expect(document.querySelector('.settings-row')).not.toBeNull();
+    expect(document.querySelector('.setting-row')).not.toBeNull();
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.settings-row-control button').forEach((button) => {
+  document.querySelectorAll<HTMLButtonElement>('.row-control button').forEach((button) => {
     if (button.textContent.trim() === 'Remove from room') button.click();
   });
   await tick();
@@ -96,10 +96,10 @@ test('sends no reason when the moderation reason is left blank', async () => {
     props: { room, permissions },
   });
   await vi.waitFor(() => {
-    expect(document.querySelector('.settings-row')).not.toBeNull();
+    expect(document.querySelector('.setting-row')).not.toBeNull();
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.settings-row-control button').forEach((button) => {
+  document.querySelectorAll<HTMLButtonElement>('.row-control button').forEach((button) => {
     if (button.textContent.trim() === 'Ban from room') button.click();
   });
   await tick();
@@ -138,14 +138,14 @@ test('keeps a changed power level when the reload still returns the old one', as
     props: { room, permissions: { ...permissions, can_change_power_levels: true } },
   });
   const names = () =>
-    Array.from(document.querySelectorAll('.settings-row'), (row) =>
+    Array.from(document.querySelectorAll('.setting-row'), (row) =>
       row.textContent.includes('Bob') ? 'Bob' : 'Alice'
     );
   await vi.waitFor(() => {
     expect(names()).toEqual(['Alice', 'Bob']);
   });
 
-  const triggers = document.querySelectorAll<HTMLElement>('.settings-row .select');
+  const triggers = document.querySelectorAll<HTMLElement>('.setting-row .select');
   await press(triggers[1]);
   await vi.waitFor(() => {
     expect(document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);

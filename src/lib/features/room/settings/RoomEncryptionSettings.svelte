@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
 
   import { canSendState } from './permission-groups';
@@ -47,26 +48,23 @@
   }
 </script>
 
-<li class="settings-row">
-  <div class="settings-row-copy">
-    <span class="settings-row-name">{$i18n.t('room.encryptionTitle')}</span>
-    <p>{enabled ? $i18n.t('room.encryptionOn') : $i18n.t('room.encryptionOff')}</p>
-  </div>
-  <div class="settings-row-control">
-    {#if enabled}
-      <StatusBadge variant="success" label={$i18n.t('room.encryptionEnabled')} />
-    {:else if canEnable}
-      <Button
-        size="small"
-        onclick={() => {
-          confirming = true;
-        }}
-      >
-        {$i18n.t('room.encryptionEnable')}
-      </Button>
-    {/if}
-  </div>
-</li>
+<SettingsRow
+  title={$i18n.t('room.encryptionTitle')}
+  description={enabled ? $i18n.t('room.encryptionOn') : $i18n.t('room.encryptionOff')}
+>
+  {#if enabled}
+    <StatusBadge variant="success" label={$i18n.t('room.encryptionEnabled')} />
+  {:else if canEnable}
+    <Button
+      size="small"
+      onclick={() => {
+        confirming = true;
+      }}
+    >
+      {$i18n.t('room.encryptionEnable')}
+    </Button>
+  {/if}
+</SettingsRow>
 
 <DialogFrame
   open={confirming}

@@ -10,7 +10,7 @@
   };
 
   interface Props {
-    title: string;
+    title?: string;
     description?: string | Snippet;
     disabled?: boolean;
     highlighted?: boolean;
@@ -21,6 +21,7 @@
     badge?: string;
     titleAction?: TitleAction;
     before?: Snippet;
+    copy?: Snippet;
     children?: Snippet;
   }
 
@@ -36,6 +37,7 @@
     badge,
     titleAction,
     before,
+    copy,
     children,
   }: Props = $props();
 </script>
@@ -47,22 +49,26 @@
 >
   {#if before}<span class="row-before">{@render before()}</span>{/if}
   <div class="row-copy">
-    <div class="row-name">
-      <span class="name">{title}</span>
-      {#if badge}<StatusBadge variant="neutral" label={badge} />{/if}
-      {#if titleAction}
-        <span class="row-share">
-          <button type="button" aria-label={titleAction.label} onclick={titleAction.onclick}>
-            <titleAction.icon />
-          </button>
-        </span>
+    {#if copy}
+      {@render copy()}
+    {:else}
+      <div class="row-name">
+        <span class="name">{title}</span>
+        {#if badge}<StatusBadge variant="neutral" label={badge} />{/if}
+        {#if titleAction}
+          <span class="row-share">
+            <button type="button" aria-label={titleAction.label} onclick={titleAction.onclick}>
+              <titleAction.icon />
+            </button>
+          </span>
+        {/if}
+      </div>
+      {#if typeof description === 'string'}<p>{description}</p>
+      {:else if description}
+        <p>
+          {@render description()}
+        </p>
       {/if}
-    </div>
-    {#if typeof description === 'string'}<p>{description}</p>
-    {:else if description}
-      <p>
-        {@render description()}
-      </p>
     {/if}
   </div>
   <div class={['row-control', { wide }]}>{@render children?.()}</div>
@@ -108,6 +114,7 @@
 
   .name {
     font-weight: var(--font-weight-medium);
+    overflow-wrap: anywhere;
   }
 
   .row-copy p {
@@ -115,6 +122,7 @@
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
     max-width: 60ch;
+    overflow-wrap: anywhere;
   }
 
   .setting-row.disabled .row-copy {
@@ -168,6 +176,8 @@
     align-items: center;
     display: flex;
     flex: 1 1 100%;
+    flex-wrap: wrap;
+    gap: var(--space-300);
     justify-content: flex-start;
     max-width: 100%;
     min-width: 0;
@@ -176,6 +186,10 @@
 
   .row-control.wide {
     min-width: 11rem;
+  }
+
+  .row-control :global(.select) {
+    min-width: min(11rem, 100%);
   }
 
   @media (hover: hover) {

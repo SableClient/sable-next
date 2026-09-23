@@ -14,6 +14,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -257,74 +258,69 @@
             {@const tag = tagForLevel(roleTags, level)}
             {@const key = locationKey(item.location)}
             {@const numberErrorId = `room-perm-number-error-${item.label.replace(/\./g, '-')}`}
-            <li class="settings-row">
-              <div class="settings-row-copy">
-                <span class="settings-row-name">{$i18n.t(item.label)}</span>
-              </div>
-              <div class="settings-row-control">
-                {#if tag}
-                  <span class="role-chip">
-                    <span
-                      class="role-swatch"
-                      style:background-color={tag.color ?? undefined}
-                      aria-hidden="true"
-                    ></span>
-                    <span class="role-name">{tag.name} ({level})</span>
-                  </span>
-                {:else}
-                  <span class="level">{levelLabel(level)}</span>
-                {/if}
-                {#if canEdit && level <= ownLevel}
-                  <IconButton
-                    variant="subtle"
-                    size="small"
-                    label={$i18n.t('room.permRoleEdit')}
+            <SettingsRow title={$i18n.t(item.label)}>
+              {#if tag}
+                <span class="role-chip">
+                  <span
+                    class="role-swatch"
+                    style:background-color={tag.color ?? undefined}
+                    aria-hidden="true"
+                  ></span>
+                  <span class="role-name">{tag.name} ({level})</span>
+                </span>
+              {:else}
+                <span class="level">{levelLabel(level)}</span>
+              {/if}
+              {#if canEdit && level <= ownLevel}
+                <IconButton
+                  variant="subtle"
+                  size="small"
+                  label={$i18n.t('room.permRoleEdit')}
+                  disabled={saving}
+                  onclick={() => startEditRole(level)}
+                >
+                  <PencilIcon />
+                </IconButton>
+                <Select
+                  value={String(level)}
+                  aria-label={$i18n.t(item.label)}
+                  disabled={saving}
+                  items={options(level)}
+                  onValueChange={(next: string) => {
+                    void setLevel(item.location, Number(next));
+                  }}
+                />
+                <div class="number-field">
+                  <TextInput
+                    inputmode="numeric"
+                    aria-label={$i18n.t('room.permLevelCustomLabel', {
+                      permission: $i18n.t(item.label),
+                    })}
+                    aria-invalid={numberErrors[key] ? 'true' : undefined}
+                    aria-describedby={numberErrors[key] ? numberErrorId : undefined}
                     disabled={saving}
-                    onclick={() => startEditRole(level)}
-                  >
-                    <PencilIcon />
-                  </IconButton>
-                  <Select
-                    value={String(level)}
-                    aria-label={$i18n.t(item.label)}
-                    disabled={saving}
-                    items={options(level)}
-                    onValueChange={(next: string) => {
-                      void setLevel(item.location, Number(next));
+                    bind:value={
+                      () => numberDrafts[key] ?? String(level),
+                      (value) => {
+                        numberDrafts = { ...numberDrafts, [key]: value };
+                      }
+                    }
+                    onchange={(event: Event) => {
+                      void commitNumber(
+                        item.location,
+                        key,
+                        (event.currentTarget as HTMLInputElement).value
+                      );
                     }}
                   />
-                  <div class="number-field">
-                    <TextInput
-                      inputmode="numeric"
-                      aria-label={$i18n.t('room.permLevelCustomLabel', {
-                        permission: $i18n.t(item.label),
-                      })}
-                      aria-invalid={numberErrors[key] ? 'true' : undefined}
-                      aria-describedby={numberErrors[key] ? numberErrorId : undefined}
-                      disabled={saving}
-                      bind:value={
-                        () => numberDrafts[key] ?? String(level),
-                        (value) => {
-                          numberDrafts = { ...numberDrafts, [key]: value };
-                        }
-                      }
-                      onchange={(event: Event) => {
-                        void commitNumber(
-                          item.location,
-                          key,
-                          (event.currentTarget as HTMLInputElement).value
-                        );
-                      }}
-                    />
-                    {#if numberErrors[key]}
-                      <p id={numberErrorId} class="number-error" role="alert">
-                        {numberErrors[key]}
-                      </p>
-                    {/if}
-                  </div>
-                {/if}
-              </div>
-            </li>
+                  {#if numberErrors[key]}
+                    <p id={numberErrorId} class="number-error" role="alert">
+                      {numberErrors[key]}
+                    </p>
+                  {/if}
+                </div>
+              {/if}
+            </SettingsRow>
           {/each}
         </ul>
       </SettingsSection>

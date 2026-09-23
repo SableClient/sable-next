@@ -18,6 +18,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import TextArea from '#lib/ui/primitives/TextArea.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -224,6 +225,12 @@
   }
 </script>
 
+{#snippet bannerPreview()}
+  {#if banner}
+    <MediaImage source={banner} alt="" width={160} height={90} class="banner-preview" />
+  {/if}
+{/snippet}
+
 <div class="section">
   <SettingsSection
     headingId="room-settings-general"
@@ -231,23 +238,22 @@
     description={$i18n.t('room.settingsGeneralDescription')}
   >
     <ul class="settings-rows">
-      <li class="settings-row">
-        <Avatar id={roomId} src={room?.avatar_url ?? null} name={room?.name ?? ''} />
-        <div class="settings-row-copy">
-          <span class="settings-row-name">{$i18n.t('room.settingsAvatarLabel')}</span>
-          <p>{$i18n.t('room.settingsAvatarHint')}</p>
-        </div>
+      <SettingsRow
+        title={$i18n.t('room.settingsAvatarLabel')}
+        description={$i18n.t('room.settingsAvatarHint')}
+      >
+        {#snippet before()}
+          <Avatar id={roomId} src={room?.avatar_url ?? null} name={room?.name ?? ''} />
+        {/snippet}
         {#if canEditAvatar}
-          <div class="settings-row-control">
-            <Button size="small" disabled={saving} onclick={() => avatarInput?.click()}>
-              {$i18n.t('room.settingsAvatarChange')}
+          <Button size="small" disabled={saving} onclick={() => avatarInput?.click()}>
+            {$i18n.t('room.settingsAvatarChange')}
+          </Button>
+          {#if room?.avatar_url}
+            <Button size="small" variant="ghost" disabled={saving} onclick={removeAvatar}>
+              {$i18n.t('room.settingsAvatarRemove')}
             </Button>
-            {#if room?.avatar_url}
-              <Button size="small" variant="ghost" disabled={saving} onclick={removeAvatar}>
-                {$i18n.t('room.settingsAvatarRemove')}
-              </Button>
-            {/if}
-          </div>
+          {/if}
         {/if}
         <input
           bind:this={avatarInput}
@@ -258,26 +264,21 @@
           aria-hidden="true"
           onchange={uploadAvatar}
         />
-      </li>
-      <li class="settings-row">
-        {#if banner}
-          <MediaImage source={banner} alt="" width={160} height={90} class="banner-preview" />
-        {/if}
-        <div class="settings-row-copy">
-          <span class="settings-row-name">{$i18n.t('room.settingsBannerLabel')}</span>
-          <p>{$i18n.t('room.settingsBannerHint')}</p>
-        </div>
+      </SettingsRow>
+      <SettingsRow
+        title={$i18n.t('room.settingsBannerLabel')}
+        description={$i18n.t('room.settingsBannerHint')}
+        before={banner ? bannerPreview : undefined}
+      >
         {#if canEditBanner}
-          <div class="settings-row-control">
-            <Button size="small" disabled={saving} onclick={() => bannerInput?.click()}>
-              {$i18n.t('room.settingsBannerChange')}
+          <Button size="small" disabled={saving} onclick={() => bannerInput?.click()}>
+            {$i18n.t('room.settingsBannerChange')}
+          </Button>
+          {#if banner}
+            <Button size="small" variant="ghost" disabled={saving} onclick={removeBanner}>
+              {$i18n.t('room.settingsBannerRemove')}
             </Button>
-            {#if banner}
-              <Button size="small" variant="ghost" disabled={saving} onclick={removeBanner}>
-                {$i18n.t('room.settingsBannerRemove')}
-              </Button>
-            {/if}
-          </div>
+          {/if}
         {/if}
         <input
           bind:this={bannerInput}
@@ -288,7 +289,7 @@
           aria-hidden="true"
           onchange={uploadBanner}
         />
-      </li>
+      </SettingsRow>
     </ul>
     {#if canEditGeneral}
       <div class="settings-form">
@@ -303,19 +304,9 @@
       </div>
     {:else}
       <ul class="settings-rows">
-        <li class="settings-row">
-          <div class="settings-row-copy">
-            <span class="settings-row-name">{$i18n.t('room.settingsNameLabel')}</span>
-            <p>{room?.name ?? ''}</p>
-          </div>
-        </li>
+        <SettingsRow title={$i18n.t('room.settingsNameLabel')} description={room?.name ?? ''} />
         {#if topic !== ''}
-          <li class="settings-row">
-            <div class="settings-row-copy">
-              <span class="settings-row-name">{$i18n.t('room.settingsTopicLabel')}</span>
-              <p>{topic}</p>
-            </div>
-          </li>
+          <SettingsRow title={$i18n.t('room.settingsTopicLabel')} description={topic} />
         {/if}
       </ul>
     {/if}
@@ -399,17 +390,14 @@
       {/if}
       <RoomPublishSettings {room} {levels} {ownPowerLevel} />
       {#if room?.is_direct}
-        <li class="settings-row">
-          <div class="settings-row-copy">
-            <span class="settings-row-name">{$i18n.t('room.settingsDirectLabel')}</span>
-            <p>{$i18n.t('room.settingsDirectHint')}</p>
-          </div>
-          <div class="settings-row-control">
-            <Button size="small" disabled={saving} onclick={convertToGroup}>
-              {$i18n.t('room.menuConvertToGroup')}
-            </Button>
-          </div>
-        </li>
+        <SettingsRow
+          title={$i18n.t('room.settingsDirectLabel')}
+          description={$i18n.t('room.settingsDirectHint')}
+        >
+          <Button size="small" disabled={saving} onclick={convertToGroup}>
+            {$i18n.t('room.menuConvertToGroup')}
+          </Button>
+        </SettingsRow>
       {/if}
     </ul>
   </SettingsSection>
@@ -444,10 +432,11 @@
     margin: 0;
   }
 
-  :global(.banner-preview) {
+  .section :global(.media-image.banner-preview) {
     border-radius: var(--radius);
     flex: none;
     height: 2.5rem;
+    max-width: none;
     object-fit: cover;
     overflow: hidden;
     width: 4.5rem;

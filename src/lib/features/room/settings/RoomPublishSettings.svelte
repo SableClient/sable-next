@@ -3,6 +3,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
 
   import { canSendState } from './permission-groups';
@@ -65,30 +66,27 @@
 </script>
 
 {#if published !== null}
-  <li class="settings-row">
-    <div class="settings-row-copy">
-      <span class="settings-row-name">{$i18n.t('room.publishTitle')}</span>
-      <p>
-        {room?.is_space ? $i18n.t('room.publishSpaceHint') : $i18n.t('room.publishRoomHint')}
-      </p>
-    </div>
-    <div class="settings-row-control">
-      {#if canEdit}
-        <Switch
-          label={$i18n.t('room.publishTitle')}
-          checked={published}
-          disabled={saving}
-          onCheckedChange={(next: boolean) => {
-            void toggle(next);
-          }}
-        />
-      {:else}
-        <span class="value">
-          {published ? $i18n.t('room.publishOn') : $i18n.t('room.publishOff')}
-        </span>
-      {/if}
-    </div>
-  </li>
+  <SettingsRow
+    title={$i18n.t('room.publishTitle')}
+    description={room?.is_space
+      ? $i18n.t('room.publishSpaceHint')
+      : $i18n.t('room.publishRoomHint')}
+  >
+    {#if canEdit}
+      <Switch
+        label={$i18n.t('room.publishTitle')}
+        checked={published}
+        disabled={saving}
+        onCheckedChange={(next: boolean) => {
+          void toggle(next);
+        }}
+      />
+    {:else}
+      <span class="value">
+        {published ? $i18n.t('room.publishOn') : $i18n.t('room.publishOff')}
+      </span>
+    {/if}
+  </SettingsRow>
 {/if}
 
 <style>

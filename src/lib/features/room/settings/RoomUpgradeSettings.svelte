@@ -11,6 +11,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
@@ -147,56 +148,47 @@
 
 <SettingsSection headingId="room-settings-upgrade" title={$i18n.t('room.settingsAdvanced')}>
   <ul class="settings-rows">
-    <li class="settings-row">
-      <div class="settings-row-copy">
-        <span class="settings-row-name">
-          {isSpace ? $i18n.t('room.upgradeSpaceTitle') : $i18n.t('room.upgradeRoomTitle')}
-        </span>
-        <p>
-          {replacement
-            ? (tombstoneBody ??
-              (isSpace
-                ? $i18n.t('room.upgradeReplacedSpace')
-                : $i18n.t('room.upgradeReplacedRoom')))
-            : $i18n.t('room.upgradeCurrentVersion', { version: version ?? '?' })}
-        </p>
-      </div>
-      <div class="settings-row-control">
-        {#if predecessor}
-          {@const old = predecessor}
-          <Button
-            size="small"
-            variant="secondary"
-            onclick={() => {
-              openRoom(old);
-            }}
-          >
-            {isSpace ? $i18n.t('room.upgradeOldSpace') : $i18n.t('room.upgradeOldRoom')}
-          </Button>
-        {/if}
-        {#if replacement}
-          {@const next = replacement}
-          <Button
-            size="small"
-            onclick={() => {
-              openRoom(next);
-            }}
-          >
-            {isSpace ? $i18n.t('room.upgradeOpenSpace') : $i18n.t('room.upgradeOpenRoom')}
-          </Button>
-        {:else}
-          <Button
-            size="small"
-            disabled={!canUpgrade}
-            onclick={() => {
-              void openDialog();
-            }}
-          >
-            {$i18n.t('room.upgradeAction')}
-          </Button>
-        {/if}
-      </div>
-    </li>
+    <SettingsRow
+      title={isSpace ? $i18n.t('room.upgradeSpaceTitle') : $i18n.t('room.upgradeRoomTitle')}
+      description={replacement
+        ? (tombstoneBody ??
+          (isSpace ? $i18n.t('room.upgradeReplacedSpace') : $i18n.t('room.upgradeReplacedRoom')))
+        : $i18n.t('room.upgradeCurrentVersion', { version: version ?? '?' })}
+    >
+      {#if predecessor}
+        {@const old = predecessor}
+        <Button
+          size="small"
+          variant="secondary"
+          onclick={() => {
+            openRoom(old);
+          }}
+        >
+          {isSpace ? $i18n.t('room.upgradeOldSpace') : $i18n.t('room.upgradeOldRoom')}
+        </Button>
+      {/if}
+      {#if replacement}
+        {@const next = replacement}
+        <Button
+          size="small"
+          onclick={() => {
+            openRoom(next);
+          }}
+        >
+          {isSpace ? $i18n.t('room.upgradeOpenSpace') : $i18n.t('room.upgradeOpenRoom')}
+        </Button>
+      {:else}
+        <Button
+          size="small"
+          disabled={!canUpgrade}
+          onclick={() => {
+            void openDialog();
+          }}
+        >
+          {$i18n.t('room.upgradeAction')}
+        </Button>
+      {/if}
+    </SettingsRow>
   </ul>
 </SettingsSection>
 

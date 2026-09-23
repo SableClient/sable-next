@@ -8,6 +8,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -160,40 +161,35 @@
   {#if aliases.length > 0}
     <ul class="settings-rows">
       {#each aliases as alias (alias)}
-        <li class="settings-row">
-          <div class="settings-row-copy">
-            <span class="settings-row-name">{alias}</span>
-          </div>
-          <div class="settings-row-control">
-            {#if alias === canonical}
-              <StatusBadge variant="primary" label={$i18n.t('room.addressesMain')} />
-            {:else if canEdit}
-              <Button
-                size="small"
-                variant="secondary"
-                disabled={busy}
-                onclick={() => {
-                  void setMain(alias);
-                }}
-              >
-                {$i18n.t('room.addressesSetMain')}
-              </Button>
-            {/if}
-            {#if canEdit}
-              <IconButton
-                variant="subtle"
-                size="small"
-                label={$i18n.t('room.addressesRemove', { alias })}
-                disabled={busy}
-                onclick={() => {
-                  pendingRemoval = alias;
-                }}
-              >
-                <TrashIcon />
-              </IconButton>
-            {/if}
-          </div>
-        </li>
+        <SettingsRow title={alias}>
+          {#if alias === canonical}
+            <StatusBadge variant="primary" label={$i18n.t('room.addressesMain')} />
+          {:else if canEdit}
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={busy}
+              onclick={() => {
+                void setMain(alias);
+              }}
+            >
+              {$i18n.t('room.addressesSetMain')}
+            </Button>
+          {/if}
+          {#if canEdit}
+            <IconButton
+              variant="subtle"
+              size="small"
+              label={$i18n.t('room.addressesRemove', { alias })}
+              disabled={busy}
+              onclick={() => {
+                pendingRemoval = alias;
+              }}
+            >
+              <TrashIcon />
+            </IconButton>
+          {/if}
+        </SettingsRow>
       {/each}
     </ul>
   {:else}

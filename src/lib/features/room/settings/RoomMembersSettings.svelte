@@ -14,6 +14,7 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import MemberIdentityRow from '../MemberIdentityRow.svelte';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -232,71 +233,71 @@
     >
       <ul class="settings-rows">
         {#each shown as member (member.user_id)}
-          <li class="settings-row">
-            <MemberIdentityRow class="member" userId={member.user_id} members={shown}>
-              {#snippet trailing()}
-                <span class="user-id">{member.user_id}</span>
-              {/snippet}
-            </MemberIdentityRow>
-            <div class="settings-row-control">
-              {#if tab === 'ban'}
-                {#if permissions?.can_ban}
-                  <Button
-                    size="small"
-                    variant="secondary"
-                    disabled={busy === member.user_id}
-                    onclick={() => {
-                      const target = roomId;
-                      if (target)
-                        void act(member.user_id, () =>
-                          core.commands.unbanUser(target, member.user_id)
-                        );
-                    }}
-                  >
-                    {$i18n.t('timeline.profileUnban')}
-                  </Button>
-                {/if}
-              {:else}
-                {#if canSetPower && !outranked(member)}
-                  <Select
-                    value={String(member.power_level)}
-                    aria-label={$i18n.t('timeline.profileChangePower')}
-                    disabled={busy === member.user_id}
-                    items={powerOptions(member)}
-                    onValueChange={(next: string) => {
-                      setPower(member, Number(next));
-                    }}
-                  />
-                {:else}
-                  <span class="power">{powerLabel(member.power_level)}</span>
-                {/if}
-                {#if permissions?.can_kick && !outranked(member)}
-                  <Button
-                    size="small"
-                    variant="secondary"
-                    disabled={busy === member.user_id}
-                    onclick={() => {
-                      openModeration(member.user_id, 'kick');
-                    }}
-                  >
-                    {$i18n.t('timeline.profileKick')}
-                  </Button>
-                {/if}
-                {#if permissions?.can_ban && !outranked(member)}
-                  <Button
-                    size="small"
-                    variant="danger"
-                    disabled={busy === member.user_id}
-                    onclick={() => {
-                      openModeration(member.user_id, 'ban');
-                    }}
-                  >
-                    {$i18n.t('timeline.profileBan')}
-                  </Button>
-                {/if}
+          <SettingsRow>
+            {#snippet copy()}
+              <MemberIdentityRow userId={member.user_id} members={shown}>
+                {#snippet trailing()}
+                  <span class="user-id">{member.user_id}</span>
+                {/snippet}
+              </MemberIdentityRow>
+            {/snippet}
+            {#if tab === 'ban'}
+              {#if permissions?.can_ban}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={busy === member.user_id}
+                  onclick={() => {
+                    const target = roomId;
+                    if (target)
+                      void act(member.user_id, () =>
+                        core.commands.unbanUser(target, member.user_id)
+                      );
+                  }}
+                >
+                  {$i18n.t('timeline.profileUnban')}
+                </Button>
               {/if}
-            </div>
-          </li>
+            {:else}
+              {#if canSetPower && !outranked(member)}
+                <Select
+                  value={String(member.power_level)}
+                  aria-label={$i18n.t('timeline.profileChangePower')}
+                  disabled={busy === member.user_id}
+                  items={powerOptions(member)}
+                  onValueChange={(next: string) => {
+                    setPower(member, Number(next));
+                  }}
+                />
+              {:else}
+                <span class="power">{powerLabel(member.power_level)}</span>
+              {/if}
+              {#if permissions?.can_kick && !outranked(member)}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  disabled={busy === member.user_id}
+                  onclick={() => {
+                    openModeration(member.user_id, 'kick');
+                  }}
+                >
+                  {$i18n.t('timeline.profileKick')}
+                </Button>
+              {/if}
+              {#if permissions?.can_ban && !outranked(member)}
+                <Button
+                  size="small"
+                  variant="danger"
+                  disabled={busy === member.user_id}
+                  onclick={() => {
+                    openModeration(member.user_id, 'ban');
+                  }}
+                >
+                  {$i18n.t('timeline.profileBan')}
+                </Button>
+              {/if}
+            {/if}
+          </SettingsRow>
         {/each}
       </ul>
     </SettingsSection>
@@ -380,11 +381,6 @@
     margin: 0;
     padding: var(--space-400) 0;
     text-align: center;
-  }
-
-  .settings-row :global(.member-identity-row.member) {
-    flex: 1;
-    min-width: 0;
   }
 
   .user-id {
