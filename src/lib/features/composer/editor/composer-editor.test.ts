@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
 import { Fragment, Slice } from 'prosemirror-model';
-import { Selection, TextSelection } from 'prosemirror-state';
+import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -413,8 +413,13 @@ function press(
   view(editor).someProp('handleKeyDown', (handler) => handler(view(editor), event));
 }
 
-function pressSurface(key: string): KeyboardEvent {
-  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+function pressSurface(key: string, modifiers: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...modifiers,
+  });
   surface().dispatchEvent(event);
   return event;
 }
@@ -1321,7 +1326,19 @@ describe('arrow keys at the edge of the document', () => {
     expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
   });
 
-  test('a selection is never claimed, so shift-selecting still reaches the browser', () => {
+  test('a selection away from the edges is left to the browser', () => {
+    const editor = open();
+    editor.setText('abc');
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, 2, 3))
+    );
+
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(false);
+  });
+
+  test('left on a selection that touches the start collapses it there', () => {
     const editor = open();
     editor.setText('ab');
     const editorView = view(editor);
@@ -1329,8 +1346,60 @@ describe('arrow keys at the edge of the document', () => {
       editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, 1, 2))
     );
 
-    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(false);
     expect(pressSurface('ArrowRight').defaultPrevented).toBe(false);
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(true);
+    expect(editorView.state.selection.empty).toBe(true);
+    expect(editorView.state.selection.from).toBe(1);
+  });
+
+  test('shift-selecting is claimed only once the head reaches the edge', () => {
+    const editor = open();
+    editor.setText('ab');
+    const editorView = view(editor);
+    const { doc } = editorView.state;
+
+    editorView.dispatch(editorView.state.tr.setSelection(TextSelection.create(doc, 1, 2)));
+    expect(pressSurface('ArrowLeft', { shiftKey: true }).defaultPrevented).toBe(false);
+
+    editorView.dispatch(editorView.state.tr.setSelection(TextSelection.create(doc, 2, 1)));
+    expect(pressSurface('ArrowLeft', { shiftKey: true }).defaultPrevented).toBe(true);
+    expect(editorView.state.selection.anchor).toBe(2);
+  });
+
+  test('modified arrows are claimed at the edge too', () => {
+    const editor = open();
+    editor.setText('ab');
+    caretAt(editor, 'start');
+
+    expect(pressSurface('ArrowLeft', { ctrlKey: true }).defaultPrevented).toBe(true);
+    expect(pressSurface('ArrowLeft', { altKey: true }).defaultPrevented).toBe(true);
+    expect(pressSurface('ArrowLeft', { metaKey: true }).defaultPrevented).toBe(true);
+
+    caretAt(editor, 'end');
+    expect(pressSurface('ArrowRight', { ctrlKey: true }).defaultPrevented).toBe(true);
+  });
+
+  test('the edge is claimed while an IME composition is open', () => {
+    const editor = open();
+    editor.setText('ab');
+    caretAt(editor, 'end');
+    surface().dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+
+    expect(view(editor).composing).toBe(true);
+    expect(pressSurface('ArrowRight').defaultPrevented).toBe(true);
+  });
+
+  test('a node selected at the edge is claimed and collapses beside it', () => {
+    const editor = open();
+    editor.setText('');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@a:x', name: 'A' }));
+    const editorView = view(editor);
+    const { doc } = editorView.state;
+
+    editorView.dispatch(editorView.state.tr.setSelection(NodeSelection.create(doc, 1)));
+    expect(pressSurface('ArrowLeft').defaultPrevented).toBe(true);
+    expect(editorView.state.selection).toBeInstanceOf(TextSelection);
+    expect(editorView.state.selection.from).toBe(1);
   });
 
   test('the start of a code block that opens the document counts as the start', () => {

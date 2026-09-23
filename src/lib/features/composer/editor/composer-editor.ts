@@ -377,12 +377,33 @@ const URL_ONLY = /^(?:https?:\/\/|mailto:)\S+$/;
 
 const PILL_SPACE = 'pillSpace';
 
-function atDocumentEdge(direction: 'left' | 'right' | 'up' | 'down'): Command {
+function documentEdgeGuard(): Plugin {
+  return new Plugin({
+    props: {
+      handleDOMEvents: {
+        keydown: (view, event) => {
+          const left = event.key === 'ArrowLeft';
+          if (!left && event.key !== 'ArrowRight') return false;
+          const { selection, doc } = view.state;
+          const edge = left ? Selection.atStart(doc) : Selection.atEnd(doc);
+          const edgePos = left ? edge.from : edge.to;
+          if ((left ? selection.from : selection.to) !== edgePos) return false;
+          if (event.shiftKey && selection.head !== edgePos) return false;
+          event.preventDefault();
+          if (!event.shiftKey && !selection.eq(edge)) {
+            view.dispatch(view.state.tr.setSelection(edge));
+          }
+          return true;
+        },
+      },
+    },
+  });
+}
+
+function atDocumentEdge(direction: 'up' | 'down'): Command {
   return (state, _dispatch, view) => {
     if (!state.selection.empty || !view) return false;
     const { $from } = state.selection;
-    if (direction === 'left') return $from.pos === Selection.atStart(state.doc).from;
-    if (direction === 'right') return $from.pos === Selection.atEnd(state.doc).to;
     const edgeBlock =
       direction === 'up' ? $from.index(0) === 0 : $from.index(0) === state.doc.childCount - 1;
     return edgeBlock && view.endOfTextblock(direction);
@@ -492,6 +513,7 @@ export class ComposerEditor {
 
     return [
       history(),
+      documentEdgeGuard(),
       queryPlugin(),
       inputRules({
         rules: [shortcodeInputRule(this.options.emotes), ...(rich ? formattingInputRules : [])],
@@ -527,8 +549,6 @@ export class ComposerEditor {
           this.options.onNavigate('ArrowUp') || atDocumentEdge('up')(state, dispatch, view),
         ArrowDown: (state, dispatch, view) =>
           this.options.onNavigate('ArrowDown') || atDocumentEdge('down')(state, dispatch, view),
-        ArrowLeft: atDocumentEdge('left'),
-        ArrowRight: atDocumentEdge('right'),
         'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
         'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
         Tab: (state, dispatch, view) =>
