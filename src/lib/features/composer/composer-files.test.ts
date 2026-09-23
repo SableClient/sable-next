@@ -1,23 +1,10 @@
 import { expect, test } from 'vitest';
 
-import {
-  canSpoiler,
-  filesFrom,
-  formatSize,
-  stageFiles,
-  toggleSpoiler,
-  unstageFile,
-} from './composer-files';
+import { canSpoiler, filesFrom, stageFiles, toggleSpoiler, unstageFile } from './composer-files';
 
 function file(name: string): File {
   return new File(['x'], name, { type: 'image/png' });
 }
-
-test('sizes read in the largest unit that keeps a whole number', () => {
-  expect(formatSize(512)).toBe('512 B');
-  expect(formatSize(2048)).toBe('2 KB');
-  expect(formatSize(1_500_000)).toBe('1.4 MB');
-});
 
 test('a transfer without files yields nothing', () => {
   expect(filesFrom(null)).toEqual([]);

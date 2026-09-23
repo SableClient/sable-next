@@ -29,6 +29,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
@@ -54,7 +55,6 @@
   import { clearDraft, readDraft, writeDraft } from './composer-drafts.svelte';
   import {
     filesFrom,
-    formatSize,
     stageFiles,
     toggleSpoiler,
     unstageFile,
@@ -705,7 +705,7 @@
     if (tooLarge) {
       error = $i18n.t('composer.tooLarge', {
         name: tooLarge.name,
-        limit: formatSize(maxAttachmentBytes),
+        limit: formatByteSize(maxAttachmentBytes),
       });
       return;
     }
@@ -715,7 +715,7 @@
       0
     );
     if (total > maxAttachmentBytes) {
-      error = $i18n.t('composer.batchTooLarge', { limit: formatSize(maxAttachmentBytes) });
+      error = $i18n.t('composer.batchTooLarge', { limit: formatByteSize(maxAttachmentBytes) });
       return;
     }
 

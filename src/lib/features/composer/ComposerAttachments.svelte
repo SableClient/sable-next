@@ -6,9 +6,10 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
-  import { canSpoiler, formatSize, type StagedFile } from './composer-files';
+  import { canSpoiler, type StagedFile } from './composer-files';
 
   interface Props {
     files: readonly StagedFile[];
@@ -34,7 +35,7 @@
       </span>
       <span class="staged-text">
         <span class="staged-name">{item.file.name}</span>
-        <span class="staged-size">{formatSize(item.file.size)}</span>
+        <span class="staged-size">{formatByteSize(item.file.size)}</span>
       </span>
       {#if canSpoiler(item.file)}
         <IconButton
