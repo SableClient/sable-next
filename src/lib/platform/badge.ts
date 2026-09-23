@@ -1,13 +1,16 @@
-import { isTauri } from '@tauri-apps/api/core';
+import { invoke, isTauri } from '@tauri-apps/api/core';
 
-export type BadgeStrategy = 'tauri-window' | 'web-app-badge' | 'none';
+export type BadgeStrategy = 'tauri-window' | 'tauri-tray' | 'web-app-badge' | 'none';
 
 export function pickBadgeStrategy(
   runningInTauri: boolean,
   os: string,
   hasWebBadge: boolean
 ): BadgeStrategy {
-  if (runningInTauri) return os === 'android' || os === 'ios' ? 'none' : 'tauri-window';
+  if (runningInTauri) {
+    if (os === 'android' || os === 'ios') return 'none';
+    return os === 'linux' ? 'tauri-tray' : 'tauri-window';
+  }
   return hasWebBadge ? 'web-app-badge' : 'none';
 }
 
@@ -22,12 +25,16 @@ export async function setUnreadBadge(count: number): Promise<void> {
   }
 
   const { type } = await import('@tauri-apps/plugin-os');
-  if (pickBadgeStrategy(true, type(), false) !== 'tauri-window') return;
+  const strategy = pickBadgeStrategy(true, type(), false);
 
   try {
-    const { getCurrentWindow } = await import('@tauri-apps/api/window');
-    await getCurrentWindow().setBadgeCount(value ?? undefined);
+    if (strategy === 'tauri-tray') {
+      await invoke('set_tray_unread', { unread: value !== null });
+    } else if (strategy === 'tauri-window') {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      await getCurrentWindow().setBadgeCount(value ?? undefined);
+    }
   } catch (error) {
-    console.debug('[sable badge] setBadgeCount unsupported', error);
+    console.debug('[sable badge] badge not updated', error);
   }
 }

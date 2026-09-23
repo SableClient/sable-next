@@ -466,6 +466,13 @@ fn apply_desktop_window_settings(
 }
 
 #[cfg(desktop)]
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+fn set_tray_unread(app: AppHandle<BrowserEngine>, unread: bool) -> Result<(), String> {
+    tray::set_unread_dot(&app, unread).map_err(|error| error.to_string())
+}
+
+#[cfg(desktop)]
 fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::WindowEvent) {
     let tauri::WindowEvent::CloseRequested { api, .. } = event else {
         return;
@@ -668,6 +675,8 @@ pub fn run() {
             set_notification_encrypted_content,
             #[cfg(desktop)]
             apply_desktop_window_settings,
+            #[cfg(desktop)]
+            set_tray_unread,
             share_inbox::share_inbox_drain,
             share_inbox::share_inbox_read,
             share_inbox::share_inbox_clear,

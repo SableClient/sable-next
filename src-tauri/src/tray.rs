@@ -1,6 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::{Deserialize, Serialize};
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
@@ -12,6 +13,7 @@ pub const MAIN_TRAY_ID: &str = "main";
 pub const WINDOW_HIDDEN_TO_TRAY_EVENT: &str = "window-hidden-to-tray";
 const TRAY_MENU_SHOW_ID: &str = "tray_show";
 const TRAY_MENU_QUIT_ID: &str = "tray_quit";
+const UNREAD_DOT: [u8; 4] = [224, 45, 45, 255];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +33,7 @@ pub struct DesktopWindowStore {
     close_to_tray: AtomicBool,
     show_system_tray_icon: AtomicBool,
     tray_available: AtomicBool,
+    unread_dot: AtomicBool,
 }
 
 impl Default for DesktopWindowStore {
@@ -39,6 +42,7 @@ impl Default for DesktopWindowStore {
             close_to_tray: AtomicBool::new(false),
             show_system_tray_icon: AtomicBool::new(true),
             tray_available: AtomicBool::new(false),
+            unread_dot: AtomicBool::new(false),
         }
     }
 }
@@ -101,6 +105,42 @@ pub fn apply<R: Runtime>(
     Ok(DesktopWindowState {
         tray_available: available,
     })
+}
+
+pub fn set_unread_dot<R: Runtime>(app: &AppHandle<R>, shown: bool) -> tauri::Result<()> {
+    let store = app.state::<DesktopWindowStore>();
+    if store.unread_dot.swap(shown, Ordering::Relaxed) == shown {
+        return Ok(());
+    }
+    let Some(tray) = app.tray_by_id(MAIN_TRAY_ID) else {
+        return Ok(());
+    };
+    tray.set_icon(tray_icon(app, shown))
+}
+
+fn tray_icon<R: Runtime>(app: &AppHandle<R>, unread: bool) -> Option<Image<'static>> {
+    let base = app.default_window_icon()?;
+    Some(if unread {
+        with_unread_dot(base)
+    } else {
+        base.clone().to_owned()
+    })
+}
+
+fn with_unread_dot(base: &Image<'_>) -> Image<'static> {
+    let (width, height) = (base.width(), base.height());
+    let (w, h) = (f64::from(width), f64::from(height));
+    let radius = w.min(h) * 0.2;
+    let (cx, cy) = (w - radius - w * 0.04, h - radius - h * 0.04);
+
+    let mut rgba = base.rgba().to_vec();
+    let positions = (0..height).flat_map(|y| (0..width).map(move |x| (x, y)));
+    for (pixel, (x, y)) in rgba.as_chunks_mut::<4>().0.iter_mut().zip(positions) {
+        if (f64::from(x) + 0.5 - cx).hypot(f64::from(y) + 0.5 - cy) <= radius {
+            pixel.copy_from_slice(&UNREAD_DOT);
+        }
+    }
+    Image::new_owned(rgba, width, height)
 }
 
 fn apply_title_bar<R: Runtime>(app: &AppHandle<R>, custom: bool) -> tauri::Result<()> {
@@ -225,8 +265,12 @@ fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             }),
     );
 
-    if let Some(icon) = app.default_window_icon() {
-        builder = builder.icon(icon.clone());
+    let unread = app
+        .state::<DesktopWindowStore>()
+        .unread_dot
+        .load(Ordering::Relaxed);
+    if let Some(icon) = tray_icon(app, unread) {
+        builder = builder.icon(icon);
     }
 
     #[cfg(target_os = "linux")]
@@ -249,5 +293,16 @@ mod tests {
             can_restore_from_background(false),
             cfg!(target_os = "macos")
         );
+    }
+
+    #[test]
+    fn the_unread_dot_sits_bottom_right_and_keeps_the_size() {
+        let base = Image::new_owned(vec![0; 32 * 32 * 4], 32, 32);
+        let dotted = with_unread_dot(&base);
+
+        assert_eq!((dotted.width(), dotted.height()), (32, 32));
+        let at = |x: usize, y: usize| &dotted.rgba()[(y * 32 + x) * 4..][..4];
+        assert_eq!(at(25, 25), &UNREAD_DOT);
+        assert_eq!(at(0, 0), &[0, 0, 0, 0]);
     }
 }
