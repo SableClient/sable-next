@@ -18,9 +18,7 @@
   let { roomId, eventId, name, class: className, children, trailing }: Props = $props();
   const roomList = useRoomList();
 
-  let avatarUrl = $derived(
-    roomList.rooms.find((room) => room.room_id === roomId)?.avatar_url ?? null
-  );
+  let avatarUrl = $derived(roomList.byId(roomId)?.avatar_url ?? null);
 </script>
 
 <li class={className}>

@@ -75,7 +75,7 @@
   );
 
   function roomName(item: InboxItemView): string {
-    return roomList.rooms.find((room) => room.room_id === item.room_id)?.name ?? item.room_id;
+    return roomList.labelFor(item.room_id);
   }
 
   function sender(item: InboxItemView): string {

@@ -38,6 +38,10 @@ export function roomPathParam(room: RoomSummary): string {
   return roomPathParamFromId(roomPathId(room));
 }
 
+export function roomLabel(room: RoomSummary): string {
+  return room.name ?? room.canonical_alias ?? room.room_id;
+}
+
 export function findRoomByPathId(
   rooms: readonly RoomSummary[],
   pathId: string | undefined
@@ -72,7 +76,19 @@ export class RoomList {
   private presentationActive = true;
   private live = false;
 
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
+  private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
+
   constructor(private readonly core: CoreClient) {}
+
+  byId(roomId: string | null | undefined): RoomSummary | undefined {
+    return roomId === null || roomId === undefined ? undefined : this.roomsById.get(roomId);
+  }
+
+  labelFor(roomId: string): string {
+    const room = this.byId(roomId);
+    return room ? roomLabel(room) : roomId;
+  }
 
   setPresentationActive(active: boolean): void {
     this.presentationActive = active;

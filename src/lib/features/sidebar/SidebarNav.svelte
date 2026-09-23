@@ -72,9 +72,7 @@
       spaces.map((space) => space.room_id)
     )
   );
-  let callRoom = $derived(
-    call.roomId === null ? undefined : roomList.rooms.find((room) => room.room_id === call.roomId)
-  );
+  let callRoom = $derived(roomList.byId(call.roomId));
   let spaceUnread = $derived(
     spaceUnreadCounts(spaces, roomList.rooms, roomList.notificationModeOf)
   );
@@ -153,12 +151,7 @@
   }
 
   function folderLabel(folder: SidebarFolder): string {
-    return (
-      folderName(
-        folder,
-        (roomId) => roomList.rooms.find((room) => room.room_id === roomId)?.name ?? null
-      ) ?? ''
-    );
+    return folderName(folder, (roomId) => roomList.byId(roomId)?.name ?? null) ?? '';
   }
 
   const railProps = {

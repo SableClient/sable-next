@@ -69,11 +69,7 @@
 
   let favourite = $derived(pendingTags.get('favourite') ?? room.tags.includes('favourite'));
   let lowPriority = $derived(pendingTags.get('low_priority') ?? room.tags.includes('low_priority'));
-  let parentSpace = $derived(
-    parentSpaceId === null
-      ? null
-      : (roomList.rooms.find((candidate) => candidate.room_id === parentSpaceId) ?? null)
-  );
+  let parentSpace = $derived(roomList.byId(parentSpaceId) ?? null);
   let addableSpaces = $derived(
     roomList.rooms.filter(
       (candidate) =>

@@ -63,18 +63,13 @@
     return chosen.some((entry) => packAddressEqual(entry, address(pack)));
   }
 
-  function roomName(roomId: string): string {
-    const room = roomList.rooms.find((candidate) => candidate.room_id === roomId);
-    return room?.name ?? room?.canonical_alias ?? roomId;
-  }
-
   let byRoom = $derived(
     Object.entries(
       roomPacks.reduce<Record<string, ImagePackView[]>>((grouped, pack) => {
         const roomId = pack.room_id ?? '';
         return { ...grouped, [roomId]: [...(grouped[roomId] ?? []), pack] };
       }, {})
-    ).sort(([left], [right]) => roomName(left).localeCompare(roomName(right)))
+    ).sort(([left], [right]) => roomList.labelFor(left).localeCompare(roomList.labelFor(right)))
   );
 
   $effect(() => {
@@ -204,7 +199,7 @@
           {#each byRoom as [roomId, roomsPacks] (roomId)}
             <div class="room-group">
               <div class="room-heading">
-                <span>{roomName(roomId)}</span>
+                <span>{roomList.labelFor(roomId)}</span>
                 <div class="room-actions">
                   <Button
                     size="small"

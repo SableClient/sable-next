@@ -1,12 +1,11 @@
 <script lang="ts">
-  import type { RoomSummary } from '#src/generated/protocol';
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions, isDeclining } from '#lib/rooms/invites.svelte.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
@@ -22,10 +21,6 @@
   let invites = $derived(
     pendingInvites(roomList.rooms).filter((invite) => !isDeclining(invite.room_id))
   );
-
-  function roomName(room: RoomSummary): string {
-    return room.name ?? room.canonical_alias ?? room.room_id;
-  }
 </script>
 
 {#if invites.length > 0}
@@ -36,7 +31,7 @@
     </h2>
     <ul>
       {#each invites as invite (invite.room_id)}
-        {@const name = roomName(invite)}
+        {@const name = roomLabel(invite)}
         {@const from = inviter(invite)}
         {@const busy = answers.isAnswering(invite.room_id)}
         <li class="card">

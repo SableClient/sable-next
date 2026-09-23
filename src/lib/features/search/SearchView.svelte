@@ -141,11 +141,11 @@
   function chipLabel(chip: SearchToken): string {
     if (chip.operator === 'in') {
       const roomId = resolveRoomTarget(roomList.rooms, chip.value);
-      return roomId === undefined ? chip.value : roomName(roomId);
+      return roomId === undefined ? chip.value : roomList.labelFor(roomId);
     }
     if (chip.operator === 'space') {
       const spaceId = resolveSpaceTarget(roomList.rooms, chip.value);
-      return spaceId === undefined ? chip.value : roomName(spaceId);
+      return spaceId === undefined ? chip.value : roomList.labelFor(spaceId);
     }
     return chip.value;
   }
@@ -233,11 +233,6 @@
       event.preventDefault();
       accept(suggestions[activeSuggestion]);
     }
-  }
-
-  function roomName(roomId: string): string {
-    const room = roomList.rooms.find((entry) => entry.room_id === roomId);
-    return room?.name ?? room?.canonical_alias ?? roomId;
   }
 
   function onInput(event: Event & { currentTarget: HTMLInputElement }): void {
@@ -481,7 +476,7 @@
         <p class="count">{$i18n.t('search.count', { count: search.hits.length })}</p>
         {#each search.groups as group (group.key)}
           <section class="group">
-            <h2>{roomName(group.roomId)}</h2>
+            <h2>{roomList.labelFor(group.roomId)}</h2>
             <ul class="hit-list">
               {#each group.hits as hit (hit.event_id)}
                 {@const snippet = snippetAround(hit.body, terms)}

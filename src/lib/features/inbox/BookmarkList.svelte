@@ -7,7 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { useBookmarks } from '#lib/features/room/bookmarks.svelte.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -34,7 +34,8 @@
   let visible = $derived(filteredBookmarks(bookmarks.entries, query));
 
   function roomName(roomId: string, fallback: string | null): string {
-    return roomList.rooms.find((room) => room.room_id === roomId)?.name ?? fallback ?? roomId;
+    const room = roomList.byId(roomId);
+    return room ? roomLabel(room) : (fallback ?? roomId);
   }
 
   async function toggle(bookmark: BookmarkView): Promise<boolean> {

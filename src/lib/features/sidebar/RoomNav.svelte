@@ -13,6 +13,7 @@
   import { i18n } from '#lib/i18n.js';
   import {
     findRoomByPathId,
+    roomLabel,
     roomPathParam,
     roomPathParamFromId,
     useRoomList,
@@ -184,10 +185,8 @@
   }
 
   // Held by id so the dialogs follow the live summary.
-  let settingsRoom = $derived(
-    roomList.rooms.find((room) => room.room_id === settingsRoomId) ?? null
-  );
-  let leaveRoom = $derived(roomList.rooms.find((room) => room.room_id === leaveRoomId) ?? null);
+  let settingsRoom = $derived(roomList.byId(settingsRoomId) ?? null);
+  let leaveRoom = $derived(roomList.byId(leaveRoomId) ?? null);
 
   type RoomNavRow = {
     room?: RoomSummary;
@@ -359,10 +358,6 @@
     }
 
     return items;
-  }
-
-  function roomName(room: RoomSummary) {
-    return room.name ?? room.room_id;
   }
 
   function roomHref(row: RoomNavRow) {
@@ -729,7 +724,7 @@
         <div class="room-list" class:collapsed>
           {#each visibleRooms as item (item.key)}
             {#if item.kind === 'category'}
-              {@const name = roomName(item.room)}
+              {@const name = roomLabel(item.room)}
               {@const isClosed = closedCategories.has(item.key)}
               <div class="room-row-wrap">
                 {#snippet categoryTrigger({ props }: { props: Record<string, unknown> })}
@@ -774,7 +769,7 @@
               </div>
             {:else if isRoom(item)}
               {@const room = item.room}
-              {@const name = room ? roomName(room) : item.roomId}
+              {@const name = room ? roomLabel(room) : item.roomId}
               {@const href = roomHref(item)}
               {@const active = page.url.pathname === href}
               {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}

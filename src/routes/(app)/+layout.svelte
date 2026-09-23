@@ -163,9 +163,7 @@
       cancelled = true;
     };
   });
-  let incomingRoom = $derived(
-    incoming ? roomList.rooms.find((room) => room.room_id === incoming.roomId) : undefined
-  );
+  let incomingRoom = $derived(incoming ? roomList.byId(incoming.roomId) : undefined);
 
   $effect(() => {
     if (core.status !== 'ready') return;
@@ -261,7 +259,7 @@
     if (!preferences.outgoingRingback) return;
     if (callSession.lifecycle !== 'active') return;
     if (callSession.transport.participants.length > 0) return;
-    if (!roomList.rooms.find((room) => room.room_id === callSession.roomId)?.is_direct) return;
+    if (!roomList.byId(callSession.roomId)?.is_direct) return;
 
     const ringback = startRingback(ringtoneVolume(preferences.callRingtoneVolume));
     return () => {
@@ -623,7 +621,7 @@
         if (target) jumpToRoom(target);
       },
       'room.markRead': () => {
-        const room = roomList.rooms.find((candidate) => candidate.room_id === openRoomId);
+        const room = roomList.byId(openRoomId);
         markRoomsRead([room], core.commands, readReceiptIsPrivate());
       },
       'room.markAllRead': () => {

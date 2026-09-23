@@ -103,7 +103,7 @@
         } catch (error) {
           console.debug('[sable room] inherited abbreviations unavailable', error);
         }
-        const space = roomList.rooms.find((candidate) => candidate.room_id === spaceId);
+        const space = roomList.byId(spaceId);
         return { spaceId, spaceName: space?.name ?? spaceId, entries: list };
       })
     ).then((groups) => {

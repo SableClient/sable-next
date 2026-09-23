@@ -385,3 +385,23 @@ test('a muted room that drops out of a reset and returns stays muted', async () 
   });
   roomList.stop();
 });
+
+test('looks rooms up by id and labels them by name, then alias, then id', () => {
+  const roomList = new RoomList({} as CoreClient);
+  roomList.rooms = [
+    { room_id: '!named:example.org', name: 'Named', canonical_alias: '#named:example.org' },
+    { room_id: '!aliased:example.org', name: null, canonical_alias: '#aliased:example.org' },
+    { room_id: '!bare:example.org', name: null, canonical_alias: null },
+  ] as RoomSummary[];
+
+  expect(roomList.byId('!aliased:example.org')).toBe(roomList.rooms[1]);
+  expect(roomList.byId('!missing:example.org')).toBeUndefined();
+  expect(roomList.byId(null)).toBeUndefined();
+  expect(roomList.labelFor('!named:example.org')).toBe('Named');
+  expect(roomList.labelFor('!aliased:example.org')).toBe('#aliased:example.org');
+  expect(roomList.labelFor('!bare:example.org')).toBe('!bare:example.org');
+  expect(roomList.labelFor('!missing:example.org')).toBe('!missing:example.org');
+
+  roomList.rooms = [{ room_id: '!missing:example.org', name: 'Arrived' }] as RoomSummary[];
+  expect(roomList.labelFor('!missing:example.org')).toBe('Arrived');
+});

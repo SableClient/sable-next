@@ -46,10 +46,6 @@
     return $i18n.t('room.leaveSpaceChildrenWarningSubspaces', { subspaces });
   });
 
-  function roomName(roomId: string): string {
-    return roomList.rooms.find((candidate) => candidate.room_id === roomId)?.name ?? roomId;
-  }
-
   async function leaveIds(ids: readonly string[]): Promise<string[]> {
     const failures: string[] = [];
     for (const id of ids) {
@@ -57,7 +53,7 @@
         await core.commands.leaveRoom(id);
       } catch (error) {
         console.warn('[sable room] leave failed', error);
-        failures.push(roomName(id));
+        failures.push(roomList.labelFor(id));
       }
     }
     return failures;
