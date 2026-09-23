@@ -4,7 +4,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
 
@@ -66,67 +66,16 @@
   {/if}
 </SettingsRow>
 
-<DialogFrame
-  open={confirming}
-  onOpenChange={(next: boolean) => {
-    confirming = next;
+<ConfirmDialog
+  bind:open={confirming}
+  title={$i18n.t('room.encryptionEnable')}
+  description={$i18n.t('room.encryptionConfirm')}
+  confirmLabel={$i18n.t('room.encryptionEnable')}
+  confirmVariant="secondary"
+  cancelLabel={$i18n.t('room.encryptionCancel')}
+  busy={enabling}
+  error={failed ? $i18n.t('room.encryptionFailed') : null}
+  onConfirm={() => {
+    void enable();
   }}
-  variant="verification"
-  label={$i18n.t('room.encryptionEnable')}
->
-  <div class="confirm">
-    <h2>{$i18n.t('room.encryptionEnable')}</h2>
-    <p>{$i18n.t('room.encryptionConfirm')}</p>
-    {#if failed}
-      <p class="error" role="alert">{$i18n.t('room.encryptionFailed')}</p>
-    {/if}
-    <div class="actions">
-      <Button
-        variant="ghost"
-        disabled={enabling}
-        onclick={() => {
-          confirming = false;
-        }}
-      >
-        {$i18n.t('room.encryptionCancel')}
-      </Button>
-      <Button
-        loading={enabling}
-        onclick={() => {
-          void enable();
-        }}
-      >
-        {$i18n.t('room.encryptionEnable')}
-      </Button>
-    </div>
-  </div>
-</DialogFrame>
-
-<style>
-  .confirm {
-    display: grid;
-    gap: var(--space-400);
-  }
-
-  h2 {
-    font-size: var(--font-size-heading);
-    line-height: var(--line-height-heading);
-    margin: 0;
-  }
-
-  .confirm p {
-    color: var(--surface-var-on-container);
-    margin: 0;
-  }
-
-  .error {
-    color: var(--crit-main);
-    font-size: var(--font-size-small);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
-  }
-</style>
+/>
