@@ -181,11 +181,11 @@
     --profile-avatar-size: var(--avatar-size-large);
     --profile-cover-height: var(--avatar-size-large);
     --profile-bio-lines: 4;
-    --profile-card-ground: var(--bg-container);
-    --profile-panel-ground: var(--surface-container);
+    --profile-card-ground: var(--surface-container);
+    --profile-panel-ground: var(--surface-var-container);
 
     background: var(--profile-card-ground);
-    border: var(--border-width) solid var(--bg-container-line);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     overflow: hidden;
     position: relative;
@@ -196,12 +196,12 @@
     --profile-card-ground: color-mix(
       in oklab,
       var(--profile-hero) var(--profile-tint),
-      var(--bg-container)
+      var(--surface-container)
     );
     --profile-panel-ground: color-mix(
       in oklab,
       var(--profile-hero) var(--profile-tint),
-      var(--surface-container)
+      var(--surface-var-container)
     );
   }
 
