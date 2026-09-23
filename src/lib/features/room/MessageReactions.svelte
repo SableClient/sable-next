@@ -224,8 +224,9 @@
   .reaction :global(.reaction-image) {
     display: block;
     height: 1.125rem;
+    max-width: 9.375rem;
     object-fit: contain;
-    width: auto;
+    width: calc(1.125rem * var(--media-ratio));
   }
 
   .reaction-key {
