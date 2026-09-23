@@ -179,7 +179,7 @@
     </div>
   </div>
 
-  <p class="visually-hidden" role="status">{announcement}</p>
+  <p class="screen-reader-only" role="status">{announcement}</p>
 
   {#if rows.length === 0}
     {#if feed.failed}
@@ -289,15 +289,6 @@
 
   h2:focus {
     outline: none;
-  }
-
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
   }
 
   .filters {

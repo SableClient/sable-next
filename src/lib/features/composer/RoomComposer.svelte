@@ -1051,7 +1051,7 @@
           />
         {/if}
         <div class="composer-measurer" bind:this={measurerEl} aria-hidden="true"></div>
-        <p class="composer-hint" id={hintId}>
+        <p class="screen-reader-only" id={hintId}>
           {preferences.enterForNewline
             ? $i18n.t('composer.hintSendModifier')
             : $i18n.t('composer.hintSend')}
@@ -1282,16 +1282,6 @@
     opacity: 0;
     pointer-events: none;
     position: absolute;
-    width: 1px;
-  }
-
-  .composer-hint {
-    clip-path: inset(50%);
-    height: 1px;
-    margin: 0;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
     width: 1px;
   }
 

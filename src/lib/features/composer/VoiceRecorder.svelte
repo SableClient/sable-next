@@ -186,7 +186,7 @@
       <StopIcon weight="fill" />
     </IconButton>
   {/if}
-  <p class="sr-only" aria-live="polite">{announcement}</p>
+  <p class="screen-reader-only" aria-live="polite">{announcement}</p>
 </div>
 
 <style>
@@ -257,16 +257,6 @@
 
   :global(.voice-send) {
     color: var(--crit-main);
-  }
-
-  .sr-only {
-    clip-path: inset(50%);
-    height: 1px;
-    margin: 0;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
-    width: 1px;
   }
 
   @media (prefers-reduced-motion: no-preference) {

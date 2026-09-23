@@ -98,18 +98,18 @@
     {#if muted}
       <span class="badge" title={$i18n.t('call.muted')}>
         <MicrophoneSlashIcon aria-hidden="true" />
-        <span class="visually-hidden">{$i18n.t('call.muted')}</span>
+        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
       </span>
     {/if}
     {#if quality === 'poor'}
       <span class="badge" title={$i18n.t('call.connectionPoor')}>
         <WifiLowIcon aria-hidden="true" />
-        <span class="visually-hidden">{$i18n.t('call.connectionPoor')}</span>
+        <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
       </span>
     {:else if quality === 'lost'}
       <span class="badge crit" title={$i18n.t('call.connectionLost')}>
         <WifiSlashIcon aria-hidden="true" />
-        <span class="visually-hidden">{$i18n.t('call.connectionLost')}</span>
+        <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
       </span>
     {/if}
     {#if !participant.local}
@@ -245,14 +245,5 @@
 
   .badge.crit {
     color: var(--crit-main);
-  }
-
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
   }
 </style>

@@ -56,7 +56,7 @@
     {#if session.encryptsMedia}
       <span class="encrypted" title={$i18n.t('call.encrypted')}>
         <LockIcon aria-hidden="true" />
-        <span class="visually-hidden">{$i18n.t('call.encrypted')}</span>
+        <span class="screen-reader-only">{$i18n.t('call.encrypted')}</span>
       </span>
     {/if}
   </header>
@@ -144,14 +144,5 @@
     list-style: none;
     margin: 0;
     padding: 0;
-  }
-
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
   }
 </style>

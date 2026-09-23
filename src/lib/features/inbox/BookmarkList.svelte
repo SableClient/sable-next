@@ -77,7 +77,12 @@
 
 <section aria-labelledby={headingId} bind:this={section}>
   <div class="header">
-    <h2 id={headingId} class={{ 'visually-hidden': standalone }} tabindex="-1" bind:this={heading}>
+    <h2
+      id={headingId}
+      class={{ 'screen-reader-only': standalone }}
+      tabindex="-1"
+      bind:this={heading}
+    >
       {$i18n.t('inbox.bookmarks')}
     </h2>
   </div>
@@ -90,7 +95,7 @@
       }}
     >
       <MagnifyingGlassIcon aria-hidden="true" />
-      <span class="visually-hidden">{$i18n.t('inbox.bookmarksSearchLabel')}</span>
+      <span class="screen-reader-only">{$i18n.t('inbox.bookmarksSearchLabel')}</span>
       <TextInput
         type="search"
         bind:value={query}
@@ -182,15 +187,6 @@
     flex: 0 0 auto;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
-  }
-
-  .visually-hidden {
-    block-size: 1px;
-    clip-path: inset(50%);
-    inline-size: 1px;
-    overflow: hidden;
-    position: absolute;
-    white-space: nowrap;
   }
 
   .feed {
