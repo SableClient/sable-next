@@ -9,6 +9,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -259,14 +260,14 @@
   <div class="remove-dialog">
     <h2>{$i18n.t('nav.removeAccountConfirm')}</h2>
     <p>{$i18n.t('nav.removeAccountDescription')}</p>
-    <div class="dialog-actions">
+    <DialogActions>
       <Button variant="ghost" disabled={removing} onclick={() => (removeAccountId = null)}
         >{$i18n.t('settings.cancel')}</Button
       >
       <Button variant="danger" loading={removing} onclick={() => void removeAccount()}
         >{$i18n.t('nav.removeAccount')}</Button
       >
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -375,11 +376,5 @@
   .remove-dialog h2,
   .remove-dialog p {
     margin: 0;
-  }
-
-  .dialog-actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

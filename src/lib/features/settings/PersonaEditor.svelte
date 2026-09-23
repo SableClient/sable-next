@@ -11,6 +11,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
@@ -229,7 +230,7 @@
       </Button>
     </fieldset>
 
-    <div class="actions">
+    <DialogActions>
       <Button
         variant="secondary"
         onclick={() => {
@@ -239,7 +240,7 @@
         {$i18n.t('personas.cancel')}
       </Button>
       <Button type="submit" loading={saving}>{$i18n.t('personas.save')}</Button>
-    </div>
+    </DialogActions>
   </form>
 </DialogFrame>
 
@@ -327,12 +328,6 @@
     align-items: end;
     display: grid;
     gap: var(--space-300);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
   }
 
   @media (width >= 34rem) {

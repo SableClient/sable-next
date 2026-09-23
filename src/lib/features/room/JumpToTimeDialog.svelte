@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -121,7 +122,7 @@
       <Alert variant="critical" role="alert">{$i18n.t('room.jumpFailed')}</Alert>
     {/if}
 
-    <div class="actions">
+    <DialogActions>
       <Button
         variant="ghost"
         onclick={() => {
@@ -134,7 +135,7 @@
           void jump();
         }}>{$i18n.t('room.jumpSubmit')}</Button
       >
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -164,11 +165,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
   }
 </style>

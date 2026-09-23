@@ -22,6 +22,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -480,14 +481,14 @@
   <div class="topic-dialog">
     <h2>{space?.name ?? $i18n.t('nav.space')}</h2>
     <p class="topic-full">{space?.topic}</p>
-    <div class="topic-actions">
+    <DialogActions>
       <Button
         variant="ghost"
         onclick={() => {
           topicOpen = false;
         }}>{$i18n.t('room.lobbyTopicClose')}</Button
       >
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -626,11 +627,6 @@
     overflow: auto;
     overflow-wrap: break-word;
     white-space: pre-wrap;
-  }
-
-  .topic-actions {
-    display: flex;
-    justify-content: flex-end;
   }
 
   .loading-note {

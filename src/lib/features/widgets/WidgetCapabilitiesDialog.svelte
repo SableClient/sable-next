@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import { capabilityLabel, isSensitiveCapability } from './capabilities.js';
@@ -63,7 +64,7 @@
       {/each}
     </ul>
 
-    <div class="actions">
+    <DialogActions>
       <Button
         variant="ghost"
         onclick={() => {
@@ -79,7 +80,7 @@
       >
         {$i18n.t('widgets.capabilitiesAllow')}
       </Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -127,11 +128,5 @@
     color: var(--crit-main);
     display: block;
     font-size: var(--font-size-small);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

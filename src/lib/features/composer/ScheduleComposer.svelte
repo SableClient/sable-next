@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -110,14 +111,14 @@
       <Alert variant="critical" role="alert">{$i18n.t('composer.schedulePast')}</Alert>
     {/if}
 
-    <div class="actions">
+    <DialogActions>
       <Button type="button" variant="ghost" onclick={cancel}>
         {$i18n.t('composer.scheduleCancel')}
       </Button>
       <Button type="submit" disabled={unavailable || chosen === null}>
         {$i18n.t('composer.scheduleConfirm')}
       </Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -150,11 +151,5 @@
     display: grid;
     gap: var(--space-300);
     grid-template-columns: 1fr 1fr;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
   }
 </style>

@@ -6,6 +6,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   import { joinedSpaceChildrenLeaveOrder, recursiveSpaceLeaveOrder } from './space-leave-order.js';
@@ -105,7 +106,7 @@
         {$i18n.t('room.leaveFailedNames', { names: failedNames.join(', ') })}
       </Alert>
     {/if}
-    <div class="actions">
+    <DialogActions>
       <Button
         variant="ghost"
         onclick={() => {
@@ -122,7 +123,7 @@
       <Button variant="danger" loading={leaving} onclick={confirm}>
         {$i18n.t('room.leaveConfirm')}
       </Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -143,11 +144,5 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

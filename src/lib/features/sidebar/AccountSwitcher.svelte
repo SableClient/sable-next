@@ -10,6 +10,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
@@ -193,7 +194,7 @@
     <div class="logout-dialog">
       <h2>{$i18n.t('settings.logout')}</h2>
       <p>{accountToLogout.user_id}</p>
-      <div class="dialog-actions">
+      <DialogActions>
         <Button variant="ghost" disabled={switching} onclick={() => (logoutAccountId = null)}
           >{$i18n.t('settings.cancel')}</Button
         >
@@ -205,7 +206,7 @@
             if (accountId) void logoutAccount(accountId).then(() => (logoutAccountId = null));
           }}>{$i18n.t('settings.logout')}</Button
         >
-      </div>
+      </DialogActions>
     </div>
   {/if}
 </DialogFrame>
@@ -229,11 +230,5 @@
   .logout-dialog h2,
   .logout-dialog p {
     margin: 0;
-  }
-
-  .dialog-actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: end;
   }
 </style>

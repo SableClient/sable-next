@@ -6,6 +6,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -95,7 +96,7 @@
       {#if failed}
         <Alert variant="critical" role="alert">{$i18n.t('room.inviteSendFailed')}</Alert>
       {/if}
-      <div class="actions">
+      <DialogActions>
         <Button
           variant="ghost"
           onclick={() => {
@@ -112,7 +113,7 @@
         >
           {$i18n.t('room.inviteConvertConfirm')}
         </Button>
-      </div>
+      </DialogActions>
     {:else}
       <p class="explain">
         {$i18n.t('room.inviteBody', { name: room?.name ?? room?.room_id ?? '' })}
@@ -142,7 +143,7 @@
         </Alert>
       {/if}
 
-      <div class="actions">
+      <DialogActions>
         <Button
           variant="ghost"
           onclick={() => {
@@ -159,7 +160,7 @@
         >
           {$i18n.t('room.inviteSubmit')}
         </Button>
-      </div>
+      </DialogActions>
     {/if}
   </div>
 </DialogFrame>
@@ -184,11 +185,5 @@
   .field {
     display: grid;
     gap: var(--space-200);
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
   }
 </style>

@@ -7,6 +7,7 @@
   import { currentFix, locates } from '#lib/platform/geolocation.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -164,10 +165,10 @@
       <TextInput id="location-label" bind:value={label} autocomplete="off" />
     </FormField>
 
-    <div class="actions">
+    <DialogActions>
       <Button variant="ghost" onclick={cancel}>{$i18n.t('composer.locationCancel')}</Button>
       <Button disabled={geoUri === null} onclick={send}>{$i18n.t('composer.locationSend')}</Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -200,11 +201,5 @@
     display: grid;
     gap: var(--space-300);
     grid-template-columns: 1fr 1fr;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-300);
-    justify-content: flex-end;
   }
 </style>

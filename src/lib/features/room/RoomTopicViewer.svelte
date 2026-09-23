@@ -1,6 +1,7 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   interface Props {
@@ -17,14 +18,14 @@
   <div class="topic-dialog">
     <h2>{roomName}</h2>
     <p class="topic-full">{topic}</p>
-    <div class="topic-actions">
+    <DialogActions>
       <Button
         variant="ghost"
         onclick={() => {
           onOpenChange(false);
         }}>{$i18n.t('room.topicClose')}</Button
       >
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -47,10 +48,5 @@
     overflow-wrap: anywhere;
     overflow-y: auto;
     white-space: pre-wrap;
-  }
-
-  .topic-actions {
-    display: flex;
-    justify-content: flex-end;
   }
 </style>

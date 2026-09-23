@@ -5,6 +5,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -84,7 +85,7 @@
       {/each}
     </ul>
 
-    <div class="actions">
+    <DialogActions>
       <Button
         type="button"
         variant="ghost"
@@ -98,7 +99,7 @@
       <Button type="submit" variant="primary" disabled={busy || !ready} loading={busy}>
         {$i18n.t('emotes.stealConfirm')}
       </Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -137,11 +138,5 @@
     display: grid;
     gap: var(--space-300);
     grid-template-columns: auto 1fr;
-  }
-
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
   }
 </style>

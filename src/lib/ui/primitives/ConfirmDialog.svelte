@@ -6,6 +6,7 @@
   import Alert from './Alert.svelte';
   import Button from './Button.svelte';
   import type { ButtonVariant } from './button-types';
+  import DialogActions from './DialogActions.svelte';
   import DialogFrame from './DialogFrame.svelte';
 
   interface Props {
@@ -60,14 +61,14 @@
     {#if error}
       <Alert variant="critical" role="alert">{error}</Alert>
     {/if}
-    <div class="actions">
+    <DialogActions>
       <Button type="button" variant="ghost" disabled={busy} onclick={cancel}>
         {cancelLabel}
       </Button>
       <Button type="submit" variant={confirmVariant} loading={busy} disabled={busy}>
         {confirmLabel}
       </Button>
-    </div>
+    </DialogActions>
   </div>
 </DialogFrame>
 
@@ -92,10 +93,7 @@
     margin: 0;
   }
 
-  .actions {
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
+  .confirm > :global(.dialog-actions) {
     margin-block-start: var(--space-100);
   }
 </style>
