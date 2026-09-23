@@ -1,6 +1,13 @@
 import { expect, test } from 'vitest';
 
-import { canSpoiler, filesFrom, stageFiles, toggleSpoiler, unstageFile } from './composer-files';
+import {
+  filesFrom,
+  previewKind,
+  restoreFile,
+  stageFiles,
+  toggleSpoiler,
+  unstageFile,
+} from './composer-files';
 
 function file(name: string): File {
   return new File(['x'], name, { type: 'image/png' });
@@ -55,8 +62,19 @@ test('a staged file starts unmarked and only the addressed one toggles', () => {
   ]);
 });
 
-test('only media can be hidden behind a spoiler', () => {
-  expect(canSpoiler(file('one.png'))).toBe(true);
-  expect(canSpoiler(new File(['x'], 'clip.webm', { type: 'video/webm' }))).toBe(true);
-  expect(canSpoiler(new File(['x'], 'report.pdf', { type: 'application/pdf' }))).toBe(false);
+test('only images and videos get a preview and a spoiler', () => {
+  expect(previewKind(file('one.png'))).toBe('image');
+  expect(previewKind(new File(['x'], 'clip.webm', { type: 'video/webm' }))).toBe('video');
+  expect(previewKind(new File(['x'], 'report.pdf', { type: 'application/pdf' }))).toBeNull();
+});
+
+test('an undone removal puts the file back where it was, once', () => {
+  let id = 0;
+  const staged = stageFiles([], [file('a.png'), file('b.png'), file('c.png')], () => id++);
+  const removed = staged[1];
+  const without = unstageFile(staged, removed.id);
+
+  const restored = restoreFile(without, removed, 1);
+  expect(restored.map((item) => item.file.name)).toEqual(['a.png', 'b.png', 'c.png']);
+  expect(restoreFile(restored, removed, 1)).toEqual(restored);
 });

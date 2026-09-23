@@ -36,6 +36,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';
@@ -55,6 +56,7 @@
   import { clearDraft, readDraft, writeDraft } from './composer-drafts.svelte';
   import {
     filesFrom,
+    restoreFile,
     stageFiles,
     toggleSpoiler,
     unstageFile,
@@ -892,7 +894,16 @@
             files={staged}
             disabled={sending}
             onRemove={(id: number) => {
+              const index = staged.findIndex((item) => item.id === id);
+              const removed = staged[index];
               staged = unstageFile(staged, id);
+              if (!removed) return;
+              toasts.undoable($i18n.t('composer.attachmentRemoved', { name: removed.file.name }), {
+                label: $i18n.t('composer.undo'),
+                onUndo: () => {
+                  staged = restoreFile(staged, removed, index);
+                },
+              });
             }}
             onToggleSpoiler={(id: number) => {
               staged = toggleSpoiler(staged, id);

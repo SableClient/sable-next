@@ -34,6 +34,7 @@ const safeAreaOwners = new Set([
   'src/lib/ui/primitives/BottomSheet.svelte',
   'src/lib/ui/primitives/DialogFrame.svelte',
   'src/lib/features/room/MediaViewer.svelte',
+  'src/lib/features/composer/StagedMediaViewer.svelte',
   'src/lib/features/auth/flow/AuthFlow.svelte',
 ]);
 
