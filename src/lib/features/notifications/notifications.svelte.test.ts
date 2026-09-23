@@ -233,6 +233,31 @@ test('a second message in a room with a standing alert does not sound again', ()
   expect(mocks.sound).toHaveBeenCalledTimes(2);
 });
 
+test('reading a room re-arms its sound while read alerts are left standing', () => {
+  preferences.clearNotificationsOnRead = false;
+  const notifications = center();
+
+  notifications.present(message('$one'));
+  notifications.readRoom('!room:example.org');
+  notifications.readRoom(null);
+  notifications.present(message('$two'));
+  expect(mocks.sound).toHaveBeenCalledTimes(2);
+
+  notifications.retireRead([room(0)]);
+  notifications.present(message('$three'));
+  expect(mocks.sound).toHaveBeenCalledTimes(3);
+  expect(mocks.retire).not.toHaveBeenCalled();
+});
+
+test('a mention sounds even in a room with a standing alert', () => {
+  const notifications = center();
+
+  notifications.present(message('$one'));
+  notifications.present({ ...message('$two'), mention: true });
+
+  expect(mocks.sound).toHaveBeenCalledTimes(2);
+});
+
 test('every message sounds while only notifying once is off', () => {
   preferences.notifyOnce = false;
   const notifications = center();

@@ -89,18 +89,16 @@ export class NotificationCenter {
     this.reading = roomId;
 
     void this.client?.commands.setReadRoom(roomId).catch(() => undefined);
-    if (roomId !== null && preferences.clearNotificationsOnRead) this.retire(roomId);
+    if (roomId !== null) this.settle(roomId);
   }
 
   retireRead(rooms: readonly RoomSummary[], unreadFor: RoomUnread = roomNotifications): void {
-    if (!preferences.clearNotificationsOnRead) return;
-
     for (const [roomId, appeared] of this.invites) {
       const room = rooms.find((item) => item.room_id === roomId);
       if (room?.state === 'invited') {
         this.invites.set(roomId, true);
       } else if (room !== undefined || appeared) {
-        this.retire(roomId);
+        this.settle(roomId);
       }
     }
 
@@ -114,15 +112,24 @@ export class NotificationCenter {
 
       this.unread.delete(room.room_id);
       if (this.retired.has(room.room_id)) continue;
-      this.retire(room.room_id);
+      this.settle(room.room_id);
     }
   }
 
-  private retire(roomId: string): void {
+  private settle(roomId: string): void {
+    if (preferences.clearNotificationsOnRead) this.retire(roomId);
+    else this.forget(roomId);
+  }
+
+  private forget(roomId: string): void {
     this.unread.delete(roomId);
     this.retired.add(roomId);
     this.invites.delete(roomId);
     this.conversations.delete(roomId);
+  }
+
+  private retire(roomId: string): void {
+    this.forget(roomId);
     this.presented.get(roomId)?.close();
     this.presented.delete(roomId);
 
@@ -143,7 +150,7 @@ export class NotificationCenter {
     const lines = appendLine(standing, line(view));
     this.conversations.set(view.room_id, lines);
 
-    const quiet = preferences.notifyOnce && standing.length > 0;
+    const quiet = preferences.notifyOnce && standing.length > 0 && !view.mention;
     if (view.noisy !== false && preferences.notificationSounds && !quiet && soundsAllowed()) {
       void playNotificationSound().catch(() => undefined);
     }
