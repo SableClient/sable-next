@@ -5,8 +5,7 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { createMasterDetail } from '#lib/ui/master-detail.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
 
@@ -23,27 +22,25 @@
   }
 
   let { section, sections, onSelect, onBack, onClose, header, content }: Props = $props();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-
-  let desktop = $derived(appLayout.matches);
-  let openSection = $derived(section ?? (desktop ? (sections[0]?.id ?? null) : null));
-  let showList = $derived(desktop || section === null);
-  let showContent = $derived(desktop || section !== null);
+  const pages = createMasterDetail(
+    () => section,
+    () => sections[0]?.id ?? null
+  );
   let activeLabel = $derived(
-    sections.find((entry) => entry.id === openSection)?.label ?? 'room.settingsTitle'
+    sections.find((entry) => entry.id === pages.openSection)?.label ?? 'room.settingsTitle'
   );
 </script>
 
-<div class="room-settings" class:paged={!desktop}>
+<div class="room-settings" class:paged={!pages.desktop}>
   <Dialog.Description class="screen-reader-only">
     {$i18n.t('room.settingsDialogDescription')}
   </Dialog.Description>
 
-  {#if showList}
-    <div class="settings-nav" class:settings-nav-paged={!desktop}>
+  {#if pages.showList}
+    <div class="settings-nav" class:settings-nav-paged={!pages.desktop}>
       <div class="nav-header settings-nav-header">
         {@render header()}
-        {#if !desktop}
+        {#if !pages.desktop}
           <IconButton
             variant="ghost"
             size="small"
@@ -54,19 +51,19 @@
       </div>
       <SettingsNav
         entries={sections.map((entry) => ({ ...entry, label: $i18n.t(entry.label) }))}
-        activeId={openSection}
+        activeId={pages.openSection}
         ariaLabel={$i18n.t('room.settingsSections')}
         onSelect={(_, id) => onSelect(id as RoomSettingsSectionId)}
-        showChevron={!desktop}
-        large={!desktop}
+        showChevron={!pages.desktop}
+        large={!pages.desktop}
       />
     </div>
   {/if}
 
-  {#if showContent && openSection}
+  {#if pages.showContent && pages.openSection}
     <div class="settings-page">
       <div class="page-header settings-nav-header">
-        {#if !desktop}
+        {#if !pages.desktop}
           <IconButton
             variant="ghost"
             size="small"
@@ -83,7 +80,7 @@
         >
       </div>
       <div class="page-scroll">
-        <div class="page-body">{@render content(openSection)}</div>
+        <div class="page-body">{@render content(pages.openSection)}</div>
       </div>
     </div>
   {/if}

@@ -12,8 +12,7 @@
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import { settingFocusId, settingsCategories } from '#lib/settings/registry.js';
-  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
-  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { createMasterDetail } from '#lib/ui/master-detail.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
@@ -32,7 +31,6 @@
 
   let { section, onSelect, onBack, onClose, content }: Props = $props();
   const core = useCoreClient();
-  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   const sections = [
     ...sectionsBeforeCategories,
     ...settingsCategories.map((category) => ({
@@ -42,12 +40,12 @@
     })),
     ...sectionsAfterCategories,
   ];
-  let desktop = $derived(appLayout.matches);
-  let openSection = $derived(section ?? (desktop ? defaultSettingsSection() : null));
-  let showList = $derived(desktop || section === null);
-  let showContent = $derived(desktop || section !== null);
+  const pages = createMasterDetail(
+    () => section,
+    () => defaultSettingsSection()
+  );
   let activeLabel = $derived(
-    sections.find((entry) => entry.id === openSection)?.label ?? 'settings.title'
+    sections.find((entry) => entry.id === pages.openSection)?.label ?? 'settings.title'
   );
 
   let query = $state('');
@@ -64,15 +62,15 @@
   }
 </script>
 
-<div class="settings-shell" class:paged={!desktop}>
+<div class="settings-shell" class:paged={!pages.desktop}>
   <Dialog.Description class="screen-reader-only">
     {$i18n.t('settings.dialogDescription')}
   </Dialog.Description>
 
-  {#if showList}
+  {#if pages.showList}
     <aside
       class="settings-nav"
-      class:settings-nav-paged={!desktop}
+      class:settings-nav-paged={!pages.desktop}
       aria-label={$i18n.t('settings.title')}
     >
       <div class="settings-title settings-nav-header">
@@ -132,12 +130,12 @@
       {:else}
         <SettingsNav
           entries={sections.map((entry) => ({ ...entry, label: $i18n.t(entry.label) }))}
-          activeId={openSection}
+          activeId={pages.openSection}
           ariaLabel={$i18n.t('settings.sections')}
           onSelect={select}
           href={(entry) => resolve(`settings/${entry.id}`)}
-          showChevron={!desktop}
-          large={!desktop}
+          showChevron={!pages.desktop}
+          large={!pages.desktop}
         />
       {/if}
       <Button
@@ -151,9 +149,9 @@
     </aside>
   {/if}
 
-  {#if showContent && openSection}
+  {#if pages.showContent && pages.openSection}
     <div class="settings-content">
-      {#if !desktop}
+      {#if !pages.desktop}
         <div class="settings-title section-bar settings-nav-header">
           <IconButton variant="ghost" size="small" label={$i18n.t('settings.back')} onclick={onBack}
             ><ArrowLeftIcon /></IconButton
@@ -167,7 +165,7 @@
           >
         </div>
       {/if}
-      <div class="settings-scroll">{@render content(openSection)}</div>
+      <div class="settings-scroll">{@render content(pages.openSection)}</div>
     </div>
   {/if}
 </div>
