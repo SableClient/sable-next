@@ -152,18 +152,9 @@ impl Core {
         let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
         let mime: Mime = mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
 
-        let in_reply_to = match in_reply_to {
-            Some(id) => Some(OwnedEventId::try_from(id).map_err(|_| CommandErr::UnknownRoom)?),
-            None => None,
-        };
-        let thread_root = match thread_root {
-            Some(id) => Some(OwnedEventId::try_from(id).map_err(|_| CommandErr::UnknownRoom)?),
-            None => None,
-        };
-        let mentions = mentions
-            .into_iter()
-            .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
-            .collect::<Result<Vec<_>, _>>()?;
+        let in_reply_to = event_id(in_reply_to)?;
+        let thread_root = event_id(thread_root)?;
+        let mentions = user_ids(mentions)?;
 
         let (caption, formatted_caption, persona) = match persona {
             Some(persona) => match caption {
@@ -229,18 +220,9 @@ impl Core {
             return Err(CommandErr::InvalidMedia);
         }
         let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
-        let in_reply_to = in_reply_to
-            .map(OwnedEventId::try_from)
-            .transpose()
-            .map_err(|_| CommandErr::UnknownRoom)?;
-        let thread_root = thread_root
-            .map(OwnedEventId::try_from)
-            .transpose()
-            .map_err(|_| CommandErr::UnknownRoom)?;
-        let mentions = mentions
-            .into_iter()
-            .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
-            .collect::<Result<Vec<_>, _>>()?;
+        let in_reply_to = event_id(in_reply_to)?;
+        let thread_root = event_id(thread_root)?;
+        let mentions = user_ids(mentions)?;
 
         let mut gallery = GalleryConfig::new()
             .caption(attachment_caption(caption, formatted_caption))
@@ -404,6 +386,18 @@ mod avatar_import_tests {
             download_persona_avatar(url).await.unwrap_err();
         }
     }
+}
+
+fn event_id(id: Option<String>) -> Result<Option<OwnedEventId>, CommandErr> {
+    id.map(OwnedEventId::try_from)
+        .transpose()
+        .map_err(|_| CommandErr::UnknownRoom)
+}
+
+fn user_ids(ids: Vec<String>) -> Result<Vec<OwnedUserId>, CommandErr> {
+    ids.into_iter()
+        .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
+        .collect()
 }
 
 fn attachment_caption(
