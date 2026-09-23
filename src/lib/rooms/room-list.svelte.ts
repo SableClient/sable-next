@@ -74,12 +74,16 @@ export class RoomList {
   private snapshotWriteTimer: ReturnType<typeof setTimeout> | undefined;
   private snapshotDirty = false;
   private presentationActive = true;
-  private live = false;
+  private live = $state(false);
 
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
   private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
 
   constructor(private readonly core: CoreClient) {}
+
+  get settled(): boolean {
+    return this.live && this.publishedLoadingModes.size === 0;
+  }
 
   byId(roomId: string | null | undefined): RoomSummary | undefined {
     return roomId === null || roomId === undefined ? undefined : this.roomsById.get(roomId);

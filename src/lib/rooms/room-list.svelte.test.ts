@@ -283,6 +283,49 @@ test('does not show cached unread counts before a room notification mode resolve
   roomList.stop();
 });
 
+test('is not settled on a painted snapshot or while notification modes load', async () => {
+  const room = { room_id: '!room:example.org' } as RoomSummary;
+  stubLocalStorage().set('sable.room-list.acct', JSON.stringify([room]));
+  let resolveSubscription: (value: {
+    subscription: number;
+    rooms: RoomSummary[];
+  }) => void = () => {};
+  let resolveModes: (value: never[]) => void = () => {};
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(
+        () =>
+          new Promise<{ subscription: number; rooms: RoomSummary[] }>((resolve) => {
+            resolveSubscription = resolve;
+          })
+      ),
+      roomNotificationModes: vi.fn(
+        () =>
+          new Promise<never[]>((resolve) => {
+            resolveModes = resolve;
+          })
+      ),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  const started = roomList.start();
+  expect(roomList.settled).toBe(false);
+
+  resolveSubscription({ subscription: 1, rooms: [room] });
+  await started;
+  expect(roomList.settled).toBe(false);
+
+  resolveModes([]);
+  await vi.waitFor(() => {
+    expect(roomList.settled).toBe(true);
+  });
+  roomList.stop();
+});
+
 test('persists the live room list for the next launch', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();

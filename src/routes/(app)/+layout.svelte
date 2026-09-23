@@ -505,7 +505,7 @@
   }
 
   $effect(() => {
-    if (core.status !== 'ready') return;
+    if (core.status !== 'ready' || !roomList.settled) return;
     notifications.retireRead(roomList.rooms, roomList.notificationsFor);
   });
 
