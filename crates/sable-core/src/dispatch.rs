@@ -1134,14 +1134,10 @@ impl Core {
 
             Command::AccountData { event_type } => {
                 self.remember_account_data_type(event_type.as_str()).await;
-                let event = self
-                    .client()
+                let content = self
+                    .global_account_data(event_type.into(), "account_data")
                     .await?
-                    .account()
-                    .fetch_account_data(event_type.into())
-                    .await
-                    .map_err(|error| self.failed("account_data", error))?;
-                let content = event.and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok());
+                    .and_then(|raw| raw.deserialize_as::<serde_json::Value>().ok());
                 Ok(CommandOk::AccountData { content })
             }
 
@@ -1150,15 +1146,8 @@ impl Core {
                 content,
             } => {
                 self.remember_account_data_type(event_type.as_str()).await;
-                let raw = Raw::new(&content)
-                    .map_err(|error| self.failed("set_account_data", error))?
-                    .cast_unchecked();
-                self.client()
-                    .await?
-                    .account()
-                    .set_account_data_raw(event_type.into(), raw)
-                    .await
-                    .map_err(|error| self.failed("set_account_data", error))?;
+                self.put_global_account_data(event_type.into(), &content, "set_account_data")
+                    .await?;
 
                 Ok(CommandOk::SetAccountData)
             }

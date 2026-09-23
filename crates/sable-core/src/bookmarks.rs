@@ -1,5 +1,4 @@
-use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDataEventType};
-use matrix_sdk::ruma::serde::Raw;
+use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use serde_json::{Value, json};
 
@@ -37,24 +36,6 @@ impl Core {
             .ok()
             .flatten()
             .and_then(|raw| raw.deserialize_as::<Value>().ok())
-    }
-
-    async fn put_account_data(
-        &self,
-        event_type: GlobalAccountDataEventType,
-        content: Value,
-    ) -> Result<(), CommandErr> {
-        let raw = Raw::<AnyGlobalAccountDataEventContent>::from_json_string(content.to_string())
-            .map_err(|error| self.failed("bookmarks", error))?;
-
-        self.client()
-            .await?
-            .account()
-            .set_account_data_raw(event_type, raw)
-            .await
-            .map_err(|error| self.failed("bookmarks", error))?;
-
-        Ok(())
     }
 
     async fn bookmark_ids(&self) -> Vec<String> {
@@ -131,10 +112,12 @@ impl Core {
 
         if bookmarked {
             let item = self.bookmark_item(&id, room_id, event_id, now_ms).await?;
-            self.put_account_data(item_event(&id), item).await?;
+            self.put_global_account_data(item_event(&id), &item, "bookmarks")
+                .await?;
             ids.push(id);
         } else {
-            self.put_account_data(item_event(&id), json!({})).await?;
+            self.put_global_account_data(item_event(&id), &json!({}), "bookmarks")
+                .await?;
             ids.retain(|candidate| candidate != &id);
         }
 
@@ -144,14 +127,15 @@ impl Core {
             .and_then(|index| index.get("revision").and_then(Value::as_u64))
             .unwrap_or(0);
 
-        self.put_account_data(
+        self.put_global_account_data(
             GlobalAccountDataEventType::from(INDEX_EVENT),
-            json!({
+            &json!({
                 "version": 1,
                 "revision": revision.saturating_add(1),
                 "updated_ts": now_ms,
                 "bookmark_ids": ids,
             }),
+            "bookmarks",
         )
         .await?;
 

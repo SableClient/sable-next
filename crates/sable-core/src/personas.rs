@@ -3,8 +3,7 @@ use std::collections::BTreeMap;
 use matrix_sdk::Room;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation;
 use matrix_sdk::ruma::events::{
-    AnyGlobalAccountDataEventContent, AnyMessageLikeEventContent, GlobalAccountDataEventType,
-    MessageLikeEventContent,
+    AnyMessageLikeEventContent, GlobalAccountDataEventType, MessageLikeEventContent,
 };
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, TransactionId};
@@ -516,12 +515,8 @@ impl Core {
         event_type: GlobalAccountDataEventType,
     ) -> Result<Option<Value>, CommandErr> {
         let Some(raw) = self
-            .client()
+            .global_account_data(event_type, "personas: fetch_account_data")
             .await?
-            .account()
-            .fetch_account_data(event_type)
-            .await
-            .map_err(|error| self.failed("personas: fetch_account_data", error))?
         else {
             return Ok(None);
         };
@@ -529,24 +524,6 @@ impl Core {
         raw.deserialize_as::<Value>()
             .map(Some)
             .map_err(|error| self.failed("personas: deserialize", error))
-    }
-
-    async fn put_persona_account_data(
-        &self,
-        event_type: GlobalAccountDataEventType,
-        content: Value,
-    ) -> Result<(), CommandErr> {
-        let raw = Raw::<AnyGlobalAccountDataEventContent>::from_json_string(content.to_string())
-            .map_err(|error| self.failed("personas", error))?;
-
-        self.client()
-            .await?
-            .account()
-            .set_account_data_raw(event_type, raw)
-            .await
-            .map_err(|error| self.failed("personas", error))?;
-
-        Ok(())
     }
 
     async fn load_personas(&self) -> Result<Vec<PersonaView>, CommandErr> {
@@ -575,9 +552,10 @@ impl Core {
     }
 
     async fn save_personas(&self, personas: &[PersonaView]) -> Result<(), CommandErr> {
-        self.put_persona_account_data(
+        self.put_global_account_data(
             GlobalAccountDataEventType::from(CATALOG_V3),
-            json!({ "profiles": personas.iter().map(persona_to_json).collect::<Vec<_>>() }),
+            &json!({ "profiles": personas.iter().map(persona_to_json).collect::<Vec<_>>() }),
+            "personas",
         )
         .await
     }
@@ -694,8 +672,12 @@ impl Core {
                     }) })
                 },
             );
-            self.put_persona_account_data(selection_event("globalassociation"), content)
-                .await?;
+            self.put_global_account_data(
+                selection_event("globalassociation"),
+                &content,
+                "personas",
+            )
+            .await?;
         }
 
         let mut rooms = self.room_selections().await?;
@@ -733,9 +715,10 @@ impl Core {
             .map(|(room_id, selection)| (room_id.clone(), selection_to_json(selection)))
             .collect();
 
-        self.put_persona_account_data(
+        self.put_global_account_data(
             selection_event("roomassociation"),
-            json!({ "associations": Value::Object(associations) }),
+            &json!({ "associations": Value::Object(associations) }),
+            "personas",
         )
         .await
     }
@@ -758,7 +741,7 @@ impl Core {
                 |selection| json!({ "association": selection_to_json(selection) }),
             );
             return self
-                .put_persona_account_data(selection_event("globalassociation"), content)
+                .put_global_account_data(selection_event("globalassociation"), &content, "personas")
                 .await;
         };
 

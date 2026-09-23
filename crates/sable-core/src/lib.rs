@@ -47,6 +47,8 @@ use std::{
 
 use matrix_sdk::executor::AbortOnDrop;
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
+use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDataEventType};
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, RwLock, mpsc};
@@ -404,6 +406,38 @@ impl Core {
             .lock()
             .await
             .insert(event_type.into());
+    }
+
+    pub(crate) async fn global_account_data(
+        &self,
+        event_type: GlobalAccountDataEventType,
+        label: &str,
+    ) -> Result<Option<Raw<AnyGlobalAccountDataEventContent>>, CommandErr> {
+        self.client()
+            .await?
+            .account()
+            .fetch_account_data(event_type)
+            .await
+            .map_err(|error| self.failed(label, error))
+    }
+
+    pub(crate) async fn put_global_account_data(
+        &self,
+        event_type: GlobalAccountDataEventType,
+        content: &serde_json::Value,
+        label: &str,
+    ) -> Result<(), CommandErr> {
+        let raw = Raw::<AnyGlobalAccountDataEventContent>::from_json_string(content.to_string())
+            .map_err(|error| self.failed(label, error))?;
+
+        self.client()
+            .await?
+            .account()
+            .set_account_data_raw(event_type, raw)
+            .await
+            .map_err(|error| self.failed(label, error))?;
+
+        Ok(())
     }
 
     pub(crate) async fn sync_service(
