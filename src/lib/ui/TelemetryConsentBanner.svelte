@@ -36,9 +36,7 @@
         <br />
         {$i18n.t('settings.telemetryBannerSent')}
         <div class="policies">
-          <a href="https://github.com/SableClient/Sable/blob/dev/docs/PRIVACY.md"
-            >{$i18n.t('settings.telemetryBannerSablePolicy')}</a
-          >
+          <a href="https://sable.moe/privacy">{$i18n.t('settings.telemetryBannerSablePolicy')}</a>
           <a href="https://sentry.io/privacy/">{$i18n.t('settings.telemetryBannerSentryPolicy')}</a>
         </div>
       </div>
