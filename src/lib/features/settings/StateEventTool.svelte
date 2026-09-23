@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { parseJsonObject } from '#lib/json-object.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -28,15 +29,8 @@
     event.preventDefault();
     if (!canSend) return;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      error = 'json';
-      sent = false;
-      return;
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    const parsed = parseJsonObject(content);
+    if (!parsed) {
       error = 'json';
       sent = false;
       return;

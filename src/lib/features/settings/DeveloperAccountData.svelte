@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { parseJsonObject } from '#lib/json-object.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
@@ -62,15 +63,8 @@
     event.preventDefault();
     const type = eventType.trim();
     if (!type || saving) return;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      error = 'json';
-      saved = false;
-      return;
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    const parsed = parseJsonObject(content);
+    if (!parsed) {
       error = 'json';
       saved = false;
       return;

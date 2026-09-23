@@ -7,6 +7,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { parseJsonObject } from '#lib/json-object.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
@@ -71,15 +72,8 @@
     const target = roomId;
     if (!target || !canSend || sending) return;
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      outcome = 'json';
-      sent = false;
-      return;
-    }
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    const parsed = parseJsonObject(content);
+    if (!parsed) {
       outcome = 'json';
       sent = false;
       return;
