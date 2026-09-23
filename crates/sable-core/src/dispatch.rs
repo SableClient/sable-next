@@ -394,45 +394,20 @@ impl Core {
                     None => content,
                 };
 
-                let previews = bundled_link_previews(&link_previews);
-                let image_source_packs = image_source_pack_references(&image_source_packs);
-                let extra = match persona {
-                    Some(persona) => {
-                        let mut extra = crate::personas::profile_extra_content(&persona);
-                        if let Some(previews) = previews {
-                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
-                        }
-                        if let Some(image_source_packs) = image_source_packs {
-                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
-                        }
-                        Some(extra)
-                    }
-                    None => (previews.is_some() || image_source_packs.is_some()).then(|| {
-                        let mut extra = serde_json::Map::new();
-                        if let Some(previews) = previews {
-                            extra.insert(BUNDLED_LINK_PREVIEWS.to_owned(), previews);
-                        }
-                        if let Some(image_source_packs) = image_source_packs {
-                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), image_source_packs);
-                        }
-                        extra
-                    }),
-                };
-
-                match extra {
-                    Some(extra) => {
-                        timeline
-                            .send_with_extra_content(content.into(), Some(extra))
-                            .await
-                            .map_err(|error| self.failed("send_message", error))?;
-                    }
-                    None => {
-                        timeline
-                            .send(content.into())
-                            .await
-                            .map_err(|error| self.failed("send_message", error))?;
-                    }
-                }
+                let extra = extra_content(
+                    persona.as_ref().map(crate::personas::profile_extra_content),
+                    [
+                        (BUNDLED_LINK_PREVIEWS, bundled_link_previews(&link_previews)),
+                        (
+                            IMAGE_SOURCE_PACKS,
+                            image_source_pack_references(&image_source_packs),
+                        ),
+                    ],
+                );
+                timeline
+                    .send_with_extra_content(content.into(), extra)
+                    .await
+                    .map_err(|error| self.failed("send_message", error))?;
 
                 Ok(CommandOk::SendMessage)
             }
@@ -510,35 +485,18 @@ impl Core {
                     (None, None) => None,
                 };
 
-                match (persona, source) {
-                    (Some(persona), source) => {
-                        let mut extra = crate::personas::profile_extra_content(
-                            &crate::personas::without_fallback(&persona),
-                        );
-                        if let Some(source) = source {
-                            extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
-                        }
-                        timeline
-                            .send_with_extra_content(content.into(), Some(extra))
-                            .await
-                            .map_err(|error| self.failed("send_sticker", error))?
-                    }
-                    (None, Some(source)) => timeline
-                        .send_with_extra_content(
-                            content.into(),
-                            Some({
-                                let mut extra = serde_json::Map::new();
-                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
-                                extra
-                            }),
-                        )
-                        .await
-                        .map_err(|error| self.failed("send_sticker", error))?,
-                    (None, None) => timeline
-                        .send(content.into())
-                        .await
-                        .map_err(|error| self.failed("send_sticker", error))?,
-                };
+                let extra = extra_content(
+                    persona.as_ref().map(|persona| {
+                        crate::personas::profile_extra_content(&crate::personas::without_fallback(
+                            persona,
+                        ))
+                    }),
+                    [(IMAGE_SOURCE_PACKS, source)],
+                );
+                timeline
+                    .send_with_extra_content(content.into(), extra)
+                    .await
+                    .map_err(|error| self.failed("send_sticker", error))?;
 
                 Ok(CommandOk::SendSticker)
             }
@@ -1269,11 +1227,7 @@ impl Core {
                     timeline
                         .send_with_extra_content(
                             ReactionEventContent::new(Annotation::new(event_id, key)).into(),
-                            Some({
-                                let mut extra = serde_json::Map::new();
-                                extra.insert(IMAGE_SOURCE_PACKS.to_owned(), source);
-                                extra
-                            }),
+                            extra_content(None, [(IMAGE_SOURCE_PACKS, Some(source))]),
                         )
                         .await
                         .map_err(|error| self.failed("react", error))?;
@@ -2644,6 +2598,19 @@ fn message_content(
 
 const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
 const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
+
+fn extra_content<const N: usize>(
+    base: Option<serde_json::Map<String, serde_json::Value>>,
+    fields: [(&str, Option<serde_json::Value>); N],
+) -> Option<serde_json::Map<String, serde_json::Value>> {
+    let mut extra = base;
+    for (key, value) in fields {
+        if let Some(value) = value {
+            extra.get_or_insert_default().insert(key.to_owned(), value);
+        }
+    }
+    extra
+}
 
 fn image_source_pack_extra(
     url: &str,
