@@ -2490,7 +2490,18 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("build mark-read timeline", error))?;
                     timeline
-                        .mark_as_read(receipt_type)
+                        .mark_as_read(receipt_type.clone())
+                        .await
+                        .map_err(|error| self.failed("mark_read", error))?;
+                    let main = room
+                        .timeline_builder()
+                        .with_focus(TimelineFocus::Live {
+                            hide_threaded_events: true,
+                        })
+                        .build()
+                        .await
+                        .map_err(|error| self.failed("build mark-read timeline", error))?;
+                    main.mark_as_read(receipt_type)
                         .await
                         .map_err(|error| self.failed("mark_read", error))?;
                     timeline

@@ -1468,7 +1468,13 @@ async fn mark_read_body(
     private_receipt: bool,
     event_id: Option<matrix_sdk::ruma::OwnedEventId>,
     include_threaded_reply: bool,
-) -> (serde_json::Value, serde_json::Value, String, String) {
+) -> (
+    serde_json::Value,
+    serde_json::Value,
+    String,
+    String,
+    Vec<(String, serde_json::Value)>,
+) {
     let server = MatrixMockServer::new().await;
     let client = server
         .client_builder()
@@ -1523,7 +1529,7 @@ async fn mark_read_body(
             r"^/_matrix/client/v3/rooms/{room_id}/receipt/{receipt_type}/.*$"
         )))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
-        .expect(1)
+        .expect(if event_id.is_some() { 1 } else { 2 })
         .mount(server.server())
         .await;
 
@@ -1546,24 +1552,31 @@ async fn mark_read_body(
             || request.url.path().contains("/receipt/m.fully_read/")
     });
 
-    let receipt = requests
-        .iter()
-        .find(|request| {
-            request.url.path().contains("/receipt/")
-                && !request.url.path().contains("/receipt/m.fully_read/")
-        })
-        .expect("a scoped receipt request");
     let marker_path = marker
         .map(|request| request.url.path().to_owned())
         .unwrap_or_default();
-    let receipt_path = receipt.url.path().to_owned();
+    let scoped: Vec<(String, serde_json::Value)> = requests
+        .iter()
+        .filter(|request| {
+            request.url.path().contains("/receipt/")
+                && !request.url.path().contains("/receipt/m.fully_read/")
+        })
+        .map(|request| {
+            (
+                request.url.path().to_owned(),
+                serde_json::from_slice(&request.body).expect("a receipt body"),
+            )
+        })
+        .collect();
+    let (receipt_path, receipt) = scoped.first().cloned().expect("a scoped receipt request");
     (
         marker
             .map(|request| serde_json::from_slice(&request.body).expect("a JSON body"))
             .unwrap_or_default(),
-        serde_json::from_slice(&receipt.body).expect("a receipt body"),
+        receipt,
         marker_path,
         receipt_path,
+        scoped,
     )
 }
 
@@ -1695,7 +1708,7 @@ async fn marking_unread_from_a_message_walks_the_read_marker_back() {
 
 #[tokio::test]
 async fn marking_read_publishes_a_receipt_and_moves_the_marker() {
-    let (body, receipt, _, _) =
+    let (body, receipt, _, _, _) =
         mark_read_body(false, Some(event_id!("$read").to_owned()), false).await;
 
     assert_eq!(receipt["thread_id"], json!("main"));
@@ -1706,7 +1719,7 @@ async fn marking_read_publishes_a_receipt_and_moves_the_marker() {
 
 #[tokio::test]
 async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
-    let (body, receipt, _, _) =
+    let (body, receipt, _, _, _) =
         mark_read_body(true, Some(event_id!("$read").to_owned()), false).await;
 
     assert_eq!(receipt["thread_id"], json!("main"));
@@ -1721,11 +1734,17 @@ async fn a_private_reader_still_moves_the_marker_without_telling_the_room() {
 
 #[tokio::test]
 async fn marking_a_room_read_uses_the_latest_threaded_event() {
-    let (body, _, fully_read_path, read_path) = mark_read_body(false, None, true).await;
+    let (body, _, fully_read_path, read_path, receipts) = mark_read_body(false, None, true).await;
 
     assert_eq!(body, json!({}));
     assert!(read_path.ends_with("/m.read/$threaded"));
     assert!(fully_read_path.ends_with("/m.fully_read/$threaded"));
+    assert!(
+        receipts
+            .iter()
+            .any(|(path, body)| path.ends_with("/m.read/$read") && body["thread_id"] == "main"),
+        "{receipts:?}"
+    );
 }
 
 async fn sender_names(timeline: &Arc<matrix_sdk_ui::timeline::Timeline>) -> Vec<Option<String>> {
