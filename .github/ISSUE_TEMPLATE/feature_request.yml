@@ -1,7 +1,13 @@
-name: 💡 Feature Request
+name: Feature Request
 description: Suggest an idea
+labels: [enhancement]
 
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search for [existing issues](https://git.sable.moe/SableClient/sable-next/issues) before suggesting a feature.
+
   - type: textarea
     id: problem
     attributes:
@@ -20,11 +26,19 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: alternatives
+  - type: dropdown
+    id: platforms
     attributes:
-      label: Alternatives considered
-      description: "Any alternative solutions you've considered"
+      label: Platforms
+      description: Select Web for the browser app, or the operating systems where this would help. Select all that apply.
+      multiple: true
+      options:
+        - Web
+        - Windows
+        - macOS
+        - Linux
+        - iOS
+        - Android
 
   - type: textarea
     id: context
