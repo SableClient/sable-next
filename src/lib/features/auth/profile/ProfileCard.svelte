@@ -112,18 +112,10 @@
     font-size: var(--font-size-heading);
   }
 
-  .eyebrow,
   .user-id,
   .intro {
     color: var(--sec-main);
     font-size: var(--font-size-small);
-  }
-
-  .user-id {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    overflow-wrap: anywhere;
-    padding: var(--space-250) var(--space-300);
   }
 
   .avatar-picker {

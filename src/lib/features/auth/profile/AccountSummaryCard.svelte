@@ -30,11 +30,6 @@
     min-width: 0;
   }
 
-  .eyebrow {
-    color: var(--sec-main);
-    font-size: var(--font-size-small);
-  }
-
   .summary-card h2 {
     font-size: var(--font-size-heading);
   }
@@ -43,13 +38,6 @@
     color: var(--sec-main);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
-  }
-
-  .user-id {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    overflow-wrap: anywhere;
-    padding: var(--space-250) var(--space-300);
   }
 
   .summary-actions {

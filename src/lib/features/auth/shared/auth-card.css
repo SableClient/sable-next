@@ -43,6 +43,18 @@
   margin: 0;
 }
 
+.auth-page .auth-card-surface .eyebrow {
+  color: var(--sec-main);
+  font-size: var(--font-size-small);
+}
+
+.auth-page .auth-card-surface .user-id {
+  background: var(--surface-var-container);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+  padding: var(--space-250) var(--space-300);
+}
+
 @keyframes auth-card-content-in {
   from {
     opacity: 0;
