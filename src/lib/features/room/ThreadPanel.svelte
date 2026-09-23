@@ -64,6 +64,7 @@
   }: Props = $props();
 
   let composer = $state<RoomComposer>();
+  let timelineList = $state<TimelineList>();
   let width = $state(27.5);
   let dragging = $state(false);
   let drag: { pointerId: number; startX: number; startWidth: number } | null = null;
@@ -243,6 +244,7 @@
     </header>
 
     <TimelineList
+      bind:this={timelineList}
       {timeline}
       {roomId}
       {members}
@@ -268,7 +270,7 @@
       currentUserId={core.session?.user_id ?? null}
     />
 
-    <div class="thread-composer">
+    <div class="thread-composer" onfocusin={(event) => timelineList?.composerFocused(event)}>
       <RoomComposer
         bind:this={composer}
         {roomId}

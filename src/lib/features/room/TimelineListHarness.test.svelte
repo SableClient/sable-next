@@ -11,6 +11,7 @@
 
   let { list }: Props = $props();
   let followingLive = $state(false);
+  let timelineList = $state<TimelineList>();
 
   $effect(() => {
     list.followingLive = followingLive;
@@ -34,4 +35,7 @@
   );
 </script>
 
-<TimelineList {...list} bind:followingLive />
+<TimelineList bind:this={timelineList} {...list} bind:followingLive />
+<div class="harness-composer" onfocusin={(event) => timelineList?.composerFocused(event)}>
+  <textarea aria-label="composer"></textarea>
+</div>

@@ -1166,6 +1166,51 @@ test('follows an own echo appended while the reader is still near latest', async
   await unmount(instance);
 });
 
+function focusComposer(): void {
+  const composer = document.querySelector<HTMLTextAreaElement>('.harness-composer textarea');
+  if (!composer) throw new Error('composer missing');
+  composer.focus();
+}
+
+test('focusing the composer near latest follows the latest message', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 30);
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+  expect(followingLive()).toBe(false);
+
+  focusComposer();
+  await tick();
+  await runAnimationFrames();
+
+  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
+  expect(followingLive()).toBe(true);
+  await unmount(instance);
+});
+
+test('focusing the composer leaves a reader past the band where they are', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { instance, element, end } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 900);
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+
+  focusComposer();
+  await tick();
+  await runAnimationFrames();
+
+  expect(element.scrollTop).toBe(end - 900);
+  expect(followingLive()).toBe(false);
+  await unmount(instance);
+});
+
 test('leaves a reader deep in history where they are when they send', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);

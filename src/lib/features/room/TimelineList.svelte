@@ -20,6 +20,7 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 
   import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineItem from './TimelineItem.svelte';
@@ -510,6 +511,10 @@
     sentEcho = echo;
     if (untrack(() => nearLatest)) void engine.jumpTo(null, 'start');
   });
+  export function composerFocused(event: FocusEvent): void {
+    if (!controller || !revealed || !isEditableTarget(event.target)) return;
+    if (nearLatest && !windowState.pinned) void controller.jumpTo(null, 'start');
+  }
   let handledFocus: string | null = null;
   $effect(() => {
     void focusEventId;
