@@ -75,7 +75,7 @@ run = [
   "cargo test --locked --workspace --exclude app --all-features",
   "cargo test --locked -p app",
   # Needs chromedriver on PATH.
-  "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev",
+  "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test",
 ]
 raw = true
 

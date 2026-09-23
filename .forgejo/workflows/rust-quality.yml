@@ -163,7 +163,7 @@ jobs:
         env:
           CHROMEDRIVER: ${{ steps.drivers.outputs.chromedriver }}
           WASM_BINDGEN_TEST_WEBDRIVER_JSON: ${{ github.workspace }}/.forgejo/webdriver.json
-        run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-dev
+        run: cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test
 
   policy:
     name: Format and dependency policy

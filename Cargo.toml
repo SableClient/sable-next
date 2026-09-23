@@ -128,6 +128,16 @@ inherits = "dev"
 opt-level = 1
 debug = false
 
+[profile.wasm-test]
+inherits = "wasm-dev"
+opt-level = "z"
+
+[profile.wasm-test.package."*"]
+opt-level = "z"
+
+[profile.wasm-test.package.sable-core]
+opt-level = "z"
+
 [profile.release]
 opt-level = "z"
 lto = "thin"
