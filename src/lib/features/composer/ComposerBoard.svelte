@@ -46,6 +46,12 @@
   }: Props = $props();
   let config = $state.raw<GifsConfig | null>(null);
   let anchor = $state<HTMLElement | null>(null);
+  const triggerElements = $state<Partial<Record<BoardTab, HTMLButtonElement>>>({});
+
+  $effect(() => {
+    if (open && anchor === null)
+      anchor = triggerElements[tab] ?? triggerElements[triggers[0]] ?? null;
+  });
 
   $effect(() => {
     let cancelled = false;
@@ -113,6 +119,7 @@
     {#each triggers as id (id)}
       {@const Icon = triggerIcons[id]}
       <button
+        bind:this={triggerElements[id]}
         type="button"
         class="composer-board-trigger selection-open"
         {disabled}
@@ -178,6 +185,7 @@
     <EmoteBoard
       {roomId}
       bind:tab
+      bind:query
       variant="sheet"
       unicode
       {gifs}
