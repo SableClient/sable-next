@@ -121,6 +121,8 @@
     "createKindRoomHint": "Une conversation où les membres peuvent discuter.",
     "createKindVoice": "Salon vocal",
     "createKindVoiceHint": "Un salon que les membres rejoignent pour parler à voix haute.",
+    "createKindForum": "Forum",
+    "createKindForumHint": "Un salon où chaque message ouvre son propre fil.",
     "createKindSpace": "Espace",
     "createKindSpaceHint": "Un conteneur qui regroupe des salons.",
     "createAccessLabel": "Accès",

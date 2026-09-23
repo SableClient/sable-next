@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import ChatsTeardropIcon from 'phosphor-svelte/lib/ChatsTeardropIcon';
   import GlobeIcon from 'phosphor-svelte/lib/GlobeIcon';
   import LockIcon from 'phosphor-svelte/lib/LockIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
@@ -246,6 +247,12 @@
             label: $i18n.t('room.createKindVoice'),
             hint: $i18n.t('room.createKindVoiceHint'),
             icon: SpeakerHighIcon,
+          },
+          {
+            value: 'forum',
+            label: $i18n.t('room.createKindForum'),
+            hint: $i18n.t('room.createKindForumHint'),
+            icon: ChatsTeardropIcon,
           },
           ...(mode === 'all'
             ? [

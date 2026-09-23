@@ -121,6 +121,8 @@
     "createKindRoomHint": "A conversation people can text in.",
     "createKindVoice": "Voice room",
     "createKindVoiceHint": "A room people join to talk out loud.",
+    "createKindForum": "Forum",
+    "createKindForumHint": "A room where each message starts its own thread.",
     "createKindSpace": "Space",
     "createKindSpaceHint": "A container that groups rooms together.",
     "createAccessLabel": "Access",

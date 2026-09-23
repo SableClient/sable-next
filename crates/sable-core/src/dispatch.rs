@@ -2193,6 +2193,7 @@ impl Core {
                     CreateRoomKind::Text => None,
                     CreateRoomKind::Space => Some(RoomType::Space),
                     CreateRoomKind::Voice => Some(RoomType::Call),
+                    CreateRoomKind::Forum => Some(RoomType::from(view::FORUM_ROOM_TYPE)),
                 };
                 if room_type.is_some() || !federate {
                     let mut creation = RoomCreateEventContent::new_v11();

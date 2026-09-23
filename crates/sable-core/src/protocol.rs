@@ -1413,8 +1413,8 @@ pub enum PaginationDirection {
     Forward,
 }
 
-/// The `m.room.create` type to ask for: `m.space`, the MSC3417 call type, or
-/// none at all.
+/// The `m.room.create` type to ask for: `m.space`, the MSC3417 call type, the
+/// forum type, or none at all.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(rename_all = "snake_case")]
@@ -1422,6 +1422,7 @@ pub enum CreateRoomKind {
     Text,
     Space,
     Voice,
+    Forum,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

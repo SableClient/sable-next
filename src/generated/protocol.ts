@@ -270,10 +270,10 @@ export type CoreEvent = {
 export type CreateJoinRuleView = "public" | "invite" | "knock" | "restricted" | "knock_restricted";
 
 /**
- *  The `m.room.create` type to ask for: `m.space`, the MSC3417 call type, or
- *  none at all.
+ *  The `m.room.create` type to ask for: `m.space`, the MSC3417 call type, the
+ *  forum type, or none at all.
  */
-export type CreateRoomKind = "text" | "space" | "voice";
+export type CreateRoomKind = "text" | "space" | "voice" | "forum";
 
 export type DefaultNotificationModesView = {
 	direct: NotificationModeView,
