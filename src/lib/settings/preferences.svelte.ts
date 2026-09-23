@@ -1,4 +1,5 @@
 import type { PresenceView } from '#src/generated/protocol';
+import type { GifProviderSetting } from '#lib/features/gif/providers.js';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
@@ -9,7 +10,6 @@ export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
-export type GifProviderChoice = 'default' | 'klipy' | 'tenor' | 'giphy';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
 export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
@@ -96,7 +96,7 @@ export interface Preferences {
   autoplayGifs: boolean;
   pauseAnimationsWhenInactive: boolean;
   autoplayStickers: boolean;
-  gifProvider: GifProviderChoice;
+  gifProvider: GifProviderSetting;
   urlPreviews: boolean;
   encryptedUrlPreviews: boolean;
   clientEmbeds: boolean;
