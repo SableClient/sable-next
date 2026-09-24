@@ -24,6 +24,7 @@ function image(width: number | null, height: number | null) {
     height,
     size: null,
     blurhash: null,
+    thumbnail: null,
     spoiler: null,
   } as const;
 }

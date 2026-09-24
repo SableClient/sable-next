@@ -26,12 +26,14 @@
       <MediaImage
         class="tile privacy-media"
         source={item.source}
+        thumbnail={item.thumbnail}
         alt={item.body}
         width={800}
         height={600}
         intrinsicWidth={item.width}
         intrinsicHeight={item.height}
         mime={item.mime}
+        blurhash={item.blurhash}
         retryable
         onclick={() => onOpen?.(index)}
       />
@@ -44,6 +46,8 @@
         kind={item.kind}
         width={item.kind === 'video' ? item.width : null}
         height={item.kind === 'video' ? item.height : null}
+        blurhash={item.kind === 'video' ? item.blurhash : null}
+        thumbnail={item.kind === 'video' ? item.thumbnail : null}
       />
     {/if}
   {/each}

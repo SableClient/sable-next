@@ -66,10 +66,19 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
         height: null,
         size: null,
         blurhash: null,
+        thumbnail: null,
         spoiler: null,
       };
     case 'video':
-      return { ...base, kind, width: null, height: null, blurhash: null, spoiler: null };
+      return {
+        ...base,
+        kind,
+        width: null,
+        height: null,
+        blurhash: null,
+        thumbnail: null,
+        spoiler: null,
+      };
     case 'audio':
       return { ...base, kind, duration_ms: null, waveform: null, voice: false };
     case 'file':
@@ -112,6 +121,8 @@ test('opens the selected gallery image', async () => {
             mime: 'image/png',
             width: 100,
             height: 100,
+            blurhash: null,
+            thumbnail: null,
           },
           {
             kind: 'image',
@@ -120,6 +131,8 @@ test('opens the selected gallery image', async () => {
             mime: 'image/png',
             width: 100,
             height: 100,
+            blurhash: null,
+            thumbnail: null,
           },
         ],
       }),
@@ -153,6 +166,7 @@ test('keeps an image filename hidden without the alt-text preference', async () 
         height: null,
         size: null,
         blurhash: null,
+        thumbnail: null,
         spoiler: null,
       }),
       canRedactOthers: false,

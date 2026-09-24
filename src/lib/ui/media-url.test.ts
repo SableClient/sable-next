@@ -1,5 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { CoreEvent } from '#src/generated/protocol';
+
 import { cachedMediaUrl, discardMediaUrl, holdMediaUrl, loadMediaUrl } from './media-url.js';
 
 afterEach(() => {
@@ -23,6 +25,7 @@ test('evicts object URLs when cached media exceeds the byte budget', async () =>
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:media-${String(nextUrl++)}`);
   const core = {
     session: session('account-a', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 
@@ -39,6 +42,7 @@ test('a discarded URL is revoked and not served again until the failure expires'
   const source = 'mxc://example.org/undecodable';
   const core = {
     session: session('account-discard', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
 
@@ -57,6 +61,7 @@ test('does not discard a URL that has since been replaced', async () => {
   const source = 'mxc://example.org/replaced';
   const core = {
     session: session('account-replaced', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
 
@@ -73,10 +78,12 @@ test('does not share a media URL between accounts', async () => {
   const source = 'mxc://example.org/account-scoped';
   const accountA = {
     session: session('account-a', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
   const accountB = {
     session: session('account-b', '@b:example.org', 'device-b'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([2]))) },
   };
 
@@ -91,6 +98,7 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:held-${String(nextUrl++)}`);
   const core = {
     session: session('account-held', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 
@@ -113,6 +121,7 @@ test('a cached URL that is held again is evicted after older ones', async () => 
   );
   const core = {
     session: session('account-recent', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: {
       fetchMedia: vi.fn((source: string) =>
         Promise.resolve(new Uint8Array(10 * 1024 * 1024 + Number(source.slice(-1))))
@@ -136,6 +145,7 @@ test('revokes the URL it replaces when a key is fetched twice', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:replaced-${String(nextUrl++)}`);
   const core = {
     session: session('account-replaced', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
   };
   const source = 'mxc://example.org/notification-avatar';
@@ -152,6 +162,7 @@ test('holds media requests at six in flight', async () => {
   const settlers: (() => void)[] = [];
   const core = {
     session: session('account-gated', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: {
       fetchMedia: vi.fn(
         () =>
@@ -187,6 +198,7 @@ test('never revokes the URL it is about to return', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:published-${String(nextUrl++)}`);
   const core = {
     session: session('account-published', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(17 * 1024 * 1024))) },
   };
 
@@ -201,6 +213,7 @@ test('lets a failed source be fetched again once its backoff has elapsed', async
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:recovered');
   const core = {
     session: session('account-recovered', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: {
       fetchMedia: vi
         .fn<() => Promise<Uint8Array<ArrayBuffer>>>()
@@ -224,6 +237,7 @@ test('does not let stalled media requests block later media forever', async () =
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:after-stall');
   const core = {
     session: session('account-stalled', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
     commands: {
       fetchMedia: vi.fn(() => new Promise<Uint8Array<ArrayBuffer>>(() => {})),
     },
@@ -237,4 +251,42 @@ test('does not let stalled media requests block later media forever', async () =
   expect(core.commands.fetchMedia).toHaveBeenCalledTimes(6);
   await vi.advanceTimersByTimeAsync(30_000);
   expect(core.commands.fetchMedia).toHaveBeenCalledTimes(7);
+});
+
+test('keeps a download alive while it reports progress', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:large');
+  const listeners = new Set<(event: CoreEvent) => void>();
+  let finish: (bytes: Uint8Array<ArrayBuffer>) => void = () => {};
+  const source = 'mxc://example.org/large';
+  const core = {
+    session: session('account-large', '@a:example.org', 'device-a'),
+    subscribeEvents: (listener: (event: CoreEvent) => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    commands: {
+      fetchMedia: vi.fn(
+        () =>
+          new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
+            finish = resolve;
+          })
+      ),
+    },
+  };
+  const progress = (current: number): void => {
+    for (const listener of listeners) {
+      listener({ type: 'media_progress', source, current, total: 100 });
+    }
+  };
+
+  const request = loadMediaUrl(core, source, 0, 0);
+  for (const current of [20, 40, 60, 80]) {
+    await vi.advanceTimersByTimeAsync(20_000);
+    progress(current);
+  }
+  finish(new Uint8Array(100));
+
+  await expect(request).resolves.toBe('blob:large');
+  expect(listeners.size).toBe(0);
 });

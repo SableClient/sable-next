@@ -16,7 +16,7 @@ const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
 const MAX_MEDIA_REQUESTS = 6;
-const MEDIA_REQUEST_TIMEOUT_MS = 30_000;
+const MEDIA_STALL_TIMEOUT_MS = 30_000;
 const MEDIA_FAILURE_TTL_MS = 30_000;
 let objectUrlBytes = 0;
 let inflight = 0;
@@ -123,6 +123,10 @@ export function holdMediaUrl(
   };
 }
 
+export function isEncryptedMedia(source: string): boolean {
+  return source.startsWith('{');
+}
+
 /** Lets a caller paint a known source without waiting a frame for a microtask. */
 export function cachedMediaUrl(
   core: Pick<CoreClient, 'session'>,
@@ -154,7 +158,7 @@ export function discardMediaUrl(
  * back through a command and get wrapped in an object URL. One URL per source
  * and size, shared by every message referencing it.
  */
-export type MediaFetcher = Pick<CoreClient, 'session'> & {
+export type MediaFetcher = Pick<CoreClient, 'session' | 'subscribeEvents'> & {
   commands: Pick<CoreCommands, 'fetchMedia'>;
 };
 
@@ -170,13 +174,22 @@ function fetchThroughGate(
     request: Promise<Uint8Array<ArrayBuffer>>
   ): Promise<Uint8Array<ArrayBuffer>> => {
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const deadline = new Promise<Uint8Array<ArrayBuffer>>((_, reject) => {
-      timeout = setTimeout(() => {
-        reject(new Error('Media request timed out'));
-      }, MEDIA_REQUEST_TIMEOUT_MS);
+    let unsubscribe = (): void => {};
+    const stalled = new Promise<Uint8Array<ArrayBuffer>>((_, reject) => {
+      const arm = (): void => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          reject(new Error('Media request stalled'));
+        }, MEDIA_STALL_TIMEOUT_MS);
+      };
+      arm();
+      unsubscribe = core.subscribeEvents((event) => {
+        if (event.type === 'media_progress' && event.source === source) arm();
+      });
     });
-    return Promise.race([request, deadline]).finally(() => {
-      if (timeout !== undefined) clearTimeout(timeout);
+    return Promise.race([request, stalled]).finally(() => {
+      clearTimeout(timeout);
+      unsubscribe();
     });
   };
   const guardedFetch = (): Promise<Uint8Array<ArrayBuffer>> => {

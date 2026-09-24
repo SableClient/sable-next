@@ -2417,6 +2417,7 @@ pub enum TimelineItemContentView {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         size: Option<u64>,
         blurhash: Option<String>,
+        thumbnail: Option<String>,
         spoiler: Option<String>,
     },
     Video {
@@ -2431,6 +2432,7 @@ pub enum TimelineItemContentView {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         height: Option<u64>,
         blurhash: Option<String>,
+        thumbnail: Option<String>,
         spoiler: Option<String>,
     },
     Audio {
@@ -2604,6 +2606,8 @@ pub enum GalleryItemView {
         width: Option<u64>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         height: Option<u64>,
+        blurhash: Option<String>,
+        thumbnail: Option<String>,
     },
     Video {
         body: String,
@@ -2613,6 +2617,8 @@ pub enum GalleryItemView {
         width: Option<u64>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         height: Option<u64>,
+        blurhash: Option<String>,
+        thumbnail: Option<String>,
     },
     Audio {
         body: String,

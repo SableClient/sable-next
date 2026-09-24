@@ -106,6 +106,9 @@ test('a decodable video never reaches the re-encoder', async () => {
   const { instance } = mountVideo();
   await settle();
 
+  document.querySelector<HTMLButtonElement>('.media-play')?.click();
+  await settle();
+
   expect(streamVideo).not.toHaveBeenCalled();
   expect(document.querySelector('.media-play')).toBeNull();
   await unmount(instance);
@@ -115,6 +118,9 @@ test('a build without the native re-encoder leaves the video alone', async () =>
   videoStreamMime.mockRejectedValueOnce(new Error('unknown command'));
 
   const { instance } = mountVideo();
+  await settle();
+
+  document.querySelector<HTMLButtonElement>('.media-play')?.click();
   await settle();
 
   expect(streamVideo).not.toHaveBeenCalled();

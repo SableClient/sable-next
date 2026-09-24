@@ -41,6 +41,7 @@
           height: null,
           size: null,
           blurhash: null,
+          thumbnail: null,
           spoiler: null,
           eventId: 'profile-avatar',
           sender: name,

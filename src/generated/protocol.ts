@@ -316,7 +316,7 @@ export type EncryptionStatusView = {
 	cross_signing_ready: boolean,
 };
 
-export type GalleryItemView = { kind: "image"; body: string; source: string; mime: string | null; width: number | null; height: number | null } | { kind: "video"; body: string; source: string; mime: string | null; width: number | null; height: number | null } | { kind: "audio"; body: string; source: string; mime: string | null } | { kind: "file"; body: string; source: string; mime: string | null };
+export type GalleryItemView = { kind: "image"; body: string; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null } | { kind: "video"; body: string; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null } | { kind: "audio"; body: string; source: string; mime: string | null } | { kind: "file"; body: string; source: string; mime: string | null };
 
 export type HomeserverSoftwareView = {
 	name: string | null,
@@ -968,9 +968,9 @@ html: string;
 /**  `m.emote`, which reads as an action by the sender rather than speech. */
 emote: boolean; notice: boolean; edited: boolean } | { kind: "image"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; spoiler: string | null } | { kind: "video"; filename: string; caption: string | null;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "video"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null;
+html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */

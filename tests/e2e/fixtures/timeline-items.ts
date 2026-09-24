@@ -56,6 +56,7 @@ export function timelineImage(id: string): TimelineItemView {
       mime: 'image/png',
       size: null,
       blurhash: null,
+      thumbnail: null,
       // Matches TIMELINE_LAYOUT.pictureRatio, so the placeholder the estimator
       // reserves is the height the loaded image takes.
       width: 800,
@@ -96,6 +97,7 @@ export function timelineWideImageWithoutDimensions(id: string): TimelineItemView
       mime: 'image/png',
       size: null,
       blurhash: null,
+      thumbnail: null,
       width: null,
       height: null,
       spoiler: null,

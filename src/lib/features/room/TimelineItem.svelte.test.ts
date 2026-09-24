@@ -90,6 +90,7 @@ function imageItem(body = 'photo.png'): TimelineItemView {
       height: 600,
       size: null,
       blurhash: null,
+      thumbnail: null,
       spoiler: null,
     },
   };
