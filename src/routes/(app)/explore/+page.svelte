@@ -10,8 +10,6 @@
   title={$i18n.t('room.directoryTitle')}
   description={$i18n.t('room.directoryDescription')}
 >
-  <RoomDirectory />
-
   <SettingsSection
     headingId="explore-join-by-address"
     title={$i18n.t('room.directoryJoinByAddress')}
@@ -19,4 +17,6 @@
   >
     <JoinAddressForm />
   </SettingsSection>
+
+  <RoomDirectory />
 </AppPageShell>
