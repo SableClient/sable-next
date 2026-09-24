@@ -12,6 +12,7 @@ export default defineConfig({
     'timeline-row-height.spec.ts',
     'composer-alignment.spec.ts',
     'composer-autocomplete.spec.ts',
+    'composer-paste.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',

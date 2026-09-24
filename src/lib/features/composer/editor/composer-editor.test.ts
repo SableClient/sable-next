@@ -1714,3 +1714,57 @@ describe('formatting in the plain composer writes markdown', () => {
     expect(body(editor)).toBe('[docs](https://example.org)');
   });
 });
+
+describe('code indentation in the composer', () => {
+  function paste(text: string, html?: string): void {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    if (html) data.setData('text/html', html);
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: data });
+    surface().dispatchEvent(event);
+  }
+
+  test('a paste from an editor keeps its indentation and its line spacing in plain mode', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter', true);
+    paste(
+      'fn main() {\n    let x = 1;\n}',
+      '<div><div><span>fn main() {</span></div><div><span>    let x = 1;</span></div><div><span>}</span></div></div>'
+    );
+    press(editor, 'Enter', true);
+    type(editor, '```');
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializePlain(doc).body).toBe('```\nfn main() {\n    let x = 1;\n}\n```');
+  });
+
+  test('Tab indents inside a code block', () => {
+    preferences.richTextComposer = true;
+    preferences.enterForNewline = true;
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter');
+    press(editor, 'Tab');
+    type(editor, 'x');
+
+    expect(editor.doc()?.firstChild?.textContent).toBe('    x');
+  });
+
+  test('Tab indents inside an open fence in plain mode, and nowhere else', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    press(editor, 'Tab');
+    type(editor, '```');
+    press(editor, 'Enter', true);
+    press(editor, 'Tab');
+    type(editor, 'x');
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializePlain(doc).body).toBe('```\n    x');
+  });
+});

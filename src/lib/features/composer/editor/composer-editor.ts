@@ -402,6 +402,26 @@ function documentEdgeGuard(): Plugin {
   });
 }
 
+const INDENT = '    ';
+
+function insideFence(state: EditorState): boolean {
+  const { $from } = state.selection;
+  const before = $from.parent.textBetween(0, $from.parentOffset, '\n', (node) =>
+    node.type === composerSchema.nodes.hard_break ? '\n' : ''
+  );
+  const fences = before.split('\n').filter((line) => line.trimStart().startsWith('```'));
+  return fences.length % 2 === 1;
+}
+
+function indentCode(markdown: boolean): Command {
+  return (state, dispatch) => {
+    const inCode = state.selection.$from.parent.type.spec.code === true;
+    if (!inCode && !(markdown && insideFence(state))) return false;
+    dispatch?.(state.tr.insertText(INDENT));
+    return true;
+  };
+}
+
 function atDocumentEdge(direction: 'up' | 'down'): Command {
   return (state, _dispatch, view) => {
     if (!state.selection.empty || !view) return false;
@@ -561,7 +581,9 @@ export class ComposerEditor {
         'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
         'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
         Tab: (state, dispatch, view) =>
-          this.options.onNavigate('Tab') || sinkListEntry(state, dispatch, view),
+          this.options.onNavigate('Tab') ||
+          indentCode(this.markdownMode())(state, dispatch, view) ||
+          sinkListEntry(state, dispatch, view),
         Escape: () => this.options.onNavigate('Escape'),
         Enter: this.enter,
         'Shift-Enter': (state, dispatch, view) =>
@@ -619,7 +641,8 @@ export class ComposerEditor {
           handlePaste: (pasteView, event, slice) =>
             this.handleFiles(filesFrom(event.clipboardData)) ||
             this.handlePastedImages(slice) ||
-            this.linkSelection(pasteView, slice),
+            this.linkSelection(pasteView, slice) ||
+            this.pasteAsText(pasteView, event),
           clipboardTextParser: (text, _context, plain) =>
             plain || this.source || !preferences.richTextComposer
               ? textSlice(text)
@@ -781,6 +804,14 @@ export class ComposerEditor {
     const sources = pastedImageSources(slice);
     if (sources.length === 0) return false;
     void filesFromSources(sources).then((files) => this.handleFiles(files));
+    return true;
+  }
+
+  private pasteAsText(view: EditorView, event: ClipboardEvent): boolean {
+    if (!this.markdownMode()) return false;
+    const text = event.clipboardData?.getData('text/plain');
+    if (!text || event.clipboardData?.getData('text/html').includes('data-pm-slice')) return false;
+    view.dispatch(view.state.tr.replaceSelection(textSlice(text)).scrollIntoView());
     return true;
   }
 
