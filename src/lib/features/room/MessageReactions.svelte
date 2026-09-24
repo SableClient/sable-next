@@ -1,6 +1,8 @@
 <script lang="ts">
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
   import { onDestroy } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import type { ImagePackView, MemberView, TimelineItemView } from '#src/generated/protocol';
 
@@ -54,6 +56,7 @@
   let imagePacks = $state.raw<ImagePackView[]>([]);
   let addReactionButton = $state<HTMLElement | null>(null);
   let addReactionOpen = $state(false);
+  const failedImages = new SvelteSet<string>();
   const press = new LongPress({
     stopPropagation: true,
     onPress: () => onViewReactions?.(pressIndex),
@@ -115,7 +118,7 @@
         onpointerup={press.end}
         onpointercancel={press.end}
       >
-        <span class="reaction-key">
+        <span class={['reaction-key', failedImages.has(reaction.key) && 'failed']}>
           {#if isCustomReaction(reaction.key)}
             <MediaImage
               class="reaction-image"
@@ -124,7 +127,12 @@
               width={64}
               height={64}
               original
+              onloaded={() => failedImages.delete(reaction.key)}
+              onfailed={() => failedImages.add(reaction.key)}
             />
+            {#if failedImages.has(reaction.key)}
+              <WarningIcon class="reaction-image-failed" aria-hidden="true" />
+            {/if}
           {:else}
             <em>{reaction.key}</em>
           {/if}
@@ -232,6 +240,18 @@
   .reaction-key {
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .reaction-key.failed :global(.reaction-image) {
+    display: none;
+  }
+
+  .reaction-key :global(.reaction-image-failed) {
+    color: var(--surface-var-on-container);
+    display: block;
+    height: 1.125rem;
+    opacity: 0.6;
+    width: 1.125rem;
   }
 
   .reaction-key em {
