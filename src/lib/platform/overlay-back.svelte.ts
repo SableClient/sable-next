@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
-import { untrack } from 'svelte';
+import { tick, untrack } from 'svelte';
 
 export function overlayBackDepth(state: App.PageState): number {
   return state.overlay ?? 0;
@@ -9,6 +9,8 @@ export function overlayBackDepth(state: App.PageState): number {
 let pushed = 0;
 let pushing = 0;
 let queued = 0;
+let popped: Promise<void> = Promise.resolve();
+const POP_FALLBACK_MS = 250;
 
 function popEntries(count: number): void {
   queued += count;
@@ -17,8 +19,25 @@ function popEntries(count: number): void {
   queueMicrotask(() => {
     const total = queued;
     queued = 0;
-    if (total > 0) history.go(-total);
+    if (total === 0) return;
+    popped = new Promise((resolve) => {
+      addEventListener(
+        'popstate',
+        () => {
+          resolve();
+        },
+        { once: true }
+      );
+      setTimeout(resolve, POP_FALLBACK_MS);
+    });
+    history.go(-total);
   });
+}
+
+export async function afterOverlayPops(): Promise<void> {
+  await tick();
+  await Promise.resolve();
+  await popped;
 }
 
 async function pushEntry(depth: number): Promise<boolean> {
