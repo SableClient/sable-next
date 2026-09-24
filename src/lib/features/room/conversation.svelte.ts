@@ -11,6 +11,7 @@ import type {
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
+import { t } from '#lib/i18n.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import type { ComposerContext } from '#lib/features/composer/composer-context.js';
@@ -21,6 +22,7 @@ import {
 } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
+import { replyFallbackFromSource } from '#lib/features/room/reply-fallback.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
 import { firstPreviewableLink } from '#lib/features/room/link-preview.js';
 import { loadUrlPreview } from '#lib/features/room/link-preview-cache.js';
@@ -402,8 +404,14 @@ export class Conversation {
       this.#requestedDetails.add(eventId);
       void this.#core.commands
         .fetchEventDetails(roomId, eventId, this.#threadRoot)
-        .catch((error: unknown) => {
+        .catch(async (error: unknown) => {
           console.debug('[sable room] reply details unavailable', error);
+          const source = await this.#core.commands.eventSource(roomId, reply.event_id);
+          const fallback = replyFallbackFromSource(source, t);
+          if (fallback) this.#timeline.provideReplyFallback(reply.event_id, fallback);
+        })
+        .catch((error: unknown) => {
+          console.debug('[sable room] replied-to event unavailable', error);
         });
     }
   };

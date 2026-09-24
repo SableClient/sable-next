@@ -73,6 +73,11 @@ export function activeRoomTimeline(core: CoreClient): ActiveRoomTimeline {
   return active;
 }
 
+export interface ReplyFallback {
+  sender: string | null;
+  body: string;
+}
+
 export class RoomTimeline {
   items = $state.raw<TimelineItemView[]>([]);
   aggregations = $state.raw<TimelineItemView[]>([]);
@@ -98,10 +103,35 @@ export class RoomTimeline {
   private state: SubscriptionState = 'stopped';
   private backwardPaginationPending = false;
   private backwardPaginationCompletion: BackwardPaginationState | null = null;
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read only while publishing items, which is what renders
+  private readonly replyFallbacks = new Map<string, ReplyFallback>();
+
   private backwardPaginationStartFirstEventId: string | null = null;
   private backwardPaginationBoundaryChanged = false;
   private backwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(private readonly core: CoreClient) {}
+
+  provideReplyFallback(eventId: string, fallback: ReplyFallback): void {
+    this.replyFallbacks.set(eventId, fallback);
+    this.items = this.withReplyFallbacks(this.items);
+  }
+
+  private withReplyFallbacks(items: TimelineItemView[]): TimelineItemView[] {
+    if (this.replyFallbacks.size === 0) return items;
+    let next: TimelineItemView[] | null = null;
+    for (const [index, item] of items.entries()) {
+      const reply = item.in_reply_to;
+      if (reply?.body !== null) continue;
+      const fallback = this.replyFallbacks.get(reply.event_id);
+      if (!fallback) continue;
+      next ??= [...items];
+      next[index] = {
+        ...item,
+        in_reply_to: { ...reply, sender: reply.sender ?? fallback.sender, body: fallback.body },
+      };
+    }
+    return next ?? items;
+  }
 
   start(roomId: string, eventId: string | null = null, hiddenEvents = false): Promise<void> {
     return this.open(
@@ -233,6 +263,7 @@ export class RoomTimeline {
     this.state = 'stopped';
     this.startPromise = null;
     this.items = [];
+    this.replyFallbacks.clear();
     this.aggregations = [];
     this.hasSnapshot = false;
     this.loading = false;
@@ -285,7 +316,7 @@ export class RoomTimeline {
         return;
       if (event.type === 'timeline_diff') {
         const before = this.items;
-        const items = applyDiffs(before, event.diffs);
+        const items = this.withReplyFallbacks(applyDiffs(before, event.diffs));
         this.items = items;
         if (before.length > 0 && items.length === 0) {
           this.backwardPaginationPending = false;
@@ -332,7 +363,7 @@ export class RoomTimeline {
     }
 
     this.subscription = response.subscription;
-    this.items = response.items;
+    this.items = this.withReplyFallbacks(response.items);
     this.aggregations = response.aggregations;
     this.hasSnapshot = true;
     this.state = 'active';

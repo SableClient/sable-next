@@ -641,3 +641,33 @@ test('a different thread in the same room resubscribes', async () => {
     { kind: 'thread', root_event_id: '$two' },
   ]);
 });
+
+test('a reply fallback fills the preview now and on every later diff', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+  const reply = {
+    ...item('reply'),
+    in_reply_to: {
+      event_id: '$reaction',
+      sender: null,
+      sender_mentioned: false,
+      sender_name: null,
+      body: null,
+    },
+  };
+  core.emit({ type: 'timeline_diff', subscription: 1, diffs: [{ op: 'push_back', value: reply }] });
+
+  timeline.provideReplyFallback('$reaction', { sender: '@ana:example.org', body: 'Reacted' });
+  expect(timeline.items.at(-1)?.in_reply_to).toMatchObject({
+    sender: '@ana:example.org',
+    body: 'Reacted',
+  });
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'set', index: 2, value: reply }],
+  });
+  expect(timeline.items.at(-1)?.in_reply_to?.body).toBe('Reacted');
+});

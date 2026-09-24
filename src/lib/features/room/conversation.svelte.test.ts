@@ -4,7 +4,7 @@ import type { TimelineItemView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
-import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
@@ -205,4 +205,46 @@ test('with the preference off an encrypted room refuses the schedule instead of 
     'encrypted'
   );
   expect(scheduledQueue()).toHaveLength(0);
+});
+
+test('a reply the SDK cannot embed takes its preview from the event source', async () => {
+  const reply = {
+    ...item('$reply:example.org', '@kris:example.org'),
+    in_reply_to: { event_id: '$reaction:example.org', sender: null, body: null },
+  } as unknown as TimelineItemView;
+  const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
+  const eventSource = vi.fn(() =>
+    Promise.resolve(
+      JSON.stringify({
+        type: 'm.reaction',
+        sender: '@ana:example.org',
+        content: { 'm.relates_to': { key: '🎉' } },
+      })
+    )
+  );
+  const core = {
+    session: { user_id: '@kris:example.org' },
+    commands: {
+      fetchEventDetails: vi.fn(() => Promise.reject(new Error('unsupported'))),
+      eventSource,
+    },
+  } as unknown as CoreClient;
+  const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
+  const conversation = new Conversation({
+    core,
+    personas: {} as PersonaStore,
+    timeline,
+    roomId: () => ROOM,
+  });
+
+  conversation.fetchMissingReplyDetails();
+  await vi.waitFor(() => {
+    expect(provideReplyFallback).toHaveBeenCalled();
+  });
+
+  expect(eventSource).toHaveBeenCalledWith(ROOM, '$reaction:example.org');
+  const [eventId, fallback] = provideReplyFallback.mock.calls[0];
+  expect(eventId).toBe('$reaction:example.org');
+  expect(fallback.sender).toBe('@ana:example.org');
+  expect(fallback.body).toContain('🎉');
 });
