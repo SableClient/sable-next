@@ -54,11 +54,11 @@
     box-sizing: border-box;
     display: inline-flex;
     font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    height: var(--line-height-small);
+    font-weight: var(--font-weight-medium);
+    height: var(--size-x50);
     justify-content: center;
-    line-height: var(--line-height-small);
-    min-width: var(--line-height-small);
-    padding: 0 var(--space-050);
+    line-height: var(--size-x50);
+    min-width: var(--size-x50);
+    padding: 0 var(--space-100);
   }
 </style>
