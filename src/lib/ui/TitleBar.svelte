@@ -1,9 +1,4 @@
 <script lang="ts">
-  import CornersInIcon from 'phosphor-svelte/lib/CornersInIcon';
-  import CornersOutIcon from 'phosphor-svelte/lib/CornersOutIcon';
-  import MinusIcon from 'phosphor-svelte/lib/MinusIcon';
-  import XIcon from 'phosphor-svelte/lib/XIcon';
-
   import { i18n } from '#lib/i18n.js';
   import {
     closeWindow,
@@ -68,7 +63,9 @@
           void minimizeWindow();
         }}
       >
-        <MinusIcon />
+        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+          <path d="M1.5 6.5h9" stroke-linecap="square" />
+        </svg>
       </button>
       <button
         type="button"
@@ -77,7 +74,14 @@
           void toggleMaximizeWindow();
         }}
       >
-        {#if maximized}<CornersInIcon />{:else}<CornersOutIcon />{/if}
+        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+          {#if maximized}
+            <rect x="1.5" y="3.5" width="7" height="7" />
+            <path d="M3.5 1.5h5a2 2 0 0 1 2 2v5" />
+          {:else}
+            <rect x="1.5" y="1.5" width="9" height="9" />
+          {/if}
+        </svg>
       </button>
       <button
         type="button"
@@ -87,7 +91,9 @@
           void closeWindow();
         }}
       >
-        <XIcon />
+        <svg viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+          <path d="M1.5 1.5l9 9M10.5 1.5l-9 9" stroke-linecap="square" />
+        </svg>
       </button>
     </div>
   {/if}
@@ -154,7 +160,8 @@
     cursor: default;
     display: flex;
     justify-content: center;
-    padding: 0 var(--space-300);
+    padding: 0;
+    width: 46px;
   }
 
   .controls button:hover {
@@ -166,9 +173,17 @@
     color: var(--crit-on-main);
   }
 
-  .controls :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
+  .controls svg {
+    fill: none;
+    height: 12px;
+    shape-rendering: crispedges;
+    stroke: currentcolor;
+    stroke-width: 1;
+    width: 12px;
+  }
+
+  .controls svg * {
+    vector-effect: non-scaling-stroke;
   }
 
   .handle {
