@@ -6,7 +6,7 @@
   import type { Component } from 'svelte';
   import type { RoomSummary } from '#src/generated/protocol';
   import { resolve } from '$app/paths';
-  import { afterNavigate } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import { roomPathParam } from '#lib/rooms/room-list.svelte.js';
@@ -44,9 +44,11 @@
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
+  import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
+  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
@@ -193,12 +195,28 @@
     })
   );
 
-  const createItem: RailItem = {
-    href: resolve('create-room'),
-    activePrefix: '/create-room',
-    icon: PlusIcon,
-    label: 'nav.createRoom',
-  };
+  const createEntries = [
+    { href: resolve('create-room'), label: 'nav.createRoom', icon: PlusIcon },
+    { href: resolve('create-space'), label: 'nav.createSpace', icon: HouseIcon },
+    {
+      href: `${resolve('explore')}#explore-join-by-address`,
+      label: 'nav.joinWithAddress',
+      icon: LinkIcon,
+    },
+    { href: resolve('explore'), label: 'nav.explore', icon: CompassIcon },
+  ] as const;
+  let createOpen = $state(false);
+  let createAnchor = $state.raw<HTMLElement | null>(null);
+
+  function openCreateMenu(event: MouseEvent): void {
+    if (event.currentTarget instanceof HTMLElement) createAnchor = event.currentTarget;
+    createOpen = true;
+  }
+
+  function navigateTo(href: string): void {
+    if (onNavigate) onNavigate(href);
+    else void goto(href);
+  }
 
   function under(path: string, root: string): boolean {
     return path === root || path.startsWith(`${root}/`);
@@ -497,6 +515,22 @@
   {/if}
 {/snippet}
 
+{#snippet createButton(props: Record<string, unknown>)}
+  <button
+    {...props}
+    type="button"
+    class="rail-item nav-tab nav-tab-side nav-tab-outlined selection-layer"
+    aria-label={$i18n.t('nav.add')}
+    aria-haspopup="menu"
+    aria-expanded={createOpen}
+    onclick={openCreateMenu}
+  >
+    <span class="icon" aria-hidden="true"
+      ><PlusIcon weight={createOpen ? 'fill' : 'regular'} /></span
+    >
+  </button>
+{/snippet}
+
 {#snippet sectionItem(item: RailItem, section: RailSection)}
   <div
     class="rail-menu-anchor rail-section-anchor"
@@ -698,7 +732,16 @@
       </ul>
     {/if}
     <ul class="rail-stack">
-      <li>{@render railItem(createItem, false)}</li>
+      <li>
+        {#if mobile}
+          {@render createButton({})}
+        {:else}
+          {#snippet trigger({ props }: { props: Record<string, unknown> })}
+            {@render createButton(props)}
+          {/snippet}
+          <Tooltip label={$i18n.t('nav.add')} side="right" {trigger} />
+        {/if}
+      </li>
     </ul>
   </div>
   {#if !mobile && compact}
@@ -747,6 +790,25 @@
     {/each}
   </ActionMenu>
 {/if}
+
+<ActionMenu
+  bind:open={createOpen}
+  label={$i18n.t('nav.add')}
+  anchor={createAnchor}
+  side="right"
+  align="end"
+>
+  {#each createEntries as entry (entry.label)}
+    <ActionMenuItem
+      onSelect={() => {
+        navigateTo(entry.href);
+      }}
+    >
+      <entry.icon />
+      {$i18n.t(entry.label)}
+    </ActionMenuItem>
+  {/each}
+</ActionMenu>
 
 {#if sectionMenu}
   {@const menu = sectionMenu}

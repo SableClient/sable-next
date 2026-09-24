@@ -670,3 +670,33 @@ test('records the active desktop direct chat', async () => {
 
   await unmount(instance);
 });
+
+test('offers join by address from the add button', async () => {
+  const visited: string[] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: { spaces: [], mobile: true, onNavigate: (href: string) => visited.push(href) },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('button[aria-label="nav.add"]')?.click();
+  await tick();
+  await tick();
+
+  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
+    element.textContent.trim()
+  );
+  expect(labels).toEqual([
+    'nav.createRoom',
+    'nav.createSpace',
+    'nav.joinWithAddress',
+    'nav.explore',
+  ]);
+
+  [...document.querySelectorAll<HTMLElement>('.menu-item')][2]?.click();
+  await tick();
+
+  expect(visited).toEqual(['/explore#explore-join-by-address']);
+
+  await unmount(instance);
+});
