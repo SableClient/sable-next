@@ -1430,6 +1430,8 @@
     "gifProviderGiphy": "Giphy",
     "urlPreviews": "Aperçus de liens",
     "urlPreviewsHint": "Demande au serveur de développer les liens publiés dans un salon.",
+    "themeFileCards": "Cartes de thèmes et de retouches",
+    "themeFileCardsHint": "Affiche un aperçu avec un bouton Installer pour les fichiers .sable.css publiés dans un salon.",
     "encryptedUrlPreviews": "Aperçus de liens dans les salons chiffrés",
     "encryptedUrlPreviewsHint": "Envoie les liens des salons chiffrés à votre serveur afin de les développer.",
     "clientEmbeds": "Intégrations côté client",

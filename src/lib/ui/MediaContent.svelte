@@ -18,6 +18,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
   import ThemeFileCard from '#lib/ui/ThemeFileCard.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { isThemeFileName, MAX_THEME_FILE_BYTES } from '#lib/settings/theme-file.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
@@ -126,7 +127,10 @@
   );
   let textLanguage = $derived(isText ? textAttachmentLanguage(mime, filename) : null);
   let isThemeFile = $derived(
-    isText && (size === null || size <= MAX_THEME_FILE_BYTES) && isThemeFileName(filename)
+    preferences.themeFileCards &&
+      isText &&
+      (size === null || size <= MAX_THEME_FILE_BYTES) &&
+      isThemeFileName(filename)
   );
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);

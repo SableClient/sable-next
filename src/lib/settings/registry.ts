@@ -37,6 +37,7 @@ import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
+import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
 import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
 import PauseIcon from 'phosphor-svelte/lib/PauseIcon';
 import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
@@ -795,6 +796,13 @@ export const settingsCategories: SettingsCategory[] = [
         icon: LinkSimpleIcon,
         name: 'settings.urlPreviews',
         description: 'settings.urlPreviewsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'themeFileCards',
+        icon: PaletteIcon,
+        name: 'settings.themeFileCards',
+        description: 'settings.themeFileCardsHint',
         type: 'boolean',
       },
       {

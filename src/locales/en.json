@@ -1425,6 +1425,8 @@
     "gifProviderGiphy": "Giphy",
     "urlPreviews": "Link previews",
     "urlPreviewsHint": "Asks the server to unfurl links posted in a room.",
+    "themeFileCards": "Theme and tweak cards",
+    "themeFileCardsHint": "Shows a preview with an Install button for .sable.css files posted in a room.",
     "encryptedUrlPreviews": "Link previews in encrypted rooms",
     "encryptedUrlPreviewsHint": "Sends links from encrypted rooms to your server to unfurl them.",
     "clientEmbeds": "Client-side embeds",

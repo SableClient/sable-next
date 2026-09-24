@@ -103,6 +103,7 @@ export interface Preferences {
   autoplayStickers: boolean;
   gifProvider: GifProviderSetting;
   urlPreviews: boolean;
+  themeFileCards: boolean;
   encryptedUrlPreviews: boolean;
   clientEmbeds: boolean;
   encryptedClientEmbeds: boolean;
@@ -302,6 +303,7 @@ const DEFAULTS: Preferences = {
   autoplayStickers: true,
   gifProvider: 'default',
   urlPreviews: false,
+  themeFileCards: true,
   encryptedUrlPreviews: false,
   clientEmbeds: false,
   encryptedClientEmbeds: false,
