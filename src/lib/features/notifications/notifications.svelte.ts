@@ -3,6 +3,7 @@ import type { NotificationView, RoomSummary } from '#src/generated/protocol';
 import { createContext } from 'svelte';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { watchNativePushMessages } from '#lib/platform/native-notifications.js';
 import { hasUnread, roomNotifications, type RoomUnread } from '#lib/rooms/unread.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -184,8 +185,21 @@ export class NotificationCenter {
     this.conversations.set(view.room_id, lines);
 
     const quiet = preferences.notifyOnce && standing.length > 0 && !view.mention;
-    if (view.noisy !== false && preferences.notificationSounds && !quiet && soundsAllowed()) {
-      void playNotificationSound().catch(() => undefined);
+    const allowed = soundsAllowed();
+    const chime = view.noisy !== false && preferences.notificationSounds && !quiet && allowed;
+    recordDebugLog('debug', 'notification', 'sound', chime ? 'chime' : 'silent', {
+      noisy: view.noisy,
+      sounds: preferences.notificationSounds,
+      quiet,
+      allowed,
+      mention: view.mention,
+      direct: view.is_direct,
+      encrypted: view.encrypted,
+    });
+    if (chime) {
+      void playNotificationSound().catch((error: unknown) => {
+        console.warn('[sable notification sound] failed', error);
+      });
     }
 
     if (!enabled() || this.reading === view.room_id) return;

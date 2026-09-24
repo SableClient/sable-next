@@ -1,6 +1,8 @@
+import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const SOUND_URL = '/sound/notification.ogg';
+const RESUME_STALL_MS = 3000;
 
 let context: AudioContext | undefined;
 let playing: AudioBufferSourceNode | undefined;
@@ -14,8 +16,24 @@ export async function playNotificationSound(): Promise<void> {
 
   try {
     const buffer = await sound;
-    if (context !== audioContext || playing !== undefined) return;
-    if (audioContext.state !== 'running') await audioContext.resume();
+    if (context !== audioContext || playing !== undefined) {
+      recordDebugLog('debug', 'notification', 'sound', 'skipped', {
+        replaced: context !== audioContext,
+        playing: playing !== undefined,
+      });
+      return;
+    }
+    if (audioContext.state !== 'running') {
+      recordDebugLog('debug', 'notification', 'sound', 'resuming', { state: audioContext.state });
+      const stalled = setTimeout(() => {
+        console.warn('[sable notification sound] resume stalled', audioContext.state);
+      }, RESUME_STALL_MS);
+      try {
+        await audioContext.resume();
+      } finally {
+        clearTimeout(stalled);
+      }
+    }
     if (context !== audioContext) return;
 
     const source = audioContext.createBufferSource();
@@ -28,6 +46,10 @@ export async function playNotificationSound(): Promise<void> {
       if (playing === source) playing = undefined;
     });
     source.start();
+    recordDebugLog('debug', 'notification', 'sound', 'started', {
+      state: audioContext.state,
+      volume: gain.gain.value,
+    });
   } catch (error) {
     if (context === audioContext) {
       context = undefined;
