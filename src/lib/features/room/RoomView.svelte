@@ -53,6 +53,7 @@
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -1011,17 +1012,18 @@
         onResize={(next) => (voiceChatWidth = clampVoiceChatWidth(next))}
         onCommit={() => localStorage.setItem(VOICE_CHAT_WIDTH_KEY, String(voiceChatWidth))}
       />
-      <header class="voice-chat-header">
-        <h2>{$i18n.t('call.chat')}</h2>
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('call.closeChat')}
-          onclick={() => (voiceChatOpen = false)}
-        >
-          <XIcon />
-        </IconButton>
-      </header>
+      <PanelHeader class="voice-chat-header" title={$i18n.t('call.chat')}>
+        {#snippet suffix()}
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('call.closeChat')}
+            onclick={() => (voiceChatOpen = false)}
+          >
+            <XIcon />
+          </IconButton>
+        {/snippet}
+      </PanelHeader>
       {@render chat()}
     </aside>
   {/if}
@@ -1289,22 +1291,6 @@
     min-height: 0;
     min-width: 0;
     position: relative;
-  }
-
-  .voice-chat-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    display: flex;
-    flex: 0 0 auto;
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-200) 0 var(--space-400);
-  }
-
-  .voice-chat-header h2 {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
   }
 
   .voice-chat :global(.resize-handle) {

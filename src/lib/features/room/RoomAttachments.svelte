@@ -27,6 +27,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -494,20 +495,21 @@
 
 {#snippet body()}
   <aside class={['attachments', { modal }]} aria-label={$i18n.t('timeline.attachmentsTitle')}>
-    <header class="attachments-header">
-      <div class="attachments-title">
+    <PanelHeader class="attachments-header" title={$i18n.t('timeline.attachmentsTitle')}>
+      {#snippet prefix()}
         <ImagesIcon aria-hidden="true" />
-        <h2>{$i18n.t('timeline.attachmentsTitle')}</h2>
-      </div>
-      <IconButton
-        variant="ghost"
-        size="small"
-        label={$i18n.t('timeline.attachmentsClose')}
-        onclick={onClose}
-      >
-        <XIcon />
-      </IconButton>
-    </header>
+      {/snippet}
+      {#snippet suffix()}
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.attachmentsClose')}
+          onclick={onClose}
+        >
+          <XIcon />
+        </IconButton>
+      {/snippet}
+    </PanelHeader>
 
     <div class="tabs" role="tablist" aria-label={$i18n.t('timeline.attachmentsTitle')}>
       {#each tabs as tab (tab.id)}
@@ -634,32 +636,6 @@
     border-left: none;
     height: 100%;
     width: 100%;
-  }
-
-  .attachments-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--bg-container-line);
-    display: flex;
-    gap: var(--space-300);
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-200) 0 var(--space-400);
-  }
-
-  .attachments-title {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    min-width: 0;
-  }
-
-  .attachments-header h2 {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .tabs {

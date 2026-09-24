@@ -11,6 +11,7 @@
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
 
   import { memberIdentity } from './members.js';
 
@@ -69,52 +70,59 @@
   let topicShown = $derived(topic !== null && topic.trim() !== '' && onTopic !== null);
 </script>
 
-<header class="room-header">
-  <IconButton
-    class="back-button"
-    variant="ghost"
-    size="small"
-    label={$i18n.t('timeline.back')}
-    onclick={onBack}
-  >
-    <BackIcon />
-  </IconButton>
-  <Avatar class="room-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
-  <div class="room-identity" class:with-topic={topicShown}>
-    <h1>{roomName}</h1>
-    {#if topicShown}
-      <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
-    {/if}
-  </div>
-  {#if isVoice || inVoice.length > 0}
-    <span
-      class="voice-chip"
-      class:live={inVoice.length > 0}
-      role="img"
-      title={voiceLabel}
-      aria-label={voiceLabel}
+<PanelHeader class="room-header">
+  {#snippet prefix()}
+    <IconButton
+      class="back-button"
+      variant="ghost"
+      size="small"
+      label={$i18n.t('timeline.back')}
+      onclick={onBack}
     >
-      <SpeakerHighIcon />
-      {#if inVoice.length > 0}
-        <span class="voice-faces">
-          {#each inVoice.slice(0, MAX_FACES) as participant (participant.userId)}
-            <Avatar
-              class="voice-face"
-              src={participant.avatar}
-              name={participant.name}
-              id={participant.userId}
-            />
-          {/each}
-        </span>
-        <span class="voice-count">{inVoice.length}</span>
+      <BackIcon />
+    </IconButton>
+
+    <Avatar class="room-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
+  {/snippet}
+
+  {#snippet main()}
+    <div class="room-identity" class:with-topic={topicShown}>
+      <h1>{roomName}</h1>
+      {#if topicShown}
+        <button class="room-topic" type="button" onclick={onTopic}>{topic}</button>
       {/if}
-    </span>
-  {/if}
-  <div class="room-actions">
+    </div>
+    {#if isVoice || inVoice.length > 0}
+      <span
+        class="voice-chip"
+        class:live={inVoice.length > 0}
+        role="img"
+        title={voiceLabel}
+        aria-label={voiceLabel}
+      >
+        <SpeakerHighIcon />
+        {#if inVoice.length > 0}
+          <span class="voice-faces">
+            {#each inVoice.slice(0, MAX_FACES) as participant (participant.userId)}
+              <Avatar
+                class="voice-face"
+                src={participant.avatar}
+                name={participant.name}
+                id={participant.userId}
+              />
+            {/each}
+          </span>
+          <span class="voice-count">{inVoice.length}</span>
+        {/if}
+      </span>
+    {/if}
+  {/snippet}
+
+  {#snippet suffix()}
     <IconButton
       class="search-button"
       variant="ghost"
-      size="medium"
+      size="small"
       label={$i18n.t('search.open')}
       onclick={onSearch}
     >
@@ -125,7 +133,7 @@
       <IconButton
         class="chat-toggle"
         variant="ghost"
-        size="medium"
+        size="small"
         label={chatBeside
           ? chatOpen
             ? $i18n.t('call.hideChat')
@@ -147,7 +155,7 @@
       <IconButton
         class="call-button"
         variant="ghost"
-        size="medium"
+        size="small"
         label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
         onclick={onCall}
       >
@@ -158,7 +166,7 @@
     <IconButton
       class="members-button selection-open"
       variant="ghost"
-      size="medium"
+      size="small"
       label={$i18n.t('timeline.members')}
       aria-pressed={membersOpen}
       data-state={membersOpen ? 'open' : 'closed'}
@@ -167,28 +175,17 @@
       <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
     </IconButton>
     {@render menu?.()}
-  </div>
-</header>
+  {/snippet}
+</PanelHeader>
 
 <style>
-  .room-header {
-    align-items: center;
-    background: var(--surface-container);
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    display: flex;
-    flex: 0 0 auto;
-    gap: var(--space-250);
-    min-height: calc(var(--header-height) + var(--edge-inset-top));
-    padding: var(--edge-inset-top) var(--page-gutter) 0;
-  }
-
   .room-identity {
     display: grid;
     flex: 1;
     min-width: 0;
   }
 
-  .room-header h1 {
+  h1 {
     font-size: var(--font-size-heading);
     line-height: var(--line-height-heading);
     margin: 0;
@@ -225,13 +222,6 @@
   .room-topic:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
-  }
-
-  .room-actions {
-    align-items: center;
-    display: flex;
-    flex: 0 0 auto;
-    gap: var(--space-050);
   }
 
   :global(.avatar-root.room-avatar) {

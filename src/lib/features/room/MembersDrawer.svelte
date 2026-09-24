@@ -12,6 +12,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
@@ -159,29 +160,23 @@
       }}
     />
   {/if}
-  <header>
-    <div>
+  <PanelHeader {modal} {title} subtitle={$i18n.t('timeline.memberCount', { count: joined.length })}>
+    {#snippet suffix()}
       {#if modal}
-        <Dialog.Title class="title">{title}</Dialog.Title>
+        <Dialog.Close
+          class="btn btn-ghost icon-button icon-button-small"
+          aria-label={$i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
+        >
       {:else}
-        <h2 class="title">{title}</h2>
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.closeMembers')}
+          onclick={onClose}><XIcon /></IconButton
+        >
       {/if}
-      <p>{$i18n.t('timeline.memberCount', { count: joined.length })}</p>
-    </div>
-    {#if modal}
-      <Dialog.Close
-        class="btn btn-ghost icon-button icon-button-small"
-        aria-label={$i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
-      >
-    {:else}
-      <IconButton
-        variant="ghost"
-        size="small"
-        label={$i18n.t('timeline.closeMembers')}
-        onclick={onClose}><XIcon /></IconButton
-      >
-    {/if}
-  </header>
+    {/snippet}
+  </PanelHeader>
 
   {#if searchable}
     <div class="controls">
@@ -323,39 +318,14 @@
     width: 100%;
   }
 
-  header {
-    align-items: center;
-    background: var(--bg-container);
-    border-bottom: var(--border-width) solid var(--bg-container-line);
-    display: flex;
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-300) 0 var(--space-400);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-  }
-
-  .title,
-  header p {
+  .title {
+    font-size: var(--font-size-subheading);
     margin: 0;
   }
 
-  .title {
-    font-size: var(--font-size-subheading);
-  }
-
-  header p,
   .status {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-  }
-
-  header p {
-    line-height: var(--line-height-small);
-  }
-
-  .status {
     margin: 0;
     padding: var(--space-300) var(--space-400);
   }

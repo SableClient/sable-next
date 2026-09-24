@@ -11,6 +11,7 @@
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import {
     finishSwipeGesture,
@@ -196,20 +197,21 @@
         onCommit={() => localStorage.setItem(WIDTH_STORAGE_KEY, String(width))}
       />
     {/if}
-    <header class="thread-header">
-      <div class="thread-title">
+    <PanelHeader class="thread-header" title={$i18n.t('timeline.thread')}>
+      {#snippet prefix()}
         <ChatsIcon aria-hidden="true" />
-        <h2>{$i18n.t('timeline.thread')}</h2>
-      </div>
-      <IconButton
-        variant="ghost"
-        size="small"
-        label={$i18n.t('timeline.threadClose')}
-        onclick={onClose}
-      >
-        <XIcon />
-      </IconButton>
-    </header>
+      {/snippet}
+      {#snippet suffix()}
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.threadClose')}
+          onclick={onClose}
+        >
+          <XIcon />
+        </IconButton>
+      {/snippet}
+    </PanelHeader>
 
     <TimelineList
       bind:this={timelineList}
@@ -296,29 +298,6 @@
   .thread-panel :global(.resize-handle) {
     left: -0.25rem;
     z-index: 1;
-  }
-
-  .thread-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--bg-container-line);
-    display: flex;
-    gap: var(--space-300);
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-200) 0 var(--space-400);
-  }
-
-  .thread-title {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    min-width: 0;
-  }
-
-  .thread-header h2 {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
   }
 
   .thread-composer {
