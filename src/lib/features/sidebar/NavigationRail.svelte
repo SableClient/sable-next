@@ -46,7 +46,6 @@
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import FolderOpenIcon from 'phosphor-svelte/lib/FolderOpenIcon';
-  import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
@@ -55,7 +54,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UserQuickTools from './UserQuickTools.svelte';
 
-  type RailSection = 'home' | 'unspaced' | 'direct';
+  type RailSection = 'unspaced' | 'direct';
 
   type RailItem = {
     href: string;
@@ -69,7 +68,6 @@
     unread?: UnreadCount;
     dm?: boolean;
     section?: RailSection;
-    badge?: boolean;
     inCall?: boolean;
   };
 
@@ -77,7 +75,6 @@
     spaces: readonly RoomSummary[];
     spaceUnread?: ReadonlyMap<string, UnreadCount>;
     callSpaces?: ReadonlySet<string>;
-    homeUnread?: UnreadCount;
     unspacedUnread?: UnreadCount;
     directRooms?: readonly RoomSummary[];
     directUnread?: UnreadCount;
@@ -99,7 +96,6 @@
     spaces,
     spaceUnread = new Map(),
     callSpaces = new Set(),
-    homeUnread = NO_UNREAD,
     unspacedUnread = NO_UNREAD,
     directRooms = [],
     directUnread = NO_UNREAD,
@@ -122,23 +118,10 @@
   let dropState = $state<DropState<LayoutRef> | null>(null);
 
   let items = $derived<readonly RailItem[]>([
-    ...(preferences.showHome
-      ? [
-          {
-            href: resolve('/(app)/home'),
-            activePrefix: '/home',
-            icon: HouseIcon,
-            label: 'nav.home',
-            unread: homeUnread,
-            section: 'home',
-            badge: false,
-          } satisfies RailItem,
-        ]
-      : []),
     {
       href: resolve('/(app)/rooms'),
       activePrefix: '/rooms',
-      icon: preferences.showHome ? HashIcon : HouseIcon,
+      icon: HouseIcon,
       label: 'nav.unspaced',
       unread: unspacedUnread,
       section: 'unspaced',
@@ -248,10 +231,7 @@
     { key: 'badgeCountDMsOnly', label: 'settings.badgeCountDMsOnly' },
     { key: 'showPingCounts', label: 'settings.showPingCounts' },
   ] as const;
-  const viewToggles = [
-    { key: 'showHome', label: 'settings.showHome' },
-    { key: 'uniformIcons', label: 'settings.uniformIcons' },
-  ] as const;
+  const viewToggles = [{ key: 'uniformIcons', label: 'settings.uniformIcons' }] as const;
 
   let contextSpace = $state<RoomSummary | null>(null);
   let contextAnchor = $state.raw<CursorAnchor | null>(null);
@@ -474,9 +454,7 @@
       uniform
     />
   {/if}
-  {#if item.badge !== false}
-    {@render unreadMark(item.unread, item.dm ?? false)}
-  {/if}
+  {@render unreadMark(item.unread, item.dm ?? false)}
   {#if item.inCall}
     <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
   {/if}

@@ -16,10 +16,10 @@
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
 
   interface Props {
-    titleKey?: string;
+    titleKey: string;
   }
 
-  let { titleKey = 'nav.home' }: Props = $props();
+  let { titleKey }: Props = $props();
   let hasLoggedInBefore = $state(false);
 
   const startCards = [

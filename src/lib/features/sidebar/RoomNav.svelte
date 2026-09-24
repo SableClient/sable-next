@@ -127,7 +127,7 @@
   let spacePermissions = $state<RoomPermissionsView | null>(null);
 
   let directSection = $derived(page.url.pathname.startsWith('/direct'));
-  let unspacedSection = $derived(page.url.pathname.startsWith('/rooms'));
+  let unspacedSection = $derived(!directSection && !page.url.pathname.startsWith('/space'));
 
   let activeSpace = $derived(
     page.url.pathname.startsWith('/space')
@@ -224,7 +224,6 @@
     direct: ChatsIcon,
     unspaced: HashIcon,
     space: HouseIcon,
-    home: HouseIcon,
   };
 
   let section = $derived(navSectionKind(page.url.pathname));
@@ -415,11 +414,7 @@
       });
     }
 
-    if (unspacedSection) {
-      return resolve('/(app)/rooms/[roomId]', { roomId: routeId });
-    }
-
-    return resolve('/(app)/home/[roomId]', { roomId: routeId });
+    return resolve('/(app)/rooms/[roomId]', { roomId: routeId });
   }
 
   let banner = $state<string | null>(null);

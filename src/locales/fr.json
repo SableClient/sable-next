@@ -2,7 +2,6 @@
   "nav": {
     "primary": "Navigation principale",
     "quickTools": "Outils rapides",
-    "home": "Accueil",
     "messages": "Messages",
     "direct": "Conversations privées",
     "inbox": "Boîte de réception",
@@ -1303,8 +1302,6 @@
     "alwaysShowAltTextHint": "Affiche la description d’une image sous celle-ci, même lorsqu’il ne s’agit que d’un nom de fichier.",
     "showRoomBanners": "Bannières de salon",
     "showRoomBannersHint": "Affiche une image de bannière de salon ou d’espace au-dessus de sa liste de salons.",
-    "showHome": "Afficher Tous les salons dans la barre latérale",
-    "showHomeHint": "Conserve l’entrée Accueil en haut de la barre latérale, avec tous les salons et une icône dièse pour ceux qui ne sont dans aucun espace.",
     "showSearch": "Afficher la recherche dans la barre latérale",
     "showSearchHint": "Conserve l’entrée de recherche de messages dans la barre latérale.",
     "showUnreadCounts": "Compteurs de messages non lus",

@@ -80,12 +80,11 @@
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );
   let entries = $derived(mergeSpaces(spaceSidebar.items, orderedSpaceIds));
-  let homeRooms = $derived(
+  let joinedRooms = $derived(
     roomList.rooms.filter((room) => room.state === 'joined' && !room.is_space)
   );
-  let homeUnread = $derived(unreadCounts(homeRooms));
   let unspacedRooms = $derived(
-    homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id))
+    joinedRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id))
   );
   let unspacedUnread = $derived(unreadCounts(unspacedRooms));
   let allDirectRooms = $derived(
@@ -114,8 +113,8 @@
     });
   }
 
-  function markSectionRead(section: 'home' | 'unspaced' | 'direct'): void {
-    const rooms = { home: homeRooms, unspaced: unspacedRooms, direct: allDirectRooms }[section];
+  function markSectionRead(section: 'unspaced' | 'direct'): void {
+    const rooms = { unspaced: unspacedRooms, direct: allDirectRooms }[section];
     markRoomsRead(rooms, core.commands, readReceiptIsPrivate());
   }
 
@@ -200,7 +199,6 @@
           {spaces}
           {spaceUnread}
           {callSpaces}
-          {homeUnread}
           {unspacedUnread}
           {directRooms}
           {directUnread}
@@ -221,7 +219,6 @@
           {spaces}
           {spaceUnread}
           {callSpaces}
-          {homeUnread}
           {unspacedUnread}
           {directRooms}
           {directUnread}

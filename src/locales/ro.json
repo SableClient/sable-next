@@ -2,7 +2,6 @@
   "nav": {
     "primary": "Navigație principală",
     "quickTools": "Unelte Rapide",
-    "home": "Acasă",
     "messages": "Mesaje",
     "direct": "Mesaje Directe",
     "inbox": "Căsuța poștală",
@@ -1221,8 +1220,6 @@
     "alwaysShowAltTextHint": "Afișează descrierea unui fișiere sub el, chiar dacă este doar numele lui.",
     "showRoomBanners": "Banner-ele camerelor",
     "showRoomBannersHint": "Afișează imaginea banner a unei camere sau spațiu deasupra listei de camere.",
-    "showHome": "Arată buton pentru toate camerele",
-    "showHomeHint": "Păstrează un buton de Casă în partea de sus a barei din stânga, care listează toate camerele și adaugă un buton de Diez care conține toate camerele fâră spațiu.",
     "showSearch": "Buton căutare în bara laterală",
     "showSearchHint": "Păstrează butonul de căutare în bara laterală.",
     "showUnreadCounts": "Număr de mesaje necitite în cameră",

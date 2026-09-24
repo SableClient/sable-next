@@ -2,7 +2,6 @@
   "nav": {
     "primary": "Primary navigation",
     "quickTools": "Quick tools",
-    "home": "Home",
     "messages": "Messages",
     "direct": "Direct messages",
     "inbox": "Inbox",
@@ -1339,8 +1338,6 @@
     "alwaysShowAltTextHint": "Shows the description of an image below it, even when it is only a filename.",
     "showRoomBanners": "Room banners",
     "showRoomBannersHint": "Show a room or space banner image above its room list.",
-    "showHome": "Show All rooms item in sidebar",
-    "showHomeHint": "Keep the Home entry at the top of the sidebar, listing every room, and a hash icon for all the rooms that is outside of a space.",
     "showSearch": "Show search in sidebar",
     "showSearchHint": "Keep the search messages entry in the sidebar.",
     "showUnreadCounts": "Room unread counts",

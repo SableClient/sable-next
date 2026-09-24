@@ -64,12 +64,10 @@ vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 import SidebarNav from './SidebarNav.svelte';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
-  setPreference('showHome', false);
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
@@ -245,7 +243,6 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
 });
 
 test('a muted room marked unread by hand still marks its section as unread', async () => {
-  setPreference('showHome', true);
   const room: RoomSummary = {
     ...space('!muted-room:example.org', 'Ops'),
     is_space: false,
