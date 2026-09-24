@@ -76,3 +76,26 @@ test('an accepted invitation raises nothing', async () => {
 
   expect(toasts.items).toEqual([]);
 });
+
+test('accepting all joins every invite without leaving the page and reports failures once', async () => {
+  const { goto } = await import('$app/navigation');
+  const other = { ...room, room_id: '!other:example.org' };
+  const third = { ...room, room_id: '!third:example.org' };
+  const joinRoom = vi.fn((roomId: string) =>
+    roomId === room.room_id ? Promise.resolve(roomId) : Promise.reject(new Error('no via'))
+  );
+  const answers = actions({ joinRoom });
+  vi.mocked(goto).mockClear();
+
+  await answers.acceptAll([room, other, third]);
+
+  expect(joinRoom.mock.calls.map(([roomId]) => roomId)).toEqual([
+    room.room_id,
+    other.room_id,
+    third.room_id,
+  ]);
+  expect(goto).not.toHaveBeenCalled();
+  expect(toasts.items).toHaveLength(1);
+  expect(toasts.items[0]?.tone).toBe('error');
+  expect(answers.isAnswering(other.room_id)).toBe(false);
+});

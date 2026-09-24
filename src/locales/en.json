@@ -107,6 +107,9 @@
     "inviteRestore": "Restore",
     "invitesShowDismissed_one": "{{count, number}} dismissed",
     "invitesShowDismissed_other": "{{count, number}} dismissed",
+    "acceptAll": "Accept all",
+    "acceptAllFailed_one": "{{count, number}} invite could not be accepted",
+    "acceptAllFailed_other": "{{count, number}} invites could not be accepted",
     "invitesShowPending": "Back to invites",
     "markedRead": "Marked {{room}} as read",
     "bookmarkRemoved": "Removed a bookmark in {{room}}"

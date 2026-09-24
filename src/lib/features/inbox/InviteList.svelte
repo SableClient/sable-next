@@ -46,6 +46,18 @@
         {$i18n.t('inbox.invites')}
         <span class="count" aria-hidden="true">{invites.length}</span>
       </h2>
+      {#if !showDismissed && invites.length > 1}
+        <Button
+          variant="ghost"
+          size="small"
+          disabled={invites.some((invite) => answers.isAnswering(invite.room_id))}
+          onclick={() => {
+            void answers.acceptAll(invites);
+          }}
+        >
+          {$i18n.t('inbox.acceptAll')}
+        </Button>
+      {/if}
       {#if dismissed.length > 0}
         <Button
           class="dismissed-toggle"
@@ -143,8 +155,8 @@
   .section-head {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
-    justify-content: space-between;
     margin: 0 0 var(--space-300);
   }
 
@@ -156,7 +168,7 @@
     font-weight: var(--font-weight-500);
     gap: var(--space-200);
     letter-spacing: 0.08em;
-    margin: 0;
+    margin: 0 auto 0 0;
     text-transform: uppercase;
   }
 
