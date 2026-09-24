@@ -1536,6 +1536,7 @@
     "callDeviceSystemDefault": "System default",
     "callDevicesUnnamed": "Unnamed device",
     "callDevicesPermission": "Allow microphone access to name your devices.",
+    "callDevicesAllow": "Allow access",
     "callDevicesUnsupported": "This platform does not let the app choose devices.",
     "callOutputVolume": "Output volume",
     "callMicTest": "Test microphone",
