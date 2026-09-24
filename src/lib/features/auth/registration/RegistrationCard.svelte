@@ -139,6 +139,7 @@
             onValidateHomeserver();
           }}
           onblur={onValidateHomeserver}
+          onsettle={onValidateHomeserver}
         />
       </FormField>
     {/if}

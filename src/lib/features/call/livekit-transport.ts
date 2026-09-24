@@ -53,6 +53,7 @@ const selfOf = (participant: LocalParticipant): CallParticipant => ({
   screenShare: trackOf(participant.getTrackPublication(Track.Source.ScreenShare)),
   microphone: trackOf(participant.getTrackPublication(Track.Source.Microphone)),
   connectionQuality: qualityOf(participant.connectionQuality),
+  speaking: participant.isSpeaking,
 });
 
 const participantOf = (participant: RemoteParticipant): CallParticipant => ({
@@ -61,6 +62,7 @@ const participantOf = (participant: RemoteParticipant): CallParticipant => ({
   screenShare: trackOf(participant.getTrackPublication(Track.Source.ScreenShare)),
   microphone: trackOf(participant.getTrackPublication(Track.Source.Microphone)),
   connectionQuality: qualityOf(participant.connectionQuality),
+  speaking: participant.isSpeaking,
 });
 
 export type LivekitTransport = CallTransport & {
@@ -291,6 +293,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.TrackMuted, syncParticipants)
     .on(RoomEvent.TrackUnmuted, syncParticipants)
     .on(RoomEvent.ConnectionQualityChanged, syncParticipants)
+    .on(RoomEvent.ActiveSpeakersChanged, syncParticipants)
+    .on(RoomEvent.ActiveSpeakersChanged, syncLocal)
     .on(RoomEvent.LocalTrackPublished, syncLocal)
     .on(RoomEvent.LocalTrackUnpublished, syncLocal)
     .on(RoomEvent.TrackMuted, syncLocal)

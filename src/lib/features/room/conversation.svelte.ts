@@ -350,6 +350,12 @@ export class Conversation {
     };
   };
 
+  readonly moveReply = (eventId: string | null): void => {
+    if (eventId === null) this.context = null;
+    else if (this.context?.kind !== 'reply' || this.context.eventId !== eventId)
+      this.reply(eventId);
+  };
+
   readonly toggleSilentReply = (): void => {
     const pending = this.context;
     if (pending?.kind !== 'reply') return;

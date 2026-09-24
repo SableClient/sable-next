@@ -20,6 +20,7 @@
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
+  import type { ReplyDirection } from '#lib/features/room/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -32,6 +33,9 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
+  import { matchesBinding } from '#lib/ui/shortcuts/binding.js';
+  import { effectiveShortcuts } from '#lib/ui/shortcuts/bindings.svelte.js';
+  import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -125,6 +129,7 @@
     onToggleSilentReply?: () => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: () => void;
+    onReplyStep?: (direction: ReplyDirection) => void;
     threadRoot?: string | null;
   }
 
@@ -147,6 +152,7 @@
     onToggleSilentReply,
     onDeleteEdited,
     onEditLast,
+    onReplyStep,
     threadRoot = null,
   }: Props = $props();
 
@@ -832,6 +838,24 @@
     editor.focus();
   }
 
+  const REPLY_STEPS: Partial<Record<string, ReplyDirection>> = {
+    'room.replyOlder': 'older',
+    'room.replyNewer': 'newer',
+  };
+
+  function stepReply(event: KeyboardEvent): void {
+    if (!onReplyStep || panelOpen || context?.kind === 'edit' || event.defaultPrevented) return;
+    const isMac = isMacPlatform();
+    const shortcut = effectiveShortcuts().find(
+      (candidate) => REPLY_STEPS[candidate.id] && matchesBinding(candidate.binding, event, isMac)
+    );
+    const direction = shortcut && REPLY_STEPS[shortcut.id];
+    if (!direction) return;
+
+    event.preventDefault();
+    onReplyStep(direction);
+  }
+
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
     if (!panelOpen) {
       if (key === 'ArrowUp' && empty && staged.length === 0 && !context && onEditLast) {
@@ -940,6 +964,7 @@
           class:multiline={multiline && !recording}
           bind:this={rowEl}
           onmousedown={focusFromRow}
+          onkeydown={stepReply}
           onsubmit={(event) => {
             event.preventDefault();
             void send();

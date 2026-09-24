@@ -24,6 +24,7 @@ import {
   mergeAggregations,
   personaLookup,
   readReceiptEventId,
+  replyTarget,
   visibleAggregations,
   visibleTimelineItems,
 } from './timeline-format';
@@ -168,6 +169,40 @@ const topic = item({
   state_key: '',
   content: null,
   change: null,
+});
+
+function withEvent(row: TimelineItemView, eventId: string | null): TimelineItemView {
+  return { ...row, id: eventId ?? row.id, event_id: eventId };
+}
+
+const replyRows = [
+  withEvent(message, '$first'),
+  withEvent(joined, '$joined'),
+  withEvent(item({ kind: 'redacted', reason: null }), '$redacted'),
+  withEvent(divider, null),
+  withEvent(message, '$second'),
+  withEvent(message, null),
+];
+
+test('the first reply step picks the latest message, skipping echoes', () => {
+  expect(replyTarget(replyRows, null, 'older', false)).toBe('$second');
+  expect(replyTarget(replyRows, null, 'newer', false)).toBeNull();
+});
+
+test('reply steps skip redactions and non-message rows unless hidden events are shown', () => {
+  expect(replyTarget(replyRows, '$second', 'older', false)).toBe('$first');
+  expect(replyTarget(replyRows, '$first', 'newer', false)).toBe('$second');
+  expect(replyTarget(replyRows, '$second', 'older', true)).toBe('$joined');
+});
+
+test('a reply step stays on the oldest row and clears past the newest', () => {
+  expect(replyTarget(replyRows, '$first', 'older', false)).toBe('$first');
+  expect(replyTarget(replyRows, '$second', 'newer', false)).toBeNull();
+});
+
+test('a reply to a row that is not shown restarts from the latest message', () => {
+  expect(replyTarget(replyRows, '$elsewhere', 'older', false)).toBe('$second');
+  expect(replyTarget(replyRows, '$joined', 'older', false)).toBe('$second');
 });
 
 test('hides profile changes and raw state events by default, keeping joins', () => {

@@ -311,6 +311,27 @@ export function latestEventId(items: readonly TimelineItemView[]): string | null
   return null;
 }
 
+export type ReplyDirection = 'older' | 'newer';
+
+function isReplyTarget(item: TimelineItemView, showHiddenEvents: boolean): boolean {
+  if (item.event_id === null || isAnnotation(item) || item.content.kind === 'redacted')
+    return false;
+  return isMessageRow(item.content) || showHiddenEvents;
+}
+
+export function replyTarget(
+  items: readonly TimelineItemView[],
+  current: string | null,
+  direction: ReplyDirection,
+  showHiddenEvents: boolean
+): string | null {
+  const targets = items.filter((item) => isReplyTarget(item, showHiddenEvents));
+  const index = current === null ? -1 : targets.findIndex((item) => item.event_id === current);
+  if (index < 0) return direction === 'older' ? (targets.at(-1)?.event_id ?? null) : null;
+  if (direction === 'newer') return targets[index + 1]?.event_id ?? null;
+  return targets[Math.max(0, index - 1)].event_id;
+}
+
 export function eventBefore(items: readonly TimelineItemView[], eventId: string): string | null {
   const index = items.findIndex((item) => item.event_id === eventId);
   if (index < 0) return null;

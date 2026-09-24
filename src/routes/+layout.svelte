@@ -21,6 +21,7 @@
   import { trackKeyboardInset } from '#lib/platform/keyboard.js';
   import { trackInspectorShortcut } from '#lib/platform/devtools.js';
   import { suppressNativeContextMenu } from '#lib/platform/context-menu.js';
+  import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
   import { registerServiceWorker } from '#lib/platform/service-worker.js';
   import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import {
@@ -64,6 +65,7 @@
     const stopGuardingClicks = guardTouchClicks();
     const stopInspectorShortcut = trackInspectorShortcut();
     const stopSuppressingContextMenu = suppressNativeContextMenu();
+    const stopBlockingEdgeNavigation = blockEdgeNavigation();
     void registerServiceWorker();
     void core.start();
     return () => {
@@ -72,6 +74,7 @@
       stopGuardingClicks();
       stopInspectorShortcut();
       stopSuppressingContextMenu();
+      stopBlockingEdgeNavigation();
       core.stop();
     };
   });

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { isTauri } from '@tauri-apps/api/core';
   import { resolve } from '$app/paths';
 
   import type { HomeserverSoftwareView } from '#src/generated/protocol';
@@ -17,7 +16,6 @@
 
   const core = useCoreClient();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
-  const canResetCache = !isTauri();
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
   let resetting = $state(false);
   let resetFailed = $state(false);
@@ -112,19 +110,17 @@
           {$i18n.t('settings.aboutReport')}
         </LinkButton>
       </SettingsRow>
-      {#if canResetCache}
-        <SettingsRow
-          id="reset-cache"
-          title={$i18n.t('settings.aboutResetCache')}
-          description={$i18n.t('settings.aboutResetCacheHint')}
-        >
-          <Button size="small" loading={resetting} onclick={resetCaches}>
-            {$i18n.t('settings.aboutReset')}
-          </Button>
-        </SettingsRow>
-        {#if resetFailed}
-          <li class="settings-form error" role="alert">{$i18n.t('settings.aboutResetFailed')}</li>
-        {/if}
+      <SettingsRow
+        id="reset-cache"
+        title={$i18n.t('settings.aboutResetCache')}
+        description={$i18n.t('settings.aboutResetCacheHint')}
+      >
+        <Button size="small" loading={resetting} onclick={resetCaches}>
+          {$i18n.t('settings.aboutReset')}
+        </Button>
+      </SettingsRow>
+      {#if resetFailed}
+        <li class="settings-form error" role="alert">{$i18n.t('settings.aboutResetFailed')}</li>
       {/if}
     </ul>
   </SettingsSection>

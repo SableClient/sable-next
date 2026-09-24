@@ -124,6 +124,7 @@
         void validateHomeserver();
       }}
       onblur={() => void validateHomeserver()}
+      onsettle={() => void validateHomeserver()}
     />
   </FormField>
 

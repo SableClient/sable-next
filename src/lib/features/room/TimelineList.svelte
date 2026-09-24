@@ -35,9 +35,11 @@
     latestEventId,
     mergeAggregations,
     personaLookup,
+    replyTarget,
     unreadCountAfter,
     visibleAggregations,
     visibleTimelineItems,
+    type ReplyDirection,
   } from './timeline-format';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
@@ -54,6 +56,7 @@
   interface Props {
     timeline: RoomTimeline;
     focusEventId?: string | null;
+    replyEventId?: string | null;
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
@@ -98,6 +101,7 @@
   let {
     timeline,
     focusEventId = null,
+    replyEventId = null,
     onRequestHistory,
     onRequestFuture,
     onRead,
@@ -144,11 +148,9 @@
   }
   const identity = new TimelineIdentityTracker();
   let followingRead = $state(false);
+  let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let allItems = $derived(
-    mergeAggregations(
-      visibleTimelineItems(timeline.items, preferences, { readOnly }),
-      visibleAggregations(timeline.aggregations, preferences)
-    )
+    mergeAggregations(eventItems, visibleAggregations(timeline.aggregations, preferences))
   );
   let visibleItems = $derived(
     followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
@@ -562,6 +564,21 @@
     if (windowState.pinned) followingRead = true;
     return onRead(eventId);
   }
+  export function stepReply(direction: ReplyDirection): string | null {
+    const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
+    const key = entries.find(({ value }) => value.item.event_id === target)?.key;
+    const row = key ? viewport?.querySelector(`[data-timeline-key="${CSS.escape(key)}"]`) : null;
+    if (key && controller && viewport && !(row && withinViewport(row, viewport))) {
+      focusNavigation?.abort();
+      void controller.jumpTo(key, 'center', !shouldReduceMotion());
+    }
+    return target;
+  }
+  function withinViewport(row: Element, node: HTMLElement): boolean {
+    const rowRect = row.getBoundingClientRect();
+    const viewportRect = node.getBoundingClientRect();
+    return rowRect.top >= viewportRect.top && rowRect.bottom <= viewportRect.bottom;
+  }
   function jumpToLatest(): void {
     focusNavigation?.abort();
     historyController.finishHistoryFill();
@@ -654,6 +671,7 @@
                       ? personas(item.thread_summary.latest_event_id)
                       : null}
                     highlighted={focusEventId !== null && item.event_id === focusEventId}
+                    selected={replyEventId !== null && item.event_id === replyEventId}
                     {onMatrixLink}
                     {onCopyLink}
                     {onMarkUnread}

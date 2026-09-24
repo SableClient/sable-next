@@ -20,6 +20,12 @@ test('a connecting call with its key reads as connecting', () => {
   ).toBe('call.connecting');
 });
 
+test('a failed call says so', () => {
+  expect(
+    callStatusKey({ lifecycle: 'failed', connection: 'disconnected', mediaReady: false })
+  ).toBe('call.failed');
+});
+
 test('every failure has its own message', () => {
   const keys = (
     ['busy', 'no-focus', 'e2ee-unsupported', 'e2ee-failed', 'setup-failed'] as const

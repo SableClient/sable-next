@@ -63,6 +63,7 @@ pub enum Command {
         account_id: String,
     },
     Logout,
+    ResetLocalCache,
     HomeserverInfo,
 
     SubscribeRoomList,
@@ -999,6 +1000,7 @@ pub enum CommandOk {
     },
     RemoveAccount,
     Logout,
+    ResetLocalCache,
     HomeserverInfo {
         homeserver: String,
         server: Option<HomeserverSoftwareView>,

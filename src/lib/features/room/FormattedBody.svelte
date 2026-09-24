@@ -746,6 +746,7 @@
 
   .formatted-body :global(img[data-mx-emoticon]) {
     height: var(--timeline-emote-size, 1em);
+    vertical-align: var(--timeline-emote-align, middle);
   }
 
   .formatted-body :global(table) {

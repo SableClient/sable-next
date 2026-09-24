@@ -1,7 +1,7 @@
 use sable_core::protocol::{CommandErr, NotificationView};
 #[cfg(any(mobile, test))]
 use sable_core::protocol::{WebPushKeys, WebPusherView};
-use sable_core::ruma::{owned_event_id, owned_room_id, owned_user_id};
+use sable_core::ruma::{EventId, owned_room_id, owned_user_id};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -391,6 +391,10 @@ pub async fn show<R: Runtime>(
     if cfg!(target_os = "android") {
         builder = builder.icon("notification_icon");
     }
+    #[cfg(target_os = "linux")]
+    if let Some(icon) = linux_icon(app) {
+        builder = builder.icon(icon);
+    }
     builder = builder.only_alert_once(core.notify_once() && !view.mention);
     if alerts_silently(view.noisy, core.notification_sounds()) {
         builder = builder.silent();
@@ -451,6 +455,20 @@ pub async fn ensure_channel<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn linux_icon<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    use tauri::Manager;
+    static ICON: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    ICON.get_or_init(|| {
+        let dir = app.path().app_cache_dir().ok()?;
+        std::fs::create_dir_all(&dir).ok()?;
+        let path = dir.join("notification-icon.png");
+        std::fs::write(&path, include_bytes!("../icons/128x128.png")).ok()?;
+        path.to_str().map(str::to_owned)
+    })
+    .clone()
+}
+
 pub async fn show_test<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core, sequence: u32) {
     show(app, core, &test_view(sequence)).await;
 }
@@ -459,7 +477,7 @@ fn test_view(sequence: u32) -> NotificationView {
     NotificationView {
         user_id: owned_user_id!("@sable:notification.test"),
         room_id: owned_room_id!("!notification:notification.test"),
-        event_id: Some(owned_event_id!("$notification-test")),
+        event_id: EventId::parse(format!("$notification-test-{sequence}")).ok(),
         room_name: "Notification test".to_owned(),
         room_avatar_url: None,
         is_direct: false,

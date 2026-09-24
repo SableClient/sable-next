@@ -7,7 +7,7 @@ const lifecycleKeys: Record<CallLifecycle, string> = {
   connecting: 'call.connecting',
   active: 'call.active',
   leaving: 'call.leaving',
-  failed: 'call.title',
+  failed: 'call.failed',
 };
 
 const failureKeys: Record<CallFailure, string> = {

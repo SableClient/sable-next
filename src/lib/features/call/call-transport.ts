@@ -21,6 +21,7 @@ export type CallParticipant = {
   screenShare?: CallTrack;
   microphone?: CallTrack;
   connectionQuality?: CallConnectionQuality;
+  speaking?: boolean;
 };
 
 export type CallTransportConnection = 'connecting' | 'connected' | 'reconnecting' | 'disconnected';

@@ -189,6 +189,7 @@ impl Core {
                     if !notifications::notifies(&actions) || core.is_read_room(room.room_id()) {
                         continue;
                     }
+                    let mut sent = None;
                     let notification = match event {
                         RawAnySyncOrStrippedTimelineEvent::Sync(raw) => {
                             if crate::calls::is_call_event_type(&raw) {
@@ -202,11 +203,12 @@ impl Core {
                                     session_start,
                                     event.origin_server_ts(),
                                 )
-                                || notifications::is_read(&room)
+                                || notifications::is_read(&room, event.origin_server_ts()).await
                                 || !alerted_events.insert(event.event_id().to_owned())
                             {
                                 continue;
                             }
+                            sent = Some(event.origin_server_ts());
                             notifications::foreground_notification(
                                 &notifications_client,
                                 &room,
@@ -228,9 +230,13 @@ impl Core {
                             notifications::invite_notification(&room, &actions).await
                         }
                     };
+                    let read = match sent {
+                        Some(sent) => notifications::is_read(&room, sent).await,
+                        None => false,
+                    };
                     if let Some(notification) = notification
                         && !core.is_read_room(room.room_id())
-                        && (notification.event_id.is_none() || !notifications::is_read(&room))
+                        && !read
                     {
                         core.emit_if_current(generation, CoreEvent::Notification { notification });
                     }

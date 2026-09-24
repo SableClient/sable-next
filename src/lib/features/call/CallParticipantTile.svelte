@@ -1,10 +1,13 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
+  import MonitorIcon from 'phosphor-svelte/lib/MonitorIcon';
+  import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
-  import WifiLowIcon from 'phosphor-svelte/lib/WifiLowIcon';
-  import WifiSlashIcon from 'phosphor-svelte/lib/WifiSlashIcon';
+  import CellSignalLowIcon from 'phosphor-svelte/lib/CellSignalLowIcon';
+  import CellSignalSlashIcon from 'phosphor-svelte/lib/CellSignalSlashIcon';
   import { untrack } from 'svelte';
   import type { Participant, Room as LivekitRoom } from 'livekit-client';
   import { Track } from 'livekit-client';
@@ -13,6 +16,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
 
+  import { cameraVisible, type CallTileSource } from './call-layout';
   import type { CallParticipant } from './call-transport';
   import {
     MAX_PARTICIPANT_VOLUME,
@@ -22,35 +26,56 @@
 
   interface Props {
     participant: CallParticipant;
+    source: CallTileSource;
     room: LivekitRoom | undefined;
     name: string;
     userId: string;
     avatar: string | null;
+    pinned?: boolean;
+    featured?: boolean;
+    onPin?: () => void;
     onVolumeChange?: (identity: string, volume: number) => void;
   }
 
-  let { participant, room, name, userId, avatar, onVolumeChange }: Props = $props();
+  let {
+    participant,
+    source,
+    room,
+    name,
+    userId,
+    avatar,
+    pinned = false,
+    featured = false,
+    onPin,
+    onVolumeChange,
+  }: Props = $props();
 
   function applyVolume(next: number): void {
     setParticipantVolume(userId, next);
     onVolumeChange?.(participant.identity, next);
   }
 
-  let screenShareOn = $derived(
-    participant.screenShare !== undefined &&
-      !participant.screenShare.muted &&
-      (participant.local === true || participant.screenShare.subscribed)
-  );
-  let cameraOn = $derived(
-    screenShareOn ||
-      (participant.camera !== undefined &&
-        !participant.camera.muted &&
-        (participant.local === true || participant.camera.subscribed))
-  );
+  let screen = $derived(source === 'screen');
+  let videoOn = $derived(screen || cameraVisible(participant));
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
+  let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
+  let label = $derived(screen ? $i18n.t('call.screenOf', { name }) : name);
   let volume = $derived(participantVolume(userId));
   let volumeOpen = $state(false);
+  let revealed = $state(false);
+
+  function reveal(event: PointerEvent): void {
+    if (event.pointerType !== 'touch') return;
+    if (event.target instanceof Element && event.target.closest('button, input')) return;
+    revealed = !revealed;
+  }
+
+  function openVolume(event: MouseEvent): void {
+    if (participant.local || screen) return;
+    event.preventDefault();
+    volumeOpen = true;
+  }
   let unmutedVolume = 1;
 
   function toggleMute(): void {
@@ -64,11 +89,11 @@
 
   function attachVideo(node: HTMLVideoElement) {
     const identity = untrack(() => participant.identity);
-    const source = untrack(() => (screenShareOn ? Track.Source.ScreenShare : Track.Source.Camera));
+    const trackSource = untrack(() => (screen ? Track.Source.ScreenShare : Track.Source.Camera));
     const owner: Participant | undefined = untrack(() => participant.local)
       ? room?.localParticipant
       : room?.remoteParticipants.get(identity);
-    const track = owner?.getTrackPublication(source)?.track;
+    const track = owner?.getTrackPublication(trackSource)?.track;
     track?.attach(node);
 
     return () => {
@@ -77,11 +102,20 @@
   }
 </script>
 
-<li class="tile" class:live={!muted} class:self={participant.local}>
-  {#if cameraOn}
+<li
+  class="tile"
+  class:speaking
+  class:screen
+  class:featured
+  class:revealed
+  class:video-on={videoOn}
+  onpointerup={reveal}
+  oncontextmenu={openVolume}
+>
+  {#if videoOn}
     <video
       class="video"
-      class:mirrored={participant.local && !screenShareOn}
+      class:mirrored={participant.local && !screen}
       autoplay
       muted
       playsinline
@@ -93,29 +127,28 @@
     </div>
   {/if}
 
-  <div class="overlay">
-    <span class="name">{name}</span>
-    {#if muted}
-      <span class="badge" title={$i18n.t('call.muted')}>
-        <MicrophoneSlashIcon aria-hidden="true" />
-        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-      </span>
-    {/if}
-    {#if quality === 'poor'}
-      <span class="badge" title={$i18n.t('call.connectionPoor')}>
-        <WifiLowIcon aria-hidden="true" />
-        <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
-      </span>
-    {:else if quality === 'lost'}
-      <span class="badge crit" title={$i18n.t('call.connectionLost')}>
-        <WifiSlashIcon aria-hidden="true" />
-        <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
-      </span>
-    {/if}
-    {#if !participant.local}
+  <div class="actions">
+    {#if onPin}
       <IconButton
         variant="ghost"
-        class="volume-toggle"
+        size="small"
+        class="tile-action"
+        label={$i18n.t(pinned ? 'call.unpin' : 'call.pin', { name: label })}
+        aria-pressed={pinned}
+        onclick={onPin}
+      >
+        {#if pinned}
+          <PushPinSlashIcon />
+        {:else}
+          <PushPinIcon />
+        {/if}
+      </IconButton>
+    {/if}
+    {#if !participant.local && !screen}
+      <IconButton
+        variant="ghost"
+        size="small"
+        class="tile-action"
         label={$i18n.t('call.participantVolume', { name })}
         aria-expanded={volumeOpen}
         onclick={() => (volumeOpen = !volumeOpen)}
@@ -126,6 +159,29 @@
           <SpeakerHighIcon />
         {/if}
       </IconButton>
+    {/if}
+  </div>
+
+  <div class="tag">
+    {#if screen}
+      <MonitorIcon aria-hidden="true" weight="fill" />
+    {:else if muted}
+      <span class="muted" title={$i18n.t('call.muted')}>
+        <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
+      </span>
+    {/if}
+    <span class="name">{label}</span>
+    {#if quality === 'poor'}
+      <span class="quality" title={$i18n.t('call.connectionPoor')}>
+        <CellSignalLowIcon aria-hidden="true" weight="fill" />
+        <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
+      </span>
+    {:else if quality === 'lost'}
+      <span class="quality lost" title={$i18n.t('call.connectionLost')}>
+        <CellSignalSlashIcon aria-hidden="true" weight="fill" />
+        <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
+      </span>
     {/if}
   </div>
 
@@ -159,22 +215,46 @@
 
 <style>
   .tile {
-    aspect-ratio: 4 / 3;
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
+    --tile-scrim: color-mix(in srgb, var(--picker-black) 62%, transparent);
+
+    background: var(--call-tile-bg, var(--surface-var-container));
     border-radius: var(--radii-400);
+    box-sizing: border-box;
+    container-type: size;
     overflow: hidden;
     position: relative;
   }
 
-  .tile.live {
-    border-color: var(--primary-main);
+  .tile::after {
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 0 var(--success-main);
+    content: '';
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    transition: box-shadow var(--motion-normal) var(--motion-easing-emphasized);
+  }
+
+  .tile.speaking.video-on::after {
+    box-shadow:
+      inset 0 0 0 0.1875rem var(--success-main),
+      inset 0 0 0 0.3125rem color-mix(in srgb, var(--success-main) 30%, transparent);
+  }
+
+  .tile.screen,
+  .tile.video-on {
+    background: var(--picker-black);
   }
 
   .video {
     block-size: 100%;
+    display: block;
     inline-size: 100%;
     object-fit: cover;
+  }
+
+  .screen .video {
+    object-fit: contain;
   }
 
   .video.mirrored {
@@ -189,35 +269,105 @@
     justify-content: center;
   }
 
-  .overlay {
+  .placeholder :global(.avatar-root) {
+    --avatar-size: clamp(2.5rem, 36cqmin, 6rem);
+
+    transition: box-shadow var(--motion-normal) var(--motion-easing-emphasized);
+  }
+
+  .featured .placeholder :global(.avatar-root) {
+    --avatar-size: clamp(3rem, 30cqmin, 9rem);
+  }
+
+  .speaking:not(.video-on) .placeholder :global(.avatar-root) {
+    box-shadow:
+      0 0 0 0.1875rem var(--call-tile-bg, var(--surface-var-container)),
+      0 0 0 0.375rem var(--success-main);
+  }
+
+  .tag {
     align-items: center;
-    background: linear-gradient(transparent, var(--overlay));
+    backdrop-filter: blur(0.5rem);
+    background: var(--tile-scrim);
+    border-radius: var(--radii-300);
+    box-sizing: border-box;
+    color: var(--picker-white);
     display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
     gap: var(--space-100);
-    inset: auto 0 0;
-    padding: var(--space-300) var(--space-200) var(--space-100);
+    inset: auto auto var(--space-200) var(--space-200);
+    max-inline-size: calc(100% - var(--space-400));
+    padding: var(--space-050) var(--space-200);
     position: absolute;
   }
 
+  .tag :global(svg) {
+    flex: none;
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
   .name {
-    color: var(--picker-white);
-    font-size: var(--font-size-small);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .badge {
-    align-items: center;
-    color: var(--picker-white);
+  .muted {
+    color: var(--crit-main);
     display: inline-flex;
     flex: none;
   }
 
-  .overlay :global(.volume-toggle) {
-    color: var(--picker-white);
+  .quality {
+    color: var(--warn-main);
+    display: inline-flex;
     flex: none;
-    margin-inline-start: auto;
+  }
+
+  .quality.lost {
+    color: var(--crit-main);
+  }
+
+  .actions {
+    display: flex;
+    gap: var(--space-100);
+    inset: var(--space-200) var(--space-200) auto auto;
+    opacity: 0;
+    pointer-events: none;
+    position: absolute;
+    transition: opacity var(--motion-normal) var(--motion-easing-emphasized);
+  }
+
+  .actions:focus-within,
+  .revealed .actions,
+  .actions:has(:global([aria-pressed='true'], [aria-expanded='true'])) {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (hover: hover) {
+    .tile:hover .actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .actions :global(.tile-action) {
+      --button-height: var(--target-hit);
+    }
+  }
+
+  .actions :global(.tile-action) {
+    --button-container: var(--tile-scrim);
+    --button-container-hover: color-mix(in srgb, var(--picker-black) 80%, transparent);
+    --button-container-active: var(--picker-black);
+
+    backdrop-filter: blur(0.5rem);
+    color: var(--picker-white);
   }
 
   .volume {
@@ -229,7 +379,8 @@
     display: flex;
     gap: var(--space-150);
     inline-size: min(14rem, calc(100% - var(--space-400)));
-    inset: auto var(--space-200) var(--space-600);
+    inset: calc(var(--space-200) + var(--control-height-300) + var(--space-100)) var(--space-200)
+      auto auto;
     padding: var(--space-150) var(--space-200);
     position: absolute;
   }
@@ -241,9 +392,5 @@
     font-variant-numeric: tabular-nums;
     inline-size: 2.5rem;
     text-align: end;
-  }
-
-  .badge.crit {
-    color: var(--crit-main);
   }
 </style>

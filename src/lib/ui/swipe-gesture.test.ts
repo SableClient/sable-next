@@ -146,3 +146,35 @@ describe('a swipe that starts inside a horizontal scroller', () => {
     expect(startsInHorizontalScroller(button, root)).toBe(false);
   });
 });
+
+describe('a swipe that starts inside editable text', () => {
+  function startOn(target: Element): SwipeGesture | undefined {
+    const touches = [{ clientX: 100, clientY: 100 }];
+    return startSwipeGesture({ timeStamp: 0, touches, target } as unknown as TouchEvent, 0);
+  }
+
+  function element(tag: string, contenteditable?: string): HTMLElement {
+    const node = document.createElement(tag);
+    if (contenteditable) node.setAttribute('contenteditable', contenteditable);
+    return node;
+  }
+
+  it('is refused in the composer, so dragging a selection does not open the drawer', () => {
+    const editor = element('div', 'true');
+    const pill = element('span', 'false');
+    editor.append(pill);
+
+    expect(startOn(editor)).toBeUndefined();
+    expect(startOn(pill)).toBeUndefined();
+  });
+
+  it('is refused in a text field', () => {
+    expect(startOn(element('textarea'))).toBeUndefined();
+    expect(startOn(element('input'))).toBeUndefined();
+  });
+
+  it('is allowed on content that is not editable', () => {
+    expect(startOn(element('span', 'false'))).toBeDefined();
+    expect(startOn(element('p'))).toBeDefined();
+  });
+});

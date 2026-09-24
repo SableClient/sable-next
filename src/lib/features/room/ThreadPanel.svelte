@@ -213,6 +213,7 @@
 
     <TimelineList
       bind:this={timelineList}
+      replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
       {roomId}
       {members}
@@ -249,6 +250,8 @@
         {readOnly}
         onDeleteEdited={conversation.redact}
         onEditLast={conversation.editLast}
+        onReplyStep={(direction) =>
+          conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
       />
     </div>
   </aside>

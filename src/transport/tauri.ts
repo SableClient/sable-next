@@ -169,7 +169,14 @@ export function createTauriTransport(): Transport {
     },
 
     async resetCaches(accountIds) {
-      await resetWebStorage(accountIds);
+      await ready;
+      try {
+        await invoke('submit_command', { command: { type: 'reset_local_cache' } });
+        await resetWebStorage(accountIds);
+      } catch (error) {
+        console.error('[sable transport] the local caches were not fully cleared', error);
+        Sentry.captureException(error, { tags: { source: 'cache-reset' } });
+      }
     },
 
     deleteAccountStore() {

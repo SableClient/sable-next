@@ -13,7 +13,12 @@
   import Slider from '#lib/ui/primitives/Slider.svelte';
 
   import { outputVolume, setOutputVolume } from './participant-volumes.svelte.js';
-  import { supportsDeviceSelection, listCallDevices, type CallDevice } from './devices.js';
+  import {
+    supportsDeviceSelection,
+    listCallDevices,
+    unlockCallDevices,
+    type CallDevice,
+  } from './devices.js';
   import '#lib/ui/primitives/settings-row.css';
 
   let devices = $state<CallDevice[]>([]);
@@ -23,9 +28,10 @@
   let stopTest: (() => void) | undefined;
 
   const supported = supportsDeviceSelection();
+  const SYSTEM_DEFAULT = 'system';
 
   const optionsFor = (kind: MediaDeviceKind) => [
-    { value: '', label: $i18n.t('settings.callDeviceSystemDefault') },
+    { value: SYSTEM_DEFAULT, label: $i18n.t('settings.callDeviceSystemDefault') },
     ...devices
       .filter((device) => device.kind === kind)
       .map((device) => ({
@@ -34,24 +40,17 @@
       })),
   ];
 
+  async function refresh(): Promise<void> {
+    const result = await listCallDevices();
+    devices = result.devices;
+    denied = result.denied;
+  }
+
   $effect(() => {
     if (!supported) return;
-    let cancelled = false;
-    void listCallDevices().then((result) => {
-      if (cancelled) return;
-      devices = result.devices;
-      denied = result.denied;
-    });
-    const refresh = () => {
-      void listCallDevices().then((result) => {
-        if (!cancelled) devices = result.devices;
-      });
-    };
-    const off = on(navigator.mediaDevices, 'devicechange', refresh);
-    return () => {
-      cancelled = true;
-      off();
-    };
+    void refresh();
+    const off = on(navigator.mediaDevices, 'devicechange', () => void refresh());
+    return off;
   });
 
   $effect(() => () => stopTest?.());
@@ -68,6 +67,7 @@
       return;
     }
     testing = true;
+    void refresh();
     stopTest = () => {
       meter();
       stopTest = undefined;
@@ -82,7 +82,18 @@
     <Alert variant="info">{$i18n.t('settings.callDevicesUnsupported')}</Alert>
   {:else}
     {#if denied}
-      <Alert variant="info">{$i18n.t('settings.callDevicesPermission')}</Alert>
+      <Alert variant="info">
+        <p>{$i18n.t('settings.callDevicesPermission')}</p>
+        <div>
+          <Button
+            variant="secondary"
+            size="small"
+            onclick={() => void unlockCallDevices().then(refresh)}
+          >
+            {$i18n.t('settings.callDevicesAllow')}
+          </Button>
+        </div>
+      </Alert>
     {/if}
 
     <div class="device-rows">
@@ -92,9 +103,10 @@
         >
         <Select
           items={optionsFor('audioinput')}
-          value={preferences.audioInputDevice}
+          value={preferences.audioInputDevice || SYSTEM_DEFAULT}
           aria-label={$i18n.t('settings.callInputDevice')}
-          onValueChange={(value) => setPreference('audioInputDevice', value)}
+          onValueChange={(value) =>
+            setPreference('audioInputDevice', value === SYSTEM_DEFAULT ? '' : value)}
         />
       </label>
 
@@ -104,9 +116,10 @@
         >
         <Select
           items={optionsFor('audiooutput')}
-          value={preferences.audioOutputDevice}
+          value={preferences.audioOutputDevice || SYSTEM_DEFAULT}
           aria-label={$i18n.t('settings.callOutputDevice')}
-          onValueChange={(value) => setPreference('audioOutputDevice', value)}
+          onValueChange={(value) =>
+            setPreference('audioOutputDevice', value === SYSTEM_DEFAULT ? '' : value)}
         />
       </label>
 
@@ -116,9 +129,10 @@
         >
         <Select
           items={optionsFor('videoinput')}
-          value={preferences.videoInputDevice}
+          value={preferences.videoInputDevice || SYSTEM_DEFAULT}
           aria-label={$i18n.t('settings.callCameraDevice')}
-          onValueChange={(value) => setPreference('videoInputDevice', value)}
+          onValueChange={(value) =>
+            setPreference('videoInputDevice', value === SYSTEM_DEFAULT ? '' : value)}
         />
       </label>
 

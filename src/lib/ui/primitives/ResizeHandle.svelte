@@ -4,7 +4,8 @@
     min: number;
     max: number;
     label: string;
-    grow: 'left' | 'right';
+    valueText?: string;
+    grow: 'left' | 'right' | 'down';
     step: number;
     shiftStep?: number;
     homeEnd?: boolean;
@@ -18,6 +19,7 @@
     min,
     max,
     label,
+    valueText,
     grow,
     step,
     shiftStep = step,
@@ -28,18 +30,26 @@
   }: Props = $props();
 
   let dragging = $state(false);
-  let drag: { pointerId: number; startX: number; startValue: number } | null = null;
+  let vertical = $derived(grow === 'down');
+  let drag: { pointerId: number; start: number; startValue: number } | null = null;
 
   function start(event: PointerEvent & { currentTarget: HTMLButtonElement }): void {
     if (event.button !== 0) return;
-    drag = { pointerId: event.pointerId, startX: event.clientX, startValue: value };
+    drag = {
+      pointerId: event.pointerId,
+      start: vertical ? event.clientY : event.clientX,
+      startValue: value,
+    };
     dragging = true;
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function move(event: PointerEvent): void {
     if (drag === null || event.pointerId !== drag.pointerId) return;
-    const delta = grow === 'left' ? drag.startX - event.clientX : event.clientX - drag.startX;
+    const delta =
+      grow === 'left'
+        ? drag.start - event.clientX
+        : (vertical ? event.clientY : event.clientX) - drag.start;
     onResize(drag.startValue + fromPixels(delta));
   }
 
@@ -53,8 +63,10 @@
   function keydown(event: KeyboardEvent): void {
     const amount = event.shiftKey ? shiftStep : step;
     const leftward = grow === 'left' ? amount : -amount;
-    if (event.key === 'ArrowLeft') onResize(value + leftward);
-    else if (event.key === 'ArrowRight') onResize(value - leftward);
+    if (vertical && event.key === 'ArrowDown') onResize(value + amount);
+    else if (vertical && event.key === 'ArrowUp') onResize(value - amount);
+    else if (!vertical && event.key === 'ArrowLeft') onResize(value + leftward);
+    else if (!vertical && event.key === 'ArrowRight') onResize(value - leftward);
     else if (homeEnd && event.key === 'Home') onResize(min);
     else if (homeEnd && event.key === 'End') onResize(max);
     else return;
@@ -67,11 +79,13 @@
   type="button"
   class="resize-handle"
   class:dragging
+  class:vertical
   role="slider"
-  aria-orientation="horizontal"
+  aria-orientation={vertical ? 'vertical' : 'horizontal'}
   aria-valuemin={min}
   aria-valuemax={max}
   aria-valuenow={value}
+  aria-valuetext={valueText}
   aria-label={label}
   onpointerdown={start}
   onpointermove={move}
@@ -93,6 +107,14 @@
     touch-action: none;
     user-select: none;
     width: 0.5rem;
+  }
+
+  .resize-handle.vertical {
+    cursor: row-resize;
+    height: 0.5rem;
+    left: 0;
+    top: auto;
+    width: 100%;
   }
 
   .resize-handle:hover,

@@ -3,7 +3,12 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { MemberView, RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
+import type {
+  MemberView,
+  RoomPermissionsView,
+  RoomSummary,
+  UserDirectoryEntryView,
+} from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -16,6 +21,8 @@ const core = Object.assign(baseCore, {
   unbanUser: vi.fn<() => Promise<void>>(),
   setUserPowerLevel: vi.fn<() => Promise<void>>(),
   inviteUser: vi.fn<(roomId: string, userId: string) => Promise<void>>(),
+  searchUserDirectory:
+    vi.fn<() => Promise<{ limited: boolean; results: UserDirectoryEntryView[] }>>(),
 });
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
@@ -114,8 +121,15 @@ test('sends no reason when the moderation reason is left blank', async () => {
   await unmount(instance);
 });
 
-test('invites from the members list when the account may invite', async () => {
+test('searches the directory and invites from the members list', async () => {
   core.roomMembers.mockResolvedValue([alice]);
+  core.searchUserDirectory.mockResolvedValue({
+    limited: false,
+    results: [
+      { user_id: '@alice:example.org', display_name: 'Alice', avatar_url: null },
+      { user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null },
+    ],
+  });
   core.inviteUser.mockResolvedValue(undefined);
   const instance = mount(RoomMembersSettings, {
     target: document.body,
@@ -125,24 +139,49 @@ test('invites from the members list when the account may invite', async () => {
     expect(document.querySelector('.setting-row')).not.toBeNull();
   });
 
-  const inviteButton = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('.search button')
-  ).find((button) => button.textContent.trim() === 'Invite');
-  if (!inviteButton) throw new Error('invite button missing');
-  inviteButton.click();
-  await tick();
-
-  const input = await vi.waitFor(() => {
-    const found = document.querySelector<HTMLInputElement>('#room-invite-user');
-    if (!found) throw new Error('invite input missing');
-    return found;
-  });
-  input.value = '@bob:example.org';
+  const input = document.querySelector<HTMLInputElement>('.search input');
+  if (!input) throw new Error('search input missing');
+  input.value = 'bo';
   input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+  const inviteSection = () =>
+    document.querySelector('[aria-labelledby="room-settings-members-invite"]');
+  await vi.waitFor(() => {
+    expect(core.searchUserDirectory).toHaveBeenCalledWith('bo', 10);
+    expect(inviteSection()?.querySelectorAll('.setting-row')).toHaveLength(1);
+  });
+  expect(inviteSection()?.textContent).toContain('@bob:example.org');
+  expect(inviteSection()?.textContent).not.toContain('@alice:example.org');
+
+  inviteSection()?.querySelector<HTMLButtonElement>('.row-control button')?.click();
   await vi.waitFor(() => {
     expect(core.inviteUser).toHaveBeenCalledWith('!room:example.org', '@bob:example.org');
+    expect(inviteSection()?.querySelector('.row-control button')).toBeNull();
+    expect(inviteSection()?.textContent).toContain('Invited');
   });
+
+  await unmount(instance);
+});
+
+test('offers a typed user id the directory does not know', async () => {
+  core.roomMembers.mockResolvedValue([alice]);
+  core.searchUserDirectory.mockResolvedValue({ limited: false, results: [] });
+  const instance = mount(RoomMembersSettings, {
+    target: document.body,
+    props: { room, permissions: { ...permissions, can_invite: true } },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.setting-row')).not.toBeNull();
+  });
+
+  const input = document.querySelector<HTMLInputElement>('.search input');
+  if (!input) throw new Error('search input missing');
+  input.value = '@carol:elsewhere.org';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+
+  const section = document.querySelector('[aria-labelledby="room-settings-members-invite"]');
+  expect(section?.textContent).toContain('@carol:elsewhere.org');
 
   await unmount(instance);
 });
@@ -158,6 +197,12 @@ test('offers no invite without the permission', async () => {
   });
 
   expect(document.querySelector('.search button')).toBeNull();
+  const input = document.querySelector<HTMLInputElement>('.search input');
+  if (!input) throw new Error('search input missing');
+  input.value = '@carol:elsewhere.org';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await tick();
+  expect(document.querySelector('[aria-labelledby="room-settings-members-invite"]')).toBeNull();
 
   await unmount(instance);
 });

@@ -691,3 +691,58 @@ test('a backend snapshot after connect forwards its publisher id', async () => {
   h.emit({ type: 'call_backends', session: 7, revision: 3, publisher_id: 'new', backends });
   expect(reconcileBackends).toHaveBeenCalledWith(backends, 'new');
 });
+
+test('deafening mutes the microphone and undeafening restores it', async () => {
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  emitTransportState({ ...idleTransportState(), connection: 'connected', microphoneEnabled: true });
+
+  session.setDeafened(true);
+  expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(false);
+
+  session.setDeafened(false);
+  expect(transport.setMicrophoneEnabled).toHaveBeenLastCalledWith(true);
+});
+
+test('undeafening leaves a microphone muted before deafening muted', async () => {
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: false, camera: false });
+  emitTransportState({
+    ...idleTransportState(),
+    connection: 'connected',
+    microphoneEnabled: false,
+  });
+  vi.mocked(transport.setMicrophoneEnabled).mockClear();
+
+  session.setDeafened(true);
+  session.setDeafened(false);
+
+  expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
+});
+
+test('unmuting while deafened undeafens', async () => {
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  emitTransportState({ ...idleTransportState(), connection: 'connected', microphoneEnabled: true });
+
+  session.setDeafened(true);
+  await session.setMicrophoneEnabled(true);
+
+  expect(session.deafened).toBe(false);
+});
+
+test('a camera that cannot start is reported, not swallowed', async () => {
+  const { client, transport } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  vi.mocked(transport.setCameraEnabled).mockRejectedValueOnce(new Error('NotAllowedError'));
+
+  await session.setCameraEnabled(true);
+
+  expect(session.deviceError).toBe('camera');
+  session.clearDeviceError();
+  expect(session.deviceError).toBeNull();
+});

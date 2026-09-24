@@ -13,6 +13,7 @@
     oninput?: HTMLInputAttributes['oninput'];
     onblur?: HTMLInputAttributes['onblur'];
     onvaluechange?: (value: string) => void;
+    onsettle?: () => void;
   }
 
   let {
@@ -24,7 +25,29 @@
     oninput,
     onblur,
     onvaluechange,
+    onsettle,
   }: Props = $props();
+
+  const SETTLE_MS = 600;
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  $effect(() => () => clearTimeout(settleTimer));
+
+  function handleInput(event: Event & { currentTarget: EventTarget & HTMLInputElement }) {
+    oninput?.(event);
+    clearTimeout(settleTimer);
+    if (onsettle && event.currentTarget.value.trim()) settleTimer = setTimeout(onsettle, SETTLE_MS);
+  }
+
+  function handleBlur(event: FocusEvent & { currentTarget: EventTarget & HTMLInputElement }) {
+    clearTimeout(settleTimer);
+    onblur?.(event);
+  }
+
+  function handleValueChange(selected: string) {
+    clearTimeout(settleTimer);
+    onvaluechange?.(selected);
+  }
 </script>
 
 {#if homeservers.allowCustom}
@@ -41,9 +64,9 @@
     spellcheck={false}
     {required}
     {ariaInvalid}
-    {oninput}
-    {onblur}
-    {onvaluechange}
+    oninput={handleInput}
+    onblur={handleBlur}
+    onvaluechange={handleValueChange}
   />
 {:else}
   <Select

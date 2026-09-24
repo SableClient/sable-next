@@ -660,9 +660,9 @@ pub fn is_backfill(
     sent < start.saturating_sub(BACKFILL_GRACE_MS)
 }
 
-#[must_use]
-pub fn is_read(room: &matrix_sdk::Room) -> bool {
+pub async fn is_read(room: &matrix_sdk::Room, sent: MilliSecondsSinceUnixEpoch) -> bool {
     room.unread_notification_counts().notification_count == 0
+        && crate::inbox::receipt_ts(room).await >= u64::from(sent.get())
 }
 
 #[must_use]
