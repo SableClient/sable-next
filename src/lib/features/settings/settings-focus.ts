@@ -1,20 +1,8 @@
-import { getContext, setContext, tick } from 'svelte';
+import { tick } from 'svelte';
 
 import { scrollBehavior } from '#lib/ui/motion.js';
 
 const SETTINGS_SCROLL_SELECTOR = '.settings-scroll';
-const FOCUS_KEY = Symbol('settings-focus');
-
-type Focus = () => string | null;
-
-export function provideSettingsFocus(focus: Focus): void {
-  setContext(FOCUS_KEY, focus);
-}
-
-export function settingsFocus(): Focus {
-  return getContext<Focus | undefined>(FOCUS_KEY) ?? (() => null);
-}
-
 export async function findSettingRow(id: string): Promise<HTMLElement | null> {
   await tick();
   for (let attempt = 0; attempt < 8; attempt++) {

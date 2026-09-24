@@ -71,6 +71,7 @@
 
 <ul class="settings-rows">
   <SettingsRow
+    id="settings-file"
     title={$i18n.t('settings.settingsFileTitle')}
     description={$i18n.t('settings.settingsFileHint')}
   >

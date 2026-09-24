@@ -80,6 +80,7 @@
 {#if icons.length}
   <ul class="app-icons" class:android aria-busy={changing}>
     <SettingsRow
+      id="app-icon"
       title={$i18n.t('settings.appIconTitle')}
       description={$i18n.t('settings.appIconDescription')}
       wide

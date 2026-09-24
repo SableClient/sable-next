@@ -13,8 +13,8 @@ const optionCards = readFileSync(
   fileURLToPath(new URL('./OptionCards.svelte', import.meta.url)),
   'utf8'
 );
-const settingsRow = readFileSync(
-  fileURLToPath(new URL('./SettingsRow.svelte', import.meta.url)),
+const settingsAnchorLink = readFileSync(
+  fileURLToPath(new URL('./SettingsAnchorLink.svelte', import.meta.url)),
   'utf8'
 );
 
@@ -22,6 +22,6 @@ test('nested controls use the inherited inner radius', () => {
   expect(formControlCss).toContain('border-radius: var(--radius-inner);');
   expect(buttonCss).toContain('border-radius: var(--radius-inner);');
   expect(optionCards).toContain('border-radius: var(--radius-inner);');
-  expect(settingsRow).toContain('border-radius: var(--radius-inner);');
+  expect(settingsAnchorLink).toContain('border-radius: var(--radius-inner);');
   expect(combobox).toContain('border-radius: var(--radius-inner);');
 });

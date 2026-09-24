@@ -30,7 +30,7 @@
 
 <div class="sentry">
   <ul class="settings">
-    <SettingsRow title={$i18n.t('settings.developerSentryConfigured')}>
+    <SettingsRow id="sentry-configured" title={$i18n.t('settings.developerSentryConfigured')}>
       <StatusBadge
         label={configured
           ? $i18n.t('settings.developerSentryConfiguredYes')
@@ -38,24 +38,24 @@
         variant={configured ? 'success' : 'warning'}
       />
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryEnvironment')}>
+    <SettingsRow id="sentry-environment" title={$i18n.t('settings.developerSentryEnvironment')}>
       <code>{import.meta.env.MODE}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryReporting')}>
+    <SettingsRow id="sentry-reporting" title={$i18n.t('settings.developerSentryReporting')}>
       <code>
         {preferences.errorReporting
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
       </code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryReplay')}>
+    <SettingsRow id="sentry-replay" title={$i18n.t('settings.developerSentryReplay')}>
       <code>
         {preferences.sessionReplay
           ? $i18n.t('settings.developerYes')
           : $i18n.t('settings.developerNo')}
       </code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSentryActivity')}>
+    <SettingsRow id="sentry-activity" title={$i18n.t('settings.developerSentryActivity')}>
       <code>
         {errors}
         {$i18n.t('settings.developerSentryErrors')}, {warnings}

@@ -81,17 +81,18 @@
     <SettingsSection title={$i18n.t('settings.aboutHomeserver')} headingId="about-homeserver">
       <ul class="settings">
         <SettingsRow
+          id="homeserver-url"
           title={$i18n.t('settings.aboutHomeserverUrl')}
           description={$i18n.t('settings.aboutHomeserverUrlHint')}
         >
           <span class="value">{info.homeserver.replace(/\/+$/, '')}</span>
         </SettingsRow>
-        <SettingsRow title={$i18n.t('settings.aboutHomeserverSoftware')}>
+        <SettingsRow id="homeserver-software" title={$i18n.t('settings.aboutHomeserverSoftware')}>
           <span class="value"
             >{info.server?.name ?? $i18n.t('settings.aboutHomeserverUnknown')}</span
           >
         </SettingsRow>
-        <SettingsRow title={$i18n.t('settings.aboutHomeserverVersion')}>
+        <SettingsRow id="homeserver-version" title={$i18n.t('settings.aboutHomeserverVersion')}>
           <span class="value"
             >{info.server?.version ?? $i18n.t('settings.aboutHomeserverUnknown')}</span
           >
@@ -103,6 +104,7 @@
   <SettingsSection title={$i18n.t('settings.aboutOptions')} headingId="about-options">
     <ul class="settings">
       <SettingsRow
+        id="report-issue"
         title={$i18n.t('settings.aboutReportIssue')}
         description={$i18n.t('settings.aboutReportIssueHint')}
       >
@@ -112,6 +114,7 @@
       </SettingsRow>
       {#if canResetCache}
         <SettingsRow
+          id="reset-cache"
           title={$i18n.t('settings.aboutResetCache')}
           description={$i18n.t('settings.aboutResetCacheHint')}
         >

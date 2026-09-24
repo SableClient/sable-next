@@ -1,13 +1,9 @@
 <script lang="ts">
-  import type { Component, Snippet } from 'svelte';
+  import type { Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
+  import SettingsAnchorLink from './SettingsAnchorLink.svelte';
+  import { settingsAnchors } from './settings-anchors.js';
   import StatusBadge from './StatusBadge.svelte';
-
-  type TitleAction = {
-    label: string;
-    icon: Component;
-    onclick: () => void;
-  };
 
   interface Props {
     title?: string;
@@ -19,7 +15,6 @@
     id?: string;
     'data-settings-focus'?: string;
     badge?: string;
-    titleAction?: TitleAction;
     before?: Snippet;
     copy?: Snippet;
     children?: Snippet;
@@ -35,17 +30,18 @@
     id,
     'data-settings-focus': dataSettingsFocus,
     badge,
-    titleAction,
     before,
     copy,
     children,
   }: Props = $props();
+  const anchors = settingsAnchors();
+  let lit = $derived(highlighted || (id !== undefined && anchors?.highlighted() === id));
 </script>
 
 <li
   {id}
   data-settings-focus={dataSettingsFocus}
-  class={['setting-row', { disabled, highlighted }, className]}
+  class={['setting-row', { disabled, highlighted: lit }, className]}
 >
   {#if before}<span class="row-before">{@render before()}</span>{/if}
   <div class="row-copy">
@@ -55,13 +51,7 @@
       <div class="row-name">
         <span class="name">{title}</span>
         {#if badge}<StatusBadge variant="neutral" label={badge} />{/if}
-        {#if titleAction}
-          <span class="row-share">
-            <button type="button" aria-label={titleAction.label} onclick={titleAction.onclick}>
-              <titleAction.icon />
-            </button>
-          </span>
-        {/if}
+        {#if id}<SettingsAnchorLink anchor={id} />{/if}
       </div>
       {#if typeof description === 'string'}<p>{description}</p>
       {:else if description}
@@ -139,39 +129,6 @@
     }
   }
 
-  .row-share {
-    display: inline-flex;
-    flex: 0 0 auto;
-  }
-
-  .row-share button {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-inner);
-    color: inherit;
-    cursor: pointer;
-    display: inline-flex;
-    height: var(--icon-size-large);
-    justify-content: center;
-    padding: 0;
-    width: var(--icon-size-large);
-  }
-
-  .row-share button:hover {
-    background: var(--surface-container-hover);
-  }
-
-  .row-share button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .row-share :global(svg) {
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
   .row-control {
     align-items: center;
     display: flex;
@@ -190,17 +147,6 @@
 
   .row-control :global(.select) {
     min-width: min(11rem, 100%);
-  }
-
-  @media (hover: hover) {
-    .row-share {
-      opacity: 0;
-    }
-
-    .setting-row:hover .row-share,
-    .setting-row:focus-within .row-share {
-      opacity: 1;
-    }
   }
 
   @media (width >= 42rem) {

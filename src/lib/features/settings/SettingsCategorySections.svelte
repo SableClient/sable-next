@@ -7,11 +7,6 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import { panelsFor } from './category-panels.js';
   import Switch from '#lib/ui/primitives/Switch.svelte';
-  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
-
-  import { buildSettingsLink } from '#lib/features/room/settings-link.js';
-  import { findSettingRow, scrollSettingRowIntoView, settingsFocus } from './settings-focus.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import { settingFocusId } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
@@ -27,7 +22,6 @@
   }
 
   let { category }: Props = $props();
-  const focus = settingsFocus();
 
   const items = $derived(category.items.filter((setting) => setting.supported?.() !== false));
 
@@ -52,45 +46,8 @@
     );
   }
 
-  let focusId = $derived(focus());
-  let highlighted = $state<string | null>(null);
-  let copied = $state<string | null>(null);
   /** Sentry reads its consent once, at boot. */
   let reloadPending = $state(false);
-
-  async function copyLink(anchor: string): Promise<void> {
-    await navigator.clipboard.writeText(buildSettingsLink(location.origin, category.id, anchor));
-    copied = anchor;
-    setTimeout(() => {
-      if (copied === anchor) copied = null;
-    }, 2000);
-  }
-
-  $effect(() => {
-    const id = focusId;
-    highlighted = null;
-    if (id === null || !items.some((setting) => settingFocusId(setting.key) === id)) {
-      return;
-    }
-
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    void findSettingRow(id).then((row) => {
-      if (cancelled || row === null) return;
-
-      scrollSettingRowIntoView(row);
-      highlighted = id;
-      timer = setTimeout(() => {
-        if (!cancelled) highlighted = null;
-      }, 3000);
-    });
-
-    return () => {
-      cancelled = true;
-      if (timer !== undefined) clearTimeout(timer);
-    };
-  });
 </script>
 
 {#snippet settingRows(rows: SettingDefinition[])}
@@ -106,14 +63,8 @@
         description={setting.description ? $i18n.t(setting.description) : undefined}
         {disabled}
         badge={setting.unavailable ? $i18n.t('settings.notAvailableYet') : undefined}
-        highlighted={highlighted === anchor}
         wide={setting.type !== 'boolean'}
         class={setting.gatedBy !== undefined ? 'gated' : undefined}
-        titleAction={{
-          label: $i18n.t(copied === anchor ? 'settings.linkCopied' : 'settings.copyLink'),
-          icon: copied === anchor ? CheckIcon : LinkIcon,
-          onclick: () => void copyLink(anchor),
-        }}
       >
         {#if setting.type === 'select'}
           {@const key = setting.key}
