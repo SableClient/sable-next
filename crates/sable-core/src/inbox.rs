@@ -124,7 +124,7 @@ async fn save(client: &matrix_sdk::Client, stored: &mut Stored) {
     }
 }
 
-async fn receipt_ts(room: &Room) -> u64 {
+pub(crate) async fn receipt_ts(room: &Room) -> u64 {
     let user_id = room.own_user_id();
     let mut latest = 0;
     for receipt_type in [ReceiptType::Read, ReceiptType::ReadPrivate] {

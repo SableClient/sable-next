@@ -234,6 +234,78 @@ async fn a_replayed_message_alerts_once() {
 }
 
 #[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_message_alerts_when_the_server_reports_no_counts() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!synapse:example.org");
+    server.mock_room_state_encryption().plain().mount().await;
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.member(client.user_id().unwrap()))
+                .add_state_event(factory.default_power_levels()),
+        )
+        .await;
+    let (core, mut events) = watching(&server, &client).await;
+    let mut rules = matrix_sdk::ruma::push::Ruleset::server_default(client.user_id().unwrap());
+    rules
+        .insert(
+            matrix_sdk::ruma::push::NewPushRule::Room(
+                matrix_sdk::ruma::push::NewSimplePushRule::new(
+                    room_id.to_owned(),
+                    vec![matrix_sdk::ruma::push::Action::Notify],
+                ),
+            ),
+            None,
+            None,
+        )
+        .unwrap();
+    let message = json!({
+        "type": "m.room.message", "event_id": "$fresh", "room_id": room_id,
+        "sender": *ALICE, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+        "content": { "msgtype": "m.text", "body": "hello" }
+    });
+    Mock::given(method("GET"))
+        .and(path_regex(r"/context/.*fresh$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "event": message, "events_before": [], "events_after": [],
+            "state": [], "start": "s", "end": "e"
+        })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(factory.push_rules(rules.clone()));
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 0, "highlight_count": 0}),
+                    )
+                    .add_timeline_event(
+                        matrix_sdk::ruma::serde::Raw::new(&message)
+                            .unwrap()
+                            .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                    ),
+            );
+        })
+        .await;
+
+    assert_eq!(
+        next_notification(&mut events)
+            .await
+            .event_id
+            .map(|event_id| event_id.to_string()),
+        Some("$fresh".to_owned())
+    );
+    core.session_tasks.lock().unwrap().clear();
+}
+
+#[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
     for mark_read in [false, true] {
         let server = MatrixMockServer::new().await;
@@ -263,9 +335,10 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
                 None,
             )
             .unwrap();
+        let sent = MilliSecondsSinceUnixEpoch::now();
         let event = json!({
             "type": "m.sticker", "event_id": "$sticker", "room_id": room_id,
-            "sender": *ALICE, "origin_server_ts": MilliSecondsSinceUnixEpoch::now(),
+            "sender": *ALICE, "origin_server_ts": sent,
             "content": { "body": "wave", "url": "mxc://example.org/wave", "info": { "w": 1, "h": 1, "mimetype": "image/png", "size": 1 } }
         });
         let requested = Arc::new(tokio::sync::Notify::new());
@@ -310,13 +383,20 @@ async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
         if mark_read {
             tokio::time::timeout(Duration::from_millis(500), server.mock_sync().ok_and_run(&client, |builder| {
             builder.add_joined_room(JoinedRoomBuilder::new(room_id)
-                .set_unread_notifications_count(json!({"notification_count": 0, "highlight_count": 0})));
+                .set_unread_notifications_count(json!({"notification_count": 0, "highlight_count": 0}))
+                .add_receipt(factory.read_receipts().add_with_timestamp(
+                    matrix_sdk::ruma::event_id!("$sticker"),
+                    client.user_id().unwrap(),
+                    matrix_sdk::ruma::events::receipt::ReceiptType::Read,
+                    matrix_sdk::ruma::events::receipt::ReceiptThread::Unthreaded,
+                    Some(MilliSecondsSinceUnixEpoch::now()),
+                ).into_event()));
             builder.add_invited_room(InvitedRoomBuilder::new(invite_room).add_state_event(stripped_state_event!({
                 "type": "m.room.member", "sender": *ALICE, "state_key": client.user_id().unwrap(),
                 "content": { "membership": "invite" }
             })));
         })).await.expect("read sync completes before context response");
-            assert!(notifications::is_read(&client.get_room(room_id).unwrap()));
+            assert!(notifications::is_read(&client.get_room(room_id).unwrap(), sent).await);
         }
         let view = next_notification(&mut events).await;
         if mark_read {
