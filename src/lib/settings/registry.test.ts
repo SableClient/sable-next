@@ -122,7 +122,7 @@ describe('notification settings', () => {
       (notifications?.items ?? []).map((item) => [item.key, item.gatedBy ?? null])
     );
 
-    expect(gates.get('notificationSounds')).toBe('systemNotifications');
+    expect(gates.get('notificationSounds')).toBeNull();
     expect(gates.get('notificationContent')).toBe('systemNotifications');
     expect(gates.get('notificationEncryptedContent')).toBe('notificationContent');
     expect(gates.get('backgroundNotificationSounds')).toBe('notificationSounds');

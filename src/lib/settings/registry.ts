@@ -1043,7 +1043,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.notificationSounds',
         description: 'settings.notificationSoundsHint',
         type: 'boolean',
-        gatedBy: 'systemNotifications',
       },
       {
         key: 'notificationSoundVolume',
