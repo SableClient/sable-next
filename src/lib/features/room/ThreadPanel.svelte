@@ -296,8 +296,18 @@
   }
 
   .thread-composer {
-    border-top: var(--border-width) solid var(--surface-container-line);
-    min-width: 0;
-    padding: 0 var(--space-400);
+    padding-bottom: max(var(--space-200), var(--edge-inset-bottom));
+  }
+
+  @media (width >= 48rem) {
+    .thread-composer {
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      margin-block-start: calc(-1 * var(--space-300));
+      min-height: var(--sidebar-footer-height);
+      padding-block: var(--space-300);
+    }
   }
 </style>
