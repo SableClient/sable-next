@@ -6,6 +6,7 @@
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -43,6 +44,7 @@
     side?: 'bottom' | 'right';
     onSettings: (room: RoomSummary) => void;
     onLeave: (room: RoomSummary) => void;
+    onLobby?: (room: RoomSummary) => void;
     onMoveUp?: () => void;
     onMoveDown?: () => void;
   }
@@ -56,6 +58,7 @@
     side = 'bottom',
     onSettings,
     onLeave,
+    onLobby,
     onMoveUp,
     onMoveDown,
   }: Props = $props();
@@ -244,6 +247,16 @@
       <UserPlusIcon />
       {$i18n.t('room.menuInvite')}
     </ActionMenuItem>
+    {#if room.is_space && onLobby}
+      <ActionMenuItem
+        onSelect={() => {
+          onLobby(room);
+        }}
+      >
+        <FlagIcon />
+        {$i18n.t('nav.lobby')}
+      </ActionMenuItem>
+    {/if}
     <ActionMenuItem onSelect={copyLink}>
       <LinkIcon />
       {$i18n.t('room.menuCopyLink')}

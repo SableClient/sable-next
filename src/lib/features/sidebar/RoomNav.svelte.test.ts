@@ -200,6 +200,46 @@ test.each([
   await unmount(instance);
 });
 
+test('a subspace context menu opens its lobby', async () => {
+  pageState.url.pathname = '/space/!root%3Aexample.org';
+  pageState.params = { spaceId: '!root:example.org' };
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      is_space: true,
+      space_children: [
+        {
+          room_id: '!nested:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+    makeRoom({ room_id: '!nested:example.org', name: 'Nested', is_space: true }),
+  ];
+  const onNavigate = vi.fn();
+  const instance = await mountNav({ onNavigate });
+
+  const trigger = document.querySelector<HTMLElement>('.room-category');
+  if (!trigger) throw new Error('Subspace heading missing');
+  trigger.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 10, clientY: 10 }));
+
+  const lobby = await vi.waitFor(() => {
+    const item = Array.from(document.querySelectorAll<HTMLElement>('.menu-item')).find((entry) =>
+      entry.textContent.includes('nav.lobby')
+    );
+    if (!item) throw new Error('Lobby action missing');
+    return item;
+  });
+  lobby.click();
+
+  expect(onNavigate).toHaveBeenCalledWith('/space/!nested%3Aexample.org/lobby');
+  await unmount(instance);
+});
+
 test('a route outside every list shows the rooms outside spaces', async () => {
   pageState.url.pathname = '/inbox';
   roomsFixture.rooms = [

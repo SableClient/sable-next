@@ -190,6 +190,10 @@
     }
   }
 
+  function openLobby(room: RoomSummary): void {
+    navigateTo(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room) }));
+  }
+
   // Held by id so the dialogs follow the live summary.
   let settingsRoom = $derived(roomList.byId(settingsRoomId) ?? null);
   let leaveRoom = $derived(roomList.byId(leaveRoomId) ?? null);
@@ -1013,6 +1017,7 @@
                       room={item.room}
                       onSettings={openSettings}
                       onLeave={openLeave}
+                      onLobby={openLobby}
                     />
                   </span>
                 {/if}
@@ -1053,6 +1058,7 @@
     bind:open={contextOpen}
     onSettings={openSettings}
     onLeave={openLeave}
+    onLobby={openLobby}
   />
 {/if}
 
