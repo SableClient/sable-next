@@ -5,7 +5,11 @@ import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 
-import { SETTINGS_ACCOUNT_SECTION, SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
+import {
+  SETTINGS_ACCOUNT_SECTION,
+  SETTINGS_DEVICES_SECTION,
+  SETTINGS_EMOTES_SECTION,
+} from '#lib/settings/registry.js';
 
 import AccountSettings from './AccountSettings.svelte';
 import AboutSettings from './AboutSettings.svelte';
@@ -20,18 +24,46 @@ export interface StandaloneSection {
   component: Component;
 }
 
-export const sectionsBeforeCategories: StandaloneSection[] = [
+interface SettingsNavGroup {
+  id: string;
+  label?: string;
+  sections: string[];
+}
+
+export const settingsNavGroups: SettingsNavGroup[] = [
+  {
+    id: 'user',
+    label: 'settings.navGroups.user',
+    sections: [
+      SETTINGS_ACCOUNT_SECTION,
+      SETTINGS_EMOTES_SECTION,
+      SETTINGS_DEVICES_SECTION,
+      'privacy',
+      'personas',
+    ],
+  },
+  {
+    id: 'interface',
+    label: 'settings.navGroups.interface',
+    sections: ['appearance', 'composer', 'keyboard', 'media', 'timeline', 'desktop'],
+  },
+  {
+    id: 'behavior',
+    label: 'settings.navGroups.behavior',
+    sections: ['notifications', 'calls', 'developer'],
+  },
+  { id: 'about', sections: ['about'] },
+];
+
+const standaloneSections: StandaloneSection[] = [
   {
     id: SETTINGS_ACCOUNT_SECTION,
     label: 'settings.account',
     icon: UserCircleIcon,
     component: AccountSettings,
   },
-];
-
-export const sectionsAfterCategories: StandaloneSection[] = [
   {
-    id: 'emotes',
+    id: SETTINGS_EMOTES_SECTION,
     label: 'settings.emotes',
     icon: SmileyIcon,
     component: EmoteSettings,
@@ -59,7 +91,5 @@ export const sectionsAfterCategories: StandaloneSection[] = [
 export function findStandaloneSection(id: string | null): StandaloneSection | undefined {
   if (id === null) return undefined;
 
-  return [...sectionsBeforeCategories, ...sectionsAfterCategories].find(
-    (section) => section.id === id
-  );
+  return standaloneSections.find((section) => section.id === id);
 }

@@ -5,6 +5,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { listPushDistributors, supportsPushDistributors } from '#lib/platform/push.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import { deliversNativePush, deliversWebPush } from '#lib/platform/notifications.js';
   import { setPreference } from '#lib/settings/preferences.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -155,7 +156,10 @@
 
 {#if android}
   <section class="gateway settings-form" aria-labelledby="push-distributor">
-    <h3 id="push-distributor">{$i18n.t('settings.pushTransport')}</h3>
+    <div class="settings-heading-row">
+      <h3 id="push-distributor" data-settings-outline>{$i18n.t('settings.pushTransport')}</h3>
+      <SettingsAnchorLink anchor="push-distributor" />
+    </div>
     <p class="hint">{$i18n.t('settings.pushTransportHint')}</p>
     <Select
       value={provider}
@@ -193,7 +197,10 @@
 {/if}
 
 <section class="gateway settings-form" aria-labelledby="push-gateway">
-  <h3 id="push-gateway">{$i18n.t('settings.pushGateway')}</h3>
+  <div class="settings-heading-row">
+    <h3 id="push-gateway" data-settings-outline>{$i18n.t('settings.pushGateway')}</h3>
+    <SettingsAnchorLink anchor="push-gateway" />
+  </div>
   <p class="hint">{$i18n.t('settings.pushGatewayHint')}</p>
 
   {#if !deliversWebPush() && !native}

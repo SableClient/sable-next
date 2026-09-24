@@ -3,6 +3,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -77,7 +78,12 @@
 </script>
 
 <section class="defaults settings-form" aria-labelledby="notification-defaults">
-  <h3 id="notification-defaults">{$i18n.t('settings.notificationDefaults')}</h3>
+  <div class="settings-heading-row">
+    <h3 id="notification-defaults" data-settings-outline>
+      {$i18n.t('settings.notificationDefaults')}
+    </h3>
+    <SettingsAnchorLink anchor="notification-defaults" />
+  </div>
   <p class="hint">{$i18n.t('settings.notificationDefaultsHint')}</p>
 
   {#if !granted}

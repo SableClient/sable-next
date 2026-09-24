@@ -40,6 +40,33 @@ describe('developer settings', () => {
   });
 });
 
+describe('setting sections', () => {
+  it('file every row under a section its category declares', async () => {
+    const { settingsCategories } = await import('./registry');
+    for (const category of settingsCategories) {
+      const declared = new Set(category.sections.map((section) => section.id));
+      for (const item of category.items) {
+        expect(declared, `${category.id}: ${item.key}`).toContain(item.section);
+      }
+    }
+  });
+
+  it('give every section an anchor no row or other section uses', async () => {
+    const { settingFocusId, settingsCategories } = await import('./registry');
+    const anchors = settingsCategories.flatMap((category) => [
+      ...category.sections.map((section) => section.id),
+      ...category.items.map((item) => settingFocusId(item.key)),
+    ]);
+    expect(new Set(anchors).size).toBe(anchors.length);
+  });
+
+  it('fold time and date into the timeline', async () => {
+    const { findCategory, findSettingByFocusId } = await import('./registry');
+    expect(findCategory('time')).toBeUndefined();
+    expect(findSettingByFocusId('hour24-clock')?.category.id).toBe('timeline');
+  });
+});
+
 describe('select settings', () => {
   it('survive sanitization for every option value the registry declares', async () => {
     const [{ settingsCategories }, { preferences, sanitize }] = await Promise.all([

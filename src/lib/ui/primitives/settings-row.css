@@ -26,3 +26,10 @@
   font-size: var(--font-size-small);
   margin: 0;
 }
+
+.settings-heading-row {
+  align-items: center;
+  display: flex;
+  gap: var(--space-100);
+  min-width: 0;
+}

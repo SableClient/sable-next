@@ -1,7 +1,8 @@
 import {
+  canonicalSection,
   findCategory,
   findSettingByFocusId,
-  SETTINGS_DEVICES_SECTION,
+  STANDALONE_PAGE_NAMES,
 } from '#lib/settings/registry.js';
 
 export interface SettingsLink {
@@ -17,17 +18,17 @@ const SECTION_PATH = /\/settings\/([a-z0-9-]+)\/?$/;
 const FOCUS_ID = /^[a-z0-9-]+$/;
 
 function knownSection(section: string): boolean {
-  return section === SETTINGS_DEVICES_SECTION || findCategory(section) !== undefined;
+  return section in STANDALONE_PAGE_NAMES || findCategory(section) !== undefined;
 }
 
 /** A focus id that moved to another category still resolves, as it does in v1. */
 function resolve(section: string, focus: string | undefined): SettingsLink | null {
-  if (focus === undefined) return knownSection(section) ? { section } : null;
+  const owner = focus === undefined ? undefined : findSettingByFocusId(focus);
+  if (owner) return { section: owner.category.id, focus };
 
-  const owner = findSettingByFocusId(focus);
-  if (!owner) return knownSection(section) ? { section } : null;
-
-  return { section: owner.category.id, focus };
+  const page = canonicalSection(section);
+  if (!knownSection(page)) return null;
+  return focus === undefined ? { section: page } : { section: page, focus };
 }
 
 function parseQuery(params: URLSearchParams): { focus?: string; marked: boolean } | null {

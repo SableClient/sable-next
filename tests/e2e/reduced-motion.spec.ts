@@ -34,7 +34,7 @@ test('enabling it in settings sets the attribute on the document element', async
 }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await app.openRooms();
-  await page.goto('/settings/accessibility');
+  await page.goto('/settings/appearance');
 
   const toggle = page.getByRole('switch', { name: 'Reduce motion' });
   await expect(page.locator('html')).toHaveAttribute('data-reduced-motion', 'off');

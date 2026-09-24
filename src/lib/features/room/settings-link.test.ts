@@ -16,6 +16,14 @@ test.each([
   expect(parseSettingsLink(href, APP)).toEqual(expected);
 });
 
+test.each([
+  ['accessibility', 'appearance'],
+  ['sync', 'account'],
+  ['time', 'timeline'],
+])('a link to the merged %s page opens %s', (legacy, section) => {
+  expect(parseSettingsLink(`${APP}/settings/${legacy}`, APP)).toEqual({ section });
+});
+
 test('another deployment needs the action marker', () => {
   const href = 'https://other.example/settings/timeline';
   expect(parseSettingsLink(href, APP)).toBeNull();
@@ -65,10 +73,15 @@ test.each([
   expect(parseSettingsLink(href, APP)).toBeNull();
 });
 
-test('an unknown focus id still opens the section', () => {
-  expect(parseSettingsLink('https://sable.example/settings/timeline?focus=long-gone', APP)).toEqual(
-    { section: 'timeline' }
-  );
+test('a focus id that is not a setting is kept for the heading it may name', () => {
+  expect(parseSettingsLink(`${APP}/settings/timeline?focus=room-events`, APP)).toEqual({
+    section: 'timeline',
+    focus: 'room-events',
+  });
+  expect(parseSettingsLink(`${APP}/settings/about?focus=about-homeserver`, APP)).toEqual({
+    section: 'about',
+    focus: 'about-homeserver',
+  });
 });
 
 test('builds a marked, shareable link that parses back', () => {

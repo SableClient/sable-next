@@ -5,6 +5,7 @@
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n, t } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import { pushOverride, trimmed } from '#lib/features/notifications/push-config.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -135,7 +136,10 @@
   tabindex="-1"
 >
   <div class="pushers-head">
-    <h3 id="pushers-heading">{$i18n.t('settings.pushers')}</h3>
+    <div class="settings-heading-row">
+      <h3 id="pushers-heading" data-settings-outline>{$i18n.t('settings.pushers')}</h3>
+      <SettingsAnchorLink anchor="pushers-heading" />
+    </div>
     <IconButton
       variant="ghost"
       size="small"

@@ -14,7 +14,11 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import '#lib/ui/primitives/settings-row.css';
+  import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
+  import SettingsCategorySections from './SettingsCategorySections.svelte';
+
+  const category = findCategory(SETTINGS_ACCOUNT_SECTION);
 
   const core = useCoreClient();
   let profile = $state<ProfileView | null>(null);
@@ -221,6 +225,7 @@
           onSaved={refreshProfile}
           section="account"
         />{/if}
+      {#if category}<SettingsCategorySections {category} />{/if}
     {/if}
   </div>
 </AppPageShell>

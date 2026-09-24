@@ -28,6 +28,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import ThemeSwatches from '#lib/ui/ThemeSwatches.svelte';
   import { i18n } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import '#lib/ui/primitives/settings-row.css';
 
   import {
@@ -170,7 +171,10 @@
 
 <section class="custom-themes settings-form" aria-labelledby="custom-themes-title">
   <div>
-    <h3 id="custom-themes-title">{$i18n.t('settings.customThemes')}</h3>
+    <div class="settings-heading-row">
+      <h3 id="custom-themes-title" data-settings-outline>{$i18n.t('settings.customThemes')}</h3>
+      <SettingsAnchorLink anchor="custom-themes-title" />
+    </div>
     <p>{$i18n.t('settings.customThemesHint')}</p>
   </div>
   <div class="actions">

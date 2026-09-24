@@ -7,6 +7,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import '#lib/ui/primitives/settings-row.css';
@@ -95,7 +96,10 @@
 </script>
 
 <section class="mentions settings-form" aria-labelledby="mention-notifications">
-  <h3 id="mention-notifications">{$i18n.t('settings.mentions')}</h3>
+  <div class="settings-heading-row">
+    <h3 id="mention-notifications" data-settings-outline>{$i18n.t('settings.mentions')}</h3>
+    <SettingsAnchorLink anchor="mention-notifications" />
+  </div>
   <p class="hint">{$i18n.t('settings.mentionsHint')}</p>
 
   {#if failed}

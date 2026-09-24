@@ -11,13 +11,20 @@
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
-  import { settingFocusId, settingsCategories } from '#lib/settings/registry.js';
+  import {
+    canonicalSection,
+    findCategory,
+    settingFocusId,
+    settingsCategories,
+  } from '#lib/settings/registry.js';
   import { createMasterDetail } from '#lib/ui/master-detail.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import { sectionsAfterCategories, sectionsBeforeCategories } from './sections.js';
+  import SettingsOutline from './SettingsOutline.svelte';
+  import { findStandaloneSection, settingsNavGroups } from './sections.js';
+  import { OutlineTracker } from './settings-outline.svelte.js';
   import { defaultSettingsSection } from './settings-navigation';
   import { searchSettings } from './settings-search.js';
 
@@ -31,17 +38,19 @@
 
   let { section, onSelect, onBack, onClose, content }: Props = $props();
   const core = useCoreClient();
-  const sections = [
-    ...sectionsBeforeCategories,
-    ...settingsCategories.map((category) => ({
-      id: category.id,
-      label: category.name,
-      icon: category.icon,
-    })),
-    ...sectionsAfterCategories,
-  ];
+  const groups = settingsNavGroups.map((group) => ({
+    id: group.id,
+    label: group.label,
+    entries: group.sections.flatMap((id) => {
+      const entry = findStandaloneSection(id) ?? findCategory(id);
+      if (!entry) return [];
+      return [{ id, label: 'label' in entry ? entry.label : entry.name, icon: entry.icon }];
+    }),
+  }));
+  const sections = groups.flatMap((group) => group.entries);
+  const outline = new OutlineTracker();
   const pages = createMasterDetail(
-    () => section,
+    () => (section === null ? null : canonicalSection(section)),
     () => defaultSettingsSection()
   );
   let activeLabel = $derived(
@@ -61,6 +70,12 @@
     onSelect(nextSection, focus);
   }
 </script>
+
+{#snippet currentOutline(entry: { label: string })}
+  {#if outline.entries.length > 0}
+    <SettingsOutline {outline} label={$i18n.t('settings.outlineLabel', { section: entry.label })} />
+  {/if}
+{/snippet}
 
 <div class="settings-shell" class:paged={!pages.desktop}>
   <Dialog.Description class="screen-reader-only">
@@ -129,13 +144,18 @@
         </ul>
       {:else}
         <SettingsNav
-          entries={sections.map((entry) => ({ ...entry, label: $i18n.t(entry.label) }))}
+          groups={groups.map((group) => ({
+            id: group.id,
+            label: group.label ? $i18n.t(group.label) : undefined,
+            entries: group.entries.map((entry) => ({ ...entry, label: $i18n.t(entry.label) })),
+          }))}
           activeId={pages.openSection}
           ariaLabel={$i18n.t('settings.sections')}
           onSelect={select}
           href={(entry) => resolve(`settings/${entry.id}`)}
           showChevron={!pages.desktop}
           large={!pages.desktop}
+          current={pages.desktop ? currentOutline : undefined}
         />
       {/if}
       <Button
@@ -165,7 +185,11 @@
           >
         </div>
       {/if}
-      <div class="settings-scroll">{@render content(pages.openSection)}</div>
+      {#key pages.openSection}
+        <div class="settings-scroll" {@attach outline.track}>
+          {@render content(pages.openSection)}
+        </div>
+      {/key}
     </div>
   {/if}
 </div>

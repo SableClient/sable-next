@@ -16,6 +16,9 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
 
+  import { findCategory, SETTINGS_EMOTES_SECTION } from '#lib/settings/registry.js';
+  import SettingsCategorySections from '#lib/features/settings/SettingsCategorySections.svelte';
+
   import ImagePackEditor from './ImagePackEditor.svelte';
   import { packDraft } from './pack-content.js';
   import { exportPacks } from './pack-transfer.js';
@@ -39,6 +42,7 @@
 
   const core = useCoreClient();
   const roomList = useRoomList();
+  const category = findCategory(SETTINGS_EMOTES_SECTION);
 
   let packs = $state.raw<ImagePackView[]>([]);
   let selection = $state.raw<EmoteRoomsContent>({});
@@ -184,6 +188,7 @@
         <ImagePackEditor pack={viewingPack} canEdit={false} />
       {/key}
     {:else}
+      {#if category}<SettingsCategorySections {category} />{/if}
       <PersonalPackSettings />
 
       <SettingsSection

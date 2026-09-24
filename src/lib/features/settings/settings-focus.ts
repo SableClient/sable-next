@@ -1,8 +1,19 @@
-import { tick } from 'svelte';
+import { getContext, setContext, tick } from 'svelte';
 
 import { scrollBehavior } from '#lib/ui/motion.js';
 
 const SETTINGS_SCROLL_SELECTOR = '.settings-scroll';
+const FOCUS_KEY = Symbol('settings-focus');
+
+type Focus = () => string | null;
+
+export function provideSettingsFocus(focus: Focus): void {
+  setContext(FOCUS_KEY, focus);
+}
+
+export function settingsFocus(): Focus {
+  return getContext<Focus | undefined>(FOCUS_KEY) ?? (() => null);
+}
 
 export async function findSettingRow(id: string): Promise<HTMLElement | null> {
   await tick();
@@ -18,20 +29,24 @@ export async function findSettingRow(id: string): Promise<HTMLElement | null> {
   return null;
 }
 
-export function scrollSettingRowIntoView(row: HTMLElement): void {
+export function scrollSettingRowIntoView(
+  row: HTMLElement,
+  block: 'center' | 'start' = 'center'
+): void {
   const behavior = scrollBehavior();
   const scroller = row.closest(SETTINGS_SCROLL_SELECTOR);
   if (!(scroller instanceof HTMLElement)) {
-    row.scrollIntoView({ block: 'center', behavior });
+    row.scrollIntoView({ block, behavior });
     return;
   }
 
   const rowRect = row.getBoundingClientRect();
   const scrollerRect = scroller.getBoundingClientRect();
-  const top =
-    scroller.scrollTop +
-    (rowRect.top - scrollerRect.top) -
-    (scroller.clientHeight - row.offsetHeight) / 2;
+  const offset =
+    block === 'center'
+      ? (scroller.clientHeight - row.offsetHeight) / 2
+      : parseFloat(getComputedStyle(scroller).fontSize);
+  const top = scroller.scrollTop + (rowRect.top - scrollerRect.top) - offset;
 
   scroller.scrollTo({ top: Math.max(0, top), behavior });
 }

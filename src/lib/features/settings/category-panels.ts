@@ -2,6 +2,7 @@ import type { Component } from 'svelte';
 
 import { usesPushGateway } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
+import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 
 import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
 import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
@@ -23,25 +24,18 @@ import DeveloperNotifications from '#lib/features/settings/DeveloperNotification
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
 import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
 
-interface BasePanel {
+export interface CategoryPanel {
   component: Component;
+  section?: string;
   when?: () => boolean;
-  class?: string;
 }
 
-export type CategoryPanel =
-  | (BasePanel & { title?: undefined; headingId?: undefined })
-  | (BasePanel & { title: string; headingId: string });
-
 export const categoryPanels: Record<string, CategoryPanel[]> = {
-  appearance: [{ component: CustomThemes }, { component: AppIconSettings }],
-  composer: [
-    {
-      component: ComposerButtonOrder,
-      title: 'settings.composerButtonOrder',
-      headingId: 'composer-button-order',
-    },
+  appearance: [
+    { component: CustomThemes, section: 'theme-language' },
+    { component: AppIconSettings, section: 'theme-language' },
   ],
+  composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
   notifications: [
     { component: NotificationDefaults },
     { component: MentionNotifications },
@@ -49,58 +43,47 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: PushersSettings },
     { component: PushGateway, when: usesPushGateway },
   ],
-  calls: [
-    {
-      component: CallDeviceSettings,
-      title: 'settings.callDevicesTitle',
-      headingId: 'call-devices',
-    },
-  ],
+  calls: [{ component: CallDeviceSettings, section: 'call-devices' }],
   personas: [{ component: PersonaSettings }],
-  sync: [
-    { component: SettingsSyncStatus, when: () => preferences.settingsSync },
-    { component: SettingsFile },
+  [SETTINGS_ACCOUNT_SECTION]: [
+    { component: SettingsSyncStatus, section: 'sync', when: () => preferences.settingsSync },
+    { component: SettingsFile, section: 'sync' },
   ],
   developer: [
     {
       component: DeveloperAccessToken,
+      section: 'developer-options',
       when: () => preferences.developerTools,
     },
     {
       component: DeveloperSyncDiagnostics,
+      section: 'developer-sync-diagnostics',
       when: () => preferences.developerTools,
-      title: 'settings.developerSyncTitle',
-      headingId: 'developer-sync-diagnostics',
     },
     {
       component: DeveloperAccountData,
+      section: 'developer-account-data',
       when: () => preferences.developerTools,
-      title: 'settings.developerAccountDataTitle',
-      headingId: 'developer-account-data',
     },
     {
       component: DeveloperNotifications,
+      section: 'developer-notifications',
       when: () => preferences.developerTools,
-      title: 'settings.developerNotificationsTitle',
-      headingId: 'developer-notifications',
     },
     {
       component: DeveloperDebugLogs,
+      section: 'developer-debug-logs',
       when: () => preferences.developerTools,
-      title: 'settings.developerLogsTitle',
-      headingId: 'developer-debug-logs',
     },
     {
       component: DeveloperSentry,
+      section: 'developer-sentry',
       when: () => preferences.developerTools,
-      title: 'settings.developerSentryTitle',
-      headingId: 'developer-sentry',
     },
     {
       component: StateEventTool,
+      section: 'settings-state-event',
       when: () => preferences.developerTools,
-      title: 'settings.stateEventTitle',
-      headingId: 'settings-state-event',
     },
   ],
 };

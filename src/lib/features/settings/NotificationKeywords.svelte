@@ -4,6 +4,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -99,7 +100,12 @@
 </script>
 
 <section class="keywords settings-form" aria-labelledby="notification-keywords">
-  <h3 id="notification-keywords">{$i18n.t('settings.notificationKeywords')}</h3>
+  <div class="settings-heading-row">
+    <h3 id="notification-keywords" data-settings-outline>
+      {$i18n.t('settings.notificationKeywords')}
+    </h3>
+    <SettingsAnchorLink anchor="notification-keywords" />
+  </div>
   <p class="hint">{$i18n.t('settings.notificationKeywordsHint')}</p>
 
   {#if error}

@@ -89,6 +89,7 @@ interface BaseSetting {
   name: string;
   icon: Component;
   description?: string;
+  section: string;
   /** Rendered disabled until this preference is on. */
   gatedBy?: BooleanPreference;
   /** The feature behind this setting does not exist yet; shown disabled. */
@@ -122,11 +123,17 @@ export interface RangeSetting extends BaseSetting {
 export type SettingDefinition = BooleanSetting | SelectSetting | RangeSetting;
 export type SettingType = SettingDefinition['type'];
 
+export interface SettingsSectionDefinition {
+  id: string;
+  name: string;
+}
+
 export interface SettingsCategory {
   id: string;
   name: string;
   description?: string;
   icon: Component;
+  sections: SettingsSectionDefinition[];
   items: SettingDefinition[];
 }
 
@@ -134,6 +141,24 @@ export interface SettingsCategory {
 export const SETTINGS_DEVICES_SECTION = 'devices';
 /** Account data comes from the homeserver, not local preferences. */
 export const SETTINGS_ACCOUNT_SECTION = 'account';
+export const SETTINGS_EMOTES_SECTION = 'emotes';
+
+export const STANDALONE_PAGE_NAMES: Partial<Record<string, string>> = {
+  [SETTINGS_DEVICES_SECTION]: 'settings.security',
+  keyboard: 'settings.keyboard',
+  about: 'settings.about',
+};
+
+const MERGED_SECTIONS: Record<string, string> = {
+  accessibility: 'appearance',
+  sync: SETTINGS_ACCOUNT_SECTION,
+  time: 'timeline',
+  updates: 'desktop',
+};
+
+export function canonicalSection(id: string): string {
+  return MERGED_SECTIONS[id] ?? id;
+}
 
 export function findCategory(id: string | undefined): SettingsCategory | undefined {
   return settingsCategories.find((category) => category.id === id);
@@ -142,6 +167,16 @@ export function findCategory(id: string | undefined): SettingsCategory | undefin
 /** Stable anchor for `/settings/<category>?focus=<id>` permalinks. */
 export function settingFocusId(key: string): string {
   return key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+}
+
+export function findSettingsSection(
+  id: string
+): { category: SettingsCategory; section: SettingsSectionDefinition } | undefined {
+  for (const category of settingsCategories) {
+    const section = category.sections.find((entry) => entry.id === id);
+    if (section) return { category, section };
+  }
+  return undefined;
 }
 
 export function findSettingByFocusId(
@@ -159,6 +194,7 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
   ? [
       {
         key: 'errorReporting',
+        section: 'diagnostics',
         icon: BugIcon,
         name: 'settings.errorReporting',
         description: 'settings.errorReportingHint',
@@ -171,6 +207,7 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
       },
       {
         key: 'sessionReplay',
+        section: 'diagnostics',
         icon: FilmStripIcon,
         name: 'settings.sessionReplay',
         description: 'settings.sessionReplayHint',
@@ -184,74 +221,149 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
     ]
   : [];
 
-const desktopCategories: SettingsCategory[] = supportsDesktopWindow()
-  ? [
-      {
-        id: 'desktop',
-        name: 'settings.desktopTitle',
-        description: 'settings.desktopDescription',
-        icon: DesktopIcon,
-        items: [
-          {
-            key: 'useCustomTitleBar',
-            icon: DesktopIcon,
-            name: 'settings.useCustomTitleBar',
-            description: 'settings.useCustomTitleBarHint',
-            type: 'boolean',
-          },
-          ...(supportsTray()
-            ? ([
-                {
-                  key: 'showSystemTrayIcon',
-                  icon: DesktopIcon,
-                  name: 'settings.showSystemTrayIcon',
-                  description: 'settings.showSystemTrayIconHint',
-                  type: 'boolean',
-                },
-                {
-                  key: 'closeToTray',
-                  icon: DesktopIcon,
-                  name: 'settings.closeToTray',
-                  description: 'settings.closeToTrayHint',
-                  type: 'boolean',
-                  gatedBy: 'showSystemTrayIcon',
-                },
-              ] satisfies SettingDefinition[])
-            : []),
-        ],
-      },
-    ]
-  : [];
-
-const updatesCategories: SettingsCategory[] = supportsAutoUpdate()
-  ? [
-      {
-        id: 'updates',
-        name: 'settings.updatesTitle',
-        description: 'settings.updatesDescription',
-        icon: ArrowCircleUpIcon,
-        items: [
-          {
-            key: 'autoUpdateCheck',
-            icon: ArrowCircleUpIcon,
-            name: 'settings.autoUpdateCheck',
-            description: 'settings.autoUpdateCheckHint',
-            type: 'boolean',
-          },
-        ],
-      },
-    ]
-  : [];
+const desktopCategories: SettingsCategory[] =
+  supportsDesktopWindow() || supportsAutoUpdate()
+    ? [
+        {
+          id: 'desktop',
+          name: 'settings.desktopTitle',
+          description: 'settings.desktopDescription',
+          icon: DesktopIcon,
+          sections: [
+            { id: 'window', name: 'settings.groups.window' },
+            { id: 'updates', name: 'settings.updatesTitle' },
+          ],
+          items: [
+            {
+              key: 'useCustomTitleBar',
+              section: 'window',
+              icon: DesktopIcon,
+              name: 'settings.useCustomTitleBar',
+              description: 'settings.useCustomTitleBarHint',
+              type: 'boolean',
+              supported: supportsDesktopWindow,
+            },
+            {
+              key: 'showSystemTrayIcon',
+              section: 'window',
+              icon: DesktopIcon,
+              name: 'settings.showSystemTrayIcon',
+              description: 'settings.showSystemTrayIconHint',
+              type: 'boolean',
+              supported: () => supportsDesktopWindow() && supportsTray(),
+            },
+            {
+              key: 'closeToTray',
+              section: 'window',
+              icon: DesktopIcon,
+              name: 'settings.closeToTray',
+              description: 'settings.closeToTrayHint',
+              type: 'boolean',
+              gatedBy: 'showSystemTrayIcon',
+              supported: () => supportsDesktopWindow() && supportsTray(),
+            },
+            {
+              key: 'autoUpdateCheck',
+              section: 'updates',
+              icon: ArrowCircleUpIcon,
+              name: 'settings.autoUpdateCheck',
+              description: 'settings.autoUpdateCheckHint',
+              type: 'boolean',
+              supported: supportsAutoUpdate,
+            },
+          ],
+        },
+      ]
+    : [];
 
 export const settingsCategories: SettingsCategory[] = [
+  {
+    id: SETTINGS_ACCOUNT_SECTION,
+    name: 'settings.account',
+    icon: CloudArrowUpIcon,
+    sections: [{ id: 'sync', name: 'settings.syncTitle' }],
+    items: [
+      {
+        key: 'settingsSync',
+        section: 'sync',
+        icon: CloudArrowUpIcon,
+        name: 'settings.settingsSync',
+        description: 'settings.settingsSyncHint',
+        type: 'boolean',
+      },
+      {
+        key: 'syncDrafts',
+        section: 'sync',
+        icon: PencilSimpleIcon,
+        name: 'settings.syncDrafts',
+        description: 'settings.syncDraftsHint',
+        type: 'boolean',
+        gatedBy: 'settingsSync',
+      },
+    ],
+  },
+  {
+    id: SETTINGS_EMOTES_SECTION,
+    name: 'settings.emotes',
+    icon: SmileyIcon,
+    sections: [
+      { id: 'emoji-images', name: 'settings.groups.emojiImages' },
+      { id: 'gif-picker', name: 'settings.groups.gifPicker' },
+    ],
+    items: [
+      {
+        key: 'twitterEmoji',
+        section: 'emoji-images',
+        icon: SmileyIcon,
+        name: 'settings.twitterEmoji',
+        description: 'settings.twitterEmojiHint',
+        type: 'boolean',
+      },
+      {
+        key: 'pixelatedImages',
+        section: 'emoji-images',
+        icon: GridFourIcon,
+        name: 'settings.pixelatedImages',
+        description: 'settings.pixelatedImagesHint',
+        type: 'select',
+        options: [
+          { value: 'always', label: 'settings.pixelatedImagesAlways' },
+          { value: 'smart', label: 'settings.pixelatedImagesSmart' },
+          { value: 'never', label: 'settings.pixelatedImagesNever' },
+        ],
+      },
+      {
+        key: 'gifProvider',
+        section: 'gif-picker',
+        icon: GifIcon,
+        name: 'settings.gifProvider',
+        description: 'settings.gifProviderHint',
+        type: 'select',
+        options: [
+          { value: 'default', label: 'settings.gifProviderDefault' },
+          { value: 'klipy', label: 'settings.gifProviderKlipy' },
+          { value: 'tenor', label: 'settings.gifProviderTenor' },
+          { value: 'giphy', label: 'settings.gifProviderGiphy' },
+        ],
+      },
+    ],
+  },
   {
     id: 'appearance',
     name: 'settings.appearanceTitle',
     description: 'settings.appearanceDescription',
     icon: PaintBrushIcon,
+    sections: [
+      { id: 'theme-language', name: 'settings.groups.themeLanguage' },
+      { id: 'message-layout', name: 'settings.groups.messageLayout' },
+      { id: 'sidebar', name: 'settings.groups.sidebar' },
+      { id: 'unread-badges', name: 'settings.groups.unreadBadges' },
+      { id: 'accessibility', name: 'settings.accessibilityTitle' },
+    ],
     items: [
       {
         key: 'language',
+        section: 'theme-language',
         icon: TranslateIcon,
         name: 'settings.language',
         description: 'settings.languageHint',
@@ -270,6 +382,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'theme',
+        section: 'theme-language',
         icon: MoonIcon,
         name: 'settings.theme',
         description: 'settings.themeHint',
@@ -282,6 +395,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'layout',
+        section: 'message-layout',
         icon: LayoutIcon,
         name: 'settings.layout',
         description: 'settings.layoutHint',
@@ -294,6 +408,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'alignOwnMessages',
+        section: 'message-layout',
         icon: LayoutIcon,
         name: 'settings.alignOwnMessages',
         description: 'settings.alignOwnMessagesHint',
@@ -301,6 +416,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'messageSpacing',
+        section: 'message-layout',
         icon: ArrowsOutLineVerticalIcon,
         name: 'settings.messageSpacing',
         description: 'settings.messageSpacingHint',
@@ -313,6 +429,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showRoomIcon',
+        section: 'sidebar',
         icon: ImageIcon,
         name: 'settings.showRoomIcon',
         description: 'settings.showRoomIconHint',
@@ -325,7 +442,16 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'uniformIcons',
+        section: 'sidebar',
+        icon: SquaresFourIcon,
+        name: 'settings.uniformIcons',
+        description: 'settings.uniformIconsHint',
+        type: 'boolean',
+      },
+      {
         key: 'showRoomBanners',
+        section: 'sidebar',
         icon: ImageIcon,
         name: 'settings.showRoomBanners',
         description: 'settings.showRoomBannersHint',
@@ -333,6 +459,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showHome',
+        section: 'sidebar',
         icon: HouseIcon,
         name: 'settings.showHome',
         description: 'settings.showHomeHint',
@@ -340,6 +467,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showSearch',
+        section: 'sidebar',
         icon: MagnifyingGlassIcon,
         name: 'settings.showSearch',
         description: 'settings.showSearchHint',
@@ -347,6 +475,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showUnreadCounts',
+        section: 'unread-badges',
         icon: ChatTextIcon,
         name: 'settings.showUnreadCounts',
         description: 'settings.showUnreadCountsHint',
@@ -354,6 +483,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'badgeCountDMsOnly',
+        section: 'unread-badges',
         icon: ChatsCircleIcon,
         name: 'settings.badgeCountDMsOnly',
         description: 'settings.badgeCountDMsOnlyHint',
@@ -361,47 +491,15 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showPingCounts',
+        section: 'unread-badges',
         icon: MegaphoneIcon,
         name: 'settings.showPingCounts',
         description: 'settings.showPingCountsHint',
         type: 'boolean',
       },
       {
-        key: 'uniformIcons',
-        icon: SquaresFourIcon,
-        name: 'settings.uniformIcons',
-        description: 'settings.uniformIconsHint',
-        type: 'boolean',
-      },
-      {
-        key: 'twitterEmoji',
-        icon: SmileyIcon,
-        name: 'settings.twitterEmoji',
-        description: 'settings.twitterEmojiHint',
-        type: 'boolean',
-      },
-      {
-        key: 'pixelatedImages',
-        icon: GridFourIcon,
-        name: 'settings.pixelatedImages',
-        description: 'settings.pixelatedImagesHint',
-        type: 'select',
-        options: [
-          { value: 'always', label: 'settings.pixelatedImagesAlways' },
-          { value: 'smart', label: 'settings.pixelatedImagesSmart' },
-          { value: 'never', label: 'settings.pixelatedImagesNever' },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'accessibility',
-    name: 'settings.accessibilityTitle',
-    description: 'settings.accessibilityDescription',
-    icon: WheelchairMotionIcon,
-    items: [
-      {
         key: 'pageZoom',
+        section: 'accessibility',
         icon: MagnifyingGlassPlusIcon,
         name: 'settings.pageZoom',
         description: 'settings.pageZoomHint',
@@ -411,6 +509,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'textScale',
+        section: 'accessibility',
         icon: TextAaIcon,
         name: 'settings.fontScale',
         description: 'settings.fontScaleHint',
@@ -420,6 +519,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'highContrast',
+        section: 'accessibility',
         icon: CircleHalfIcon,
         name: 'settings.highContrast',
         description: 'settings.highContrastHint',
@@ -427,6 +527,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'underlineLinks',
+        section: 'accessibility',
         icon: LinkIcon,
         name: 'settings.underlineLinks',
         description: 'settings.underlineLinksHint',
@@ -434,6 +535,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'reducedMotion',
+        section: 'accessibility',
         icon: WheelchairMotionIcon,
         name: 'settings.reducedMotion',
         description: 'settings.reducedMotionHint',
@@ -441,6 +543,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'alwaysShowAltText',
+        section: 'accessibility',
         icon: EyeIcon,
         name: 'settings.alwaysShowAltText',
         description: 'settings.alwaysShowAltTextHint',
@@ -449,41 +552,21 @@ export const settingsCategories: SettingsCategory[] = [
     ],
   },
   {
-    id: 'time',
-    name: 'settings.timeTitle',
-    description: 'settings.timeDescription',
-    icon: ClockIcon,
-    items: [
-      {
-        key: 'hour24Clock',
-        icon: ClockIcon,
-        name: 'settings.hour24Clock',
-        description: 'settings.hour24ClockHint',
-        type: 'boolean',
-      },
-      {
-        key: 'dateFormat',
-        icon: CalendarBlankIcon,
-        name: 'settings.dateFormat',
-        description: 'settings.dateFormatHint',
-        type: 'select',
-        options: [
-          { value: 'auto', label: 'settings.dateFormatAuto' },
-          { value: 'dmy', label: 'settings.dateFormatDmy' },
-          { value: 'mdy', label: 'settings.dateFormatMdy' },
-          { value: 'ymd', label: 'settings.dateFormatYmd' },
-        ],
-      },
-    ],
-  },
-  {
     id: 'timeline',
     name: 'settings.timelineTitle',
     description: 'settings.timelineDescription',
     icon: ChatsCircleIcon,
+    sections: [
+      { id: 'messages', name: 'settings.groups.messages' },
+      { id: 'time-date', name: 'settings.timeTitle' },
+      { id: 'room-events', name: 'settings.groups.roomEvents' },
+      { id: 'receipts-typing', name: 'settings.groups.receiptsTyping' },
+      { id: 'members-pronouns', name: 'settings.groups.membersPronouns' },
+    ],
     items: [
       {
         key: 'timelineEmoteSize',
+        section: 'messages',
         icon: SmileyIcon,
         name: 'settings.timelineEmoteSize',
         description: 'settings.timelineEmoteSizeHint',
@@ -498,53 +581,8 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
-        key: 'hideMembershipEvents',
-        icon: UsersIcon,
-        name: 'settings.hideMembershipEvents',
-        description: 'settings.hideMembershipEventsHint',
-        type: 'boolean',
-      },
-      {
-        key: 'hideProfileChanges',
-        icon: UserCircleIcon,
-        name: 'settings.hideProfileChanges',
-        description: 'settings.hideProfileChangesHint',
-        type: 'boolean',
-      },
-      {
-        key: 'hideMemberInReadOnly',
-        icon: MegaphoneIcon,
-        name: 'settings.hideMemberInReadOnly',
-        description: 'settings.hideMemberInReadOnlyHint',
-        type: 'boolean',
-      },
-      {
-        key: 'showTombstoneEvents',
-        icon: TrashIcon,
-        name: 'settings.showTombstoneEvents',
-        description: 'settings.showTombstoneEventsHint',
-        type: 'boolean',
-      },
-      {
-        key: 'hideReadReceipts',
-        icon: ChecksIcon,
-        name: 'settings.hideReadReceipts',
-        description: 'settings.hideReadReceiptsHint',
-        type: 'boolean',
-      },
-      {
-        key: 'readReceiptPlacement',
-        icon: ChecksIcon,
-        name: 'settings.readReceiptPlacement',
-        description: 'settings.readReceiptPlacementHint',
-        type: 'select',
-        options: [
-          { value: 'message', label: 'settings.readReceiptPlacementMessage' },
-          { value: 'room', label: 'settings.readReceiptPlacementRoom' },
-        ],
-      },
-      {
         key: 'replyPreviewStyle',
+        section: 'messages',
         icon: QuotesIcon,
         name: 'settings.replyPreviewStyle',
         description: 'settings.replyPreviewStyleHint',
@@ -556,7 +594,82 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'hour24Clock',
+        section: 'time-date',
+        icon: ClockIcon,
+        name: 'settings.hour24Clock',
+        description: 'settings.hour24ClockHint',
+        type: 'boolean',
+      },
+      {
+        key: 'dateFormat',
+        section: 'time-date',
+        icon: CalendarBlankIcon,
+        name: 'settings.dateFormat',
+        description: 'settings.dateFormatHint',
+        type: 'select',
+        options: [
+          { value: 'auto', label: 'settings.dateFormatAuto' },
+          { value: 'dmy', label: 'settings.dateFormatDmy' },
+          { value: 'mdy', label: 'settings.dateFormatMdy' },
+          { value: 'ymd', label: 'settings.dateFormatYmd' },
+        ],
+      },
+      {
+        key: 'hideMembershipEvents',
+        section: 'room-events',
+        icon: UsersIcon,
+        name: 'settings.hideMembershipEvents',
+        description: 'settings.hideMembershipEventsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'hideProfileChanges',
+        section: 'room-events',
+        icon: UserCircleIcon,
+        name: 'settings.hideProfileChanges',
+        description: 'settings.hideProfileChangesHint',
+        type: 'boolean',
+      },
+      {
+        key: 'hideMemberInReadOnly',
+        section: 'room-events',
+        icon: MegaphoneIcon,
+        name: 'settings.hideMemberInReadOnly',
+        description: 'settings.hideMemberInReadOnlyHint',
+        type: 'boolean',
+      },
+      {
+        key: 'showTombstoneEvents',
+        section: 'room-events',
+        icon: TrashIcon,
+        name: 'settings.showTombstoneEvents',
+        description: 'settings.showTombstoneEventsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'hideReadReceipts',
+        section: 'receipts-typing',
+        icon: ChecksIcon,
+        name: 'settings.hideReadReceipts',
+        description: 'settings.hideReadReceiptsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'readReceiptPlacement',
+        section: 'receipts-typing',
+        icon: ChecksIcon,
+        name: 'settings.readReceiptPlacement',
+        description: 'settings.readReceiptPlacementHint',
+        type: 'select',
+        options: [
+          { value: 'message', label: 'settings.readReceiptPlacementMessage' },
+          { value: 'room', label: 'settings.readReceiptPlacementRoom' },
+        ],
+      },
+      {
         key: 'hideTypingIndicators',
+        section: 'receipts-typing',
         icon: DotsThreeIcon,
         name: 'settings.hideTypingIndicators',
         description: 'settings.hideTypingIndicatorsHint',
@@ -564,6 +677,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'groupMembersByPresence',
+        section: 'members-pronouns',
         icon: UsersIcon,
         name: 'settings.groupMembersByPresence',
         description: 'settings.groupMembersByPresenceHint',
@@ -571,6 +685,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showPronouns',
+        section: 'members-pronouns',
         icon: UserCircleIcon,
         name: 'settings.showPronouns',
         description: 'settings.showPronounsHint',
@@ -578,6 +693,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'filterPronounsByLanguage',
+        section: 'members-pronouns',
         icon: TranslateIcon,
         name: 'settings.filterPronounsByLanguage',
         description: 'settings.filterPronounsByLanguageHint',
@@ -586,6 +702,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'pronounPillLimit',
+        section: 'members-pronouns',
         icon: UserCircleIcon,
         name: 'settings.pronounPillLimit',
         description: 'settings.pronounPillLimitHint',
@@ -600,6 +717,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'pronounPillLength',
+        section: 'members-pronouns',
         icon: TextAaIcon,
         name: 'settings.pronounPillLength',
         description: 'settings.pronounPillLengthHint',
@@ -619,23 +737,24 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.composerTitle',
     description: 'settings.composerDescription',
     icon: PencilSimpleIcon,
+    sections: [
+      { id: 'writing', name: 'settings.groups.writing' },
+      { id: 'sending', name: 'settings.groups.sending' },
+      { id: 'composer-buttons', name: 'settings.groups.buttons' },
+      { id: 'composer-button-order', name: 'settings.composerButtonOrder' },
+    ],
     items: [
       {
         key: 'enterForNewline',
+        section: 'writing',
         icon: KeyReturnIcon,
         name: 'settings.enterForNewline',
         description: 'settings.enterForNewlineHint',
         type: 'boolean',
       },
       {
-        key: 'mentionInReplies',
-        icon: BellIcon,
-        name: 'settings.mentionInReplies',
-        description: 'settings.mentionInRepliesHint',
-        type: 'boolean',
-      },
-      {
         key: 'richTextComposer',
+        section: 'writing',
         icon: CodeIcon,
         name: 'settings.richTextComposer',
         description: 'settings.richTextComposerHint',
@@ -643,13 +762,31 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'formattingToolbar',
+        section: 'writing',
         icon: TextAaIcon,
         name: 'settings.formattingToolbar',
         description: 'settings.formattingToolbarHint',
         type: 'boolean',
       },
       {
+        key: 'mentionInReplies',
+        section: 'sending',
+        icon: BellIcon,
+        name: 'settings.mentionInReplies',
+        description: 'settings.mentionInRepliesHint',
+        type: 'boolean',
+      },
+      {
+        key: 'scheduleInEncryptedRooms',
+        section: 'sending',
+        icon: LockIcon,
+        name: 'settings.scheduleInEncryptedRooms',
+        description: 'settings.scheduleInEncryptedRoomsHint',
+        type: 'boolean',
+      },
+      {
         key: 'composerFormatButton',
+        section: 'composer-buttons',
         icon: TextAaIcon,
         name: 'settings.composerFormatButton',
         description: 'settings.composerFormatButtonHint',
@@ -657,6 +794,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'composerGifButton',
+        section: 'composer-buttons',
         icon: GifIcon,
         name: 'settings.composerGifButton',
         description: 'settings.composerGifButtonHint',
@@ -664,6 +802,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'composerStickerButton',
+        section: 'composer-buttons',
         icon: StickerIcon,
         name: 'settings.composerStickerButton',
         description: 'settings.composerStickerButtonHint',
@@ -671,6 +810,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'composerEmoteButton',
+        section: 'composer-buttons',
         icon: SmileyIcon,
         name: 'settings.composerEmoteButton',
         description: 'settings.composerEmoteButtonHint',
@@ -678,16 +818,10 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'composerVoiceButton',
+        section: 'composer-buttons',
         icon: MicrophoneIcon,
         name: 'settings.composerVoiceButton',
         description: 'settings.composerVoiceButtonHint',
-        type: 'boolean',
-      },
-      {
-        key: 'scheduleInEncryptedRooms',
-        icon: LockIcon,
-        name: 'settings.scheduleInEncryptedRooms',
-        description: 'settings.scheduleInEncryptedRoomsHint',
         type: 'boolean',
       },
     ],
@@ -697,9 +831,15 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.privacyTitle',
     description: 'settings.privacyDescription',
     icon: EyeSlashIcon,
+    sections: [
+      { id: 'activity', name: 'settings.groups.activity' },
+      { id: 'blurring', name: 'settings.groups.blurring' },
+      { id: 'diagnostics', name: 'settings.groups.diagnostics' },
+    ],
     items: [
       {
         key: 'sendTypingNotifications',
+        section: 'activity',
         icon: KeyboardIcon,
         name: 'settings.sendTypingNotifications',
         description: 'settings.sendTypingNotificationsHint',
@@ -707,6 +847,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'sendReadReceipts',
+        section: 'activity',
         icon: EyeIcon,
         name: 'settings.sendReadReceipts',
         description: 'settings.sendReadReceiptsHint',
@@ -714,6 +855,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'sendPresence',
+        section: 'activity',
         icon: PulseIcon,
         name: 'settings.sendPresence',
         description: 'settings.sendPresenceHint',
@@ -721,6 +863,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'blurMedia',
+        section: 'blurring',
         icon: ImageIcon,
         name: 'settings.blurMedia',
         description: 'settings.blurMediaHint',
@@ -728,6 +871,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'blurAvatars',
+        section: 'blurring',
         icon: UserCircleIcon,
         name: 'settings.blurAvatars',
         description: 'settings.blurAvatarsHint',
@@ -735,6 +879,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'blurEmotes',
+        section: 'blurring',
         icon: SmileyIcon,
         name: 'settings.blurEmotes',
         description: 'settings.blurEmotesHint',
@@ -748,9 +893,15 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.mediaTitle',
     description: 'settings.mediaDescription',
     icon: ImageIcon,
+    sections: [
+      { id: 'playback', name: 'settings.groups.playback' },
+      { id: 'previews', name: 'settings.groups.previews' },
+      { id: 'embeds', name: 'settings.groups.embeds' },
+    ],
     items: [
       {
         key: 'mediaAutoLoad',
+        section: 'playback',
         icon: ImageIcon,
         name: 'settings.mediaAutoLoad',
         description: 'settings.mediaAutoLoadHint',
@@ -759,61 +910,55 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'autoplayGifs',
+        section: 'playback',
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
         description: 'settings.autoplayGifsHint',
         type: 'boolean',
       },
       {
-        key: 'pauseAnimationsWhenInactive',
-        icon: PauseIcon,
-        name: 'settings.pauseAnimationsWhenInactive',
-        description: 'settings.pauseAnimationsWhenInactiveHint',
-        type: 'boolean',
-      },
-      {
         key: 'autoplayStickers',
+        section: 'playback',
         icon: StickerIcon,
         name: 'settings.autoplayStickers',
         description: 'settings.autoplayStickersHint',
         type: 'boolean',
       },
       {
-        key: 'gifProvider',
-        icon: GifIcon,
-        name: 'settings.gifProvider',
-        description: 'settings.gifProviderHint',
-        type: 'select',
-        options: [
-          { value: 'default', label: 'settings.gifProviderDefault' },
-          { value: 'klipy', label: 'settings.gifProviderKlipy' },
-          { value: 'tenor', label: 'settings.gifProviderTenor' },
-          { value: 'giphy', label: 'settings.gifProviderGiphy' },
-        ],
+        key: 'pauseAnimationsWhenInactive',
+        section: 'playback',
+        icon: PauseIcon,
+        name: 'settings.pauseAnimationsWhenInactive',
+        description: 'settings.pauseAnimationsWhenInactiveHint',
+        type: 'boolean',
       },
       {
         key: 'urlPreviews',
+        section: 'previews',
         icon: LinkSimpleIcon,
         name: 'settings.urlPreviews',
         description: 'settings.urlPreviewsHint',
         type: 'boolean',
       },
       {
-        key: 'themeFileCards',
-        icon: PaletteIcon,
-        name: 'settings.themeFileCards',
-        description: 'settings.themeFileCardsHint',
-        type: 'boolean',
-      },
-      {
         key: 'encryptedUrlPreviews',
+        section: 'previews',
         icon: LinkSimpleIcon,
         name: 'settings.encryptedUrlPreviews',
         description: 'settings.encryptedUrlPreviewsHint',
         type: 'boolean',
       },
       {
+        key: 'themeFileCards',
+        section: 'previews',
+        icon: PaletteIcon,
+        name: 'settings.themeFileCards',
+        description: 'settings.themeFileCardsHint',
+        type: 'boolean',
+      },
+      {
         key: 'clientEmbeds',
+        section: 'embeds',
         icon: BrowserIcon,
         name: 'settings.clientEmbeds',
         description: 'settings.clientEmbedsHint',
@@ -821,6 +966,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'encryptedClientEmbeds',
+        section: 'embeds',
         icon: BrowserIcon,
         name: 'settings.encryptedClientEmbeds',
         description: 'settings.encryptedClientEmbedsHint',
@@ -829,6 +975,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'youtubeEmbeds',
+        section: 'embeds',
         icon: YoutubeLogoIcon,
         name: 'settings.youtubeEmbeds',
         description: 'settings.youtubeEmbedsHint',
@@ -842,16 +989,65 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.notificationsTitle',
     description: 'settings.notificationsDescription',
     icon: BellIcon,
+    sections: [
+      { id: 'alerts', name: 'settings.groups.systemNotifications' },
+      { id: 'sounds', name: 'settings.groups.sounds' },
+      { id: 'highlights', name: 'settings.groups.highlights' },
+    ],
     items: [
       {
         key: 'systemNotifications',
+        section: 'alerts',
         icon: BellIcon,
         name: 'settings.systemNotifications',
         description: 'settings.systemNotificationsHint',
         type: 'boolean',
       },
       {
+        key: 'notificationContent',
+        section: 'alerts',
+        icon: ChatTextIcon,
+        name: 'settings.notificationContent',
+        description: 'settings.notificationContentHint',
+        type: 'boolean',
+        gatedBy: 'systemNotifications',
+      },
+      {
+        key: 'notificationEncryptedContent',
+        section: 'alerts',
+        icon: LockIcon,
+        name: 'settings.notificationEncryptedContent',
+        description: 'settings.notificationEncryptedContentHint',
+        type: 'boolean',
+        gatedBy: 'notificationContent',
+      },
+      {
+        key: 'notifyOnce',
+        section: 'alerts',
+        icon: BellSimpleIcon,
+        name: 'settings.notifyOnce',
+        description: 'settings.notifyOnceHint',
+        type: 'boolean',
+      },
+      {
+        key: 'clearNotificationsOnRead',
+        section: 'alerts',
+        icon: CheckCircleIcon,
+        name: 'settings.clearNotificationsOnRead',
+        description: 'settings.clearNotificationsOnReadHint',
+        type: 'boolean',
+      },
+      {
+        key: 'richPushPayloads',
+        section: 'alerts',
+        icon: PaperPlaneTiltIcon,
+        name: 'settings.richPushPayloads',
+        description: 'settings.richPushPayloadsHint',
+        type: 'boolean',
+      },
+      {
         key: 'notificationSounds',
+        section: 'sounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSounds',
         description: 'settings.notificationSoundsHint',
@@ -860,6 +1056,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'notificationSoundVolume',
+        section: 'sounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSoundVolume',
         description: 'settings.notificationSoundVolumeHint',
@@ -871,14 +1068,8 @@ export const settingsCategories: SettingsCategory[] = [
         },
       },
       {
-        key: 'notifyOnce',
-        icon: BellSimpleIcon,
-        name: 'settings.notifyOnce',
-        description: 'settings.notifyOnceHint',
-        type: 'boolean',
-      },
-      {
         key: 'backgroundNotificationSounds',
+        section: 'sounds',
         icon: SpeakerHighIcon,
         name: 'settings.backgroundNotificationSounds',
         description: 'settings.backgroundNotificationSoundsHint',
@@ -887,30 +1078,8 @@ export const settingsCategories: SettingsCategory[] = [
         supported: presentsInApp,
       },
       {
-        key: 'notificationContent',
-        icon: ChatTextIcon,
-        name: 'settings.notificationContent',
-        description: 'settings.notificationContentHint',
-        type: 'boolean',
-        gatedBy: 'systemNotifications',
-      },
-      {
-        key: 'notificationEncryptedContent',
-        icon: LockIcon,
-        name: 'settings.notificationEncryptedContent',
-        description: 'settings.notificationEncryptedContentHint',
-        type: 'boolean',
-        gatedBy: 'notificationContent',
-      },
-      {
-        key: 'richPushPayloads',
-        icon: PaperPlaneTiltIcon,
-        name: 'settings.richPushPayloads',
-        description: 'settings.richPushPayloadsHint',
-        type: 'boolean',
-      },
-      {
         key: 'highlightMentions',
+        section: 'highlights',
         icon: AtIcon,
         name: 'settings.highlightMentions',
         description: 'settings.highlightMentionsHint',
@@ -918,16 +1087,10 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'faviconForMentionsOnly',
+        section: 'highlights',
         icon: AtIcon,
         name: 'settings.faviconForMentionsOnly',
         description: 'settings.faviconForMentionsOnlyHint',
-        type: 'boolean',
-      },
-      {
-        key: 'clearNotificationsOnRead',
-        icon: CheckCircleIcon,
-        name: 'settings.clearNotificationsOnRead',
-        description: 'settings.clearNotificationsOnReadHint',
         type: 'boolean',
       },
     ],
@@ -937,9 +1100,16 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.callsTitle',
     description: 'settings.callsDescription',
     icon: PhoneIcon,
+    sections: [
+      { id: 'call-devices', name: 'settings.callDevicesTitle' },
+      { id: 'microphone', name: 'settings.groups.microphone' },
+      { id: 'ringing', name: 'settings.groups.ringing' },
+      { id: 'call-button', name: 'settings.groups.callButton' },
+    ],
     items: [
       {
         key: 'noiseSuppression',
+        section: 'microphone',
         icon: MicrophoneIcon,
         name: 'settings.noiseSuppression',
         description: 'settings.noiseSuppressionHint',
@@ -947,6 +1117,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'voiceIsolation',
+        section: 'microphone',
         icon: MicrophoneIcon,
         name: 'settings.voiceIsolation',
         description: 'settings.voiceIsolationHint',
@@ -955,6 +1126,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'echoCancellation',
+        section: 'microphone',
         icon: MicrophoneIcon,
         name: 'settings.echoCancellation',
         description: 'settings.echoCancellationHint',
@@ -962,6 +1134,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'autoGainControl',
+        section: 'microphone',
         icon: MicrophoneIcon,
         name: 'settings.autoGainControl',
         description: 'settings.autoGainControlHint',
@@ -969,20 +1142,15 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'incomingCallSound',
+        section: 'ringing',
         icon: PhoneIcon,
         name: 'settings.incomingCallSound',
         description: 'settings.incomingCallSoundHint',
         type: 'boolean',
       },
       {
-        key: 'outgoingRingback',
-        icon: PhoneIcon,
-        name: 'settings.outgoingRingback',
-        description: 'settings.outgoingRingbackHint',
-        type: 'boolean',
-      },
-      {
         key: 'callRingtoneVolume',
+        section: 'ringing',
         icon: SpeakerHighIcon,
         name: 'settings.callRingtoneVolume',
         description: 'settings.callRingtoneVolumeHint',
@@ -995,7 +1163,16 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'outgoingRingback',
+        section: 'ringing',
+        icon: PhoneIcon,
+        name: 'settings.outgoingRingback',
+        description: 'settings.outgoingRingbackHint',
+        type: 'boolean',
+      },
+      {
         key: 'ringForGroupCalls',
+        section: 'ringing',
         icon: PhoneIcon,
         name: 'settings.ringForGroupCalls',
         description: 'settings.ringForGroupCallsHint',
@@ -1003,6 +1180,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'alwaysShowCallButton',
+        section: 'call-button',
         icon: PhoneIcon,
         name: 'settings.alwaysShowCallButton',
         description: 'settings.alwaysShowCallButtonHint',
@@ -1015,9 +1193,11 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'personas.title',
     description: 'personas.description',
     icon: UserSwitchIcon,
+    sections: [{ id: 'persona-sending', name: 'settings.groups.sending' }],
     items: [
       {
         key: 'personaPicker',
+        section: 'persona-sending',
         icon: UserSwitchIcon,
         name: 'personas.picker',
         description: 'personas.pickerHint',
@@ -1025,6 +1205,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'personaProxying',
+        section: 'persona-sending',
         icon: ChatTextIcon,
         name: 'personas.proxying',
         description: 'personas.proxyingHint',
@@ -1032,6 +1213,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'personaLatching',
+        section: 'persona-sending',
         icon: PushPinIcon,
         name: 'personas.latching',
         description: 'personas.latchingHint',
@@ -1045,6 +1227,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'personaFallback',
+        section: 'persona-sending',
         icon: TextAaIcon,
         name: 'personas.fallback',
         description: 'personas.fallbackHint',
@@ -1053,38 +1236,24 @@ export const settingsCategories: SettingsCategory[] = [
     ],
   },
   ...desktopCategories,
-  ...updatesCategories,
-  {
-    id: 'sync',
-    name: 'settings.syncTitle',
-    description: 'settings.syncDescription',
-    icon: CloudArrowUpIcon,
-    items: [
-      {
-        key: 'settingsSync',
-        icon: CloudArrowUpIcon,
-        name: 'settings.settingsSync',
-        description: 'settings.settingsSyncHint',
-        type: 'boolean',
-      },
-      {
-        key: 'syncDrafts',
-        icon: PencilSimpleIcon,
-        name: 'settings.syncDrafts',
-        description: 'settings.syncDraftsHint',
-        type: 'boolean',
-        gatedBy: 'settingsSync',
-      },
-    ],
-  },
   {
     id: 'developer',
     name: 'settings.developerTitle',
     description: 'settings.developerDescription',
     icon: CodeIcon,
+    sections: [
+      { id: 'developer-options', name: 'settings.groups.developerTools' },
+      { id: 'developer-sync-diagnostics', name: 'settings.developerSyncTitle' },
+      { id: 'developer-account-data', name: 'settings.developerAccountDataTitle' },
+      { id: 'developer-notifications', name: 'settings.developerNotificationsTitle' },
+      { id: 'developer-debug-logs', name: 'settings.developerLogsTitle' },
+      { id: 'developer-sentry', name: 'settings.developerSentryTitle' },
+      { id: 'settings-state-event', name: 'settings.stateEventTitle' },
+    ],
     items: [
       {
         key: 'developerTools',
+        section: 'developer-options',
         icon: CodeIcon,
         name: 'settings.developerTools',
         description: 'settings.developerToolsHint',
@@ -1092,6 +1261,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'showHiddenEvents',
+        section: 'developer-options',
         icon: BugIcon,
         name: 'settings.showHiddenEvents',
         description: 'settings.showHiddenEventsHint',
@@ -1100,6 +1270,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'hiddenEventEdits',
+        section: 'developer-options',
         icon: PencilSimpleIcon,
         name: 'settings.hiddenEventEdits',
         description: 'settings.hiddenEventEditsHint',
@@ -1108,6 +1279,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'hiddenEventReactions',
+        section: 'developer-options',
         icon: SmileyIcon,
         name: 'settings.hiddenEventReactions',
         description: 'settings.hiddenEventReactionsHint',
@@ -1116,6 +1288,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'hiddenEventRedactions',
+        section: 'developer-options',
         icon: TrashIcon,
         name: 'settings.hiddenEventRedactions',
         description: 'settings.hiddenEventRedactionsHint',
@@ -1124,6 +1297,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'hiddenEventOther',
+        section: 'developer-options',
         icon: DotsThreeIcon,
         name: 'settings.hiddenEventOther',
         description: 'settings.hiddenEventOtherHint',

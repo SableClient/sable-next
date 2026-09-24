@@ -21,9 +21,11 @@ const categories: SettingsCategory[] = [
     id: 'notifications',
     name: 'category.notifications',
     icon: (() => {}) as unknown as SettingsCategory['icon'],
+    sections: [{ id: 'main', name: 'section.main' }],
     items: [
       {
         key: 'systemNotifications',
+        section: 'main',
         icon: (() => {}) as unknown as SettingsCategory['icon'],
         name: 'setting.systemNotifications',
         description: 'setting.systemNotificationsHint',
@@ -35,9 +37,11 @@ const categories: SettingsCategory[] = [
     id: 'media',
     name: 'category.media',
     icon: (() => {}) as unknown as SettingsCategory['icon'],
+    sections: [{ id: 'main', name: 'section.main' }],
     items: [
       {
         key: 'autoplayGifs',
+        section: 'main',
         icon: (() => {}) as unknown as SettingsCategory['icon'],
         name: 'setting.autoplayGifs',
         description: 'setting.autoplayGifsHint',
@@ -45,6 +49,7 @@ const categories: SettingsCategory[] = [
       },
       {
         key: 'urlPreviews',
+        section: 'main',
         icon: (() => {}) as unknown as SettingsCategory['icon'],
         name: 'setting.hidden',
         type: 'boolean',

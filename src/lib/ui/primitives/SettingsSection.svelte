@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
+  import SettingsAnchorLink from './SettingsAnchorLink.svelte';
 
   type Props = {
     title: string;
@@ -30,7 +31,8 @@
     {#if icon}<span class="settings-section-icon" aria-hidden="true">{@render icon()}</span>{/if}
     <div class="settings-section-heading">
       <div class="settings-section-title">
-        <h2 id={headingId}>{title}</h2>
+        <h2 id={headingId} data-settings-outline>{title}</h2>
+        <SettingsAnchorLink anchor={headingId} />
         {#if titleActions}{@render titleActions()}{/if}
       </div>
       {#if description}<p>{description}</p>{/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Component } from 'svelte';
+  import type { Component, Snippet } from 'svelte';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
 
   export interface SettingsNavEntry {
@@ -8,63 +8,92 @@
     icon: Component;
   }
 
-  interface Props {
+  export interface SettingsNavGroup {
+    id: string;
+    label?: string;
     entries: readonly SettingsNavEntry[];
+  }
+
+  interface Props {
+    entries?: readonly SettingsNavEntry[];
+    groups?: readonly SettingsNavGroup[];
     activeId: string | null;
     ariaLabel: string;
     onSelect: (event: MouseEvent, id: string) => void;
     href?: (entry: SettingsNavEntry) => string;
     showChevron?: boolean;
     large?: boolean;
+    current?: Snippet<[SettingsNavEntry]>;
   }
 
+  const uid = $props.id();
   let {
-    entries,
+    entries = [],
+    groups,
     activeId,
     ariaLabel,
     onSelect,
     href,
     showChevron = false,
     large = false,
+    current,
   }: Props = $props();
+  let sections = $derived(groups ?? [{ id: 'entries', entries }]);
 </script>
 
 <nav class="settings-nav-list" aria-label={ariaLabel}>
-  {#each entries as entry (entry.id)}
-    {@const active = activeId === entry.id}
-    {@const Icon = entry.icon}
-    {@const classes = [
-      'settings-nav-item',
-      'selection-current',
-      'selection-layer',
-      { 'settings-nav-item-large': large },
-    ]}
-    {#if href}
-      <a
-        class={classes}
-        href={href(entry)}
-        aria-current={active ? 'page' : undefined}
-        data-current={active ? 'true' : undefined}
-        onclick={(event) => onSelect(event, entry.id)}
-      >
-        <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
-        <span class="label">{entry.label}</span>
-        {#if showChevron}<span class="chevron" aria-hidden="true"><CaretRightIcon /></span>{/if}
-      </a>
-    {:else}
-      <button
-        class={classes}
-        type="button"
-        aria-current={active ? 'page' : undefined}
-        data-current={active ? 'true' : undefined}
-        onclick={(event) => onSelect(event, entry.id)}
-      >
-        <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
-        <span class="label">{entry.label}</span>
-      </button>
-    {/if}
+  {#each sections as group (group.id)}
+    {@const labelId = `${uid}-${group.id}`}
+    <div
+      class="settings-nav-group"
+      role={group.label ? 'group' : undefined}
+      aria-labelledby={group.label ? labelId : undefined}
+    >
+      {#if group.label}
+        <p class="settings-nav-group-label" id={labelId}>{group.label}</p>
+      {/if}
+      {#each group.entries as entry (entry.id)}
+        {@render item(entry)}
+      {/each}
+    </div>
   {/each}
 </nav>
+
+{#snippet item(entry: SettingsNavEntry)}
+  {@const active = activeId === entry.id}
+  {@const Icon = entry.icon}
+  {@const classes = [
+    'settings-nav-item',
+    'selection-current',
+    'selection-layer',
+    { 'settings-nav-item-large': large },
+  ]}
+  {#if href}
+    <a
+      class={classes}
+      href={href(entry)}
+      aria-current={active ? 'page' : undefined}
+      data-current={active ? 'true' : undefined}
+      onclick={(event) => onSelect(event, entry.id)}
+    >
+      <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
+      <span class="label">{entry.label}</span>
+      {#if showChevron}<span class="chevron" aria-hidden="true"><CaretRightIcon /></span>{/if}
+    </a>
+  {:else}
+    <button
+      class={classes}
+      type="button"
+      aria-current={active ? 'page' : undefined}
+      data-current={active ? 'true' : undefined}
+      onclick={(event) => onSelect(event, entry.id)}
+    >
+      <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
+      <span class="label">{entry.label}</span>
+    </button>
+  {/if}
+  {#if active && current}{@render current(entry)}{/if}
+{/snippet}
 
 <style>
   .settings-nav-list {
@@ -79,6 +108,26 @@
     overflow: hidden auto;
     padding: var(--space-200);
     scrollbar-gutter: stable;
+  }
+
+  .settings-nav-group {
+    display: grid;
+    gap: var(--space-050);
+    min-width: 0;
+  }
+
+  .settings-nav-group + .settings-nav-group {
+    border-top: var(--border-width) solid var(--bg-container-line);
+    margin-top: var(--space-200);
+    padding-top: var(--space-200);
+  }
+
+  .settings-nav-group-label {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    margin: var(--space-100) 0 var(--space-050);
+    padding: 0 var(--space-300);
   }
 
   .settings-nav-item {
