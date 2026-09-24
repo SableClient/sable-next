@@ -12,6 +12,7 @@ export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
 export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
+export type PixelatedImages = 'always' | 'smart' | 'never';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
@@ -38,6 +39,7 @@ export interface Preferences {
   highContrast: boolean;
   alwaysShowAltText: boolean;
   twitterEmoji: boolean;
+  pixelatedImages: PixelatedImages;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   roomBannerHeight: number;
@@ -187,6 +189,7 @@ const ENUMS = {
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   fontScale: ['smallest', 'small', 'default', 'large', 'largest', 'huge'],
+  pixelatedImages: ['always', 'smart', 'never'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],
   readReceiptPlacement: ['message', 'room'],
@@ -232,6 +235,7 @@ const DEFAULTS: Preferences = {
   highContrast: false,
   alwaysShowAltText: false,
   twitterEmoji: true,
+  pixelatedImages: 'smart',
   showRoomIcon: 'always',
   showRoomBanners: true,
   roomBannerHeight: 190,

@@ -7,6 +7,7 @@
   import { dominantColor } from '#lib/ui/dominant-color.js';
   import { DEFAULT_FRAME_MS, openGifPlayback, type GifPlayback } from '#lib/ui/gif-frames.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
+  import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { automaticMediaRetryDelay, mediaRetryDelay } from '#lib/ui/media-retry.js';
   import {
     cachedMediaUrl,
@@ -101,6 +102,9 @@
       intrinsicHeight > 0;
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
+  let pixelated = $derived(
+    pixelatedImage(preferences.pixelatedImages, intrinsicWidth, intrinsicHeight)
+  );
   let animated = $derived(
     ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
   );
@@ -476,7 +480,7 @@
 
 {#if !failed && (manualGif || onclick)}
   <button
-    class={[className, 'media-image', 'interactive', { gif: manualGif }]}
+    class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
     style:contain-intrinsic-inline-size="{width}px"
@@ -492,7 +496,7 @@
   </button>
 {:else}
   <span
-    class={[className, 'media-image']}
+    class={[className, 'media-image', { pixelated }]}
     {style}
     style:--media-ratio={aspectRatio}
     style:contain-intrinsic-inline-size="{width}px"
@@ -516,6 +520,10 @@
     height: 100%;
     object-fit: cover;
     width: 100%;
+  }
+
+  .pixelated .media-image-content {
+    image-rendering: pixelated;
   }
 
   .media-image-blurhash,

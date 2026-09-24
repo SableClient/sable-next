@@ -21,6 +21,7 @@ import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
 import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
 import GifIcon from 'phosphor-svelte/lib/GifIcon';
+import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
 import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import KeyReturnIcon from 'phosphor-svelte/lib/KeyReturnIcon';
@@ -375,6 +376,18 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.twitterEmoji',
         description: 'settings.twitterEmojiHint',
         type: 'boolean',
+      },
+      {
+        key: 'pixelatedImages',
+        icon: GridFourIcon,
+        name: 'settings.pixelatedImages',
+        description: 'settings.pixelatedImagesHint',
+        type: 'select',
+        options: [
+          { value: 'always', label: 'settings.pixelatedImagesAlways' },
+          { value: 'smart', label: 'settings.pixelatedImagesSmart' },
+          { value: 'never', label: 'settings.pixelatedImagesNever' },
+        ],
       },
     ],
   },

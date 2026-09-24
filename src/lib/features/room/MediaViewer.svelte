@@ -6,10 +6,12 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
+  import { pixelatedImage } from '#lib/ui/pixelated.js';
   import {
     AXIS_LOCK_THRESHOLD,
     SWIPE_THRESHOLD,
@@ -158,6 +160,10 @@
       fitsWindow = true;
       imageReady = false;
       editingZoom = false;
+      pixelated =
+        item?.kind === 'image' || item?.kind === 'sticker'
+          ? pixelatedImage(preferences.pixelatedImages, item.width, item.height)
+          : false;
     });
   });
 
