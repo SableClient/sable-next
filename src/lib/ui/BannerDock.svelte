@@ -14,7 +14,10 @@
 
 <style>
   .dock {
-    bottom: calc(var(--space-400) + var(--safe-bottom));
+    bottom: max(
+      calc(var(--space-400) + var(--safe-bottom)),
+      calc(var(--composer-clearance, 0px) + var(--space-200))
+    );
     display: grid;
     gap: var(--space-300);
     inset-inline: calc(var(--space-400) + var(--safe-left))

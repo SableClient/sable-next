@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { on } from 'svelte/events';
   import type {
     MemberView,
     MembershipView,
@@ -205,6 +206,23 @@
     threadRootId = rootEventId;
     threadsOpen = false;
     desktopMembersOpen = false;
+  }
+
+  function publishComposerClearance(node: HTMLElement): () => void {
+    const root = document.documentElement;
+    const update = (): void => {
+      const clearance = Math.max(0, window.innerHeight - node.getBoundingClientRect().top);
+      root.style.setProperty('--composer-clearance', `${String(clearance)}px`);
+    };
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    const stopResize = on(window, 'resize', update);
+    update();
+    return () => {
+      observer.disconnect();
+      stopResize();
+      root.style.removeProperty('--composer-clearance');
+    };
   }
 
   function closeThread(): void {
@@ -762,7 +780,11 @@
       {/snippet}
     </TimelineList>
   {/key}
-  <div class="composer-dock" onfocusin={(event) => timelineList?.composerFocused(event)}>
+  <div
+    class="composer-dock"
+    onfocusin={(event) => timelineList?.composerFocused(event)}
+    {@attach publishComposerClearance}
+  >
     {#if isTombstoned}
       <RoomTombstoneBanner
         isSpace={resolvedRoom?.is_space ?? false}

@@ -50,6 +50,7 @@
     flex-flow: column wrap;
     gap: var(--space-400);
     padding: var(--space-400);
+    pointer-events: auto;
   }
 
   .banner-warning {
@@ -108,12 +109,7 @@
     flex: 0 0 auto;
     gap: var(--space-300);
     justify-content: flex-end;
-    pointer-events: none;
     width: 100%;
-  }
-
-  .actions :global(.btn) {
-    pointer-events: auto;
   }
 
   @media (width >= 42rem) {
