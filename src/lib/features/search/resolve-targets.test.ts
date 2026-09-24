@@ -3,6 +3,8 @@ import { expect, test } from 'vitest';
 import type { RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
 
 import {
+  parentSpaceOf,
+  resolveDirectRooms,
   resolveRoomTarget,
   resolveSpaceRooms,
   resolveSpaceTarget,
@@ -147,4 +149,54 @@ test('a space resolves to every non-space room in its subtree', () => {
 
 test('an unknown space resolves to nothing', () => {
   expect(resolveSpaceRooms(spaceRooms, 'nowhere')).toBeUndefined();
+});
+
+test('a room resolves to the space that lists it as a child', () => {
+  expect(parentSpaceOf(spaceRooms, '!dev:example.org')).toBe('!eng:example.org');
+  expect(parentSpaceOf(spaceRooms, '!ops:example.org')).toBe('!subteam:example.org');
+});
+
+test('a room outside every joined space has no parent space', () => {
+  expect(parentSpaceOf(spaceRooms, '!unrelated:example.org')).toBeUndefined();
+  expect(
+    parentSpaceOf(
+      spaceRooms.map((entry) => ({ ...entry, state: 'left' as const })),
+      '!dev:example.org'
+    )
+  ).toBeUndefined();
+});
+
+const directRooms = [
+  room({
+    room_id: '!dm-erwan:example.org',
+    is_direct: true,
+    direct_targets: ['@erwan:example.org'],
+  }),
+  room({
+    room_id: '!group:example.org',
+    is_direct: true,
+    direct_targets: ['@erwan:example.org', '@alice:example.org'],
+  }),
+  room({
+    room_id: '!dm-alice:example.org',
+    is_direct: true,
+    direct_targets: ['@alice:example.org'],
+  }),
+  room({ room_id: '!public:example.org', direct_targets: [] }),
+];
+
+test('with: resolves a person to every direct room they are in', () => {
+  expect(resolveDirectRooms(directRooms, '@erwan:example.org')).toEqual([
+    '!dm-erwan:example.org',
+    '!group:example.org',
+  ]);
+  expect(resolveDirectRooms(directRooms, 'alice')).toEqual([
+    '!group:example.org',
+    '!dm-alice:example.org',
+  ]);
+});
+
+test('with: someone you have no direct room with resolves to nothing', () => {
+  expect(resolveDirectRooms(directRooms, '@nobody:example.org')).toBeUndefined();
+  expect(resolveDirectRooms(directRooms, '')).toBeUndefined();
 });

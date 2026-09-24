@@ -17,8 +17,11 @@
 
   import { formatDate, formatTime } from '../room/timeline-format';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import { MessageSearch } from './message-search.svelte.js';
+  import { MESSAGE_SEARCH_FIELD_ID, MessageSearch } from './message-search.svelte.js';
+  import { clearRecentSearches, recentSearches, rememberSearch } from './recent-searches.svelte.js';
   import {
+    parentSpaceOf,
+    resolveDirectRooms,
     resolveRoomTarget,
     resolveSpaceRooms,
     resolveSpaceTarget,
@@ -41,10 +44,12 @@
     roomId: (value) => resolveRoomTarget(roomList.rooms, value),
     userId: (value) => resolveUserTarget(knownSenders(), value),
     spaceRooms: (value) => resolveSpaceRooms(roomList.rooms, value),
+    directRooms: (value) =>
+      resolveDirectRooms(roomList.rooms, resolveUserTarget(knownSenders(), value) ?? value),
   }));
 
   search.query = page.url.searchParams.get('q') ?? '';
-  search.order = page.url.searchParams.get('order') === 'recent' ? 'recent' : 'rank';
+  search.order = orderFrom(page.url.searchParams.get('order'));
   if (search.query !== '') search.schedule();
 
   onDestroy(() => {
@@ -60,28 +65,44 @@
 
   let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
 
+  const CLEAR_RECENT = 'recent:clear';
+  let userId = $derived(core.session?.user_id ?? null);
+  let recent = $derived(userId === null ? [] : recentSearches(userId));
+  let showingRecent = $derived(
+    suggestionsOpen && !showOperatorList && search.query === '' && recent.length > 0
+  );
+
   let suggestions = $derived(
-    suggestionsOpen
-      ? suggestionsFor(
-          search.query,
-          {
-            rooms: roomList.rooms.map((room) => ({
-              id: room.room_id,
-              alias: room.canonical_alias,
-              name: room.name,
-              avatarUrl: room.avatar_url,
-            })),
-            senders: knownSenders(),
-            spaces: spaces.map((space) => ({
-              id: space.room_id,
-              alias: space.canonical_alias,
-              name: space.name,
-              avatarUrl: space.avatar_url,
-            })),
-          },
-          showOperatorList
-        )
-      : []
+    showingRecent
+      ? [
+          ...recent.map((query, index) => ({
+            id: `recent:${String(index)}`,
+            label: query,
+            insert: `${query} `,
+          })),
+          { id: CLEAR_RECENT, label: $i18n.t('search.clearRecent'), insert: '' },
+        ]
+      : suggestionsOpen
+        ? suggestionsFor(
+            search.query,
+            {
+              rooms: roomList.rooms.map((room) => ({
+                id: room.room_id,
+                alias: room.canonical_alias,
+                name: room.name,
+                avatarUrl: room.avatar_url,
+              })),
+              senders: knownSenders(),
+              spaces: spaces.map((space) => ({
+                id: space.room_id,
+                alias: space.canonical_alias,
+                name: space.name,
+                avatarUrl: space.avatar_url,
+              })),
+            },
+            showOperatorList
+          )
+        : []
   );
   let field = $derived(splitTokenField(search.query, search.parsed));
   let input = $state<HTMLInputElement>();
@@ -120,6 +141,10 @@
     return hints;
   });
 
+  function orderFrom(value: string | null): SearchOrder {
+    return value === 'recent' || value === 'oldest' ? value : 'rank';
+  }
+
   function knownSenders(): SenderIdentity[] {
     const fromRooms = roomList.rooms
       .map((room) => room.latest_event?.sender)
@@ -132,6 +157,11 @@
   }
 
   function accept(suggestion: Suggestion): void {
+    if (suggestion.id === CLEAR_RECENT) {
+      if (userId !== null) clearRecentSearches(userId);
+      suggestionsOpen = false;
+      return;
+    }
     search.query = applySuggestion(search.query, suggestion);
     suggestionsOpen = false;
     activeSuggestion = 0;
@@ -190,7 +220,14 @@
       return;
     }
     if (spaceScopeToken || spaces.length === 0) return;
-    setScopeToken(spaceTokenValue(spaces[0]));
+    setScopeToken(spaceTokenValue(currentSpace() ?? spaces[0]));
+  }
+
+  function currentSpace(): (typeof spaces)[number] | undefined {
+    const roomChip = field.chips.find((chip) => chip.operator === 'in' && !chip.negated);
+    const roomId = roomChip ? resolveRoomTarget(roomList.rooms, roomChip.value) : undefined;
+    const spaceId = roomId === undefined ? undefined : parentSpaceOf(roomList.rooms, roomId);
+    return spaces.find((space) => space.room_id === spaceId);
   }
 
   function chooseSpace(roomId: string): void {
@@ -221,7 +258,10 @@
       suggestionsOpen = false;
       return;
     }
-    if (suggestions.length === 0) return;
+    if (suggestions.length === 0) {
+      if (event.key === 'Enter') remember();
+      return;
+    }
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -288,14 +328,20 @@
     syncUrl();
   }
 
+  function remember(): void {
+    if (userId !== null && search.runnable) rememberSearch(userId, search.query);
+  }
+
   async function openHit(hit: SearchHitView): Promise<void> {
+    remember();
     await goto(roomSectionPath(roomList.rooms, hit.room_id, hit.event_id));
   }
 
-  const orders: { value: SearchOrder; label: string }[] = [
+  let orders = $derived<{ value: SearchOrder; label: string }[]>([
     { value: 'rank', label: $i18n.t('search.orderRank') },
     { value: 'recent', label: $i18n.t('search.orderRecent') },
-  ];
+    { value: 'oldest', label: $i18n.t('search.orderOldest') },
+  ]);
 </script>
 
 <AppPageShell title={$i18n.t('search.title')} density="compact">
@@ -342,6 +388,9 @@
             chooseSpace(event.currentTarget.value);
           }}
         >
+          {#if scopeSpaceId === undefined}
+            <option value="" disabled>{spaceScopeToken?.value}</option>
+          {/if}
           {#each spaces as space (space.room_id)}
             <option value={space.room_id}
               >{space.name ?? space.canonical_alias ?? space.room_id}</option
@@ -386,6 +435,7 @@
 
         <input
           bind:this={input}
+          id={MESSAGE_SEARCH_FIELD_ID}
           class="token-input"
           value={field.draft}
           type="text"
@@ -428,7 +478,9 @@
           <ComposerAutocomplete
             id={listboxId}
             {optionId}
-            heading={$i18n.t('search.suggestions')}
+            heading={showingRecent
+              ? $i18n.t('search.recentSearches')
+              : $i18n.t('search.suggestions')}
             {suggestions}
             active={activeSuggestion}
             onSelect={accept}

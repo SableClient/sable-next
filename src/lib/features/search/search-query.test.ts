@@ -7,6 +7,7 @@ const resolve = {
   userId: (value: string) => (value === 'erwan' ? '@erwan:example.org' : undefined),
   spaceRooms: (value: string) =>
     value === 'eng' ? ['!dev:example.org', '!ops:example.org'] : undefined,
+  directRooms: (value: string) => (value === 'erwan' ? ['!dm:example.org'] : undefined),
 };
 
 function filterFor(query: string) {
@@ -121,11 +122,48 @@ test('an unknown operator is treated as ordinary text', () => {
   expect(parsed.tokens).toEqual([]);
 });
 
-test('pinned is reported as unsupported instead of silently ignored', () => {
-  const parsed = parseSearchQuery('deploy pinned:true');
+test('pinned and has:pin keep only pinned messages, and their negation drops them', () => {
+  expect(filterFor('deploy pinned:true').pinned).toBe(true);
+  expect(filterFor('deploy has:pin').pinned).toBe(true);
+  expect(filterFor('deploy pinned:false').pinned).toBe(false);
+  expect(filterFor('deploy -has:pin').pinned).toBe(false);
+  expect(filterFor('deploy').pinned).toBeNull();
+  expect(resolveFor('pinned:maybe').unresolved.map((token) => token.value)).toEqual(['maybe']);
+});
 
-  expect(parsed.unsupported).toEqual(['pinned']);
-  expect(parsed.text).toBe('deploy');
+test('is:thread keeps thread replies and its negation drops them', () => {
+  expect(filterFor('deploy is:thread').in_thread).toBe(true);
+  expect(filterFor('deploy -is:thread').in_thread).toBe(false);
+  expect(resolveFor('is:starred').unresolved.map((token) => token.value)).toEqual(['starred']);
+});
+
+test('with: scopes to the direct messages with that person', () => {
+  expect(filterFor('deploy with:erwan').rooms).toEqual(['!dm:example.org']);
+  expect(filterFor('deploy -with:erwan').not_rooms).toEqual(['!dm:example.org']);
+  expect(resolveFor('with:nobody').unresolved.map((token) => token.value)).toEqual(['nobody']);
+});
+
+test('on bounds a single day like during', () => {
+  const filter = filterFor('on:2026-03-15');
+
+  expect(filter.after_ts).toBe(Date.parse('2026-03-15T00:00:00'));
+  expect(filter.before_ts).toBe(Date.parse('2026-03-16T00:00:00') - 1);
+});
+
+test('during also takes a whole month or a whole year', () => {
+  const month = filterFor('during:2026-02');
+  expect(month.after_ts).toBe(Date.parse('2026-02-01T00:00:00'));
+  expect(month.before_ts).toBe(Date.parse('2026-03-01T00:00:00') - 1);
+
+  const year = filterFor('during:2025');
+  expect(year.after_ts).toBe(Date.parse('2025-01-01T00:00:00'));
+  expect(year.before_ts).toBe(Date.parse('2026-01-01T00:00:00') - 1);
+
+  expect(resolveFor('during:2026-13').unresolved.map((token) => token.value)).toEqual(['2026-13']);
+});
+
+test('a negated on: is unsupported like every other date bound', () => {
+  expect(parseSearchQuery('deploy -on:2026-01-01').unsupported).toEqual(['-on']);
 });
 
 test('names resolve to matrix ids and unknown names are reported', () => {
@@ -181,6 +219,7 @@ test('a colon inside a matrix id survives', () => {
     roomId: () => undefined,
     userId: (value: string) => (value === '@erwan:example.org' ? value : undefined),
     spaceRooms: () => undefined,
+    directRooms: () => undefined,
   };
   const { filter } = toSearchFilter(parseSearchQuery('from:@erwan:example.org'), withId);
 

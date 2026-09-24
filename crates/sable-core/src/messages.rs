@@ -100,19 +100,28 @@ impl Core {
         if let Some(events) = room.pinned_event_ids() {
             return Ok(events);
         }
-        if !self
+        if let Some(events) = self
             .probed_pinned_rooms
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(room_id.clone())
+            .get(room_id)
         {
-            return Ok(Vec::new());
+            return Ok(events.clone());
         }
-        Ok(room
+        let events = room
             .load_pinned_events()
             .await
             .map_err(|error| self.failed("pinned_events", error))?
-            .unwrap_or_default())
+            .unwrap_or_default();
+        self.remember_pinned(room_id, &events);
+        Ok(events)
+    }
+
+    fn remember_pinned(&self, room_id: &OwnedRoomId, events: &[OwnedEventId]) {
+        self.probed_pinned_rooms
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(room_id.clone(), events.to_vec());
     }
 
     pub(crate) async fn set_pinned(
@@ -130,11 +139,13 @@ impl Core {
         }
         .map_err(|error| self.failed("set_pinned", error))?;
 
-        Ok(room
+        let events = room
             .load_pinned_events()
             .await
             .map_err(|error| self.failed("set_pinned", error))?
-            .unwrap_or_default())
+            .unwrap_or_default();
+        self.remember_pinned(room_id, &events);
+        Ok(events)
     }
 
     pub(crate) async fn report_message(

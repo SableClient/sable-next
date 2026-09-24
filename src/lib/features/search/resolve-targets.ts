@@ -49,6 +49,36 @@ export function resolveSpaceRooms(
     .map((room) => room.room_id);
 }
 
+export function resolveDirectRooms(
+  rooms: readonly RoomSummary[],
+  value: string
+): string[] | undefined {
+  const wanted = value.trim().toLocaleLowerCase();
+  if (wanted === '') return undefined;
+  const localpart = wanted.startsWith('@') ? wanted.slice(1) : wanted;
+
+  const roomIds = rooms
+    .filter(
+      (room) =>
+        room.is_direct &&
+        room.direct_targets.some((userId) => {
+          const folded = userId.toLocaleLowerCase();
+          return folded === wanted || folded.slice(1).split(':')[0] === localpart;
+        })
+    )
+    .map((room) => room.room_id);
+  return roomIds.length > 0 ? roomIds : undefined;
+}
+
+export function parentSpaceOf(rooms: readonly RoomSummary[], roomId: string): string | undefined {
+  return rooms.find(
+    (room) =>
+      room.is_space &&
+      room.state === 'joined' &&
+      room.space_children.some((child) => child.room_id === roomId)
+  )?.room_id;
+}
+
 export interface UserCandidate {
   userId: string;
   displayName: string;

@@ -149,6 +149,8 @@ const fn expressible(filter: &SearchFilter) -> bool {
         && filter.before_ts.is_none()
         && filter.phrases.is_empty()
         && filter.exclude.is_empty()
+        && filter.pinned.is_none()
+        && filter.in_thread.is_none()
 }
 
 fn request_for(query: &ServerQuery<'_>, limit: u64, next_batch: Option<&str>) -> Request {
@@ -166,7 +168,7 @@ fn request_for(query: &ServerQuery<'_>, limit: u64, next_batch: Option<&str>) ->
     criteria.filter = events;
     criteria.order_by = Some(match query.order {
         SearchOrder::Rank => OrderBy::Rank,
-        SearchOrder::Recent => OrderBy::Recent,
+        SearchOrder::Recent | SearchOrder::Oldest => OrderBy::Recent,
     });
     criteria.event_context.before_limit = UInt::MIN;
     criteria.event_context.after_limit = UInt::MIN;

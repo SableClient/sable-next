@@ -62,6 +62,8 @@ export type SearchCorpus = {
   statePath: string;
   generalId: string;
   randomId: string;
+  clubId: string;
+  clubhouseId: string;
   sender: MatrixAdmin;
 };
 
@@ -253,6 +255,39 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         await readerAdmin.join(randomId);
         for (const body of searchBodies('Random')) await sender.sendMessage(randomId, body);
       }
+      const clubId =
+        existing.get('Club') ??
+        (await sender.createRoom({ name: 'Club', isSpace: true, invite: [reader.userId] }));
+      const clubhouseId =
+        existing.get('Clubhouse') ??
+        (await sender.createRoom({ name: 'Clubhouse', invite: [reader.userId] }));
+      if (!existing.has('Clubhouse')) {
+        await readerAdmin.join(clubhouseId);
+        const noticeId = await sender.sendMessage(clubhouseId, 'Clubhouse notice board');
+        await sender.sendMessage(clubhouseId, 'Clubhouse thread reply', {
+          'm.relates_to': {
+            rel_type: 'm.thread',
+            event_id: noticeId,
+            is_falling_back: true,
+            'm.in_reply_to': { event_id: noticeId },
+          },
+        });
+        await sender.sendStateEvent(clubhouseId, 'm.room.pinned_events', '', {
+          pinned: [noticeId],
+        });
+      }
+      if (!existing.has('Club')) {
+        await sender.addSpaceChild(clubId, clubhouseId);
+        await readerAdmin.join(clubId);
+      }
+      if (!existing.has('Elsewhere')) {
+        const elsewhereId = await sender.createRoom({
+          name: 'Elsewhere',
+          isSpace: true,
+          invite: [reader.userId],
+        });
+        await readerAdmin.join(elsewhereId);
+      }
 
       const statePath = join('tests/e2e/.auth', `search-${suffix}.json`);
       await saveSignedInState(
@@ -263,7 +298,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         statePath,
         async (page) => {
           const shell = new AppShell(page);
-          for (const roomId of [generalId, randomId]) {
+          for (const roomId of [generalId, randomId, clubhouseId]) {
             await shell.openRoom(roomId);
             await expect(
               page.locator('.timeline-viewport .item[data-event-id]').first()
@@ -272,7 +307,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
         }
       );
 
-      await use({ statePath, generalId, randomId, sender });
+      await use({ statePath, generalId, randomId, clubId, clubhouseId, sender });
     },
     { scope: 'worker' },
   ],

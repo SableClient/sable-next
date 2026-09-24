@@ -8,7 +8,11 @@ export type SearchOperator =
   | 'has'
   | 'before'
   | 'after'
-  | 'during';
+  | 'during'
+  | 'on'
+  | 'with'
+  | 'is'
+  | 'pinned';
 
 export interface SearchToken {
   operator: SearchOperator;
@@ -35,10 +39,13 @@ export const SEARCH_OPERATORS: readonly SearchOperator[] = [
   'before',
   'after',
   'during',
+  'on',
+  'with',
+  'is',
+  'pinned',
 ];
 
-const UNSUPPORTED_OPERATORS = ['pinned'];
-const DATE_OPERATORS = ['before', 'after', 'during'];
+const DATE_OPERATORS = ['before', 'after', 'during', 'on'];
 
 const ATTACHMENTS: Record<string, SearchAttachment | undefined> = {
   image: 'image',
@@ -50,7 +57,6 @@ const ATTACHMENTS: Record<string, SearchAttachment | undefined> = {
 };
 
 const SEGMENT = /-?[A-Za-z]+:"[^"]*"|-?"[^"]*"|\S+/g;
-const DAY_MS = 86_400_000;
 
 function isOperator(candidate: string): candidate is SearchOperator {
   return (SEARCH_OPERATORS as readonly string[]).includes(candidate);
@@ -95,11 +101,8 @@ export function parseSearchQuery(input: string): ParsedQuery {
     const value = raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
     if (value === '') continue;
 
-    if (
-      UNSUPPORTED_OPERATORS.includes(operator) ||
-      (negated && DATE_OPERATORS.includes(operator))
-    ) {
-      parsed.unsupported.push(negated ? `-${operator}` : operator);
+    if (negated && DATE_OPERATORS.includes(operator)) {
+      parsed.unsupported.push(`-${operator}`);
       continue;
     }
     if (isOperator(operator)) {
@@ -126,10 +129,24 @@ function startOfDay(value: string): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+function periodOf(value: string): [number, number] | null {
+  if (!/^\d{4}(-\d{2}){0,2}$/.test(value)) return null;
+  const parts = value.split('-');
+  const start = startOfDay([...parts, '01', '01'].slice(0, 3).join('-'));
+  if (start === null) return null;
+
+  const end = new Date(start);
+  if (parts.length === 3) end.setDate(end.getDate() + 1);
+  else if (parts.length === 2) end.setMonth(end.getMonth() + 1);
+  else end.setFullYear(end.getFullYear() + 1);
+  return [start, end.getTime() - 1];
+}
+
 export interface QueryResolvers {
   roomId: (value: string) => string | undefined;
   userId: (value: string) => string | undefined;
   spaceRooms: (value: string) => string[] | undefined;
+  directRooms: (value: string) => string[] | undefined;
 }
 
 export interface ResolvedQuery {
@@ -152,6 +169,8 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
     before_ts: null,
     phrases: [...parsed.phrases],
     exclude: [...parsed.exclude],
+    pinned: null,
+    in_thread: null,
   };
 
   for (const token of parsed.tokens) {
@@ -182,7 +201,8 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
       }
       case 'has': {
         const attachment = ATTACHMENTS[token.value.toLowerCase()];
-        if (attachment !== undefined)
+        if (token.value.toLowerCase() === 'pin') filter.pinned = !token.negated;
+        else if (attachment !== undefined)
           (token.negated ? filter.not_has : filter.has).push(attachment);
         else unresolved.push(token);
         break;
@@ -199,14 +219,35 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
         else filter.before_ts = day;
         break;
       }
-      case 'during': {
-        const day = startOfDay(token.value);
-        if (day === null) {
+      case 'during':
+      case 'on': {
+        const period =
+          token.operator === 'on' && token.value.split('-').length !== 3
+            ? null
+            : periodOf(token.value);
+        if (period === null) {
           unresolved.push(token);
         } else {
-          filter.after_ts = day;
-          filter.before_ts = day + DAY_MS - 1;
+          [filter.after_ts, filter.before_ts] = period;
         }
+        break;
+      }
+      case 'with': {
+        const roomIds = resolve.directRooms(token.value);
+        if (roomIds) (token.negated ? filter.not_rooms : filter.rooms).push(...roomIds);
+        else unresolved.push(token);
+        break;
+      }
+      case 'is': {
+        if (token.value.toLowerCase() === 'thread') filter.in_thread = !token.negated;
+        else unresolved.push(token);
+        break;
+      }
+      case 'pinned': {
+        const value = token.value.toLowerCase();
+        if (value === 'true' || value === 'false')
+          filter.pinned = (value === 'true') !== token.negated;
+        else unresolved.push(token);
         break;
       }
     }

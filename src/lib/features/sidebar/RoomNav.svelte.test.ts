@@ -443,6 +443,28 @@ test('counts mentions in the badge, and quiet traffic only dots', async () => {
   await unmount(instance);
 });
 
+test('message search from a space is scoped to that space', async () => {
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!space:example.org',
+      canonical_alias: '#design:example.org',
+      name: 'Design',
+      is_space: true,
+    }),
+  ];
+  pageState.url.pathname = '/space/!space:example.org';
+  pageState.params = { spaceId: '!space:example.org' };
+
+  const instance = await mountNav();
+  const search = Array.from(document.querySelectorAll('.room-nav-actions a')).find((node) =>
+    node.getAttribute('href')?.startsWith('/search')
+  );
+  expect(search?.getAttribute('href')).toBe(
+    `/search?q=${encodeURIComponent('space:#design:example.org ')}`
+  );
+  await unmount(instance);
+});
+
 test('a space list header shows the space banner above it', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),

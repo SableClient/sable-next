@@ -10,6 +10,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::{StreamExt, stream};
 use linkify::LinkFinder;
 use matrix_sdk::RoomState;
 use matrix_sdk::deserialized_responses::TimelineEvent;
@@ -38,6 +39,7 @@ const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MAX_INDEXED_MESSAGES: usize = 50_000;
+const PINNED_FETCH_CONCURRENCY: usize = 4;
 
 const INITIAL_DOCUMENTS: usize = 64;
 const PERSIST_INTERVAL: Duration = Duration::from_secs(20);
@@ -59,6 +61,7 @@ struct Document {
     attachment: Option<SearchAttachment>,
     has_link: bool,
     mentions: Vec<OwnedUserId>,
+    in_thread: bool,
 }
 
 impl Document {
@@ -118,6 +121,18 @@ impl Document {
         {
             return false;
         }
+        if filter
+            .in_thread
+            .is_some_and(|wanted| wanted != self.in_thread)
+        {
+            return false;
+        }
+        if filter
+            .pinned
+            .is_some_and(|wanted| wanted != terms.pinned.contains(&self.event_id))
+        {
+            return false;
+        }
 
         if !terms
             .phrases
@@ -137,11 +152,13 @@ impl Document {
 struct FoldedTerms {
     phrases: Vec<String>,
     exclude: Vec<String>,
+    pinned: HashSet<OwnedEventId>,
 }
 
 impl FoldedTerms {
-    fn of(filter: &SearchFilter) -> Self {
+    fn of(filter: &SearchFilter, pinned: HashSet<OwnedEventId>) -> Self {
         Self {
+            pinned,
             phrases: filter
                 .phrases
                 .iter()
@@ -252,6 +269,13 @@ impl RoomIndex {
 
     fn mark_classified(&mut self, event_id: OwnedEventId) {
         self.dirty |= self.classified.insert(event_id);
+    }
+
+    fn in_thread(&self, event_id: &OwnedEventId) -> bool {
+        self.key_of
+            .get(event_id)
+            .and_then(|key| self.documents.get(key))
+            .is_some_and(|document| document.in_thread)
     }
 
     fn indexed_body(&self, event_id: &OwnedEventId) -> Option<&String> {
@@ -510,6 +534,7 @@ impl MessageIndex {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn search(
         &self,
         query: &str,
@@ -518,7 +543,19 @@ impl MessageIndex {
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
-        let terms = FoldedTerms::of(filter);
+        self.search_pinned(query, filter, HashSet::new(), order, limit, offset)
+    }
+
+    pub(crate) fn search_pinned(
+        &self,
+        query: &str,
+        filter: &SearchFilter,
+        pinned: HashSet<OwnedEventId>,
+        order: SearchOrder,
+        limit: usize,
+        offset: usize,
+    ) -> Vec<Hit> {
+        let terms = FoldedTerms::of(filter, pinned);
         let ranked = self
             .rooms
             .iter()
@@ -604,6 +641,11 @@ impl MessageIndex {
                     if !edits_another && index.edited.contains(&target) {
                         continue;
                     }
+                    let in_thread = if edits_another {
+                        index.in_thread(&target)
+                    } else {
+                        matches!(original.content.relates_to, Some(Relation::Thread(_)))
+                    };
                     let body = latest_body(cache, &target).await.unwrap_or_else(|| {
                         replacement_body(original)
                             .unwrap_or_else(|| indexable_body(original.content.body()))
@@ -621,6 +663,7 @@ impl MessageIndex {
                         origin_server_ts: original.origin_server_ts.get().into(),
                         attachment: attachment_of(&original.content.msgtype),
                         mentions: mentioned_users(original),
+                        in_thread,
                     });
                 }
 
@@ -655,6 +698,12 @@ fn by_recency(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
         .then_with(|| left.event_id.cmp(right.event_id))
 }
 
+fn by_age(left: &Ranked<'_>, right: &Ranked<'_>) -> std::cmp::Ordering {
+    left.origin_server_ts
+        .cmp(&right.origin_server_ts)
+        .then_with(|| left.event_id.cmp(right.event_id))
+}
+
 fn page_ranked(
     mut ranked: Vec<Ranked<'_>>,
     order: SearchOrder,
@@ -664,6 +713,7 @@ fn page_ranked(
     let compare = match order {
         SearchOrder::Rank => by_rank,
         SearchOrder::Recent => by_recency,
+        SearchOrder::Oldest => by_age,
     };
     let wanted = offset.saturating_add(limit);
 
@@ -784,7 +834,8 @@ impl Core {
         limit: usize,
         offset: usize,
     ) -> Vec<Hit> {
-        if let Ok(client) = self.client().await
+        if order != SearchOrder::Oldest
+            && let Ok(client) = self.client().await
             && let Some(room_id) = server::target(&client, filter).await
         {
             let target = server::ServerQuery {
@@ -806,11 +857,39 @@ impl Core {
 
         let mut filter = filter.clone();
         filter.not_senders.extend(self.ignored_senders().await);
+        let pinned = if filter.pinned.is_some() {
+            self.pinned_in_scope(&filter).await
+        } else {
+            HashSet::new()
+        };
 
         self.search_index
             .lock()
             .await
-            .search(query, &filter, order, limit, offset)
+            .search_pinned(query, &filter, pinned, order, limit, offset)
+    }
+
+    async fn pinned_in_scope(&self, filter: &SearchFilter) -> HashSet<OwnedEventId> {
+        let Ok(client) = self.client().await else {
+            return HashSet::new();
+        };
+
+        let in_scope: Vec<OwnedRoomId> = client
+            .joined_rooms()
+            .into_iter()
+            .map(|room| room.room_id().to_owned())
+            .filter(|room_id| {
+                (filter.rooms.is_empty() || filter.rooms.contains(room_id))
+                    && !filter.not_rooms.contains(room_id)
+            })
+            .collect();
+
+        stream::iter(in_scope)
+            .map(|room_id| async move { self.pinned_events(&room_id).await.unwrap_or_default() })
+            .buffer_unordered(PINNED_FETCH_CONCURRENCY)
+            .flat_map(stream::iter)
+            .collect()
+            .await
     }
 
     async fn ignored_senders(&self) -> Vec<OwnedUserId> {
@@ -1115,6 +1194,7 @@ mod tests {
             origin_server_ts: ts,
             attachment,
             mentions,
+            in_thread: false,
         }
     }
 
@@ -1621,6 +1701,120 @@ mod tests {
         assert_eq!(hits[0].body, "the rollback finished");
 
         drop(room);
+    }
+
+    #[async_test]
+    async fn test_a_thread_reply_is_marked_and_keeps_the_mark_through_an_edit() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!threads:localhost").to_owned();
+        let thread_root = event_id!("$root");
+        let reply_id = event_id!("$reply");
+
+        let room = server.sync_joined_room(&client, &room_id).await;
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+        let (cache, _drop) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+
+        let events = vec![
+            factory
+                .text_msg("the deploy pipeline is broken")
+                .event_id(thread_root)
+                .into_event(),
+            factory
+                .text_msg("deploy retried")
+                .in_thread(thread_root, thread_root)
+                .event_id(reply_id)
+                .into_event(),
+            factory
+                .text_msg("* deploy retried twice")
+                .edit(
+                    reply_id,
+                    RoomMessageEventContentWithoutRelation::text_plain("deploy retried twice"),
+                )
+                .event_id(event_id!("$reply-edit"))
+                .into_event(),
+        ];
+
+        let mut index = MessageIndex::new();
+        index
+            .ingest(&room_id, events, &cache, &RedactionRules::V11)
+            .await;
+
+        let threaded = |wanted| {
+            index
+                .search(
+                    "deploy",
+                    &super::SearchFilter {
+                        in_thread: Some(wanted),
+                        ..super::SearchFilter::default()
+                    },
+                    super::SearchOrder::Rank,
+                    10,
+                    0,
+                )
+                .into_iter()
+                .map(|hit| hit.event_id.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(threaded(true), vec!["$reply"]);
+        assert_eq!(threaded(false), vec!["$root"]);
+
+        drop(room);
+    }
+
+    #[test]
+    fn test_pinned_keeps_or_drops_the_pinned_events() {
+        let (index, _room) = filtered_index();
+        let pinned: std::collections::HashSet<_> =
+            [event_id!("$alice").to_owned()].into_iter().collect();
+
+        let search = |wanted| {
+            index
+                .search_pinned(
+                    "deploy",
+                    &super::SearchFilter {
+                        pinned: Some(wanted),
+                        ..super::SearchFilter::default()
+                    },
+                    pinned.clone(),
+                    super::SearchOrder::Recent,
+                    10,
+                    0,
+                )
+                .into_iter()
+                .map(|hit| hit.event_id.to_string())
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(search(true), vec!["$alice"]);
+        assert_eq!(search(false), vec!["$screenshot", "$erwan"]);
+    }
+
+    #[test]
+    fn test_oldest_orders_hits_by_ascending_time() {
+        let (index, _room) = filtered_index();
+
+        let hits: Vec<String> = index
+            .search(
+                "deploy",
+                &super::SearchFilter::default(),
+                super::SearchOrder::Oldest,
+                10,
+                0,
+            )
+            .into_iter()
+            .map(|hit| hit.event_id.to_string())
+            .collect();
+
+        assert_eq!(hits, vec!["$erwan", "$alice", "$screenshot"]);
     }
 
     #[test]
@@ -2949,6 +3143,7 @@ mod stress {
             attachment: None,
             has_link: false,
             mentions: Vec::new(),
+            in_thread: false,
         }
     }
 

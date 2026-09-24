@@ -43,6 +43,39 @@ test('the room header search button opens the search page scoped to that room', 
   await expect(searchField(page)).toHaveValue('');
 });
 
+test('this space scopes a room search to the space that room is in', async ({
+  page,
+  app,
+  searchCorpus,
+}) => {
+  await app.openRoom(searchCorpus.clubhouseId);
+  await page.getByRole('button', { name: 'Search messages' }).click();
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.locator('.chips .chip')).toHaveText(/in:\s*Clubhouse/);
+
+  await page.getByRole('radio', { name: en.search.scopeSpace }).click();
+
+  await expect(page.getByRole('combobox', { name: en.search.scopeSpaceLabel })).toHaveValue(
+    searchCorpus.clubId
+  );
+  await expect(page.locator('.chips .chip').filter({ hasText: 'space:' })).toHaveText(
+    /space:\s*Club/
+  );
+});
+
+test('message search from a space sidebar starts scoped to that space', async ({
+  page,
+  searchCorpus,
+}) => {
+  await page.goto(`/space/${encodeURIComponent(searchCorpus.clubId)}`);
+
+  await page.getByRole('link', { name: en.nav.messageSearch }).click();
+
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.locator('.chips .chip')).toHaveText(/space:\s*Club/);
+  await expect(page.getByRole('radio', { name: en.search.scopeSpace })).toBeChecked();
+});
+
 test('a query returns hits grouped by room and opens the message it lands on', async ({ page }) => {
   await page.goto('/search');
 
@@ -92,12 +125,69 @@ test('the query survives a reload through the url', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Welcome to/ }).first()).toBeVisible(INDEXED);
 });
 
-test('an unsupported operator is reported rather than silently dropped', async ({ page }) => {
+test('pinned:true keeps only the pinned message', async ({ page }) => {
   await page.goto('/search');
 
-  await searchField(page).fill('welcome pinned:true');
+  await searchField(page).fill('Clubhouse pinned:true ');
 
-  await expect(page.getByText('Not supported yet: pinned')).toBeVisible();
+  await expect(page.locator('.chips .chip')).toHaveText(/pinned:\s*true/);
+  await expect(page.getByRole('button', { name: /Clubhouse notice board/ })).toBeVisible(INDEXED);
+  await expect(page.getByRole('button', { name: /Clubhouse thread reply/ })).toHaveCount(0);
+});
+
+test('is:thread keeps only thread replies', async ({ page }) => {
+  await page.goto('/search');
+
+  await searchField(page).fill('Clubhouse is:thread ');
+
+  await expect(page.getByRole('button', { name: /Clubhouse thread reply/ })).toBeVisible(INDEXED);
+  await expect(page.getByRole('button', { name: /Clubhouse notice board/ })).toHaveCount(0);
+});
+
+test('sorting by oldest puts the first message first', async ({ page }) => {
+  await page.goto('/search');
+  await searchField(page).fill('message in:General ');
+  await expect(page.locator('.hit-row').first()).toBeVisible(INDEXED);
+
+  await page.getByRole('button', { name: en.search.orderOldest }).click();
+
+  await expect(page).toHaveURL(/order=oldest/);
+  await expect(page.locator('.hit-row').first()).toContainText('General message 1', INDEXED);
+});
+
+test('the search shortcut in a room scopes the search to it', async ({
+  page,
+  app,
+  searchCorpus,
+}) => {
+  await app.openRoom(searchCorpus.generalId);
+
+  await page.keyboard.press('ControlOrMeta+f');
+
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.locator('.chips .chip')).toHaveText(/in:\s*General/);
+});
+
+test('a submitted search is offered again from an empty field', async ({ page }) => {
+  await page.goto('/search');
+  const field = searchField(page);
+  await field.fill('rollback plan');
+  await field.press('Enter');
+
+  await page.goto('/search');
+  await field.focus();
+
+  const recent = page.getByRole('option', { name: 'rollback plan' });
+  await expect(page.getByRole('listbox', { name: en.search.recentSearches })).toBeVisible();
+  await recent.click();
+  await expect(field).toHaveValue(/^rollback plan\s*$/);
+
+  await field.fill('');
+  await field.focus();
+  await page.getByRole('option', { name: en.search.clearRecent }).click();
+  await field.blur();
+  await field.focus();
+  await expect(page.getByRole('option', { name: 'rollback plan' })).toHaveCount(0);
 });
 
 test('a query with no matches says so instead of staying blank', async ({ page }) => {

@@ -12,6 +12,7 @@ const resolvers = {
   roomId: (value: string) => value,
   userId: (value: string) => value,
   spaceRooms: () => undefined,
+  directRooms: () => undefined,
 };
 
 function hit(eventId: string): SearchHitView {

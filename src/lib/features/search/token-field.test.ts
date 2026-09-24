@@ -105,5 +105,8 @@ test('a phrase is not a chip', () => {
 });
 
 test('an unsupported operator is not a chip', () => {
-  expect(split('pinned:true deploy')).toEqual({ chips: [], draft: 'pinned:true deploy' });
+  expect(split('-before:2026-01-01 deploy')).toEqual({
+    chips: [],
+    draft: '-before:2026-01-01 deploy',
+  });
 });

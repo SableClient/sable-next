@@ -4,7 +4,7 @@ import { page } from '$app/state';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 
 export function leaveRoomView(): void {
   if (page.url.pathname.startsWith('/direct/')) {
@@ -20,10 +20,30 @@ export function leaveRoomView(): void {
   void goto(resolve('/(app)/rooms'));
 }
 
-export function searchInRoom(room: RoomSummary | undefined, roomId: string): void {
+export function scopedSearchPath(
+  operator: 'in' | 'space',
+  room: RoomSummary | undefined,
+  roomId: string
+): string {
   const label = room?.canonical_alias ?? room?.name ?? roomId;
   const scope = label.includes(' ') ? `"${label}"` : label;
-  const target = `${resolve('/(app)/search')}?q=${encodeURIComponent(`in:${scope} `)}`;
+  return `${resolve('/(app)/search')}?q=${encodeURIComponent(`${operator}:${scope} `)}`;
+}
+
+export function contextSearchPath(
+  rooms: readonly RoomSummary[],
+  roomPathId: string | undefined,
+  spacePathId: string | undefined
+): string {
+  const room = findRoomByPathId(rooms, roomPathId);
+  if (room) return scopedSearchPath('in', room, room.room_id);
+  const space = findRoomByPathId(rooms, spacePathId);
+  if (space) return scopedSearchPath('space', space, space.room_id);
+  return resolve('/(app)/search');
+}
+
+export function searchInRoom(room: RoomSummary | undefined, roomId: string): void {
+  const target = scopedSearchPath('in', room, roomId);
 
   goto(target).catch(() => {
     window.location.assign(target);

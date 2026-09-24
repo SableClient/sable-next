@@ -20,7 +20,9 @@ export interface SuggestionSources {
   spaces?: SuggestionRoom[];
 }
 
-const ATTACHMENT_VALUES = ['image', 'video', 'audio', 'file', 'link'];
+const ATTACHMENT_VALUES = ['image', 'video', 'audio', 'file', 'link', 'pin'];
+const IS_VALUES = ['thread'];
+const PINNED_VALUES = ['true', 'false'];
 
 const OPERATOR_HINTS: Record<SearchOperator, string> = {
   in: 'room',
@@ -30,7 +32,11 @@ const OPERATOR_HINTS: Record<SearchOperator, string> = {
   has: 'attachment',
   before: 'YYYY-MM-DD',
   after: 'YYYY-MM-DD',
-  during: 'YYYY-MM-DD',
+  during: 'YYYY, YYYY-MM or YYYY-MM-DD',
+  on: 'YYYY-MM-DD',
+  with: 'direct messages with a user',
+  is: 'thread',
+  pinned: 'true or false',
 };
 const MAX_SUGGESTIONS = 8;
 const PARTIAL = /(-?)([A-Za-z]*)(:?)("?)([^"]*)$/;
@@ -87,14 +93,14 @@ export function suggestionsFor(
 
   if (!partial.hasColon) {
     if (partial.operator === '' && !includeOperatorList) return [];
-    return SEARCH_OPERATORS.filter((operator) => operator.startsWith(partial.operator))
-      .map((operator) => ({
+    return SEARCH_OPERATORS.filter((operator) => operator.startsWith(partial.operator)).map(
+      (operator) => ({
         id: `operator:${operator}`,
         label: `${operator}:`,
         detail: OPERATOR_HINTS[operator],
         insert: `${partial.negated}${operator}:`,
-      }))
-      .slice(0, MAX_SUGGESTIONS);
+      })
+    );
   }
 
   const operator = partial.operator as SearchOperator;
@@ -143,6 +149,7 @@ export function suggestionsFor(
 
     case 'from':
     case 'mentions':
+    case 'with':
       return sources.senders
         .filter(
           (sender) =>
@@ -160,19 +167,29 @@ export function suggestionsFor(
         .slice(0, MAX_SUGGESTIONS);
 
     case 'has':
-      return ATTACHMENT_VALUES.filter(
-        (value) => partial.value === '' || value.startsWith(partial.value.toLocaleLowerCase())
-      )
-        .map((value) => ({
-          id: `has:${value}`,
-          label: value,
-          insert: `${prefix}${value} `,
-        }))
-        .slice(0, MAX_SUGGESTIONS);
+      return valueSuggestions(ATTACHMENT_VALUES, operator, prefix, partial.value);
+
+    case 'is':
+      return valueSuggestions(IS_VALUES, operator, prefix, partial.value);
+
+    case 'pinned':
+      return valueSuggestions(PINNED_VALUES, operator, prefix, partial.value);
 
     default:
       return [];
   }
+}
+
+function valueSuggestions(
+  values: readonly string[],
+  operator: string,
+  prefix: string,
+  typed: string
+): Suggestion[] {
+  return values
+    .filter((value) => typed === '' || value.startsWith(typed.toLocaleLowerCase()))
+    .map((value) => ({ id: `${operator}:${value}`, label: value, insert: `${prefix}${value} ` }))
+    .slice(0, MAX_SUGGESTIONS);
 }
 
 export function applySuggestion(query: string, suggestion: Suggestion): string {

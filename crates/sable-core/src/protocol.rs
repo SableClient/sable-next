@@ -1668,6 +1668,7 @@ pub enum SearchOrder {
     #[default]
     Rank,
     Recent,
+    Oldest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1727,6 +1728,8 @@ pub struct SearchFilter {
     pub before_ts: Option<u64>,
     pub phrases: Vec<String>,
     pub exclude: Vec<String>,
+    pub pinned: Option<bool>,
+    pub in_thread: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]

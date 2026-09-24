@@ -64,6 +64,7 @@
   import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
+  import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
 
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
@@ -159,7 +160,11 @@
       : resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(activeSpace) })
   );
 
-  const searchHref = resolve('/(app)/search');
+  let searchHref = $derived(
+    activeSpace === null
+      ? resolve('/(app)/search')
+      : scopedSearchPath('space', activeSpace, activeSpace.room_id)
+  );
   const joinHref = `${resolve('explore')}#explore-join-by-address`;
   let createSpaceHref = $derived(
     activeSpace === null

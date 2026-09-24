@@ -14,6 +14,8 @@ import {
 const PAGE_SIZE = 30;
 const DEBOUNCE_MS = 200;
 
+export const MESSAGE_SEARCH_FIELD_ID = 'message-search-field';
+
 export interface RoomGroup {
   key: string;
   roomId: string;

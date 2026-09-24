@@ -138,6 +138,8 @@ const EMPTY_SEARCH_FILTER: SearchFilter = {
   before_ts: null,
   phrases: [],
   exclude: [],
+  pinned: null,
+  in_thread: null,
 };
 
 export function createCommands(transport: () => Transport) {

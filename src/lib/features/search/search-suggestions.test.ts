@@ -24,7 +24,7 @@ const sources = {
 
 test('a bare word suggests matching operators', () => {
   expect(suggestionsFor('fr', sources).map((entry) => entry.label)).toEqual(['from:']);
-  expect(suggestionsFor('deploy i', sources).map((entry) => entry.label)).toEqual(['in:']);
+  expect(suggestionsFor('deploy i', sources).map((entry) => entry.label)).toEqual(['in:', 'is:']);
 });
 
 test('an empty token suggests nothing unless the list is asked for', () => {
@@ -43,7 +43,20 @@ test('the operator cheat-sheet is available on request', () => {
     'before:',
     'after:',
     'during:',
+    'on:',
+    'with:',
+    'is:',
+    'pinned:',
   ]);
+});
+
+test('is:, pinned:, has:pin and with: suggest their values', () => {
+  expect(suggestionsFor('is:', sources).map((entry) => entry.label)).toEqual(['thread']);
+  expect(suggestionsFor('pinned:', sources).map((entry) => entry.label)).toEqual(['true', 'false']);
+  expect(suggestionsFor('has:p', sources).map((entry) => entry.label)).toEqual(['pin']);
+  expect(suggestionsFor('with:', sources).map((entry) => entry.label)).toEqual(
+    suggestionsFor('from:', sources).map((entry) => entry.label)
+  );
 });
 
 test('an operator suggestion explains what it takes', () => {
@@ -96,6 +109,7 @@ test('has: suggests the attachment kinds the core knows', () => {
     'audio',
     'file',
     'link',
+    'pin',
   ]);
   expect(suggestionsFor('has:im', sources).map((entry) => entry.label)).toEqual(['image']);
 });

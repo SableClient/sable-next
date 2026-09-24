@@ -846,6 +846,8 @@ export type SearchFilter = {
 	before_ts: number | null,
 	phrases: string[],
 	exclude: string[],
+	pinned: boolean | null,
+	in_thread: boolean | null,
 };
 
 export type SearchHitView = {
@@ -857,7 +859,7 @@ export type SearchHitView = {
 	score: number,
 };
 
-export type SearchOrder = "rank" | "recent";
+export type SearchOrder = "rank" | "recent" | "oldest";
 
 /**  Without this a failed send renders as an ordinary message. */
 export type SendStateView = { status: "sending";
