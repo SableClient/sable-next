@@ -308,7 +308,7 @@
         return;
       }
 
-      if (anchor.target !== '_blank' || event.button !== 0) return;
+      if (anchor.target !== '_blank' || event.button > 1) return;
       if (!opensExternalUrls()) return;
       if (anchor.protocol !== 'http:' && anchor.protocol !== 'https:') return;
 
@@ -319,7 +319,12 @@
       });
     };
 
-    return on(document, 'click', onClick);
+    const offClick = on(document, 'click', onClick);
+    const offAuxClick = on(document, 'auxclick', onClick);
+    return () => {
+      offClick();
+      offAuxClick();
+    };
   });
 
   $effect(() => {
