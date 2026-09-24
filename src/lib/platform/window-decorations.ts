@@ -69,10 +69,6 @@ export async function closeWindow(): Promise<void> {
   await (await currentWindow()).close();
 }
 
-export async function startWindowDrag(): Promise<void> {
-  await (await currentWindow()).startDragging();
-}
-
 export async function startWindowResize(edge: WindowEdge): Promise<void> {
   await (await currentWindow()).startResizeDragging(edge);
 }

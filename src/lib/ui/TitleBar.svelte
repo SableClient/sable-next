@@ -8,7 +8,6 @@
   import {
     closeWindow,
     minimizeWindow,
-    startWindowDrag,
     startWindowResize,
     toggleMaximizeWindow,
     watchMaximized,
@@ -57,17 +56,7 @@
 </script>
 
 <div class={['titlebar', kind === 'mac' && 'titlebar-mac']}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="drag"
-    data-tauri-drag-region
-    ondblclick={() => {
-      void toggleMaximizeWindow();
-    }}
-    onmousedown={(event) => {
-      if (event.button === 0 && event.detail === 1) void startWindowDrag();
-    }}
-  >
+  <div class="drag" data-tauri-drag-region>
     <span class="title">Sable</span>
   </div>
   {#if kind === 'desktop'}
@@ -127,6 +116,7 @@
     height: var(--titlebar-height);
     inset: 0 0 auto;
     position: fixed;
+    user-select: none;
     z-index: var(--layer-chrome);
   }
 
