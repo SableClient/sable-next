@@ -22,7 +22,7 @@
   }
 </script>
 
-<div class="autocomplete">
+<div class="autocomplete composer-autocomplete">
   <p class="heading" id="{id}-heading">{heading}</p>
   {#if suggestions.length === 0}
     <p class="empty">{$i18n.t('composer.noSuggestions')}</p>

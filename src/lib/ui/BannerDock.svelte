@@ -28,4 +28,8 @@
   .dock > :global(*) {
     width: min(34rem, 100%);
   }
+
+  :global(body:has(.composer-autocomplete)) .dock {
+    visibility: hidden;
+  }
 </style>
