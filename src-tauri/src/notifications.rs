@@ -1,7 +1,7 @@
 use sable_core::protocol::{CommandErr, NotificationView};
 #[cfg(any(mobile, test))]
 use sable_core::protocol::{WebPushKeys, WebPusherView};
-use sable_core::ruma::{owned_event_id, owned_room_id, owned_user_id};
+use sable_core::ruma::{EventId, owned_room_id, owned_user_id};
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -459,7 +459,7 @@ fn test_view(sequence: u32) -> NotificationView {
     NotificationView {
         user_id: owned_user_id!("@sable:notification.test"),
         room_id: owned_room_id!("!notification:notification.test"),
-        event_id: Some(owned_event_id!("$notification-test")),
+        event_id: EventId::parse(format!("$notification-test-{sequence}")).ok(),
         room_name: "Notification test".to_owned(),
         room_avatar_url: None,
         is_direct: false,
