@@ -4,6 +4,7 @@
     MembershipView,
     RoomPermissionsView,
     RoomSummary,
+    UserDirectoryEntryView,
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -42,6 +43,9 @@
     { level: -1, label: 'timeline.powerLevelMuted' },
   ];
 
+  const userIdPattern = /^@[^:\s]+:\S+$/;
+  const noMembers: MemberView[] = [];
+
   let tab = $state<MembershipView>('join');
   let search = $state('');
   let members = $state.raw<MemberView[]>([]);
@@ -49,11 +53,29 @@
   let failed = $state(false);
   let busy = $state<string | null>(null);
   let inviteOpen = $state(false);
+  let directory = $state.raw<UserDirectoryEntryView[]>([]);
+  let searching = $state(false);
+  let inviting = $state<string | null>(null);
+  let invitedIds = $state.raw<string[]>([]);
+  let inviteFailed = $state(false);
   let run = 0;
+  let lookup = 0;
 
   let roomId = $derived(room?.room_id ?? null);
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
   let canSetPower = $derived(permissions?.can_change_power_levels ?? false);
+  let isDirect = $derived(room?.is_direct ?? false);
+  let canInviteInline = $derived((permissions?.can_invite ?? false) && !isDirect && tab !== 'ban');
+  let inviteQuery = $derived(canInviteInline ? search.trim() : '');
+  let candidates = $derived.by(() => {
+    const typed =
+      userIdPattern.test(inviteQuery) && !directory.some((entry) => entry.user_id === inviteQuery)
+        ? [{ user_id: inviteQuery, display_name: null, avatar_url: null }]
+        : [];
+    return [...typed, ...directory].filter(
+      (entry) => !members.some((member) => member.user_id === entry.user_id)
+    );
+  });
   let sorted = $derived(
     [...members].sort(
       (left, right) =>
@@ -76,6 +98,52 @@
     void roomId;
     void load();
   });
+
+  $effect(() => {
+    const query = inviteQuery;
+    const current = ++lookup;
+    searching = query !== '';
+    if (!query) {
+      directory = [];
+      return;
+    }
+    const timer = setTimeout(() => {
+      void findUsers(query, current);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+    };
+  });
+
+  async function findUsers(query: string, current: number): Promise<void> {
+    try {
+      const { results } = await core.commands.searchUserDirectory(query, 10);
+      if (current === lookup) directory = results;
+    } catch (error) {
+      console.warn('[sable room] user directory unavailable', error);
+      if (current === lookup) directory = [];
+    } finally {
+      if (current === lookup) searching = false;
+    }
+  }
+
+  async function invite(userId: string): Promise<void> {
+    const target = roomId;
+    if (!target || inviting) return;
+
+    inviting = userId;
+    inviteFailed = false;
+    try {
+      await core.commands.inviteUser(target, userId);
+      invitedIds = [...invitedIds, userId];
+      await load();
+    } catch (error) {
+      console.warn('[sable room] invite failed', error);
+      inviteFailed = true;
+    } finally {
+      inviting = null;
+    }
+  }
 
   function memberName(member: MemberView): string {
     return member.display_name ?? member.user_id;
@@ -217,10 +285,14 @@
     <TextInput
       bind:value={search}
       type="search"
-      placeholder={$i18n.t('timeline.searchMembers')}
-      aria-label={$i18n.t('timeline.searchMembers')}
+      placeholder={canInviteInline
+        ? $i18n.t('room.membersSearchOrInvite')
+        : $i18n.t('timeline.searchMembers')}
+      aria-label={canInviteInline
+        ? $i18n.t('room.membersSearchOrInvite')
+        : $i18n.t('timeline.searchMembers')}
     />
-    {#if permissions?.can_invite}
+    {#if permissions?.can_invite && isDirect}
       <Button
         variant="secondary"
         onclick={() => {
@@ -314,6 +386,57 @@
           </SettingsRow>
         {/each}
       </ul>
+    </SettingsSection>
+  {/if}
+
+  {#if inviteQuery}
+    <SettingsSection
+      headingId="room-settings-members-invite"
+      title={$i18n.t('room.membersInviteHeading')}
+    >
+      {#if inviteFailed}
+        <div class="settings-form">
+          <Alert variant="critical" role="alert">{$i18n.t('room.inviteSendFailed')}</Alert>
+        </div>
+      {/if}
+      {#if candidates.length > 0}
+        <ul class="settings-rows">
+          {#each candidates as entry (entry.user_id)}
+            <SettingsRow>
+              {#snippet copy()}
+                <MemberIdentityRow userId={entry.user_id} members={noMembers}>
+                  {#snippet trailing()}
+                    <span class="user-id">{entry.user_id}</span>
+                  {/snippet}
+                </MemberIdentityRow>
+              {/snippet}
+              {#if invitedIds.includes(entry.user_id)}
+                <span class="power">{$i18n.t('room.membersInvited')}</span>
+              {:else}
+                <Button
+                  size="small"
+                  variant="secondary"
+                  loading={inviting === entry.user_id}
+                  disabled={inviting !== null}
+                  onclick={() => {
+                    void invite(entry.user_id);
+                  }}
+                >
+                  {$i18n.t('room.inviteSubmit')}
+                </Button>
+              {/if}
+            </SettingsRow>
+          {/each}
+        </ul>
+      {:else}
+        <div class="settings-form">
+          {#if searching}
+            <p class="settings-note" role="status"><Spinner small /></p>
+          {:else}
+            <p class="settings-note">{$i18n.t('room.membersInviteEmpty')}</p>
+          {/if}
+        </div>
+      {/if}
     </SettingsSection>
   {/if}
 </div>
