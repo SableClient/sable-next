@@ -2,7 +2,11 @@
   import { i18n } from '#lib/i18n.js';
   import {
     closeWindow,
+    dismissSnapLayouts,
     minimizeWindow,
+    releaseSnapLayouts,
+    showSnapLayouts,
+    supportsSnapLayouts,
     startWindowResize,
     toggleMaximizeWindow,
     watchMaximized,
@@ -16,6 +20,35 @@
 
   let { kind }: Props = $props();
   let maximized = $state(false);
+
+  const SNAP_LAYOUTS_DELAY_MS = 620;
+  let snapTimer: ReturnType<typeof setTimeout> | undefined;
+  let snapShown = false;
+
+  function snapFailed(error: unknown): void {
+    console.debug('[sable window] snap layouts failed', error);
+  }
+
+  function hoverMaximize(): void {
+    if (kind !== 'desktop' || !supportsSnapLayouts()) return;
+    clearTimeout(snapTimer);
+    snapTimer = setTimeout(() => {
+      snapShown = true;
+      showSnapLayouts().catch(snapFailed);
+    }, SNAP_LAYOUTS_DELAY_MS);
+  }
+
+  function endSnap(action: () => Promise<void>): void {
+    clearTimeout(snapTimer);
+    if (!snapShown) return;
+    snapShown = false;
+    action().catch(snapFailed);
+  }
+
+  const leaveMaximize = (): void => endSnap(releaseSnapLayouts);
+  const dismissSnap = (): void => endSnap(dismissSnapLayouts);
+
+  $effect(() => dismissSnap);
 
   $effect(() => {
     let stop: (() => void) | null = null;
@@ -60,6 +93,7 @@
         type="button"
         aria-label={$i18n.t('window.minimize')}
         onclick={() => {
+          dismissSnap();
           void minimizeWindow();
         }}
       >
@@ -70,7 +104,10 @@
       <button
         type="button"
         aria-label={maximized ? $i18n.t('window.restore') : $i18n.t('window.maximize')}
+        onmouseenter={hoverMaximize}
+        onmouseleave={leaveMaximize}
         onclick={() => {
+          dismissSnap();
           void toggleMaximizeWindow();
         }}
       >
@@ -88,6 +125,7 @@
         class="close"
         aria-label={$i18n.t('window.close')}
         onclick={() => {
+          dismissSnap();
           void closeWindow();
         }}
       >

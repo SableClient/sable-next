@@ -73,6 +73,19 @@ export async function startWindowResize(edge: WindowEdge): Promise<void> {
   await (await currentWindow()).startResizeDragging(edge);
 }
 
+export function supportsSnapLayouts(): boolean {
+  return supportsDesktopWindow() && osType() === 'windows';
+}
+
+async function snapLayouts(command: string): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke(command);
+}
+
+export const showSnapLayouts = (): Promise<void> => snapLayouts('show_snap_layouts');
+export const releaseSnapLayouts = (): Promise<void> => snapLayouts('release_snap_layouts');
+export const dismissSnapLayouts = (): Promise<void> => snapLayouts('dismiss_snap_layouts');
+
 export async function watchMaximized(onChange: (maximized: boolean) => void): Promise<() => void> {
   const window = await currentWindow();
   onChange(await window.isMaximized());
