@@ -79,6 +79,26 @@ export async function describeCatalog(
   await Promise.all(Array.from({ length: DESCRIBE_CONCURRENCY }, worker));
 }
 
+let loaded: CatalogEntry[] | null = null;
+
+export async function loadCatalog(onEntry: (entry: CatalogEntry) => void): Promise<void> {
+  if (loaded) {
+    for (const entry of loaded) onEntry(entry);
+    return;
+  }
+  const catalog = await fetchCatalog();
+  const found: CatalogEntry[] = [];
+  const collect = (entry: CatalogEntry): void => {
+    found.push(entry);
+    onEntry(entry);
+  };
+  await Promise.all([
+    describeCatalog('theme', catalog.themes, collect),
+    describeCatalog('tweak', catalog.tweaks, collect),
+  ]);
+  loaded = found;
+}
+
 export function entryName(entry: CatalogEntry): string {
   return entry.meta.name ?? entry.basename;
 }

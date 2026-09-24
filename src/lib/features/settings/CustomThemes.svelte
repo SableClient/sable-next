@@ -31,10 +31,9 @@
   import '#lib/ui/primitives/settings-row.css';
 
   import {
-    describeCatalog,
     entryName,
-    fetchCatalog,
     filterCatalog,
+    loadCatalog,
     type CatalogEntry,
     type CatalogFilter,
   } from './theme-catalog';
@@ -82,14 +81,9 @@
     loading = true;
     error = null;
     try {
-      const catalog = await fetchCatalog();
-      const add = (entry: CatalogEntry): void => {
+      await loadCatalog((entry) => {
         entries = [...entries, entry];
-      };
-      await Promise.all([
-        describeCatalog('theme', catalog.themes, add),
-        describeCatalog('tweak', catalog.tweaks, add),
-      ]);
+      });
     } catch (reason) {
       console.debug('[sable themes] catalog unavailable', reason);
       error = $i18n.t('settings.customThemesErrorLoad');
