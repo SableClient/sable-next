@@ -236,7 +236,7 @@ const DEFAULTS: Preferences = {
   showRoomBanners: true,
   roomBannerHeight: 190,
   showHome: false,
-  showSearch: true,
+  showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,
   showPingCounts: true,

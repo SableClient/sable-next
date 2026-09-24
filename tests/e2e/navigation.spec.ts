@@ -5,12 +5,8 @@ test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
-// "Create room" is omitted: the rail and the room list both render that link,
-// so the name is ambiguous. rooms.spec.ts covers the page.
-const RAIL_DESTINATIONS = [
-  { link: 'Search messages', path: '/search' },
-  { link: 'Direct messages', path: '/direct' },
-] as const;
+// "Create room" sits behind the rail's add menu; rooms.spec.ts covers the page.
+const RAIL_DESTINATIONS = [{ link: 'Direct messages', path: '/direct' }] as const;
 
 for (const { link, path } of RAIL_DESTINATIONS) {
   test(`reaches ${path} from the primary navigation`, async ({ page, app }) => {
