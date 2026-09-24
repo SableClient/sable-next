@@ -119,6 +119,57 @@ test('an Android push for the room being read is immediately retired', () => {
   expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
 });
 
+function readThrough(eventId: string): RoomSummary {
+  return { ...room(0), latest_event: { event_id: eventId } } as RoomSummary;
+}
+
+function push(eventId: string): void {
+  const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as
+    | ((message: { message: string }) => void)
+    | undefined;
+  handler?.({
+    message: JSON.stringify({
+      notification: { room_id: '!room:example.org', event_id: eventId, counts: { unread: 1 } },
+    }),
+  });
+}
+
+test('an Android push for a message already read on another device is retired', () => {
+  const notifications = center();
+  notifications.retireRead([readThrough('$new')]);
+  mocks.retire.mockClear();
+
+  push('$new');
+
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
+});
+
+test('an Android push that outruns its read message is retired once the message syncs', () => {
+  const notifications = center();
+  notifications.retireRead([readThrough('$old')]);
+  mocks.retire.mockClear();
+
+  push('$new');
+  notifications.retireRead([readThrough('$old')]);
+  expect(mocks.retire).not.toHaveBeenCalled();
+
+  notifications.retireRead([readThrough('$new')]);
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
+});
+
+test('an Android push for an unread message stands until the room is read', () => {
+  const notifications = center();
+  notifications.retireRead([readThrough('$old')]);
+  mocks.retire.mockClear();
+
+  push('$new');
+  notifications.retireRead([{ ...readThrough('$new'), unread: 1 }]);
+  expect(mocks.retire).not.toHaveBeenCalled();
+
+  notifications.retireRead([readThrough('$new')]);
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
+});
+
 test('a native MSC4174 validation push without native handling is acknowledged without an alert', async () => {
   center();
   const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as

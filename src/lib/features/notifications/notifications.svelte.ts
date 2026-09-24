@@ -32,7 +32,10 @@ export class NotificationCenter {
   private reading: string | null = null;
   private retirePosted: ReturnType<typeof setTimeout> | undefined;
   private readRooms: readonly string[] = [];
+  private rooms: readonly RoomSummary[] = [];
+  private unreadFor: RoomUnread = roomNotifications;
   /* eslint-disable svelte/prefer-svelte-reactivity -- a write from a notification would subscribe whichever effect is running */
+  private readonly pushed = new Map<string, string>();
   private readonly unread = new Set<string>();
   private readonly retired = new Set<string>();
   private readonly invites = new Map<string, boolean>();
@@ -80,6 +83,8 @@ export class NotificationCenter {
     clearTimeout(this.retirePosted);
     this.retirePosted = undefined;
     this.readRooms = [];
+    this.rooms = [];
+    this.pushed.clear();
     this.client = null;
     this.open = null;
     this.reading = null;
@@ -99,6 +104,8 @@ export class NotificationCenter {
   }
 
   retireRead(rooms: readonly RoomSummary[], unreadFor: RoomUnread = roomNotifications): void {
+    this.rooms = rooms;
+    this.unreadFor = unreadFor;
     for (const [roomId, appeared] of this.invites) {
       const room = rooms.find((item) => item.room_id === roomId);
       if (room?.state === 'invited') {
@@ -114,11 +121,17 @@ export class NotificationCenter {
       if (hasUnread(unreadFor(room))) {
         this.unread.add(room.room_id);
         this.retired.delete(room.room_id);
+        this.pushed.delete(room.room_id);
         continue;
       }
 
       read.push(room.room_id);
       this.unread.delete(room.room_id);
+      if (this.readThrough(room, this.pushed.get(room.room_id))) {
+        this.pushed.delete(room.room_id);
+        this.settle(room.room_id);
+        continue;
+      }
       if (this.retired.has(room.room_id)) continue;
       this.settle(room.room_id);
     }
@@ -183,9 +196,24 @@ export class NotificationCenter {
   private retirePush(raw: string): void {
     const notification = parsePushPayload(raw)?.notification;
     if (notification?.room_id === undefined) return;
-    if (notification.counts?.unread === 0 || this.reading === notification.room_id) {
-      this.retire(notification.room_id);
+    const roomId = notification.room_id;
+    if (notification.counts?.unread === 0 || this.reading === roomId) {
+      this.retire(roomId);
+      return;
     }
+    if (notification.event_id === undefined) return;
+
+    const room = this.rooms.find((item) => item.room_id === roomId);
+    if (room !== undefined && this.readThrough(room, notification.event_id)) this.settle(roomId);
+    else this.pushed.set(roomId, notification.event_id);
+  }
+
+  private readThrough(room: RoomSummary, eventId: string | undefined): boolean {
+    return (
+      eventId !== undefined &&
+      room.latest_event?.event_id === eventId &&
+      !hasUnread(this.unreadFor(room))
+    );
   }
 
   private async show(view: NotificationView, lines: readonly ConversationLine[]): Promise<void> {
