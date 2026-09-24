@@ -136,6 +136,10 @@
 {/if}
 
 <style>
+  section {
+    container-type: inline-size;
+  }
+
   .section-head {
     align-items: center;
     display: flex;
@@ -273,7 +277,7 @@
     flex: 2;
   }
 
-  @media (width >= 32rem) {
+  @container (width >= 32rem) {
     .actions {
       flex-direction: row-reverse;
       justify-content: flex-start;
