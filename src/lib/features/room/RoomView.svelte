@@ -213,9 +213,7 @@
   onMount(() => {
     void bookmarks.load();
     const storedWidth = Number.parseInt(localStorage.getItem(VOICE_CHAT_WIDTH_KEY) ?? '', 10);
-    if (Number.isFinite(storedWidth)) {
-      voiceChatWidth = Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, storedWidth));
-    }
+    if (Number.isFinite(storedWidth)) voiceChatWidth = clampVoiceChatWidth(storedWidth);
   });
   let showReceiptFooter = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'room'
@@ -259,6 +257,10 @@
   const VOICE_CHAT_DEFAULT_WIDTH = 400;
   const VOICE_CHAT_MIN_WIDTH = 300;
   const VOICE_CHAT_MAX_WIDTH = 1000;
+
+  function clampVoiceChatWidth(width: number): number {
+    return Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, width));
+  }
   let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
   let voiceChatOpen = $state(false);
   let voiceChatWidth = $state(VOICE_CHAT_DEFAULT_WIDTH);
@@ -798,7 +800,7 @@
   data-inset-owner={voiceView ? 'top' : 'top bottom'}
 >
   <div class="timeline">
-    {#snippet widgetsButton()}
+    {#snippet headerActions()}
       {#if !voiceView}
         <IconButton
           variant="ghost"
@@ -838,7 +840,7 @@
       onMembers={toggleMembers}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
       onTopic={() => (topicOpen = true)}
-      widgets={widgetsButton}
+      actions={headerActions}
     >
       {#snippet pins()}
         <RoomPinMenu
@@ -897,8 +899,7 @@
         grow="left"
         step={16}
         shiftStep={64}
-        onResize={(next) =>
-          (voiceChatWidth = Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, next)))}
+        onResize={(next) => (voiceChatWidth = clampVoiceChatWidth(next))}
         onCommit={() => localStorage.setItem(VOICE_CHAT_WIDTH_KEY, String(voiceChatWidth))}
       />
       <header class="voice-chat-header">

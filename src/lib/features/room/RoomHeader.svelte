@@ -34,7 +34,7 @@
     onSearch: () => void;
     onTopic?: (() => void) | null;
     pins?: Snippet;
-    widgets?: Snippet;
+    actions?: Snippet;
     menu?: Snippet;
   }
 
@@ -56,7 +56,7 @@
     onSearch,
     onTopic = null,
     pins,
-    widgets,
+    actions,
     menu,
   }: Props = $props();
 
@@ -154,7 +154,7 @@
         <PhoneIcon />
       </IconButton>
     {/if}
-    {@render widgets?.()}
+    {@render actions?.()}
     <IconButton
       class="members-button selection-open"
       variant="ghost"
