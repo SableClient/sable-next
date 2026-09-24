@@ -65,7 +65,6 @@ export class CallTelemetry {
       name: 'call.join',
       op: 'call.join',
       parentSpan: null,
-      forceTransaction: true,
       attributes: this.#attributes,
     });
   }

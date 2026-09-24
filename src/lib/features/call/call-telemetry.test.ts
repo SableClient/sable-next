@@ -44,7 +44,6 @@ test('closes the root and stage spans after a successful join', async () => {
     name: 'call.join',
     op: 'call.join',
     parentSpan: null,
-    forceTransaction: true,
   });
   expect(telemetryMock.spans[1].options.parentSpan).toBeDefined();
   expect(telemetryMock.spans.every((span) => span.end.mock.calls.length === 1)).toBe(true);
