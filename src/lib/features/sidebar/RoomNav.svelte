@@ -215,7 +215,9 @@
 
   const closedCategories = new SvelteSet<string>();
   const roomListId = $props.id();
+  const favouritesListId = `${roomListId}-favourites`;
   let roomsClosed = $state(false);
+  let favouritesClosed = $state(false);
 
   const newChatHref = resolve('direct');
   const SECTION_ICONS: Record<NavSectionKind, Component> = {
@@ -237,7 +239,7 @@
     return space?.name ?? $i18n.t(labels.title);
   });
   let TitleIcon = $derived(SECTION_ICONS[section]);
-  let spaceRootItems = $derived.by<RoomNavItem[]>(() => {
+  let spaceTree = $derived.by<RoomNavItem[]>(() => {
     if (!page.url.pathname.startsWith('/space')) return [];
 
     const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
@@ -250,7 +252,8 @@
     );
     return spaceItems(space, roomsById, [space.room_id], space.room_id);
   });
-  let rooms = $derived.by<RoomNavRow[]>(() => {
+  let spaceRootItems = $derived(withoutFavourites(spaceTree));
+  let listedRooms = $derived.by<RoomNavRow[]>(() => {
     if (directSection) {
       return roomList.rooms
         .filter((room) => room.state === 'joined' && room.is_direct)
@@ -259,7 +262,7 @@
     }
 
     if (page.url.pathname.startsWith('/space')) {
-      return spaceRootItems.filter(isRoom);
+      return spaceTree.filter(isRoom);
     }
 
     const claimedByJoinedSpace = unspacedSection
@@ -277,6 +280,18 @@
       .map(roomRow)
       .sort(byRecency);
   });
+  let favourites = $derived.by<RoomNavRow[]>(() => {
+    const rows = page.url.pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
+    return rows
+      .filter(
+        (row, index) =>
+          isFavourite(row) && rows.findIndex((other) => other.roomId === row.roomId) === index
+      )
+      .map((row) => ({ ...row, depth: 0, key: row.roomId }))
+      .sort(byRecency);
+  });
+  let rooms = $derived(listedRooms.filter((row) => !isFavourite(row)));
+  let sectionRooms = $derived([...favourites, ...rooms]);
   let invites = $derived.by<RoomSummary[]>(() => {
     const pending = roomList.rooms.filter(
       (room) =>
@@ -303,22 +318,39 @@
     );
   });
   $effect(() => {
-    publishVisibleRoomOrder(rooms.map((row) => row.roomId));
+    publishVisibleRoomOrder(sectionRooms.map((row) => row.roomId));
   });
   let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
   let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));
-  let collapsedRooms = $derived(
-    rooms.filter((item) => {
+  let visibleFavourites = $derived(favouritesClosed ? stillShown(favourites) : favourites);
+  let visibleRooms = $derived<RoomNavItem[]>([
+    ...(roomsClosed ? stillShown(rooms) : rooms),
+    ...visibleSubspaces,
+  ]);
+
+  function stillShown(rows: RoomNavRow[]): RoomNavRow[] {
+    return rows.filter((item) => {
       const room = item.room;
       if (room === undefined) return false;
       if (page.url.pathname === roomHref(item)) return true;
       return hasUnread(roomList.unreadFor(room));
-    })
-  );
-  let visibleRooms = $derived<RoomNavItem[]>([
-    ...(roomsClosed ? collapsedRooms : rooms),
-    ...visibleSubspaces,
-  ]);
+    });
+  }
+
+  function isFavourite(row: RoomNavRow): boolean {
+    return row.room?.tags.includes('favourite') ?? false;
+  }
+
+  function treeRows(items: RoomNavItem[]): RoomNavRow[] {
+    return items.flatMap((item) => (item.kind === 'room' ? [item] : treeRows(item.children)));
+  }
+
+  function withoutFavourites(items: RoomNavItem[]): RoomNavItem[] {
+    return items.flatMap<RoomNavItem>((item) => {
+      if (item.kind === 'room') return isFavourite(item) ? [] : [item];
+      return [{ ...item, children: withoutFavourites(item.children) }];
+    });
+  }
 
   function roomRow(room: RoomSummary): RoomNavRow {
     return { room, roomId: room.room_id, depth: 0, kind: 'room', key: room.room_id };
@@ -494,7 +526,7 @@
   });
 
   let sectionUnread = $derived(
-    rooms.some((item) => {
+    sectionRooms.some((item) => {
       const room = item.room;
       return room !== undefined && hasUnread(roomList.unreadFor(room));
     })
@@ -502,7 +534,7 @@
 
   function markSectionRead(): void {
     markRoomsRead(
-      rooms.map((item) => item.room),
+      sectionRooms.map((item) => item.room),
       core.commands,
       readReceiptIsPrivate()
     );
@@ -637,6 +669,194 @@
     {/if}
   {/snippet}
 
+  {#snippet navRoom(item: RoomNavRow)}
+    {@const room = item.room}
+    {@const name = room ? roomLabel(room) : item.roomId}
+    {@const href = roomHref(item)}
+    {@const active = page.url.pathname === href}
+    {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
+    {@const mentions = counts.highlight}
+    {@const unread = counts.unread}
+    {@const marked = counts.marked ?? false}
+    {@const live = room?.call_participants.length ?? 0}
+    {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
+    {@const typing =
+      !preferences.hideTypingIndicators &&
+      room !== undefined &&
+      roomList.typingUsers.has(room.room_id) &&
+      mentions === 0 &&
+      unread === 0 &&
+      !marked}
+    {@const peerId = room?.is_direct ? dmPeerId(room) : null}
+    {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
+    {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
+    <div class="room-row-wrap">
+      {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
+        <a
+          {...props}
+          oncontextmenu={mouseContextMenu((event) => {
+            if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
+          })}
+          {@attach longPress({
+            enabled: () => room !== undefined,
+            onPress: (event) => {
+              if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
+            },
+          })}
+          class="room-row selection-current selection-layer"
+          class:unread={mentions > 0 || unread > 0 || marked}
+          {href}
+          style:--room-depth={collapsed ? 0 : item.depth}
+          onclick={() => onNavigate?.(href)}
+          aria-label={collapsed ? name : undefined}
+          aria-current={active ? 'page' : undefined}
+          {@attach peerId !== null && !collapsed
+            ? whenVisible(() => {
+                requestPeerProfile(peerId);
+              })
+            : undefined}
+        >
+          {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(room?.avatar_url))}
+            <span class="room-avatar">
+              <Avatar
+                class={['room-avatar-icon', { glyph: !room?.avatar_url, voice: room?.is_voice }]}
+                id={room?.avatar_url ? item.roomId : null}
+                src={room?.avatar_url ?? null}
+                size="small"
+                uniform
+              >
+                <RoomIcon
+                  isSpace={room?.is_space ?? false}
+                  isVoice={room?.is_voice ?? false}
+                  joinRule={room?.join_rule ?? null}
+                  weight={active ? 'fill' : 'regular'}
+                />
+              </Avatar>
+              {#if peerPresence && peerPresence.presence !== 'offline'}
+                <PresenceDot
+                  presence={peerPresence.presence}
+                  label={$i18n.t(`presence.${peerPresence.presence}`)}
+                  class="room-presence"
+                  size="medium"
+                />
+              {/if}
+            </span>
+          {:else}
+            <span class="room-icon" aria-hidden="true">
+              <RoomIcon
+                isSpace={room?.is_space ?? false}
+                isVoice={room?.is_voice ?? false}
+                joinRule={room?.join_rule ?? null}
+                weight={active ? 'fill' : 'regular'}
+              />
+            </span>
+          {/if}
+          {#if !collapsed}
+            <span class="room-text">
+              <span class="room-name">{name}</span>
+              {#if room?.is_direct && room.topic}
+                <span class="room-topic">{room.topic}</span>
+              {:else if peerStatus}
+                <span class="room-topic"
+                  >{#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
+                    >{/if}{peerStatus.text}</span
+                >
+              {/if}
+            </span>
+            {#if room && live > 0}
+              {@const faces = room.call_participants.slice(0, MAX_VOICE_FACES)}
+              <span
+                class="voice-live"
+                role="img"
+                aria-label={$i18n.t('nav.voiceLive', { count: live })}
+                {@attach whenVisible(() => {
+                  for (const userId of faces) requestPeerProfile(userId);
+                })}
+              >
+                <span class="voice-faces">
+                  {#each faces as userId (userId)}
+                    {@const profile = peerProfiles.get(userId)}
+                    <Avatar
+                      class="voice-face"
+                      src={profile?.avatar_url ?? null}
+                      name={profile?.display_name ?? userId}
+                      id={userId}
+                    />
+                  {/each}
+                </span>
+                <span class="voice-badge">{live}</span>
+              </span>
+            {/if}
+            <span class="room-status">
+              {#if typing}
+                <span class="room-typing"><TypingDots /></span>
+              {:else}
+                <UnreadBadge
+                  {counts}
+                  dm={room?.is_direct ?? false}
+                  role="img"
+                  aria-label={mentions > 0
+                    ? $i18n.t('nav.unreadMentions', { count: mentions })
+                    : unread > 0
+                      ? $i18n.t('nav.unreadMessages', { count: unread })
+                      : $i18n.t('nav.markedUnread')}
+                />
+              {/if}
+              {#if notifyMode}
+                {@const chip = notificationChip(notifyMode)}
+                <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
+                  <chip.icon />
+                </span>
+              {/if}
+            </span>
+          {/if}
+        </a>
+      {/snippet}
+      {#if collapsed}
+        <Tooltip label={name} side="right" trigger={roomTrigger} />
+      {:else}
+        {@render roomTrigger({ props: {} })}
+        {#if room}
+          <span class="room-options-slot">
+            <RoomOptionsMenu
+              {room}
+              parentSpaceId={item.parentSpaceId ?? null}
+              onSettings={openSettings}
+              onLeave={openLeave}
+            />
+          </span>
+        {/if}
+      {/if}
+    </div>
+    {#if room?.is_voice && live > 0}
+      <ul
+        class:collapsed
+        class="call-participant-list"
+        aria-label={$i18n.t('nav.voiceLive', { count: live })}
+      >
+        {#each room.call_participants as userId (userId)}
+          {@const profile = peerProfiles.get(userId)}
+          <li
+            {@attach whenVisible(() => {
+              requestPeerProfile(userId);
+            })}
+          >
+            <Avatar
+              src={profile?.avatar_url ?? null}
+              name={profile?.display_name ?? userId}
+              id={userId}
+              size="small"
+              alt={collapsed ? (profile?.display_name ?? userId) : undefined}
+            />
+            {#if !collapsed}
+              <span>{profile?.display_name ?? userId}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  {/snippet}
+
   <div class="room-nav-content">
     <RoomInvites {collapsed} {invites} />
 
@@ -705,6 +925,31 @@
       {/if}
     </div>
 
+    {#if favourites.length > 0}
+      {#if !collapsed}
+        <button
+          type="button"
+          class="rooms-heading selection-layer"
+          aria-expanded={!favouritesClosed}
+          data-state={favouritesClosed ? 'closed' : 'open'}
+          aria-controls={favouritesListId}
+          onclick={() => {
+            favouritesClosed = !favouritesClosed;
+          }}
+        >
+          <span class="rooms-heading-label">{$i18n.t('nav.favourites')}</span>
+          <span class:closed={favouritesClosed} class="category-caret" aria-hidden="true"
+            ><CaretDownIcon /></span
+          >
+        </button>
+      {/if}
+      <div id={favouritesListId} class="room-list favourites" class:collapsed>
+        {#each visibleFavourites as item (item.key)}
+          {@render navRoom(item)}
+        {/each}
+      </div>
+    {/if}
+
     {#if !collapsed}
       <button
         type="button"
@@ -724,7 +969,7 @@
     {/if}
 
     <div id={roomListId}>
-      {#if rooms.length === 0 && subspaces.length === 0}
+      {#if sectionRooms.length === 0 && subspaces.length === 0}
         {#if !collapsed && !roomsClosed}
           <div class="empty-rooms">
             <p>{listEmpty}</p>
@@ -778,197 +1023,7 @@
                 {/if}
               </div>
             {:else if isRoom(item)}
-              {@const room = item.room}
-              {@const name = room ? roomLabel(room) : item.roomId}
-              {@const href = roomHref(item)}
-              {@const active = page.url.pathname === href}
-              {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
-              {@const mentions = counts.highlight}
-              {@const unread = counts.unread}
-              {@const marked = counts.marked ?? false}
-              {@const live = room?.call_participants.length ?? 0}
-              {@const notifyMode = room ? roomList.notificationOverride(room.room_id) : null}
-              {@const typing =
-                !preferences.hideTypingIndicators &&
-                room !== undefined &&
-                roomList.typingUsers.has(room.room_id) &&
-                mentions === 0 &&
-                unread === 0 &&
-                !marked}
-              {@const peerId = room?.is_direct ? dmPeerId(room) : null}
-              {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
-              {@const peerStatus = peerId
-                ? resolveUserStatus(peerProfiles.get(peerId), peerPresence)
-                : null}
-              <div class="room-row-wrap">
-                {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
-                  <a
-                    {...props}
-                    oncontextmenu={mouseContextMenu((event) => {
-                      if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
-                    })}
-                    {@attach longPress({
-                      enabled: () => room !== undefined,
-                      onPress: (event) => {
-                        if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
-                      },
-                    })}
-                    class="room-row selection-current selection-layer"
-                    class:unread={mentions > 0 || unread > 0 || marked}
-                    {href}
-                    style:--room-depth={collapsed ? 0 : item.depth}
-                    onclick={() => onNavigate?.(href)}
-                    aria-label={collapsed ? name : undefined}
-                    aria-current={active ? 'page' : undefined}
-                    {@attach peerId !== null && !collapsed
-                      ? whenVisible(() => {
-                          requestPeerProfile(peerId);
-                        })
-                      : undefined}
-                  >
-                    {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(room?.avatar_url))}
-                      <span class="room-avatar">
-                        <Avatar
-                          class={[
-                            'room-avatar-icon',
-                            { glyph: !room?.avatar_url, voice: room?.is_voice },
-                          ]}
-                          id={room?.avatar_url ? item.roomId : null}
-                          src={room?.avatar_url ?? null}
-                          size="small"
-                          uniform
-                        >
-                          <RoomIcon
-                            isSpace={room?.is_space ?? false}
-                            isVoice={room?.is_voice ?? false}
-                            joinRule={room?.join_rule ?? null}
-                            weight={active ? 'fill' : 'regular'}
-                          />
-                        </Avatar>
-                        {#if peerPresence && peerPresence.presence !== 'offline'}
-                          <PresenceDot
-                            presence={peerPresence.presence}
-                            label={$i18n.t(`presence.${peerPresence.presence}`)}
-                            class="room-presence"
-                            size="medium"
-                          />
-                        {/if}
-                      </span>
-                    {:else}
-                      <span class="room-icon" aria-hidden="true">
-                        <RoomIcon
-                          isSpace={room?.is_space ?? false}
-                          isVoice={room?.is_voice ?? false}
-                          joinRule={room?.join_rule ?? null}
-                          weight={active ? 'fill' : 'regular'}
-                        />
-                      </span>
-                    {/if}
-                    {#if !collapsed}
-                      <span class="room-text">
-                        <span class="room-name">{name}</span>
-                        {#if room?.is_direct && room.topic}
-                          <span class="room-topic">{room.topic}</span>
-                        {:else if peerStatus}
-                          <span class="room-topic"
-                            >{#if peerStatus.emoji}<span class="room-status-emoji"
-                                >{peerStatus.emoji}</span
-                              >{/if}{peerStatus.text}</span
-                          >
-                        {/if}
-                      </span>
-                      {#if room && live > 0}
-                        {@const faces = room.call_participants.slice(0, MAX_VOICE_FACES)}
-                        <span
-                          class="voice-live"
-                          role="img"
-                          aria-label={$i18n.t('nav.voiceLive', { count: live })}
-                          {@attach whenVisible(() => {
-                            for (const userId of faces) requestPeerProfile(userId);
-                          })}
-                        >
-                          <span class="voice-faces">
-                            {#each faces as userId (userId)}
-                              {@const profile = peerProfiles.get(userId)}
-                              <Avatar
-                                class="voice-face"
-                                src={profile?.avatar_url ?? null}
-                                name={profile?.display_name ?? userId}
-                                id={userId}
-                              />
-                            {/each}
-                          </span>
-                          <span class="voice-badge">{live}</span>
-                        </span>
-                      {/if}
-                      <span class="room-status">
-                        {#if typing}
-                          <span class="room-typing"><TypingDots /></span>
-                        {:else}
-                          <UnreadBadge
-                            {counts}
-                            dm={room?.is_direct ?? false}
-                            role="img"
-                            aria-label={mentions > 0
-                              ? $i18n.t('nav.unreadMentions', { count: mentions })
-                              : unread > 0
-                                ? $i18n.t('nav.unreadMessages', { count: unread })
-                                : $i18n.t('nav.markedUnread')}
-                          />
-                        {/if}
-                        {#if notifyMode}
-                          {@const chip = notificationChip(notifyMode)}
-                          <span class="room-mode" role="img" aria-label={$i18n.t(chip.label)}>
-                            <chip.icon />
-                          </span>
-                        {/if}
-                      </span>
-                    {/if}
-                  </a>
-                {/snippet}
-                {#if collapsed}
-                  <Tooltip label={name} side="right" trigger={roomTrigger} />
-                {:else}
-                  {@render roomTrigger({ props: {} })}
-                  {#if room}
-                    <span class="room-options-slot">
-                      <RoomOptionsMenu
-                        {room}
-                        parentSpaceId={item.parentSpaceId ?? null}
-                        onSettings={openSettings}
-                        onLeave={openLeave}
-                      />
-                    </span>
-                  {/if}
-                {/if}
-              </div>
-              {#if room?.is_voice && live > 0}
-                <ul
-                  class:collapsed
-                  class="call-participant-list"
-                  aria-label={$i18n.t('nav.voiceLive', { count: live })}
-                >
-                  {#each room.call_participants as userId (userId)}
-                    {@const profile = peerProfiles.get(userId)}
-                    <li
-                      {@attach whenVisible(() => {
-                        requestPeerProfile(userId);
-                      })}
-                    >
-                      <Avatar
-                        src={profile?.avatar_url ?? null}
-                        name={profile?.display_name ?? userId}
-                        id={userId}
-                        size="small"
-                        alt={collapsed ? (profile?.display_name ?? userId) : undefined}
-                      />
-                      {#if !collapsed}
-                        <span>{profile?.display_name ?? userId}</span>
-                      {/if}
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
+              {@render navRoom(item)}
             {/if}
           {/each}
         </div>

@@ -32,6 +32,7 @@
     "accountSignedOut": "Signed out",
     "accountSignInAgain": "Sign in again",
     "currentAccount": "Current",
+    "favourites": "Favourites",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
     "unspaced": "Rooms outside spaces",
