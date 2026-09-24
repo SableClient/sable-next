@@ -1955,7 +1955,6 @@ pub enum RoomJoinRuleView {
 #[serde(rename_all = "snake_case")]
 pub enum RoomTag {
     Favourite,
-    LowPriority,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

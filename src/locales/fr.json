@@ -231,7 +231,6 @@
     "settingsFailed": "Impossible d’enregistrer cette modification.",
     "menuLabel": "Options du salon",
     "menuFavourite": "Favoris",
-    "menuLowPriority": "Priorité basse",
     "menuNotifications": "Notifications",
     "notifyDefault": "Par défaut ({{mode}})",
     "notifyAll": "Tous les messages",

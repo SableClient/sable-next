@@ -10,7 +10,6 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import StarIcon from 'phosphor-svelte/lib/StarIcon';
-  import TrayIcon from 'phosphor-svelte/lib/TrayIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
@@ -68,7 +67,6 @@
   const pendingTags = new SvelteMap<RoomTag, boolean>();
 
   let favourite = $derived(pendingTags.get('favourite') ?? room.tags.includes('favourite'));
-  let lowPriority = $derived(pendingTags.get('low_priority') ?? room.tags.includes('low_priority'));
   let parentSpace = $derived(roomList.byId(parentSpaceId) ?? null);
   let addableSpaces = $derived(
     roomList.rooms.filter(
@@ -226,14 +224,6 @@
     >
       <StarIcon weight={favourite ? 'fill' : 'regular'} />
       {$i18n.t('room.menuFavourite')}
-    </ActionMenuItem>
-    <ActionMenuItem
-      onSelect={() => {
-        toggleTag('low_priority', lowPriority);
-      }}
-    >
-      <TrayIcon weight={lowPriority ? 'fill' : 'regular'} />
-      {$i18n.t('room.menuLowPriority')}
     </ActionMenuItem>
 
     {#if room.is_direct}

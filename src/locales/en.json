@@ -230,7 +230,6 @@
     "settingsFailed": "That change could not be saved.",
     "menuLabel": "Room options",
     "menuFavourite": "Favourite",
-    "menuLowPriority": "Low priority",
     "menuNotifications": "Notifications",
     "notifyDefault": "Default ({{mode}})",
     "notifyAll": "All messages",
