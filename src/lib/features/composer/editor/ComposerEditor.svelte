@@ -183,10 +183,13 @@
   .editor.empty::before {
     color: var(--surface-var-on-container);
     content: attr(data-placeholder);
-    left: var(--space-200);
+    inset-inline: var(--space-200);
+    overflow: hidden;
     pointer-events: none;
     position: absolute;
+    text-overflow: ellipsis;
     top: var(--space-200);
+    white-space: nowrap;
   }
 
   .editor :global(.composer-mention),
