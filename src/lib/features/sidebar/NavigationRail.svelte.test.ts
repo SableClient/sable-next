@@ -328,6 +328,35 @@ test('marks a whole section read from the tab that badges it', async () => {
   await unmount(instance);
 });
 
+test('marks the rooms outside spaces read from their tab', async () => {
+  const marked: string[] = [];
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [],
+      unspacedUnread: { unread: 2, highlight: 0 },
+      onMarkSectionRead: (section: string) => marked.push(section),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  const anchor = document.querySelector('a[href="/rooms"]')?.closest('.rail-section-anchor');
+  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+
+  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
+    (element) => element.textContent.trim() === 'nav.markSectionRead'
+  );
+  item?.click();
+  await tick();
+
+  expect(marked).toEqual(['unspaced']);
+
+  await unmount(instance);
+});
+
 test('restores a space to its last desktop route', () => {
   expect(
     spaceNavigationHref(

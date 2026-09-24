@@ -84,9 +84,10 @@
     roomList.rooms.filter((room) => room.state === 'joined' && !room.is_space)
   );
   let homeUnread = $derived(unreadCounts(homeRooms));
-  let unspacedUnread = $derived(
-    unreadCounts(homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id)))
+  let unspacedRooms = $derived(
+    homeRooms.filter((room) => !room.is_direct && !claimed.has(room.room_id))
   );
+  let unspacedUnread = $derived(unreadCounts(unspacedRooms));
   let allDirectRooms = $derived(
     roomList.rooms.filter((room) => room.state === 'joined' && room.is_direct)
   );
@@ -113,12 +114,9 @@
     });
   }
 
-  function markSectionRead(section: 'home' | 'direct'): void {
-    markRoomsRead(
-      section === 'home' ? homeRooms : allDirectRooms,
-      core.commands,
-      readReceiptIsPrivate()
-    );
+  function markSectionRead(section: 'home' | 'unspaced' | 'direct'): void {
+    const rooms = { home: homeRooms, unspaced: unspacedRooms, direct: allDirectRooms }[section];
+    markRoomsRead(rooms, core.commands, readReceiptIsPrivate());
   }
 
   $effect.pre(() => {

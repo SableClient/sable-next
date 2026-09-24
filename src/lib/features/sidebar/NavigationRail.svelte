@@ -53,7 +53,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import UserQuickTools from './UserQuickTools.svelte';
 
-  type RailSection = 'home' | 'direct';
+  type RailSection = 'home' | 'unspaced' | 'direct';
 
   type RailItem = {
     href: string;
@@ -139,6 +139,7 @@
       icon: preferences.showHome ? HashIcon : HouseIcon,
       label: 'nav.unspaced',
       unread: unspacedUnread,
+      section: 'unspaced',
     },
     ...(preferences.showSearch
       ? [
