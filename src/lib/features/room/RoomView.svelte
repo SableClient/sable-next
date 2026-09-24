@@ -15,6 +15,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
 
   import { runtimeConfig } from '#lib/config/runtime-config.js';
@@ -58,6 +59,7 @@
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import MembersDrawer from './MembersDrawer.svelte';
+  import ThreadList from './ThreadList.svelte';
   import ThreadPanel from './ThreadPanel.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -195,9 +197,11 @@
 
   const bookmarks = useBookmarks();
   let threadRootId = $state<string | null>(null);
+  let threadsOpen = $state(false);
 
   function openThread(rootEventId: string): void {
     threadRootId = rootEventId;
+    threadsOpen = false;
     desktopMembersOpen = false;
   }
 
@@ -303,6 +307,7 @@
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
     threadRootId = null;
+    threadsOpen = false;
     closeProfile();
   });
 
@@ -697,6 +702,17 @@
 >
   <div class="timeline">
     {#snippet widgetsButton()}
+      {#if !voiceView}
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('timeline.threadsOpen')}
+          aria-pressed={threadsOpen}
+          onclick={() => (threadsOpen = !threadsOpen)}
+        >
+          <ChatsIcon />
+        </IconButton>
+      {/if}
       {#if widgets.length > 0}
         <IconButton
           variant="ghost"
@@ -853,6 +869,16 @@
       </div>
     {/if}
   </div>
+
+  {#if threadsOpen}
+    <ThreadList
+      roomId={resolvedRoomId}
+      members={memberLoader.members}
+      modal={!desktop}
+      onOpenThread={openThread}
+      onClose={() => (threadsOpen = false)}
+    />
+  {/if}
 
   {#if desktop}
     {#if threadRootId !== null}

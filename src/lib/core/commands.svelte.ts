@@ -46,6 +46,7 @@ import type {
   RoomPreviewView,
   RoomStateEventView,
   UrlPreviewView,
+  ThreadRootView,
   RoomSummary,
   SidebarItemView,
   SpaceHierarchyRoomView,
@@ -344,6 +345,14 @@ export function createCommands(transport: () => Transport) {
     async roomSummary(roomId: string): Promise<RoomSummary> {
       const response = await transport().send({ type: 'room_summary', room_id: roomId });
       return response.room;
+    },
+
+    async listThreads(
+      roomId: string,
+      from: string | null
+    ): Promise<{ roots: ThreadRootView[]; next_batch: string | null }> {
+      const response = await transport().send({ type: 'list_threads', room_id: roomId, from });
+      return { roots: response.roots, next_batch: response.next_batch };
     },
 
     async urlPreview(url: string): Promise<UrlPreviewView | null> {
