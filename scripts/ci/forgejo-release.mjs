@@ -129,6 +129,29 @@ async function findPrevious(assetName, excludeTag) {
   return '';
 }
 
+async function listReleases() {
+  const releases = [];
+  for (let page = 1; ; page += 1) {
+    const batch = await request('GET', `/releases?limit=50&page=${page}`);
+    if (!batch?.length) return releases;
+    releases.push(...batch);
+  }
+}
+
+// Deleting a release drops its attachments but leaves a tag-only entry behind,
+// which then has to go through the tags endpoint.
+async function pruneNightlies(keep, currentTag) {
+  const nightlies = (await listReleases())
+    .filter((release) => release.prerelease && release.tag_name.startsWith('nightly-'))
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  for (const release of nightlies.slice(keep)) {
+    if (release.tag_name === currentTag) continue;
+    await request('DELETE', `/releases/${release.id}`);
+    await request('DELETE', `/tags/${encodeURIComponent(release.tag_name)}`, { allow404: true });
+    console.log(`Pruned ${release.tag_name}`);
+  }
+}
+
 async function deleteAsset(tag, name) {
   const release = await requireRelease(tag);
   const asset = release.assets?.find((candidate) => candidate.name === name);
@@ -226,12 +249,20 @@ try {
     case 'find-previous':
       console.log(await findPrevious(flags.asset, tag));
       break;
+    case 'prune': {
+      const keep = Number(flags.keep);
+      if (!Number.isInteger(keep) || keep <= 0) {
+        throw new Error(`--keep must be a positive integer (got: ${flags.keep})`);
+      }
+      await pruneNightlies(keep, tag);
+      break;
+    }
     case 'body':
       console.log((await requireRelease(tag)).body ?? '');
       break;
     default:
       console.error(
-        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|find-previous|edit|body> [flags]'
+        'Usage: forgejo-release.mjs <ensure|wait|wait-assets|upload|assets|download|delete-asset|find-previous|prune|edit|body> [flags]'
       );
       process.exit(1);
   }
