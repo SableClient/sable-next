@@ -688,6 +688,7 @@
       {/snippet}
       {#if directSection}
         {@render action(newChatHref, $i18n.t('nav.newChat'), PlusIcon)}
+        {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
       {:else}
         {@render createMenu()}
         {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}

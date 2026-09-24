@@ -385,7 +385,7 @@ test('direct page lists joined direct rooms only', async () => {
   await unmount(instance);
 });
 
-test('direct page offers starting a chat instead of creating or browsing rooms', async () => {
+test('direct page offers starting a chat and searching instead of creating or browsing rooms', async () => {
   pageState.url.pathname = '/direct';
 
   const instance = await mountNav();
@@ -393,7 +393,7 @@ test('direct page offers starting a chat instead of creating or browsing rooms',
     Array.from(document.querySelectorAll('.room-nav-actions a')).map((node) =>
       node.getAttribute('href')
     )
-  ).toEqual(['/direct']);
+  ).toEqual(['/direct', '/search']);
   expect(document.querySelector('.rooms-heading-label')?.textContent).toBe('nav.chats');
   expect(document.querySelector('.empty-rooms p')?.textContent).toBe('nav.chatsEmpty');
   await unmount(instance);
