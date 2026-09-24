@@ -11,6 +11,7 @@
     selectCustomTheme,
     selectedCustomThemeId,
   } from '#lib/settings/custom-themes.svelte.js';
+  import { isThemeFileName, parseThemeFile, themeFileBaseName } from '#lib/settings/theme-file.js';
   import { pickFiles } from '#lib/platform/files.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -41,27 +42,12 @@
     pendingRemoval = null;
   }
 
-  function metadata(css: string, fallback: string): { name: string; kind: 'light' | 'dark' } {
-    const field = (name: string): string | undefined =>
-      css.match(new RegExp(`^\\s*${name}:\\s*(.+)$`, 'im'))?.[1]?.trim();
-    return { name: field('name') ?? fallback, kind: field('kind') === 'dark' ? 'dark' : 'light' };
-  }
-
   function install(css: string, fallback: string): void {
-    if (css.length > 1024 * 1024) {
-      error = $i18n.t('settings.customThemesErrorSize');
-      return;
-    }
-    if (css.includes('@sable-tweak')) {
-      installCustomTweak({ id: crypto.randomUUID(), name: metadata(css, fallback).name, css });
-      return;
-    }
-    if (!css.includes('@sable-theme')) {
-      error = $i18n.t('settings.customThemesErrorHeader');
-      return;
-    }
-    const theme = metadata(css, fallback);
-    installCustomTheme({ id: crypto.randomUUID(), ...theme, css });
+    const parsed = parseThemeFile(css, fallback);
+    if (parsed === 'size') error = $i18n.t('settings.customThemesErrorSize');
+    else if (parsed === 'header') error = $i18n.t('settings.customThemesErrorHeader');
+    else if (parsed.kind === 'tweak') installCustomTweak(parsed.tweak);
+    else installCustomTheme(parsed.theme);
   }
 
   async function loadCatalog(): Promise<void> {
@@ -120,11 +106,11 @@
 
   async function importFiles(files: FileList | File[]): Promise<void> {
     for (const file of files) {
-      if (!file.name.endsWith('.sable.css')) {
+      if (!isThemeFileName(file.name)) {
         error = $i18n.t('settings.customThemesErrorChoose');
         continue;
       }
-      install(await file.text(), file.name.replace(/\.sable\.css$/i, ''));
+      install(await file.text(), themeFileBaseName(file.name));
     }
   }
 
