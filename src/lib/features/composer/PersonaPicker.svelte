@@ -172,4 +172,8 @@
   :global(.persona-button-format) {
     color: var(--surface-var-on-container);
   }
+
+  :global(.persona-button-format .avatar-root) {
+    --avatar-size: var(--avatar-size-200);
+  }
 </style>
