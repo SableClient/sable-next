@@ -375,6 +375,7 @@ html {
   --link-decoration: underline;
   --font-scale: 1;
   --titlebar-height: 0px;
+  --header-height: 3.5rem;
   --resize-handle: 4px;
   --mac-traffic-lights: 4.5rem;
 

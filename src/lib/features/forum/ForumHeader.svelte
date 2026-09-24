@@ -47,7 +47,8 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-300);
-    padding: var(--space-300) var(--space-400);
+    min-height: var(--header-height);
+    padding: 0 var(--space-400);
   }
 
   .forum-header h1 {

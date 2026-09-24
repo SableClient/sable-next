@@ -70,8 +70,8 @@
     border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     justify-content: space-between;
-    min-height: 3.5rem;
-    padding: var(--space-200) var(--space-300) var(--space-200) var(--space-400);
+    min-height: var(--header-height);
+    padding: 0 var(--space-300) 0 var(--space-400);
   }
 
   .title {

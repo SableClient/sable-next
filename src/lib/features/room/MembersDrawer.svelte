@@ -319,8 +319,8 @@
     border-bottom: var(--border-width) solid var(--bg-container-line);
     display: flex;
     justify-content: space-between;
-    min-height: 3.5rem;
-    padding: var(--space-200) var(--space-300) var(--space-200) var(--space-400);
+    min-height: var(--header-height);
+    padding: 0 var(--space-300) 0 var(--space-400);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -356,7 +356,7 @@
     gap: var(--space-200);
     padding: var(--space-250);
     position: sticky;
-    top: 3.5rem;
+    top: var(--header-height);
     z-index: 1;
   }
 

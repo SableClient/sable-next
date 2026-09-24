@@ -178,7 +178,8 @@
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
-    padding: var(--space-300) var(--space-400);
+    min-height: var(--header-height);
+    padding: 0 var(--space-400);
   }
 
   .widgets-header h2 {

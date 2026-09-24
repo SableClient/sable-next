@@ -1056,10 +1056,10 @@
   .room-nav-header {
     align-items: center;
     display: flex;
-    flex: 0 0 3.5rem;
+    flex: 0 0 var(--header-height);
     gap: var(--space-100);
     justify-content: space-between;
-    min-height: 3.5rem;
+    min-height: var(--header-height);
     padding: 0 var(--space-300) 0 var(--space-400);
   }
 

@@ -170,7 +170,7 @@
     display: flex;
     flex: 0 0 auto;
     gap: var(--space-250);
-    min-height: calc(3.5rem + var(--edge-inset-top));
+    min-height: calc(var(--header-height) + var(--edge-inset-top));
     padding: var(--edge-inset-top) var(--page-gutter) 0;
   }
 

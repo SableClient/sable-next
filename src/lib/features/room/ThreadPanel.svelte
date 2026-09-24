@@ -298,7 +298,7 @@
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
-    min-height: 3.5rem;
+    min-height: var(--header-height);
     padding: 0 var(--space-200) 0 var(--space-400);
   }
 
