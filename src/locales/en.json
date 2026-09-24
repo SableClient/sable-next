@@ -2297,6 +2297,9 @@
     "lobbyEmpty": "Voice chat's empty - be the first to hop in!",
     "lobbyNoPermission": "You don't have permission to join.",
     "showChat": "Show chat",
+    "hideChat": "Hide chat",
+    "closeChat": "Close chat",
+    "chat": "Chat",
     "showCall": "Show call"
   },
   "presence": {

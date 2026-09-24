@@ -18,6 +18,7 @@ export default defineConfig({
     'thread-panel.spec.ts',
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',
+    'voice-room-chat.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,

@@ -28,6 +28,7 @@
     onCall?: (() => void) | null;
     onToggleChat?: (() => void) | null;
     chatOpen?: boolean;
+    chatBeside?: boolean;
     onBack: () => void;
     onMembers: () => void;
     onSearch: () => void;
@@ -49,6 +50,7 @@
     onCall = null,
     onToggleChat = null,
     chatOpen = false,
+    chatBeside = false,
     onBack,
     onMembers,
     onSearch,
@@ -124,14 +126,20 @@
         class="chat-toggle"
         variant="ghost"
         size="medium"
-        label={chatOpen ? $i18n.t('call.showCall') : $i18n.t('call.showChat')}
+        label={chatBeside
+          ? chatOpen
+            ? $i18n.t('call.hideChat')
+            : $i18n.t('call.showChat')
+          : chatOpen
+            ? $i18n.t('call.showCall')
+            : $i18n.t('call.showChat')}
         aria-pressed={chatOpen}
         onclick={onToggleChat}
       >
-        {#if chatOpen}
+        {#if chatOpen && !chatBeside}
           <PhoneIcon />
         {:else}
-          <ChatCircleIcon />
+          <ChatCircleIcon weight={chatOpen ? 'fill' : 'regular'} />
         {/if}
       </IconButton>
     {/if}

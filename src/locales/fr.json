@@ -2253,6 +2253,9 @@
     "lobbyEmpty": "La discussion vocale est vide : lancez-vous !",
     "lobbyNoPermission": "Vous n’avez pas l’autorisation de rejoindre l’appel.",
     "showChat": "Afficher la conversation",
+    "hideChat": "Masquer la discussion",
+    "closeChat": "Fermer la discussion",
+    "chat": "Discussion",
     "showCall": "Afficher l’appel"
   },
   "presence": {

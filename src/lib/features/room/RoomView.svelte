@@ -17,6 +17,7 @@
 
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
@@ -59,6 +60,7 @@
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import MembersDrawer from './MembersDrawer.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import ThreadList from './ThreadList.svelte';
   import ThreadPanel from './ThreadPanel.svelte';
   import MentionProfile from './MentionProfile.svelte';
@@ -210,6 +212,10 @@
   }
   onMount(() => {
     void bookmarks.load();
+    const storedWidth = Number.parseInt(localStorage.getItem(VOICE_CHAT_WIDTH_KEY) ?? '', 10);
+    if (Number.isFinite(storedWidth)) {
+      voiceChatWidth = Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, storedWidth));
+    }
   });
   let showReceiptFooter = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'room'
@@ -249,9 +255,13 @@
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  const VOICE_CHAT_WIDTH_KEY = 'sable-voice-chat-width';
+  const VOICE_CHAT_DEFAULT_WIDTH = 400;
+  const VOICE_CHAT_MIN_WIDTH = 300;
+  const VOICE_CHAT_MAX_WIDTH = 1000;
   let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
   let voiceChatOpen = $state(false);
-  let voiceView = $derived(isVoiceRoom && !voiceChatOpen);
+  let voiceChatWidth = $state(VOICE_CHAT_DEFAULT_WIDTH);
   let callShown = $derived(call.roomId === resolvedRoomId && (call.active || call.failure));
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
@@ -283,6 +293,8 @@
   );
   const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   let desktop = $derived(sidePanels.matches);
+  let voiceView = $derived(isVoiceRoom && (!voiceChatOpen || desktop));
+  let voiceChatBeside = $derived(isVoiceRoom && voiceChatOpen && desktop);
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
   let typingLabel = $derived.by(() => {
     if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
@@ -695,6 +707,91 @@
   <RoomPredecessorNotice onOpen={openPredecessor} />
 {/snippet}
 
+{#snippet chat()}
+  {#key resolvedRoomId}
+    <TimelineList
+      bind:this={timelineList}
+      {timeline}
+      focusEventId={eventId}
+      onRequestHistory={requestHistory}
+      onRequestFuture={requestFuture}
+      onRead={markRead}
+      onMarkUnread={markUnreadFrom}
+      onMatrixLink={handleMatrixLink}
+      onCopyLink={copyEventLink}
+      onSenderProfile={openProfile}
+      onMentionUser={mentionUser}
+      onRetrySend={conversation.retrySend}
+      onCancelSend={conversation.cancelSend}
+      onToggleReaction={conversation.toggleReaction}
+      onDelete={conversation.redact}
+      onReply={conversation.reply}
+      onOpenThread={openThread}
+      onEdit={conversation.edit}
+      roomId={resolvedRoomId}
+      members={memberLoader.members}
+      onJumpToEvent={jumpToEvent}
+      onJumpToLive={jumpToLive}
+      onOpenMedia={openMedia}
+      onPersonaAvatarClick={openProfileAvatar}
+      onVotePoll={conversation.votePoll}
+      onEndPoll={conversation.endPoll}
+      readOnly={permissions ? !permissions.can_post : false}
+      canRedactOthers={permissions?.can_redact_others ?? false}
+      encrypted={resolvedRoom?.encrypted ?? null}
+      currentUserId={core.session?.user_id ?? null}
+      scrollLocked={profileOpen || receiptsOpen}
+      {typingLabel}
+      footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
+      bind:nearLatest={timelineAtBottom}
+      bind:followingLive={timelineFollowingLive}
+      timelineStart={predecessor ? predecessorNotice : undefined}
+    >
+      {#snippet footTrailing()}
+        {#if showReceiptFooter}
+          <RoomReadReceipts
+            bind:open={receiptsOpen}
+            readers={latestReadBy}
+            members={receiptMembers}
+            visible={timelineAtBottom}
+            onMemberProfile={openProfile}
+          />
+        {/if}
+      {/snippet}
+    </TimelineList>
+  {/key}
+  <div class="composer-dock" onfocusin={(event) => timelineList?.composerFocused(event)}>
+    {#if isTombstoned}
+      <RoomTombstoneBanner
+        isSpace={resolvedRoom?.is_space ?? false}
+        body={tombstoneBody}
+        resolved={tombstoneChecked}
+        successorId={tombstoneReplacementId}
+        joined={tombstoneSuccessorJoined}
+        joining={tombstoneJoining}
+        failed={tombstoneJoinFailed}
+        onOpen={openTombstoneSuccessor}
+        onJoin={() => void joinTombstoneSuccessor()}
+      />
+    {:else}
+      {#key resolvedRoomId}
+        <ScheduledMessages roomId={resolvedRoomId} />
+        <ConversationComposer
+          bind:this={composer}
+          {conversation}
+          roomId={resolvedRoomId}
+          onSchedule={conversation.schedule}
+          {roomName}
+          readOnly={permissions ? !permissions.can_post : false}
+          encrypted={resolvedRoom?.encrypted ?? null}
+          onDeleteEdited={conversation.redact}
+          onEditLast={conversation.editLast}
+        />
+      {/key}
+    {/if}
+  </div>
+{/snippet}
+
 <main
   class="room-view"
   aria-label={$i18n.t('timeline.label')}
@@ -736,6 +833,7 @@
       onCall={callOffered && !isVoiceRoom ? openPrescreen : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
+      chatBeside={desktop}
       onBack={leaveRoomView}
       onMembers={toggleMembers}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
@@ -785,90 +883,38 @@
         />
       {/if}
     {:else}
-      {#key resolvedRoomId}
-        <TimelineList
-          bind:this={timelineList}
-          {timeline}
-          focusEventId={eventId}
-          onRequestHistory={requestHistory}
-          onRequestFuture={requestFuture}
-          onRead={markRead}
-          onMarkUnread={markUnreadFrom}
-          onMatrixLink={handleMatrixLink}
-          onCopyLink={copyEventLink}
-          onSenderProfile={openProfile}
-          onMentionUser={mentionUser}
-          onRetrySend={conversation.retrySend}
-          onCancelSend={conversation.cancelSend}
-          onToggleReaction={conversation.toggleReaction}
-          onDelete={conversation.redact}
-          onReply={conversation.reply}
-          onOpenThread={openThread}
-          onEdit={conversation.edit}
-          roomId={resolvedRoomId}
-          members={memberLoader.members}
-          onJumpToEvent={jumpToEvent}
-          onJumpToLive={jumpToLive}
-          onOpenMedia={openMedia}
-          onPersonaAvatarClick={openProfileAvatar}
-          onVotePoll={conversation.votePoll}
-          onEndPoll={conversation.endPoll}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          currentUserId={core.session?.user_id ?? null}
-          scrollLocked={profileOpen || receiptsOpen}
-          {typingLabel}
-          footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
-          bind:nearLatest={timelineAtBottom}
-          bind:followingLive={timelineFollowingLive}
-          timelineStart={predecessor ? predecessorNotice : undefined}
-        >
-          {#snippet footTrailing()}
-            {#if showReceiptFooter}
-              <RoomReadReceipts
-                bind:open={receiptsOpen}
-                readers={latestReadBy}
-                members={receiptMembers}
-                visible={timelineAtBottom}
-                onMemberProfile={openProfile}
-              />
-            {/if}
-          {/snippet}
-        </TimelineList>
-      {/key}
-      <div class="composer-dock" onfocusin={(event) => timelineList?.composerFocused(event)}>
-        {#if isTombstoned}
-          <RoomTombstoneBanner
-            isSpace={resolvedRoom?.is_space ?? false}
-            body={tombstoneBody}
-            resolved={tombstoneChecked}
-            successorId={tombstoneReplacementId}
-            joined={tombstoneSuccessorJoined}
-            joining={tombstoneJoining}
-            failed={tombstoneJoinFailed}
-            onOpen={openTombstoneSuccessor}
-            onJoin={() => void joinTombstoneSuccessor()}
-          />
-        {:else}
-          {#key resolvedRoomId}
-            <ScheduledMessages roomId={resolvedRoomId} />
-            <ConversationComposer
-              bind:this={composer}
-              {conversation}
-              roomId={resolvedRoomId}
-              onSchedule={conversation.schedule}
-              {roomName}
-              readOnly={permissions ? !permissions.can_post : false}
-              encrypted={resolvedRoom?.encrypted ?? null}
-              onDeleteEdited={conversation.redact}
-              onEditLast={conversation.editLast}
-            />
-          {/key}
-        {/if}
-      </div>
+      {@render chat()}
     {/if}
   </div>
+
+  {#if voiceChatBeside}
+    <aside class="voice-chat" style:width="{voiceChatWidth}px" aria-label={$i18n.t('call.chat')}>
+      <ResizeHandle
+        value={voiceChatWidth}
+        min={VOICE_CHAT_MIN_WIDTH}
+        max={VOICE_CHAT_MAX_WIDTH}
+        label={$i18n.t('call.chat')}
+        grow="left"
+        step={16}
+        shiftStep={64}
+        onResize={(next) =>
+          (voiceChatWidth = Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, next)))}
+        onCommit={() => localStorage.setItem(VOICE_CHAT_WIDTH_KEY, String(voiceChatWidth))}
+      />
+      <header class="voice-chat-header">
+        <h2>{$i18n.t('call.chat')}</h2>
+        <IconButton
+          variant="ghost"
+          size="small"
+          label={$i18n.t('call.closeChat')}
+          onclick={() => (voiceChatOpen = false)}
+        >
+          <XIcon />
+        </IconButton>
+      </header>
+      {@render chat()}
+    </aside>
+  {/if}
 
   {#if threadsOpen}
     <ThreadList
@@ -1084,6 +1130,40 @@
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+
+  .voice-chat {
+    background: var(--surface-container);
+    border-left: var(--border-width) solid var(--surface-container-line);
+    box-sizing: border-box;
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    max-width: 60%;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+  }
+
+  .voice-chat-header {
+    align-items: center;
+    border-bottom: var(--border-width) solid var(--surface-container-line);
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: space-between;
+    min-height: var(--header-height);
+    padding: 0 var(--space-200) 0 var(--space-400);
+  }
+
+  .voice-chat-header h2 {
+    font-size: var(--font-size-heading);
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+  }
+
+  .voice-chat :global(.resize-handle) {
+    left: -0.25rem;
+    z-index: 1;
   }
 
   .composer-dock {

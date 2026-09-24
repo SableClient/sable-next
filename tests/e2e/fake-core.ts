@@ -27,7 +27,8 @@ export type RoomCoreMode =
   | 'empty_room'
   | 'delayed_layout_diff'
   | 'spaces'
-  | 'tombstoned';
+  | 'tombstoned'
+  | 'voice';
 
 type WorkerMode = RoomCoreMode;
 
@@ -193,12 +194,23 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       unread: 0,
       highlight: 0,
     };
+    const voiceRoom: RoomSummary = {
+      ...room,
+      room_id: '!voice:example.test',
+      name: 'Hangout',
+      is_voice: true,
+      room_type: 'org.matrix.msc3417.call',
+      unread: 0,
+      highlight: 0,
+    };
     const joinedRooms: RoomSummary[] =
-      workerMode === 'spaces'
-        ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
-        : workerMode === 'tombstoned'
-          ? [room, secondRoom, invitedRoom, tombstonedRoom, successorRoom]
-          : [room, secondRoom, invitedRoom];
+      workerMode === 'voice'
+        ? [room, secondRoom, invitedRoom, voiceRoom]
+        : workerMode === 'spaces'
+          ? [room, secondRoom, invitedRoom, alphaSpace, betaSpace, gammaSpace]
+          : workerMode === 'tombstoned'
+            ? [room, secondRoom, invitedRoom, tombstonedRoom, successorRoom]
+            : [room, secondRoom, invitedRoom];
 
     const hierarchyRoom = (
       roomId: string,
@@ -405,6 +417,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [invitedRoom.room_id, invitedRoom],
       [tombstonedRoom.room_id, tombstonedRoom],
       [successorRoom.room_id, successorRoom],
+      [voiceRoom.room_id, voiceRoom],
     ]);
     let nextSubscription = 2;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
