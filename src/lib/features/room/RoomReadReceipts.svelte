@@ -74,6 +74,7 @@
   }
 
   :global(.read-receipts-popover) {
+    background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
