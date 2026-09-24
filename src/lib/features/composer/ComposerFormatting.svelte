@@ -26,15 +26,17 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import type { FormatAction } from './editor/formatting';
+  import { MARKDOWN_FORMATS } from './editor/markdown-format';
 
   interface Props {
     active: readonly FormatAction[];
     source: boolean;
+    markdown: boolean;
     onFormat: (action: FormatAction) => void;
     onToggleSource: () => void;
   }
 
-  let { active, source, onFormat, onToggleSource }: Props = $props();
+  let { active, source, markdown, onFormat, onToggleSource }: Props = $props();
 
   const buttons: { action: FormatAction; label: string; icon: Component }[] = [
     { action: 'strong', label: 'composer.bold', icon: TextBIcon },
@@ -60,7 +62,7 @@
 </script>
 
 <div class="formatting" role="group" aria-label={$i18n.t('composer.formatting')}>
-  {#each buttons as button (button.action)}
+  {#each markdown ? buttons.filter( (button) => MARKDOWN_FORMATS.includes(button.action) ) : buttons as button (button.action)}
     <IconButton
       variant="ghost"
       size="small"
@@ -74,20 +76,22 @@
       <button.icon />
     </IconButton>
   {/each}
-  <IconButton
-    variant="ghost"
-    size="small"
-    class="format-button choice"
-    label={$i18n.t('composer.markdownSource')}
-    aria-pressed={source}
-    onclick={onToggleSource}
-  >
-    {#if source}
-      <ArticleNyTimesIcon />
-    {:else}
-      <MarkdownLogoIcon />
-    {/if}
-  </IconButton>
+  {#if source || !markdown}
+    <IconButton
+      variant="ghost"
+      size="small"
+      class="format-button choice"
+      label={$i18n.t('composer.markdownSource')}
+      aria-pressed={source}
+      onclick={onToggleSource}
+    >
+      {#if source}
+        <ArticleNyTimesIcon />
+      {:else}
+        <MarkdownLogoIcon />
+      {/if}
+    </IconButton>
+  {/if}
 </div>
 
 <style>

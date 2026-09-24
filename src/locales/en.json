@@ -1365,6 +1365,8 @@
     "scheduleInEncryptedRoomsHint": "Your homeserver cannot hold an encrypted message, so a scheduled one is kept in your account data as plain text until a device of yours sends it. Off refuses to schedule in encrypted rooms.",
     "formattingToolbar": "Formatting toolbar",
     "formattingToolbarHint": "Keeps the bold, italic and list controls always open.",
+    "composerFormatButton": "Formatting button",
+    "composerFormatButtonHint": "Shows the button that opens the formatting toolbar. Without the rich text editor, it inserts markdown.",
     "privacyTitle": "Privacy",
     "privacyDescription": "What Sable tells other people about you.",
     "sendTypingNotifications": "Send typing notifications",

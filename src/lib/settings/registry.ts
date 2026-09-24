@@ -646,7 +646,13 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.formattingToolbar',
         description: 'settings.formattingToolbarHint',
         type: 'boolean',
-        gatedBy: 'richTextComposer',
+      },
+      {
+        key: 'composerFormatButton',
+        icon: TextAaIcon,
+        name: 'settings.composerFormatButton',
+        description: 'settings.composerFormatButtonHint',
+        type: 'boolean',
       },
       {
         key: 'composerGifButton',

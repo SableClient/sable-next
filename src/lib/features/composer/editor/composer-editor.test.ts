@@ -1652,3 +1652,65 @@ describe('Enter for a newline in the plain composer', () => {
     expect(message.formatted).toBe('<pre><code>a\nb</code></pre>');
   });
 });
+
+describe('formatting in the plain composer writes markdown', () => {
+  function plainEditor(text: string): ComposerEditor {
+    preferences.richTextComposer = false;
+    const editor = open();
+    type(editor, text);
+    return editor;
+  }
+
+  function select(editor: ComposerEditor, from: number, to: number): void {
+    const editorView = view(editor);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, from, to))
+    );
+  }
+
+  function body(editor: ComposerEditor): string {
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    return serializePlain(doc).body;
+  }
+
+  test('bold wraps the selection, and a second press unwraps it', () => {
+    const editor = plainEditor('say hi');
+    select(editor, 5, 7);
+    editor.format('strong');
+    expect(body(editor)).toBe('say **hi**');
+
+    editor.format('strong');
+    expect(body(editor)).toBe('say hi');
+  });
+
+  test('italic over bold text adds its own marker instead of eating one of bold', () => {
+    const editor = plainEditor('**hi**');
+    select(editor, 3, 5);
+    editor.format('em');
+    expect(body(editor)).toBe('***hi***');
+  });
+
+  test('a list prefixes every selected line', () => {
+    const editor = plainEditor('one');
+    press(editor, 'Enter', true);
+    type(editor, 'two');
+    select(editor, 1, view(editor).state.doc.content.size - 1);
+    editor.format('bullet_list');
+    expect(body(editor)).toBe('- one\n- two');
+  });
+
+  test('a code block fences the selection on its own lines', () => {
+    const editor = plainEditor('x = 1');
+    select(editor, 1, 6);
+    editor.format('code_block');
+    expect(body(editor)).toBe('```\nx = 1\n```');
+  });
+
+  test('a link is written as markdown', () => {
+    const editor = plainEditor('docs');
+    select(editor, 1, 5);
+    editor.applyLink('https://example.org');
+    expect(body(editor)).toBe('[docs](https://example.org)');
+  });
+});

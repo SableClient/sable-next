@@ -1370,6 +1370,8 @@
     "scheduleInEncryptedRoomsHint": "Votre serveur d’accueil ne peut pas conserver un message chiffré ; un message programmé est donc gardé en clair dans vos données de compte jusqu’à ce qu’un de vos appareils l’envoie. Désactivé, la programmation dans les salons chiffrés est refusée.",
     "formattingToolbar": "Barre de mise en forme",
     "formattingToolbarHint": "Conserve toujours ouverts les contrôles de gras, italique et listes.",
+    "composerFormatButton": "Bouton de mise en forme",
+    "composerFormatButtonHint": "Affiche le bouton qui ouvre la barre de mise en forme. Sans l’éditeur de texte enrichi, il insère du markdown.",
     "privacyTitle": "Vie privée",
     "privacyDescription": "Ce que Sable indique aux autres à votre sujet.",
     "sendTypingNotifications": "Envoyer des notifications de saisie",

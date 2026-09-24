@@ -71,6 +71,7 @@ export interface Preferences {
   enterForNewline: boolean;
   mentionInReplies: boolean;
   formattingToolbar: boolean;
+  composerFormatButton: boolean;
   richTextComposer: boolean;
   composerGifButton: boolean;
   composerStickerButton: boolean;
@@ -269,6 +270,7 @@ const DEFAULTS: Preferences = {
   enterForNewline: false,
   mentionInReplies: true,
   formattingToolbar: false,
+  composerFormatButton: true,
   richTextComposer: false,
   composerGifButton: true,
   composerStickerButton: true,

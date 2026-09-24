@@ -41,6 +41,7 @@ import {
   splitListEntry,
   type FormatAction,
 } from './formatting';
+import { markdownFormatCommands, markdownLink } from './markdown-format';
 import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
 import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
@@ -852,11 +853,20 @@ export class ComposerEditor {
     return true;
   }
 
+  private markdownMode(): boolean {
+    return this.source || !preferences.richTextComposer;
+  }
+
   format(action: FormatAction): void {
     const view = this.view;
     if (!view) return;
     if (action === 'link') {
       this.options.onLinkRequest();
+      return;
+    }
+    if (this.markdownMode()) {
+      markdownFormatCommands[action]?.(view.state, view.dispatch, view);
+      view.focus();
       return;
     }
     if (action === 'spoiler' && !activeMarks(view.state).includes('spoiler')) {
@@ -880,6 +890,11 @@ export class ComposerEditor {
   applyLink(href: string): void {
     const view = this.view;
     if (!view) return;
+    if (this.markdownMode()) {
+      view.dispatch(view.state.tr.replaceSelectionWith(markdownLink(view.state, href), false));
+      view.focus();
+      return;
+    }
     const { from, to, empty } = view.state.selection;
     const mark = composerSchema.marks.link.create({ href });
     const tr = empty

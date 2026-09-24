@@ -910,10 +910,11 @@
             }}
           />
         {/if}
-        {#if formattingOpen && richText}
+        {#if formattingOpen}
           <ComposerFormatting
             active={activeFormats}
             source={sourceMode}
+            markdown={sourceMode || !richText}
             onFormat={(action: FormatAction) => {
               editor.format(action);
             }}
@@ -992,7 +993,7 @@
               {#if showPersonaPicker}
                 <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
               {/if}
-              {#if richText}
+              {#if preferences.composerFormatButton}
                 <IconButton
                   variant="ghost"
                   size="small"

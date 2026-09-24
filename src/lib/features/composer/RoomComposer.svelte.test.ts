@@ -19,6 +19,7 @@ afterEach(() => {
   document.body.replaceChildren();
   clearDrafts();
   setPreference('formattingToolbar', false);
+  setPreference('composerFormatButton', true);
   setPreference('richTextComposer', true);
 });
 
@@ -917,14 +918,28 @@ test('the toolbar toggle writes the setting back, so it survives a remount', asy
   void unmount(second);
 });
 
-test('neither the toolbar nor its toggle appear without rich text', async () => {
+test('without rich text the toolbar offers only what markdown can write', async () => {
   setPreference('formattingToolbar', true);
   setPreference('richTextComposer', false);
   const app = render({ roomId: '!room:example.org' });
   await tick();
 
+  expect(document.querySelector('.composer-format')).not.toBeNull();
+  const labels = [...(formattingBar()?.querySelectorAll('button') ?? [])].map((button) =>
+    button.getAttribute('aria-label')
+  );
+  expect(labels).toContain('Bold');
+  expect(labels).not.toContain('Underline');
+  expect(labels).not.toContain('Edit as Markdown');
+  void unmount(app);
+});
+
+test('the formatting button can be hidden on its own', async () => {
+  setPreference('composerFormatButton', false);
+  const app = render({ roomId: '!room:example.org' });
+  await tick();
+
   expect(document.querySelector('.composer-format')).toBeNull();
-  expect(formattingBar()).toBeNull();
   void unmount(app);
 });
 
