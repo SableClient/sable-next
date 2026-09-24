@@ -35,7 +35,7 @@
       sender_avatar_url: null,
       body: $i18n.t('settings.developerNotificationsBody', { count }),
       mention: false,
-      noisy: false,
+      noisy: true,
     };
   }
 
@@ -48,10 +48,7 @@
         failed = true;
         return;
       }
-      if (alertsNatively()) {
-        await sendNativeTestNotification(sequence);
-        return;
-      }
+      if (alertsNatively()) await sendNativeTestNotification(sequence);
       notifications.present(view(sequence));
     } catch {
       failed = true;

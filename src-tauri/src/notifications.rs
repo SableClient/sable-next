@@ -469,7 +469,7 @@ fn test_view(sequence: u32) -> NotificationView {
         sender_avatar_url: None,
         body: format!("Test notification {sequence}"),
         mention: false,
-        noisy: Some(false),
+        noisy: Some(true),
     }
 }
 
