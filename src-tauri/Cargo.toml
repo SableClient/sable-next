@@ -93,7 +93,7 @@ tauri-plugin-sharekit = "=0.4.0-rc.7"
 # target directory, where scripts/cef/copy-libs.sh looks for it.
 [target."cfg(target_os = \"windows\")".dependencies]
 enigo = { version = "0.6.1", default-features = false }
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_System_ProcessStatus",
   "Win32_System_Threading",
@@ -101,12 +101,12 @@ windows = { version = "0.61", features = [
 ] }
 
 [target."cfg(target_os = \"linux\")".dependencies]
-gtk = "0.18"
+gtk = "0.19"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
 tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "94e2a39968afe001e2eaa0c79273d51bcc5ded61", optional = true }
 # The CEF runtime currently uses the beta.2 drag event API. Keep Cargo from
 # selecting beta.3, which removed its paths and DragMoved payloads.
-winit = { version = "=0.31.0-beta.2", optional = true }
+winit = { version = "=0.31.0-beta.3", optional = true }
 cef = { version = "=150.2.1", optional = true }
 sha2 = { version = "0.11", optional = true }
 # Auto-download stays off: fetching a codec build would make Sable the one
