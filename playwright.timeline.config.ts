@@ -21,6 +21,7 @@ export default defineConfig({
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',
     'voice-room-chat.spec.ts',
+    'room-icon-badge.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,
