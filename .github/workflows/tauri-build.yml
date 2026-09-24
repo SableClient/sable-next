@@ -527,7 +527,7 @@ jobs:
           for arch in x86_64 aarch64; do
             url="$FORGEJO_URL/$FORGEJO_REPOSITORY/releases/download/$TAG/sable-next-$VERSION-linux-$arch.tar.gz"
             for attempt in $(seq 20); do
-              if curl -fsSLI -o /dev/null "$url"; then
+              if curl -fsSL -r 0-0 -o /dev/null "$url"; then
                 unset url
                 break
               fi

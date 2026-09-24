@@ -140,12 +140,12 @@ async function listReleases() {
 
 // Deleting a release drops its attachments but leaves a tag-only entry behind,
 // which then has to go through the tags endpoint.
-async function pruneNightlies(keep, currentTag) {
+async function pruneNightlies(keep, currentTag, protectedTags) {
   const nightlies = (await listReleases())
     .filter((release) => release.prerelease && release.tag_name.startsWith('nightly-'))
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   for (const release of nightlies.slice(keep)) {
-    if (release.tag_name === currentTag) continue;
+    if (release.tag_name === currentTag || protectedTags.includes(release.tag_name)) continue;
     await request('DELETE', `/releases/${release.id}`);
     await request('DELETE', `/tags/${encodeURIComponent(release.tag_name)}`, { allow404: true });
     console.log(`Pruned ${release.tag_name}`);
@@ -254,7 +254,7 @@ try {
       if (!Number.isInteger(keep) || keep <= 0) {
         throw new Error(`--keep must be a positive integer (got: ${flags.keep})`);
       }
-      await pruneNightlies(keep, tag);
+      await pruneNightlies(keep, tag, (flags.protect ?? '').split(',').filter(Boolean));
       break;
     }
     case 'body':

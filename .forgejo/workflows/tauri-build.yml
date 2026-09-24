@@ -582,4 +582,12 @@ jobs:
               node scripts/ci/forgejo-release.mjs upload --tag nightly "$name"
           done
       - name: Prune old nightly releases
-        run: node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP"
+        run: |
+          repo=https://sableclient.github.io/sable-next/repo
+          protect=""
+          for arch in x86_64 aarch64; do
+            commit="$(curl -fsS "$repo/refs/heads/app/moe.sable.next.Nightly/$arch/master")"
+            protect="$protect,$(curl -fsS "$repo/objects/${commit:0:2}/${commit:2}.commit" \
+              | grep -aoE 'download/nightly-[^/]+' | cut -d/ -f2 | tr '\n' ',')"
+          done
+          node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
