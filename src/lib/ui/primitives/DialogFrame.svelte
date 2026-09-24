@@ -38,6 +38,11 @@
     onConfirm?.();
   }
 
+  function keepOpenOnTitleBar(event: PointerEvent): void {
+    if (event.target instanceof Element && event.target.closest('.titlebar'))
+      event.preventDefault();
+  }
+
   holdOverlayBack(
     () => open === true && !ownsBack,
     () => {
@@ -56,6 +61,7 @@
       style={contentStyle}
       aria-label={label}
       {onOpenAutoFocus}
+      onInteractOutside={keepOpenOnTitleBar}
     >
       {#if onConfirm}
         <form class="dialog-form" onsubmit={submit}>{@render children()}</form>
