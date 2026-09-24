@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { MemberView } from '#src/generated/protocol';
   import { Dialog } from 'bits-ui';
+  import { onMount } from 'svelte';
   import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
   import FunnelIcon from 'phosphor-svelte/lib/FunnelIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -88,6 +89,7 @@
   let busy = $derived(filter === 'join' ? loading : fetching);
   let width = $state<number | null>(null);
 
+  const WIDTH_STORAGE_KEY = 'sable-members-drawer-width';
   const DEFAULT_WIDTH = 266;
   const MIN_WIDTH = 192;
   const MAX_WIDTH = 640;
@@ -129,6 +131,11 @@
   function resize(next: number): void {
     width = Math.min(maxWidth, Math.max(MIN_WIDTH, next));
   }
+
+  onMount(() => {
+    const stored = Number.parseInt(localStorage.getItem(WIDTH_STORAGE_KEY) ?? '', 10);
+    if (Number.isFinite(stored)) resize(stored);
+  });
 </script>
 
 <aside
@@ -147,6 +154,9 @@
       shiftStep={64}
       homeEnd
       onResize={resize}
+      onCommit={() => {
+        if (width !== null) localStorage.setItem(WIDTH_STORAGE_KEY, String(width));
+      }}
     />
   {/if}
   <header>

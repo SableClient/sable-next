@@ -32,6 +32,7 @@ const observerBackup = globalThis.IntersectionObserver;
 afterEach(() => {
   offline.clear();
   document.body.replaceChildren();
+  localStorage.clear();
   setPreference('memberSort', 'name-asc');
   setPreference('groupMembersByPresence', true);
   globalThis.IntersectionObserver = observerBackup;
@@ -108,6 +109,23 @@ test('resizes the desktop drawer with the keyboard', async () => {
 
   expect(drawer?.style.width).toBe('282px');
   await unmount(instance);
+});
+
+test('reopens the desktop drawer at the width it was resized to', async () => {
+  const props = { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() };
+  const first = mount(MembersDrawer, { target: document.body, props });
+  await tick();
+  document
+    .querySelector<HTMLButtonElement>('.resize-handle')
+    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  await tick();
+  await unmount(first);
+
+  const second = mount(MembersDrawer, { target: document.body, props });
+  await tick();
+
+  expect(document.querySelector<HTMLElement>('.members-drawer')?.style.width).toBe('282px');
+  await unmount(second);
 });
 
 test('honours the sort preference and fetches the membership a filter names', async () => {
