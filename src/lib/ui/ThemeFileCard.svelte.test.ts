@@ -46,7 +46,7 @@ test('previews a shared theme and installs it once confirmed', async () => {
     expect(document.querySelector('.theme-file-name')?.textContent).toBe('Night Owl');
   });
   expect(document.querySelector('.theme-file-kind')?.textContent).toBe('Dark theme');
-  expect(document.querySelectorAll('.theme-file-swatch')).toHaveLength(2);
+  expect(document.querySelectorAll('.swatch')).toHaveLength(2);
 
   button('Install')?.click();
   flushSync();

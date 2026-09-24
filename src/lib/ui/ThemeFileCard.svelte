@@ -1,6 +1,4 @@
 <script lang="ts">
-  import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
-
   import { i18n } from '#lib/i18n.js';
   import {
     customThemes,
@@ -15,6 +13,7 @@
   } from '#lib/settings/theme-file.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
+  import ThemeSwatches from '#lib/ui/ThemeSwatches.svelte';
 
   interface Props {
     src: string;
@@ -76,13 +75,7 @@
 
 {#if file}
   <div class="theme-file-card">
-    <span class="theme-file-swatches" aria-hidden="true">
-      {#each swatches as color, index (index)}
-        <span class="theme-file-swatch" style:background={color}></span>
-      {:else}
-        <PaletteIcon />
-      {/each}
-    </span>
+    <ThemeSwatches colors={swatches} />
     <span class="theme-file-identity">
       <span class="theme-file-name">{title}</span>
       <span class="theme-file-kind">{kindLabel}</span>
@@ -117,23 +110,6 @@
     margin-top: var(--space-200);
     max-width: 24rem;
     padding: var(--space-200) var(--space-300);
-  }
-
-  .theme-file-swatches {
-    color: var(--surface-var-on-container);
-    display: flex;
-    flex: none;
-  }
-
-  .theme-file-swatch {
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radii-round);
-    height: 1.25rem;
-    width: 1.25rem;
-  }
-
-  .theme-file-swatch + .theme-file-swatch {
-    margin-inline-start: calc(var(--space-150) * -1);
   }
 
   .theme-file-identity {

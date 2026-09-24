@@ -1,6 +1,5 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
-  import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import {
@@ -27,6 +26,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import ThemeSwatches from '#lib/ui/ThemeSwatches.svelte';
   import { i18n } from '#lib/i18n.js';
   import '#lib/ui/primitives/settings-row.css';
 
@@ -148,20 +148,10 @@
   }
 </script>
 
-{#snippet swatches(colors: readonly string[])}
-  <span class="swatches" aria-hidden="true">
-    {#each colors as color, index (index)}
-      <span class="swatch" style:background={color}></span>
-    {:else}
-      <PaletteIcon />
-    {/each}
-  </span>
-{/snippet}
-
 {#snippet catalogCard(entry: CatalogEntry)}
   {@const installed = installedSources.has(entry.fullUrl)}
   <li class="card">
-    {#if entry.kind === 'theme'}{@render swatches(entry.swatches)}{/if}
+    {#if entry.kind === 'theme'}<ThemeSwatches colors={entry.swatches} />{/if}
     <span class="identity">
       <span class="name">{entryName(entry)}</span>
       <span class="meta">{entryDetail(entry)}</span>
@@ -206,7 +196,7 @@
       {#each customThemes.themes as theme (theme.id)}
         {@const used = inUse(theme)}
         <li class="card">
-          {@render swatches(themeSwatches(theme.css))}
+          <ThemeSwatches colors={themeSwatches(theme.css)} />
           <span class="identity">
             <span class="name">{theme.name}</span>
             <span class="meta">
@@ -396,23 +386,6 @@
     gap: var(--space-300);
     min-width: 0;
     padding: var(--space-200) var(--space-300);
-  }
-
-  .swatches {
-    color: var(--surface-var-on-container);
-    display: flex;
-    flex: none;
-  }
-
-  .swatch {
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radii-round);
-    height: 1.25rem;
-    width: 1.25rem;
-  }
-
-  .swatch + .swatch {
-    margin-inline-start: calc(var(--space-150) * -1);
   }
 
   .identity {
