@@ -174,7 +174,9 @@
     :global(.dialog-content-settings) {
       border: var(--border-width) solid var(--surface-container-line);
       border-radius: var(--radius);
-      height: min(52rem, calc(100dvh - 3rem));
+      height: min(52rem, calc(100dvh - 3rem - var(--titlebar-height)));
+      padding-block: 0;
+      top: calc(50% + var(--titlebar-height) / 2);
       width: calc(100% - 3rem);
     }
   }
