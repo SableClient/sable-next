@@ -1063,7 +1063,7 @@
   }
 
   .room-nav-header.on-banner {
-    background: linear-gradient(180deg, var(--media-scrim) 0%, var(--media-scrim-clear) 100%);
+    background: linear-gradient(180deg, var(--media-scrim-solid) 0%, var(--media-scrim-clear) 100%);
     color: var(--media-on-scrim);
     left: 0;
     position: absolute;

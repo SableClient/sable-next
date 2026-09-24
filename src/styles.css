@@ -98,6 +98,7 @@ html {
   --picker-white: #fff;
   --media-scrim: rgb(0 0 0 / 60%);
   --media-scrim-clear: rgb(0 0 0 / 0%);
+  --media-scrim-solid: rgb(0 0 0 / 100%);
   --media-scrim-hover: rgb(255 255 255 / 20%);
   --media-on-scrim: #fff;
 }
