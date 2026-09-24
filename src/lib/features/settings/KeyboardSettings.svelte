@@ -2,6 +2,7 @@
   import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { settingFocusId } from '#lib/settings/registry.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -37,6 +38,10 @@
   let isMac = $derived(isMacPlatform());
   let shortcuts = $derived(effectiveShortcuts());
   let rebound = $derived(SHORTCUTS.some((shortcut) => isRebound(shortcut.id)));
+
+  function shortcutAnchor(id: ShortcutId): string {
+    return `shortcut-${settingFocusId(id.replace('.', '-'))}`;
+  }
 
   function label(id: ShortcutId): string {
     const shortcut = SHORTCUTS.find((candidate) => candidate.id === id);
@@ -79,7 +84,7 @@
       >
         <ul class="settings-rows">
           {#each items as shortcut (shortcut.id)}
-            <SettingsRow title={$i18n.t(shortcut.labelKey)}>
+            <SettingsRow id={shortcutAnchor(shortcut.id)} title={$i18n.t(shortcut.labelKey)}>
               <div class="binding">
                 <Button
                   size="small"

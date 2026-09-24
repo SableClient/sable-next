@@ -71,6 +71,7 @@
 
 <ul class="settings settings-rows">
   <SettingsRow
+    id="send-test-notification"
     title={$i18n.t('settings.developerNotificationsTitle')}
     description={$i18n.t('settings.developerNotificationsDescription')}
   >
@@ -80,6 +81,7 @@
   </SettingsRow>
   {#if alertsNatively()}
     <SettingsRow
+      id="push-outcomes"
       title={$i18n.t('settings.developerPushOutcomesTitle')}
       description={$i18n.t('settings.developerPushOutcomesDescription')}
     >

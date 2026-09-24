@@ -21,7 +21,7 @@
 </script>
 
 <ul class="settings">
-  <SettingsRow title={$i18n.t('settings.syncStatusTitle')} description={status} />
+  <SettingsRow id="sync-status" title={$i18n.t('settings.syncStatusTitle')} description={status} />
 </ul>
 
 <style>

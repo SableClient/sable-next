@@ -370,7 +370,7 @@
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.otherProfileFields')} headingId="profile-extra">
-      <SettingsRow title={$i18n.t('settings.otherProfileFieldsTitle')}>
+      <SettingsRow id="other-profile-fields" title={$i18n.t('settings.otherProfileFieldsTitle')}>
         {#snippet description()}
           <span>{$i18n.t('settings.otherProfileFieldsDescription')}</span>
           <span aria-label={$i18n.t('settings.otherProfileFieldsKaomojiTranslation')}

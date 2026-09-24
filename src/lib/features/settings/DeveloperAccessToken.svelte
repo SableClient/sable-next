@@ -29,6 +29,7 @@
 
 <ul class="settings">
   <SettingsRow
+    id="access-token"
     title={$i18n.t('settings.developerAccessTokenTitle')}
     description={$i18n.t('settings.developerAccessTokenDescription')}
   >

@@ -51,6 +51,7 @@
 <div class="logs">
   <ul class="settings">
     <SettingsRow
+      id="debug-logs-status"
       title={$i18n.t('settings.developerLogsStatus')}
       description={$i18n.t('settings.developerLogsDescription')}
     >

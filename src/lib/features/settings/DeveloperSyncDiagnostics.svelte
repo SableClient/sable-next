@@ -25,22 +25,22 @@
 
 <div class="diagnostics">
   <ul class="settings">
-    <SettingsRow title={$i18n.t('settings.developerSyncState')}>
+    <SettingsRow id="sync-state" title={$i18n.t('settings.developerSyncState')}>
       <StatusBadge label={syncLabel} variant={badgeVariant} />
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncCoreStatus')}>
+    <SettingsRow id="sync-core-status" title={$i18n.t('settings.developerSyncCoreStatus')}>
       <code>{core.status}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncRooms')}>
+    <SettingsRow id="sync-rooms" title={$i18n.t('settings.developerSyncRooms')}>
       <code>{roomList.rooms.length}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncAccount')}>
+    <SettingsRow id="sync-account" title={$i18n.t('settings.developerSyncAccount')}>
       <code>{core.session?.account_id ?? '-'}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncRevision')}>
+    <SettingsRow id="sync-revision" title={$i18n.t('settings.developerSyncRevision')}>
       <code>{core.accountRevision}</code>
     </SettingsRow>
-    <SettingsRow title={$i18n.t('settings.developerSyncUnresponsive')}>
+    <SettingsRow id="sync-unresponsive" title={$i18n.t('settings.developerSyncUnresponsive')}>
       <code>
         {core.unresponsive ? $i18n.t('settings.developerYes') : $i18n.t('settings.developerNo')}
       </code>

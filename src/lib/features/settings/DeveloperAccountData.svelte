@@ -89,6 +89,7 @@
 <div class="account-data">
   <ul class="settings">
     <SettingsRow
+      id="account-data-add"
       title={$i18n.t('settings.developerAccountDataAdd')}
       description={$i18n.t('settings.developerAccountDataDescription')}
     >

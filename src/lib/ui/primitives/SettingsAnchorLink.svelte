@@ -3,14 +3,14 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { settingsAnchorLink } from './settings-anchor-link.js';
+  import { settingsAnchors } from './settings-anchors.js';
 
   interface Props {
     anchor: string;
   }
 
   let { anchor }: Props = $props();
-  const link = settingsAnchorLink();
+  const link = settingsAnchors()?.link;
   let copied = $state(false);
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -71,8 +71,10 @@
       opacity: 0;
     }
 
-    :global(:hover) > .anchor-link,
-    .anchor-link:focus-visible {
+    :global(
+        :is(.setting-row, .settings-heading-row, .settings-section-title):is(:hover, :focus-within)
+      )
+      .anchor-link {
       opacity: 1;
     }
   }

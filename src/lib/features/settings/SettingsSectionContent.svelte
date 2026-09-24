@@ -5,14 +5,10 @@
     findCategory,
     SETTINGS_DEVICES_SECTION,
   } from '#lib/settings/registry.js';
-  import { provideSettingsAnchorLink } from '#lib/ui/primitives/settings-anchor-link.js';
+  import { provideSettingsAnchors } from '#lib/ui/primitives/settings-anchors.js';
 
   import SettingsCategoryView from './SettingsCategoryView.svelte';
-  import {
-    findSettingRow,
-    provideSettingsFocus,
-    scrollSettingRowIntoView,
-  } from './settings-focus.js';
+  import { findSettingRow, scrollSettingRowIntoView } from './settings-focus.js';
   import { findStandaloneSection } from './sections.js';
 
   interface Props {
@@ -29,20 +25,36 @@
   );
   let pageId = $derived(standalone?.id ?? category?.id ?? SETTINGS_DEVICES_SECTION);
 
-  provideSettingsFocus(() => focus);
-  provideSettingsAnchorLink((anchor) => buildSettingsLink(location.origin, pageId, anchor));
+  let highlighted = $state<string | null>(null);
+
+  provideSettingsAnchors({
+    link: (anchor) => buildSettingsLink(location.origin, pageId, anchor),
+    highlighted: () => highlighted,
+  });
 
   $effect(() => {
     const id = focus;
+    highlighted = null;
     if (id === null) return;
 
     let cancelled = false;
-    void findSettingRow(id).then((heading) => {
-      if (cancelled || !heading?.hasAttribute('data-settings-outline')) return;
-      scrollSettingRowIntoView(heading.closest('section') ?? heading, 'start');
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    void findSettingRow(id).then((target) => {
+      if (cancelled || target === null) return;
+      if (target.hasAttribute('data-settings-outline')) {
+        scrollSettingRowIntoView(target.closest('section') ?? target, 'start');
+        return;
+      }
+
+      scrollSettingRowIntoView(target);
+      highlighted = id;
+      timer = setTimeout(() => {
+        if (!cancelled) highlighted = null;
+      }, 3000);
     });
     return () => {
       cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
     };
   });
 </script>
