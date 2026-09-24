@@ -15,6 +15,7 @@ const core = Object.assign(baseCore, {
   banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
   unbanUser: vi.fn<() => Promise<void>>(),
   setUserPowerLevel: vi.fn<() => Promise<void>>(),
+  inviteUser: vi.fn<(roomId: string, userId: string) => Promise<void>>(),
 });
 
 vi.mock('#lib/rooms/presence.svelte.js', () => ({
@@ -109,6 +110,54 @@ test('sends no reason when the moderation reason is left blank', async () => {
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });
+
+  await unmount(instance);
+});
+
+test('invites from the members list when the account may invite', async () => {
+  core.roomMembers.mockResolvedValue([alice]);
+  core.inviteUser.mockResolvedValue(undefined);
+  const instance = mount(RoomMembersSettings, {
+    target: document.body,
+    props: { room, permissions: { ...permissions, can_invite: true } },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.setting-row')).not.toBeNull();
+  });
+
+  const inviteButton = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('.search button')
+  ).find((button) => button.textContent.trim() === 'Invite');
+  if (!inviteButton) throw new Error('invite button missing');
+  inviteButton.click();
+  await tick();
+
+  const input = await vi.waitFor(() => {
+    const found = document.querySelector<HTMLInputElement>('#room-invite-user');
+    if (!found) throw new Error('invite input missing');
+    return found;
+  });
+  input.value = '@bob:example.org';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await vi.waitFor(() => {
+    expect(core.inviteUser).toHaveBeenCalledWith('!room:example.org', '@bob:example.org');
+  });
+
+  await unmount(instance);
+});
+
+test('offers no invite without the permission', async () => {
+  core.roomMembers.mockResolvedValue([alice]);
+  const instance = mount(RoomMembersSettings, {
+    target: document.body,
+    props: { room, permissions },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.setting-row')).not.toBeNull();
+  });
+
+  expect(document.querySelector('.search button')).toBeNull();
 
   await unmount(instance);
 });

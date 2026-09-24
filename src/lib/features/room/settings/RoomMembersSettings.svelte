@@ -14,6 +14,7 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import MemberIdentityRow from '../MemberIdentityRow.svelte';
+  import RoomInviteDialog from '../RoomInviteDialog.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -47,6 +48,7 @@
   let loading = $state(false);
   let failed = $state(false);
   let busy = $state<string | null>(null);
+  let inviteOpen = $state(false);
   let run = 0;
 
   let roomId = $derived(room?.room_id ?? null);
@@ -211,12 +213,24 @@
     {/each}
   </div>
 
-  <TextInput
-    bind:value={search}
-    type="search"
-    placeholder={$i18n.t('timeline.searchMembers')}
-    aria-label={$i18n.t('timeline.searchMembers')}
-  />
+  <div class="search">
+    <TextInput
+      bind:value={search}
+      type="search"
+      placeholder={$i18n.t('timeline.searchMembers')}
+      aria-label={$i18n.t('timeline.searchMembers')}
+    />
+    {#if permissions?.can_invite}
+      <Button
+        variant="secondary"
+        onclick={() => {
+          inviteOpen = true;
+        }}
+      >
+        {$i18n.t('room.inviteTitle')}
+      </Button>
+    {/if}
+  </div>
 
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('room.membersFailed')}</Alert>
@@ -304,6 +318,15 @@
   {/if}
 </div>
 
+<RoomInviteDialog
+  open={inviteOpen}
+  {room}
+  onOpenChange={(open: boolean) => {
+    inviteOpen = open;
+    if (!open) void load();
+  }}
+/>
+
 <DialogFrame
   open={moderationTarget !== null}
   onOpenChange={(next) => {
@@ -374,6 +397,17 @@
   .tabs button:hover:not(:disabled, [aria-selected='true']) {
     background: var(--surface-var-container-hover);
     color: var(--bg-on-container);
+  }
+
+  .search {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .search > :global(.text-input) {
+    flex: 1;
+    min-width: 0;
   }
 
   .user-id {
