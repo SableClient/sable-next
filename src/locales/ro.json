@@ -1221,7 +1221,6 @@
     "accessibilityTitle": "Accesibilitate",
     "accessibilityDescription": "Mărimea textului, contrast, mișcare, și text alternativ.",
     "fontScale": "Mărimea textului",
-    "fontScaleHint": "Schimbă mărimea întregii interfațe, nu doar a mesajelor.",
     "highContrast": "Mărește contrastul",
     "highContrastHint": "Face marginile și textul mai lizibile fată de fundal.",
     "alwaysShowAltText": "Afișează mereu textul alternativ",

@@ -79,12 +79,12 @@ describe('applySettings', () => {
     expect(applied?.preferences.developerTools).toBe(true);
   });
 
-  it('keeps this device’s font scale and media devices over an older upload', () => {
-    const local: Preferences = { ...base, fontScale: 'large', audioInputDevice: 'usb-mic' };
+  it('keeps this device’s page size and media devices over an older upload', () => {
+    const local: Preferences = { ...base, pageZoom: 1.25, audioInputDevice: 'usb-mic' };
     const applied = applySettings(
       {
         v: 1,
-        settings: { fontScale: 'smallest', audioInputDevice: 'webcam-mic' },
+        settings: { pageZoom: 0.75, audioInputDevice: 'webcam-mic' },
         themes: noThemes,
       },
       local,
@@ -92,7 +92,7 @@ describe('applySettings', () => {
       []
     );
 
-    expect(applied?.preferences.fontScale).toBe('large');
+    expect(applied?.preferences.pageZoom).toBe(1.25);
     expect(applied?.preferences.audioInputDevice).toBe('usb-mic');
   });
 

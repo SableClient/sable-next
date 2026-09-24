@@ -91,7 +91,8 @@
   });
 
   $effect(() => {
-    document.documentElement.dataset.fontScale = preferences.fontScale;
+    document.documentElement.style.setProperty('--font-scale', String(preferences.pageZoom));
+    document.documentElement.style.setProperty('--text-scale', String(preferences.textScale));
     document.documentElement.dataset.highContrast = preferences.highContrast ? 'on' : 'off';
     document.documentElement.dataset.reducedMotion = shouldReduceMotion() ? 'on' : 'off';
     document.documentElement.dataset.twitterEmoji = preferences.twitterEmoji ? 'on' : 'off';

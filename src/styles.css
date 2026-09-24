@@ -374,6 +374,7 @@ html {
   --timeline-row-padding: var(--space-100);
   --link-decoration: underline;
   --font-scale: 1;
+  --text-scale: 1;
   --titlebar-height: 0px;
   --header-height: 3.5rem;
   --resize-handle: 4px;
@@ -390,18 +391,18 @@ html {
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
 
   /* Typography scale */
-  --font-size-x-small: 0.75rem;
-  --font-size-small: 0.75rem;
-  --font-size-label: 0.875rem;
-  --font-size-body: 0.9375rem;
-  --font-size-subheading: 1rem;
-  --font-size-heading: 1.125rem;
-  --font-size-display: 2rem;
-  --font-size-emoji-display: 2.1875rem;
-  --font-size-editor: 1rem;
+  --font-size-x-small: calc(0.75rem * var(--text-scale));
+  --font-size-small: calc(0.75rem * var(--text-scale));
+  --font-size-label: calc(0.875rem * var(--text-scale));
+  --font-size-body: calc(0.9375rem * var(--text-scale));
+  --font-size-subheading: calc(1rem * var(--text-scale));
+  --font-size-heading: calc(1.125rem * var(--text-scale));
+  --font-size-display: calc(2rem * var(--text-scale));
+  --font-size-emoji-display: calc(2.1875rem * var(--text-scale));
+  --font-size-editor: calc(1rem * var(--text-scale));
 
   /* Line heights */
-  --line-height-small: 1.25rem;
+  --line-height-small: calc(1.25rem * var(--text-scale));
   --line-height-body: 1.5;
   --line-height-heading: 1.2;
 
@@ -512,26 +513,6 @@ body {
     --duration-medium: 0s;
     --duration-slow: 0s;
   }
-}
-
-:root[data-font-scale='smallest'] {
-  --font-scale: 0.75;
-}
-
-:root[data-font-scale='small'] {
-  --font-scale: 0.9375;
-}
-
-:root[data-font-scale='large'] {
-  --font-scale: 1.125;
-}
-
-:root[data-font-scale='largest'] {
-  --font-scale: 1.25;
-}
-
-:root[data-font-scale='huge'] {
-  --font-scale: 1.5;
 }
 
 :root[data-twitter-emoji='on'] {

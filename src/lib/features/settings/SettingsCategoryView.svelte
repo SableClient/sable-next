@@ -154,9 +154,12 @@
                   label={$i18n.t(setting.name)}
                   value={preferences[key]}
                   oninput={(value) => {
-                    setPreference(key, value);
+                    if (!setting.applyOnCommit) setPreference(key, value);
                   }}
-                  oncommit={(value) => setting.onChange?.(value)}
+                  oncommit={(value) => {
+                    if (setting.applyOnCommit) setPreference(key, value);
+                    setting.onChange?.(value);
+                  }}
                 />
                 <span class="range-reading">{Math.round(preferences[key] * 100)}%</span>
               </div>

@@ -31,6 +31,7 @@ import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
+import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlusIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
 import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
@@ -113,6 +114,7 @@ export interface RangeSetting extends BaseSetting {
   type: 'range';
   key: RangePreference;
   step: number;
+  applyOnCommit?: true;
   onChange?: (value: number) => void;
 }
 
@@ -398,19 +400,22 @@ export const settingsCategories: SettingsCategory[] = [
     icon: WheelchairMotionIcon,
     items: [
       {
-        key: 'fontScale',
+        key: 'pageZoom',
+        icon: MagnifyingGlassPlusIcon,
+        name: 'settings.pageZoom',
+        description: 'settings.pageZoomHint',
+        type: 'range',
+        step: 0.05,
+        applyOnCommit: true,
+      },
+      {
+        key: 'textScale',
         icon: TextAaIcon,
         name: 'settings.fontScale',
         description: 'settings.fontScaleHint',
-        type: 'select',
-        options: [
-          { value: 'smallest', label: '75%', literal: true },
-          { value: 'small', label: '94%', literal: true },
-          { value: 'default', label: '100%', literal: true },
-          { value: 'large', label: '113%', literal: true },
-          { value: 'largest', label: '125%', literal: true },
-          { value: 'huge', label: '150%', literal: true },
-        ],
+        type: 'range',
+        step: 0.05,
+        applyOnCommit: true,
       },
       {
         key: 'highContrast',

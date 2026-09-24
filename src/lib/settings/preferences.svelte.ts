@@ -11,7 +11,6 @@ export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
-export type FontScale = 'smallest' | 'small' | 'default' | 'large' | 'largest' | 'huge';
 export type PixelatedImages = 'always' | 'smart' | 'never';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
@@ -35,7 +34,8 @@ export interface Preferences {
   theme: ThemeMode;
   underlineLinks: boolean;
   reducedMotion: boolean;
-  fontScale: FontScale;
+  pageZoom: number;
+  textScale: number;
   highContrast: boolean;
   alwaysShowAltText: boolean;
   twitterEmoji: boolean;
@@ -188,7 +188,6 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
-  fontScale: ['smallest', 'small', 'default', 'large', 'largest', 'huge'],
   pixelatedImages: ['always', 'smart', 'never'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],
@@ -217,6 +216,8 @@ export type FreeTextPreference = (typeof FREE_TEXT)[number];
 
 export const PREFERENCE_RANGES = {
   notificationSoundVolume: { min: 0, max: 1 },
+  pageZoom: { min: 0.75, max: 1.5 },
+  textScale: { min: 0.75, max: 1.5 },
   roomBannerHeight: { min: 56, max: 500 },
 } as const satisfies Partial<Record<keyof Preferences, { min: number; max: number }>>;
 
@@ -231,7 +232,8 @@ const DEFAULTS: Preferences = {
   theme: 'system',
   underlineLinks: true,
   reducedMotion: prefersReducedMotion(),
-  fontScale: 'default',
+  pageZoom: 1,
+  textScale: 1,
   highContrast: false,
   alwaysShowAltText: false,
   twitterEmoji: true,
@@ -405,13 +407,27 @@ function mergeNotificationSwitch(stored: Record<string, unknown>, next: Preferen
   return next;
 }
 
+const LEGACY_FONT_SCALES: Record<string, number> = {
+  smallest: 0.75,
+  small: 0.9375,
+  large: 1.125,
+  largest: 1.25,
+  huge: 1.5,
+};
+
+function mergeFontScale(stored: Record<string, unknown>, next: Preferences): Preferences {
+  if (stored.pageZoom !== undefined || typeof stored.fontScale !== 'string') return next;
+  next.pageZoom = LEGACY_FONT_SCALES[stored.fontScale] ?? next.pageZoom;
+  return next;
+}
+
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
   const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
   if (!stored) return { ...DEFAULTS };
 
-  return mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS));
+  return mergeFontScale(stored, mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS)));
 }
 
 export const preferences = $state<Preferences>(load());
