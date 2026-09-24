@@ -1619,3 +1619,36 @@ describe('the editor api the composer component drives', () => {
     expect(editor.doc()?.textContent).toBe('keep **x**');
   });
 });
+
+describe('Enter for a newline in the plain composer', () => {
+  function typeLines(editor: ComposerEditor, lines: string[]): void {
+    for (const [index, line] of lines.entries()) {
+      if (index > 0) press(editor, 'Enter');
+      type(editor, line);
+    }
+  }
+
+  test('breaks the line instead of starting a paragraph', () => {
+    preferences.richTextComposer = false;
+    preferences.enterForNewline = true;
+    const editor = open();
+    typeLines(editor, ['a', 'b']);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializePlain(doc).body).toBe('a\nb');
+  });
+
+  test('keeps a typed fence as markdown, with its lines single-spaced', () => {
+    preferences.richTextComposer = false;
+    preferences.enterForNewline = true;
+    const editor = open();
+    typeLines(editor, ['```', 'a', 'b', '```']);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    const message = serializePlain(doc);
+    expect(message.body).toBe('```\na\nb\n```');
+    expect(message.formatted).toBe('<pre><code>a\nb</code></pre>');
+  });
+});

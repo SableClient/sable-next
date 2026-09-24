@@ -482,12 +482,14 @@ export class ComposerEditor {
 
   private enter: Command = (state, dispatch, view) => {
     if (this.options.onNavigate('Enter')) return true;
-    if (!this.source && openFence(state, dispatch, view)) return true;
+    const rich = preferences.richTextComposer && !this.source;
+    if (rich && openFence(state, dispatch, view)) return true;
     if (exitEmptyCodeLine(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
     if (splitListEntry(state, dispatch, view)) return true;
     if (insideListItem(state) && liftEmptyBlock(state, dispatch, view)) return true;
-    return preferences.enterForNewline ? splitEntry(state, dispatch, view) : this.submit();
+    if (!preferences.enterForNewline) return this.submit();
+    return rich ? splitEntry(state, dispatch, view) : insertHardBreak(state, dispatch, view);
   };
 
   private domAttributes(): Record<string, string> {
