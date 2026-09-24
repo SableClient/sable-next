@@ -160,3 +160,21 @@ test('a mouse or keyboard contextmenu reaches the handler', () => {
 
   expect(handler).toHaveBeenCalledTimes(2);
 });
+
+test('a touch press is held until it lifts or fires', () => {
+  vi.useFakeTimers();
+  const press = new LongPress({ onPress: vi.fn() });
+
+  press.start(pointer());
+  expect(press.pressing).toBe(true);
+  press.end(pointer());
+  expect(press.pressing).toBe(false);
+
+  press.start(pointer());
+  vi.advanceTimersByTime(LONG_PRESS_MS);
+  expect(press.pressing).toBe(false);
+
+  press.start(pointer({ pointerType: 'mouse' }));
+  expect(press.pressing).toBe(false);
+  vi.useRealTimers();
+});

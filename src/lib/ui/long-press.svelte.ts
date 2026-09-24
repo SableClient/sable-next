@@ -50,6 +50,7 @@ export function longPress(options: LongPressOptions): (node: Element) => () => v
 export class LongPress {
   fired = $state(false);
   touch = $state(false);
+  pressing = $state(false);
 
   #timer: ReturnType<typeof setTimeout> | undefined;
   #origin: { x: number; y: number } | null = null;
@@ -67,6 +68,7 @@ export class LongPress {
     if (this.options.enabled && !this.options.enabled()) return;
 
     this.fired = false;
+    this.pressing = true;
     this.#origin = { x: event.clientX, y: event.clientY };
     this.#timer = setTimeout(() => {
       this.#timer = undefined;
@@ -77,6 +79,7 @@ export class LongPress {
 
   fire(event: MouseEvent): void {
     this.fired = true;
+    this.pressing = false;
     hapticFeedback('medium');
     armTrailingClickSwallow();
     this.options.onPress(event);
@@ -97,10 +100,12 @@ export class LongPress {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = undefined;
     this.#origin = null;
+    this.pressing = false;
   };
 
   cancel(): void {
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = undefined;
+    this.pressing = false;
   }
 }

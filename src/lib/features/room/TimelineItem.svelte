@@ -773,7 +773,7 @@
         collapsed,
         pending,
         highlighted,
-        pressed: rowPress.touch && !rowPress.fired,
+        pressed: rowPress.pressing,
         'has-connected-reply':
           item.in_reply_to !== null && preferences.replyPreviewStyle === 'connected',
         persona: personaTint,
