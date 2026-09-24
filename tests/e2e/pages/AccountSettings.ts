@@ -1,4 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+import { COLD_BOOT_TIMEOUT } from './AppShell';
 
 export class AccountSettings {
   readonly profile: Locator;
@@ -31,6 +33,7 @@ export class AccountSettings {
 
   async open(): Promise<void> {
     await this.page.goto('/settings/account');
+    await expect(this.profile).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
   }
 
   colorSwatch(label: string): Locator {

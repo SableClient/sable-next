@@ -1,11 +1,12 @@
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ hasTouch: true, viewport: { width: 412, height: 915 } });
+test.use({ storageState: SIGNED_OUT, hasTouch: true });
 
 test('mobile: the space create menu opens the selected destination', async ({
   page,
   spaceTree,
 }) => {
+  await page.setViewportSize({ width: 412, height: 915 });
   await page.goto(`/space/${encodeURIComponent(spaceTree.alphaId)}`);
 
   await page.getByRole('button', { name: 'Create room in Space' }).click();

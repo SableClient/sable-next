@@ -420,6 +420,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [voiceRoom.room_id, voiceRoom],
     ]);
     let nextSubscription = 2;
+    let signedOut = false;
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     const notificationKeywords: string[] = [];
     const mentionNotificationModes: MentionNotificationsView = {
@@ -639,7 +640,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (workerMode === 'error') throw new FakeCoreError('failed');
         return { type: 'restore', session };
       },
-      list_accounts: () => ({ type: 'list_accounts', accounts: [session] }),
+      logout: () => {
+        signedOut = true;
+        return { type: 'logout' };
+      },
+      list_accounts: () => ({ type: 'list_accounts', accounts: signedOut ? [] : [session] }),
       switch_account: () => ({ type: 'switch_account', session }),
       homeserver_info: () => ({
         type: 'homeserver_info',

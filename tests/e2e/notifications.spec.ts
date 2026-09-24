@@ -33,12 +33,13 @@ async function stubNotifications(page: Page): Promise<void> {
   });
 }
 
-async function turnOn(page: Page, label: string): Promise<void> {
+async function setSwitch(page: Page, label: string, checked: boolean): Promise<void> {
   await page.goto('/settings/notifications');
   const toggle = page.getByRole('switch', { name: label });
   await expect(toggle).toBeVisible({ timeout: 20_000 });
-  if ((await toggle.getAttribute('aria-checked')) !== 'true') await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-checked', 'true');
+  const state = String(checked);
+  if ((await toggle.getAttribute('aria-checked')) !== state) await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked', state);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -71,8 +72,8 @@ for (const opened of [false, true]) {
       await app.openRoom(roomId);
       await expect(app.composer).toBeVisible();
     }
-    await turnOn(page, 'System notifications');
-    await turnOn(page, 'Show message content');
+    await setSwitch(page, 'System notifications', true);
+    await setSwitch(page, 'Show message content', true);
     await app.openRooms();
     await page.reload();
     await expect(app.primaryNavigation).toBeVisible();
@@ -102,6 +103,7 @@ test('stays quiet until the switch is on', async ({ page, app, admin, guest }) =
   await admin.join(roomId);
   await admin.sendMessage(roomId, 'Channel opened');
 
+  await setSwitch(page, 'System notifications', false);
   await app.openRooms();
   await app.openRoom(roomId);
   await expect(app.composer).toBeVisible();

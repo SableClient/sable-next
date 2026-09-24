@@ -25,8 +25,9 @@ test('keeps account settings in profile order', async ({ page }) => {
     account.contacts,
     account.blockedUsers,
   ];
-  await Promise.all(headings.map((heading) => expect(heading).toBeVisible()));
-  const positions = await Promise.all(headings.map((heading) => heading.boundingBox()));
+  for (const heading of headings) await expect(heading).toBeVisible();
+  const positions = [];
+  for (const heading of headings) positions.push(await heading.boundingBox());
   const layout = positions.filter(
     (position): position is NonNullable<typeof position> => position !== null
   );
@@ -71,7 +72,8 @@ test('opens a profile color picker next to its swatch', async ({ page }) => {
   const picker = account.colorPicker();
   await expect(picker).toBeVisible();
 
-  const [swatchBox, pickerBox] = await Promise.all([swatch.boundingBox(), picker.boundingBox()]);
+  const swatchBox = await swatch.boundingBox();
+  const pickerBox = await picker.boundingBox();
   expect(swatchBox).not.toBeNull();
   expect(pickerBox).not.toBeNull();
   if (!swatchBox || !pickerBox) throw new Error('Color picker is not laid out.');
