@@ -1,14 +1,20 @@
 <script lang="ts">
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+
   import {
     customThemes,
     enableCustomTweak,
     installCustomTheme,
     installCustomTweak,
+    removeCustomTheme,
+    removeCustomTweak,
     selectCustomTheme,
     selectedCustomThemeId,
   } from '#lib/settings/custom-themes.svelte.js';
   import { pickFiles } from '#lib/platform/files.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import { i18n } from '#lib/i18n.js';
@@ -25,6 +31,15 @@
   let picker = $state<HTMLInputElement>();
   let catalogSelection = $state('');
   let tweakSelection = $state('');
+  let pendingRemoval = $state.raw<{ kind: 'theme' | 'tweak'; id: string; name: string } | null>(
+    null
+  );
+
+  function confirmRemoval(): void {
+    if (pendingRemoval?.kind === 'theme') removeCustomTheme(pendingRemoval.id);
+    else if (pendingRemoval?.kind === 'tweak') removeCustomTweak(pendingRemoval.id);
+    pendingRemoval = null;
+  }
 
   function metadata(css: string, fallback: string): { name: string; kind: 'light' | 'dark' } {
     const field = (name: string): string | undefined =>
@@ -191,12 +206,34 @@
         </label>
       {/each}
     </div>
+    <ul class="installed" aria-label={$i18n.t('settings.customThemesInstalled')}>
+      {#each customThemes.themes as theme (theme.id)}
+        <li>
+          <span class="name">{theme.name}</span>
+          <span class="kind">
+            {theme.kind === 'light'
+              ? $i18n.t('settings.customThemesLightTheme')
+              : $i18n.t('settings.customThemesDarkTheme')}
+          </span>
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('settings.customThemesRemove', { name: theme.name })}
+            onclick={() => {
+              pendingRemoval = { kind: 'theme', id: theme.id, name: theme.name };
+            }}
+          >
+            <TrashIcon />
+          </IconButton>
+        </li>
+      {/each}
+    </ul>
   {/if}
   {#if customThemes.tweaks.length > 0}
-    <ul class="tweaks">
+    <ul class="installed">
       {#each customThemes.tweaks as tweak (tweak.id)}
         <li>
-          <span>{tweak.name}</span>
+          <span class="name">{tweak.name}</span>
           <Switch
             label={tweak.name}
             checked={customThemes.enabledTweakIds.includes(tweak.id)}
@@ -204,11 +241,32 @@
               enableCustomTweak(tweak.id, checked);
             }}
           />
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('settings.customThemesRemove', { name: tweak.name })}
+            onclick={() => {
+              pendingRemoval = { kind: 'tweak', id: tweak.id, name: tweak.name };
+            }}
+          >
+            <TrashIcon />
+          </IconButton>
         </li>
       {/each}
     </ul>
   {/if}
 </section>
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  onOpenChange={(next: boolean) => {
+    if (!next) pendingRemoval = null;
+  }}
+  title={$i18n.t('settings.customThemesRemoveTitle', { name: pendingRemoval?.name ?? '' })}
+  description={$i18n.t('settings.customThemesRemoveHint')}
+  confirmLabel={$i18n.t('settings.customThemesRemove', { name: pendingRemoval?.name ?? '' })}
+  onConfirm={confirmRemoval}
+/>
 
 <style>
   .custom-themes {
@@ -244,7 +302,7 @@
     gap: var(--space-100);
   }
 
-  .tweaks {
+  .installed {
     display: grid;
     gap: var(--space-200);
     list-style: none;
@@ -252,12 +310,21 @@
     padding: 0;
   }
 
-  .tweaks li {
+  .installed li {
     align-items: center;
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-300);
-    justify-content: space-between;
+  }
+
+  .installed .name {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .installed .kind {
+    color: var(--surface-var-on-container);
   }
 
   .error {

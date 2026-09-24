@@ -96,6 +96,19 @@ export function enableCustomTweak(id: string, enabled: boolean): void {
   persist();
 }
 
+export function removeCustomTheme(id: string): void {
+  customThemes.themes = customThemes.themes.filter((theme) => theme.id !== id);
+  if (customThemes.lightThemeId === id) customThemes.lightThemeId = null;
+  if (customThemes.darkThemeId === id) customThemes.darkThemeId = null;
+  persist();
+}
+
+export function removeCustomTweak(id: string): void {
+  customThemes.tweaks = customThemes.tweaks.filter((tweak) => tweak.id !== id);
+  customThemes.enabledTweakIds = customThemes.enabledTweakIds.filter((item) => item !== id);
+  persist();
+}
+
 export function replaceCustomThemes(next: StoredThemes): void {
   customThemes.themes = next.themes;
   customThemes.tweaks = next.tweaks;
