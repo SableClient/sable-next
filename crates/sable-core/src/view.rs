@@ -49,7 +49,7 @@ use matrix_sdk::ruma::events::{
 };
 
 use crate::matrix_html::{
-    display_html, has_profile_fallback_html, strip_profile_fallback_body,
+    display_html, has_profile_fallback_html, preview_body, strip_profile_fallback_body,
     strip_profile_fallback_html,
 };
 use crate::profiles::pronoun_sets;
@@ -1747,7 +1747,10 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
 /// Plain text: a preview must not run untrusted HTML.
 fn body_of(content: &TimelineItemContent) -> Option<String> {
     match &msg_like(content)?.kind {
-        MsgLikeKind::Message(message) => Some(message.body().to_owned()),
+        MsgLikeKind::Message(message) => Some(preview_body(
+            message.body(),
+            formatted_body(message.msgtype()).as_deref(),
+        )),
         MsgLikeKind::Sticker(sticker) => Some(sticker.content().body.clone()),
         MsgLikeKind::Poll(state) => Some(state.results().question),
         _ => None,

@@ -68,3 +68,23 @@ test('an event with no body still yields a quotable empty preview', () => {
     })
   ).toBe('m.key.verification.start');
 });
+
+test('a spoiler stays hidden in the preview', () => {
+  expect(
+    replyPreviewBody({
+      kind: 'message',
+      body: 'look ||secret|| here',
+      html: 'look <span data-mx-spoiler="">sec<b>ret</b></span> here &amp; there',
+      emote: false,
+      notice: false,
+      edited: false,
+    })
+  ).toBe('look [Spoiler] here & there');
+  expect(
+    replyPreviewBody({
+      ...video,
+      caption: '||secret||',
+      html: '<span data-mx-spoiler="">secret</span>',
+    })
+  ).toBe('[Spoiler]');
+});

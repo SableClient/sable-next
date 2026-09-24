@@ -10,7 +10,8 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 use ammonia::{Builder, UrlRelative};
 use linkify::{LinkFinder, LinkKind};
 use matrix_sdk::ruma::html::{
-    ElementAttributesSchemes, Html, ListBehavior, PropertiesNames, SanitizerConfig,
+    ElementAttributesSchemes, Html, ListBehavior, NodeData, NodeRef, PropertiesNames,
+    SanitizerConfig,
 };
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
 use time::OffsetDateTime;
@@ -777,6 +778,51 @@ fn sanitize(formatted: &str) -> String {
     SANITIZER.clean(&html.to_string()).to_string()
 }
 
+const SPOILER_ATTRIBUTE: &str = "data-mx-spoiler";
+const SPOILER_PLACEHOLDER: &str = "[Spoiler]";
+
+#[must_use]
+pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
+    let Some(formatted) = formatted.filter(|formatted| formatted.contains(SPOILER_ATTRIBUTE))
+    else {
+        return body.to_owned();
+    };
+    if nests_too_deeply(formatted) {
+        return SPOILER_PLACEHOLDER.to_owned();
+    }
+    let html = Html::parse(formatted);
+    html.sanitize_with(&MATRIX_POLICY);
+    let mut text = String::new();
+    for node in html.children() {
+        push_preview_text(&node, &mut text);
+    }
+    text
+}
+
+fn push_preview_text(node: &NodeRef, out: &mut String) {
+    match node.data() {
+        NodeData::Text(text) => out.push_str(&text.borrow()),
+        NodeData::Element(element) => {
+            if element
+                .attrs
+                .borrow()
+                .iter()
+                .any(|attribute| &*attribute.name.local == SPOILER_ATTRIBUTE)
+            {
+                out.push_str(SPOILER_PLACEHOLDER);
+                return;
+            }
+            if &*element.name.local == "br" {
+                out.push('\n');
+            }
+            for child in node.children() {
+                push_preview_text(&child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// The HTML the UI renders for a message: the sender's `formatted_body` once
 /// sanitised, or the plain body linkified.
 #[must_use]
@@ -817,7 +863,7 @@ fn render_html(body: &str, formatted: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        display_html, render_plain_text, rewrite_markup, strip_profile_fallback_body,
+        display_html, preview_body, render_plain_text, rewrite_markup, strip_profile_fallback_body,
         strip_profile_fallback_html,
     };
 
@@ -962,6 +1008,32 @@ mod tests {
         );
 
         assert_eq!(html, "Answer");
+    }
+
+    #[test]
+    fn preview_body_hides_spoilers() {
+        assert_eq!(
+            preview_body(
+                "look ||secret|| here",
+                Some("look <span data-mx-spoiler=\"\">sec<b>ret</b></span> here &amp; there"),
+            ),
+            "look [Spoiler] here & there"
+        );
+        assert_eq!(
+            preview_body(
+                "> quoted\n\n||secret||",
+                Some(
+                    "<mx-reply><blockquote>quoted</blockquote></mx-reply>\
+                     <span data-mx-spoiler=\"why\">secret</span>"
+                ),
+            ),
+            "[Spoiler]"
+        );
+        assert_eq!(
+            preview_body("plain **bold**", Some("plain <b>bold</b>")),
+            "plain **bold**"
+        );
+        assert_eq!(preview_body("plain", None), "plain");
     }
 
     #[test]
