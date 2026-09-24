@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { Attachment } from 'svelte/attachments';
+  import { on } from 'svelte/events';
 
   import DialogFrame from './DialogFrame.svelte';
 
@@ -39,7 +41,10 @@
   let velocityY = 0;
   let dragProgress = $state(0);
   let suppressClick = false;
+  let touchDragging = $state(false);
   const dismissVelocity = 0.3;
+  const NO_DRAG =
+    '[data-sheet-no-drag], input, textarea, select, [contenteditable="true"], .slider';
 
   $effect(() => {
     // Closing from the outside unmounts the handle mid-drag, so `endDrag` never
@@ -90,8 +95,99 @@
   }
 
   function startContentDrag(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
     startDrag(event);
   }
+
+  function scrolledAway(from: Element | null, boundary: Element): boolean {
+    for (let element = from; element; element = element.parentElement) {
+      const { overflowY } = getComputedStyle(element);
+      if (
+        (overflowY === 'auto' || overflowY === 'scroll') &&
+        element.scrollHeight > element.clientHeight &&
+        element.scrollTop > 0
+      ) {
+        return true;
+      }
+      if (element === boundary) return false;
+    }
+    return false;
+  }
+
+  function settle(moved: number, velocity: number): void {
+    const viewportHeight = Math.max(window.innerHeight, 1);
+    if (moved / viewportHeight >= 0.18 || velocity >= dismissVelocity) close();
+    else dragProgress = 0;
+  }
+
+  const swipeToDismiss: Attachment<HTMLElement> = (node) => {
+    let claimable = false;
+    let originX = 0;
+    let originY = 0;
+    let moved = 0;
+    let previousY = 0;
+    let previousTime = 0;
+    let velocity = 0;
+
+    function start(event: TouchEvent): void {
+      const touch = event.touches.item(0);
+      const sheet = node.closest('.dialog-content');
+      touchDragging = false;
+      suppressClick = false;
+      claimable =
+        event.touches.length === 1 &&
+        touch !== null &&
+        sheet !== null &&
+        !(event.target instanceof Element && event.target.closest(NO_DRAG)) &&
+        !window.getSelection()?.toString() &&
+        !scrolledAway(event.target instanceof Element ? event.target : null, sheet);
+      if (!touch) return;
+      originX = touch.clientX;
+      originY = touch.clientY;
+      previousY = touch.clientY;
+      previousTime = event.timeStamp;
+      moved = 0;
+      velocity = 0;
+    }
+
+    function move(event: TouchEvent): void {
+      const touch = event.touches.item(0);
+      if (!claimable || !touch) return;
+      const deltaY = touch.clientY - originY;
+      if (!touchDragging) {
+        if (deltaY <= 0 || Math.abs(touch.clientX - originX) > deltaY) {
+          claimable = false;
+          return;
+        }
+        touchDragging = true;
+        suppressClick = true;
+      }
+      event.preventDefault();
+      const elapsed = event.timeStamp - previousTime;
+      if (elapsed > 0) velocity = (touch.clientY - previousY) / elapsed;
+      previousY = touch.clientY;
+      previousTime = event.timeStamp;
+      moved = Math.max(0, deltaY);
+      dragProgress = Math.min(moved / Math.max(window.innerHeight, 1), 0.5);
+    }
+
+    function end(): void {
+      claimable = false;
+      if (!touchDragging) return;
+      touchDragging = false;
+      settle(moved, velocity);
+    }
+
+    const offs = [
+      on(node, 'touchstart', start, { passive: true }),
+      on(node, 'touchmove', move, { passive: false }),
+      on(node, 'touchend', end),
+      on(node, 'touchcancel', end),
+    ];
+    return () => {
+      for (const off of offs) off();
+    };
+  };
 
   function contentClick(event: MouseEvent): void {
     if (!suppressClick) return;
@@ -104,11 +200,7 @@
     if (pointerId !== event.pointerId) return;
     trackVelocity(event);
     pointerId = null;
-    if (dragProgress >= 0.18 || velocityY >= dismissVelocity) {
-      close();
-      return;
-    }
-    dragProgress = 0;
+    settle(dragProgress * Math.max(window.innerHeight, 1), velocityY);
   }
 
   function handleClick(event: MouseEvent): void {
@@ -126,7 +218,7 @@
   variant="sheet"
   {ownsBack}
   {label}
-  contentClass={pointerId !== null ? 'sheet-dragging' : 'sheet-settling'}
+  contentClass={pointerId !== null || touchDragging ? 'sheet-dragging' : 'sheet-settling'}
   contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
   {onOpenChange}
   {onOpenAutoFocus}
@@ -139,6 +231,7 @@
     onpointermove={drag}
     onpointerup={endDrag}
     onpointercancel={endDrag}
+    {@attach swipeToDismiss}
   >
     {@render children()}
   </div>

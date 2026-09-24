@@ -16,6 +16,7 @@ export default defineConfig({
     'room-settings-mobile.spec.ts',
     'thread-panel.spec.ts',
     'settings-backdrop.spec.ts',
+    'sheet-swipe.spec.ts',
   ],
   workers: 1,
   timeout: 60_000,
