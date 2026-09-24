@@ -435,6 +435,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     );
     let event_sink = Arc::new(EventSink::default());
     let pushing = core.clone();
+    #[cfg(target_os = "android")]
+    let _ = cold_push::CORE.set(core.clone());
     app.manage(AppState {
         core,
         event_sink: event_sink.clone(),

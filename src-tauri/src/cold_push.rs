@@ -1,5 +1,10 @@
+use std::sync::{Arc, OnceLock};
+
 use jni::objects::{JClass, JString};
 use jni::{Env, EnvUnowned};
+use sable_core::Core;
+
+pub static CORE: OnceLock<Arc<Core>> = OnceLock::new();
 
 #[unsafe(no_mangle)]
 #[expect(unsafe_code, reason = "JNI entry point")]
@@ -20,28 +25,33 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeDe
         let device_id = device_id.to_string();
         let room_id = room_id.to_string();
         let event_json = event_json.to_string();
-        let clear = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
+        let core = CORE.get();
+        let decrypt = async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(20),
+                sable_core::notifications::decrypt_cold_push(
+                    core.map(Arc::as_ref),
+                    std::path::Path::new(&data_dir),
+                    &user_id,
+                    &device_id,
+                    &room_id,
+                    &event_json,
+                ),
+            )
+            .await
             .ok()
-            .and_then(|runtime| {
-                runtime.block_on(async {
-                    tokio::time::timeout(
-                        std::time::Duration::from_secs(20),
-                        sable_core::notifications::decrypt_cold_push(
-                            std::path::Path::new(&data_dir),
-                            &user_id,
-                            &device_id,
-                            &room_id,
-                            &event_json,
-                        ),
-                    )
-                    .await
-                    .ok()
-                    .flatten()
-                })
-            })
-            .unwrap_or_default();
+            .flatten()
+        };
+        let clear = if core.is_some() {
+            tauri::async_runtime::block_on(decrypt)
+        } else {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .ok()
+                .and_then(|runtime| runtime.block_on(decrypt))
+        }
+        .unwrap_or_default();
 
         JString::from_str(env, clear)
     });

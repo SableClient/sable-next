@@ -1,5 +1,7 @@
 use matrix_sdk::Client;
 use matrix_sdk::notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode};
+#[cfg(not(target_family = "wasm"))]
+use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::ruma::api::client::push::{
     PusherIds, PusherInit, PusherKind, delete_pushrule, set_pushrule, set_pushrule_actions,
     set_pushrule_enabled,
@@ -17,6 +19,8 @@ use matrix_sdk::ruma::push::{
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
+#[cfg(not(target_family = "wasm"))]
+use matrix_sdk_ui::notification_client::RawNotificationEvent;
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
     NotificationStatus,
@@ -56,9 +60,10 @@ fn push_account<'a>(
     })
 }
 
-/// Decrypt an Android push without a running Tauri application.
+/// Decrypt an Android push.
 #[cfg(not(target_family = "wasm"))]
 pub async fn decrypt_cold_push(
+    core: Option<&crate::Core>,
     data_dir: &std::path::Path,
     user_id: &str,
     device_id: &str,
@@ -66,7 +71,28 @@ pub async fn decrypt_cold_push(
     event_json: &str,
 ) -> Option<String> {
     let store_dir = cold_push_store_dir(data_dir);
-    decrypt_push_from_store(&store_dir, user_id, device_id, room_id, event_json).await
+    if let Some(core) = core {
+        let live = core
+            .session
+            .read()
+            .await
+            .as_ref()
+            .filter(|session| {
+                session.client.user_id().is_some_and(|id| id == user_id)
+                    && session.client.device_id().is_some_and(|id| id == device_id)
+            })
+            .map(|session| (session.client.clone(), session.sync_service.clone()));
+        return match live {
+            Some((client, sync_service)) => {
+                decrypt_push_event(&client, KeyFetch::Live(sync_service), room_id, event_json).await
+            }
+            None => {
+                decrypt_push_from_store(&store_dir, user_id, device_id, room_id, event_json).await
+            }
+        };
+    }
+    let client = push_client(&store_dir, user_id, device_id).await?;
+    decrypt_push_event(&client, KeyFetch::Cold, room_id, event_json).await
 }
 
 /// Decrypt using the same session and SDK stores as the application. Callers
@@ -79,14 +105,40 @@ pub async fn decrypt_push_from_store(
     room_id: &str,
     event_json: &str,
 ) -> Option<String> {
+    let client = push_client(store_dir, user_id, device_id).await?;
+    decrypt_push_event(&client, KeyFetch::Never, room_id, event_json).await
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn push_client(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+) -> Option<Client> {
     let stored = FileSessionStore::new(store_dir).load().await.ok()??;
     let base_store = store_dir.to_str()?;
     let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
     accounts.reanchor_stores(base_store);
     let account = push_account(&accounts, user_id, device_id)?;
-    let client = crate::session::restore_authenticated_client(&account.store_id, &account.session)
+    crate::session::restore_authenticated_client(&account.store_id, &account.session)
         .await
-        .ok()?;
+        .ok()
+}
+
+#[cfg(not(target_family = "wasm"))]
+enum KeyFetch {
+    Never,
+    Live(std::sync::Arc<matrix_sdk_ui::sync_service::SyncService>),
+    Cold,
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn decrypt_push_event(
+    client: &Client,
+    key_fetch: KeyFetch,
+    room_id: &str,
+    event_json: &str,
+) -> Option<String> {
     let room_id = RoomId::parse(room_id).ok()?;
     let room = client.get_room(&room_id)?;
     let event =
@@ -95,11 +147,33 @@ pub async fn decrypt_push_from_store(
 
     match decrypted.kind {
         matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(event) => {
-            Some(event.event.json().get().to_owned())
+            return Some(event.event.json().get().to_owned());
         }
+        matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt {
+            utd_info, ..
+        } if utd_info.reason.is_missing_room_key() => {}
         matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt { .. }
-        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => None,
+        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => return None,
     }
+
+    let sync_service = match key_fetch {
+        KeyFetch::Never => return None,
+        KeyFetch::Live(sync_service) => sync_service,
+        KeyFetch::Cold => crate::session::build_sync(client.clone()).await.ok()?,
+    };
+    let event_id = event.get_field::<OwnedEventId>("event_id").ok()??;
+    let setup = NotificationProcessSetup::SingleProcess { sync_service };
+    let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
+    let Ok(NotificationStatus::Event(item)) =
+        notifications.get_notification(&room_id, &event_id).await
+    else {
+        return None;
+    };
+    let RawNotificationEvent::Timeline(clear) = item.raw_event else {
+        return None;
+    };
+    (clear.get_field::<String>("type").ok()?? != "m.room.encrypted")
+        .then(|| clear.json().get().to_owned())
 }
 
 impl From<NotificationModeView> for RoomNotificationMode {
@@ -799,8 +873,18 @@ mod tests {
         let event = json!({"type":"m.room.encrypted", "event_id":"$cold",
             "sender":"@sender:example.org", "origin_server_ts":1, "content":content})
         .to_string();
+        let cold = |device| {
+            decrypt_cold_push(
+                None,
+                &data_dir,
+                "@alice:example.org",
+                device,
+                room.as_str(),
+                &event,
+            )
+        };
         // A second SDK client must coexist with the warm application's store owner.
-        let clear = decrypt_cold_push(&data_dir, "@alice:example.org", "A", room.as_str(), &event)
+        let clear = cold("A")
             .await
             .expect("cold decryption while the application has the store open");
         assert_eq!(
@@ -808,22 +892,8 @@ mod tests {
             "Cold preview 🔐"
         );
         drop(client);
-        assert!(
-            decrypt_cold_push(&data_dir, "@alice:example.org", "A", room.as_str(), &event)
-                .await
-                .is_some()
-        );
-        assert!(
-            decrypt_cold_push(
-                &data_dir,
-                "@alice:example.org",
-                "OTHER",
-                room.as_str(),
-                &event
-            )
-            .await
-            .is_none()
-        );
+        assert!(cold("A").await.is_some());
+        assert!(cold("OTHER").await.is_none());
         assert!(!data_dir.join("session.json").exists());
 
         tokio::fs::remove_dir_all(&data_dir).await.unwrap();
