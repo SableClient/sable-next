@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
   import { Popover } from 'bits-ui';
+  import type { Snippet } from 'svelte';
   import GifIcon from 'phosphor-svelte/lib/GifIcon';
   import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
   import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
@@ -30,6 +31,7 @@
     onPickUnicode: (emoji: string) => void;
     onPickGif?: (gif: GifResult) => void;
     onBeforeOpen?: () => void;
+    extras?: Partial<Record<'persona' | 'format', Snippet>>;
   }
 
   let {
@@ -43,6 +45,7 @@
     onPickUnicode,
     onPickGif,
     onBeforeOpen,
+    extras = {},
   }: Props = $props();
   let config = $state.raw<GifsConfig | null>(null);
   let anchor = $state<HTMLElement | null>(null);
@@ -50,7 +53,7 @@
 
   $effect(() => {
     if (open && anchor === null)
-      anchor = triggerElements[tab] ?? triggerElements[triggers[0]] ?? null;
+      anchor = triggerElements[tab] ?? triggerElements[boardTriggers[0]] ?? null;
   });
 
   $effect(() => {
@@ -69,15 +72,21 @@
       : null
   );
 
-  let triggers = $derived.by(() => {
+  let boardTriggers = $derived.by((): BoardTab[] => {
     const wanted = preferences.composerButtonOrder.filter(
-      (id) =>
-        (id !== 'gif' || (preferences.composerGifButton && gifs)) &&
-        (id !== 'sticker' || preferences.composerStickerButton) &&
-        (id !== 'emoticon' || preferences.composerEmoteButton)
+      (id): id is BoardTab =>
+        (id === 'gif' && preferences.composerGifButton && gifs !== null) ||
+        (id === 'sticker' && preferences.composerStickerButton) ||
+        (id === 'emoticon' && preferences.composerEmoteButton)
     );
-    return wanted.length > 0 ? wanted : (['emoticon'] as const);
+    return wanted.length > 0 ? wanted : ['emoticon'];
   });
+
+  let triggers = $derived(
+    preferences.composerButtonOrder.filter((id) =>
+      id === 'persona' || id === 'format' ? extras[id] !== undefined : boardTriggers.includes(id)
+    )
+  );
 
   const triggerIcons = { gif: GifIcon, sticker: StickerIcon, emoticon: SmileyIcon };
 
@@ -117,20 +126,24 @@
 {#if desktop}
   <Popover.Root bind:open>
     {#each triggers as id (id)}
-      {@const Icon = triggerIcons[id]}
-      <button
-        bind:this={triggerElements[id]}
-        type="button"
-        class="composer-board-trigger selection-open"
-        {disabled}
-        data-state={open && tab === id ? 'open' : 'closed'}
-        aria-label={triggerLabel(id)}
-        onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
-          openOn(id, event.currentTarget);
-        }}
-      >
-        <Icon />
-      </button>
+      {#if id === 'persona' || id === 'format'}
+        {@render extras[id]?.()}
+      {:else}
+        {@const Icon = triggerIcons[id]}
+        <button
+          bind:this={triggerElements[id]}
+          type="button"
+          class="composer-board-trigger selection-open"
+          {disabled}
+          data-state={open && tab === id ? 'open' : 'closed'}
+          aria-label={triggerLabel(id)}
+          onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+            openOn(id, event.currentTarget);
+          }}
+        >
+          <Icon />
+        </button>
+      {/if}
     {/each}
     <Popover.Portal>
       <Popover.Content
@@ -157,25 +170,29 @@
   </Popover.Root>
 {:else}
   {#each triggers as id (id)}
-    {@const Icon = triggerIcons[id]}
-    <button
-      type="button"
-      class="composer-board-trigger selection-open"
-      {disabled}
-      data-state={open && tab === id ? 'open' : 'closed'}
-      aria-label={triggerLabel(id)}
-      onpointerdown={onBeforeOpen}
-      onclick={() => {
-        if (open && tab === id) {
-          open = false;
-          return;
-        }
-        tab = id;
-        open = true;
-      }}
-    >
-      <Icon />
-    </button>
+    {#if id === 'persona' || id === 'format'}
+      {@render extras[id]?.()}
+    {:else}
+      {@const Icon = triggerIcons[id]}
+      <button
+        type="button"
+        class="composer-board-trigger selection-open"
+        {disabled}
+        data-state={open && tab === id ? 'open' : 'closed'}
+        aria-label={triggerLabel(id)}
+        onpointerdown={onBeforeOpen}
+        onclick={() => {
+          if (open && tab === id) {
+            open = false;
+            return;
+          }
+          tab = id;
+          open = true;
+        }}
+      >
+        <Icon />
+      </button>
+    {/if}
   {/each}
   <BottomSheet
     bind:open

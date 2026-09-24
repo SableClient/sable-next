@@ -20,6 +20,7 @@ afterEach(() => {
   clearDrafts();
   setPreference('formattingToolbar', false);
   setPreference('composerFormatButton', true);
+  setPreference('composerButtonOrder', ['gif', 'sticker', 'emoticon', 'persona', 'format']);
   setPreference('richTextComposer', true);
 });
 
@@ -1070,4 +1071,14 @@ test('a press beside the text focuses the editor, and one on a button does not',
   expect(document.activeElement).not.toBe(editable);
 
   void unmount(instance);
+});
+
+test('the format button follows the configured button order', async () => {
+  setPreference('composerButtonOrder', ['format', 'emoticon', 'gif', 'sticker', 'persona']);
+  const app = render({ roomId: '!room:example.org' });
+  await tick();
+
+  const after = document.querySelector('.composer-after');
+  expect(after?.firstElementChild?.classList.contains('composer-format')).toBe(true);
+  void unmount(app);
 });

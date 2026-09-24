@@ -978,6 +978,24 @@
             <div class="composer-field">
               <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
             </div>
+            {#snippet personaButton()}
+              <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
+            {/snippet}
+            {#snippet formatButton()}
+              <IconButton
+                variant="ghost"
+                size="small"
+                class="composer-format selection-open"
+                aria-pressed={formattingOpen}
+                data-state={formattingOpen ? 'open' : 'closed'}
+                label={$i18n.t('composer.formatting')}
+                onclick={() => {
+                  setPreference('formattingToolbar', !formattingOpen);
+                }}
+              >
+                <TextAaIcon />
+              </IconButton>
+            {/snippet}
             <div class="composer-after" bind:this={afterEl}>
               <ComposerBoard
                 {roomId}
@@ -989,25 +1007,11 @@
                 onPickUnicode={pickUnicodeFromBoard}
                 onPickGif={onSendGif ? pickGifFromBoard : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
+                extras={{
+                  ...(showPersonaPicker && { persona: personaButton }),
+                  ...(preferences.composerFormatButton && { format: formatButton }),
+                }}
               />
-              {#if showPersonaPicker}
-                <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
-              {/if}
-              {#if preferences.composerFormatButton}
-                <IconButton
-                  variant="ghost"
-                  size="small"
-                  class="composer-format selection-open"
-                  aria-pressed={formattingOpen}
-                  data-state={formattingOpen ? 'open' : 'closed'}
-                  label={$i18n.t('composer.formatting')}
-                  onclick={() => {
-                    setPreference('formattingToolbar', !formattingOpen);
-                  }}
-                >
-                  <TextAaIcon />
-                </IconButton>
-              {/if}
               <IconButton
                 type={primaryAction === 'record' ? 'button' : 'submit'}
                 variant="ghost"

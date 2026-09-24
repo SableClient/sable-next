@@ -18,11 +18,13 @@ export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
-export type ComposerButton = 'gif' | 'sticker' | 'emoticon';
+export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
   'sticker',
   'emoticon',
+  'persona',
+  'format',
 ] as const satisfies readonly ComposerButton[];
 
 export interface Preferences {

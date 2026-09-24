@@ -14,15 +14,20 @@
     gif: 'settings.composerGifButton',
     sticker: 'settings.composerStickerButton',
     emoticon: 'settings.composerEmoteButton',
+    persona: 'personas.picker',
+    format: 'settings.composerFormatButton',
   };
 
+  const visibility = {
+    gif: 'composerGifButton',
+    sticker: 'composerStickerButton',
+    emoticon: 'composerEmoteButton',
+    persona: 'personaPicker',
+    format: 'composerFormatButton',
+  } as const satisfies Record<ComposerButton, keyof typeof preferences>;
+
   let shown = $derived(
-    preferences.composerButtonOrder.filter(
-      (button) =>
-        (button === 'gif' && preferences.composerGifButton) ||
-        (button === 'sticker' && preferences.composerStickerButton) ||
-        (button === 'emoticon' && preferences.composerEmoteButton)
-    )
+    preferences.composerButtonOrder.filter((button) => preferences[visibility[button]])
   );
 
   function move(button: ComposerButton, index: number, offset: number): void {

@@ -18,3 +18,10 @@ test('keeps a resized banner height across a reload', () => {
   expect(sanitize({ roomBannerHeight: 320 }, preferences).roomBannerHeight).toBe(320);
   expect(sanitize({ roomBannerHeight: 9000 }, preferences).roomBannerHeight).toBe(500);
 });
+
+test('an older button order gains the persona and format buttons at the end', () => {
+  expect(
+    sanitize({ composerButtonOrder: ['emoticon', 'gif', 'sticker'] }, preferences)
+      .composerButtonOrder
+  ).toEqual(['emoticon', 'gif', 'sticker', 'persona', 'format']);
+});
