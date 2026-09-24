@@ -33,6 +33,8 @@ mod tray;
 mod video_transcode;
 #[cfg(all(not(feature = "cef"), target_os = "linux"))]
 mod webkit;
+#[cfg(desktop)]
+mod window_geometry;
 
 use std::{
     collections::HashMap,
@@ -378,8 +380,14 @@ async fn set_notification_encrypted_content(
     Ok(())
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::Error>> {
+    for config in &app.config().app.windows {
+        let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
+        #[cfg(desktop)]
+        let builder = window_geometry::restore(app.handle(), builder, &config.label);
+        builder.build()?;
+    }
+
     // GTK's X11 backend swaps out the X error handlers on the way in,
     // so the runtime's have to go back on after it.
     #[cfg(all(feature = "cef", target_os = "linux"))]
@@ -629,7 +637,7 @@ pub fn run() {
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(window_geometry::plugin())
         .on_window_event(hide_to_tray_on_close);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
