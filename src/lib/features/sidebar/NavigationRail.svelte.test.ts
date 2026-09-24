@@ -59,7 +59,6 @@ import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
-  setPreference('showHome', false);
   setPreference('showSearch', true);
 });
 
@@ -92,58 +91,34 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
   };
 }
 
-test('badges unread direct chats but leaves home alone', async () => {
-  setPreference('showHome', true);
+test('badges unread direct chats', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
       spaces: [],
-      homeUnread: { unread: 4, highlight: 2 },
       directUnread: { unread: 3, highlight: 3 },
       mobile: true,
     },
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .unread-badge')).toBeNull();
   expect(document.querySelector('a[href="/direct"] .unread-badge-count')?.textContent).toBe('3');
 
   await unmount(instance);
 });
 
-test('badges the unspaced section, which home no longer repeats', async () => {
-  setPreference('showHome', true);
+test('badges the unspaced section', async () => {
   const instance = mount(NavigationRail, {
     target: document.body,
     props: {
       spaces: [],
-      homeUnread: { unread: 9, highlight: 5 },
       unspacedUnread: { unread: 4, highlight: 2 },
       mobile: true,
     },
   });
   await tick();
 
-  expect(document.querySelector('a[href="/home"] .unread-badge')).toBeNull();
   expect(document.querySelector('a[href="/rooms"] .unread-badge-count')?.textContent).toBe('2');
-
-  await unmount(instance);
-});
-
-test('home is absent until the preference asks for it', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], mobile: true },
-  });
-  await tick();
-
-  expect(document.querySelector('a[href="/home"]')).toBeNull();
-  expect(document.querySelector('a[href="/rooms"]')).not.toBeNull();
-
-  setPreference('showHome', true);
-  await tick();
-
-  expect(document.querySelector('a[href="/home"]')).not.toBeNull();
 
   await unmount(instance);
 });

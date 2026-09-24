@@ -22,7 +22,6 @@ import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
 import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
 import GifIcon from 'phosphor-svelte/lib/GifIcon';
 import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
-import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import KeyReturnIcon from 'phosphor-svelte/lib/KeyReturnIcon';
 import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
@@ -455,14 +454,6 @@ export const settingsCategories: SettingsCategory[] = [
         icon: ImageIcon,
         name: 'settings.showRoomBanners',
         description: 'settings.showRoomBannersHint',
-        type: 'boolean',
-      },
-      {
-        key: 'showHome',
-        section: 'sidebar',
-        icon: HouseIcon,
-        name: 'settings.showHome',
-        description: 'settings.showHomeHint',
         type: 'boolean',
       },
       {

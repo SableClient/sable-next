@@ -45,7 +45,6 @@ export interface Preferences {
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   roomBannerHeight: number;
-  showHome: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
@@ -245,7 +244,6 @@ const DEFAULTS: Preferences = {
   showRoomIcon: 'always',
   showRoomBanners: true,
   roomBannerHeight: 190,
-  showHome: false,
   showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,

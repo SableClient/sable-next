@@ -13,7 +13,7 @@ import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 const pageState = vi.hoisted(() => ({
-  url: { pathname: '/home' },
+  url: { pathname: '/rooms' },
   params: {},
   state: {},
 }));
@@ -132,7 +132,7 @@ async function mountNav(props: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  pageState.url.pathname = '/home';
+  pageState.url.pathname = '/rooms';
   pageState.params = {};
   roomsFixture.rooms = [];
   roomsFixture.reset();
@@ -200,7 +200,8 @@ test.each([
   await unmount(instance);
 });
 
-test('home lists every joined room, including the children of joined spaces', async () => {
+test('a route outside every list shows the rooms outside spaces', async () => {
+  pageState.url.pathname = '/inbox';
   roomsFixture.rooms = [
     makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
     makeRoom({ room_id: '!direct:example.org', name: 'Direct', is_direct: true }),
@@ -223,11 +224,11 @@ test('home lists every joined room, including the children of joined spaces', as
   ];
 
   const instance = await mountNav();
-  expect(roomNames()).toEqual(['Plain', 'Direct', 'Child']);
+  expect(roomNames()).toEqual(['Plain']);
   await unmount(instance);
 });
 
-test('home orders rooms by their latest event', async () => {
+test('rooms are ordered by their latest event', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
     makeRoom({ room_id: '!silent:example.org', name: 'Silent' }),
@@ -240,7 +241,6 @@ test('home orders rooms by their latest event', async () => {
 });
 
 test('favourites sit in their own section above the rest of the list', async () => {
-  pageState.url.pathname = '/rooms';
   roomsFixture.rooms = [
     makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
     makeRoom({
@@ -300,12 +300,13 @@ test('a space lifts a favourite out of its subspace', async () => {
   await unmount(instance);
 });
 
-test('home links a room to its own section', async () => {
+test('a route outside every list links rooms to the rooms section', async () => {
+  pageState.url.pathname = '/inbox';
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
 
   const instance = await mountNav();
   expect(document.querySelector('.room-row')?.getAttribute('href')).toBe(
-    '/home/!plain%3Aexample.org'
+    '/rooms/!plain%3Aexample.org'
   );
   await unmount(instance);
 });
@@ -723,6 +724,7 @@ function roomTopics(): (string | null)[] {
 }
 
 test('a DM row shows the peer status once its profile arrives', async () => {
+  pageState.url.pathname = '/direct';
   observeImmediately();
   core.userProfile.mockResolvedValue({ status: { text: 'Shipping', emoji: '\u{1F680}' } });
   roomsFixture.rooms = [
@@ -743,6 +745,7 @@ test('a DM row shows the peer status once its profile arrives', async () => {
 });
 
 test('a DM row falls back to the peer presence message, and a topic still wins', async () => {
+  pageState.url.pathname = '/direct';
   presenceFixture.entry = { statusMessage: 'In a meeting' };
   roomsFixture.rooms = [
     makeRoom({
