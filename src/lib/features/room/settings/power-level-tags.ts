@@ -64,6 +64,15 @@ export function withPowerLevelTag(
   return next;
 }
 
+export function withPowerLevelTagsFrom(
+  rawContent: unknown,
+  rawSource: unknown
+): Record<string, unknown> {
+  const base = typeof rawContent === 'object' && rawContent !== null ? rawContent : {};
+  const source = typeof rawSource === 'object' && rawSource !== null ? rawSource : {};
+  return { ...(base as Record<string, unknown>), ...(source as Record<string, unknown>) };
+}
+
 export function isValidPowerLevel(value: number): boolean {
   return Number.isInteger(value) && value >= MIN_POWER_LEVEL && value <= MAX_POWER_LEVEL;
 }

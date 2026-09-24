@@ -8,6 +8,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -21,9 +22,12 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
+  import { ancestorSpaceIds } from '../abbreviations.js';
   import {
+    canSendState,
     levelAt,
     permissionGroups,
+    syncedFromSpace,
     toEventContent,
     withLevel,
     type PermissionLocation,
@@ -34,6 +38,7 @@
     POWER_LEVEL_TAGS_EVENT_TYPE,
     tagForLevel,
     withPowerLevelTag,
+    withPowerLevelTagsFrom,
     type PowerLevelTagMap,
   } from './power-level-tags';
 
@@ -44,6 +49,7 @@
 
   let { room, permissions }: Props = $props();
   const core = useCoreClient();
+  const roomList = useRoomList();
 
   const namedLevels: readonly { level: number; label: string }[] = [
     { level: 100, label: 'timeline.powerLevelAdmin' },
@@ -77,6 +83,19 @@
   let groups = $derived(permissionGroups(room?.is_space ?? false));
   let canEdit = $derived(permissions?.can_change_power_levels ?? false);
   let ownLevel = $derived(permissions?.own_power_level ?? 0);
+
+  let syncChoice = $state<string | null>(null);
+  let syncConfirm = $state(false);
+  let syncing = $state(false);
+  let syncFailed = $state(false);
+  let syncSpaceIds = $derived(
+    roomId && !room?.is_space ? ancestorSpaceIds(roomList.rooms, roomId).reverse() : []
+  );
+  let syncSpaceId = $derived(
+    syncChoice !== null && syncSpaceIds.includes(syncChoice)
+      ? syncChoice
+      : (syncSpaceIds[0] ?? null)
+  );
 
   $effect(() => {
     void roomId;
@@ -122,6 +141,41 @@
       failed = true;
     } finally {
       saving = false;
+    }
+  }
+
+  function spaceName(spaceId: string): string {
+    return roomList.byId(spaceId)?.name ?? spaceId;
+  }
+
+  async function syncFromSpace(): Promise<void> {
+    const target = roomId;
+    const spaceId = syncSpaceId;
+    const current = levels;
+    const userId = core.session?.user_id;
+    if (!target || !spaceId || !current || !userId || syncing) return;
+
+    syncing = true;
+    syncFailed = false;
+    try {
+      const [spaceLevels, spaceTags] = await Promise.all([
+        core.commands.roomPowerLevels(spaceId),
+        core.commands.roomStateEvent(spaceId, POWER_LEVEL_TAGS_EVENT_TYPE),
+      ]);
+      const next = syncedFromSpace(current, spaceLevels, userId, ownLevel);
+      await core.commands.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
+      levels = next;
+      if (spaceTags && canSendState(next, ownLevel, POWER_LEVEL_TAGS_EVENT_TYPE)) {
+        const nextTags = withPowerLevelTagsFrom(rawRoleTags, spaceTags);
+        await core.commands.sendStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE, '', nextTags);
+        rawRoleTags = nextTags;
+      }
+      syncConfirm = false;
+    } catch (error) {
+      console.warn('[sable room] permission sync failed', error);
+      syncFailed = true;
+    } finally {
+      syncing = false;
     }
   }
 
@@ -250,6 +304,42 @@
   {#if loading && levels === null}
     <p class="settings-status" role="status"><Spinner small /></p>
   {:else if levels}
+    {#if canEdit && syncSpaceId}
+      <SettingsSection headingId="room-perm-sync" title={$i18n.t('room.permSyncTitle')}>
+        <ul class="settings-rows">
+          <SettingsRow
+            title={$i18n.t('room.permSyncRow', { space: spaceName(syncSpaceId) })}
+            description={$i18n.t('room.permSyncHint')}
+          >
+            {#if syncSpaceIds.length > 1}
+              <Select
+                value={syncSpaceId}
+                aria-label={$i18n.t('room.permSyncSpace')}
+                disabled={syncing}
+                items={syncSpaceIds.map((spaceId) => ({
+                  value: spaceId,
+                  label: spaceName(spaceId),
+                }))}
+                onValueChange={(next: string) => {
+                  syncChoice = next;
+                }}
+              />
+            {/if}
+            <Button
+              variant="secondary"
+              disabled={saving || syncing}
+              onclick={() => {
+                syncFailed = false;
+                syncConfirm = true;
+              }}
+            >
+              {$i18n.t('room.permSync')}
+            </Button>
+          </SettingsRow>
+        </ul>
+      </SettingsSection>
+    {/if}
+
     {#each groups as group (group.label)}
       <SettingsSection headingId={`room-perm-${group.label}`} title={$i18n.t(group.label)}>
         <ul class="settings-rows">
@@ -373,6 +463,16 @@
     {/if}
   {/if}
 </div>
+
+<ConfirmDialog
+  bind:open={syncConfirm}
+  title={$i18n.t('room.permSyncConfirm', { space: syncSpaceId ? spaceName(syncSpaceId) : '' })}
+  description={$i18n.t('room.permSyncConfirmHint')}
+  confirmLabel={$i18n.t('room.permSync')}
+  busy={syncing}
+  error={syncFailed ? $i18n.t('room.permFailed') : null}
+  onConfirm={() => void syncFromSpace()}
+/>
 
 <ConfirmDialog
   bind:open={roleRemoveConfirm}

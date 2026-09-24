@@ -8,6 +8,7 @@ import {
   parsePowerLevelTags,
   tagForLevel,
   withPowerLevelTag,
+  withPowerLevelTagsFrom,
 } from './power-level-tags';
 
 test('a valid tag map is read with its name and colour', () => {
@@ -92,4 +93,18 @@ test('parsing the numeric input rejects non-integers and levels above the accoun
   expect(parsePowerLevelInput('12.5', 100)).toEqual({ valid: false, reason: 'not-a-number' });
   expect(parsePowerLevelInput('', 100)).toEqual({ valid: false, reason: 'not-a-number' });
   expect(parsePowerLevelInput('101', 100)).toEqual({ valid: false, reason: 'exceeds-own' });
+});
+
+test('syncing tags takes the source role at each level and keeps the rest', () => {
+  const next = withPowerLevelTagsFrom(
+    { '100': { name: 'Owner' }, '20': { name: 'Helper', color: '#00ff00' } },
+    { '100': { name: 'Admin', color: '#0088ff' }, '50': { name: 'Moderator' } }
+  );
+
+  expect(parsePowerLevelTags(next)).toEqual({
+    100: { name: 'Admin', color: '#0088ff' },
+    50: { name: 'Moderator', color: null },
+    20: { name: 'Helper', color: '#00ff00' },
+  });
+  expect(withPowerLevelTagsFrom(null, undefined)).toEqual({});
 });

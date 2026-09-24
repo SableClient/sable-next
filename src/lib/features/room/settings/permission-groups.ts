@@ -129,6 +129,61 @@ export function permissionGroups(isSpace: boolean): readonly PermissionGroup[] {
   return [MESSAGES, CALLS, MODERATION, overview(false), settings(false), OTHER];
 }
 
+const SYNCED_LOCATIONS: readonly PermissionLocation[] = [
+  { kind: 'state-default' },
+  ...[MODERATION, overview(true), settings(true), OTHER].flatMap((group) =>
+    group.items.map((item) => item.location).filter((location) => location.kind !== 'state-default')
+  ),
+];
+
+function editableBy(ownLevel: number, from: number, to: number): boolean {
+  return from !== to && from <= ownLevel && to <= ownLevel;
+}
+
+function syncedUserLevel(
+  from: number | undefined,
+  to: number | undefined,
+  isOwn: boolean,
+  ownLevel: number
+): number | undefined {
+  if (isOwn || (from !== undefined && from >= ownLevel) || (to !== undefined && to > ownLevel)) {
+    return from;
+  }
+  return to;
+}
+
+export function syncedFromSpace(
+  room: RoomPowerLevelsView,
+  space: RoomPowerLevelsView,
+  ownUserId: string,
+  ownLevel: number
+): RoomPowerLevelsView {
+  let next = room;
+  for (const location of SYNCED_LOCATIONS) {
+    if (location.kind === 'event' && !(location.eventType in space.events)) continue;
+    const to = levelAt(space, location);
+    if (editableBy(ownLevel, levelAt(next, location), to)) next = withLevel(next, location, to);
+  }
+
+  const userIds = new Set([...Object.keys(room.users), ...Object.keys(space.users)]);
+  const users = Object.fromEntries(
+    [...userIds].flatMap((userId) => {
+      const level = syncedUserLevel(
+        room.users[userId],
+        space.users[userId],
+        userId === ownUserId,
+        ownLevel
+      );
+      return level === undefined ? [] : [[userId, level] as const];
+    })
+  );
+
+  const usersDefault = editableBy(ownLevel, room.users_default, space.users_default)
+    ? space.users_default
+    : room.users_default;
+  return { ...next, users, users_default: usersDefault };
+}
+
 export function levelAt(levels: RoomPowerLevelsView, location: PermissionLocation): number {
   switch (location.kind) {
     case 'event':

@@ -6,6 +6,7 @@ import {
   canSendState,
   levelAt,
   permissionGroups,
+  syncedFromSpace,
   toEventContent,
   withLevel,
 } from './permission-groups';
@@ -96,4 +97,76 @@ test('a space is offered space permissions, a room room ones', () => {
   expect(space).toContain('room.permManageRooms');
   expect(space).not.toContain('room.permEncryption');
   expect(space).not.toContain('room.permHistoryVisibility');
+});
+
+const space: RoomPowerLevelsView = {
+  ban: 75,
+  kick: 75,
+  redact: 50,
+  invite: 50,
+  events_default: 100,
+  state_default: 100,
+  users_default: 0,
+  events: { 'm.space.child': 50, 'm.room.name': 50 },
+  users: { '@admin:example.org': 100, '@mod:example.org': 50 },
+  notifications_room: 50,
+};
+
+test('a sync takes the space levels a room shares with it', () => {
+  const next = syncedFromSpace(levels, space, '@admin:example.org', 100);
+
+  expect(next.ban).toBe(75);
+  expect(next.kick).toBe(75);
+  expect(next.invite).toBe(50);
+  expect(next.state_default).toBe(100);
+  expect(next.events['m.room.name']).toBe(50);
+  expect(next.users['@mod:example.org']).toBe(50);
+});
+
+test('a sync keeps what only a room has, or only a space means', () => {
+  const next = syncedFromSpace(levels, space, '@admin:example.org', 100);
+
+  expect(next.events_default).toBe(0);
+  expect(next.events['m.reaction']).toBe(25);
+  expect(next.events['im.vector.modular.widgets']).toBe(20);
+  expect(next.events['m.space.child']).toBeUndefined();
+  expect(next.events['m.room.redaction']).toBeUndefined();
+});
+
+test('a sync applies the space default before the types that fall back to it', () => {
+  const next = syncedFromSpace(
+    { ...levels, events: {} },
+    { ...space, events: { 'm.room.topic': 50 } },
+    '@admin:example.org',
+    100
+  );
+
+  expect(levelAt(next, { kind: 'state', eventType: 'm.room.topic' })).toBe(50);
+  expect(levelAt(next, { kind: 'state', eventType: 'm.room.avatar' })).toBe(100);
+});
+
+test('a sync removes members the space does not list', () => {
+  const next = syncedFromSpace(
+    { ...levels, users: { '@admin:example.org': 100, '@bot:example.org': 50 } },
+    space,
+    '@admin:example.org',
+    100
+  );
+
+  expect(next.users).toEqual({ '@admin:example.org': 100, '@mod:example.org': 50 });
+});
+
+test('a sync leaves everything the server would refuse to change', () => {
+  const next = syncedFromSpace(
+    { ...levels, users: { '@self:example.org': 50, '@peer:example.org': 50 } },
+    { ...space, users: { '@self:example.org': 0, '@new:example.org': 100 } },
+    '@self:example.org',
+    50
+  );
+
+  expect(next.users).toEqual({ '@self:example.org': 50, '@peer:example.org': 50 });
+  expect(next.ban).toBe(50);
+  expect(next.state_default).toBe(50);
+  expect(next.redact).toBe(50);
+  expect(next.invite).toBe(50);
 });
