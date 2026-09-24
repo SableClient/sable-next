@@ -149,7 +149,8 @@ describe('a swipe that starts inside a horizontal scroller', () => {
 
 describe('a swipe that starts inside editable text', () => {
   function startOn(target: Element): SwipeGesture | undefined {
-    return startSwipeGesture({ ...touchEvent(100, 100, 0), target } as TouchEvent, 0);
+    const touches = [{ clientX: 100, clientY: 100 }];
+    return startSwipeGesture({ timeStamp: 0, touches, target } as unknown as TouchEvent, 0);
   }
 
   function element(tag: string, contenteditable?: string): HTMLElement {
