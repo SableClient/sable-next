@@ -37,6 +37,7 @@
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import { isDeclining } from '#lib/rooms/invites.svelte.js';
+  import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { hasUnread, NO_UNREAD } from '#lib/rooms/unread.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
@@ -273,7 +274,10 @@
   });
   let invites = $derived.by<RoomSummary[]>(() => {
     const pending = roomList.rooms.filter(
-      (room) => room.state === 'invited' && !isDeclining(room.room_id)
+      (room) =>
+        room.state === 'invited' &&
+        !isDeclining(room.room_id) &&
+        !dismissedInvites.has(room.room_id)
     );
 
     if (directSection) {

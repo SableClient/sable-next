@@ -8,6 +8,7 @@
   } from '#lib/features/settings/settings-navigation.js';
   import { countInvites, countNotifications, hasMarkedUnread } from '#lib/features/inbox/inbox.js';
   import { isDeclining } from '#lib/rooms/invites.svelte.js';
+  import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -33,7 +34,11 @@
   const notificationMode = (roomId: string) => roomList.notificationMode(roomId);
   let inboxCount = $derived(
     countNotifications(roomList.rooms, notificationMode) +
-      countInvites(roomList.rooms.filter((room) => !isDeclining(room.room_id)))
+      countInvites(
+        roomList.rooms.filter(
+          (room) => !isDeclining(room.room_id) && !dismissedInvites.has(room.room_id)
+        )
+      )
   );
   let inboxCounts = $derived({
     unread: 0,

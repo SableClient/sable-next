@@ -103,6 +103,11 @@
     "removeBookmark": "Remove bookmark in {{room}}",
     "undo": "Undo",
     "inviteDeclined": "Declined the invite to {{room}}",
+    "inviteDismiss": "Dismiss",
+    "inviteRestore": "Restore",
+    "invitesShowDismissed_one": "{{count, number}} dismissed",
+    "invitesShowDismissed_other": "{{count, number}} dismissed",
+    "invitesShowPending": "Back to invites",
     "markedRead": "Marked {{room}} as read",
     "bookmarkRemoved": "Removed a bookmark in {{room}}"
   },

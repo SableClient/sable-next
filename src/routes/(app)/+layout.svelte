@@ -15,6 +15,7 @@
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
+  import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -490,11 +491,13 @@
     void spaceSidebar.start(core);
     notifications.start(core, openNotification);
     presence.start(core);
+    dismissedInvites.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();
       notifications.stop();
       presence.stop();
+      dismissedInvites.stop();
     };
   });
 

@@ -4,11 +4,13 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
+  import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { InviteActions, isDeclining } from '#lib/rooms/invites.svelte.js';
   import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { DisplayNames } from './display-names.svelte';
   import { inviter, pendingInvites } from './inbox';
 
@@ -18,17 +20,46 @@
   const names = new DisplayNames(core);
   const headingId = $props.id();
 
-  let invites = $derived(
+  let pending = $derived(
     pendingInvites(roomList.rooms).filter((invite) => !isDeclining(invite.room_id))
   );
+  let dismissed = $derived(pending.filter((invite) => dismissedInvites.has(invite.room_id)));
+  let dismissedOpen = $state(false);
+  let showDismissed = $derived(dismissedOpen && dismissed.length > 0);
+  let invites = $derived(
+    showDismissed ? dismissed : pending.filter((invite) => !dismissedInvites.has(invite.room_id))
+  );
+
+  function setDismissed(roomId: string, next: boolean): void {
+    const write = next ? dismissedInvites.dismiss(roomId) : dismissedInvites.restore(roomId);
+    write.catch((error: unknown) => {
+      console.warn('[sable room] dismissed invites not saved', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+    });
+  }
 </script>
 
-{#if invites.length > 0}
+{#if invites.length > 0 || dismissed.length > 0}
   <section aria-labelledby={headingId}>
-    <h2 id={headingId}>
-      {$i18n.t('inbox.invites')}
-      <span class="count" aria-hidden="true">{invites.length}</span>
-    </h2>
+    <div class="section-head">
+      <h2 id={headingId}>
+        {$i18n.t('inbox.invites')}
+        <span class="count" aria-hidden="true">{invites.length}</span>
+      </h2>
+      {#if dismissed.length > 0}
+        <Button
+          class="dismissed-toggle"
+          variant="ghost"
+          size="small"
+          aria-pressed={showDismissed}
+          onclick={() => (dismissedOpen = !showDismissed)}
+        >
+          {showDismissed
+            ? $i18n.t('inbox.invitesShowPending')
+            : $i18n.t('inbox.invitesShowDismissed', { count: dismissed.length })}
+        </Button>
+      {/if}
+    </div>
     <ul>
       {#each invites as invite (invite.room_id)}
         {@const name = roomLabel(invite)}
@@ -87,6 +118,16 @@
                 answers.decline(invite);
               }}>{$i18n.t('room.inviteDecline')}</Button
             >
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onclick={() => {
+                setDismissed(invite.room_id, !showDismissed);
+              }}
+              >{showDismissed
+                ? $i18n.t('inbox.inviteRestore')
+                : $i18n.t('inbox.inviteDismiss')}</Button
+            >
           </div>
         </li>
       {/each}
@@ -95,6 +136,14 @@
 {/if}
 
 <style>
+  .section-head {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    justify-content: space-between;
+    margin: 0 0 var(--space-300);
+  }
+
   h2 {
     align-items: center;
     color: var(--surface-var-on-container);
@@ -103,7 +152,7 @@
     font-weight: var(--font-weight-500);
     gap: var(--space-200);
     letter-spacing: 0.08em;
-    margin: 0 0 var(--space-300);
+    margin: 0;
     text-transform: uppercase;
   }
 

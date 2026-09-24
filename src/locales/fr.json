@@ -103,6 +103,11 @@
     "removeBookmark": "Supprimer le signet de {{room}}",
     "undo": "Annuler",
     "inviteDeclined": "Invitation à {{room}} refusée",
+    "inviteDismiss": "Masquer",
+    "inviteRestore": "Rétablir",
+    "invitesShowDismissed_one": "{{count, number}} masquée",
+    "invitesShowDismissed_other": "{{count, number}} masquées",
+    "invitesShowPending": "Retour aux invitations",
     "markedRead": "{{room}} marqué comme lu",
     "bookmarkRemoved": "Signet de {{room}} supprimé"
   },
