@@ -773,6 +773,7 @@
         collapsed,
         pending,
         highlighted,
+        'pressed': rowPress.touch && !rowPress.fired,
         'has-connected-reply':
           item.in_reply_to !== null && preferences.replyPreviewStyle === 'connected',
         persona: personaTint,
@@ -1384,6 +1385,11 @@
   }
 
   .message.highlighted {
+    border-radius: var(--radius);
+  }
+
+  .message.pressed {
+    background: var(--bg-container-active);
     border-radius: var(--radius);
   }
 
