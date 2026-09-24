@@ -700,8 +700,8 @@
     background: var(--surface-container-hover);
   }
 
-  /* Only long lines scroll. A vertical scroller here would swallow the wheel
-     whenever the pointer crossed a code block, stalling the timeline. */
+  /* An expanded block never scrolls vertically: a scroller there would swallow
+     the wheel whenever the pointer crossed it, stalling the timeline. */
   .formatted-body :global(pre) {
     line-height: var(--code-line-height);
     margin: 0;
@@ -719,6 +719,8 @@
      estimate for the row stays close. */
   .formatted-body :global(.code-block[data-collapsed] pre) {
     max-height: 18.75rem;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
   }
 
   .formatted-body :global(.code-block[data-collapsed])::after {
