@@ -2248,6 +2248,7 @@
   "widgets": {
     "label": "Widgets",
     "title": "Widgets",
+    "resize": "Redimensionner les widgets",
     "close": "Fermer les widgets",
     "empty": "Ce salon ne contient aucun widget.",
     "remove": "Supprimer {{name}}",

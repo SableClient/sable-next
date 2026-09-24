@@ -2289,6 +2289,7 @@
   "widgets": {
     "label": "Widgets",
     "title": "Widgets",
+    "resize": "Resize widgets",
     "close": "Close widgets",
     "empty": "This room has no widgets.",
     "remove": "Remove {{name}}",

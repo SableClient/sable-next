@@ -15,6 +15,7 @@ import type { RoomWidget } from './widget-content.js';
 
 afterEach(() => {
   document.body.replaceChildren();
+  localStorage.clear();
 });
 
 const widgets: RoomWidget[] = [
@@ -137,5 +138,34 @@ test('calls onClose from the close button', async () => {
 
   document.querySelector<HTMLButtonElement>('.widgets-header button')?.click();
   expect(onClose).toHaveBeenCalled();
+  await unmount(instance);
+});
+
+test('resizes the side panel and reopens at that width', async () => {
+  const props = { ...commonProps, widgets: [], onClose: vi.fn() };
+  const first = mount(WidgetsPanel, { target: document.body, props });
+  await tick();
+
+  document
+    .querySelector<HTMLButtonElement>('.resize-handle')
+    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+  await tick();
+  expect(document.querySelector<HTMLElement>('.widgets-panel')?.style.width).toBe('23rem');
+  await unmount(first);
+
+  const second = mount(WidgetsPanel, { target: document.body, props });
+  await tick();
+  expect(document.querySelector<HTMLElement>('.widgets-panel')?.style.width).toBe('23rem');
+  await unmount(second);
+});
+
+test('leaves the drawer variant unresizable', async () => {
+  const instance = mount(WidgetsPanel, {
+    target: document.body,
+    props: { ...commonProps, widgets: [], modal: true, onClose: vi.fn() },
+  });
+  await tick();
+
+  expect(document.querySelector('.resize-handle')).toBeNull();
   await unmount(instance);
 });

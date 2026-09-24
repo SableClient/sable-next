@@ -1,9 +1,11 @@
 <script lang="ts">
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { onMount } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
 
   import type { RoomWidget } from './widget-content.js';
   import { templateWidgetUrl } from './widget-url.js';
@@ -34,7 +36,26 @@
     onRemove,
   }: Props = $props();
 
+  const WIDTH_STORAGE_KEY = 'sable-widgets-panel-width';
+  const MIN_WIDTH = 18;
+  const MAX_WIDTH = 48;
+  const WIDTH_STEP = 1;
+
+  let width = $state(22);
   let activeId = $state<string | null>(null);
+
+  function clampWidth(next: number): number {
+    return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, next));
+  }
+
+  function remFromPixels(pixels: number): number {
+    return pixels / Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  }
+
+  onMount(() => {
+    const stored = Number.parseFloat(localStorage.getItem(WIDTH_STORAGE_KEY) ?? '');
+    if (Number.isFinite(stored)) width = clampWidth(stored);
+  });
   let pendingRemoval = $state<RoomWidget | null>(null);
 
   interface PendingApproval {
@@ -72,7 +93,24 @@
   );
 </script>
 
-<aside class="widgets-panel" class:modal aria-label={$i18n.t('widgets.label')}>
+<aside
+  class={['widgets-panel', { modal }]}
+  aria-label={$i18n.t('widgets.label')}
+  style:width={modal ? null : `${width}rem`}
+>
+  {#if !modal}
+    <ResizeHandle
+      value={width}
+      min={MIN_WIDTH}
+      max={MAX_WIDTH}
+      label={$i18n.t('widgets.resize')}
+      grow="left"
+      step={WIDTH_STEP}
+      fromPixels={remFromPixels}
+      onResize={(next) => (width = clampWidth(next))}
+      onCommit={() => localStorage.setItem(WIDTH_STORAGE_KEY, String(width))}
+    />
+  {/if}
   <header class="widgets-header">
     <h2>{$i18n.t('widgets.title')}</h2>
     <IconButton variant="ghost" size="small" label={$i18n.t('widgets.close')} onclick={onClose}>
@@ -162,14 +200,18 @@
     height: 100%;
     min-height: 0;
     overflow-x: hidden;
+    position: relative;
     width: 100%;
   }
 
-  @media (width > 70.25rem) {
-    .widgets-panel:not(.modal) {
-      border-left: var(--border-width) solid var(--surface-container-line);
-      width: 22rem;
-    }
+  .widgets-panel:not(.modal) {
+    border-left: var(--border-width) solid var(--surface-container-line);
+    flex: 0 0 auto;
+  }
+
+  .widgets-panel :global(.resize-handle) {
+    left: -0.25rem;
+    z-index: 1;
   }
 
   .widgets-header {
