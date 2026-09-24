@@ -380,7 +380,7 @@
   .profile-card-panel.framed {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
-    border-radius: var(--radius);
+    border-radius: var(--radius-inner);
     overflow: clip;
   }
 
