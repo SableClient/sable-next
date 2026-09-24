@@ -94,12 +94,9 @@ pub fn room_summary<S: BuildHasher>(
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
-        // Only `display_name()` fills this cache, so `prime_display_names` must
-        // have run. `name()` covers an explicit `m.room.name` until then.
         name: item
-            .cached_display_name()
-            .map(|name| name.to_string())
-            .or_else(|| item.name()),
+            .name()
+            .or_else(|| item.cached_display_name().map(|name| name.to_string())),
         topic: item.topic(),
         avatar_url: info.map_or_else(
             || item.avatar_url().map(|url| url.to_string()),

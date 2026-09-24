@@ -46,6 +46,32 @@ pub(crate) async fn reconcile_memberships(client: &Client) -> Result<(), matrix_
     Ok(())
 }
 
+pub(crate) async fn reconcile_joined_invites(client: Client) {
+    use tokio::sync::broadcast::error::{RecvError, TryRecvError};
+
+    let mut updates = client.room_info_notable_update_receiver();
+    loop {
+        match updates.recv().await {
+            Ok(update) => {
+                let invited = |room_id: &RoomId| {
+                    client
+                        .get_room(room_id)
+                        .is_some_and(|room| room.state() == RoomState::Invited)
+                };
+                if !invited(&update.room_id) {
+                    continue;
+                }
+                while let Ok(_) | Err(TryRecvError::Lagged(_)) = updates.try_recv() {}
+                if let Err(error) = reconcile_memberships(&client).await {
+                    tracing::warn!("could not reconcile a joined invite: {error}");
+                }
+            }
+            Err(RecvError::Lagged(_)) => {}
+            Err(RecvError::Closed) => break,
+        }
+    }
+}
+
 pub(crate) async fn fill_own_members(client: &Client) -> Result<(), matrix_sdk::Error> {
     let Some(own) = client.user_id() else {
         return Ok(());

@@ -531,6 +531,7 @@ impl Core {
         session.take()
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) async fn start_session(
         self: &Arc<Self>,
         client: matrix_sdk::Client,
@@ -587,6 +588,7 @@ impl Core {
         self.watch_notifications(&client, generation).await;
         self.watch_notification_settings(&client, generation);
         self.watch_space_sidebar(&client, generation);
+        self.watch_joined_invites(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         self.watch_search_index(&client);
