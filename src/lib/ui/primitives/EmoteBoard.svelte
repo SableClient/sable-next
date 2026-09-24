@@ -838,7 +838,8 @@
   /* Matches the pack avatars beside it, so the rail reads as one column. */
   .rail-glyph {
     align-items: center;
-    font-size: var(--font-size-heading);
+    box-sizing: content-box;
+    font-size: calc(var(--avatar-size-small) * 0.8);
     height: var(--avatar-size-small);
     justify-content: center;
     line-height: 1;
