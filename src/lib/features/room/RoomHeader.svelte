@@ -10,8 +10,8 @@
   import type { MemberView } from '#src/generated/protocol';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
 
   import { memberIdentity } from './members.js';
 
@@ -72,15 +72,9 @@
 
 <PanelHeader class="room-header">
   {#snippet prefix()}
-    <IconButton
-      class="back-button"
-      variant="ghost"
-      size="small"
-      label={$i18n.t('timeline.back')}
-      onclick={onBack}
-    >
+    <PanelHeaderButton class="back-button" label={$i18n.t('timeline.back')} onclick={onBack}>
       <BackIcon />
-    </IconButton>
+    </PanelHeaderButton>
 
     <Avatar class="room-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
   {/snippet}
@@ -119,21 +113,13 @@
   {/snippet}
 
   {#snippet suffix()}
-    <IconButton
-      class="search-button"
-      variant="ghost"
-      size="small"
-      label={$i18n.t('search.open')}
-      onclick={onSearch}
-    >
+    <PanelHeaderButton class="search-button" label={$i18n.t('search.open')} onclick={onSearch}>
       <MagnifyingGlassIcon />
-    </IconButton>
+    </PanelHeaderButton>
     {@render pins?.()}
     {#if onToggleChat}
-      <IconButton
+      <PanelHeaderButton
         class="chat-toggle"
-        variant="ghost"
-        size="small"
         label={chatBeside
           ? chatOpen
             ? $i18n.t('call.hideChat')
@@ -149,31 +135,27 @@
         {:else}
           <ChatCircleIcon weight={chatOpen ? 'fill' : 'regular'} />
         {/if}
-      </IconButton>
+      </PanelHeaderButton>
     {/if}
     {#if onCall}
-      <IconButton
+      <PanelHeaderButton
         class="call-button"
-        variant="ghost"
-        size="small"
         label={inVoice.length > 0 ? $i18n.t('call.join') : $i18n.t('call.start')}
         onclick={onCall}
       >
         <PhoneIcon />
-      </IconButton>
+      </PanelHeaderButton>
     {/if}
     {@render actions?.()}
-    <IconButton
+    <PanelHeaderButton
       class="members-button selection-open"
-      variant="ghost"
-      size="small"
       label={$i18n.t('timeline.members')}
       aria-pressed={membersOpen}
       data-state={membersOpen ? 'open' : 'closed'}
       onclick={onMembers}
     >
       <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
-    </IconButton>
+    </PanelHeaderButton>
     {@render menu?.()}
   {/snippet}
 </PanelHeader>

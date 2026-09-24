@@ -6,6 +6,7 @@
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
 
   import type { RoomWidget } from './widget-content.js';
@@ -114,9 +115,9 @@
   {/if}
   <PanelHeader class="widgets-header" title={$i18n.t('widgets.title')}>
     {#snippet suffix()}
-      <IconButton variant="ghost" size="small" label={$i18n.t('widgets.close')} onclick={onClose}>
+      <PanelHeaderButton label={$i18n.t('widgets.close')} onclick={onClose}>
         <XIcon />
-      </IconButton>
+      </PanelHeaderButton>
     {/snippet}
   </PanelHeader>
 

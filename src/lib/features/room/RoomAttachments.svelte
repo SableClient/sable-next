@@ -28,6 +28,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -500,14 +501,9 @@
         <ImagesIcon aria-hidden="true" />
       {/snippet}
       {#snippet suffix()}
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('timeline.attachmentsClose')}
-          onclick={onClose}
-        >
+        <PanelHeaderButton label={$i18n.t('timeline.attachmentsClose')} onclick={onClose}>
           <XIcon />
-        </IconButton>
+        </PanelHeaderButton>
       {/snippet}
     </PanelHeader>
 

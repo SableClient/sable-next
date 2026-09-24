@@ -52,8 +52,8 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
@@ -869,9 +869,7 @@
   <div class="timeline" bind:clientHeight={timelineHeight}>
     {#snippet headerActions()}
       {#if !voiceView}
-        <IconButton
-          variant="ghost"
-          size="medium"
+        <PanelHeaderButton
           label={$i18n.t('timeline.threadsOpen')}
           aria-pressed={threadsOpen}
           onclick={() => {
@@ -880,28 +878,21 @@
           }}
         >
           <ChatsIcon weight={threadsOpen ? 'fill' : 'regular'} />
-        </IconButton>
+        </PanelHeaderButton>
         {#if desktop}
-          <IconButton
-            variant="ghost"
-            size="medium"
+          <PanelHeaderButton
             label={$i18n.t('timeline.attachmentsOpen')}
             aria-pressed={attachmentsOpen}
             onclick={toggleAttachments}
           >
             <ImagesIcon weight={attachmentsOpen ? 'fill' : 'regular'} />
-          </IconButton>
+          </PanelHeaderButton>
         {/if}
       {/if}
       {#if widgets.length > 0}
-        <IconButton
-          variant="ghost"
-          size="medium"
-          label={$i18n.t('widgets.label')}
-          onclick={toggleWidgets}
-        >
+        <PanelHeaderButton label={$i18n.t('widgets.label')} onclick={toggleWidgets}>
           <GridFourIcon />
-        </IconButton>
+        </PanelHeaderButton>
       {/if}
     {/snippet}
     <RoomHeader
@@ -1014,14 +1005,12 @@
       />
       <PanelHeader class="voice-chat-header" title={$i18n.t('call.chat')}>
         {#snippet suffix()}
-          <IconButton
-            variant="ghost"
-            size="small"
+          <PanelHeaderButton
             label={$i18n.t('call.closeChat')}
             onclick={() => (voiceChatOpen = false)}
           >
             <XIcon />
-          </IconButton>
+          </PanelHeaderButton>
         {/snippet}
       </PanelHeader>
       {@render chat()}

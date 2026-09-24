@@ -11,8 +11,8 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
@@ -168,11 +168,8 @@
           aria-label={$i18n.t('timeline.closeMembers')}><XIcon /></Dialog.Close
         >
       {:else}
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('timeline.closeMembers')}
-          onclick={onClose}><XIcon /></IconButton
+        <PanelHeaderButton label={$i18n.t('timeline.closeMembers')} onclick={onClose}
+          ><XIcon /></PanelHeaderButton
         >
       {/if}
     {/snippet}

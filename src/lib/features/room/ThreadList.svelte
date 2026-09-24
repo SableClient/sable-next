@@ -7,8 +7,8 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import { memberName } from './members';
@@ -63,14 +63,9 @@
         <ChatsIcon aria-hidden="true" />
       {/snippet}
       {#snippet suffix()}
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('timeline.threadsClose')}
-          onclick={onClose}
-        >
+        <PanelHeaderButton label={$i18n.t('timeline.threadsClose')} onclick={onClose}>
           <XIcon />
-        </IconButton>
+        </PanelHeaderButton>
       {/snippet}
     </PanelHeader>
 

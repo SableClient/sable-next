@@ -10,8 +10,8 @@
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import {
     finishSwipeGesture,
@@ -202,14 +202,9 @@
         <ChatsIcon aria-hidden="true" />
       {/snippet}
       {#snippet suffix()}
-        <IconButton
-          variant="ghost"
-          size="small"
-          label={$i18n.t('timeline.threadClose')}
-          onclick={onClose}
-        >
+        <PanelHeaderButton label={$i18n.t('timeline.threadClose')} onclick={onClose}>
           <XIcon />
-        </IconButton>
+        </PanelHeaderButton>
       {/snippet}
     </PanelHeader>
 
