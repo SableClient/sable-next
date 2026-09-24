@@ -2276,6 +2276,96 @@ async fn a_deleted_mention_is_not_highlighted() {
     assert_eq!(mention, crate::protocol::MentionView::None);
 }
 
+#[tokio::test]
+async fn a_redaction_the_server_rejects_restores_the_message() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let own_user_id = client.user_id().expect("a logged-in user").to_owned();
+    let room_id = room_id!("!rejected-redaction:example.org");
+    let factory = EventFactory::new().room(room_id).sender(&own_user_id);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_bulk([
+                    factory.member(&own_user_id).into_raw(),
+                    factory.default_power_levels().into_raw(),
+                ])
+                .add_timeline_event(factory.text_msg("keep me").event_id(event_id!("$kept"))),
+        )
+        .await;
+    server
+        .mock_room_redact()
+        .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+            "errcode": "M_FORBIDDEN",
+            "error": "You don't have permission to redact",
+        })))
+        .mount()
+        .await;
+
+    let timeline = Arc::new(
+        build_room_timeline(&room, &TimelineFocusView::Live, false)
+            .await
+            .expect("a timeline"),
+    );
+    let item_id =
+        matrix_sdk_ui::timeline::TimelineEventItemId::EventId(event_id!("$kept").to_owned());
+    timeline
+        .redact(&item_id, None)
+        .await
+        .expect("the redaction is queued");
+
+    let rejected = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let items = timeline.items().await;
+            if let Some(item) = items.iter().find(|item| {
+                item.as_event().is_some_and(|event| {
+                    matches!(
+                        event.redaction_send_state(),
+                        Some(matrix_sdk_ui::timeline::EventSendState::SendingFailed {
+                            is_recoverable: false,
+                            ..
+                        })
+                    )
+                })
+            }) {
+                break item.clone();
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the server rejected the redaction");
+    assert!(
+        rejected
+            .as_event()
+            .is_some_and(|event| event.content().is_redacted())
+    );
+
+    crate::subscriptions::abort_rejected_redaction(&timeline, &rejected);
+
+    tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let items = timeline.items().await;
+            if items.iter().any(|item| {
+                item.as_event().is_some_and(|event| {
+                    event.event_id() == Some(event_id!("$kept"))
+                        && !event.content().is_redacted()
+                        && event.redaction_send_state().is_none()
+                })
+            }) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the message is shown again");
+}
+
 fn message_htmls(views: &[crate::protocol::TimelineItemView]) -> Vec<String> {
     contents(views)
         .into_iter()

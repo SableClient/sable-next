@@ -58,6 +58,7 @@ function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
   return {
     own_power_level: canChangeJoinRule ? 100 : 0,
     can_post: true,
+    can_redact_own: true,
     can_redact_others: false,
     can_invite: false,
     can_kick: false,

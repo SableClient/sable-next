@@ -521,14 +521,17 @@ test('anything you sent is yours to redact, not only your text', () => {
     spoiler: null,
   } as const;
 
-  expect(canRedact(own(message.content), false)).toBe(true);
-  expect(canRedact(own(image), false), 'an image you sent must be deletable').toBe(true);
-  expect(canRedact(theirs(image), false)).toBe(false);
-  expect(canRedact(theirs(image), true)).toBe(true);
-  expect(canRedact(own(joined.content), false)).toBe(true);
-  expect(canRedact(theirs(joined.content), true)).toBe(true);
-  expect(canRedact(own(divider.content), true)).toBe(false);
-  expect(canRedact(own({ kind: 'redacted', reason: null }), true)).toBe(false);
+  expect(canRedact(own(message.content), true, false)).toBe(true);
+  expect(canRedact(own(image), true, false), 'an image you sent must be deletable').toBe(true);
+  expect(canRedact(own(message.content), false, true), 'redactions barred by power levels').toBe(
+    false
+  );
+  expect(canRedact(theirs(image), true, false)).toBe(false);
+  expect(canRedact(theirs(image), true, true)).toBe(true);
+  expect(canRedact(own(joined.content), true, false)).toBe(true);
+  expect(canRedact(theirs(joined.content), true, true)).toBe(true);
+  expect(canRedact(own(divider.content), true, true)).toBe(false);
+  expect(canRedact(own({ kind: 'redacted', reason: null }), true, true)).toBe(false);
 });
 
 test('a tombstone is a message row, so it keeps the sender and the menu', () => {

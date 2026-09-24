@@ -40,6 +40,7 @@
     roomName?: string | null;
     members?: readonly MemberView[];
     readOnly?: boolean;
+    canRedactOwn?: boolean;
     canRedactOthers?: boolean;
     encrypted?: boolean | null;
     modal?: boolean;
@@ -55,6 +56,7 @@
     roomName = null,
     members = [],
     readOnly = false,
+    canRedactOwn = true,
     canRedactOthers = false,
     encrypted = null,
     modal = false,
@@ -215,6 +217,7 @@
       {roomId}
       {members}
       {readOnly}
+      {canRedactOwn}
       {canRedactOthers}
       {encrypted}
       {onSenderProfile}

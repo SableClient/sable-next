@@ -60,6 +60,7 @@ const room: RoomSummary = {
 const permissions: RoomPermissionsView = {
   own_power_level: 50,
   can_post: true,
+  can_redact_own: true,
   can_redact_others: false,
   can_invite: false,
   can_kick: false,

@@ -2166,7 +2166,9 @@ pub struct PredecessorRoomView {
 pub struct RoomPermissionsView {
     pub own_power_level: i32,
     pub can_post: bool,
-    /// Redacting someone else's event. Your own needs no extra level.
+    /// Redacting your own event, which needs the level to send `m.room.redaction`.
+    pub can_redact_own: bool,
+    /// Redacting someone else's event.
     pub can_redact_others: bool,
     pub can_invite: bool,
     pub can_kick: bool,

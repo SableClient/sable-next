@@ -83,6 +83,7 @@
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
+    canRedactOwn?: boolean;
     canRedactOthers?: boolean;
     encrypted?: boolean | null;
     scrollLocked?: boolean;
@@ -122,6 +123,7 @@
     onVotePoll,
     onEndPoll,
     readOnly = false,
+    canRedactOwn = true,
     canRedactOthers = false,
     encrypted = null,
     scrollLocked = false,
@@ -665,6 +667,7 @@
                     {onOpenThread}
                     {onEdit}
                     {onDelete}
+                    {canRedactOwn}
                     {canRedactOthers}
                     {encrypted}
                     {members}

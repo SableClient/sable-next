@@ -49,9 +49,13 @@ export function canForward(content: TimelineItemContentView): boolean {
   return (FORWARDABLE_KINDS as readonly string[]).includes(content.kind);
 }
 
-export function canRedact(item: TimelineItemView, canRedactOthers: boolean): boolean {
+export function canRedact(
+  item: TimelineItemView,
+  canRedactOwn: boolean,
+  canRedactOthers: boolean
+): boolean {
   if (isAnnotation(item) || item.content.kind === 'redacted') return false;
-  return item.is_own || canRedactOthers;
+  return item.is_own ? canRedactOwn : canRedactOthers;
 }
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\s)+$/u;

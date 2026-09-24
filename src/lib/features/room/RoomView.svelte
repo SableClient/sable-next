@@ -758,6 +758,7 @@
       onVotePoll={conversation.votePoll}
       onEndPoll={conversation.endPoll}
       readOnly={permissions ? !permissions.can_post : false}
+      canRedactOwn={permissions?.can_redact_own ?? true}
       canRedactOthers={permissions?.can_redact_others ?? false}
       encrypted={resolvedRoom?.encrypted ?? null}
       currentUserId={core.session?.user_id ?? null}
@@ -959,6 +960,7 @@
           {roomName}
           members={memberLoader.members}
           readOnly={permissions ? !permissions.can_post : false}
+          canRedactOwn={permissions?.can_redact_own ?? true}
           canRedactOthers={permissions?.can_redact_others ?? false}
           encrypted={resolvedRoom?.encrypted ?? null}
           onClose={closeThread}
@@ -1013,6 +1015,7 @@
           {roomName}
           members={memberLoader.members}
           readOnly={permissions ? !permissions.can_post : false}
+          canRedactOwn={permissions?.can_redact_own ?? true}
           canRedactOthers={permissions?.can_redact_others ?? false}
           encrypted={resolvedRoom?.encrypted ?? null}
           modal

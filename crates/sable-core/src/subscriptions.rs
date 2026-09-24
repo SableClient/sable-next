@@ -10,6 +10,7 @@ use matrix_sdk_ui::room_list_service::RoomListLoadingState;
 use matrix_sdk_ui::room_list_service::filters::{
     new_filter_all, new_filter_deduplicate_versions, new_filter_non_left,
 };
+use matrix_sdk_ui::timeline::{EventSendState, SendTarget, Timeline, TimelineItem};
 
 use crate::protocol::{
     CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView, TimelineItemView,
@@ -23,6 +24,28 @@ const ROOM_LIST_PAGE_SIZE: usize = 200;
 
 const fn pages_for(total: u32) -> usize {
     (total as usize).div_ceil(ROOM_LIST_PAGE_SIZE)
+}
+
+pub(crate) fn abort_rejected_redaction(timeline: &Arc<Timeline>, item: &TimelineItem) {
+    let Some(event) = item.as_event() else {
+        return;
+    };
+    if !matches!(
+        event.redaction_send_state(),
+        Some(EventSendState::SendingFailed {
+            is_recoverable: false,
+            ..
+        })
+    ) {
+        return;
+    }
+    let timeline = timeline.clone();
+    let item_id = event.identifier();
+    drop(spawn(async move {
+        if let Err(error) = timeline.abort_send(&item_id, SendTarget::Redaction).await {
+            tracing::warn!("abort rejected redaction failed: {error}");
+        }
+    }));
 }
 
 impl Core {
@@ -166,6 +189,7 @@ impl Core {
         let stream_user_id = own_user_id.clone();
         let stream_relays = relays.clone();
         let stream_room = room.clone();
+        let stream_timeline = timeline.clone();
         let task = spawn(async move {
             pin_mut!(stream);
             while let Some(diffs) = stream.next().await {
@@ -188,6 +212,7 @@ impl Core {
                                 {
                                     stream_content.forget(transaction_id);
                                 }
+                                abort_rejected_redaction(&stream_timeline, item);
                                 view::timeline_item(
                                     item,
                                     stream_user_id.as_deref(),
@@ -246,6 +271,7 @@ impl Core {
             items: items
                 .iter()
                 .map(|item| {
+                    abort_rejected_redaction(&timeline, item);
                     view::timeline_item(
                         item,
                         own_user_id.as_deref(),

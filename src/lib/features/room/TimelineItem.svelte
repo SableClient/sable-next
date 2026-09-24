@@ -106,6 +106,7 @@
     onDelete?: (eventId: string, reason: string | null) => void;
     onCopyLink?: (eventId: string) => void;
     onMarkUnread?: (eventId: string) => void;
+    canRedactOwn?: boolean;
     canRedactOthers?: boolean;
     encrypted?: boolean | null;
     selected?: boolean;
@@ -144,6 +145,7 @@
     onDelete,
     onCopyLink,
     onMarkUnread,
+    canRedactOwn = true,
     canRedactOthers = false,
     encrypted = null,
     selected = false,
@@ -266,7 +268,7 @@
   let editable = $derived(
     item.is_own && (item.content.kind === 'message' || item.content.kind === 'image')
   );
-  let redactable = $derived(canRedact(item, canRedactOthers));
+  let redactable = $derived(canRedact(item, canRedactOwn, canRedactOthers));
   const swipe = new MessageSwipe({
     enabled: () => actionable && actions.onReply !== undefined,
     canEdit: () => actionable && actions.onEdit !== undefined,

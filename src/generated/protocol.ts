@@ -712,7 +712,9 @@ export type RoomOpenView = {
 export type RoomPermissionsView = {
 	own_power_level: number,
 	can_post: boolean,
-	/**  Redacting someone else's event. Your own needs no extra level. */
+	/**  Redacting your own event, which needs the level to send `m.room.redaction`. */
+	can_redact_own: boolean,
+	/**  Redacting someone else's event. */
 	can_redact_others: boolean,
 	can_invite: boolean,
 	can_kick: boolean,

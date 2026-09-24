@@ -208,6 +208,7 @@
         {roomName}
         members={memberLoader.members}
         readOnly={permissions ? !permissions.can_post : false}
+        canRedactOwn={permissions?.can_redact_own ?? true}
         canRedactOthers={permissions?.can_redact_others ?? false}
         modal={!desktop}
         onClose={closeThread}
