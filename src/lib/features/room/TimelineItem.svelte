@@ -2021,4 +2021,12 @@
     padding-left: 0;
     padding-right: calc(var(--avatar-size-small) + var(--space-250));
   }
+
+  .message.layout-bubble.own.align-own .message-content > .receipt-slot {
+    margin-inline-end: calc(-1 * (var(--avatar-size-small) + var(--timeline-row-gap)));
+  }
+
+  .message.layout-bubble.own.align-own.collapsed .message-content > .receipt-slot {
+    margin-inline-end: calc(-1 * (var(--avatar-size-small) + var(--space-250)));
+  }
 </style>
