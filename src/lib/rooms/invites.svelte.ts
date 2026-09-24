@@ -32,6 +32,23 @@ export class InviteActions {
     });
   }
 
+  async acceptAll(rooms: readonly RoomSummary[]): Promise<void> {
+    const pending = rooms.filter((room) => !this.answering.has(room.room_id));
+    for (const room of pending) this.answering.add(room.room_id);
+    let failed = 0;
+    for (const room of pending) {
+      try {
+        await this.core.commands.joinRoom(room.room_id);
+      } catch (error) {
+        failed += 1;
+        console.warn('[sable room] accepting the invitation failed', error);
+      } finally {
+        this.answering.delete(room.room_id);
+      }
+    }
+    if (failed > 0) toasts.error(t('inbox.acceptAllFailed', { count: failed }));
+  }
+
   decline(room: RoomSummary): void {
     const roomId = room.room_id;
     if (this.answering.has(roomId) || declining.has(roomId)) return;

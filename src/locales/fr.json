@@ -107,6 +107,9 @@
     "inviteRestore": "Rétablir",
     "invitesShowDismissed_one": "{{count, number}} masquée",
     "invitesShowDismissed_other": "{{count, number}} masquées",
+    "acceptAll": "Tout accepter",
+    "acceptAllFailed_one": "{{count, number}} invitation n’a pas pu être acceptée",
+    "acceptAllFailed_other": "{{count, number}} invitations n’ont pas pu être acceptées",
     "invitesShowPending": "Retour aux invitations",
     "markedRead": "{{room}} marqué comme lu",
     "bookmarkRemoved": "Signet de {{room}} supprimé"

@@ -67,3 +67,31 @@ test('a dismissed invite moves behind the dismissed toggle and can be restored',
   });
   await unmount(instance);
 });
+
+test('accept all joins every pending invite but the dismissed ones', async () => {
+  rooms.push(
+    invite('!a:example.org', 'Alpha'),
+    invite('!b:example.org', 'Beta'),
+    invite('!c:example.org', 'Gamma')
+  );
+  const joinRoom = vi.fn((roomId: string) => Promise.resolve(roomId));
+  Object.assign(core.commands, { joinRoom });
+  dismissedInvites.start(core as unknown as CoreClient);
+  const instance = mount(InviteList, { target: document.body });
+  await tick();
+
+  button('Dismiss')?.click();
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Beta', 'Gamma']);
+  });
+
+  button('Accept all')?.click();
+  await vi.waitFor(() => {
+    expect(joinRoom).toHaveBeenCalledTimes(2);
+  });
+  expect(joinRoom.mock.calls.map(([roomId]) => roomId)).toEqual([
+    '!b:example.org',
+    '!c:example.org',
+  ]);
+  await unmount(instance);
+});
