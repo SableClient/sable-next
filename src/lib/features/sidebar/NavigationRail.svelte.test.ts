@@ -619,6 +619,8 @@ test('long-pressing a top-level space opens its options menu', async () => {
     new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: 8, clientY: 8 })
   );
   vi.advanceTimersByTime(LONG_PRESS_MS);
+  window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch' }));
+  vi.advanceTimersByTime(500);
   vi.useRealTimers();
   await tick();
   await tick();
