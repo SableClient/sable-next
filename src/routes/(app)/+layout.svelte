@@ -625,6 +625,27 @@
       'app.showShortcuts': () => {
         shortcutsHelpState.open = true;
       },
+      'call.toggleMute': () => {
+        if (callSession.active && callSession.mediaReady) {
+          void callSession.setMicrophoneEnabled(!callSession.transport.microphoneEnabled);
+        }
+      },
+      'call.toggleDeafen': () => {
+        if (callSession.active) callSession.setDeafened(!callSession.deafened);
+      },
+      'call.toggleCamera': () => {
+        if (callSession.active && callSession.mediaReady) {
+          void callSession.setCameraEnabled(!callSession.transport.cameraEnabled);
+        }
+      },
+      'call.toggleScreenShare': () => {
+        if (callSession.active && callSession.mediaReady && callSession.canScreenShare) {
+          void callSession.setScreenShareEnabled(!callSession.transport.screenShareEnabled);
+        }
+      },
+      'call.hangUp': () => {
+        if (callSession.active) void callSession.leave();
+      },
       'app.openSettings': () => {
         void goto(resolve('/(app)/settings'));
       },

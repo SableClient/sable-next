@@ -51,13 +51,11 @@
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
-  import CallDevicePreview from '#lib/features/call/CallDevicePreview.svelte';
   import VoiceLobby from '#lib/features/call/VoiceLobby.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
@@ -69,6 +67,7 @@
   import ThreadPanel from './ThreadPanel.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
+  import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
   import RoomInviteDialog from './RoomInviteDialog.svelte';
   import { canSendState } from './settings/permission-groups';
@@ -102,7 +101,6 @@
   const timeline = activeTimeline.timeline;
   const memberLoader = new RoomMemberLoader();
   const call = useCallSession();
-  let prescreenOpen = $state(false);
   let prescreenMedia = $state<CallMedia>({ microphone: true, camera: false });
   let membersOpen = $state(false);
   let desktopMembersOpen = $state(true);
@@ -240,6 +238,12 @@
     void bookmarks.load();
     const storedWidth = Number.parseInt(localStorage.getItem(VOICE_CHAT_WIDTH_KEY) ?? '', 10);
     if (Number.isFinite(storedWidth)) voiceChatWidth = clampVoiceChatWidth(storedWidth);
+    const storedRatio = Number.parseFloat(localStorage.getItem(CALL_STAGE_RATIO_KEY) ?? '');
+    callStageRatio = Number.isFinite(storedRatio)
+      ? clampCallStageRatio(storedRatio)
+      : sidePanels.matches
+        ? CALL_STAGE_DEFAULT_RATIO
+        : CALL_STAGE_MOBILE_RATIO;
   });
   let showReceiptFooter = $derived(
     !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'room'
@@ -287,6 +291,17 @@
   function clampVoiceChatWidth(width: number): number {
     return Math.min(VOICE_CHAT_MAX_WIDTH, Math.max(VOICE_CHAT_MIN_WIDTH, width));
   }
+  const CALL_STAGE_RATIO_KEY = 'sable-call-stage-ratio';
+  const CALL_STAGE_DEFAULT_RATIO = 0.65;
+  const CALL_STAGE_MOBILE_RATIO = 0.4;
+  const CALL_STAGE_MIN_RATIO = 0.2;
+  const CALL_STAGE_MAX_RATIO = 0.8;
+
+  function clampCallStageRatio(ratio: number): number {
+    return Math.min(CALL_STAGE_MAX_RATIO, Math.max(CALL_STAGE_MIN_RATIO, ratio));
+  }
+  let callStageRatio = $state(CALL_STAGE_DEFAULT_RATIO);
+  let timelineHeight = $state(0);
   let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
   let voiceChatOpen = $state(false);
   let voiceChatWidth = $state(VOICE_CHAT_DEFAULT_WIDTH);
@@ -734,19 +749,13 @@
     void goto(roomSectionPath(roomList.rooms, predecessor.room_id, null, predecessor.via));
   }
 
-  function openPrescreen(): void {
+  function startCall(): void {
     call.clearFailure();
-    prescreenMedia = { microphone: true, camera: resolvedRoom?.is_voice === false };
-    prescreenOpen = true;
+    void call.join(resolvedRoomId, { microphone: true, camera: false }, callFallbackUrl);
   }
 
-  async function joinCall(): Promise<void> {
-    if (!resolvedRoomId) return;
-    try {
-      await call.join(resolvedRoomId, prescreenMedia, callFallbackUrl);
-    } finally {
-      prescreenOpen = false;
-    }
+  function joinCall(): void {
+    void call.join(resolvedRoomId, prescreenMedia, callFallbackUrl);
   }
 </script>
 
@@ -856,7 +865,7 @@
   aria-label={$i18n.t('timeline.label')}
   data-inset-owner={voiceView ? 'top' : 'top bottom'}
 >
-  <div class="timeline">
+  <div class="timeline" bind:clientHeight={timelineHeight}>
     {#snippet headerActions()}
       {#if !voiceView}
         <IconButton
@@ -903,7 +912,7 @@
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
       membersOpen={desktop ? desktopMembersOpen : membersOpen}
-      onCall={callOffered && !isVoiceRoom ? openPrescreen : null}
+      onCall={callOffered && !isVoiceRoom ? startCall : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
       chatBeside={desktop}
@@ -938,10 +947,36 @@
         />
       {/snippet}
     </RoomHeader>
-    {#if callShown}
-      {#await import('#lib/features/call/CallView.svelte') then { default: CallView }}
-        <CallView session={call} members={memberLoader.members} />
-      {/await}
+    {#if callShown && (voiceView || !isVoiceRoom)}
+      <div
+        class="call-stage"
+        class:docked={!voiceView}
+        style:flex-basis={voiceView ? undefined : `${callStageRatio * 100}%`}
+      >
+        {#await import('#lib/features/call/CallView.svelte') then { default: CallView }}
+          <CallView
+            session={call}
+            members={memberLoader.members}
+            onInvite={permissions?.can_invite ? () => (inviteOpen = true) : undefined}
+            onOpenSettings={(event: MouseEvent) => openSettingsOver(event, 'calls')}
+          />
+        {/await}
+        {#if !voiceView}
+          <ResizeHandle
+            value={callStageRatio}
+            min={CALL_STAGE_MIN_RATIO}
+            max={CALL_STAGE_MAX_RATIO}
+            label={$i18n.t('call.resizeStage')}
+            valueText={$i18n.t('call.stageShare', { percent: Math.round(callStageRatio * 100) })}
+            grow="down"
+            step={0.05}
+            shiftStep={0.15}
+            fromPixels={(pixels) => (timelineHeight > 0 ? pixels / timelineHeight : 0)}
+            onResize={(next) => (callStageRatio = clampCallStageRatio(next))}
+            onCommit={() => localStorage.setItem(CALL_STAGE_RATIO_KEY, String(callStageRatio))}
+          />
+        {/if}
+      </div>
     {/if}
     {#if voiceView}
       {#if !callShown}
@@ -952,8 +987,10 @@
           joining={call.lifecycle === 'joining'}
           canJoin={callable}
           hasPermission={callSupport?.can_join ?? false}
+          {roomName}
+          selfId={core.session?.user_id ?? null}
           onChange={(media: CallMedia) => (prescreenMedia = media)}
-          onJoin={() => void joinCall()}
+          onJoin={joinCall}
         />
       {/if}
     {:else}
@@ -1110,20 +1147,6 @@
     </DialogFrame>
   {/if}
 
-  <BottomSheet
-    bind:open={prescreenOpen}
-    label={$i18n.t('call.prescreenTitle')}
-    closeLabel={$i18n.t('banner.close')}
-  >
-    <CallDevicePreview
-      media={prescreenMedia}
-      joining={call.lifecycle === 'joining'}
-      onChange={(media: CallMedia) => (prescreenMedia = media)}
-      onJoin={() => void joinCall()}
-      onCancel={() => (prescreenOpen = false)}
-    />
-  </BottomSheet>
-
   <RoomTopicViewer
     open={topicOpen}
     {roomName}
@@ -1222,6 +1245,37 @@
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+
+  .call-stage {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    position: relative;
+  }
+
+  .call-stage.docked {
+    flex-grow: 0;
+    flex-shrink: 0;
+    min-height: 10rem;
+  }
+
+  .call-stage :global(.resize-handle) {
+    bottom: -0.25rem;
+    z-index: 3;
+  }
+
+  .call-stage :global(.resize-handle)::after {
+    background: var(--surface-container-line);
+    border-radius: var(--radii-pill);
+    content: '';
+    height: 0.25rem;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    translate: -50% -50%;
+    width: 2.5rem;
   }
 
   .voice-chat {

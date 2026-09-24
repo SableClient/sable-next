@@ -11,6 +11,9 @@ import { createNativeTransport } from './native-transport';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
+import { cameraVisible, screenShareVisible } from './call-layout';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant } from './call-transport';
 
 export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leaving' | 'failed';
@@ -18,6 +21,16 @@ export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leav
 export type CallFailure = 'busy' | 'no-focus' | 'e2ee-unsupported' | 'e2ee-failed' | 'setup-failed';
 
 export type CallMedia = { microphone: boolean; camera: boolean };
+
+export type CallVoiceState = {
+  speaking: boolean;
+  muted: boolean;
+  camera: boolean;
+  screen: boolean;
+  deafened: boolean;
+};
+
+export type CallDeviceError = 'microphone' | 'camera' | 'screen';
 
 const OWN_KEY_TIMEOUT_MS = 10_000;
 
@@ -49,6 +62,8 @@ export class CallSession {
   mediaReady = $state(false);
   encryptsMedia = $state(false);
   deafened = $state(false);
+  connectedAt = $state<number | null>(null);
+  deviceError = $state<CallDeviceError | null>(null);
 
   readonly #client: CoreClient;
   readonly #deps: CallSessionDeps;
@@ -76,6 +91,8 @@ export class CallSession {
   #backendEnded = false;
   #ownKey: { resolve: () => void; reject: (error: Error) => void } | undefined;
   #telemetry: CallTelemetry | undefined;
+  #lastJoin: { roomId: string; media: CallMedia; serviceUrl: string | null } | undefined;
+  #micBeforeDeafen: boolean | undefined;
 
   constructor(client: CoreClient, deps: CallSessionDeps = {}) {
     this.#client = client;
@@ -106,6 +123,27 @@ export class CallSession {
     return this.#media?.capabilities.screenShare !== undefined;
   }
 
+  readonly voiceStates = $derived.by(() => {
+    /* eslint-disable svelte/prefer-svelte-reactivity -- rebuilt whole on every change, never mutated after */
+    const userIds = new Map(this.members.map((member) => [member.identity, member.user_id]));
+    const states = new Map<string, CallVoiceState>();
+    const { self, participants } = this.transport;
+    for (const participant of self ? [self, ...participants] : participants) {
+      const userId = userIds.get(participant.identity);
+      if (!userId) continue;
+      const previous = states.get(userId);
+      states.set(userId, {
+        speaking: (previous?.speaking ?? false) || participant.speaking === true,
+        muted: (previous?.muted ?? true) && (participant.microphone?.muted ?? true),
+        camera: (previous?.camera ?? false) || cameraVisible(participant),
+        screen: (previous?.screen ?? false) || screenShareVisible(participant),
+        deafened: (previous?.deafened ?? false) || (participant.local === true && this.deafened),
+      });
+    }
+    /* eslint-enable svelte/prefer-svelte-reactivity */
+    return states;
+  });
+
   get active(): boolean {
     return this.lifecycle !== 'idle' && this.lifecycle !== 'failed';
   }
@@ -120,6 +158,8 @@ export class CallSession {
     }
 
     this.#lease = lease;
+    this.#lastJoin = { roomId, media, serviceUrl };
+    this.deviceError = null;
     const attempt = ++this.#attemptGeneration;
     const telemetry = new CallTelemetry({
       'call.microphone_requested': media.microphone,
@@ -274,6 +314,7 @@ export class CallSession {
       this.mediaReady = true;
 
       this.lifecycle = 'active';
+      this.connectedAt = Date.now();
       telemetry.finish('connected');
     } catch (error) {
       if (attempt !== this.#attemptGeneration) return;
@@ -293,6 +334,8 @@ export class CallSession {
     this.lifecycle = 'idle';
     this.failure = null;
     this.roomId = null;
+    this.connectedAt = null;
+    this.deviceError = null;
   }
 
   clearFailure(): void {
@@ -302,8 +345,32 @@ export class CallSession {
     this.roomId = null;
   }
 
+  async retry(): Promise<void> {
+    const last = this.#lastJoin;
+    if (this.lifecycle !== 'failed' || !last) return;
+    await this.join(last.roomId, last.media, last.serviceUrl);
+  }
+
+  clearDeviceError(): void {
+    this.deviceError = null;
+  }
+
+  async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<void> {
+    try {
+      await action();
+      if (this.deviceError === kind) this.deviceError = null;
+    } catch (error) {
+      if (kind === 'screen' && error instanceof Error && error.name === 'NotAllowedError') return;
+      this.deviceError = kind;
+    }
+  }
+
   async setMicrophoneEnabled(enabled: boolean): Promise<void> {
-    await this.#media?.setMicrophoneEnabled(enabled);
+    if (enabled && this.deafened) {
+      this.deafened = false;
+      this.#micBeforeDeafen = undefined;
+    }
+    await this.#device('microphone', () => this.#media?.setMicrophoneEnabled(enabled));
   }
 
   async setParticipantVolume(identity: string, volume: number): Promise<void> {
@@ -311,15 +378,37 @@ export class CallSession {
   }
 
   setDeafened(deafened: boolean): void {
+    if (deafened === this.deafened) return;
     this.deafened = deafened;
+    if (!this.#media) return;
+    if (deafened) {
+      this.#micBeforeDeafen = this.transport.microphoneEnabled;
+      if (this.#micBeforeDeafen) {
+        void this.#device('microphone', () => this.#media?.setMicrophoneEnabled(false));
+      }
+      return;
+    }
+    const restore = this.#micBeforeDeafen;
+    this.#micBeforeDeafen = undefined;
+    if (restore) void this.#device('microphone', () => this.#media?.setMicrophoneEnabled(true));
+  }
+
+  async switchDevice(kind: MediaDeviceKind, deviceId: string): Promise<void> {
+    setPreference(DEVICE_PREFERENCE[kind], deviceId);
+    const error = kind === 'videoinput' ? 'camera' : 'microphone';
+    await this.#device(error, async () => {
+      await Promise.all(
+        this.rooms.map(({ room }) => room.switchActiveDevice(kind, deviceId || 'default'))
+      );
+    });
   }
 
   async setCameraEnabled(enabled: boolean): Promise<void> {
-    await this.#media?.setCameraEnabled(enabled);
+    await this.#device('camera', () => this.#media?.setCameraEnabled(enabled));
   }
 
   async setScreenShareEnabled(enabled: boolean): Promise<void> {
-    await this.#media?.capabilities.screenShare?.setEnabled(enabled);
+    await this.#device('screen', () => this.#media?.capabilities.screenShare?.setEnabled(enabled));
   }
 
   #classify(error: unknown): CallFailure {
@@ -330,6 +419,7 @@ export class CallSession {
   #fail(failure: CallFailure): void {
     this.failure = failure;
     this.lifecycle = 'failed';
+    this.connectedAt = null;
   }
 
   #onCoreEvent(event: CoreEvent): void {

@@ -32,6 +32,9 @@
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
+  import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
+  import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
@@ -66,6 +69,8 @@
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
 
+  import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
+  import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -99,9 +104,29 @@
     onNavigate?: (href: string) => void;
     width?: number;
     collapsed?: boolean;
+    callRoomId?: string | null;
+    callVoiceStates?: ReadonlyMap<string, CallVoiceState>;
+    onCallVolume?: (userId: string, volume: number) => void;
   }
 
-  let { onNavigate, width, collapsed = false }: Props = $props();
+  let {
+    onNavigate,
+    width,
+    collapsed = false,
+    callRoomId = null,
+    callVoiceStates = new Map(),
+    onCallVolume,
+  }: Props = $props();
+
+  let volumeTarget = $state<{ userId: string; name: string; anchor: HTMLElement } | null>(null);
+  let volumeOpen = $state(false);
+
+  function openCallVolume(event: MouseEvent, userId: string, name: string): void {
+    if (!(event.currentTarget instanceof HTMLElement)) return;
+    event.preventDefault();
+    volumeTarget = { userId, name, anchor: event.currentTarget };
+    volumeOpen = true;
+  }
   const roomList = useRoomList();
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
@@ -835,7 +860,13 @@
       >
         {#each room.call_participants as userId (userId)}
           {@const profile = peerProfiles.get(userId)}
+          {@const voice = room.room_id === callRoomId ? callVoiceStates.get(userId) : undefined}
+          {@const displayName = profile?.display_name ?? userId}
           <li
+            class:speaking={voice?.speaking && !voice.muted}
+            oncontextmenu={voice && userId !== core.session?.user_id
+              ? (event) => openCallVolume(event, userId, displayName)
+              : undefined}
             {@attach whenVisible(() => {
               requestPeerProfile(userId);
             })}
@@ -849,6 +880,30 @@
             />
             {#if !collapsed}
               <span>{profile?.display_name ?? userId}</span>
+              {#if voice && (voice.muted || voice.deafened || voice.camera || voice.screen)}
+                <span class="voice-badges">
+                  {#if voice.screen}
+                    <span class="voice-stream">{$i18n.t('call.live')}</span>
+                  {/if}
+                  {#if voice.camera}
+                    <span title={$i18n.t('call.cameraOnLabel')}>
+                      <VideoCameraIcon aria-hidden="true" weight="fill" />
+                      <span class="screen-reader-only">{$i18n.t('call.cameraOnLabel')}</span>
+                    </span>
+                  {/if}
+                  {#if voice.deafened}
+                    <span class="voice-off" title={$i18n.t('call.deafened')}>
+                      <SpeakerSlashIcon aria-hidden="true" weight="fill" />
+                      <span class="screen-reader-only">{$i18n.t('call.deafened')}</span>
+                    </span>
+                  {:else if voice.muted}
+                    <span class="voice-off" title={$i18n.t('call.muted')}>
+                      <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+                      <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
+                    </span>
+                  {/if}
+                </span>
+              {/if}
             {/if}
           </li>
         {/each}
@@ -1031,6 +1086,16 @@
     </div>
   </div>
 </section>
+
+{#if volumeTarget}
+  <CallVolumePopover
+    bind:open={volumeOpen}
+    anchor={volumeTarget.anchor}
+    userId={volumeTarget.userId}
+    name={volumeTarget.name}
+    onVolumeChange={onCallVolume}
+  />
+{/if}
 
 <RoomSettingsDialog
   open={settingsRoom !== null}
@@ -1679,6 +1744,48 @@
 
   .call-participant-list :global(.avatar-root) {
     --avatar-size: var(--avatar-size-200);
+
+    border-radius: var(--radii-pill);
+    flex: none;
+    transition: box-shadow var(--motion-normal) var(--motion-easing-emphasized);
+  }
+
+  .call-participant-list li.speaking {
+    color: var(--bg-on-container);
+  }
+
+  .call-participant-list li.speaking :global(.avatar-root) {
+    box-shadow:
+      0 0 0 0.125rem var(--bg-container),
+      0 0 0 0.25rem var(--success-main);
+  }
+
+  .voice-badges {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: inline-flex;
+    flex: none;
+    gap: var(--space-100);
+    margin-inline-start: auto;
+  }
+
+  .voice-badges > span {
+    display: inline-flex;
+  }
+
+  .voice-off {
+    color: var(--crit-main);
+  }
+
+  .voice-stream {
+    background: var(--crit-main);
+    border-radius: var(--radii-300);
+    color: var(--crit-on-main);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.04em;
+    padding: 0 var(--space-100);
+    text-transform: uppercase;
   }
 
   .call-participant-list li span {

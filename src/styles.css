@@ -271,6 +271,37 @@ html {
 /* Global CSS */
 
 :root {
+  --call-stage-bg: #0c0c0f;
+  --call-stage-tile: #25242c;
+  --call-stage-container: #1b1a21;
+  --call-stage-container-hover: #24232c;
+  --call-stage-container-active: #2d2c36;
+  --call-stage-container-line: #363541;
+  --call-stage-on-container: #eae8f0;
+  --call-stage-control: #2a2933;
+  --call-stage-control-hover: #34333e;
+  --call-stage-control-active: #3e3d49;
+  --call-stage-success: #85e0ba;
+  --call-stage-success-hover: #70dbaf;
+  --call-stage-success-active: #66d9a9;
+  --call-stage-success-ink: #0f3d2a;
+  --call-stage-warn: #e3ba91;
+  --call-stage-crit: #f0a3a3;
+  --call-stage-crit-container: #602929;
+  --call-stage-crit-container-hover: #6b2e2e;
+  --call-stage-crit-container-active: #763333;
+  --call-stage-crit-on-container: #f5d6d6;
+  --call-stage-focus-ring: rgb(189 182 236 / 70%);
+  --call-stage-scrim: rgb(0 0 0 / 62%);
+  --call-stage-on: #eae8f0;
+  --call-stage-on-hover: #fff;
+  --call-stage-on-ink: #1b1a21;
+  --call-stage-hangup: #da3633;
+  --call-stage-hangup-hover: #c42b29;
+  --call-stage-hangup-active: #ad2321;
+  --call-stage-hangup-ink: #fff;
+  --call-stage-shadow: 0 0.25rem 1.25rem rgb(0 0 0 / 45%);
+  --call-stage-notice-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 50%);
   --space-050: 0.125rem;
   --space-100: 0.25rem;
   --space-150: 0.375rem;
@@ -622,6 +653,50 @@ label,
 label[for],
 [role='switch'] {
   user-select: none;
+}
+
+.call-stage-theme {
+  --bg-container: var(--call-stage-container);
+  --bg-container-hover: var(--call-stage-container-hover);
+  --bg-container-active: var(--call-stage-container-active);
+  --bg-container-line: var(--call-stage-container-line);
+  --bg-on-container: var(--call-stage-on-container);
+  --surface-container: var(--call-stage-container);
+  --surface-container-hover: var(--call-stage-container-hover);
+  --surface-container-active: var(--call-stage-container-active);
+  --surface-container-line: var(--call-stage-container-line);
+  --surface-on-container: var(--call-stage-on-container);
+  --sec-container: var(--call-stage-control);
+  --sec-container-hover: var(--call-stage-control-hover);
+  --sec-container-active: var(--call-stage-control-active);
+  --sec-container-line: var(--call-stage-container-line);
+  --sec-on-container: var(--call-stage-on-container);
+  --surface-var-container: var(--call-stage-control);
+  --surface-var-container-hover: var(--call-stage-control-hover);
+  --surface-var-container-active: var(--call-stage-control-active);
+  --surface-var-on-container: var(--call-stage-on-container);
+  --success-main: var(--call-stage-success);
+  --success-main-hover: var(--call-stage-success-hover);
+  --success-main-active: var(--call-stage-success-active);
+  --success-on-main: var(--call-stage-success-ink);
+  --warn-main: var(--call-stage-warn);
+  --crit-main: var(--call-stage-crit);
+  --crit-container: var(--call-stage-crit-container);
+  --crit-container-hover: var(--call-stage-crit-container-hover);
+  --crit-container-active: var(--call-stage-crit-container-active);
+  --crit-on-container: var(--call-stage-crit-on-container);
+  --focus-ring: var(--call-stage-focus-ring);
+  --call-on-container: var(--call-stage-on);
+  --call-on-container-hover: var(--call-stage-on-hover);
+  --call-on-ink: var(--call-stage-on-ink);
+  --call-hangup: var(--call-stage-hangup);
+  --call-hangup-hover: var(--call-stage-hangup-hover);
+  --call-hangup-active: var(--call-stage-hangup-active);
+  --call-hangup-ink: var(--call-stage-hangup-ink);
+  --call-pill-shadow: var(--call-stage-shadow);
+  --target-hit: 2.75rem;
+
+  color-scheme: dark;
 }
 
 .selection-layer {

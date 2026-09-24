@@ -4,6 +4,12 @@ export type CallDevice = {
   label: string;
 };
 
+export const DEVICE_PREFERENCE = {
+  audioinput: 'audioInputDevice',
+  audiooutput: 'audioOutputDevice',
+  videoinput: 'videoInputDevice',
+} as const;
+
 export function supportsDeviceSelection(): boolean {
   return (
     typeof navigator !== 'undefined' &&

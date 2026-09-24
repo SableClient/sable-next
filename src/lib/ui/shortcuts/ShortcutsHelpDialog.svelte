@@ -17,6 +17,7 @@
     { id: 'navigation', labelKey: 'shortcuts.categoryNavigation' },
     { id: 'general', labelKey: 'shortcuts.categoryGeneral' },
     { id: 'room', labelKey: 'shortcuts.categoryRoom' },
+    { id: 'call', labelKey: 'shortcuts.categoryCall' },
   ];
 
   let shortcuts = $derived(effectiveShortcuts());

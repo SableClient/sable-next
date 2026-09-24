@@ -15,12 +15,17 @@ export type ShortcutId =
   | 'room.markRead'
   | 'room.markAllRead'
   | 'room.replyOlder'
-  | 'room.replyNewer';
+  | 'room.replyNewer'
+  | 'call.toggleMute'
+  | 'call.toggleDeafen'
+  | 'call.toggleCamera'
+  | 'call.toggleScreenShare'
+  | 'call.hangUp';
 
 export interface ShortcutDefinition {
   id: ShortcutId;
   labelKey: string;
-  category: 'general' | 'navigation' | 'room';
+  category: 'general' | 'navigation' | 'room' | 'call';
   binding: string;
   allowInEditable?: boolean;
 }
@@ -119,6 +124,38 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.replyNewer',
     category: 'room',
     binding: 'ctrl+down',
+  },
+  {
+    id: 'call.toggleMute',
+    labelKey: 'shortcuts.toggleMute',
+    category: 'call',
+    binding: 'mod+shift+m',
+    allowInEditable: true,
+  },
+  {
+    id: 'call.toggleDeafen',
+    labelKey: 'shortcuts.toggleDeafen',
+    category: 'call',
+    binding: 'mod+shift+d',
+    allowInEditable: true,
+  },
+  {
+    id: 'call.toggleCamera',
+    labelKey: 'shortcuts.toggleCamera',
+    category: 'call',
+    binding: 'mod+shift+v',
+  },
+  {
+    id: 'call.toggleScreenShare',
+    labelKey: 'shortcuts.toggleScreenShare',
+    category: 'call',
+    binding: 'mod+shift+e',
+  },
+  {
+    id: 'call.hangUp',
+    labelKey: 'shortcuts.hangUp',
+    category: 'call',
+    binding: 'mod+shift+h',
   },
 ] as const;
 
