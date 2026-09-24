@@ -36,7 +36,9 @@
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -50,7 +52,6 @@
 
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
-  import MutualRoomsPanel from './MutualRoomsPanel.svelte';
   import { profileFieldMap } from './profile-field-map';
   import { senderColor } from './timeline-format';
 
@@ -200,12 +201,15 @@
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;
   let mutualRooms = $state.raw<MutualRoomView[]>([]);
   let ignored = $state(false);
-  let shared = $state<'rooms' | 'spaces' | null>(null);
   let miscOpen = $state(false);
   let sharedRooms = $derived(mutualRooms.filter((room) => !room.is_space));
   let sharedSpaces = $derived(mutualRooms.filter((room) => room.is_space));
-  let sharedList = $derived(shared === 'spaces' ? sharedSpaces : sharedRooms);
-  let sharedExpanded = $state(false);
+  let sharedDirect = $derived(
+    sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct === true)
+  );
+  let sharedGroups = $derived(
+    sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct !== true)
+  );
   let hasMeta = $derived(
     Boolean(pronouns || localTime || animalText || roleLabel || presenceLabel)
   );
@@ -231,7 +235,6 @@
     );
     return () => {
       cancelled = true;
-      shared = null;
     };
   });
 
@@ -334,11 +337,6 @@
     );
   }
 
-  function showShared(kind: 'rooms' | 'spaces' | null): void {
-    shared = shared === kind ? null : kind;
-    sharedExpanded = false;
-  }
-
   function openRoom(target: string): void {
     void goto(roomSectionPath(roomList.rooms, target));
   }
@@ -413,30 +411,32 @@
     </IconContext>
   </ActionMenu>
   {#if sharedRooms.length > 0}
-    <button
-      class="profile-action selection-open"
-      type="button"
-      aria-expanded={shared === 'rooms'}
-      onclick={() => {
-        showShared('rooms');
-      }}
-    >
-      <ChatsIcon size={14} />
-      {$i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
-    </button>
+    {@const label = $i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
+    <ActionMenu {label} class="profile-mutual-menu" align="start">
+      {#snippet trigger({ props })}
+        <button {...props} class="profile-action selection-open" type="button">
+          <ChatsIcon size={14} />
+          {label}
+        </button>
+      {/snippet}
+      {@render mutualRows(sharedGroups)}
+      {#if sharedGroups.length > 0 && sharedDirect.length > 0}
+        <ActionMenuSeparator />
+      {/if}
+      {@render mutualRows(sharedDirect)}
+    </ActionMenu>
   {/if}
   {#if sharedSpaces.length > 0}
-    <button
-      class="profile-action selection-open"
-      type="button"
-      aria-expanded={shared === 'spaces'}
-      onclick={() => {
-        showShared('spaces');
-      }}
-    >
-      <UsersThreeIcon size={14} />
-      {$i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })}
-    </button>
+    {@const label = $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })}
+    <ActionMenu {label} class="profile-mutual-menu" align="start">
+      {#snippet trigger({ props })}
+        <button {...props} class="profile-action selection-open" type="button">
+          <UsersThreeIcon size={14} />
+          {label}
+        </button>
+      {/snippet}
+      {@render mutualRows(sharedSpaces)}
+    </ActionMenu>
   {/if}
   <ActionMenu label={$i18n.t('timeline.profileMoreActions')}>
     {#snippet trigger({ props })}
@@ -549,19 +549,22 @@
   {/if}
 {/snippet}
 
-{#snippet sharedPanel()}
-  <MutualRoomsPanel
-    kind={shared === 'spaces' ? 'spaces' : 'rooms'}
-    rooms={sharedList}
-    expanded={sharedExpanded}
-    onOpenRoom={openRoom}
-    onExpand={() => {
-      sharedExpanded = true;
-    }}
-    onBack={() => {
-      showShared(null);
-    }}
-  />
+{#snippet mutualRows(rooms: readonly MutualRoomView[])}
+  {#each rooms as room (room.room_id)}
+    <ActionMenuItem
+      onSelect={() => {
+        openRoom(room.room_id);
+      }}
+    >
+      <Avatar
+        id={room.room_id}
+        src={roomList.byId(room.room_id)?.avatar_url}
+        name={room.name ?? room.room_id}
+        size="small"
+      />
+      <span class="profile-mutual-name">{room.name ?? room.room_id}</span>
+    </ActionMenuItem>
+  {/each}
 {/snippet}
 
 {#snippet composer()}
@@ -656,8 +659,8 @@
   nameColorDark={currentProfile?.name_color_dark}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
-  children={shared ? sharedPanel : showFailure || currentProfile?.bio ? bioPanel : undefined}
-  footer={!shared && extra.length > 0 ? miscData : undefined}
+  children={showFailure || currentProfile?.bio ? bioPanel : undefined}
+  footer={extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
   {variant}
 />
@@ -698,6 +701,21 @@
 </DialogFrame>
 
 <style>
+  :global(.profile-mutual-menu) {
+    --menu-max-height: min(32rem, 80dvh);
+  }
+
+  :global(.profile-mutual-menu .avatar-root) {
+    --avatar-size: var(--avatar-size-200);
+  }
+
+  .profile-mutual-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .profile-meta-item {
     align-items: center;
     display: inline-flex;

@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { ProfileView } from '#src/generated/protocol';
+import type { MutualRoomView, ProfileView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -12,7 +12,7 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 const core = Object.assign(baseCore, {
   session: { user_id: '@me:example.org' },
   createDm: vi.fn<() => Promise<string>>(),
-  userRelations: vi.fn<() => Promise<{ mutualRooms: never[]; ignored: boolean }>>(),
+  userRelations: vi.fn<() => Promise<{ mutualRooms: MutualRoomView[]; ignored: boolean }>>(),
   setUserIgnored: vi.fn<() => Promise<void>>(),
   sendMessage: vi.fn<() => Promise<void>>(),
   kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
@@ -24,7 +24,11 @@ const toastError = vi.hoisted(() => vi.fn());
 vi.mock('#lib/ui/toasts.svelte.js', () => ({ toasts: { error: toastError } }));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
-  useRoomList: () => ({ rooms: [] }),
+  useRoomList: () => ({
+    rooms: [],
+    byId: (roomId: string) =>
+      roomId === '!dm:example.org' ? { room_id: roomId, is_direct: true } : undefined,
+  }),
 }));
 
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
@@ -508,4 +512,49 @@ test('toasts a failed role change and reports nothing', async () => {
     expect(toastError).toHaveBeenCalled();
   });
   expect(onPowerLevelChange).not.toHaveBeenCalled();
+});
+
+test('lists mutual rooms in a menu of their own, with direct messages last', async () => {
+  core.userRelations.mockResolvedValueOnce({
+    mutualRooms: [
+      { room_id: '!dm:example.org', name: 'Alice', is_space: false },
+      { room_id: '!general:example.org', name: 'General', is_space: false },
+      { room_id: '!space:example.org', name: 'Space', is_space: true },
+    ],
+    ignored: false,
+  });
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  const rooms = await vi.waitFor(() => {
+    const chip = [...document.querySelectorAll<HTMLButtonElement>('.profile-action')].find(
+      (button) => button.textContent.includes('2 mutual rooms')
+    );
+    if (!chip) throw new Error('mutual rooms chip not rendered');
+    return chip;
+  });
+  rooms.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      button: 0,
+      isPrimary: true,
+    })
+  );
+  await tick();
+  await tick();
+
+  const names = [...document.querySelectorAll('.profile-mutual-name')].map(
+    (node) => node.textContent
+  );
+  expect(names).toEqual(['General', 'Alice']);
+  expect(document.querySelector('.profile-card-bio')).toBeNull();
+  await unmount(instance);
 });
