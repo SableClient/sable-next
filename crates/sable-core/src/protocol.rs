@@ -336,6 +336,13 @@ pub enum Command {
         room_id: OwnedRoomId,
         from: Option<String>,
     },
+    RoomAttachments {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        kind: RoomAttachmentKind,
+        limit: u32,
+        offset: u32,
+    },
     NotificationKeywords,
     AddNotificationKeyword {
         keyword: String,
@@ -1141,6 +1148,10 @@ pub enum CommandOk {
     ListThreads {
         roots: Vec<ThreadRootView>,
         next_batch: Option<String>,
+    },
+    RoomAttachments {
+        items: Vec<RoomAttachmentView>,
+        exhausted: bool,
     },
     NotificationKeywords {
         keywords: Vec<String>,
@@ -2113,6 +2124,68 @@ pub struct ThreadRootView {
     pub body: String,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub timestamp: Option<u64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum RoomAttachmentKind {
+    Media,
+    File,
+    Link,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomAttachmentView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub sender: OwnedUserId,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub timestamp: u64,
+    pub content: RoomAttachmentContentView,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RoomAttachmentContentView {
+    Image {
+        filename: String,
+        source: String,
+        mime: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        width: Option<u64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        height: Option<u64>,
+        blurhash: Option<String>,
+        thumbnail: Option<String>,
+        spoiler: Option<String>,
+    },
+    Video {
+        filename: String,
+        source: String,
+        mime: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        width: Option<u64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        height: Option<u64>,
+        blurhash: Option<String>,
+        thumbnail: Option<String>,
+        spoiler: Option<String>,
+    },
+    File {
+        filename: String,
+        source: String,
+        mime: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        size: Option<u64>,
+    },
+    Link {
+        urls: Vec<String>,
+        body: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

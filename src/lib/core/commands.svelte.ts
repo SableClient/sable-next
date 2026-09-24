@@ -46,6 +46,8 @@ import type {
   RoomPreviewView,
   RoomStateEventView,
   UrlPreviewView,
+  RoomAttachmentKind,
+  RoomAttachmentView,
   ThreadRootView,
   RoomSummary,
   SidebarItemView,
@@ -355,6 +357,22 @@ export function createCommands(transport: () => Transport) {
     ): Promise<{ roots: ThreadRootView[]; next_batch: string | null }> {
       const response = await transport().send({ type: 'list_threads', room_id: roomId, from });
       return { roots: response.roots, next_batch: response.next_batch };
+    },
+
+    async roomAttachments(
+      roomId: string,
+      kind: RoomAttachmentKind,
+      limit: number,
+      offset: number
+    ): Promise<{ items: RoomAttachmentView[]; exhausted: boolean }> {
+      const response = await transport().send({
+        type: 'room_attachments',
+        room_id: roomId,
+        kind,
+        limit,
+        offset,
+      });
+      return { items: response.items, exhausted: response.exhausted };
     },
 
     async urlPreview(url: string): Promise<UrlPreviewView | null> {

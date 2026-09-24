@@ -956,6 +956,23 @@ impl Core {
                 })
             }
 
+            Command::RoomAttachments {
+                room_id,
+                kind,
+                limit,
+                offset,
+            } => {
+                let (items, exhausted) = self
+                    .room_attachments(
+                        &room_id,
+                        kind,
+                        (limit as usize).min(MAX_SEARCH_RESULTS),
+                        offset as usize,
+                    )
+                    .await?;
+                Ok(CommandOk::RoomAttachments { items, exhausted })
+            }
+
             Command::UrlPreview { url } => {
                 let sent = self
                     .client()

@@ -899,6 +899,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             : null,
       }),
       list_threads: () => ({ type: 'list_threads', roots: [], next_batch: null }),
+      room_attachments: () => ({ type: 'room_attachments', items: [], exhausted: true }),
       notification_keywords: () => ({
         type: 'notification_keywords',
         keywords: [...notificationKeywords],

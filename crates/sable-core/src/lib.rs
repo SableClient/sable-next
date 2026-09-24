@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod accounts;
+mod attachments;
 mod auth;
 mod bookmarks;
 mod calls;

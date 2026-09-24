@@ -2935,6 +2935,106 @@ mod tests {
     }
 
     #[async_test]
+    async fn test_room_attachments_sort_the_index_into_media_files_and_links() {
+        use matrix_sdk::ruma::events::room::message::{
+            FileMessageEventContent, MessageType, RoomMessageEventContent,
+        };
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!attachments:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .add_timeline_event(
+                        factory
+                            .image(
+                                "beach.png".to_owned(),
+                                matrix_sdk::ruma::owned_mxc_uri!("mxc://localhost/beach"),
+                            )
+                            .event_id(event_id!("$image")),
+                    )
+                    .add_timeline_event(
+                        factory
+                            .event(RoomMessageEventContent::new(MessageType::File(
+                                FileMessageEventContent::plain(
+                                    "notes.pdf".to_owned(),
+                                    matrix_sdk::ruma::owned_mxc_uri!("mxc://localhost/notes"),
+                                ),
+                            )))
+                            .event_id(event_id!("$file")),
+                    )
+                    .add_timeline_event(
+                        factory
+                            .text_msg(
+                                "tickets at https://example.org/tickets and javascript://%0Aalert(1)",
+                            )
+                            .event_id(event_id!("$link")),
+                    )
+                    .add_timeline_event(
+                        factory
+                            .text_msg("nothing to see")
+                            .event_id(event_id!("$plain")),
+                    ),
+            )
+            .await;
+
+        let core = logged_in(&server, &client, "room-attachments").await;
+        let (cache, _drop_handles) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+        reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+
+        let (media, exhausted) = core
+            .room_attachments(&room_id, crate::protocol::RoomAttachmentKind::Media, 10, 0)
+            .await
+            .expect("media");
+        assert!(exhausted);
+        assert!(matches!(
+            media.as_slice(),
+            [crate::protocol::RoomAttachmentView {
+                content: crate::protocol::RoomAttachmentContentView::Image { filename, source, .. },
+                ..
+            }] if filename == "beach.png" && source == "mxc://localhost/beach"
+        ));
+
+        let (files, _) = core
+            .room_attachments(&room_id, crate::protocol::RoomAttachmentKind::File, 10, 0)
+            .await
+            .expect("files");
+        assert!(matches!(
+            files.as_slice(),
+            [crate::protocol::RoomAttachmentView {
+                content: crate::protocol::RoomAttachmentContentView::File { filename, .. },
+                ..
+            }] if filename == "notes.pdf"
+        ));
+
+        let (links, _) = core
+            .room_attachments(&room_id, crate::protocol::RoomAttachmentKind::Link, 10, 0)
+            .await
+            .expect("links");
+        assert!(matches!(
+            links.as_slice(),
+            [crate::protocol::RoomAttachmentView {
+                content: crate::protocol::RoomAttachmentContentView::Link { urls, .. },
+                ..
+            }] if urls == &["https://example.org/tickets".to_owned()]
+        ));
+
+        drop(room);
+    }
+
+    #[async_test]
     async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;

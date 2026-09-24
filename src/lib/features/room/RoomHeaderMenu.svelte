@@ -7,6 +7,7 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import type { RoomSummary } from '#src/generated/protocol';
@@ -32,6 +33,7 @@
     onMembers: () => void;
     onSettings: () => void;
     onJumpToTime: () => void;
+    onAttachments?: () => void;
     onLeave: () => void;
   }
 
@@ -45,6 +47,7 @@
     onMembers,
     onSettings,
     onJumpToTime,
+    onAttachments,
     onLeave,
   }: Props = $props();
   const core = useCoreClient();
@@ -108,6 +111,12 @@
         <UserCircleIcon />
         {$i18n.t('timeline.members')}
       </ActionMenuItem>
+      {#if onAttachments}
+        <ActionMenuItem onSelect={onAttachments}>
+          <ImagesIcon />
+          {$i18n.t('timeline.attachmentsOpen')}
+        </ActionMenuItem>
+      {/if}
     {/if}
     <ActionMenuItem onSelect={copyLink}>
       <LinkIcon />

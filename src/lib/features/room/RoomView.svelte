@@ -17,6 +17,7 @@
   import { page } from '$app/state';
 
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -35,6 +36,7 @@
   import { Conversation } from './conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
@@ -63,6 +65,7 @@
   import MembersDrawer from './MembersDrawer.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import ThreadList from './ThreadList.svelte';
+  import RoomAttachments from './RoomAttachments.svelte';
   import ThreadPanel from './ThreadPanel.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -131,6 +134,7 @@
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
   let profileAvatarItem = $state<MediaItem | null>(null);
+  let panelMediaItems = $state.raw<MediaItem[] | null>(null);
   let profileAvatarSequence = 0;
   let callSupport = $state<CallSupportView | null>(null);
   let callFallbackUrl = $state<string | null>(null);
@@ -148,7 +152,9 @@
   );
 
   let mediaItems = $derived(
-    profileAvatarItem ? [profileAvatarItem] : timelineMediaItems(timeline.items)
+    profileAvatarItem
+      ? [profileAvatarItem]
+      : (panelMediaItems ?? timelineMediaItems(timeline.items))
   );
 
   $effect(() => {
@@ -201,10 +207,12 @@
   const bookmarks = useBookmarks();
   let threadRootId = $state<string | null>(null);
   let threadsOpen = $state(false);
+  let attachmentsOpen = $state(false);
 
   function openThread(rootEventId: string): void {
     threadRootId = rootEventId;
     threadsOpen = false;
+    attachmentsOpen = false;
     desktopMembersOpen = false;
   }
 
@@ -340,6 +348,7 @@
     receiptsOpen = false;
     threadRootId = null;
     threadsOpen = false;
+    attachmentsOpen = false;
     closeProfile();
   });
 
@@ -637,7 +646,27 @@
 
   function openMedia(eventId: string): void {
     profileAvatarItem = null;
+    panelMediaItems = null;
     mediaEventId = eventId;
+  }
+
+  function openPanelMedia(items: MediaItem[], eventId: string): void {
+    profileAvatarItem = null;
+    panelMediaItems = items;
+    mediaEventId = eventId;
+  }
+
+  function jumpFromViewer(eventId: string): void {
+    closeMedia();
+    if (!desktop) attachmentsOpen = false;
+    void afterOverlayPops().then(() => {
+      jumpToEvent(eventId);
+    });
+  }
+
+  function toggleAttachments(): void {
+    attachmentsOpen = !attachmentsOpen;
+    threadsOpen = false;
   }
 
   function openProfileAvatar(source: string, displayName: string): void {
@@ -665,6 +694,7 @@
   function closeMedia(): void {
     mediaEventId = null;
     profileAvatarItem = null;
+    panelMediaItems = null;
   }
 
   function tombstoneSuccessorPath(id: string, isSpace: boolean): string {
@@ -828,18 +858,32 @@
       {#if !voiceView}
         <IconButton
           variant="ghost"
-          size="small"
+          size="medium"
           label={$i18n.t('timeline.threadsOpen')}
           aria-pressed={threadsOpen}
-          onclick={() => (threadsOpen = !threadsOpen)}
+          onclick={() => {
+            threadsOpen = !threadsOpen;
+            attachmentsOpen = false;
+          }}
         >
-          <ChatsIcon />
+          <ChatsIcon weight={threadsOpen ? 'fill' : 'regular'} />
         </IconButton>
+        {#if desktop}
+          <IconButton
+            variant="ghost"
+            size="medium"
+            label={$i18n.t('timeline.attachmentsOpen')}
+            aria-pressed={attachmentsOpen}
+            onclick={toggleAttachments}
+          >
+            <ImagesIcon weight={attachmentsOpen ? 'fill' : 'regular'} />
+          </IconButton>
+        {/if}
       {/if}
       {#if widgets.length > 0}
         <IconButton
           variant="ghost"
-          size="small"
+          size="medium"
           label={$i18n.t('widgets.label')}
           onclick={toggleWidgets}
         >
@@ -886,6 +930,7 @@
           onMembers={toggleMembers}
           onSettings={() => (settingsOpen = true)}
           onJumpToTime={() => (jumpOpen = true)}
+          onAttachments={voiceView ? undefined : toggleAttachments}
           onLeave={() => (leaveOpen = true)}
         />
       {/snippet}
@@ -948,6 +993,18 @@
       modal={!desktop}
       onOpenThread={openThread}
       onClose={() => (threadsOpen = false)}
+    />
+  {/if}
+
+  {#if attachmentsOpen}
+    <RoomAttachments
+      roomId={resolvedRoomId}
+      members={memberLoader.members}
+      modal={!desktop}
+      onJump={jumpToEvent}
+      onOpenMedia={openPanelMedia}
+      onMatrixLink={handleMatrixLink}
+      onClose={() => (attachmentsOpen = false)}
     />
   {/if}
 
@@ -1130,7 +1187,12 @@
   />
 
   {#if mediaEventId}
-    <MediaViewer items={mediaItems} selectedEventId={mediaEventId} onClose={closeMedia} />
+    <MediaViewer
+      items={mediaItems}
+      selectedEventId={mediaEventId}
+      onClose={closeMedia}
+      onJump={panelMediaItems ? jumpFromViewer : undefined}
+    />
   {/if}
 </main>
 

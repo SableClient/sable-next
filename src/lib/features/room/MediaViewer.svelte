@@ -55,6 +55,7 @@
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
+  import ChatCenteredTextIcon from 'phosphor-svelte/lib/ChatCenteredTextIcon';
 
   export type MediaItem = Extract<
     TimelineItemView['content'],
@@ -68,9 +69,10 @@
     items: readonly MediaItem[];
     selectedEventId: string;
     onClose: () => void;
+    onJump?: (eventId: string) => void;
   }
 
-  let { items, selectedEventId, onClose }: Props = $props();
+  let { items, selectedEventId, onClose, onJump }: Props = $props();
   const core = useCoreClient();
   holdOverlayBack(
     () => item !== undefined,
@@ -627,6 +629,16 @@
             </div>
           </div>
           <div class="actions">
+            {#if onJump}
+              <IconButton
+                label={$i18n.t('viewer.jumpToMessage')}
+                size="medium"
+                variant="ghost"
+                onclick={() => {
+                  if (item) onJump(item.eventId);
+                }}><ChatCenteredTextIcon /></IconButton
+              >
+            {/if}
             {#if isImage}
               <IconButton
                 class="desktop-control"

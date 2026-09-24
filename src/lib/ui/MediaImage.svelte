@@ -185,7 +185,9 @@
   let mediaLabel = $derived(
     manualGif
       ? $i18n.t(gifPlaying ? 'timeline.stopGif' : 'timeline.playGif')
-      : `Open ${alt || 'media'}`
+      : alt
+        ? $i18n.t('timeline.openMedia', { name: alt })
+        : $i18n.t('timeline.openMediaUnnamed')
   );
   let retryLabel = $derived(
     retryWait === 0

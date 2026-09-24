@@ -1192,7 +1192,7 @@ fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
 
 /// `media.rs` reads a bare string back as a plain mxc URI, so the common case
 /// skips the serializer and the wrapper object.
-fn media_source(source: &MediaSource) -> String {
+pub(crate) fn media_source(source: &MediaSource) -> String {
     match source {
         MediaSource::Plain(uri) => uri.as_str().to_owned(),
         encrypted @ MediaSource::Encrypted(_) => {
@@ -1201,11 +1201,11 @@ fn media_source(source: &MediaSource) -> String {
     }
 }
 
-fn image_thumbnail(info: &ImageInfo) -> Option<String> {
+pub(crate) fn image_thumbnail(info: &ImageInfo) -> Option<String> {
     info.thumbnail_source.as_ref().map(media_source)
 }
 
-fn video_thumbnail(info: &VideoInfo) -> Option<String> {
+pub(crate) fn video_thumbnail(info: &VideoInfo) -> Option<String> {
     info.thumbnail_source.as_ref().map(media_source)
 }
 
@@ -1357,7 +1357,7 @@ pub(crate) const CALL_SLOT_ID: &str = "m.call#ROOM";
 
 pub(crate) const SPOILER_PROPERTY: &str = "page.codeberg.everypizza.msc4193.spoiler";
 
-fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
+pub(crate) fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
     const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";
 
     let content = content?;
