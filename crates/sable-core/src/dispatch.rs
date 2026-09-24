@@ -283,6 +283,11 @@ impl Core {
 
             Command::Logout => self.logout().await,
 
+            #[cfg(not(target_family = "wasm"))]
+            Command::ResetLocalCache => self.reset_local_cache().await,
+            #[cfg(target_family = "wasm")]
+            Command::ResetLocalCache => Err(CommandErr::Unsupported),
+
             Command::HomeserverInfo => {
                 let client = self.client().await?;
                 let server = match client.send(get_server_version::v1::Request::new()).await {

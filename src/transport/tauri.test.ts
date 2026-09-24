@@ -117,3 +117,19 @@ test('a video stream is not whole until the end-of-stream marker arrives', async
   expect(settled).toBe(true);
   expect(chunks.flatMap((chunk) => [...chunk])).toEqual([1, 2, 3, 4]);
 });
+
+test('a cache reset goes through the core and still resolves when the core fails it', async () => {
+  invoke.mockImplementation((command: string) =>
+    command === 'submit_command' ? Promise.reject(new Error('failed')) : Promise.resolve(undefined)
+  );
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  captureException.mockClear();
+  const transport = createTauriTransport();
+
+  await expect(transport.resetCaches(['a1'])).resolves.toBeUndefined();
+
+  expect(invoke).toHaveBeenCalledWith('submit_command', {
+    command: { type: 'reset_local_cache' },
+  });
+  expect(captureException).toHaveBeenCalledTimes(1);
+});

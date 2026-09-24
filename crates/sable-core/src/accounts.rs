@@ -239,6 +239,34 @@ impl Core {
         Ok(CommandOk::RemoveAccount)
     }
 
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) async fn reset_local_cache(self: &Arc<Self>) -> Result<CommandOk, CommandErr> {
+        let outcome = {
+            let _restore = self.restore_lock.lock().await;
+            let _activation = self.session_activation_lock.lock().await;
+            let _swap = self.session_swap_lock.lock().await;
+            let invalidated = self
+                .session_attempt_generation
+                .fetch_add(1, Ordering::SeqCst)
+                + 1;
+            self.session_generation.store(invalidated, Ordering::SeqCst);
+            if let Some(session) = self.take_session().await {
+                session.sync_service.stop().await;
+            }
+            let accounts = self.accounts().await?;
+            let mut outcome = Ok(());
+            for account in &accounts.accounts {
+                self.invalidate_account_client(&account.account_id).await;
+                if let Err(error) = reset_account_cache(account).await {
+                    outcome = Err(self.failed("reset local cache", error));
+                }
+            }
+            outcome
+        };
+        self.restore().await?;
+        outcome.map(|()| CommandOk::ResetLocalCache)
+    }
+
     pub(crate) async fn persist(
         &self,
         account_id: &str,
@@ -785,6 +813,47 @@ fn remove_store_dir(store_id: &str) {
 #[cfg(target_family = "wasm")]
 const fn remove_store_dir(_store_id: &str) {}
 
+#[cfg(not(target_family = "wasm"))]
+const CACHE_DATABASES: [&str; 3] = [
+    matrix_sdk::STATE_STORE_DATABASE_NAME,
+    "matrix-sdk-event-cache.sqlite3",
+    "matrix-sdk-media.sqlite3",
+];
+
+#[cfg(not(target_family = "wasm"))]
+async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
+    use matrix_sdk_base::crypto::store::CryptoStore as _;
+
+    let store = std::path::Path::new(&account.store_id).join("store");
+    if !store.exists() {
+        return Ok(());
+    }
+
+    let crypto = matrix_sdk::SqliteCryptoStore::open(&store, None)
+        .await
+        .map_err(|error| error.to_string())?;
+    crypto
+        .remove_custom_value(&format!(
+            "sliding_sync_store::room-list::{}::instance",
+            account.session.credentials.user_id()
+        ))
+        .await
+        .map_err(|error| error.to_string())?;
+    drop(crypto);
+
+    for database in CACHE_DATABASES {
+        for suffix in ["", "-wal", "-shm"] {
+            let path = store.join(format!("{database}{suffix}"));
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(format!("{}: {error}", path.display())),
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(all(test, not(target_family = "wasm")))]
 #[allow(clippy::large_futures)]
 mod regression_tests {
@@ -943,6 +1012,90 @@ mod regression_tests {
         assert_eq!(handler_counts[0], handler_counts[1]);
         let session = core.take_session().await.unwrap();
         session.sync_service.stop().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_cache_reset_keeps_the_login_and_keys_but_not_the_sync_position() {
+        use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
+        use matrix_sdk_base::crypto::store::CryptoStore as _;
+
+        let server = MatrixMockServer::new().await;
+        let base = std::env::temp_dir().join(format!(
+            "sable-reset-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let base_id = base.to_str().unwrap().to_owned();
+        let (core, _events) = Core::new(base_id.clone(), Box::new(MemorySessionStore::default()));
+        let mut registry = AccountRegistry::empty();
+        let (account_id, store_id) = registry.allocate_account(&base_id);
+        registry.active_account_id = Some(account_id.clone());
+        registry.upsert(PersistedAccount {
+            account_id,
+            store_id: store_id.clone(),
+            session: PersistedSession {
+                resolved_homeserver: None,
+                homeserver: server.server().uri(),
+                credentials: Credentials::Password(
+                    serde_json::from_value(serde_json::json!({
+                        "user_id": "@alice:example.org",
+                        "device_id": "DEVICE",
+                        "access_token": "token"
+                    }))
+                    .unwrap(),
+                ),
+            },
+            needs_reauth: false,
+        });
+        core.sessions
+            .save(serde_json::to_vec(&registry).unwrap())
+            .await
+            .unwrap();
+        core.restore().await.unwrap();
+
+        let client = core.client().await.unwrap();
+        let identity = client.encryption().ed25519_key().await;
+        assert!(identity.is_some());
+        client
+            .state_store()
+            .set_custom_value(b"marker", b"cached".to_vec())
+            .await
+            .unwrap();
+        let store = std::path::Path::new(&store_id).join("store");
+        let pos = "sliding_sync_store::room-list::@alice:example.org::instance";
+        matrix_sdk::SqliteCryptoStore::open(&store, None)
+            .await
+            .unwrap()
+            .set_custom_value(pos, br#"{"pos":"stale"}"#.to_vec())
+            .await
+            .unwrap();
+        drop(client);
+
+        core.reset_local_cache().await.unwrap();
+
+        let client = core.client().await.unwrap();
+        assert!(
+            client
+                .state_store()
+                .get_custom_value(b"marker")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(client.encryption().ed25519_key().await, identity);
+        assert!(
+            matrix_sdk::SqliteCryptoStore::open(&store, None)
+                .await
+                .unwrap()
+                .get_custom_value(pos)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        let session = core.take_session().await.unwrap();
+        session.sync_service.stop().await;
+        drop((session, client));
+        std::fs::remove_dir_all(&store_id).unwrap();
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
