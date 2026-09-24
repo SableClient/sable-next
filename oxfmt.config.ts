@@ -8,6 +8,7 @@ export default {
   svelte: true,
   ignorePatterns: [
     '.agents/skills',
+    '.impeccable',
     'dist',
     'node_modules',
     '.svelte-kit',
