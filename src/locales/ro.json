@@ -204,7 +204,6 @@
     "settingsFailed": "Această schimbare nu a putut fi salvată.",
     "menuLabel": "Opțiuni cameră",
     "menuFavourite": "Preferată",
-    "menuLowPriority": "Prioritate redusă",
     "menuNotifications": "Notificări",
     "notifyDefault": "({{mode}}) implicit",
     "notifyAll": "Toate mesajele",

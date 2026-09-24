@@ -571,15 +571,12 @@ const fn join_rule_summary_view(rule: &JoinRuleSummary) -> RoomJoinRuleView {
     }
 }
 
-/// The two tags a row shows are the two the SDK keeps as notable flags on
-/// cached room info, so this reads memory where `Room::tags` reads the store.
+/// The tag a row shows is one the SDK keeps as a notable flag on cached room
+/// info, so this reads memory where `Room::tags` reads the store.
 fn room_tags(room: &Room) -> Vec<RoomTag> {
     let mut tags = Vec::new();
     if room.is_favourite() {
         tags.push(RoomTag::Favourite);
-    }
-    if room.is_low_priority() {
-        tags.push(RoomTag::LowPriority);
     }
     tags
 }

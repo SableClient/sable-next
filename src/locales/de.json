@@ -190,7 +190,6 @@
     "settingsFailed": "Die Änderungen konnten nicht gespeichert werden.",
     "menuLabel": "Raumoptionen",
     "menuFavourite": "Favoriten",
-    "menuLowPriority": "Niedrige Priorität",
     "menuNotifications": "Benachrichtigungen",
     "notifyDefault": "Standard ({{mode}})",
     "notifyAll": "Alle Nachrichten",

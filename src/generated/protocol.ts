@@ -801,7 +801,7 @@ export type RoomSummary = {
 	latest_event: LatestEventView | null,
 };
 
-export type RoomTag = "favourite" | "low_priority";
+export type RoomTag = "favourite";
 
 export type RoomVersionView = {
 	id: string,

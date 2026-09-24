@@ -1876,7 +1876,6 @@ impl Core {
                 let room = self.room(&room_id).await?;
                 let name = match tag {
                     RoomTag::Favourite => TagName::Favorite,
-                    RoomTag::LowPriority => TagName::LowPriority,
                 };
 
                 if set {
