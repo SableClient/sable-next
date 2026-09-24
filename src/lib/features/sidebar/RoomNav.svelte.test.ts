@@ -239,6 +239,67 @@ test('home orders rooms by their latest event', async () => {
   await unmount(instance);
 });
 
+test('favourites sit in their own section above the rest of the list', async () => {
+  pageState.url.pathname = '/rooms';
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({
+      room_id: '!starred:example.org',
+      name: 'Starred',
+      tags: ['favourite'],
+      latest_event: latestAt(10),
+    }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
+  ];
+
+  const instance = await mountNav();
+  const favourites = Array.from(
+    document.querySelectorAll('.room-list.favourites .room-row .room-name')
+  ).map((node) => node.textContent);
+
+  expect(favourites).toEqual(['Starred']);
+  expect(roomNames()).toEqual(['Starred', 'Busy', 'Quiet']);
+  expect(
+    Array.from(document.querySelectorAll('.rooms-heading-label')).map((node) => node.textContent)
+  ).toEqual(['nav.favourites', 'nav.rooms']);
+  await unmount(instance);
+});
+
+test('a space lifts a favourite out of its subspace', async () => {
+  pageState.url.pathname = '/space/!root%3Aexample.org';
+  pageState.params = { spaceId: '!root:example.org' };
+  const edge = (roomId: string) => ({
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+  });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      is_space: true,
+      space_children: [edge('!top:example.org'), edge('!nested:example.org')],
+    }),
+    makeRoom({
+      room_id: '!nested:example.org',
+      name: 'Nested',
+      is_space: true,
+      space_children: [edge('!deep:example.org')],
+    }),
+    makeRoom({ room_id: '!top:example.org', name: 'Top' }),
+    makeRoom({ room_id: '!deep:example.org', name: 'Deep', tags: ['favourite'] }),
+  ];
+
+  const instance = await mountNav();
+  expect(roomNames()).toEqual(['Deep', 'Top']);
+  expect(document.querySelector('.room-list.favourites .room-row')?.getAttribute('href')).toBe(
+    '/space/!root%3Aexample.org/!deep%3Aexample.org'
+  );
+  await unmount(instance);
+});
+
 test('home links a room to its own section', async () => {
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
 
