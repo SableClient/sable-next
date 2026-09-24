@@ -114,6 +114,16 @@
     padding: var(--space-200);
   }
 
+  .option:hover {
+    background: var(--surface-container-hover);
+    color: var(--surface-on-container);
+  }
+
+  .option[aria-selected='true'] {
+    background: var(--surface-container-active);
+    color: var(--surface-on-container);
+  }
+
   .option :global(.emote) {
     aspect-ratio: 1;
     flex: 0 0 auto;

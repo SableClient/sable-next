@@ -10,6 +10,7 @@ export default defineConfig({
     'timeline-media.spec.ts',
     'timeline-receipts.spec.ts',
     'composer-alignment.spec.ts',
+    'composer-autocomplete.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',
