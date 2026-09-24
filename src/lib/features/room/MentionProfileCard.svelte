@@ -725,6 +725,10 @@
     overflow-wrap: anywhere;
   }
 
+  .profile-meta-item :global(.presence-dot) {
+    margin: 0.25em;
+  }
+
   .profile-meta-aside {
     color: var(--profile-icon, var(--sec-main));
   }
