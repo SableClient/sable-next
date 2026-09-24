@@ -176,6 +176,8 @@
     /* --sec-main alone fails 4.5:1 on the light background at this text
        size, so small words get a stronger mix and it is left to icons. */
     --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
+    --profile-icon: var(--sec-main);
+    --profile-line: var(--surface-container-line);
     --profile-avatar-size: var(--avatar-size-large);
     --profile-cover-height: var(--avatar-size-large);
     --profile-bio-lines: 4;
@@ -183,7 +185,7 @@
     --profile-panel-ground: var(--surface-var-container);
 
     background: var(--profile-card-ground);
-    border: var(--border-width) solid var(--surface-container-line);
+    border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
     overflow: hidden;
     position: relative;
@@ -201,6 +203,9 @@
       var(--profile-hero) var(--profile-tint),
       var(--surface-var-container)
     );
+    --profile-text-muted: color-mix(in oklab, var(--profile-hero) 35%, var(--bg-on-container));
+    --profile-icon: var(--profile-text-muted);
+    --profile-line: color-mix(in oklab, var(--profile-hero) 40%, var(--surface-container-line));
   }
 
   .profile-card.tinted.tint-dark {
@@ -279,7 +284,7 @@
      the owner wrote, not a control. */
   .profile-card-status {
     background: var(--profile-panel-ground);
-    border: var(--border-width) solid var(--surface-container-line);
+    border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
     font-size: var(--font-size-body);
     line-height: var(--line-height-body);
@@ -374,7 +379,7 @@
      both edges of the panel. */
   .profile-card-panel.framed {
     background: var(--profile-panel-ground);
-    border: var(--border-width) solid var(--surface-container-line);
+    border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
     overflow: clip;
   }
@@ -414,7 +419,7 @@
   }
 
   .profile-card-footer.divided {
-    border-top: var(--border-width) solid var(--surface-container-line);
+    border-top: var(--border-width) solid var(--profile-line);
   }
 
   @media (prefers-color-scheme: dark) {

@@ -708,7 +708,7 @@
   }
 
   .profile-meta-aside {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
   }
 
   .profile-meta-elevated {
@@ -723,7 +723,7 @@
   :global(.profile-action) {
     align-items: center;
     background: none;
-    border: var(--border-width) solid var(--surface-container-line);
+    border: var(--border-width) solid var(--profile-line, var(--surface-container-line));
     border-radius: var(--radius-pill);
     color: var(--bg-on-container);
     cursor: pointer;
@@ -743,7 +743,7 @@
   }
 
   :global(.profile-action svg) {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     flex: none;
   }
 
@@ -768,7 +768,7 @@
   }
 
   :global(.profile-power-level) {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
   }
@@ -844,7 +844,7 @@
   }
 
   .profile-extra summary :global(svg) {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     flex: none;
   }
 
@@ -866,7 +866,7 @@
   }
 
   .profile-extra dt {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     font-weight: var(--font-weight-medium);
     overflow-wrap: anywhere;
   }
@@ -885,7 +885,7 @@
     align-items: center;
     background: none;
     border: 0;
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     cursor: pointer;
     display: flex;
     font: inherit;
@@ -929,7 +929,7 @@
   }
 
   .profile-extra th {
-    color: var(--sec-main);
+    color: var(--profile-icon, var(--sec-main));
     font-weight: var(--font-weight-medium);
     width: 40%;
   }
