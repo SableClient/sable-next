@@ -45,3 +45,10 @@ export function roomIconComponent(room: RoomIconShape): Component {
 
   return HashStraightIcon;
 }
+
+export function roomIconWeight(
+  room: RoomIconShape,
+  weight: 'regular' | 'fill'
+): 'regular' | 'fill' | 'bold' {
+  return weight === 'fill' && roomIconComponent(room) === HashStraightIcon ? 'bold' : weight;
+}

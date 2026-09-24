@@ -3,6 +3,7 @@
     roomIconComponent,
     roomIconOverlay,
     roomIconOverlayComponent,
+    roomIconWeight,
     type RoomIconShape,
   } from './room-icon.js';
 
@@ -15,19 +16,20 @@
   let room = $derived({ isSpace, isVoice, joinRule });
   let overlay = $derived(roomIconOverlay(room));
   let Glyph = $derived(roomIconComponent(room));
+  let glyphWeight = $derived(roomIconWeight(room, weight));
   let Badge = $derived(overlay === undefined ? undefined : roomIconOverlayComponent(overlay));
 </script>
 
 <span class="room-icon-root">
   {#if Badge && overlay}
     <span class="room-icon-composite">
-      <Glyph {weight} />
+      <Glyph weight={glyphWeight} />
       <span class={['room-icon-badge', overlay]} aria-hidden="true">
         <span class="room-icon-badge-glyph"><Badge size="100%" weight="regular" /></span>
       </span>
     </span>
   {:else}
-    <Glyph {weight} />
+    <Glyph weight={glyphWeight} />
   {/if}
 </span>
 

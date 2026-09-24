@@ -6,7 +6,7 @@ import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
 
-import { roomIconComponent, roomIconOverlay } from './room-icon.js';
+import { roomIconComponent, roomIconOverlay, roomIconWeight } from './room-icon.js';
 
 test('a regular room keeps its hash glyph and carries the join rule as a badge', () => {
   expect(roomIconComponent({ joinRule: 'invite' })).toBe(HashStraightIcon);
@@ -26,4 +26,11 @@ test('a space and a voice room carry the join rule in the glyph, not a badge', (
 test('a restricted rule reads as neither open nor locked', () => {
   expect(roomIconOverlay({ joinRule: 'restricted' })).toBeUndefined();
   expect(roomIconOverlay({ joinRule: null })).toBeUndefined();
+});
+
+test('a current room keeps an outline hash, since the filled one is a solid square', () => {
+  expect(roomIconWeight({ joinRule: 'public' }, 'fill')).toBe('bold');
+  expect(roomIconWeight({}, 'regular')).toBe('regular');
+  expect(roomIconWeight({ isSpace: true }, 'fill')).toBe('fill');
+  expect(roomIconWeight({ isVoice: true }, 'fill')).toBe('fill');
 });
