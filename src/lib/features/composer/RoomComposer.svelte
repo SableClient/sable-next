@@ -24,6 +24,7 @@
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
+  import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -772,6 +773,16 @@
     if (event.relatedTarget !== null) return;
     dragging = false;
   }
+
+  $effect(() =>
+    listenNativeFileDrop({
+      onEnter: () => (dragging = !readOnly),
+      onLeave: () => (dragging = false),
+      onDrop: (files) => {
+        if (!readOnly) stage(files);
+      },
+    })
+  );
 
   function nodeFor(sigil: string, suggestion: Suggestion): ProseMirrorNode {
     if (sigil === '/') return composerSchema.text(suggestion.insert);
