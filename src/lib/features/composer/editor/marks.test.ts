@@ -18,7 +18,6 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
   preferences.enterForNewline = false;
-  preferences.richTextComposer = false;
   resetModel();
 });
 
@@ -139,7 +138,6 @@ test('a mark survives a soft line break', () => {
 });
 
 test('a mark survives a paragraph split when enter makes newlines', () => {
-  preferences.richTextComposer = true;
   preferences.enterForNewline = true;
   const model = cm('<p>|</p>');
   strike(model);

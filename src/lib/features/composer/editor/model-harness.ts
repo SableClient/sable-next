@@ -2,6 +2,8 @@ import { DOMSerializer } from 'prosemirror-model';
 import { TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import { ComposerEditor } from './composer-editor';
 import { composerSchema, parseMatrixHtml } from './schema';
 
@@ -21,12 +23,14 @@ export function resetModel(): void {
   dispose = undefined;
   document.body.replaceChildren();
   sentCount = 0;
+  preferences.richTextComposer = false;
 }
 
 export const view = (editor: ComposerEditor): EditorView =>
   (editor as unknown as { view: EditorView }).view;
 
 export function cm(html: string): ComposerEditor {
+  preferences.richTextComposer = true;
   const host = document.createElement('div');
   document.body.append(host);
   const editor = new ComposerEditor({
