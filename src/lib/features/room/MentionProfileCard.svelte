@@ -4,8 +4,8 @@
     ProfileView,
     RoomPermissionsView,
     MutualRoomView,
+    ProfileFieldView,
   } from '#src/generated/protocol';
-  import { Collapsible } from 'bits-ui';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
@@ -52,10 +52,12 @@
 
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
-  import { profileFieldMap } from './profile-field-map';
+  // import { profileFieldMap } from './profile-field-map';
   import { senderColor } from './timeline-format';
 
   import '#lib/ui/primitives/menu.css';
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import { profileFieldMap } from './profile-field-map.js';
 
   interface Props {
     userId: string;
@@ -213,6 +215,7 @@
   let hasMeta = $derived(
     Boolean(pronouns || localTime || animalText || roleLabel || presenceLabel)
   );
+  let activeExtra = $state<ProfileFieldView | null>(null);
 
   $effect(() => {
     const target = userId;
@@ -592,55 +595,61 @@
 {/snippet}
 
 {#snippet miscData()}
-  <details
+  <Button
     class="profile-extra"
-    ontoggle={(event) => {
-      miscOpen = event.currentTarget.open;
+    onclick={() => {
+      miscOpen = !miscOpen;
+      activeExtra = null;
     }}
+    block
+    style="background: transparent; border: 0;"
   >
-    <summary>
+    {#if miscOpen}
+      <CaretDownIcon />
+      {#if activeExtra}
+        {activeExtra.key}
+      {:else}
+        {$i18n.t('timeline.profileHideMiscData', { count: extra.length })}
+      {/if}
+    {:else}
       <CaretRightIcon />
-      {miscOpen
-        ? $i18n.t('timeline.profileHideMiscData', { count: extra.length })
-        : $i18n.t('timeline.profileMiscData', { count: extra.length })}
-    </summary>
-    <dl>
-      {#each extra as field (field.key)}
-        {@const map = profileFieldMap(field.value)}
-        {#if map}
-          <Collapsible.Root>
-            <dt>
-              <Collapsible.Trigger class="profile-extra-toggle">
-                <CaretRightIcon />
-                {field.key}
-              </Collapsible.Trigger>
-            </dt>
-            <Collapsible.Content>
-              {#snippet child({ props })}
-                <dd {...props}>
-                  <table>
-                    <tbody>
-                      {#each map as [key, value] (key)}
-                        <tr>
-                          <th scope="row">{key}</th>
-                          <td>{value}</td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </dd>
-              {/snippet}
-            </Collapsible.Content>
-          </Collapsible.Root>
-        {:else}
-          <div>
-            <dt>{field.key}</dt>
-            <dd>{field.value}</dd>
-          </div>
-        {/if}
-      {/each}
-    </dl>
-  </details>
+      {$i18n.t('timeline.profileMiscData', { count: extra.length })}
+    {/if}
+  </Button>
+  {#if miscOpen}
+    {#if activeExtra === null}
+      <div class="profile-keys">
+        {#each extra as field (field.key)}
+          <Button
+            size="small"
+            class="choice"
+            block
+            style="background: transparent; border: 0;"
+            onclick={() => {
+              activeExtra = field;
+            }}
+          >
+            {field.key}
+          </Button>
+          <div class="profile-menu-key"></div>
+        {/each}
+      </div>
+    {:else}
+      {@const map = profileFieldMap(activeExtra.value)}
+      {#if map}
+        <tbody>
+          {#each map as [key, value] (key)}
+            <tr>
+              <th scope="row">{key}</th>
+              <td>{value}</td>
+            </tr>
+          {/each}
+        </tbody>
+      {:else}
+        {activeExtra.value}
+      {/if}
+    {/if}
+  {/if}
 {/snippet}
 
 <ProfileCard
@@ -834,122 +843,6 @@
   .profile-extra {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
-  }
-
-  .profile-extra summary {
-    align-items: center;
-    cursor: pointer;
-    display: flex;
-    font-weight: var(--font-weight-medium);
-    gap: var(--space-200);
-    list-style: none;
-    margin: 0;
-    min-height: 2.75rem;
-    padding: 0 var(--space-300);
-  }
-
-  .profile-extra summary::-webkit-details-marker {
-    display: none;
-  }
-
-  .profile-extra summary:hover {
-    color: var(--bg-on-container);
-  }
-
-  .profile-extra summary:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .profile-extra summary :global(svg) {
-    color: var(--profile-icon, var(--sec-main));
-    flex: none;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .profile-extra summary :global(svg) {
-      transition: transform var(--motion-fast) var(--motion-easing-standard);
-    }
-  }
-
-  .profile-extra[open] summary :global(svg) {
-    transform: rotate(90deg);
-  }
-
-  .profile-extra dl {
-    display: grid;
-    gap: var(--space-050);
-    margin: 0;
-    padding: 0 var(--space-300) var(--space-300);
-  }
-
-  .profile-extra dt {
-    color: var(--profile-icon, var(--sec-main));
-    font-weight: var(--font-weight-medium);
-    overflow-wrap: anywhere;
-  }
-
-  .profile-extra dl > :global(div) {
-    display: grid;
-    gap: var(--space-050);
-  }
-
-  .profile-extra dd {
-    margin: 0 0 var(--space-200);
-    overflow-wrap: anywhere;
-  }
-
-  .profile-extra :global(.profile-extra-toggle) {
-    align-items: center;
-    background: none;
-    border: 0;
-    color: var(--profile-icon, var(--sec-main));
-    cursor: pointer;
-    display: flex;
-    font: inherit;
-    font-weight: var(--font-weight-medium);
-    gap: var(--space-100);
-    padding: 0;
-    text-align: start;
-  }
-
-  .profile-extra :global(.profile-extra-toggle:hover) {
-    color: var(--bg-on-container);
-  }
-
-  .profile-extra :global(.profile-extra-toggle:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .profile-extra :global(.profile-extra-toggle[data-state='open'] svg) {
-    transform: rotate(90deg);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .profile-extra :global(.profile-extra-toggle svg) {
-      transition: transform var(--motion-fast) var(--motion-easing-standard);
-    }
-  }
-
-  .profile-extra table {
-    border-collapse: collapse;
-    width: 100%;
-  }
-
-  .profile-extra th,
-  .profile-extra td {
-    border-top: var(--border-width) solid var(--bg-container-line);
-    overflow-wrap: anywhere;
-    padding: var(--space-100) var(--space-200) var(--space-100) 0;
-    text-align: start;
-    vertical-align: top;
-  }
-
-  .profile-extra th {
-    color: var(--profile-icon, var(--sec-main));
-    font-weight: var(--font-weight-medium);
-    width: 40%;
   }
 
   .moderation {
