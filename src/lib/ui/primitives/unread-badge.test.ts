@@ -26,19 +26,15 @@ test('a hand-marked room dots with no count', () => {
   ).toBe('dot');
 });
 
-test('a room counts its messages only where room counts are on', () => {
-  const counts = { unread: 4, highlight: 0 };
+test('a count setting never numbers messages that did not notify', () => {
+  const counts = { unread: 4, highlight: 0, notifying: 0 };
 
-  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
-    mode: 'count',
-    count: 4,
-    highlight: false,
-  });
-  expect(resolveUnreadBadge(counts, off)?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('dot');
 });
 
-test('a direct chat follows the direct-message count setting', () => {
-  const counts = { unread: 4, highlight: 0 };
+test('a direct chat mention follows the direct-message count setting', () => {
+  const counts = { unread: 4, highlight: 1 };
 
   expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('count');
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true }, true)?.mode).toBe('dot');
@@ -96,7 +92,7 @@ test('an aggregate counts what notified, not every unread message under it', () 
   expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 2, highlight: true });
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
     mode: 'count',
-    count: 32,
+    count: 2,
     highlight: true,
   });
 });
