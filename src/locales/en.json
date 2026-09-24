@@ -2136,6 +2136,7 @@
   },
   "personas": {
     "title": "Per-Message Profiles",
+    "search": "Search profiles",
     "description": "Send messages with a different appearance from the same account.",
     "picker": "Profile picker in the composer",
     "pickerHint": "Adds a button next to the message box for choosing who a message is sent as. Hidden until you have created a per-message profile.",

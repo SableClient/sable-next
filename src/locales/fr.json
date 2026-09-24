@@ -2094,6 +2094,7 @@
   },
   "personas": {
     "title": "Profils par message",
+    "search": "Rechercher des profils",
     "description": "Envoyez des messages sous une autre apparence depuis le même compte.",
     "picker": "Sélecteur de profil dans la zone de rédaction",
     "pickerHint": "Ajoute un bouton près du champ de message pour choisir sous quel profil envoyer. Il reste masqué tant qu’aucun profil par message n’a été créé.",

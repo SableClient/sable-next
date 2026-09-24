@@ -59,8 +59,8 @@
     bind:value={query}
     type="search"
     autocomplete="off"
-    placeholder={$i18n.t('search.placeholder')}
-    aria-label={$i18n.t('search.title')}
+    placeholder={$i18n.t('personas.search')}
+    aria-label={$i18n.t('personas.search')}
   />
 
   <ul class="persona-options">
