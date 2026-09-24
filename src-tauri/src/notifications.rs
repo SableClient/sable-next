@@ -391,6 +391,10 @@ pub async fn show<R: Runtime>(
     if cfg!(target_os = "android") {
         builder = builder.icon("notification_icon");
     }
+    #[cfg(target_os = "linux")]
+    if let Some(icon) = linux_icon(app) {
+        builder = builder.icon(icon);
+    }
     builder = builder.only_alert_once(core.notify_once() && !view.mention);
     if alerts_silently(view.noisy, core.notification_sounds()) {
         builder = builder.silent();
@@ -449,6 +453,20 @@ pub async fn ensure_channel<R: Runtime>(app: &AppHandle<R>) {
     if let Err(error) = app.notifications().create_channel(channel).await {
         log::warn!("could not create the message notification channel: {error}");
     }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_icon<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    use tauri::Manager;
+    static ICON: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    ICON.get_or_init(|| {
+        let dir = app.path().app_cache_dir().ok()?;
+        std::fs::create_dir_all(&dir).ok()?;
+        let path = dir.join("notification-icon.png");
+        std::fs::write(&path, include_bytes!("../icons/128x128.png")).ok()?;
+        path.to_str().map(str::to_owned)
+    })
+    .clone()
 }
 
 pub async fn show_test<R: Runtime>(app: &AppHandle<R>, core: &sable_core::Core, sequence: u32) {
