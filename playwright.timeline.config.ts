@@ -9,6 +9,7 @@ export default defineConfig({
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
     'timeline-receipts.spec.ts',
+    'timeline-row-height.spec.ts',
     'composer-alignment.spec.ts',
     'composer-autocomplete.spec.ts',
     'reaction-sheet.spec.ts',

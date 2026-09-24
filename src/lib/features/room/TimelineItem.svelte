@@ -552,7 +552,9 @@
     (readersForDialog ?? item.read_by).filter((readerId) => readerId !== currentUserId)
   );
   let showReceiptBadge = $derived(
-    !preferences.hideReadReceipts && preferences.readReceiptPlacement === 'message'
+    !preferences.hideReadReceipts &&
+      preferences.readReceiptPlacement === 'message' &&
+      receiptReaders.length > 0
   );
   let nonTextContent = $derived(item.content.kind !== 'message');
   let previewUrl = $derived(
