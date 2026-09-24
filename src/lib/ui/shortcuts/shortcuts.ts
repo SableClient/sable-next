@@ -13,7 +13,9 @@ export type ShortcutId =
   | 'navigation.cycleNextUnread'
   | 'navigation.cyclePreviousUnread'
   | 'room.markRead'
-  | 'room.markAllRead';
+  | 'room.markAllRead'
+  | 'room.replyOlder'
+  | 'room.replyNewer';
 
 export interface ShortcutDefinition {
   id: ShortcutId;
@@ -105,6 +107,18 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.markAllRead',
     category: 'room',
     binding: 'mod+shift+escape',
+  },
+  {
+    id: 'room.replyOlder',
+    labelKey: 'shortcuts.replyOlder',
+    category: 'room',
+    binding: 'ctrl+up',
+  },
+  {
+    id: 'room.replyNewer',
+    labelKey: 'shortcuts.replyNewer',
+    category: 'room',
+    binding: 'ctrl+down',
   },
 ] as const;
 

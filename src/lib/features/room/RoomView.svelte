@@ -762,6 +762,7 @@
   {#key resolvedRoomId}
     <TimelineList
       bind:this={timelineList}
+      replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
       focusEventId={eventId}
       onRequestHistory={requestHistory}
@@ -842,6 +843,8 @@
           encrypted={resolvedRoom?.encrypted ?? null}
           onDeleteEdited={conversation.redact}
           onEditLast={conversation.editLast}
+          onReplyStep={(direction) =>
+            conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
         />
       {/key}
     {/if}

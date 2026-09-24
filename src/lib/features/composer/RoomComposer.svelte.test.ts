@@ -93,6 +93,7 @@ interface ComposerProps {
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
+  onReplyStep?: (direction: 'older' | 'newer') => void;
   threadRoot?: string | null;
   readOnly?: boolean;
   roomName?: string;
@@ -1098,4 +1099,33 @@ test('the format button follows the configured button order', async () => {
   const after = document.querySelector('.composer-after');
   expect(after?.firstElementChild?.classList.contains('composer-format')).toBe(true);
   void unmount(app);
+});
+
+function pressInEditor(init: KeyboardEventInit): void {
+  document
+    .querySelector('[role="combobox"]')
+    ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+}
+
+test('Ctrl+Up and Ctrl+Down step the reply unless an edit is in flight', async () => {
+  const step = vi.fn();
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    onReplyStep: step,
+    registerContext: (set) => {
+      setContext = set;
+    },
+  });
+  await tick();
+
+  pressInEditor({ key: 'ArrowUp', ctrlKey: true });
+  pressInEditor({ key: 'ArrowDown', ctrlKey: true });
+  expect(step.mock.calls).toEqual([['older'], ['newer']]);
+
+  setContext?.({ kind: 'edit', eventId: '$one:example.org', body: 'never mind' });
+  await tick();
+  pressInEditor({ key: 'ArrowUp', ctrlKey: true });
+  expect(step).toHaveBeenCalledTimes(2);
+  void unmount(instance);
 });

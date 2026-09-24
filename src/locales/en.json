@@ -2460,6 +2460,8 @@
     "nextRoom": "Next room",
     "markRead": "Mark this room as read",
     "markAllRead": "Mark every room as read",
+    "replyOlder": "Reply to the previous message",
+    "replyNewer": "Reply to the next message",
     "pressKeys": "Press keys…",
     "conflict": "That combination is already used by “{{name}}”.",
     "resetOne": "Reset to default",
