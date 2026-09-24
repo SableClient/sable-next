@@ -22,7 +22,7 @@
 </script>
 
 {#snippet content()}
-  <div class="receipts-dialog">
+  <div class="receipts-dialog" class:sheet={!desktop}>
     <h2>{$i18n.t('timeline.readReceipts')}</h2>
     <MemberUserList
       title={$i18n.t('timeline.readReceipts')}
@@ -53,6 +53,11 @@
     display: grid;
     gap: var(--space-300);
     width: min(22rem, calc(100vw - 2rem));
+  }
+
+  .receipts-dialog.sheet {
+    padding: 0 var(--space-400);
+    width: auto;
   }
 
   h2 {
