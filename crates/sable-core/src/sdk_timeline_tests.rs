@@ -2412,3 +2412,80 @@ async fn a_local_echo_keeps_the_formatted_body_it_was_sent_with() {
         "the SDK's own copy of a local echo drops the time element"
     );
 }
+
+#[tokio::test]
+async fn an_invite_joined_without_a_required_state_member_becomes_joined() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let own = client.user_id().unwrap().to_owned();
+    let room_id = room_id!("!joined-invite:example.org");
+    let sliding_sync = client
+        .sliding_sync("invite")
+        .unwrap()
+        .build()
+        .await
+        .unwrap();
+    sliding_sync.add_room_subscriptions(&[room_id], None, true);
+    let stream = sliding_sync.sync();
+    pin_mut!(stream);
+    let respond = |room: serde_json::Value| {
+        let mut rooms = serde_json::Map::new();
+        rooms.insert(room_id.to_string(), room);
+        Mock::given(method("POST"))
+            .and(path(
+                "/_matrix/client/unstable/org.matrix.simplified_msc3575/sync",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "pos": "1", "lists": {}, "rooms": rooms, "extensions": {}
+            })))
+    };
+
+    let invite = respond(json!({
+        "initial": true,
+        "invite_state": [
+            {"content": {"name": "Invited"}, "sender": *ALICE, "state_key": "", "type": "m.room.name"},
+            {"content": {"membership": "invite"}, "sender": *ALICE, "state_key": own, "type": "m.room.member"}
+        ]
+    }))
+    .mount_as_scoped(server.server())
+    .await;
+    stream.next().await.unwrap().unwrap();
+    drop(invite);
+    assert_eq!(
+        client.get_room(room_id).unwrap().state(),
+        matrix_sdk::RoomState::Invited
+    );
+
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/joined_rooms"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"joined_rooms": [room_id]})))
+        .mount(server.server())
+        .await;
+    let watcher =
+        matrix_sdk::executor::spawn(crate::rooms::reconcile_joined_invites(client.clone()));
+    let join = respond(json!({
+        "initial": false,
+        "name": "Invited",
+        "timeline": [{
+            "content": {"membership": "join"}, "event_id": "$join", "origin_server_ts": 1,
+            "sender": own, "state_key": own, "type": "m.room.member",
+            "unsigned": {"prev_content": {"membership": "invite"}}
+        }],
+        "required_state": [
+            {"content": {"name": "Invited"}, "event_id": "$name", "origin_server_ts": 1, "sender": *ALICE, "state_key": "", "type": "m.room.name"}
+        ]
+    }))
+    .mount_as_scoped(server.server())
+    .await;
+    stream.next().await.unwrap().unwrap();
+    drop(join);
+
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while client.get_room(room_id).unwrap().state() != matrix_sdk::RoomState::Joined {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the joined invite is marked joined");
+    watcher.abort();
+}

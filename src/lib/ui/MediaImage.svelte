@@ -13,6 +13,7 @@
     cachedMediaUrl,
     discardMediaUrl,
     holdMediaUrl,
+    isEncryptedMedia,
     loadMediaUrl,
     mediaAspectRatio,
     retryMediaUrl,
@@ -31,6 +32,7 @@
 
   interface Props {
     source: string;
+    thumbnail?: string | null;
     alt: string;
     title?: string;
     width: number;
@@ -53,6 +55,7 @@
 
   let {
     source,
+    thumbnail = null,
     alt,
     title,
     width,
@@ -118,20 +121,32 @@
       servedSideways ||
       undecodableThumbnail === source
   );
+  let requested = $derived(
+    thumbnail !== null &&
+      isEncryptedMedia(source) &&
+      !original &&
+      !animated &&
+      !servedSideways &&
+      undecodableThumbnail !== source
+      ? thumbnail
+      : source
+  );
   let requestedWidth = $derived(asIs ? 0 : width);
   let requestedHeight = $derived(asIs ? 0 : height);
   let requestKey = $derived(
-    `${String(attempt)}:${String(requestedWidth)}x${String(requestedHeight)}:${source}`
+    `${String(attempt)}:${String(requestedWidth)}x${String(requestedHeight)}:${requested}`
   );
   let url = $derived(
     outcome?.key === requestKey
       ? outcome.url
-      : (cachedMediaUrl(core, source, requestedWidth, requestedHeight) ?? null)
+      : (cachedMediaUrl(core, requested, requestedWidth, requestedHeight) ?? null)
   );
   let failed = $derived(outcome?.key === requestKey && outcome.url === null);
   let undecodable = $derived(failed && outcome?.undecodable === true);
   let fileRatio = $derived(
-    url === null && !failed ? null : mediaAspectRatio(core, source, requestedWidth, requestedHeight)
+    url === null && !failed
+      ? null
+      : mediaAspectRatio(core, requested, requestedWidth, requestedHeight)
   );
   let imageLoaded = $derived(url !== null && loadedUrl === url);
   let gifPreviewReady = $derived(url !== null && previewUrl === url);
@@ -165,7 +180,7 @@
     alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
   );
   let retryWait = $derived(Math.max(0, backoff.at - clock));
-  const loading = mediaProgress(core, () => (!url && !failed ? source : null));
+  const loading = mediaProgress(core, () => (!url && !failed ? requested : null));
   let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
   let mediaLabel = $derived(
     manualGif
@@ -208,22 +223,23 @@
 
   $effect(() => {
     const key = requestKey;
+    const requestSource = requested;
     const requestWidth = requestedWidth;
     const requestHeight = requestedHeight;
-    const release = holdMediaUrl(core, source, requestWidth, requestHeight);
+    const release = holdMediaUrl(core, requestSource, requestWidth, requestHeight);
     if (
       outcome?.key === key ||
-      cachedMediaUrl(core, source, requestWidth, requestHeight) !== undefined
+      cachedMediaUrl(core, requestSource, requestWidth, requestHeight) !== undefined
     ) {
       return release;
     }
 
     let active = true;
     const load = attempt > 0 ? retryMediaUrl : loadMediaUrl;
-    void load(core, source, requestWidth, requestHeight, mime)
+    void load(core, requestSource, requestWidth, requestHeight, mime)
       .then((nextUrl) => {
         if (!active) return;
-        if (sideways(mediaAspectRatio(core, source, requestWidth, requestHeight))) {
+        if (sideways(mediaAspectRatio(core, requestSource, requestWidth, requestHeight))) {
           sidewaysSource = source;
         }
         outcome = { key, url: nextUrl };
@@ -347,7 +363,7 @@
   async function retry(event: MouseEvent): Promise<void> {
     event.stopPropagation();
     if (retryWait > 0) return;
-    if (undecodable) await core.commands.forgetMedia(source).catch(() => undefined);
+    if (undecodable) await core.commands.forgetMedia(requested).catch(() => undefined);
     undecodableThumbnail = null;
     backoff = { ...backoff, attempt: backoff.attempt + 1, manual: backoff.manual + 1, at: 0 };
   }
@@ -374,7 +390,7 @@
   }
 
   function brokenImage(): void {
-    if (url) discardMediaUrl(core, source, requestedWidth, requestedHeight, url);
+    if (url) discardMediaUrl(core, requested, requestedWidth, requestedHeight, url);
     if (!asIs) {
       undecodableThumbnail = source;
       return;

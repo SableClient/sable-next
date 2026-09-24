@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { InboxItemView } from '#src/generated/protocol';
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AtIcon from 'phosphor-svelte/lib/AtIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -64,7 +64,10 @@
     })
   );
 
-  onMount(() => {
+  let waiting = $derived(roomList.rooms.reduce((total, room) => total + room.unread, 0));
+
+  $effect(() => {
+    void waiting;
     void feed.backfill(false);
   });
 
@@ -183,7 +186,7 @@
           }}>{$i18n.t('inbox.retry')}</Button
         >
       </div>
-    {:else if !feed.loaded || feed.backfilling}
+    {:else if !feed.loaded || !feed.checked}
       <p class="empty">{$i18n.t('inbox.checking')}</p>
     {:else}
       <p class="empty">{emptyLabel()}</p>

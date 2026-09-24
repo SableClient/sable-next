@@ -3,6 +3,8 @@
   import type { Snippet } from 'svelte';
   import type { ClassValue } from 'svelte/elements';
 
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
+
   import { useActionMenuSurface } from './action-menu.js';
 
   interface Props {
@@ -34,8 +36,12 @@
   ]);
 
   function select(): void {
-    onSelect();
-    if (surface.sheet && closeOnSelect) surface.close();
+    if (!surface.sheet || !closeOnSelect) {
+      onSelect();
+      return;
+    }
+    surface.close();
+    void afterOverlayPops().then(onSelect);
   }
 </script>
 

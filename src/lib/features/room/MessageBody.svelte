@@ -92,6 +92,7 @@
   <MediaImage
     class="image privacy-media"
     source={item.content.source}
+    thumbnail={item.content.thumbnail}
     alt={item.content.caption ?? item.content.filename}
     title={item.content.caption ?? item.content.filename}
     width={800}
@@ -151,6 +152,7 @@
     height={item.content.kind === 'video' ? item.content.height : null}
     size={item.content.kind === 'file' ? item.content.size : null}
     blurhash={item.content.kind === 'video' ? item.content.blurhash : null}
+    thumbnail={item.content.kind === 'video' ? item.content.thumbnail : null}
     durationMs={item.content.kind === 'audio' ? item.content.duration_ms : null}
     waveform={item.content.kind === 'audio' ? item.content.waveform : null}
     onOpen={item.event_id ? () => onOpenMedia?.(item.event_id ?? '') : undefined}

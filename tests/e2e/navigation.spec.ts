@@ -1,3 +1,4 @@
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
 
 test.beforeEach(async ({ page }) => {
@@ -64,7 +65,7 @@ test('keeps the mobile quick tools visible on inbox', async ({ page }) => {
   await page.goto('/inbox');
 
   await expect(page.getByRole('navigation', { name: 'Quick tools' }).last()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Account' }).last()).toBeVisible();
+  await expect(page.getByRole('link', { name: en.nav.manageAccounts }).last()).toBeVisible();
 });
 
 test('dismissing the inbox popover returns to the previous page', async ({ page, app }) => {

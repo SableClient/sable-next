@@ -1114,3 +1114,36 @@ test('a GIF played by hand holds its frame while the window is inactive', async 
   });
   await unmount(instance);
 });
+
+test('an encrypted picture loads the sender thumbnail instead of the original', async () => {
+  const source = JSON.stringify({ url: 'mxc://example.org/sealed-original' });
+  const thumbnail = JSON.stringify({ url: 'mxc://example.org/sealed-thumbnail' });
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: { source, thumbnail, alt: 'Photo', width: 800, height: 600 },
+  });
+
+  await settle();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  expect(core.fetchMedia).toHaveBeenCalledWith(thumbnail, 800, 600);
+  await unmount(instance);
+});
+
+test('a plain picture keeps the server thumbnail of the original', async () => {
+  const instance = mount(MediaImage, {
+    target: document.body,
+    props: {
+      source: 'mxc://example.org/plain-original',
+      thumbnail: 'mxc://example.org/plain-thumbnail',
+      alt: 'Photo',
+      width: 800,
+      height: 600,
+    },
+  });
+
+  await settle();
+
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/plain-original', 800, 600);
+  await unmount(instance);
+});

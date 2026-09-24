@@ -2,7 +2,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 import en from '../../../src/locales/en.json' with { type: 'json' };
 
-const COLD_BOOT_TIMEOUT = 45_000;
+export const COLD_BOOT_TIMEOUT = 45_000;
 
 export class AppShell {
   readonly primaryNavigation: Locator;

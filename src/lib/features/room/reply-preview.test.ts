@@ -13,6 +13,7 @@ const video: TimelineItemContentView = {
   width: null,
   height: null,
   blurhash: null,
+  thumbnail: null,
   spoiler: null,
 };
 

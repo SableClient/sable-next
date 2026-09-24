@@ -15,6 +15,7 @@
   import { mimeExtension } from '#lib/ui/mime-extension.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextAttachmentViewer from '#lib/ui/TextAttachmentViewer.svelte';
   import ThemeFileCard from '#lib/ui/ThemeFileCard.svelte';
@@ -41,6 +42,7 @@
     height?: number | null;
     size?: number | null;
     blurhash?: string | null;
+    thumbnail?: string | null;
     durationMs?: number | null;
     waveform?: number[] | null;
     onOpen?: () => void;
@@ -57,6 +59,7 @@
     height = null,
     size = null,
     blurhash = null,
+    thumbnail = null,
     durationMs = null,
     waveform = null,
     class: className = '',
@@ -90,7 +93,8 @@
   /* Keyed by source: a recycled tile must not inherit another's start. */
   let startedSource = $state<string | null>(null);
   let started = $derived(startedSource === source);
-  let awaitingPlay = $derived(transcode && !started);
+  let awaitingPlay = $derived(kind === 'video' && !started && url === null);
+  let posterFailed = $state<string | null>(null);
   let aspectRatio = $derived(
     kind === 'video' &&
       typeof width === 'number' &&
@@ -132,6 +136,7 @@
       (size === null || size <= MAX_THEME_FILE_BYTES) &&
       isThemeFileName(filename)
   );
+  let deferred = $derived(kind === 'video' || (kind === 'file' && !isPdf && !isText));
   let extension = $derived(mimeExtension(mime));
   let sizeLabel = $derived(size !== null ? formatByteSize(size) : null);
   let retryWait = $derived(Math.max(0, retryAt - clock));
@@ -158,10 +163,26 @@
   function download(event: MouseEvent): void {
     if (url === null || !savesNatively()) return;
     event.preventDefault();
-    void saveFile(url, mediaLabel).then((outcome) => {
+    save(url);
+  }
+
+  function save(objectUrl: string): void {
+    if (!savesNatively()) {
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = mediaLabel;
+      link.click();
+      return;
+    }
+    void saveFile(objectUrl, mediaLabel).then((outcome) => {
       if (outcome === 'saved') toasts.info($i18n.t('viewer.saved'));
       if (outcome === 'failed') toasts.error($i18n.t('errors.actionFailed'));
     });
+  }
+
+  function fetchFile(): void {
+    startedSource = source;
+    void loadMediaUrl(core, source, 0, 0, mime).then(save, () => {});
   }
 
   $effect(() => {
@@ -191,6 +212,7 @@
     }
 
     url = null;
+    if (deferred && !started) return release;
     const load = retry ? retryMediaUrl : loadMediaUrl;
     void load(core, source, 0, 0, mime)
       .then((nextUrl) => {
@@ -215,6 +237,7 @@
 
   function play(): void {
     startedSource = source;
+    if (!transcode) return;
     url = null;
     const wanted = source;
     void videoStreamUrl(
@@ -322,6 +345,34 @@
       <span class="media-file-name">{mediaLabel}</span>
       {#if sizeLabel}<span class="media-file-size">{sizeLabel}</span>{/if}
     </span>
+    {#if deferred && !started}
+      <div class="media-actions">
+        <Button class="media-download" size="small" onclick={fetchFile}>
+          <DownloadSimpleIcon aria-hidden="true" />
+          {sizeLabel
+            ? $i18n.t('timeline.downloadFileSized', { size: sizeLabel })
+            : $i18n.t('timeline.downloadFile')}
+        </Button>
+      </div>
+    {/if}
+  {:else if kind === 'video'}
+    {#if thumbnail && posterFailed !== thumbnail}
+      <MediaImage
+        class="media-poster"
+        source={thumbnail}
+        alt=""
+        width={800}
+        height={600}
+        intrinsicWidth={width}
+        intrinsicHeight={height}
+        {blurhash}
+        onfailed={() => {
+          posterFailed = thumbnail;
+        }}
+      />
+    {:else if posterUrl}
+      <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
+    {/if}
   {/if}
   {#if awaitingPlay && !failed}
     <button
@@ -330,18 +381,12 @@
       onclick={play}
       aria-label={$i18n.t('timeline.playVideo', { name: mediaLabel })}
     >
-      {#if posterUrl}
-        <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
-      {/if}
       <span class="media-play-badge" aria-hidden="true">
         <PlayIcon weight="fill" />
       </span>
     </button>
-  {:else if !failed && !url}
+  {:else if !failed && !url && !(deferred && !started)}
     <span class="media-loading">
-      {#if posterUrl}
-        <img class="media-loading-poster" src={posterUrl} alt="" aria-hidden="true" />
-      {/if}
       <span class="media-loading-status">
         <Spinner small />
         {#if transcode}
@@ -369,6 +414,13 @@
     inset: 0;
     justify-content: center;
     position: absolute;
+  }
+
+  .media-frame :global(.media-poster) {
+    height: 100%;
+    inset: 0;
+    position: absolute;
+    width: 100%;
   }
 
   .media-loading-poster {

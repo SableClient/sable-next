@@ -43,6 +43,7 @@ function image(eventId: string, filename: string): TimelineItemView {
       height: 600,
       size: null,
       blurhash: null,
+      thumbnail: null,
       spoiler: null,
     },
     in_reply_to: null,

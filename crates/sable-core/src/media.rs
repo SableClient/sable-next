@@ -27,6 +27,7 @@ use crate::{Core, MatrixClient};
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
 const MEDIA_DOWNLOAD_TIMEOUT: Duration = Duration::from_hours(1);
+const UNSIZED_PROGRESS_STEP: u64 = 256 * 1024;
 
 #[derive(serde::Deserialize)]
 pub struct GalleryAttachment {
@@ -73,7 +74,7 @@ impl Core {
         let client = self.client().await?;
         let media = media_label(&source);
 
-        if width == 0 || height == 0 {
+        if width == 0 || height == 0 || matches!(source, MediaSource::Encrypted(_)) {
             return self
                 .original_media(&client, &key, source)
                 .await
@@ -201,9 +202,12 @@ impl Core {
         while let Some(chunk) = chunks.next().await {
             content.extend_from_slice(&chunk?);
             let current = u64::try_from(content.len()).unwrap_or(u64::MAX);
-            let percent = current.saturating_mul(100).checked_div(total).unwrap_or(0);
-            if percent > reported {
-                reported = percent;
+            let step = current
+                .saturating_mul(100)
+                .checked_div(total)
+                .unwrap_or(current / UNSIZED_PROGRESS_STEP);
+            if step > reported {
+                reported = step;
                 self.emit(CoreEvent::MediaProgress {
                     source: key.to_owned(),
                     current,

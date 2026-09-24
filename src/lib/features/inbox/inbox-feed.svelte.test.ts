@@ -53,3 +53,29 @@ test('a failed backfill is reported and releases the busy flag', async () => {
   expect(feed.failed).toBe(true);
   expect(feed.backfilling).toBe(false);
 });
+
+test('a backfill asked for while one runs runs once more afterwards', async () => {
+  let finish: () => void = () => {};
+  const backfillInbox = vi.fn(
+    () =>
+      new Promise<number>((resolve) => {
+        finish = () => {
+          resolve(0);
+        };
+      })
+  );
+  const feed = new InboxFeed({ inboxNotifications: vi.fn(), backfillInbox });
+
+  const first = feed.backfill(false);
+  void feed.backfill(false);
+  void feed.backfill(false);
+  finish();
+  await vi.waitFor(() => {
+    expect(backfillInbox).toHaveBeenCalledTimes(2);
+  });
+  finish();
+  await first;
+
+  expect(backfillInbox).toHaveBeenCalledTimes(2);
+  expect(feed.backfilling).toBe(false);
+});

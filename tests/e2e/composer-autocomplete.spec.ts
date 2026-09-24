@@ -1,6 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ storageState: SIGNED_OUT });
+test.use({ storageState: SIGNED_OUT, keepUnverifiedBanner: true });
 
 test('the arrow keys move a visible highlight through emote suggestions', async ({
   page,

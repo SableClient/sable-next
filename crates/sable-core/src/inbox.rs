@@ -294,6 +294,9 @@ impl Core {
 
     pub(crate) async fn backfill_inbox(&self, include_read: bool) -> Result<u32, CommandErr> {
         let client = self.client().await?;
+        if let Err(error) = crate::rooms::fill_own_members(&client).await {
+            warn!("could not fill in our own room memberships: {error}");
+        }
         let stored = load(&client).await;
         let mut candidates = Vec::new();
 

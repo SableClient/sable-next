@@ -607,6 +607,57 @@ async fn an_original_streams_with_progress_and_is_cached() {
 
 #[tokio::test]
 #[allow(clippy::unwrap_used)]
+async fn an_encrypted_thumbnail_downloads_the_original() {
+    use std::io::Read;
+
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let plaintext = vec![3_u8; 64 * 1024];
+    let mut cursor = std::io::Cursor::new(plaintext.clone());
+    let mut encryptor = matrix_sdk_base::crypto::AttachmentEncryptor::new(&mut cursor);
+    let mut ciphertext = Vec::new();
+    encryptor.read_to_end(&mut ciphertext).unwrap();
+    let keys = encryptor.finish();
+    let file = matrix_sdk::ruma::events::room::EncryptedFile::new(
+        matrix_sdk::ruma::OwnedMxcUri::from("mxc://example.org/sealed"),
+        keys.encryption_info,
+        keys.hashes,
+    );
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/sealed"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(ciphertext))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/thumbnail/example.org/sealed",
+        ))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = serde_json::to_string(&matrix_sdk::ruma::events::room::MediaSource::Encrypted(
+        Box::new(file),
+    ))
+    .unwrap();
+
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 800, 600)
+            .await
+            .unwrap(),
+        plaintext
+    );
+    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), plaintext);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
 async fn forgotten_media_is_fetched_again() {
     let server = MatrixMockServer::new().await;
     let client = server

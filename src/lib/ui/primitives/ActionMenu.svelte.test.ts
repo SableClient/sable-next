@@ -65,7 +65,7 @@ test('a wide viewport opens the anchored menu', async () => {
   await unmount(instance);
 });
 
-test('a narrow viewport runs a menu action and then closes its sheet', async () => {
+test('a narrow viewport closes its sheet and then runs the menu action', async () => {
   narrowViewport();
   const onPick = vi.fn();
   const instance = mount(ActionMenuHarness, { target: document.body, props: { onPick } });
@@ -79,8 +79,10 @@ test('a narrow viewport runs a menu action and then closes its sheet', async () 
   expect(action).not.toBeNull();
   if (action) await press(action);
 
-  expect(onPick).toHaveBeenCalledOnce();
   expect(document.querySelector('.dialog-content-sheet')).toBeNull();
+  await vi.waitFor(() => {
+    expect(onPick).toHaveBeenCalledOnce();
+  });
   await unmount(instance);
 });
 
@@ -109,8 +111,10 @@ test('a narrow viewport opens a bottom sheet, and a submenu pushes a second one'
 
   if (checked) await press(checked);
 
-  expect(onPick).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('.dialog-content-sheet')).toHaveLength(0);
+  await vi.waitFor(() => {
+    expect(onPick).toHaveBeenCalledOnce();
+  });
 
   await unmount(instance);
 });

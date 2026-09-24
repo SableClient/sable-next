@@ -9,12 +9,13 @@ use matrix_sdk::room_preview::RoomPreview;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
 use matrix_sdk::ruma::events::SyncStateEvent;
 use matrix_sdk::ruma::events::poll::start::PollKind;
-use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
+use matrix_sdk::ruma::events::room::message::VideoInfo;
 use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
+use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
 use matrix_sdk::ruma::events::space::child::{
     HierarchySpaceChildEvent, SpaceChildEventContent, SpaceChildOrd,
 };
@@ -93,12 +94,9 @@ pub fn room_summary<S: BuildHasher>(
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
-        // Only `display_name()` fills this cache, so `prime_display_names` must
-        // have run. `name()` covers an explicit `m.room.name` until then.
         name: item
-            .cached_display_name()
-            .map(|name| name.to_string())
-            .or_else(|| item.name()),
+            .name()
+            .or_else(|| item.cached_display_name().map(|name| name.to_string())),
         topic: item.topic(),
         avatar_url: info.map_or_else(
             || item.avatar_url().map(|url| url.to_string()),
@@ -1203,6 +1201,14 @@ fn media_source(source: &MediaSource) -> String {
     }
 }
 
+fn image_thumbnail(info: &ImageInfo) -> Option<String> {
+    info.thumbnail_source.as_ref().map(media_source)
+}
+
+fn video_thumbnail(info: &VideoInfo) -> Option<String> {
+    info.thumbnail_source.as_ref().map(media_source)
+}
+
 fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
     let dimension = |value: Option<UInt>| value.map(u64::from);
 
@@ -1213,6 +1219,8 @@ fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
+            blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+            thumbnail: image.info.as_deref().and_then(image_thumbnail),
         },
         GalleryItemType::Video(video) => GalleryItemView::Video {
             body: video.body.clone(),
@@ -1220,6 +1228,8 @@ fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
+            blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+            thumbnail: video.info.as_deref().and_then(video_thumbnail),
         },
         GalleryItemType::Audio(audio) => GalleryItemView::Audio {
             body: audio.body.clone(),
@@ -1442,6 +1452,7 @@ fn message_content(
                 height: dimension(image.info.as_ref().and_then(|info| info.height)),
                 size: dimension(image.info.as_ref().and_then(|info| info.size)),
                 blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+                thumbnail: image.info.as_deref().and_then(image_thumbnail),
                 spoiler: spoiler_reason(raw.content.as_ref()),
             }
         }
@@ -1457,6 +1468,7 @@ fn message_content(
                 width: dimension(video.info.as_ref().and_then(|info| info.width)),
                 height: dimension(video.info.as_ref().and_then(|info| info.height)),
                 blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+                thumbnail: video.info.as_deref().and_then(video_thumbnail),
                 spoiler: spoiler_reason(raw.content.as_ref()),
             }
         }

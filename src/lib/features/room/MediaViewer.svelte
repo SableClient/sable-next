@@ -7,7 +7,14 @@
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
+  import {
+    cachedMediaUrl,
+    holdMediaUrl,
+    isEncryptedMedia,
+    loadMediaUrl,
+  } from '#lib/ui/media-url.js';
+  import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
@@ -89,6 +96,12 @@
     item === undefined ? '' : item.kind === 'sticker' ? item.body : (item.caption ?? item.filename)
   );
   let url = $state<string | null>(null);
+  const loading = mediaProgress(core, () => (!url && !failed ? source : null));
+  let preview = $derived(
+    item?.kind === 'image' && (item.thumbnail !== null || !isEncryptedMedia(item.source))
+      ? item
+      : null
+  );
   let videoEl = $state<HTMLVideoElement>();
   let failed = $state(false);
   let zoom = $state(1);
@@ -745,7 +758,26 @@
               <span>{$i18n.t('timeline.mediaUnavailableDetail')}</span>
             </div>
           {:else}
-            <Spinner label={$i18n.t('a11y.loading')} />
+            {#if preview}
+              <MediaImage
+                class="viewer-preview"
+                source={preview.source}
+                thumbnail={preview.thumbnail}
+                alt=""
+                width={800}
+                height={600}
+                intrinsicWidth={preview.width}
+                intrinsicHeight={preview.height}
+                mime={preview.mime}
+                blurhash={preview.blurhash}
+              />
+            {/if}
+            <span class="loading">
+              <Spinner label={$i18n.t('a11y.loading')} />
+              {#if loading.percent !== null}
+                <span>{$i18n.t('timeline.downloadProgress', { percent: loading.percent })}</span>
+              {/if}
+            </span>
           {/if}
           {#if index < items.length - 1}
             <IconButton class="nav next" label={$i18n.t('viewer.next')} size="large" onclick={next}
@@ -1043,6 +1075,41 @@
     .actions :global(.desktop-control) {
       display: none;
     }
+  }
+
+  .stage :global(.viewer-preview) {
+    aspect-ratio: auto;
+    inset: var(--space-200);
+    position: absolute;
+  }
+
+  .stage :global(.viewer-preview :is(.media-image-content, .media-image-blurhash)) {
+    object-fit: contain;
+  }
+
+  .stage
+    :global(
+      .viewer-preview
+        :is(
+          .media-image-placeholder,
+          .media-image-progress,
+          .media-image-size,
+          .media-image-unavailable
+        )
+    ) {
+    display: none;
+  }
+
+  .loading {
+    align-items: center;
+    background: var(--surface-container);
+    border-radius: var(--radius);
+    color: var(--surface-var-on-container);
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-100);
+    padding: var(--space-100) var(--space-200);
+    position: relative;
   }
 
   .error {

@@ -27,12 +27,18 @@ async function settle(): Promise<void> {
 }
 
 test.each([
-  { kind: 'video' as const, selector: 'video', width: 1920, height: 1080 },
-  { kind: 'audio' as const, selector: 'audio', width: null, height: null },
-  { kind: 'file' as const, selector: 'a[download="report.pdf"]', width: null, height: null },
+  { kind: 'video' as const, selector: 'video', width: 1920, height: 1080, start: '.media-play' },
+  { kind: 'audio' as const, selector: 'audio', width: null, height: null, start: null },
+  {
+    kind: 'file' as const,
+    selector: 'a[download="report.pdf"]',
+    width: null,
+    height: null,
+    start: '.media-download',
+  },
 ])(
   'renders a $kind attachment from the original media',
-  async ({ kind, selector, width, height }) => {
+  async ({ kind, selector, width, height, start }) => {
     core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
     const instance = mount(MediaContent, {
       target: document.body,
@@ -47,6 +53,11 @@ test.each([
     });
 
     await settle();
+    if (start !== null) {
+      expect(core.fetchMedia).not.toHaveBeenCalled();
+      document.querySelector<HTMLButtonElement>(start)?.click();
+      await settle();
+    }
 
     expect(core.fetchMedia).toHaveBeenCalledWith(`mxc://example.org/${kind}`, 0, 0);
     expect(document.querySelector(selector)).not.toBeNull();
@@ -229,6 +240,8 @@ test('shows the download percentage while the original is fetched', async () => 
     props: { kind: 'file', source: 'mxc://example.org/big', mime: null, filename: 'big.zip' },
   });
   await settle();
+  document.querySelector<HTMLButtonElement>('.media-download')?.click();
+  await settle();
 
   for (const listener of listeners) {
     listener({ type: 'media_progress', source: 'mxc://example.org/other', current: 9, total: 10 });
@@ -239,4 +252,26 @@ test('shows the download percentage while the original is fetched', async () => 
   expect(document.querySelector('.media-loading-label')?.textContent.trim()).toBe('40%');
   await unmount(instance);
   subscribe.mockImplementation(() => () => {});
+});
+
+test('a video shows its thumbnail and waits for play before fetching', async () => {
+  const instance = mount(MediaContent, {
+    target: document.body,
+    props: {
+      kind: 'video',
+      source: 'mxc://example.org/waiting-video',
+      thumbnail: 'mxc://example.org/waiting-poster',
+      mime: 'video/mp4',
+      filename: 'clip.mp4',
+      width: 1920,
+      height: 1080,
+    },
+  });
+
+  await settle();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(1);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/waiting-poster', 800, 600);
+  expect(document.querySelector('.media-poster')).not.toBeNull();
+  await unmount(instance);
 });

@@ -730,6 +730,23 @@ test('switching rooms saves the active draft under its original room', async () 
   void unmount(reopened);
 });
 
+test('an unmount keeps the typed draft for the next mount', async () => {
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const first = render({ roomId: '!room:example.org' });
+  await tick();
+
+  await unmount(first);
+  document.body.replaceChildren();
+  const reopened = render({ roomId: '!room:example.org' });
+  await tick();
+
+  expect(editorText()).toBe('half a thought');
+  void unmount(reopened);
+});
+
 test('a thread keeps its draft out of the room it hangs off', async () => {
   const thread = render({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
   await tick();

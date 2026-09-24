@@ -8,8 +8,10 @@ export class InboxFeed {
   hasMore = $state(false);
   loaded = $state(false);
   backfilling = $state(false);
+  checked = $state(false);
   failed = $state(false);
   #revision = 0;
+  #rerun: boolean | null = null;
 
   constructor(private readonly commands: InboxFeedCommands) {}
 
@@ -31,7 +33,10 @@ export class InboxFeed {
   }
 
   async backfill(includeRead: boolean): Promise<void> {
-    if (this.backfilling) return;
+    if (this.backfilling) {
+      this.#rerun = (this.#rerun ?? false) || includeRead;
+      return;
+    }
     this.backfilling = true;
     try {
       await this.commands.backfillInbox(includeRead);
@@ -40,6 +45,10 @@ export class InboxFeed {
       this.failed = true;
     } finally {
       this.backfilling = false;
+      this.checked = true;
     }
+    const rerun = this.#rerun;
+    this.#rerun = null;
+    if (rerun !== null) await this.backfill(rerun);
   }
 }

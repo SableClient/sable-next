@@ -33,6 +33,6 @@ test('does not preload a route on hover, but still handles its error when clicke
 
   await expect.poll(() => lazyRouteRequests).toBeGreaterThan(0);
   await expect(page).toHaveURL(/\/register$/);
-  await expect(page.getByText('Internal Error')).toBeVisible();
+  await expect(page.locator('main.error-page')).toBeVisible();
   expect(errors).toEqual([]);
 });

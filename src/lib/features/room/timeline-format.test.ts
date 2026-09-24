@@ -517,6 +517,7 @@ test('anything you sent is yours to redact, not only your text', () => {
     height: 8,
     size: null,
     blurhash: null,
+    thumbnail: null,
     spoiler: null,
   } as const;
 

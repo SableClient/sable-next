@@ -1,6 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ storageState: SIGNED_OUT });
+test.use({ storageState: SIGNED_OUT, keepUnverifiedBanner: true });
 
 test('a docked banner takes the pointer across its whole card', async ({
   page,

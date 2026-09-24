@@ -9,17 +9,19 @@ test('lists rooms that named us, and opens one', async ({ page, app, admin, gues
   const roomName = `Mentioned ${String(Date.now())}`;
   const roomId = await guest.createRoom({ name: roomName, invite: [admin.userId] });
   await admin.join(roomId);
-  const body = `${admin.userId}: take a look`;
-  await guest.sendMessage(roomId, body, { 'm.mentions': { user_ids: [admin.userId] } });
+  await guest.sendMessage(roomId, `${admin.userId}: take a look`, {
+    'm.mentions': { user_ids: [admin.userId] },
+  });
 
   await app.openInbox();
 
   // Scoped to the page body: the sidebar lists the same rooms.
   const inbox = page.getByRole('main');
   await expect(inbox.getByRole('heading', { name: 'Notifications' })).toBeVisible();
-  await expect(inbox.getByText(body, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+  const row = inbox.getByRole('listitem').filter({ hasText: roomName });
+  await expect(row).toBeVisible({ timeout: 15_000 });
 
-  await inbox.getByRole('listitem').filter({ hasText: roomName }).getByRole('link').click();
+  await row.getByRole('link').click();
   await expect(page).toHaveURL((url) => url.pathname.endsWith(encodeURIComponent(roomId)));
 });
 

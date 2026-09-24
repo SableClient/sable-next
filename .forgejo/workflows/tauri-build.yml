@@ -20,6 +20,8 @@ env:
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: ${{ github.repository }}
   FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+  # Each nightly is ~1.5 GB of bundles on a node with ~100 GB of disk.
+  NIGHTLY_KEEP: 5
   SCCACHE_BUCKET: sccache
   SCCACHE_S3_KEY_PREFIX: sable-next
   SCCACHE_ENDPOINT: https://s3.erwanleboucher.dev
@@ -450,6 +452,8 @@ jobs:
           ipa_build="$(jq -r '.ipa.build' github-bundles.json)"
 
           if [ "$IS_NIGHTLY" = 'true' ]; then
+            # Older entries would 404 once their nightly release is pruned.
+            export ALTSTORE_MAX_VERSIONS="$NIGHTLY_KEEP"
             node scripts/ci/forgejo-release.mjs download \
               --tag nightly --pattern altstore-source.json --dir .
             [ -e altstore-source.json ] || \
@@ -577,3 +581,5 @@ jobs:
             [ ! -e "$name" ] || \
               node scripts/ci/forgejo-release.mjs upload --tag nightly "$name"
           done
+      - name: Prune old nightly releases
+        run: node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP"
