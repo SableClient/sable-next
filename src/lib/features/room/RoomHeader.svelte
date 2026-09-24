@@ -129,7 +129,7 @@
         onclick={onToggleChat}
       >
         {#if chatOpen}
-          <SpeakerHighIcon />
+          <PhoneIcon />
         {:else}
           <ChatCircleIcon />
         {/if}
