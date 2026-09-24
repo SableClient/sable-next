@@ -9,12 +9,14 @@ export type CustomTheme = {
   name: string;
   kind: ResolvedTheme;
   css: string;
+  source?: string;
 };
 
 export type CustomTweak = {
   id: string;
   name: string;
   css: string;
+  source?: string;
 };
 
 export type StoredThemes = {
