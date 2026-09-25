@@ -1197,6 +1197,7 @@
     position: absolute;
     touch-action: none;
     width: 100%;
+    z-index: 1;
   }
 
   .room-banner-resize:hover,
