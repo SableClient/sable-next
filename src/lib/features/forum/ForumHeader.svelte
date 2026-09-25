@@ -18,7 +18,7 @@
   let { roomId, roomName, roomAvatar, onBack, onSearch }: Props = $props();
 </script>
 
-<PanelHeader class="forum-header" title={roomName}>
+<PanelHeader class="forum-header" title={roomName} titleSize="h1">
   {#snippet prefix()}
     <PanelHeaderButton class="back-button" label={$i18n.t('timeline.back')} onclick={onBack}>
       <BackIcon />

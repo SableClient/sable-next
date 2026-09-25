@@ -11,6 +11,7 @@
     main?: Snippet;
     suffix?: Snippet;
     title?: string;
+    titleSize?: 'h1' | 'h2';
     subtitle?: string;
   }
 
@@ -21,6 +22,7 @@
     main,
     suffix,
     title = '',
+    titleSize = 'h2',
     subtitle = '',
   }: Props = $props();
 </script>
@@ -35,6 +37,8 @@
     {:else if title}
       {#if modal}
         <Dialog.Title class="title">{title}</Dialog.Title>
+      {:else if titleSize == 'h1'}
+        <h1 class="title">{title}</h1>
       {:else}
         <h2 class="title">{title}</h2>
       {/if}
