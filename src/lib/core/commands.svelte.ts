@@ -1077,6 +1077,11 @@ export function createCommands(transport: () => Transport) {
       return response.events;
     },
 
+    async roomFullState(roomId: string): Promise<unknown[]> {
+      const response = await transport().send({ type: 'room_full_state', room_id: roomId });
+      return response.events;
+    },
+
     async searchUserDirectory(
       term: string,
       limit: number | null

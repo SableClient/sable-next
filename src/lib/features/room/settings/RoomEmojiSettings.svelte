@@ -12,7 +12,10 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { invalidatePacks } from '#lib/emoji/load-packs.js';
   import ImagePackEditor from '#lib/features/emotes/ImagePackEditor.svelte';
-  import { ROOM_IMAGE_PACK_EVENT_TYPE } from '#lib/features/emotes/pack-address.js';
+  import {
+    ROOM_EMOTES_EVENT_TYPE,
+    ROOM_IMAGE_PACK_EVENT_TYPE,
+  } from '#lib/features/emotes/pack-address.js';
   import {
     packEventContent,
     uniqueShortcode,
@@ -92,6 +95,17 @@
     await load();
   }
 
+  async function clearLegacyPack(stateKey: string): Promise<void> {
+    const target = roomId;
+    if (!target) return;
+
+    const legacy = await core.commands
+      .roomStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey)
+      .catch(() => null);
+    if (typeof legacy !== 'object' || legacy === null || Object.keys(legacy).length === 0) return;
+    await core.commands.sendStateEvent(target, ROOM_EMOTES_EVENT_TYPE, stateKey, {});
+  }
+
   async function createPack(): Promise<void> {
     const name = newPackName.trim();
     if (name === '' || busy) return;
@@ -120,6 +134,9 @@
     busy = true;
     failed = false;
     try {
+      await clearLegacyPack(pack.id).catch((error: unknown) => {
+        console.warn('[sable room] legacy pack not cleared', error);
+      });
       await writePack(pack.id, {});
       if (viewing === pack.id) viewing = null;
     } catch (error) {

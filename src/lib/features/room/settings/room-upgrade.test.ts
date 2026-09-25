@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
 
-import { additionalCreatorsSupported, readCreate, readTombstone } from './room-upgrade';
+import {
+  additionalCreatorsSupported,
+  readCreate,
+  readFounders,
+  readTombstone,
+} from './room-upgrade';
 
 test('additional creators arrived in room version 12', () => {
   expect(additionalCreatorsSupported('11')).toBe(false);
@@ -38,4 +43,20 @@ test('an empty tombstone body falls back to nothing, not an empty line', () => {
 
 test('a room with no tombstone has not been replaced', () => {
   expect(readTombstone(null)).toEqual({ replacement: null, body: null });
+});
+
+test('founders are the creator and the additional creators from version 12', () => {
+  expect(
+    readFounders({
+      sender: '@alice:example.org',
+      content: { room_version: '12', additional_creators: ['@bob:example.org', 7] },
+    })
+  ).toEqual(['@alice:example.org', '@bob:example.org']);
+});
+
+test('a room before version 12 has no founders', () => {
+  expect(readFounders({ sender: '@alice:example.org', content: { room_version: '11' } })).toEqual(
+    []
+  );
+  expect(readFounders(null)).toEqual([]);
 });

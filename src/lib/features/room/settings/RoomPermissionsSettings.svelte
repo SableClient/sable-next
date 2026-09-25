@@ -4,7 +4,10 @@
     RoomPowerLevelsView,
     RoomSummary,
   } from '#src/generated/protocol';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
   import PencilIcon from 'phosphor-svelte/lib/PencilIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -19,11 +22,15 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import '#lib/ui/primitives/settings-row.css';
 
   import { ancestorSpaceIds, descendantRoomIds } from '../abbreviations.js';
+  import MemberIdentityRow from '../MemberIdentityRow.svelte';
+  import ReactionPicker from '../ReactionPicker.svelte';
   import RoleTagIcon from '../RoleTagIcon.svelte';
+  import { readFounders } from './room-upgrade';
   import {
     canSendState,
     levelAt,
@@ -66,6 +73,18 @@
 
   let rawRoleTags = $state.raw<unknown>(null);
   let roleTags = $derived<PowerLevelTagMap>(parsePowerLevelTags(rawRoleTags));
+  let founders = $state.raw<string[]>([]);
+  let peekLevel = $state<number | null>(null);
+  let iconUploading = $state(false);
+  let iconInput = $state<HTMLInputElement | null>(null);
+  let roleLevels = $derived(
+    [
+      ...new Set([
+        ...Object.keys(roleTags).map(Number),
+        ...namedLevels.map((entry) => entry.level),
+      ]),
+    ].sort((left, right) => right - left)
+  );
 
   let numberDrafts = $state.raw<Record<string, string>>({});
   let numberErrors = $state.raw<Record<string, string>>({});
@@ -123,6 +142,7 @@
     loading = true;
     failed = false;
     try {
+      void loadFounders(target, current);
       const [loaded, tagsContent] = await Promise.all([
         core.commands.roomPowerLevels(target),
         core.commands.roomStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE),
@@ -135,6 +155,16 @@
       if (current === run) failed = true;
     } finally {
       if (current === run) loading = false;
+    }
+  }
+
+  async function loadFounders(target: string, current: number): Promise<void> {
+    try {
+      const events = await core.commands.roomStateEventsRaw(target, 'm.room.create', '');
+      if (current === run) founders = readFounders(events[0]);
+    } catch (error) {
+      console.debug('[sable room] founders unavailable', error);
+      if (current === run) founders = [];
     }
   }
 
@@ -390,6 +420,25 @@
     }
   }
 
+  async function uploadRoleIcon(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file || iconUploading) return;
+
+    iconUploading = true;
+    roleFailed = false;
+    try {
+      const upright = await uprightJpeg(file);
+      const bytes = new Uint8Array(await upright.arrayBuffer());
+      roleIconDraft = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
+    } catch (error) {
+      console.warn('[sable room] role icon upload failed', error);
+      roleFailed = true;
+    } finally {
+      iconUploading = false;
+    }
+  }
+
   async function confirmRemoveRole(): Promise<void> {
     await removeRole();
     roleRemoveConfirm = false;
@@ -404,14 +453,47 @@
   {#if loading && levels === null}
     <p class="settings-status" role="status"><Spinner small /></p>
   {:else if levels}
-    {#if canEdit}
-      <SettingsSection headingId="room-perm-roles" title={$i18n.t('room.permRoles')}>
+    {#if founders.length > 0}
+      <SettingsSection
+        headingId="room-perm-founders"
+        title={$i18n.t('room.permFounders')}
+        description={$i18n.t('room.permFoundersHint')}
+      >
         <ul class="settings-rows">
-          {#each Object.entries(roleTags).sort(([left], [right]) => Number(right) - Number(left)) as [key, tag] (key)}
-            {@const level = Number(key)}
-            <SettingsRow title={`${tag.name} (${level})`}>
-              {#if tag.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
-              <span class="role-swatch" style:background-color={tag.color ?? undefined}></span>
+          {#each founders as founder (founder)}
+            <SettingsRow>
+              {#snippet copy()}
+                <MemberIdentityRow userId={founder} members={[]}>
+                  {#snippet trailing()}
+                    <span class="level">{founder}</span>
+                  {/snippet}
+                </MemberIdentityRow>
+              {/snippet}
+            </SettingsRow>
+          {/each}
+        </ul>
+      </SettingsSection>
+    {/if}
+
+    <SettingsSection headingId="room-perm-roles" title={$i18n.t('room.permRoles')}>
+      <ul class="settings-rows">
+        {#each roleLevels as level (level)}
+          {@const tag = tagForLevel(roleTags, level)}
+          <SettingsRow title={`${levelLabel(level)} (${level})`}>
+            {#if tag?.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
+            <span class="role-swatch" style:background-color={tag?.color ?? undefined}></span>
+            <IconButton
+              variant="subtle"
+              size="small"
+              label={$i18n.t('room.permRolePeek', { role: levelLabel(level) })}
+              aria-expanded={peekLevel === level}
+              onclick={() => {
+                peekLevel = peekLevel === level ? null : level;
+              }}
+            >
+              <ListChecksIcon />
+            </IconButton>
+            {#if canEdit && level <= ownLevel}
               <IconButton
                 variant="subtle"
                 size="small"
@@ -421,16 +503,41 @@
               >
                 <PencilIcon />
               </IconButton>
-            </SettingsRow>
-          {/each}
+            {/if}
+          </SettingsRow>
+          {#if peekLevel === level}
+            <li class="settings-form peek">
+              {#each groups as group (group.label)}
+                <div class="peek-group">
+                  <p class="peek-title">{$i18n.t(group.label)}</p>
+                  <ul class="peek-items">
+                    {#each group.items as item (item.label)}
+                      {@const allowed = levelAt(levels, item.location) <= level}
+                      <li class:denied={!allowed}>
+                        {#if allowed}<CheckIcon aria-hidden="true" />{:else}<XIcon
+                            aria-hidden="true"
+                          />{/if}
+                        <span>{$i18n.t(item.label)}</span>
+                        <span class="screen-reader-only">
+                          {allowed ? $i18n.t('room.permAllowed') : $i18n.t('room.permDenied')}
+                        </span>
+                      </li>
+                    {/each}
+                  </ul>
+                </div>
+              {/each}
+            </li>
+          {/if}
+        {/each}
+        {#if canEdit}
           <li class="settings-row role-add-row">
             <Button variant="secondary" onclick={startAddRole} disabled={saving}>
               {$i18n.t('room.permRoleAdd')}
             </Button>
           </li>
-        </ul>
-      </SettingsSection>
-    {/if}
+        {/if}
+      </ul>
+    </SettingsSection>
 
     {#if canEdit && syncSpaceId}
       <SettingsSection headingId="room-perm-sync" title={$i18n.t('room.permSyncTitle')}>
@@ -607,8 +714,59 @@
               placeholder={$i18n.t('room.permRoleColorHint')}
             />
           </FormField>
-          <FormField fieldId="room-perm-role-icon" label={$i18n.t('emoji.unicode')}>
-            <TextInput id="room-perm-role-icon" bind:value={roleIconDraft} placeholder="✨" />
+          <FormField fieldId="room-perm-role-icon" label={$i18n.t('room.permRoleIcon')}>
+            <div class="icon-field">
+              <span class="icon-preview" aria-hidden="true">
+                {#if roleIconDraft}<RoleTagIcon icon={roleIconDraft} />{/if}
+              </span>
+              <TextInput
+                id="room-perm-role-icon"
+                class="icon-text"
+                bind:value={roleIconDraft}
+                placeholder="✨"
+                autocomplete="off"
+              />
+              <ReactionPicker
+                label={$i18n.t('room.permRoleIconPick')}
+                roomId={roomId ?? ''}
+                triggerClass="btn btn-secondary btn-small"
+                onPick={(key: string) => {
+                  roleIconDraft = key;
+                }}
+              >
+                {$i18n.t('room.permRoleIconPick')}
+              </ReactionPicker>
+              <Button
+                type="button"
+                size="small"
+                variant="secondary"
+                loading={iconUploading}
+                onclick={() => iconInput?.click()}
+              >
+                {$i18n.t('room.permRoleIconUpload')}
+              </Button>
+              {#if roleIconDraft}
+                <Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  onclick={() => {
+                    roleIconDraft = '';
+                  }}
+                >
+                  {$i18n.t('room.permRoleIconClear')}
+                </Button>
+              {/if}
+              <input
+                bind:this={iconInput}
+                class="icon-input"
+                type="file"
+                accept="image/*"
+                tabindex="-1"
+                aria-hidden="true"
+                onchange={uploadRoleIcon}
+              />
+            </div>
           </FormField>
           <div class="actions">
             {#if editingHasTag}
@@ -704,6 +862,82 @@
 
   :global(.role-icon) {
     font-size: var(--font-size-small);
+  }
+
+  .peek {
+    gap: var(--space-300);
+  }
+
+  .peek-group {
+    display: grid;
+    gap: var(--space-100);
+  }
+
+  .peek-title {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    margin: 0;
+  }
+
+  .peek-items {
+    display: grid;
+    gap: var(--space-100);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .peek-items li {
+    align-items: center;
+    display: flex;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+  }
+
+  .peek-items li :global(svg) {
+    color: var(--success-main);
+    flex: 0 0 auto;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .peek-items li.denied {
+    color: var(--surface-var-on-container);
+  }
+
+  .peek-items li.denied :global(svg) {
+    color: var(--crit-main);
+  }
+
+  .icon-field {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+  }
+
+  .icon-field :global(.icon-text) {
+    flex: 1 1 8rem;
+    min-width: 0;
+  }
+
+  .icon-preview {
+    align-items: center;
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
+    display: inline-flex;
+    font-size: var(--font-size-heading);
+    height: var(--control-height-medium);
+    justify-content: center;
+    width: var(--control-height-medium);
+  }
+
+  .icon-input {
+    height: 0;
+    opacity: 0;
+    position: absolute;
+    width: 0;
   }
 
   .number-field {

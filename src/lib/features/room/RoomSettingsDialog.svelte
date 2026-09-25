@@ -8,9 +8,14 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import SettingsShell, {
+    type SettingsShellNav,
+  } from '#lib/features/settings/SettingsShell.svelte';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
+  import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
 
   import RoomAbbreviationsSettings from './settings/RoomAbbreviationsSettings.svelte';
   import RoomAppearanceSettings from './settings/RoomAppearanceSettings.svelte';
@@ -20,7 +25,6 @@
   import RoomGeneralSettings from './settings/RoomGeneralSettings.svelte';
   import RoomMembersSettings from './settings/RoomMembersSettings.svelte';
   import RoomPermissionsSettings from './settings/RoomPermissionsSettings.svelte';
-  import RoomSettingsShell from './settings/RoomSettingsShell.svelte';
   import {
     roomSettingsSections,
     type RoomSettingsSectionId,
@@ -55,7 +59,7 @@
 
   let sections = $derived(
     roomSettingsSections(room?.is_space ?? false).filter((entry) => {
-      if (entry.id === 'emojis-stickers') return editable('im.ponies.room_emotes');
+      if (entry.id === 'emojis-stickers') return editable('m.room.image_pack');
       return true;
     })
   );
@@ -99,32 +103,59 @@
   function close(): void {
     onOpenChange(false);
   }
+
+  function sectionLabel(id: string): string {
+    return $i18n.t(sections.find((entry) => entry.id === id)?.label ?? 'room.settingsTitle');
+  }
 </script>
 
 <DialogFrame {open} {onOpenChange} variant="settings" label={$i18n.t('room.settingsTitle')}>
-  <RoomSettingsShell
+  <SettingsShell
     {section}
-    {sections}
-    onSelect={(next: RoomSettingsSectionId) => {
-      section = next;
-    }}
+    fallback={() => sections[0]?.id ?? null}
+    label={$i18n.t('room.settingsTitle')}
+    description={$i18n.t('room.settingsDialogDescription')}
+    closeLabel={$i18n.t('room.settingsClose')}
+    backLabel={$i18n.t('room.settingsBack')}
+    {sectionLabel}
+    {heading}
+    {nav}
+    {content}
     onBack={() => {
       section = null;
     }}
     onClose={close}
-    {header}
-    {content}
   />
 </DialogFrame>
 
-{#snippet header()}
-  <div class="room-heading">
+{#snippet heading()}
+  <span class="room-heading">
     <Avatar id={roomId} src={room?.avatar_url ?? null} name={roomName} size="small" />
-    <span class="room-name">{roomName}</span>
-  </div>
+    <span class="room-heading-name">{roomName}</span>
+  </span>
 {/snippet}
 
-{#snippet content(active: RoomSettingsSectionId)}
+{#snippet nav(state: SettingsShellNav)}
+  <SettingsNav
+    entries={sections.map((entry) => ({ ...entry, label: $i18n.t(entry.label) }))}
+    activeId={state.openSection}
+    ariaLabel={$i18n.t('room.settingsSections')}
+    onSelect={(_, id) => {
+      section = id as RoomSettingsSectionId;
+    }}
+    showChevron={!state.desktop}
+    large={!state.desktop}
+    current={state.current}
+  />
+{/snippet}
+
+{#snippet content(active: string)}
+  <AppPageShell title={sectionLabel(active)} density="compact" class="room-settings-page">
+    {@render page(active as RoomSettingsSectionId)}
+  </AppPageShell>
+{/snippet}
+
+{#snippet page(active: RoomSettingsSectionId)}
   {#if active === 'general'}
     <RoomGeneralSettings {room} {permissions} {levels} onClose={close} />
   {:else if active === 'members'}
@@ -152,13 +183,14 @@
     min-width: 0;
   }
 
-  .room-name {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    line-height: var(--line-height-heading);
+  .room-heading-name {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  :global(.settings-scroll .app-page-shell.room-settings-page) {
+    overflow: visible;
   }
 </style>

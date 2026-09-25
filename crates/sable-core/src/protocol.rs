@@ -526,6 +526,10 @@ pub enum Command {
         #[serde(default)]
         state_key: Option<String>,
     },
+    RoomFullState {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     SearchUserDirectory {
         term: String,
         #[serde(default)]
@@ -1318,6 +1322,10 @@ pub enum CommandOk {
         events: Vec<serde_json::Value>,
     },
     RoomStateEventsRaw {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<specta_typescript::Unknown>))]
+        events: Vec<serde_json::Value>,
+    },
+    RoomFullState {
         #[cfg_attr(feature = "typegen", specta(type = Vec<specta_typescript::Unknown>))]
         events: Vec<serde_json::Value>,
     },

@@ -9,20 +9,20 @@
   import { useCoreClient } from '#lib/core/context.js';
   import {
     COSMETIC_EVENT_TYPES,
-    fontContent,
     pronounContent,
     writeMemberColors,
   } from '#lib/features/composer/slash-commands.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
-  import { COSMETIC_FONTS, cosmeticFont } from '#lib/rooms/cosmetic-fonts.js';
+  import { cosmeticFont } from '#lib/rooms/cosmetic-fonts.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   import { senderDisplayColors } from '../members';
   import SenderName from '../SenderName.svelte';
@@ -30,7 +30,6 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
-  const DEFAULT_FONT = 'default';
   const MEMBER_LEVEL = 0;
   const MODERATOR_LEVEL = 50;
 
@@ -42,7 +41,7 @@
 
   let { room, permissions, levels }: Props = $props();
   const core = useCoreClient();
-  const pronounsId = $props.id();
+  const uid = $props.id();
 
   let roomId = $derived(room?.room_id ?? null);
   let userId = $derived(core.session?.user_id ?? null);
@@ -53,7 +52,13 @@
 
   let colorOnLight = $state('');
   let colorOnDark = $state('');
-  let font = $state(DEFAULT_FONT);
+  let font = $state<string | null>(null);
+  let name = $state('');
+  let savedName = $state('');
+  let profileName = $state<string | null>(null);
+  let avatar = $state<string | null>(null);
+  let profileAvatar = $state<string | null>(null);
+  let avatarInput = $state<HTMLInputElement | null>(null);
   let pronouns = $state('');
   let savedPronouns = $state('');
   let saving = $state<string | null>(null);
@@ -61,7 +66,6 @@
   let run = 0;
 
   let canSetColor = $derived(canSendState(effectiveLevels, ownLevel, 'm.room.member'));
-  let canSetFont = $derived(canSendState(effectiveLevels, ownLevel, COSMETIC_EVENT_TYPES.font));
   let canSetPronouns = $derived(
     canSendState(effectiveLevels, ownLevel, COSMETIC_EVENT_TYPES.pronoun)
   );
@@ -84,14 +88,11 @@
     senderDisplayColors(userId ?? '', null, null, false, {
       colorOnLight: colorOnLight || null,
       colorOnDark: colorOnDark || null,
-      font: cosmeticFont(font)?.family ?? null,
+      font,
       pronouns: previewPronouns,
     })
   );
-  let fontItems = $derived([
-    { value: DEFAULT_FONT, label: $i18n.t('room.cosmeticsFontDefault') },
-    ...COSMETIC_FONTS.map((entry) => ({ value: entry.name, label: entry.name })),
-  ]);
+  let previewName = $derived(name.trim() || profileName || userId || '');
 
   $effect(() => {
     const target = roomId;
@@ -111,16 +112,24 @@
   async function load(target: string, self: string): Promise<void> {
     const current = ++run;
     try {
-      const [member, fontEvent, pronounEvent] = await Promise.all([
+      const [member, fontEvent, pronounEvent, profile] = await Promise.all([
         core.commands.roomStateEvent(target, 'm.room.member', self),
         core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.font, self),
         core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, self),
+        core.userProfile(self).catch(() => null),
       ]);
       if (current !== run) return;
       const colors = record(record(member)['eu.she-a.color']);
       colorOnLight = text(colors.on_light);
       colorOnDark = text(colors.on_dark);
-      font = cosmeticFont(text(record(fontEvent).font))?.name ?? DEFAULT_FONT;
+      profileName = profile?.display_name ?? null;
+      profileAvatar = profile?.avatar_url ?? null;
+      const memberAvatar = text(record(member).avatar_url);
+      avatar = memberAvatar === '' || memberAvatar === profileAvatar ? null : memberAvatar;
+      const memberName = text(record(member).displayname);
+      name = memberName === profileName ? '' : memberName;
+      savedName = name;
+      font = cosmeticFont(text(record(fontEvent).font))?.family ?? null;
       const sets = record(pronounEvent).pronouns;
       pronouns = Array.isArray(sets)
         ? sets
@@ -159,16 +168,51 @@
     );
   }
 
-  function saveFont(next: string): void {
-    font = next;
-    void save('font', (target, self) =>
-      core.commands.sendStateEvent(
-        target,
-        COSMETIC_EVENT_TYPES.font,
-        self,
-        fontContent(next === DEFAULT_FONT ? 'reset' : next) ?? {}
-      )
+  async function writeMember(
+    target: string,
+    self: string,
+    field: 'displayname' | 'avatar_url',
+    value: string | null
+  ): Promise<void> {
+    const rest = Object.fromEntries(
+      Object.entries(
+        record(await core.commands.roomStateEvent(target, 'm.room.member', self))
+      ).filter(([key]) => key !== field)
     );
+    await core.commands.sendStateEvent(target, 'm.room.member', self, {
+      ...rest,
+      membership: 'join',
+      ...(value ? { [field]: value } : {}),
+    });
+  }
+
+  function saveName(): void {
+    void save('name', async (target, self) => {
+      const next = name.trim() || profileName;
+      await writeMember(target, self, 'displayname', next);
+      name = next === profileName ? '' : (next ?? '');
+      savedName = name;
+    });
+  }
+
+  function uploadAvatar(event: Event & { currentTarget: HTMLInputElement }): void {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    void save('avatar', async (target, self) => {
+      const upright = await uprightJpeg(file);
+      const bytes = new Uint8Array(await upright.arrayBuffer());
+      const uri = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
+      await writeMember(target, self, 'avatar_url', uri);
+      avatar = uri;
+    });
+  }
+
+  function resetAvatar(): void {
+    void save('avatar', async (target, self) => {
+      await writeMember(target, self, 'avatar_url', profileAvatar);
+      avatar = null;
+    });
   }
 
   function savePronouns(): void {
@@ -209,13 +253,59 @@
   >
     <div class="preview" aria-hidden="true">
       <SenderName
-        displayName={core.session?.user_id ?? ''}
+        displayName={previewName}
         colors={previewColors}
-        font={cosmeticFont(font)?.family ?? null}
+        {font}
         pronouns={{ visible: previewPronouns, overflow: [] }}
       />
     </div>
     <ul class="settings-rows">
+      {#if !isSpace}
+        <SettingsRow
+          title={$i18n.t('room.cosmeticsAvatar')}
+          description={$i18n.t('room.cosmeticsAvatarHint')}
+        >
+          {#snippet before()}
+            <Avatar id={userId} src={avatar ?? profileAvatar} name={previewName} />
+          {/snippet}
+          <Button size="small" disabled={saving !== null} onclick={() => avatarInput?.click()}>
+            {$i18n.t('room.cosmeticsAvatarChange')}
+          </Button>
+          {#if avatar}
+            <Button size="small" variant="ghost" disabled={saving !== null} onclick={resetAvatar}>
+              {$i18n.t('room.cosmeticsAvatarReset')}
+            </Button>
+          {/if}
+          <input
+            bind:this={avatarInput}
+            class="avatar-input"
+            type="file"
+            accept="image/*"
+            tabindex="-1"
+            aria-hidden="true"
+            onchange={uploadAvatar}
+          />
+        </SettingsRow>
+        <SettingsRow
+          title={$i18n.t('room.cosmeticsName')}
+          description={$i18n.t('room.cosmeticsNameHint')}
+          wide
+        >
+          <div class="inline-field">
+            <TextInput
+              id={`${uid}-name`}
+              bind:value={name}
+              placeholder={profileName ?? userId ?? ''}
+              aria-label={$i18n.t('room.cosmeticsName')}
+            />
+            <Button
+              variant="secondary"
+              disabled={name === savedName || saving === 'name'}
+              onclick={saveName}>{$i18n.t('room.cosmeticsSave')}</Button
+            >
+          </div>
+        </SettingsRow>
+      {/if}
       {#if canSetColor}
         <li class="settings-form form-stack">
           <ColorSetting
@@ -243,19 +333,6 @@
         </li>
       {/if}
       <SettingsRow
-        title={$i18n.t('room.cosmeticsFont')}
-        description={canSetFont ? undefined : $i18n.t('room.cosmeticsNotAllowed')}
-        disabled={!canSetFont}
-      >
-        <Select
-          value={font}
-          aria-label={$i18n.t('room.cosmeticsFont')}
-          items={fontItems}
-          disabled={!canSetFont || saving === 'font'}
-          onValueChange={saveFont}
-        />
-      </SettingsRow>
-      <SettingsRow
         title={$i18n.t('room.cosmeticsPronouns')}
         description={canSetPronouns
           ? $i18n.t('room.cosmeticsPronounsHint')
@@ -263,9 +340,9 @@
         disabled={!canSetPronouns}
         wide
       >
-        <div class="pronouns">
+        <div class="inline-field">
           <TextInput
-            id={pronounsId}
+            id={`${uid}-pronouns`}
             bind:value={pronouns}
             disabled={!canSetPronouns}
             placeholder={$i18n.t('room.cosmeticsPronounsPlaceholder')}
@@ -335,7 +412,14 @@
     padding: var(--space-300) var(--space-400);
   }
 
-  .pronouns {
+  .avatar-input {
+    height: 0;
+    opacity: 0;
+    position: absolute;
+    width: 0;
+  }
+
+  .inline-field {
     display: flex;
     gap: var(--space-200);
   }

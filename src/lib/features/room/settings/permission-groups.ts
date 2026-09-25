@@ -1,10 +1,13 @@
 import type { RoomPowerLevelsView } from '#src/generated/protocol';
 
+import { POWER_LEVEL_TAGS_EVENT_TYPE } from './power-level-tags';
+
 export type PermissionLocation =
   | { kind: 'event'; eventType: string }
   | { kind: 'state'; eventType: string }
   | { kind: 'events-default' }
   | { kind: 'state-default' }
+  | { kind: 'users-default' }
   | { kind: 'action'; action: 'invite' | 'kick' | 'ban' | 'redact' }
   | { kind: 'notification-room' };
 
@@ -17,6 +20,11 @@ export interface PermissionGroup {
   label: string;
   items: readonly PermissionItem[];
 }
+
+const DEFAULTS: PermissionGroup = {
+  label: 'room.permGroupDefaults',
+  items: [{ label: 'room.permUsersDefault', location: { kind: 'users-default' } }],
+};
 
 const MESSAGES: PermissionGroup = {
   label: 'room.permGroupMessages',
@@ -85,6 +93,10 @@ function settings(isSpace: boolean): PermissionGroup {
         label: 'room.permChangePermissions',
         location: { kind: 'state', eventType: 'm.room.power_levels' },
       },
+      {
+        label: 'room.permPowerLevelTags',
+        location: { kind: 'state', eventType: POWER_LEVEL_TAGS_EVENT_TYPE },
+      },
       ...(isSpace
         ? []
         : [
@@ -103,16 +115,26 @@ function settings(isSpace: boolean): PermissionGroup {
   };
 }
 
-const OTHER: PermissionGroup = {
-  label: 'room.permGroupOther',
-  items: [
-    {
-      label: 'room.permImagePacks',
-      location: { kind: 'state', eventType: 'im.ponies.room_emotes' },
-    },
-    { label: 'room.permServerAcl', location: { kind: 'state', eventType: 'm.room.server_acl' } },
-  ],
-};
+function other(isSpace: boolean): PermissionGroup {
+  return {
+    label: 'room.permGroupOther',
+    items: [
+      {
+        label: 'room.permImagePacks',
+        location: { kind: 'state', eventType: 'm.room.image_pack' },
+      },
+      { label: 'room.permServerAcl', location: { kind: 'state', eventType: 'm.room.server_acl' } },
+      ...(isSpace
+        ? []
+        : [
+            {
+              label: 'room.permWidgets',
+              location: { kind: 'state' as const, eventType: 'im.vector.modular.widgets' },
+            },
+          ]),
+    ],
+  };
+}
 
 const SPACE_MANAGE: PermissionGroup = {
   label: 'room.permGroupManage',
@@ -124,14 +146,14 @@ const SPACE_MANAGE: PermissionGroup = {
 
 export function permissionGroups(isSpace: boolean): readonly PermissionGroup[] {
   if (isSpace) {
-    return [SPACE_MANAGE, MODERATION, overview(true), settings(true), OTHER];
+    return [DEFAULTS, SPACE_MANAGE, CALLS, MODERATION, overview(true), settings(true), other(true)];
   }
-  return [MESSAGES, CALLS, MODERATION, overview(false), settings(false), OTHER];
+  return [DEFAULTS, MESSAGES, CALLS, MODERATION, overview(false), settings(false), other(false)];
 }
 
 const SYNCED_LOCATIONS: readonly PermissionLocation[] = [
   { kind: 'state-default' },
-  ...[MODERATION, overview(true), settings(true), OTHER].flatMap((group) =>
+  ...[MODERATION, overview(true), settings(true), other(true)].flatMap((group) =>
     group.items.map((item) => item.location).filter((location) => location.kind !== 'state-default')
   ),
 ];
@@ -194,6 +216,8 @@ export function levelAt(levels: RoomPowerLevelsView, location: PermissionLocatio
       return levels.events_default;
     case 'state-default':
       return levels.state_default;
+    case 'users-default':
+      return levels.users_default;
     case 'action':
       return levels[location.action];
     case 'notification-room':
@@ -214,6 +238,8 @@ export function withLevel(
       return { ...levels, events_default: level };
     case 'state-default':
       return { ...levels, state_default: level };
+    case 'users-default':
+      return { ...levels, users_default: level };
     case 'action':
       return { ...levels, [location.action]: level };
     case 'notification-room':

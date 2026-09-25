@@ -165,6 +165,15 @@
     });
   }
 
+  function resetDirectName(): void {
+    const target = roomId;
+    if (!target || !canEditName) return;
+    void run(async () => {
+      await core.commands.setRoomName(target, null);
+      name = '';
+    });
+  }
+
   async function uploadAvatar(event: Event & { currentTarget: HTMLInputElement }): Promise<void> {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
@@ -392,6 +401,11 @@
           title={$i18n.t('room.settingsDirectLabel')}
           description={$i18n.t('room.settingsDirectHint')}
         >
+          {#if canEditName && room.name}
+            <Button size="small" variant="ghost" disabled={saving} onclick={resetDirectName}>
+              {$i18n.t('room.settingsDirectResetName')}
+            </Button>
+          {/if}
           <Button size="small" disabled={saving} onclick={convertToGroup}>
             {$i18n.t('room.menuConvertToGroup')}
           </Button>

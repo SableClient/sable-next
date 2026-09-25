@@ -17,6 +17,22 @@ export function readCreate(content: unknown): { version: string; predecessor: st
   };
 }
 
+export function readFounders(event: unknown): string[] {
+  if (typeof event !== 'object' || event === null) return [];
+
+  const create = event as { sender?: unknown; content?: unknown };
+  const content = (
+    typeof create.content === 'object' && create.content !== null ? create.content : {}
+  ) as { room_version?: unknown; additional_creators?: unknown };
+  const version = typeof content.room_version === 'string' ? content.room_version : '1';
+  if (!additionalCreatorsSupported(version) || typeof create.sender !== 'string') return [];
+
+  const additional = Array.isArray(content.additional_creators)
+    ? content.additional_creators.filter((entry): entry is string => typeof entry === 'string')
+    : [];
+  return [...new Set([create.sender, ...additional])];
+}
+
 export function readTombstone(content: unknown): {
   replacement: string | null;
   body: string | null;

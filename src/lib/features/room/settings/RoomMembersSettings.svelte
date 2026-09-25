@@ -1,7 +1,8 @@
 <script lang="ts">
+  import ArrowsDownUpIcon from 'phosphor-svelte/lib/ArrowsDownUpIcon';
   import type {
     MemberView,
-    MembershipView,
+    ProfileView,
     RoomPermissionsView,
     RoomSummary,
     UserDirectoryEntryView,
@@ -9,12 +10,28 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import MemberIdentityRow from '../MemberIdentityRow.svelte';
+  import {
+    MEMBERSHIP_FILTERS,
+    MEMBERSHIP_FILTER_LABELS,
+    MEMBER_SORTS,
+    MEMBER_SORT_LABELS,
+    groupMembers,
+    matchesFilter,
+    membershipFor,
+    type MembershipFilter,
+  } from '../member-listing';
+  import MentionProfile from '../MentionProfile.svelte';
+  import { powerTag } from '../power-tags';
+  import RoleTagIcon from '../RoleTagIcon.svelte';
   import RoomInviteDialog from '../RoomInviteDialog.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -22,6 +39,12 @@
 
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+
+  import {
+    parsePowerLevelTags,
+    POWER_LEVEL_TAGS_EVENT_TYPE,
+    type PowerLevelTagMap,
+  } from './power-level-tags';
 
   interface Props {
     room: RoomSummary | null;
@@ -31,11 +54,6 @@
   let { room, permissions }: Props = $props();
   const core = useCoreClient();
 
-  const tabs: readonly { id: MembershipView; label: string }[] = [
-    { id: 'join', label: 'room.membersJoined' },
-    { id: 'invite', label: 'room.membersInvited' },
-    { id: 'ban', label: 'room.membersBanned' },
-  ];
   const powerChoices: readonly { level: number; label: string }[] = [
     { level: 100, label: 'timeline.powerLevelAdmin' },
     { level: 50, label: 'timeline.powerLevelModerator' },
@@ -46,7 +64,7 @@
   const userIdPattern = /^@[^:\s]+:\S+$/;
   const noMembers: MemberView[] = [];
 
-  let tab = $state<MembershipView>('join');
+  let tab = $state<MembershipFilter>('join');
   let search = $state('');
   let members = $state.raw<MemberView[]>([]);
   let loading = $state(false);
@@ -58,8 +76,14 @@
   let inviting = $state<string | null>(null);
   let invitedIds = $state.raw<string[]>([]);
   let inviteFailed = $state(false);
+  let powerTags = $state.raw<PowerLevelTagMap>({});
+  let profileUserId = $state<string | null>(null);
+  let profileAnchor = $state<HTMLElement | null>(null);
+  let profile = $state<ProfileView | null>(null);
+  let profileFailed = $state(false);
   let run = 0;
   let lookup = 0;
+  let profileRequest = 0;
 
   let roomId = $derived(room?.room_id ?? null);
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
@@ -76,28 +100,63 @@
       (entry) => !members.some((member) => member.user_id === entry.user_id)
     );
   });
-  let sorted = $derived(
-    [...members].sort(
-      (left, right) =>
-        right.power_level - left.power_level ||
-        memberName(left).localeCompare(memberName(right), undefined, { sensitivity: 'base' })
-    )
-  );
+  let sort = $derived(preferences.memberSort);
   let shown = $derived.by(() => {
     const query = search.trim().toLocaleLowerCase();
-    if (!query) return sorted;
-    return sorted.filter(
+    if (!query) return members;
+    return members.filter(
       (member) =>
         memberName(member).toLocaleLowerCase().includes(query) ||
         member.user_id.toLocaleLowerCase().includes(query)
     );
   });
 
+  let groups = $derived(groupMembers(shown, sort, () => true));
+
   $effect(() => {
     void tab;
     void roomId;
     void load();
   });
+
+  $effect(() => {
+    const target = roomId;
+    if (!target) return;
+    let current = true;
+    void core.commands
+      .roomStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE)
+      .then((content) => {
+        if (current) powerTags = parsePowerLevelTags(content);
+      })
+      .catch(() => {
+        if (current) powerTags = {};
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  function openProfile(userId: string, anchor: HTMLElement): void {
+    const request = ++profileRequest;
+    profileUserId = userId;
+    profileAnchor = anchor;
+    profile = null;
+    profileFailed = false;
+    void core
+      .userProfile(userId)
+      .then((next) => {
+        if (request === profileRequest) profile = next;
+      })
+      .catch(() => {
+        if (request === profileRequest) profileFailed = true;
+      });
+  }
+
+  function closeProfile(): void {
+    profileRequest += 1;
+    profileUserId = null;
+    profileAnchor = null;
+  }
 
   $effect(() => {
     const query = inviteQuery;
@@ -151,16 +210,16 @@
 
   async function load(): Promise<void> {
     const target = roomId;
-    const membership = tab;
+    const filter = tab;
     if (!target) return;
 
     const current = ++run;
     loading = true;
     failed = false;
     try {
-      const loaded = await core.commands.roomMembers(target, [membership]);
+      const loaded = await core.commands.roomMembers(target, [membershipFor(filter)]);
       if (current !== run) return;
-      members = loaded;
+      members = loaded.filter((member) => matchesFilter(member, filter));
     } catch (error) {
       console.warn('[sable room] members unavailable', error);
       if (current === run) failed = true;
@@ -265,20 +324,40 @@
 
 <div class="section">
   <div class="tabs" role="tablist" aria-label={$i18n.t('room.settingsMembers')}>
-    {#each tabs as entry (entry.id)}
+    {#each MEMBERSHIP_FILTERS as entry (entry)}
       <button
         type="button"
         role="tab"
-        aria-selected={tab === entry.id}
+        aria-selected={tab === entry}
         class="choice"
         onclick={() => {
-          tab = entry.id;
+          tab = entry;
           search = '';
         }}
       >
-        {$i18n.t(entry.label)}
+        {$i18n.t(MEMBERSHIP_FILTER_LABELS[entry])}
       </button>
     {/each}
+    <div class="sort">
+      <ActionMenu label={$i18n.t('timeline.memberSort')}>
+        {#snippet trigger({ props })}
+          <Button {...props} variant="secondary" aria-label={$i18n.t('timeline.memberSort')}>
+            <ArrowsDownUpIcon aria-hidden="true" />
+            {$i18n.t(MEMBER_SORT_LABELS[sort])}
+          </Button>
+        {/snippet}
+        {#each MEMBER_SORTS as option (option)}
+          <ActionMenuItem
+            checked={sort === option}
+            onSelect={() => {
+              setPreference('memberSort', option);
+            }}
+          >
+            {$i18n.t(MEMBER_SORT_LABELS[option])}
+          </ActionMenuItem>
+        {/each}
+      </ActionMenu>
+    </div>
   </div>
 
   <div class="search">
@@ -313,80 +392,106 @@
   {:else if shown.length === 0}
     <p class="settings-status">{$i18n.t('timeline.noMembersFound')}</p>
   {:else}
-    <SettingsSection
-      headingId="room-settings-members"
-      title={$i18n.t('timeline.memberCount', { count: shown.length })}
-    >
-      <ul class="settings-rows">
-        {#each shown as member (member.user_id)}
-          <SettingsRow>
-            {#snippet copy()}
-              <MemberIdentityRow userId={member.user_id} members={shown}>
-                {#snippet trailing()}
-                  <span class="user-id">{member.user_id}</span>
-                {/snippet}
-              </MemberIdentityRow>
-            {/snippet}
-            {#if tab === 'ban'}
-              {#if permissions?.can_ban}
-                <Button
-                  size="small"
-                  variant="secondary"
-                  disabled={busy === member.user_id}
-                  onclick={() => {
-                    const target = roomId;
-                    if (target)
-                      void act(member.user_id, () =>
-                        core.commands.unbanUser(target, member.user_id)
-                      );
-                  }}
+    {#each groups as group (group.key)}
+      {@const tag = powerTag(group.level ?? 0, $i18n.t, powerTags)}
+      {#snippet tagIcon()}
+        <RoleTagIcon icon={tag.icon ?? ''} />
+      {/snippet}
+      <SettingsSection
+        headingId={`room-settings-members-${group.key}`}
+        title={tag.name}
+        description={$i18n.t('timeline.memberCount', { count: group.members.length })}
+        icon={tag.icon ? tagIcon : undefined}
+      >
+        <ul class="settings-rows">
+          {#each group.members as member (member.user_id)}
+            <SettingsRow>
+              {#snippet copy()}
+                <MemberIdentityRow
+                  userId={member.user_id}
+                  members={shown}
+                  powerTag={tag}
+                  onProfile={openProfile}
                 >
-                  {$i18n.t('timeline.profileUnban')}
-                </Button>
-              {/if}
-            {:else}
-              {#if canSetPower && !outranked(member)}
-                <Select
-                  value={String(member.power_level)}
-                  aria-label={$i18n.t('timeline.profileChangePower')}
-                  disabled={busy === member.user_id}
-                  items={powerOptions(member)}
-                  onValueChange={(next: string) => {
-                    setPower(member, Number(next));
-                  }}
-                />
+                  {#snippet trailing()}
+                    <span class="user-id">{member.user_id}</span>
+                  {/snippet}
+                </MemberIdentityRow>
+              {/snippet}
+              {#if tab === 'leave' || tab === 'kick'}
+                {#if permissions?.can_ban && !outranked(member)}
+                  <Button
+                    size="small"
+                    variant="danger"
+                    disabled={busy === member.user_id}
+                    onclick={() => {
+                      openModeration(member.user_id, 'ban');
+                    }}
+                  >
+                    {$i18n.t('timeline.profileBan')}
+                  </Button>
+                {/if}
+              {:else if tab === 'ban'}
+                {#if permissions?.can_ban}
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={busy === member.user_id}
+                    onclick={() => {
+                      const target = roomId;
+                      if (target)
+                        void act(member.user_id, () =>
+                          core.commands.unbanUser(target, member.user_id)
+                        );
+                    }}
+                  >
+                    {$i18n.t('timeline.profileUnban')}
+                  </Button>
+                {/if}
               {:else}
-                <span class="power">{powerLabel(member.power_level)}</span>
+                {#if canSetPower && !outranked(member)}
+                  <Select
+                    value={String(member.power_level)}
+                    aria-label={$i18n.t('timeline.profileChangePower')}
+                    disabled={busy === member.user_id}
+                    items={powerOptions(member)}
+                    onValueChange={(next: string) => {
+                      setPower(member, Number(next));
+                    }}
+                  />
+                {:else}
+                  <span class="power">{powerLabel(member.power_level)}</span>
+                {/if}
+                {#if permissions?.can_kick && !outranked(member)}
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={busy === member.user_id}
+                    onclick={() => {
+                      openModeration(member.user_id, 'kick');
+                    }}
+                  >
+                    {$i18n.t('timeline.profileKick')}
+                  </Button>
+                {/if}
+                {#if permissions?.can_ban && !outranked(member)}
+                  <Button
+                    size="small"
+                    variant="danger"
+                    disabled={busy === member.user_id}
+                    onclick={() => {
+                      openModeration(member.user_id, 'ban');
+                    }}
+                  >
+                    {$i18n.t('timeline.profileBan')}
+                  </Button>
+                {/if}
               {/if}
-              {#if permissions?.can_kick && !outranked(member)}
-                <Button
-                  size="small"
-                  variant="secondary"
-                  disabled={busy === member.user_id}
-                  onclick={() => {
-                    openModeration(member.user_id, 'kick');
-                  }}
-                >
-                  {$i18n.t('timeline.profileKick')}
-                </Button>
-              {/if}
-              {#if permissions?.can_ban && !outranked(member)}
-                <Button
-                  size="small"
-                  variant="danger"
-                  disabled={busy === member.user_id}
-                  onclick={() => {
-                    openModeration(member.user_id, 'ban');
-                  }}
-                >
-                  {$i18n.t('timeline.profileBan')}
-                </Button>
-              {/if}
-            {/if}
-          </SettingsRow>
-        {/each}
-      </ul>
-    </SettingsSection>
+            </SettingsRow>
+          {/each}
+        </ul>
+      </SettingsSection>
+    {/each}
   {/if}
 
   {#if inviteQuery}
@@ -440,6 +545,25 @@
     </SettingsSection>
   {/if}
 </div>
+
+{#if roomId}
+  <MentionProfile
+    open={profileUserId !== null}
+    onOpenChange={(open: boolean) => {
+      if (!open) closeProfile();
+    }}
+    userId={profileUserId}
+    anchor={profileAnchor}
+    member={members.find((member) => member.user_id === profileUserId) ?? null}
+    {roomId}
+    {ownPowerLevel}
+    {permissions}
+    {powerTags}
+    {profile}
+    failed={profileFailed}
+    onPowerLevelChange={() => void load()}
+  />
+{/if}
 
 <RoomInviteDialog
   open={inviteOpen}
@@ -496,30 +620,14 @@
   }
 
   .tabs {
+    align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
   }
 
-  .tabs button {
-    background: transparent;
-    border: var(--border-width) solid transparent;
-    border-radius: var(--radius-pill);
-    color: var(--surface-var-on-container);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    padding: var(--space-200) var(--space-300);
-  }
-
-  .tabs button:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .tabs button:hover:not(:disabled, [aria-selected='true']) {
-    background: var(--surface-var-container-hover);
-    color: var(--bg-on-container);
+  .sort {
+    margin-inline-start: auto;
   }
 
   .search {

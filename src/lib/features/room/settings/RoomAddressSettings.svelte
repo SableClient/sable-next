@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { RoomPowerLevelsView, RoomSummary } from '#src/generated/protocol';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -33,16 +34,24 @@
   let alternatives = $state.raw<string[]>([]);
   let draft = $state('');
   let busy = $state(false);
-  let pendingRemoval = $state<string | null>(null);
+  let selected = $state.raw<ReadonlySet<string>>(new Set());
+  let pendingRemoval = $state.raw<readonly string[]>([]);
   let outcome = $state<'invalid' | 'failed' | null>(null);
   let run = 0;
 
   let roomId = $derived(room?.room_id ?? null);
   let canEdit = $derived(canSendState(levels, ownPowerLevel, CANONICAL_EVENT_TYPE));
   let server = $derived(roomId?.split(':').slice(1).join(':') ?? '');
+  let published = $derived([
+    ...(canonical === null ? [] : [canonical]),
+    ...alternatives.filter((alias) => alias !== canonical),
+  ]);
+  let chosen = $derived(aliases.filter((alias) => selected.has(alias)));
+  let allSelected = $derived(aliases.length > 0 && chosen.length === aliases.length);
 
   $effect(() => {
     void roomId;
+    selected = new Set();
     void load();
   });
 
@@ -59,6 +68,7 @@
       if (current !== run) return;
 
       aliases = local;
+      selected = new Set([...selected].filter((alias) => local.includes(alias)));
       const content = canonicalContent as { alias?: unknown; alt_aliases?: unknown } | null;
       canonical = typeof content?.alias === 'string' ? content.alias : null;
       alternatives = Array.isArray(content?.alt_aliases)
@@ -76,7 +86,36 @@
     return /^#[^:\s]+:\S+$/u.test(full) ? full : null;
   }
 
-  async function add(): Promise<void> {
+  async function change(action: () => Promise<void>, label: string): Promise<void> {
+    if (busy) return;
+
+    busy = true;
+    outcome = null;
+    try {
+      await action();
+      await load();
+    } catch (error) {
+      console.warn(`[sable room] ${label} failed`, error);
+      outcome = 'failed';
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function writeCanonical(alias: string | null, alt: readonly string[]): Promise<void> {
+    const target = roomId;
+    if (!target) return;
+
+    const rest = [...new Set(alt)].filter((entry) => entry !== alias);
+    await core.commands.sendStateEvent(target, CANONICAL_EVENT_TYPE, '', {
+      ...(alias === null ? {} : { alias }),
+      ...(rest.length > 0 ? { alt_aliases: rest } : {}),
+    });
+    canonical = alias;
+    alternatives = rest;
+  }
+
+  function add(): void {
     const target = roomId;
     const alias = normalise(draft);
     if (!target || busy) return;
@@ -85,92 +124,85 @@
       return;
     }
 
-    busy = true;
-    outcome = null;
-    try {
+    void change(async () => {
       await core.commands.createRoomAlias(target, alias);
       draft = '';
-      await load();
-    } catch (error) {
-      console.warn('[sable room] alias creation failed', error);
-      outcome = 'failed';
-    } finally {
-      busy = false;
-    }
+    }, 'alias creation');
   }
 
-  async function remove(alias: string): Promise<void> {
-    if (busy) return;
+  function setMain(alias: string): void {
+    void change(() => writeCanonical(alias, alternatives), 'main address change');
+  }
 
-    busy = true;
-    outcome = null;
-    try {
-      if (alias === canonical) await publish(null);
-      await core.commands.deleteRoomAlias(alias);
-      await load();
-    } catch (error) {
-      console.warn('[sable room] alias removal failed', error);
-      outcome = 'failed';
-    } finally {
-      busy = false;
-    }
+  function unsetMain(): void {
+    void change(() => writeCanonical(null, alternatives), 'main address change');
+  }
+
+  function unpublish(targets: readonly string[]): void {
+    void change(
+      () =>
+        writeCanonical(
+          canonical !== null && targets.includes(canonical) ? null : canonical,
+          alternatives.filter((alias) => !targets.includes(alias))
+        ),
+      'unpublish'
+    );
+  }
+
+  function publish(targets: readonly string[]): void {
+    void change(() => writeCanonical(canonical, [...alternatives, ...targets]), 'publish');
   }
 
   async function confirmRemoval(): Promise<void> {
-    const alias = pendingRemoval;
-    if (alias === null) return;
-    await remove(alias);
-    pendingRemoval = null;
+    const targets = pendingRemoval;
+    if (targets.length === 0) return;
+    await change(async () => {
+      if (targets.some((alias) => published.includes(alias))) {
+        await writeCanonical(
+          canonical !== null && targets.includes(canonical) ? null : canonical,
+          alternatives.filter((alias) => !targets.includes(alias))
+        );
+      }
+      for (const alias of targets) await core.commands.deleteRoomAlias(alias);
+      selected = new Set();
+    }, 'alias removal');
+    pendingRemoval = [];
   }
 
-  async function publish(alias: string | null): Promise<void> {
-    const target = roomId;
-    if (!target) return;
-
-    const alt = alternatives.filter((entry) => entry !== alias);
-    await core.commands.sendStateEvent(target, CANONICAL_EVENT_TYPE, '', {
-      ...(alias === null ? {} : { alias }),
-      ...(alt.length > 0 ? { alt_aliases: alt } : {}),
-    });
-    canonical = alias;
-    alternatives = alt;
+  function toggle(alias: string): void {
+    selected = selected.has(alias)
+      ? new Set([...selected].filter((entry) => entry !== alias))
+      : new Set([...selected, alias]);
   }
 
-  async function setMain(alias: string | null): Promise<void> {
-    if (busy) return;
-
-    busy = true;
-    outcome = null;
-    try {
-      await publish(alias);
-      await load();
-    } catch (error) {
-      console.warn('[sable room] main address change failed', error);
-      outcome = 'failed';
-    } finally {
-      busy = false;
-    }
+  function toggleAll(): void {
+    selected = allSelected ? new Set() : new Set(aliases);
   }
 </script>
 
 <SettingsSection
-  headingId="room-settings-addresses"
-  title={$i18n.t('room.addressesTitle')}
-  description={$i18n.t('room.addressesHint')}
+  headingId="room-settings-published-addresses"
+  title={$i18n.t('room.addressesPublishedTitle')}
+  description={$i18n.t('room.addressesPublishedHint')}
 >
-  {#if aliases.length > 0}
+  {#if published.length > 0}
     <ul class="settings-rows">
-      {#each aliases as alias (alias)}
+      {#each published as alias (alias)}
         <SettingsRow title={alias}>
           {#if alias === canonical}
             <StatusBadge variant="primary" label={$i18n.t('room.addressesMain')} />
+            {#if canEdit}
+              <Button size="small" variant="ghost" disabled={busy} onclick={unsetMain}>
+                {$i18n.t('room.addressesUnsetMain')}
+              </Button>
+            {/if}
           {:else if canEdit}
             <Button
               size="small"
               variant="secondary"
               disabled={busy}
               onclick={() => {
-                void setMain(alias);
+                setMain(alias);
               }}
             >
               {$i18n.t('room.addressesSetMain')}
@@ -180,10 +212,106 @@
             <IconButton
               variant="subtle"
               size="small"
+              label={$i18n.t('room.addressesUnpublish', { alias })}
+              disabled={busy}
+              onclick={() => {
+                unpublish([alias]);
+              }}
+            >
+              <XIcon />
+            </IconButton>
+          {/if}
+        </SettingsRow>
+      {/each}
+    </ul>
+  {:else}
+    <p class="settings-note settings-form">{$i18n.t('room.addressesPublishedEmpty')}</p>
+  {/if}
+</SettingsSection>
+
+<SettingsSection
+  headingId="room-settings-addresses"
+  title={$i18n.t('room.addressesTitle')}
+  description={$i18n.t('room.addressesHint')}
+>
+  {#if canEdit && aliases.length > 0}
+    <div class="bulk-bar">
+      <label class="bulk-select-all">
+        <input type="checkbox" checked={allSelected} disabled={busy} onchange={toggleAll} />
+        {$i18n.t('room.addressesSelectAll')}
+      </label>
+      {#if chosen.length > 0}
+        <span class="bulk-count">
+          {$i18n.t('room.addressesSelectedCount', { count: chosen.length })}
+        </span>
+        <div class="bulk-actions">
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={busy || chosen.every((alias) => published.includes(alias))}
+            onclick={() => {
+              publish(chosen);
+            }}
+          >
+            {$i18n.t('room.addressesPublish')}
+          </Button>
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={busy || !chosen.some((alias) => published.includes(alias))}
+            onclick={() => {
+              unpublish(chosen);
+            }}
+          >
+            {$i18n.t('room.addressesUnpublishSelected')}
+          </Button>
+          <Button
+            size="small"
+            variant="danger"
+            disabled={busy}
+            onclick={() => {
+              pendingRemoval = chosen;
+            }}
+          >
+            {$i18n.t('room.addressesDeleteSelected')}
+          </Button>
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if aliases.length > 0}
+    <ul class="settings-rows">
+      {#each aliases as alias (alias)}
+        <SettingsRow title={alias}>
+          {#snippet before()}
+            {#if canEdit}
+              <label class="alias-select">
+                <input
+                  type="checkbox"
+                  checked={selected.has(alias)}
+                  disabled={busy}
+                  aria-label={$i18n.t('room.addressesSelect', { alias })}
+                  onchange={() => {
+                    toggle(alias);
+                  }}
+                />
+              </label>
+            {/if}
+          {/snippet}
+          {#if alias === canonical}
+            <StatusBadge variant="primary" label={$i18n.t('room.addressesMain')} />
+          {:else if published.includes(alias)}
+            <StatusBadge label={$i18n.t('room.addressesPublished')} />
+          {/if}
+          {#if canEdit}
+            <IconButton
+              variant="subtle"
+              size="small"
               label={$i18n.t('room.addressesRemove', { alias })}
               disabled={busy}
               onclick={() => {
-                pendingRemoval = alias;
+                pendingRemoval = [alias];
               }}
             >
               <TrashIcon />
@@ -211,15 +339,10 @@
           onkeydown={(event: KeyboardEvent) => {
             if (event.key !== 'Enter') return;
             event.preventDefault();
-            void add();
+            add();
           }}
         />
-        <Button
-          disabled={draft.trim() === '' || busy}
-          onclick={() => {
-            void add();
-          }}
-        >
+        <Button disabled={draft.trim() === '' || busy} onclick={add}>
           {$i18n.t('room.addressesAdd')}
         </Button>
       </div>
@@ -228,17 +351,69 @@
 </SettingsSection>
 
 <ConfirmDialog
-  open={pendingRemoval !== null}
+  open={pendingRemoval.length > 0}
   onOpenChange={(next: boolean) => {
-    if (!next && busy === false) pendingRemoval = null;
+    if (!next && busy === false) pendingRemoval = [];
   }}
-  title={$i18n.t('room.addressesRemoveConfirm', { alias: pendingRemoval ?? '' })}
+  title={pendingRemoval.length === 1
+    ? $i18n.t('room.addressesRemoveConfirm', { alias: pendingRemoval[0] })
+    : $i18n.t('room.addressesRemoveManyConfirm', { count: pendingRemoval.length })}
   confirmLabel={$i18n.t('room.remove')}
   {busy}
   onConfirm={() => void confirmRemoval()}
 />
 
 <style>
+  .bulk-bar {
+    align-items: center;
+    border-bottom: var(--border-width) solid var(--surface-var-container-line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-300);
+    padding: var(--space-300) var(--space-400);
+  }
+
+  .bulk-select-all {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .bulk-count {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+  }
+
+  .bulk-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+    margin-inline-start: auto;
+  }
+
+  .alias-select {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    inline-size: var(--icon-size-small);
+    justify-content: center;
+    position: relative;
+  }
+
+  .alias-select::after {
+    content: '';
+    inset: calc((var(--icon-size-small) - var(--target-hit)) / 2);
+    position: absolute;
+  }
+
+  .alias-select input,
+  .bulk-select-all input {
+    accent-color: var(--primary-main);
+    block-size: var(--icon-size-small);
+    inline-size: var(--icon-size-small);
+    margin: 0;
+  }
+
   .inline {
     display: grid;
     gap: var(--space-300);

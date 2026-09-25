@@ -32,7 +32,7 @@ use matrix_sdk::ruma::{
 };
 use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
-use matrix_sdk::{EncryptionState, RoomState};
+use matrix_sdk::{Client, EncryptionState, RoomState};
 use matrix_sdk_base::crypto::types::events::UtdCause;
 use matrix_sdk_base::store::SerializableEventContent;
 use matrix_sdk_ui::{
@@ -414,21 +414,32 @@ async fn is_direct(room: &Room) -> bool {
     room.is_direct().await.unwrap_or(false)
 }
 
-pub async fn has_space_parent(room: &Room) -> bool {
-    let Ok(parents) = room.parent_spaces().await else {
-        return false;
-    };
-    pin_mut!(parents);
-
-    while let Some(Ok(parent)) = parents.next().await {
-        if let ParentSpace::Reciprocal(space) = parent
-            && space.is_space()
-        {
-            return true;
+pub async fn restricted_parents(client: &Client, room: &Room) -> Vec<OwnedRoomId> {
+    let mut parents = Vec::new();
+    if let Ok(stream) = room.parent_spaces().await {
+        pin_mut!(stream);
+        while let Some(Ok(parent)) = stream.next().await {
+            if let ParentSpace::Reciprocal(space) = parent
+                && space.is_space()
+            {
+                parents.push(space.room_id().to_owned());
+            }
         }
     }
+    if !parents.is_empty() {
+        return parents;
+    }
 
-    false
+    for space in client.joined_space_rooms() {
+        let lists_room = space_children(&space)
+            .await
+            .iter()
+            .any(|edge| edge.room_id == room.room_id() && !edge.via.is_empty());
+        if lists_room {
+            parents.push(space.room_id().to_owned());
+        }
+    }
+    parents
 }
 
 #[must_use]

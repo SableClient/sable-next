@@ -1,12 +1,11 @@
 use std::sync::{Arc, atomic::Ordering};
 
-use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::room::ListThreadsOptions;
+use matrix_sdk::room::Receipts;
 use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::room::reply::{EnforceThread, Reply as SdkReply};
-use matrix_sdk::room::{ParentSpace, Receipts};
 use matrix_sdk::ruma::RoomAliasId;
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
@@ -1069,7 +1068,7 @@ impl Core {
                 let client = self.client().await?;
                 let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
                 Ok(CommandOk::RoomHasSpaceParent {
-                    has_space_parent: view::has_space_parent(&room).await,
+                    has_space_parent: !view::restricted_parents(&client, &room).await.is_empty(),
                 })
             }
 
@@ -1380,6 +1379,20 @@ impl Core {
                     .room_state_events_raw(&room_id, &event_type, state_key.as_deref())
                     .await?,
             }),
+            Command::RoomFullState { room_id } => {
+                let client = self.client().await?;
+                let response = client
+                    .send(get_state_events::v3::Request::new(room_id))
+                    .await
+                    .map_err(|error| self.failed("room_full_state", error))?;
+                Ok(CommandOk::RoomFullState {
+                    events: response
+                        .room_state
+                        .iter()
+                        .filter_map(|raw| raw.deserialize_as::<serde_json::Value>().ok())
+                        .collect(),
+                })
+            }
             Command::SearchUserDirectory { term, limit } => {
                 let (limited, results) = self.search_user_directory(&term, limit).await?;
                 Ok(CommandOk::SearchUserDirectory { limited, results })
@@ -2112,22 +2125,12 @@ impl Core {
                         return Err(CommandErr::Unsupported);
                     }
                     JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
-                        let parents = room.parent_spaces().await.map_err(|error| {
-                            self.room_error("set_room_join_rule: parents", error)
-                        })?;
-                        pin_mut!(parents);
-                        let mut allow = Vec::new();
-
-                        while let Some(parent) = parents.next().await {
-                            let parent = parent.map_err(|error| {
-                                self.room_error("set_room_join_rule: parent", error)
-                            })?;
-                            if let ParentSpace::Reciprocal(space) = parent
-                                && space.is_space()
-                            {
-                                allow.push(AllowRule::room_membership(space.room_id().to_owned()));
-                            }
-                        }
+                        let client = self.client().await?;
+                        let allow: Vec<_> = view::restricted_parents(&client, &room)
+                            .await
+                            .into_iter()
+                            .map(AllowRule::room_membership)
+                            .collect();
 
                         if allow.is_empty() {
                             return Err(CommandErr::Denied);
