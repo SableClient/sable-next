@@ -34,6 +34,7 @@ export type RuntimeConfig = {
   calls: CallsConfig;
   disableAccountSwitcher: boolean;
   settingsDefaults: Record<string, unknown>;
+  hideUsernamePasswordFields: boolean;
 };
 
 const NO_GIFS: GifsConfig = {
@@ -59,6 +60,7 @@ const EMPTY: RuntimeConfig = {
   calls: NO_CALLS,
   disableAccountSwitcher: false,
   settingsDefaults: {},
+  hideUsernamePasswordFields: false,
 };
 
 function text(value: unknown): string | null {
@@ -150,6 +152,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
       !Array.isArray(source.settingsDefaults)
         ? (source.settingsDefaults as Record<string, unknown>)
         : {},
+    hideUsernamePasswordFields: source.hideUsernamePasswordFields === true,
   };
 }
 

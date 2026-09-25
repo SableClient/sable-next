@@ -7,6 +7,7 @@
   import LoginMethod from '../login/LoginMethod.svelte';
   import LegacyRegistrationForm from './LegacyRegistrationForm.svelte';
   import { REGISTRATION_METHOD_ORDER, registrationMethodAvailable } from './registration-methods';
+  import { passwordFields } from '../shared/password-fields.svelte.js';
 
   type RegistrationField =
     | 'homeserver'
@@ -72,17 +73,18 @@
     });
   });
 
+  let uiaaAvailable = $derived(registrationFlows?.uiaa === true && !passwordFields.hidden);
   let availableRegistrationMethodCount = $derived.by(() => {
     if (!loginFlows) return 0;
     return REGISTRATION_METHOD_ORDER.filter((method) =>
-      registrationMethodAvailable(loginFlows, method, registrationFlows?.uiaa === true)
+      registrationMethodAvailable(loginFlows, method, uiaaAvailable)
     ).length;
   });
   let firstAvailableRegistrationMethod = $derived.by(() => {
     if (!loginFlows) return null;
     return (
       REGISTRATION_METHOD_ORDER.find((method) =>
-        registrationMethodAvailable(loginFlows, method, registrationFlows?.uiaa === true)
+        registrationMethodAvailable(loginFlows, method, uiaaAvailable)
       ) ?? null
     );
   });
@@ -94,7 +96,7 @@
 <div class="registration-methods">
   {#if availableRegistrationMethodCount > 0}
     <div class="method-slot" id={methodSlotId}>
-      {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
+      {#if loginFlows && registrationMethodAvailable(loginFlows, 'oidc', uiaaAvailable) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'oidc')}
         <LoginMethod>
           <Button
             loading={isRegistering}
@@ -109,7 +111,7 @@
         </LoginMethod>
       {/if}
 
-      {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', registrationFlows?.uiaa === true) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
+      {#if loginFlows && registrationMethodAvailable(loginFlows, 'sso', uiaaAvailable) && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'sso')}
         <LoginMethod>
           <div class="actions">
             {#if loginFlows.sso_identity_providers.length > 0}
@@ -141,7 +143,7 @@
         </LoginMethod>
       {/if}
 
-      {#if loginFlows && registrationFlows?.uiaa && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
+      {#if loginFlows && uiaaAvailable && (showAllRegistrationMethods || firstAvailableRegistrationMethod === 'password')}
         <LoginMethod>
           <LegacyRegistrationForm
             {serverLabel}

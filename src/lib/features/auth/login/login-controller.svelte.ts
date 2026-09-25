@@ -5,6 +5,8 @@ import {
   authenticationError,
   logAuthenticationFailure,
 } from '#lib/features/auth/registration/registration-errors.js';
+import { loginIdentifier } from './login-identifier';
+import { passwordFields } from '../shared/password-fields.svelte.js';
 
 export type LoginField = 'homeserver' | 'username' | 'password';
 
@@ -39,7 +41,7 @@ export class LoginController {
       this.error = this.options.getValidationError();
       return;
     }
-    if (!flows.password) {
+    if (!flows.password || passwordFields.hidden) {
       this.error = t('auth.chooseSignInMethod');
       return;
     }
@@ -55,7 +57,7 @@ export class LoginController {
     try {
       await this.options.core.login(
         this.options.getHomeserver().trim(),
-        this.username.trim(),
+        loginIdentifier(this.username),
         this.password,
         this.options.getReauthAccountId?.()
       );

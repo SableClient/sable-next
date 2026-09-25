@@ -13,6 +13,9 @@
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import LoginProviderButton from './LoginProviderButton.svelte';
   import { resetPasswordHref } from '../reset-password/reset-password-url';
+  import { homeservers } from '../shared/homeservers.svelte.js';
+  import { passwordFields } from '../shared/password-fields.svelte.js';
+  import { sameServer, userIdServer } from './login-identifier';
 
   type LoginField = 'homeserver' | 'username' | 'password';
   type LoginMethodType = 'oidc' | 'sso';
@@ -35,6 +38,7 @@
     ) => Promise<void>;
     onLogin: () => Promise<void>;
     onCreateAccount?: () => void;
+    followUserServer?: boolean;
   }
 
   let {
@@ -53,6 +57,7 @@
     onLaunchRedirectLogin,
     onLogin,
     onCreateAccount,
+    followUserServer = true,
   }: Props = $props();
 
   const core = useCoreClient();
@@ -64,28 +69,43 @@
   );
 
   const loginMethodOrder: Array<'oidc' | 'sso' | 'password'> = ['oidc', 'sso', 'password'];
+  let offeredFlows = $derived(
+    loginFlows && passwordFields.hidden ? { ...loginFlows, password: false } : loginFlows
+  );
   let preferredLoginMethod = $derived.by(() => {
-    const flows = loginFlows;
+    const flows = offeredFlows;
     if (!flows) return null;
     if (flows.oauth_aware_preferred && flows.oidc) return 'oidc';
     return loginMethodOrder.find((method) => flows[method]) ?? null;
   });
   let availableLoginMethodCount = $derived.by(() => {
-    const flows = loginFlows;
+    const flows = offeredFlows;
     if (!flows) return 0;
     return loginMethodOrder.filter((method) => flows[method]).length;
   });
   let isPasswordLoginVisible = $derived(
-    loginFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
+    offeredFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
   );
   let forgotPasswordHref = $derived(
-    loginFlows?.password && !loginFlows.oidc ? resetPasswordHref(displayedHomeserver) : null
+    offeredFlows?.password && !offeredFlows.oidc ? resetPasswordHref(displayedHomeserver) : null
   );
   let hasLoginAction = $derived(loginFlows === null || preferredLoginMethod !== null);
+  let userServerError = $state<string | null>(null);
+  let declinedServer: string | null = null;
+  let usernameServer = $derived(followUserServer ? userIdServer(username) : null);
   let statusError = $derived(
-    !isPasswordLoginVisible && (fieldError || loginError || core.status === 'error')
-      ? (fieldError ?? loginError ?? $i18n.t('auth.unableToStart'))
-      : null
+    userServerError ??
+      (!isPasswordLoginVisible && (fieldError || loginError || core.status === 'error')
+        ? (fieldError ?? loginError ?? $i18n.t('auth.unableToStart'))
+        : null)
+  );
+  let statusMessage = $derived(
+    statusError ??
+      (loginFlows && availableLoginMethodCount === 0
+        ? $i18n.t('errors.unsupportedSignIn')
+        : usernameServer && sameServer(displayedHomeserver, usernameServer)
+          ? $i18n.t('auth.signingInOn', { server: usernameServer })
+          : null)
   );
 
   const methodSlotId = $props.id();
@@ -102,6 +122,35 @@
     }
     return flows;
   }
+
+  async function followUsernameServer(): Promise<boolean | null> {
+    const server = usernameServer;
+    if (!server || server === declinedServer || sameServer(homeserver, server)) return null;
+    if (!homeservers.allowCustom && !homeservers.list.includes(server)) {
+      declinedServer = server;
+      userServerError = $i18n.t('auth.userServerNotFound', { server });
+      return false;
+    }
+    const previous = homeserver;
+    homeserver = server;
+    userServerError = null;
+    onClearHomeserverValidation();
+    const pending = validateHomeserver();
+    const validation = latestValidation;
+    const flows = await pending;
+    if (flows) return true;
+    if (validation !== latestValidation || homeserver !== server) return false;
+    homeserver = previous;
+    onClearHomeserverValidation();
+    declinedServer = server;
+    userServerError = $i18n.t('auth.userServerNotFound', { server });
+    return false;
+  }
+
+  async function submit(): Promise<void> {
+    if ((await followUsernameServer()) === false) return;
+    await onLogin();
+  }
 </script>
 
 <form
@@ -111,7 +160,7 @@
   novalidate
   onsubmit={(event) => {
     event.preventDefault();
-    void onLogin();
+    void submit();
   }}
 >
   <FormField dense fieldId="homeserver" label={$i18n.t('auth.accountProvider')}>
@@ -121,9 +170,13 @@
       disabled={isAuthenticating}
       required
       ariaInvalid={invalidField === 'homeserver'}
-      oninput={onClearHomeserverValidation}
+      oninput={() => {
+        userServerError = null;
+        onClearHomeserverValidation();
+      }}
       onvaluechange={(selectedHomeserver: string) => {
         homeserver = selectedHomeserver;
+        userServerError = null;
         onClearHomeserverValidation();
         void validateHomeserver();
       }}
@@ -135,8 +188,7 @@
   <AuthStatusSlot
     loading={isCheckingHomeserver}
     loadingMessage={$i18n.t('auth.checkingProvider')}
-    message={statusError ??
-      (loginFlows && availableLoginMethodCount === 0 ? $i18n.t('errors.unsupportedSignIn') : null)}
+    message={statusMessage}
     tone={statusError ? 'error' : 'muted'}
   />
 
@@ -195,7 +247,7 @@
         </LoginMethod>
       {/if}
 
-      {#if loginFlows?.password && (showAllLoginMethods || preferredLoginMethod === 'password')}
+      {#if isPasswordLoginVisible}
         <LoginMethod>
           <PasswordLoginForm
             invalidField={invalidField === 'homeserver' ? null : invalidField}
@@ -206,7 +258,14 @@
             resetPasswordHref={forgotPasswordHref}
             bind:username
             bind:password
-            {onClearFieldError}
+            onClearFieldError={(field: Exclude<LoginField, 'homeserver'>) => {
+              if (field === 'username') {
+                userServerError = null;
+                declinedServer = null;
+              }
+              onClearFieldError(field);
+            }}
+            onUsernameBlur={() => void followUsernameServer()}
           />
         </LoginMethod>
       {/if}

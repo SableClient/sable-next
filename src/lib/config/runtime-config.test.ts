@@ -187,3 +187,13 @@ test('settings defaults are read only from an object', () => {
     expect(parseRuntimeConfig({ settingsDefaults }).settingsDefaults).toEqual({});
   }
 });
+
+test('password fields stay visible unless the deployment hides them outright', () => {
+  expect(parseRuntimeConfig({}).hideUsernamePasswordFields).toBe(false);
+  expect(
+    parseRuntimeConfig({ hideUsernamePasswordFields: 'true' }).hideUsernamePasswordFields
+  ).toBe(false);
+  expect(parseRuntimeConfig({ hideUsernamePasswordFields: true }).hideUsernamePasswordFields).toBe(
+    true
+  );
+});

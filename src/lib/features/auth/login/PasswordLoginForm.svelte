@@ -18,6 +18,7 @@
     isCheckingHomeserver: boolean;
     resetPasswordHref: string | null;
     onClearFieldError: (field: 'username' | 'password') => void;
+    onUsernameBlur?: () => void;
   }
 
   let {
@@ -30,10 +31,12 @@
     isCheckingHomeserver,
     resetPasswordHref,
     onClearFieldError,
+    onUsernameBlur,
   }: Props = $props();
 
   const core = useCoreClient();
   const errorId = $props.id();
+  const hintId = `${errorId}-hint`;
   let showPassword = $state(false);
   let error = $derived(
     fieldError || loginError || core.status === 'error'
@@ -43,19 +46,23 @@
 </script>
 
 <div class="password-form">
-  <FormField dense fieldId="username" label={$i18n.t('auth.username')}>
+  <FormField dense fieldId="username" label={$i18n.t('auth.loginIdentifier')}>
     <TextInput
       id="username"
       bind:value={username}
       autocomplete="username"
+      autocapitalize="off"
+      spellcheck={false}
       required
       disabled={isAuthenticating || isCheckingHomeserver}
       aria-invalid={invalidField === 'username'}
-      aria-describedby={error && invalidField === 'username' ? errorId : undefined}
+      aria-describedby={error && invalidField === 'username' ? `${hintId} ${errorId}` : hintId}
       oninput={() => {
         onClearFieldError('username');
       }}
+      onblur={onUsernameBlur}
     />
+    <p class="username-hint" id={hintId}>{$i18n.t('auth.loginIdentifierHint')}</p>
   </FormField>
   <FormField dense fieldId="password" label={$i18n.t('auth.password')}>
     {#snippet labelSuffix()}
@@ -93,6 +100,12 @@
   .password-form {
     display: grid;
     gap: var(--space-300);
+  }
+
+  .username-hint {
+    color: var(--sec-main);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .forgot-password {
