@@ -17,6 +17,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
+  import MentionProfileCard from '#lib/features/room/MentionProfileCard.svelte';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
 
@@ -36,6 +37,9 @@
   let userId = $derived(core.session?.user_id ?? '');
   let avatarUrl = $derived(avatarPreview ?? profile?.avatar_url ?? null);
   let nameChanged = $derived(displayName !== (profile?.display_name ?? ''));
+  let previewProfile = $derived(
+    profile ? { ...profile, display_name: displayName.trim() || null, avatar_url: avatarUrl } : null
+  );
 
   onDestroy(() => {
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
@@ -174,69 +178,80 @@
     {#if loading}
       <div class="loading" role="status"><Spinner /></div>
     {:else}
-      <SettingsSection title={$i18n.t('settings.profile')} headingId="account-profile">
-        <div class="settings-form">
-          {#if profile}<ExtendedProfileSettings
-              {profile}
-              onSaved={refreshProfile}
-              section="banner"
-            />{/if}
-          <div class="avatar-setting">
-            <span class="setting-label">{$i18n.t('settings.avatar')}</span>
-            <div class="avatar-row">
-              <div class="avatar-actions">
-                <label class="file-button btn btn-secondary btn-small">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={savingAvatar}
-                    onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-                      const file = event.currentTarget.files?.[0];
-                      event.currentTarget.value = '';
-                      if (file) void uploadAvatar(file);
-                    }}
-                  />
-                  {$i18n.t(profile?.avatar_url ? 'settings.changeAvatar' : 'settings.uploadAvatar')}
-                </label>
-                {#if profile?.avatar_url && !avatarFile}
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    loading={savingAvatar}
-                    onclick={() => void removeAvatar()}
-                  >
-                    {$i18n.t('settings.removeAvatar')}
-                  </Button>
-                {/if}
+      <div class="profile-layout">
+        <div class="profile-grid">
+          <aside class="profile-preview" aria-label={$i18n.t('settings.profilePreview')}>
+            <MentionProfileCard {userId} member={null} roomId="" profile={previewProfile} />
+          </aside>
+          <div class="settings-stack">
+            <SettingsSection title={$i18n.t('settings.profile')} headingId="account-profile">
+              <div class="settings-form">
+                {#if profile}<ExtendedProfileSettings
+                    {profile}
+                    onSaved={refreshProfile}
+                    section="banner"
+                  />{/if}
+                <div class="avatar-setting">
+                  <span class="setting-label">{$i18n.t('settings.avatar')}</span>
+                  <div class="avatar-row">
+                    <div class="avatar-actions">
+                      <label class="file-button btn btn-secondary btn-small">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={savingAvatar}
+                          onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+                            const file = event.currentTarget.files?.[0];
+                            event.currentTarget.value = '';
+                            if (file) void uploadAvatar(file);
+                          }}
+                        />
+                        {$i18n.t(
+                          profile?.avatar_url ? 'settings.changeAvatar' : 'settings.uploadAvatar'
+                        )}
+                      </label>
+                      {#if profile?.avatar_url && !avatarFile}
+                        <Button
+                          variant="ghost"
+                          size="small"
+                          loading={savingAvatar}
+                          onclick={() => void removeAvatar()}
+                        >
+                          {$i18n.t('settings.removeAvatar')}
+                        </Button>
+                      {/if}
+                    </div>
+                    <Avatar id={userId} src={avatarUrl} name={displayName || userId} size="large" />
+                  </div>
+                </div>
+                <form
+                  class="name-form"
+                  onsubmit={(event) => {
+                    event.preventDefault();
+                    void saveName();
+                  }}
+                >
+                  <label for="account-display-name">{$i18n.t('settings.displayName')}</label>
+                  <div class="name-controls">
+                    <TextInput
+                      id="account-display-name"
+                      bind:value={displayName}
+                      autocomplete="nickname"
+                      maxlength={255}
+                      onchange={() => void saveName()}
+                    />
+                  </div>
+                </form>
               </div>
-              <Avatar id={userId} src={avatarUrl} name={displayName || userId} size="large" />
-            </div>
+            </SettingsSection>
+            {#if profile}<ExtendedProfileSettings
+                {profile}
+                onSaved={refreshProfile}
+                section="profile"
+              />{/if}
           </div>
-          <form
-            class="name-form"
-            onsubmit={(event) => {
-              event.preventDefault();
-              void saveName();
-            }}
-          >
-            <label for="account-display-name">{$i18n.t('settings.displayName')}</label>
-            <div class="name-controls">
-              <TextInput
-                id="account-display-name"
-                bind:value={displayName}
-                autocomplete="nickname"
-                maxlength={255}
-                onchange={() => void saveName()}
-              />
-            </div>
-          </form>
         </div>
-      </SettingsSection>
-      {#if profile}<ExtendedProfileSettings
-          {profile}
-          onSaved={refreshProfile}
-          section="profile"
-        />{/if}
+      </div>
       <SettingsSection title={$i18n.t('settings.matrixId')} headingId="account-matrix-id">
         <div class="settings-form matrix-id">
           <code>{userId}</code>
@@ -263,6 +278,35 @@
   .settings-stack {
     display: grid;
     gap: var(--space-400);
+  }
+
+  .profile-layout {
+    container-type: inline-size;
+  }
+
+  .profile-grid {
+    display: grid;
+    gap: var(--space-400);
+  }
+
+  .profile-preview {
+    justify-self: center;
+    max-width: 22rem;
+    width: 100%;
+  }
+
+  @container (width >= 44rem) {
+    .profile-grid {
+      align-items: start;
+      grid-template-columns: minmax(0, 1fr) 22rem;
+    }
+
+    .profile-preview {
+      grid-column: 2;
+      grid-row: 1;
+      position: sticky;
+      top: 0;
+    }
   }
 
   .avatar-row,
