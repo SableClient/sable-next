@@ -14,7 +14,14 @@ import { history, redo, undo } from 'prosemirror-history';
 import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { keymap } from 'prosemirror-keymap';
 import { Slice, type Node as ProseMirrorNode, type ResolvedPos } from 'prosemirror-model';
-import { Plugin, EditorState, Selection, TextSelection, type Command } from 'prosemirror-state';
+import {
+  Plugin,
+  EditorState,
+  Selection,
+  TextSelection,
+  type Command,
+  type Transaction,
+} from 'prosemirror-state';
 import { Decoration, DecorationSet, EditorView } from 'prosemirror-view';
 import { untrack } from 'svelte';
 
@@ -128,6 +135,22 @@ const deleteInlineAtomBackward: Command = (state, dispatch) => {
   dispatch?.(state.tr.delete(cursor.pos - before.nodeSize, cursor.pos).scrollIntoView());
   return true;
 };
+
+const ANDROID_DELETE_WINDOW_MS = 500;
+
+function selectsAtomBeforeCursor(state: EditorState, tr: Transaction): boolean {
+  if (tr.docChanged || tr.getMeta('pointer') === true) return false;
+  const cursor = state.selection instanceof TextSelection ? state.selection.$cursor : null;
+  const { from, to } = tr.selection;
+  const atom = tr.doc.nodeAt(from);
+  return (
+    cursor?.pos === to &&
+    atom !== null &&
+    atom.isInline &&
+    atom.type.spec.atom === true &&
+    from + atom.nodeSize === to
+  );
+}
 
 function isHeadingLike(node: ProseMirrorNode): boolean {
   return node.type === composerSchema.nodes.heading || node.type === composerSchema.nodes.subtext;
@@ -485,6 +508,7 @@ export class ComposerEditor {
   private detachedDoc: ProseMirrorNode | undefined;
   private source = false;
   private pillSpace: number | null = null;
+  private androidDelete: { pos: number; at: number } | null = null;
 
   constructor(private options: ComposerEditorOptions) {}
 
@@ -658,6 +682,9 @@ export class ComposerEditor {
           handleDOMEvents: {
             beforeinput: (view, event) => {
               if (event.inputType === 'deleteContentBackward') {
+                if (hasAndroidCompositionQuirk()) {
+                  this.androidDelete = { pos: view.state.selection.head, at: Date.now() };
+                }
                 if (
                   event.cancelable &&
                   chainCommands(deleteEmptyCodeBlock, deleteInlineAtomBackward)(
@@ -690,6 +717,7 @@ export class ComposerEditor {
             },
           },
           dispatchTransaction: (tr) => {
+            if (this.keepCaretOffPill(view, tr)) return;
             this.pillSpace = (tr.getMeta(PILL_SPACE) as number | undefined) ?? null;
             const next = view.state.apply(tr);
             view.updateState(next);
@@ -802,6 +830,16 @@ export class ComposerEditor {
       this.reconfigurePlugins();
     }
     return false;
+  }
+
+  private keepCaretOffPill(view: EditorView, tr: Transaction): boolean {
+    const last = this.androidDelete;
+    if (!last || Date.now() - last.at > ANDROID_DELETE_WINDOW_MS) return false;
+    if (!selectsAtomBeforeCursor(view.state, tr)) return false;
+    const { from, to } = tr.selection;
+    if (to === last.pos) view.dispatch(view.state.tr.delete(from, to).scrollIntoView());
+    view.focus();
+    return true;
   }
 
   private handlePastedImages(slice: Slice): boolean {

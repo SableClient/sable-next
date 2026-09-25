@@ -72,8 +72,8 @@ function surface(): HTMLElement {
   return element;
 }
 
-function beforeInput(element: HTMLElement, inputType: string): Event {
-  const event = new Event('beforeinput', { bubbles: true, cancelable: true });
+function beforeInput(element: HTMLElement, inputType: string, cancelable = true): Event {
+  const event = new Event('beforeinput', { bubbles: true, cancelable });
   Object.assign(event, { inputType });
   element.dispatchEvent(event);
   return event;
@@ -288,6 +288,63 @@ describe('Android backspace fallback', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(hasMention(editor)).toBe(false);
     expect(editorView.state.selection).toBeInstanceOf(TextSelection);
+  });
+
+  test('deletes a mention the IME selects after an uncancelable backspace', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setText('hi ');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+    const editorView = view(editor);
+    caretAfterMention(editorView);
+    const { from } = editorView.state.selection;
+
+    beforeInput(surface(), 'deleteContentBackward', false);
+    editorView.dispatch(
+      editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, from - 1))
+    );
+
+    expect(hasMention(editor)).toBe(false);
+    expect(editorView.state.selection).toBeInstanceOf(TextSelection);
+  });
+
+  test('keeps the caret after a mention the IME selects once the space before it is gone', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setText('hi ');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+    const editorView = view(editor);
+    const { from } = editorView.state.selection;
+
+    beforeInput(surface(), 'deleteContentBackward', false);
+    editorView.dispatch(editorView.state.tr.delete(from - 1, from));
+    editorView.dispatch(
+      editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, from - 2))
+    );
+
+    expect(hasMention(editor)).toBe(true);
+    expect(editorView.state.selection).toBeInstanceOf(TextSelection);
+    expect(editorView.state.selection.head).toBe(from - 1);
+  });
+
+  test('still selects a tapped mention', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setText('hi ');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+    const editorView = view(editor);
+    caretAfterMention(editorView);
+    const { from } = editorView.state.selection;
+
+    beforeInput(surface(), 'deleteContentBackward', false);
+    editorView.dispatch(
+      editorView.state.tr
+        .setSelection(NodeSelection.create(editorView.state.doc, from - 1))
+        .setMeta('pointer', true)
+    );
+
+    expect(hasMention(editor)).toBe(true);
+    expect(editorView.state.selection).toBeInstanceOf(NodeSelection);
   });
 
   test('removes an empty code block before the IME can mutate its DOM', () => {
