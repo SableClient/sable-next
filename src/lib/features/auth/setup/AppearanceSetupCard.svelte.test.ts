@@ -43,6 +43,7 @@ test('starts from the current settings', async () => {
   expect(document.querySelector('[data-select="setup-reply"]')?.getAttribute('data-value')).toBe(
     'connected'
   );
+  expect(document.body.textContent).toContain('Sable (default)');
 
   await unmount(instance);
 });

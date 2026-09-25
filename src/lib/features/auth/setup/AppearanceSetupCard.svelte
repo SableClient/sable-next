@@ -10,6 +10,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Label from '#lib/ui/primitives/Label.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
@@ -60,6 +61,10 @@
     />
   </div>
 
+  <div class="appearance-themes">
+    <CustomThemes />
+  </div>
+
   <div class="appearance-setting">
     <Label for="setup-layout">{$i18n.t('settings.layout')}</Label>
     <p>{$i18n.t('settings.layoutHint')}</p>
@@ -96,6 +101,10 @@
 <style>
   .appearance-setup-card {
     min-width: 0;
+  }
+
+  .appearance-themes :global(.custom-themes.settings-form) {
+    padding: 0;
   }
 
   .appearance-setting {
