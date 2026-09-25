@@ -344,6 +344,10 @@
     transform: translateX(0) scale(1);
   }
 
+  .rail:not(.is-navigating, .is-dragging) :global(.auth-card:not(.active)) {
+    visibility: hidden;
+  }
+
   .rail.motion-ready :global(.auth-card.entering) {
     animation: card-enter var(--duration-fast) var(--ease-smooth-out) both;
   }
