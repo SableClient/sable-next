@@ -29,6 +29,7 @@ afterEach(() => {
   setPreference('composerButtonOrder', ['gif', 'sticker', 'emoticon', 'persona', 'format']);
   setPreference('richTextComposer', true);
   setPreference('sendAttachmentAsCaption', true);
+  setPreference('sendAttachmentsAsGallery', true);
 });
 
 const members: MemberView[] = [
@@ -217,6 +218,28 @@ test('sends multiple staged files as one gallery', async () => {
     mentions: { userIds: [], room: false },
   });
   expect(attachment).not.toHaveBeenCalled();
+  void unmount(instance);
+});
+
+test('sends each staged file on its own when galleries are off', async () => {
+  setPreference('sendAttachmentsAsGallery', false);
+  const gallery = vi.fn(async () => {});
+  const attachment = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSendGallery: gallery,
+  });
+  const first = new File(['one'], 'one.png', { type: 'image/png' });
+  const second = new File(['two'], 'two.pdf', { type: 'application/pdf' });
+
+  await pick(first, second);
+  submit();
+  await tick();
+
+  expect(gallery).not.toHaveBeenCalled();
+  expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', first, { spoiler: false });
+  expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', second, { spoiler: false });
   void unmount(instance);
 });
 

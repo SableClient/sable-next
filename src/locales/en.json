@@ -1830,7 +1830,7 @@
     "sendAttachmentAsCaption": "Send text as a caption",
     "sendAttachmentAsCaptionHint": "Text sent with a single attachment becomes its caption. Off sends it as a separate message.",
     "sendAttachmentsAsGallery": "Send attachments as a gallery",
-    "sendAttachmentsAsGalleryHint": "Several attachments sent together become one gallery message. Clients without gallery support (MSC4274) cannot show it, so off sends each attachment as its own message.",
+    "sendAttachmentsAsGalleryHint": "Several attachments sent together become one gallery. Off sends each one as its own message, for clients without gallery support.",
     "formattingToolbar": "Formatting toolbar",
     "formattingToolbarHint": "Keeps the bold, italic and list controls always open.",
     "composerFormatButton": "Formatting button",

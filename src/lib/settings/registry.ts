@@ -844,6 +844,14 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'sendAttachmentsAsGallery',
+        section: 'sending',
+        icon: SquaresFourIcon,
+        name: 'settings.sendAttachmentsAsGallery',
+        description: 'settings.sendAttachmentsAsGalleryHint',
+        type: 'boolean',
+      },
+      {
         key: 'composerFormatButton',
         section: 'composer-buttons',
         icon: TextAaIcon,

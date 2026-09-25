@@ -100,6 +100,7 @@ export interface Preferences {
   composerButtonOrder: ComposerButton[];
   scheduleInEncryptedRooms: boolean;
   sendAttachmentAsCaption: boolean;
+  sendAttachmentsAsGallery: boolean;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -308,6 +309,7 @@ const DEFAULTS: Preferences = {
   composerButtonOrder: [...COMPOSER_BUTTONS],
   scheduleInEncryptedRooms: true,
   sendAttachmentAsCaption: true,
+  sendAttachmentsAsGallery: true,
 
   personaPicker: true,
   personaProxying: false,

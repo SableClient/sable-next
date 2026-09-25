@@ -595,7 +595,10 @@
             };
         const captioned = asCaption && unsent.length === 1 && message.body !== '';
         const gallery =
-          onSendGallery !== undefined && unsent.length > 1 && unsent.every((item) => !item.spoiler);
+          preferences.sendAttachmentsAsGallery &&
+          onSendGallery !== undefined &&
+          unsent.length > 1 &&
+          unsent.every((item) => !item.spoiler);
 
         if (gallery) {
           await onSendGallery(

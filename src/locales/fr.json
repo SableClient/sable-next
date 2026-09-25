@@ -1546,6 +1546,8 @@
     "scheduleInEncryptedRoomsHint": "Votre serveur d’accueil ne peut pas conserver un message chiffré ; un message programmé est donc gardé en clair dans vos données de compte jusqu’à ce qu’un de vos appareils l’envoie. Désactivé, la programmation dans les salons chiffrés est refusée.",
     "sendAttachmentAsCaption": "Envoyer le texte en légende",
     "sendAttachmentAsCaptionHint": "Le texte envoyé avec une seule pièce jointe devient sa légende. Désactivé, il est envoyé dans un message séparé.",
+    "sendAttachmentsAsGallery": "Envoyer les pièces jointes en galerie",
+    "sendAttachmentsAsGalleryHint": "Plusieurs pièces jointes envoyées ensemble deviennent une galerie. Désactivé, chacune est envoyée dans son propre message, pour les clients sans prise en charge des galeries.",
     "formattingToolbar": "Barre de mise en forme",
     "formattingToolbarHint": "Conserve toujours ouverts les contrôles de gras, italique et listes.",
     "composerFormatButton": "Bouton de mise en forme",
