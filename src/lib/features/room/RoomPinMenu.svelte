@@ -182,7 +182,7 @@
     {...props}
     class="pin-button selection-open"
     variant="ghost"
-    size="small"
+    size="medium"
     label={$i18n.t('room.pinsTitle')}
   >
     <PushPinIcon weight={open ? 'fill' : 'regular'} />
