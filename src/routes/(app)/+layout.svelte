@@ -494,8 +494,32 @@
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string; userId?: string; eventId?: string }
+        | {
+            type?: string;
+            roomId?: string;
+            userId?: string;
+            eventId?: string | null;
+            outcome?: 'answer' | 'decline';
+          }
         | undefined;
+      if (
+        message?.type === 'sable:call-action' &&
+        message.roomId !== undefined &&
+        message.userId !== undefined &&
+        (message.outcome === 'answer' || message.outcome === 'decline')
+      ) {
+        const outcome = message.outcome;
+        void openNativeNotification(
+          core,
+          { userId: message.userId, roomId: message.roomId, eventId: message.eventId ?? null },
+          (roomId, eventId) => {
+            answerFromNotification(roomId, eventId, outcome);
+          }
+        ).catch((error: unknown) => {
+          console.debug('[sable notifications] call not answered', error);
+        });
+        return;
+      }
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
         pushedRoom = {
           roomId: message.roomId,

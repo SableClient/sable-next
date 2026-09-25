@@ -59,6 +59,7 @@ test('an event_id_only push names the room from what the app cached', () => {
     tag: '@me:example.org !room:example.org',
     roomId: '!room:example.org',
     eventId: '$event',
+    ring: false,
   });
 });
 
@@ -97,6 +98,31 @@ test('an invitation says so rather than reading as a message', () => {
   });
 
   expect(alert(invite, 'Design crew', true)?.body).toBe('Ada invited you');
+});
+
+test('a ring reads as a call and asks to be answered', () => {
+  const ring = payload({
+    room_id: '!room:example.org',
+    event_id: '$ring',
+    type: 'org.matrix.msc4075.rtc.notification',
+    sender_display_name: 'Ada',
+    content: { body: 'ignored', notification_type: 'ring' },
+  });
+
+  const shown = alert(ring, 'Design crew', true);
+  expect(shown?.body).toBe('Ada is calling');
+  expect(shown?.ring).toBe(true);
+});
+
+test('a call notification that does not ring stays a plain alert', () => {
+  const notify = payload({
+    room_id: '!room:example.org',
+    type: 'm.rtc.notification',
+    sender_display_name: 'Ada',
+    content: { notification_type: 'notification' },
+  });
+
+  expect(alert(notify, 'Design crew', true)?.ring).toBe(false);
 });
 
 test('an unnamed room falls back rather than showing a room id', () => {

@@ -143,7 +143,11 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
   const held = await conversation(showing.tag);
   const lines = appendLine(showContent ? held : hideLines(held), showing.line);
 
-  const options: NotificationOptions & { renotify?: boolean; timestamp?: number } = {
+  const options: NotificationOptions & {
+    renotify?: boolean;
+    timestamp?: number;
+    actions?: { action: string; title: string }[];
+  } = {
     body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
     renotify: !policy.notifyOnce || held.length === 0,
@@ -157,6 +161,13 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
       lines,
     },
   };
+  if (showing.ring) {
+    options.actions = [
+      { action: 'answer', title: 'Answer' },
+      { action: 'decline', title: 'Decline' },
+    ];
+    options.requireInteraction = true;
+  }
 
   await worker.registration.showNotification(showing.title, options);
 }
@@ -216,8 +227,31 @@ worker.addEventListener('notificationclick', (event) => {
   const data = event.notification.data as
     | { roomId?: string; userId?: string; eventId?: string | null }
     | undefined;
+  if (event.action === 'answer' || event.action === 'decline') {
+    event.waitUntil(callAction(event.action, data?.roomId, data?.userId, data?.eventId ?? null));
+    return;
+  }
   event.waitUntil(open(data?.roomId, data?.userId, data?.eventId ?? undefined));
 });
+
+async function callAction(
+  outcome: 'answer' | 'decline',
+  roomId: string | undefined,
+  userId: string | undefined,
+  eventId: string | null
+): Promise<void> {
+  if (roomId === undefined || userId === undefined) return;
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const client = clients.at(0);
+  if (client) {
+    client.postMessage({ type: 'sable:call-action', outcome, roomId, userId, eventId });
+    if (outcome === 'answer') await client.focus();
+    return;
+  }
+  if (outcome === 'answer') {
+    await worker.clients.openWindow(notificationPermalink(roomId, eventId ?? undefined, userId));
+  }
+}
 
 async function open(
   roomId: string | undefined,

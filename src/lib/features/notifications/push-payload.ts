@@ -22,7 +22,7 @@ export type PushPayload = {
   };
 };
 
-export type PushContent = { body?: string; membership?: string };
+export type PushContent = { body?: string; membership?: string; notification_type?: string };
 
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
@@ -30,7 +30,11 @@ function text(value: unknown): string | undefined {
 
 export function pushContent(value: unknown): PushContent {
   const content = isRecord(value) ? value : {};
-  return { body: text(content.body), membership: text(content.membership) };
+  return {
+    body: text(content.body),
+    membership: text(content.membership),
+    notification_type: text(content.notification_type),
+  };
 }
 
 export function parsePushPayload(raw: string | undefined): PushPayload | null {
@@ -115,7 +119,18 @@ export type PushAlert = {
   tag: string;
   roomId: string;
   eventId: string | null;
+  ring: boolean;
 };
+
+const RING_EVENT_TYPES = new Set(['m.rtc.notification', 'org.matrix.msc4075.rtc.notification']);
+
+export function rings(notification: NonNullable<PushPayload['notification']>): boolean {
+  return (
+    notification.type !== undefined &&
+    RING_EVENT_TYPES.has(notification.type) &&
+    notification.content?.notification_type === 'ring'
+  );
+}
 
 export function unreadCount(payload: PushPayload): number | null {
   return payload.notification?.counts?.unread ?? null;
@@ -149,6 +164,7 @@ export function alert(
     tag: roomTag(notification.user_id, roomId),
     roomId,
     eventId: notification.event_id ?? null,
+    ring: rings(notification),
   };
 }
 
@@ -159,7 +175,13 @@ function line(
 ): ConversationLine {
   const eventId = notification.event_id ?? null;
   const said = notification.content?.body;
-  if (showContent && !invites(notification) && said !== undefined && said !== '') {
+  if (
+    showContent &&
+    !invites(notification) &&
+    !rings(notification) &&
+    said !== undefined &&
+    said !== ''
+  ) {
     return { sender, body: said, eventId };
   }
   return { sender: null, body: body(notification, sender, showContent), eventId };
@@ -176,6 +198,10 @@ function body(
 ): string {
   if (invites(notification)) {
     return sender === null ? 'Invited you' : `${sender} invited you`;
+  }
+
+  if (rings(notification)) {
+    return sender === null ? 'Incoming call' : `${sender} is calling`;
   }
 
   const said = notification.content?.body;
