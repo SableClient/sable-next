@@ -1931,6 +1931,7 @@ pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> Roo
     RoomPermissionsView {
         own_power_level: clamp_power_level(power_levels.for_user(user_id)),
         can_post: power_levels.user_can_send_message(user_id, MessageLikeEventType::RoomMessage),
+        can_react: power_levels.user_can_send_message(user_id, MessageLikeEventType::Reaction),
         can_redact_own: power_levels.user_can_redact_own_event(user_id),
         can_redact_others: power_levels.user_can_redact_event_of_other(user_id),
         can_invite: power_levels.user_can_invite(user_id),

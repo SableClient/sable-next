@@ -790,6 +790,7 @@ export type RoomOpenView = {
 export type RoomPermissionsView = {
 	own_power_level: number,
 	can_post: boolean,
+	can_react: boolean,
 	/**  Redacting your own event, which needs the level to send `m.room.redaction`. */
 	can_redact_own: boolean,
 	/**  Redacting someone else's event. */

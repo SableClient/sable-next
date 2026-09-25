@@ -369,6 +369,7 @@ test('collects an optional reason before kicking a member', async () => {
       permissions: {
         own_power_level: 100,
         can_post: true,
+        can_react: true,
         can_redact_own: true,
         can_redact_others: false,
         can_invite: false,
@@ -433,6 +434,7 @@ test('sends no reason when the moderation reason is left blank', async () => {
       permissions: {
         own_power_level: 100,
         can_post: true,
+        can_react: true,
         can_redact_own: true,
         can_redact_others: false,
         can_invite: false,
@@ -486,6 +488,7 @@ async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<vo
       permissions: {
         own_power_level: 100,
         can_post: true,
+        can_react: true,
         can_redact_own: true,
         can_redact_others: false,
         can_invite: false,

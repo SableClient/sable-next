@@ -762,6 +762,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           type: 'room_permissions',
           own_power_level: canPost ? 100 : 0,
           can_post: canPost,
+          can_react: canPost,
           can_redact_own: canPost,
           can_redact_others: canPost,
           can_invite: canPost,

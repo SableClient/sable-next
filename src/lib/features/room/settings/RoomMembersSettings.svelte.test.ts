@@ -47,6 +47,7 @@ const room: RoomSummary = { room_id: '!room:example.org' } as RoomSummary;
 const permissions: RoomPermissionsView = {
   own_power_level: 100,
   can_post: true,
+  can_react: true,
   can_redact_own: true,
   can_redact_others: false,
   can_invite: false,

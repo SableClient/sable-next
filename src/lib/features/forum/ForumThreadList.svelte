@@ -12,10 +12,10 @@
     canLoadMore: boolean;
     onOpen: (eventId: string) => void;
     canDelete: (thread: ForumThread) => boolean;
-    onEdit: (thread: ForumThread) => void;
+    onEdit?: (thread: ForumThread) => void;
     onDelete: (eventId: string, reason: string | null) => void;
     roomId: string;
-    onReact: (eventId: string, key: string) => void;
+    onReact?: (eventId: string, key: string) => void;
     loadImagePacks: (roomId: string) => Promise<import('#src/generated/protocol').ImagePackView[]>;
     onCopyLink: (eventId: string) => void;
     onLoadMore: () => void;

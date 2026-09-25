@@ -97,6 +97,7 @@
     readOnly?: boolean;
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
+    canPin?: boolean;
     encrypted?: boolean | null;
     scrollLocked?: boolean;
     nearLatest?: boolean;
@@ -140,6 +141,7 @@
     readOnly = false,
     canRedactOwn = true,
     canRedactOthers = false,
+    canPin = true,
     encrypted = null,
     scrollLocked = false,
     nearLatest = $bindable(true),
@@ -781,6 +783,7 @@
                     {onDelete}
                     {canRedactOwn}
                     {canRedactOthers}
+                    {canPin}
                     {encrypted}
                     {members}
                     layout={preferences.layout}

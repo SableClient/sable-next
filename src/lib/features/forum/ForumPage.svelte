@@ -230,10 +230,10 @@
         canLoadMore={forumThreads.backwardPagination === 'idle'}
         onOpen={openThread}
         canDelete={canDeleteThread}
-        onEdit={editThread}
+        onEdit={permissions?.can_post === false ? undefined : editThread}
         onDelete={deleteThread}
         roomId={resolvedRoomId}
-        onReact={conversation.toggleReaction}
+        onReact={permissions?.can_react === false ? undefined : conversation.toggleReaction}
         loadImagePacks={core.commands.imagePacks}
         onCopyLink={copyEventLink}
         onLoadMore={loadMoreThreads}
@@ -251,6 +251,8 @@
         readOnly={permissions ? !permissions.can_post : false}
         canRedactOwn={permissions?.can_redact_own ?? true}
         canRedactOthers={permissions?.can_redact_others ?? false}
+        canReact={permissions?.can_react ?? true}
+        canPin={permissions?.can_pin ?? false}
         modal={!desktop}
         onClose={closeThread}
       />

@@ -16,10 +16,10 @@
     thread: ForumThread;
     onOpen: (eventId: string) => void;
     canDelete: boolean;
-    onEdit: (thread: ForumThread) => void;
+    onEdit?: (thread: ForumThread) => void;
     onDelete: (eventId: string, reason: string | null) => void;
     roomId: string;
-    onReact: (eventId: string, key: string) => void;
+    onReact?: (eventId: string, key: string) => void;
     loadImagePacks: (roomId: string) => Promise<import('#src/generated/protocol').ImagePackView[]>;
     onCopyLink: (eventId: string) => void;
   }
@@ -52,9 +52,9 @@
   let actions = $derived({
     loadImagePacks,
     roomId,
-    onReact: (key: string) => onReact(thread.eventId, key),
+    onReact: onReact ? (key: string) => onReact(thread.eventId, key) : undefined,
     onOpenThread: () => onOpen(thread.eventId),
-    onEdit: thread.editable ? () => onEdit(thread) : undefined,
+    onEdit: thread.editable && onEdit ? () => onEdit(thread) : undefined,
     onCopyText:
       thread.preview === '' ? undefined : () => void navigator.clipboard.writeText(thread.preview),
     onCopyLink: () => onCopyLink(thread.eventId),

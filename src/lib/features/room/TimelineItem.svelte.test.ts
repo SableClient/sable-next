@@ -427,6 +427,32 @@ test('an open message dialog outlives its row leaving the window', async () => {
   await unmount(instance);
 });
 
+test.each([
+  [true, true],
+  [false, false],
+])('offers pinning when canPin is %s', async (canPin, offered) => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, roomId: '!room:example.org', canPin },
+    },
+  });
+  await tick();
+
+  document
+    .querySelector('.message')
+    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+
+  const labels = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].map((row) =>
+    row.textContent.trim()
+  );
+  expect(labels.length).toBeGreaterThan(0);
+  expect(labels.some((label) => label.includes('Pin message'))).toBe(offered);
+  await unmount(instance);
+});
+
 test('keeps the sender header for an ordinary message', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

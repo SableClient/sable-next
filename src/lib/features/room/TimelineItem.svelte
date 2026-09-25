@@ -102,6 +102,7 @@
     onMarkUnread?: (eventId: string) => void;
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
+    canPin?: boolean;
     encrypted?: boolean | null;
     selected?: boolean;
     layout?: TimelineLayout;
@@ -141,6 +142,7 @@
     onMarkUnread,
     canRedactOwn = true,
     canRedactOthers = false,
+    canPin = true,
     encrypted = null,
     selected = false,
     layout = 'modern',
@@ -372,7 +374,7 @@
             }
           : undefined,
       onReproxy:
-        editable && item.content.kind === 'message' && eventId !== ''
+        editable && onEdit && item.content.kind === 'message' && eventId !== ''
           ? () => {
               void personaStore.load();
               dialogs.open(item, { kind: 'reproxy' });
@@ -399,7 +401,7 @@
           : undefined,
       pinned,
       bookmarked,
-      onPin: roomId && eventId ? () => void togglePin(eventId) : undefined,
+      onPin: canPin && roomId && eventId ? () => void togglePin(eventId) : undefined,
       onBookmark: roomId && eventId ? () => void toggleBookmark(eventId) : undefined,
       onForward:
         roomId && eventId && canForward(item.content)

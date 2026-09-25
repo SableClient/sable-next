@@ -43,6 +43,8 @@
     readOnly?: boolean;
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
+    canReact?: boolean;
+    canPin?: boolean;
     encrypted?: boolean | null;
     modal?: boolean;
     onClose: () => void;
@@ -59,6 +61,8 @@
     readOnly = false,
     canRedactOwn = true,
     canRedactOthers = false,
+    canReact = true,
+    canPin = true,
     encrypted = null,
     modal = false,
     onClose,
@@ -217,6 +221,7 @@
       {readOnly}
       {canRedactOwn}
       {canRedactOthers}
+      {canPin}
       {encrypted}
       {onSenderProfile}
       onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
@@ -226,10 +231,10 @@
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}
-      onReply={conversation.reply}
-      onEdit={conversation.edit}
+      onReply={readOnly ? undefined : conversation.reply}
+      onEdit={readOnly ? undefined : conversation.edit}
       onDelete={conversation.redact}
-      onToggleReaction={conversation.toggleReaction}
+      onToggleReaction={canReact ? conversation.toggleReaction : undefined}
       onVotePoll={conversation.votePoll}
       onEndPoll={conversation.endPoll}
       onRetrySend={conversation.retrySend}
