@@ -47,7 +47,7 @@
 </script>
 
 {#if preferences.sendPresence}
-  <ActionMenuSub label={$i18n.t('presence.title')}>
+  <ActionMenuSub class="presence-selector" label={$i18n.t('presence.title')}>
     {#snippet trigger()}
       <PresenceDot {presence} size="large" label={$i18n.t(`presence.${presence}`)} />
       <span class="presence-name">{$i18n.t(`presence.${presence}`)}</span>
@@ -59,7 +59,7 @@
           setPreference('presence', option);
         }}
       >
-        <PresenceDot presence={option} label={$i18n.t(`presence.${option}`)} />
+        <PresenceDot presence={option} label={$i18n.t(`presence.${option}`)} size="medium" />
         <span class="presence-name">{$i18n.t(`presence.${option}`)}</span>
       </ActionMenuItem>
     {/each}
@@ -138,6 +138,11 @@
   :global(.account-popover .menu-item .presence-dot) {
     /* margin: (size of menu item icon - size of large presence dot) / 2 */
     margin: 0 calc((var(--size-x200) - var(--space-250)) / 2);
+  }
+
+  :global(.presence-selector .menu-item .presence-dot) {
+    /* margin: (size of menu item icon - size of medium presence dot) / 2 */
+    margin-right: calc((var(--size-x200) - var(--space-200)) / 2);
   }
 
   .account-row {
