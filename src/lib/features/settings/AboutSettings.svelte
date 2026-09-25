@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
 
   import type { HomeserverSoftwareView } from '#src/generated/protocol';
   import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/config/links.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { restartSetup } from '#lib/features/auth/setup/setup-record.js';
   import { i18n } from '#lib/i18n.js';
   import { checkForMobileUpdate, checkForUpdate, updatePlatform } from '#lib/platform/updates.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
@@ -21,6 +23,8 @@
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
   let resetting = $state(false);
   let resetFailed = $state(false);
+  let restarting = $state(false);
+  let restartFailed = $state(false);
   let checkingForUpdate = $state(false);
   let updateCheckResult = $state<'available' | 'current' | 'mobile-available' | 'failed' | null>(
     null
@@ -49,6 +53,21 @@
     } catch {
       resetting = false;
       resetFailed = true;
+    }
+  }
+
+  async function runSetupAgain(): Promise<void> {
+    const session = core.session;
+    if (!session) return;
+    restarting = true;
+    restartFailed = false;
+    try {
+      await restartSetup(core, localStorage, session.user_id, session.device_id);
+      await goto(resolve('setup'));
+    } catch {
+      restartFailed = true;
+    } finally {
+      restarting = false;
     }
   }
 
@@ -165,6 +184,18 @@
         <li class="settings-form error" role="alert">
           {$i18n.t('settings.aboutUpdateCheckFailed')}
         </li>
+      {/if}
+      <SettingsRow
+        id="run-setup-again"
+        title={$i18n.t('settings.aboutRunSetup')}
+        description={$i18n.t('settings.aboutRunSetupHint')}
+      >
+        <Button size="small" loading={restarting} onclick={() => void runSetupAgain()}>
+          {$i18n.t('settings.aboutRunSetupAction')}
+        </Button>
+      </SettingsRow>
+      {#if restartFailed}
+        <li class="settings-form error" role="alert">{$i18n.t('settings.actionFailed')}</li>
       {/if}
       <SettingsRow
         id="reset-cache"

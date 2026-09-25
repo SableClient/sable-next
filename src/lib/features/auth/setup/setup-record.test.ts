@@ -11,6 +11,7 @@ import {
   ONBOARDING_ACCOUNT_DATA_TYPE,
   pendingStep,
   readSetupRecord,
+  restartSetup,
   setupRecordKey,
   writeSetupRecord,
   type SetupRecord,
@@ -93,5 +94,29 @@ describe('account progress', () => {
     await markAccountFinished(core, 'recovery');
 
     expect(setAccountData).not.toHaveBeenCalled();
+  });
+});
+
+describe('running setup again', () => {
+  test('forgets the account steps, keeps unknown fields and starts a full run here', async () => {
+    const setAccountData = vi.fn(() => Promise.resolve());
+    const core = {
+      commands: {
+        accountData: vi.fn(() => Promise.resolve({ finished: ['notifications'], extra: 1 })),
+        setAccountData,
+      },
+    } as unknown as CoreClient;
+
+    await restartSetup(core, localStorage, '@a:x', 'ONE');
+
+    expect(setAccountData).toHaveBeenCalledWith(ONBOARDING_ACCOUNT_DATA_TYPE, {
+      extra: 1,
+      finished: [],
+    });
+    expect(readSetupRecord(localStorage, setupRecordKey('@a:x', 'ONE'))).toMatchObject({
+      full: true,
+      registering: true,
+      finished: [],
+    });
   });
 });

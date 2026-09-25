@@ -93,3 +93,21 @@ export async function markAccountFinished(core: CoreClient, step: AccountStep): 
     finished: [...finished, step],
   });
 }
+
+export async function restartSetup(
+  core: CoreClient,
+  storage: Storage,
+  userId: string,
+  deviceId: string
+): Promise<void> {
+  const content = await core.commands.accountData(ONBOARDING_ACCOUNT_DATA_TYPE);
+  const base = typeof content === 'object' && content !== null ? content : {};
+  await core.commands.setAccountData(ONBOARDING_ACCOUNT_DATA_TYPE, { ...base, finished: [] });
+  writeSetupRecord(storage, setupRecordKey(userId, deviceId), {
+    full: true,
+    registering: true,
+    homeserver: '',
+    steps: [],
+    finished: [],
+  });
+}
