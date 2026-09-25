@@ -49,6 +49,7 @@
   bind:open
   {anchor}
   collisionPadding={12}
+  sideOffset={10}
   closeOnAnchorHidden
   label={$i18n.t('timeline.personaSheet')}
   closeLabel={$i18n.t('timeline.closeProfile')}

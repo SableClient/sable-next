@@ -58,6 +58,7 @@
   {side}
   sticky="always"
   collisionPadding={12}
+  sideOffset={10}
   closeOnAnchorHidden
   label={$i18n.t('timeline.userProfile')}
   closeLabel={$i18n.t('timeline.closeProfile')}
