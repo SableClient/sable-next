@@ -154,13 +154,17 @@ export function visibleAggregations(
 
 export function mergeAggregations(
   items: readonly TimelineItemView[],
-  aggregations: readonly TimelineItemView[]
+  aggregations: readonly TimelineItemView[],
+  loaded: { start: boolean; end: boolean }
 ): readonly TimelineItemView[] {
   if (aggregations.length === 0) return items;
 
+  const events = items.filter((item) => item.event_id !== null);
+  const oldest = loaded.start ? -Infinity : (events.at(0)?.timestamp ?? Infinity);
+  const newest = loaded.end ? Infinity : (events.at(-1)?.timestamp ?? -Infinity);
   const known = new Set(items.map((item) => item.id));
   const pending = aggregations
-    .filter((item) => !known.has(item.id))
+    .filter((item) => !known.has(item.id) && item.timestamp >= oldest && item.timestamp <= newest)
     .sort((left, right) => left.timestamp - right.timestamp);
   if (pending.length === 0) return items;
 

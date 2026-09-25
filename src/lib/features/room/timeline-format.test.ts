@@ -373,9 +373,36 @@ test('slots aggregation rows into the timeline by timestamp', () => {
   const before = at('$before', 9);
   const after = at('$after', 11);
 
-  expect(mergeAggregations([sent], [after, before])).toEqual([before, sent, after]);
-  expect(mergeAggregations([sent], [])).toEqual([sent]);
-  expect(mergeAggregations([sent, before], [before])).toEqual([sent, before]);
+  const whole = { start: true, end: true };
+  expect(mergeAggregations([sent], [after, before], whole)).toEqual([before, sent, after]);
+  expect(mergeAggregations([sent], [], whole)).toEqual([sent]);
+  expect(mergeAggregations([sent, before], [before], whole)).toEqual([sent, before]);
+});
+
+test('drops aggregation rows outside the loaded range', () => {
+  const at = (id: string, timestamp: number): TimelineItemView => ({
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null }, id),
+    timestamp,
+  });
+  const first = { ...message, id: 'first', event_id: '$first', timestamp: 10 };
+  const last = { ...message, id: 'last', event_id: '$last', timestamp: 20 };
+  const older = at('$older', 5);
+  const inside = at('$inside', 15);
+  const newer = at('$newer', 25);
+  const aggregations = [older, inside, newer];
+
+  expect(mergeAggregations([first, last], aggregations, { start: false, end: true })).toEqual([
+    first,
+    inside,
+    last,
+    newer,
+  ]);
+  expect(mergeAggregations([first, last], aggregations, { start: false, end: false })).toEqual([
+    first,
+    inside,
+    last,
+  ]);
+  expect(mergeAggregations([], aggregations, { start: false, end: true })).toEqual([]);
 });
 
 test('sizes emoji-only bodies by how many there are', () => {

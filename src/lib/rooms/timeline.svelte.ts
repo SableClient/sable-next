@@ -318,6 +318,10 @@ export class RoomTimeline {
         const before = this.items;
         const items = this.withReplyFallbacks(applyDiffs(before, event.diffs));
         this.items = items;
+        if (event.diffs.some((diff) => diff.op === 'clear' || diff.op === 'reset')) {
+          const oldest = items.find((item) => item.event_id !== null)?.timestamp ?? Infinity;
+          this.aggregations = this.aggregations.filter((item) => item.timestamp >= oldest);
+        }
         if (before.length > 0 && items.length === 0) {
           this.backwardPaginationPending = false;
           this.backwardPaginationCompletion = null;

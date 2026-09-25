@@ -106,6 +106,34 @@ test('requests live context as part of its snapshot subscription', async () => {
   expect(timeline.hasSnapshot).toBe(false);
 });
 
+test('a reload drops the aggregations older than what it kept, and a page brings them back', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+  const at = (id: string, timestamp: number) => ({ ...item(id), timestamp });
+  const old = at('old-reaction', 5);
+  core.emit({
+    type: 'timeline_aggregations',
+    subscription: 1,
+    items: [old, at('new-reaction', 50)],
+  });
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'clear' }, { op: 'append', values: [at('kept', 20)] }],
+  });
+  expect(timeline.aggregations.map((entry) => entry.id)).toEqual(['new-reaction']);
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_front', value: at('page', 1) }],
+  });
+  core.emit({ type: 'timeline_aggregations', subscription: 1, items: [old] });
+  expect(timeline.aggregations.map((entry) => entry.id)).toEqual(['new-reaction', 'old-reaction']);
+});
+
 test('opens a permalink as a focused timeline without live pagination', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);

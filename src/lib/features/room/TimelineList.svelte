@@ -150,7 +150,10 @@
   let followingRead = $state(false);
   let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let allItems = $derived(
-    mergeAggregations(eventItems, visibleAggregations(timeline.aggregations, preferences))
+    mergeAggregations(eventItems, visibleAggregations(timeline.aggregations, preferences), {
+      start: timeline.backwardPagination === 'end',
+      end: timeline.mode.kind === 'live' || timeline.forwardPagination === 'end',
+    })
   );
   let visibleItems = $derived(
     followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
