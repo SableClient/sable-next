@@ -2332,6 +2332,7 @@
     "returnTo": "Revenir à {{room}}",
     "lobbyEmpty": "La discussion vocale est vide : lancez-vous !",
     "lobbyNoPermission": "Vous n’avez pas l’autorisation de rejoindre l’appel.",
+    "lobbyNoFocus": "Ce serveur d’accueil ne peut pas héberger d’appels.",
     "showChat": "Afficher la conversation",
     "hideChat": "Masquer la discussion",
     "closeChat": "Fermer la discussion",
@@ -2377,7 +2378,8 @@
     "joinVoice": "Rejoindre le vocal",
     "checkDevices": "Vérifier les appareils",
     "testMicNeedsMic": "Activez votre micro pour le tester",
-    "lobbyNoPermissionHint": "Demandez à un modérateur du salon d’autoriser les membres à rejoindre les appels."
+    "lobbyNoPermissionHint": "Demandez à un modérateur du salon d’autoriser les membres à rejoindre les appels.",
+    "lobbyNoFocusHint": "Un appel pourra démarrer ici une fois qu’un serveur d’appels aura été configuré par son administrateur."
   },
   "presence": {
     "online": "En ligne",

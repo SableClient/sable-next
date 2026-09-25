@@ -26,6 +26,7 @@
     joining: boolean;
     canJoin: boolean;
     hasPermission: boolean;
+    hasFocus?: boolean;
     roomName?: string;
     selfId?: string | null;
     onChange: (media: CallMedia) => void;
@@ -39,6 +40,7 @@
     joining,
     canJoin,
     hasPermission,
+    hasFocus = true,
     roomName,
     selfId = null,
     onChange,
@@ -177,6 +179,11 @@
       <div class="closed">
         <p class="notice">{$i18n.t('call.lobbyNoPermission')}</p>
         <p class="hint">{$i18n.t('call.lobbyNoPermissionHint')}</p>
+      </div>
+    {:else if !hasFocus}
+      <div class="closed">
+        <p class="notice">{$i18n.t('call.lobbyNoFocus')}</p>
+        <p class="hint">{$i18n.t('call.lobbyNoFocusHint')}</p>
       </div>
     {/if}
   </div>

@@ -1021,6 +1021,7 @@
           joining={call.lifecycle === 'joining'}
           canJoin={callable}
           hasPermission={callSupport?.can_join ?? false}
+          hasFocus={callSupport?.has_focus ?? true}
           {roomName}
           selfId={core.session?.user_id ?? null}
           onChange={(media: CallMedia) => (prescreenMedia = media)}

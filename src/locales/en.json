@@ -2549,6 +2549,7 @@
     "returnTo": "Return to {{room}}",
     "lobbyEmpty": "Voice chat's empty - be the first to hop in!",
     "lobbyNoPermission": "You don't have permission to join.",
+    "lobbyNoFocus": "This homeserver can't host calls.",
     "showChat": "Show chat",
     "hideChat": "Hide chat",
     "closeChat": "Close chat",
@@ -2594,7 +2595,8 @@
     "joinVoice": "Join voice",
     "checkDevices": "Check devices",
     "testMicNeedsMic": "Turn your microphone on to test it",
-    "lobbyNoPermissionHint": "Ask a moderator of this room to let members join calls."
+    "lobbyNoPermissionHint": "Ask a moderator of this room to let members join calls.",
+    "lobbyNoFocusHint": "A call can start here once its administrator sets up a call server."
   },
   "presence": {
     "online": "Online",
