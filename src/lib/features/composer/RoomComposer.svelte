@@ -570,6 +570,7 @@
 
     const doc = editor.doc();
     const rich = richSend;
+    const asCaption = preferences.sendAttachmentAsCaption;
     let unsent = staged;
 
     inFlight += 1;
@@ -592,7 +593,7 @@
               mentions: { userIds: [], room: false },
               imageSourcePacks: [],
             };
-        const captioned = unsent.length === 1 && message.body !== '';
+        const captioned = asCaption && unsent.length === 1 && message.body !== '';
         const gallery =
           onSendGallery !== undefined && unsent.length > 1 && unsent.every((item) => !item.spoiler);
 

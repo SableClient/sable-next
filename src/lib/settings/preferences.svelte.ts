@@ -82,6 +82,7 @@ export interface Preferences {
   composerVoiceButton: boolean;
   composerButtonOrder: ComposerButton[];
   scheduleInEncryptedRooms: boolean;
+  sendAttachmentAsCaption: boolean;
 
   personaPicker: boolean;
   personaProxying: boolean;
@@ -285,6 +286,7 @@ const DEFAULTS: Preferences = {
   composerVoiceButton: true,
   composerButtonOrder: [...COMPOSER_BUTTONS],
   scheduleInEncryptedRooms: true,
+  sendAttachmentAsCaption: true,
 
   personaPicker: true,
   personaProxying: false,

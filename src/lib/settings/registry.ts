@@ -47,6 +47,7 @@ import QuotesIcon from 'phosphor-svelte/lib/QuotesIcon';
 import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
+import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TextAlignLeftIcon from 'phosphor-svelte/lib/TextAlignLeftIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
@@ -805,6 +806,14 @@ export const settingsCategories: SettingsCategory[] = [
         icon: LockIcon,
         name: 'settings.scheduleInEncryptedRooms',
         description: 'settings.scheduleInEncryptedRoomsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'sendAttachmentAsCaption',
+        section: 'sending',
+        icon: SubtitlesIcon,
+        name: 'settings.sendAttachmentAsCaption',
+        description: 'settings.sendAttachmentAsCaptionHint',
         type: 'boolean',
       },
       {

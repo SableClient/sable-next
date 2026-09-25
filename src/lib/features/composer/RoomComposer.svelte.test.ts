@@ -28,6 +28,7 @@ afterEach(() => {
   setPreference('composerFormatButton', true);
   setPreference('composerButtonOrder', ['gif', 'sticker', 'emoticon', 'persona', 'format']);
   setPreference('richTextComposer', true);
+  setPreference('sendAttachmentAsCaption', true);
 });
 
 const members: MemberView[] = [
@@ -402,6 +403,51 @@ test.each([true, false])(
     await unmount(instance);
   }
 );
+
+test('the caption toggle sends text beside a lone attachment', async () => {
+  const attachment = vi.fn(async () => {});
+  const message = vi.fn(async () => {});
+  const instance = render({
+    roomId: '!room:example.org',
+    onSendAttachment: attachment,
+    onSend: message,
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'look at this' },
+  });
+  await tick();
+  const file = new File(['one'], 'one.png', { type: 'image/png' });
+
+  await pick(file);
+  const toggle = document.querySelector('.staged-caption');
+  if (!(toggle instanceof HTMLButtonElement)) throw new Error('caption toggle not found');
+  expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  toggle.click();
+  await tick();
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+
+  submit();
+  await vi.waitFor(() => {
+    expect(message).toHaveBeenCalled();
+  });
+
+  expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
+  expect(message).toHaveBeenCalledWith('!room:example.org', 'look at this', null, {
+    userIds: [],
+    room: false,
+  });
+  void unmount(instance);
+});
+
+test('the caption toggle only offers itself for a lone attachment', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+
+  await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+  expect(document.querySelector('.staged-caption')).not.toBeNull();
+
+  await pick(new File(['two'], 'two.png', { type: 'image/png' }));
+  expect(document.querySelector('.staged-caption')).toBeNull();
+  void unmount(instance);
+});
 
 test('text follows two attachments as its own message', async () => {
   const attachment = vi.fn(async () => {});

@@ -1,9 +1,12 @@
 <script lang="ts">
   import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
+  import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
+  import SubtitlesSlashIcon from 'phosphor-svelte/lib/SubtitlesSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
@@ -24,55 +27,76 @@
   let media = $derived(files.filter((item) => previewKind(item.file) !== null));
 </script>
 
-<ul class="staged" aria-label={$i18n.t('composer.stagedFiles')}>
-  {#each files as item (item.id)}
-    {@const kind = previewKind(item.file)}
-    <li class={['staged-item', kind ? 'staged-media' : 'staged-file']}>
-      {#if kind}
-        <StagedThumbnail
-          file={item.file}
-          {kind}
-          spoiler={item.spoiler}
-          onOpen={() => {
-            viewing = item.id;
-          }}
-        />
-        <span class="staged-name">{item.file.name}</span>
+<div class="attachments">
+  <ul class="staged" aria-label={$i18n.t('composer.stagedFiles')}>
+    {#each files as item (item.id)}
+      {@const kind = previewKind(item.file)}
+      <li class={['staged-item', kind ? 'staged-media' : 'staged-file']}>
+        {#if kind}
+          <StagedThumbnail
+            file={item.file}
+            {kind}
+            spoiler={item.spoiler}
+            onOpen={() => {
+              viewing = item.id;
+            }}
+          />
+          <span class="staged-name">{item.file.name}</span>
+          <IconButton
+            variant="ghost"
+            size="small"
+            class={['staged-control staged-spoiler', item.spoiler && 'staged-spoiler-on']}
+            {disabled}
+            aria-pressed={item.spoiler}
+            label={$i18n.t('composer.spoilerAttachment', { name: item.file.name })}
+            onclick={() => {
+              onToggleSpoiler(item.id);
+            }}
+          >
+            <EyeSlashIcon />
+          </IconButton>
+        {:else}
+          <span class="staged-icon" aria-hidden="true"><FileIcon /></span>
+          <span class="staged-text">
+            <span class="staged-name">{item.file.name}</span>
+            <span class="staged-size">{formatByteSize(item.file.size)}</span>
+          </span>
+        {/if}
         <IconButton
           variant="ghost"
           size="small"
-          class={['staged-control staged-spoiler', item.spoiler && 'staged-spoiler-on']}
+          class="staged-control staged-remove"
           {disabled}
-          aria-pressed={item.spoiler}
-          label={$i18n.t('composer.spoilerAttachment', { name: item.file.name })}
+          label={$i18n.t('composer.removeAttachment', { name: item.file.name })}
           onclick={() => {
-            onToggleSpoiler(item.id);
+            onRemove(item.id);
           }}
         >
-          <EyeSlashIcon />
+          <XIcon />
         </IconButton>
+      </li>
+    {/each}
+  </ul>
+  {#if files.length === 1}
+    <IconButton
+      variant="ghost"
+      size="small"
+      class="staged-caption"
+      {disabled}
+      label={$i18n.t('composer.sendAsCaption')}
+      aria-pressed={preferences.sendAttachmentAsCaption}
+      onclick={() => {
+        setPreference('sendAttachmentAsCaption', !preferences.sendAttachmentAsCaption);
+      }}
+    >
+      {#if preferences.sendAttachmentAsCaption}
+        <SubtitlesIcon />
       {:else}
-        <span class="staged-icon" aria-hidden="true"><FileIcon /></span>
-        <span class="staged-text">
-          <span class="staged-name">{item.file.name}</span>
-          <span class="staged-size">{formatByteSize(item.file.size)}</span>
-        </span>
+        <SubtitlesSlashIcon />
       {/if}
-      <IconButton
-        variant="ghost"
-        size="small"
-        class="staged-control staged-remove"
-        {disabled}
-        label={$i18n.t('composer.removeAttachment', { name: item.file.name })}
-        onclick={() => {
-          onRemove(item.id);
-        }}
-      >
-        <XIcon />
-      </IconButton>
-    </li>
-  {/each}
-</ul>
+    </IconButton>
+  {/if}
+</div>
 
 {#if viewing !== null}
   <StagedMediaViewer
@@ -87,11 +111,23 @@
 {/if}
 
 <style>
+  .attachments {
+    align-items: center;
+    display: flex;
+  }
+
+  .attachments :global(.staged-caption) {
+    flex: none;
+    margin: var(--space-200) var(--space-200) 0 0;
+  }
+
   .staged {
     display: flex;
+    flex: 1;
     gap: var(--space-150);
     list-style: none;
     margin: 0;
+    min-width: 0;
     overflow: auto hidden;
     overscroll-behavior-x: contain;
     padding: var(--space-200) var(--space-200) 0;
