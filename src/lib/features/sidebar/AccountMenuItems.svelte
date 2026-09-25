@@ -76,7 +76,11 @@
       {#each accounts as account (account.account_id)}
         {@const active = account.account_id === currentAccountId}
         {@const identity = profiles.identity(account.user_id)}
-        <div class="account-row" data-active={active ? 'true' : undefined}>
+        <div
+          class="account-row menu-item"
+          aria-checked={active ? 'true' : undefined}
+          data-active={active ? 'true' : undefined}
+        >
           <button
             class="account-select"
             type="button"
@@ -147,7 +151,6 @@
 
   .account-row {
     align-items: center;
-    border-radius: var(--radius-inner);
     display: flex;
     gap: var(--space-300);
     min-height: var(--control-height-500);
@@ -159,16 +162,6 @@
     gap: var(--space-100);
     min-width: min(15rem, calc(100vw - 2rem));
     padding: 0;
-  }
-
-  .account-row:hover,
-  .account-row:focus-within {
-    background: var(--bg-container-hover);
-  }
-
-  .account-row[data-active='true'] {
-    background: var(--primary-container);
-    color: var(--primary-on-container);
   }
 
   .account-select {
