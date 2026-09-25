@@ -32,6 +32,7 @@ export type RuntimeConfig = {
   gifs: GifsConfig;
   homeservers: HomeserversConfig;
   calls: CallsConfig;
+  disableAccountSwitcher: boolean;
 };
 
 const NO_GIFS: GifsConfig = {
@@ -55,6 +56,7 @@ const EMPTY: RuntimeConfig = {
   gifs: NO_GIFS,
   homeservers: BUILT_IN_HOMESERVERS,
   calls: NO_CALLS,
+  disableAccountSwitcher: false,
 };
 
 function text(value: unknown): string | null {
@@ -139,6 +141,7 @@ export function parseRuntimeConfig(raw: unknown): RuntimeConfig {
       source.defaultHomeserver
     ),
     calls: parseCalls(source.calls),
+    disableAccountSwitcher: source.disableAccountSwitcher === true,
   };
 }
 

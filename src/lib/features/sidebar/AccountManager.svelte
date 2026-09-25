@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { PresenceView, ProfileView } from '#src/generated/protocol';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
@@ -28,6 +30,7 @@
   const accountProfiles = new AccountDirectory(core);
   const signOut = new SignOutGuard(core);
   let switching = $state(false);
+  let accountSwitching = $state(true);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -43,9 +46,20 @@
     { value: 'unavailable', label: $i18n.t('presence.unavailable') },
     { value: 'offline', label: $i18n.t('presence.offline') },
   ]);
+  let listedAccounts = $derived(
+    accountSwitching
+      ? core.accounts
+      : core.accounts.filter((account) => account.account_id === activeAccountId)
+  );
   let accountToRemove = $derived(
     core.accounts.find((account) => account.account_id === removeAccountId) ?? null
   );
+
+  onMount(() => {
+    void runtimeConfig().then((config) => {
+      accountSwitching = !config.disableAccountSwitcher;
+    });
+  });
 
   $effect(() => {
     if (!activeUserId) return;
@@ -174,7 +188,7 @@
       <p>{$i18n.t('nav.manageAccountsDescription')}</p>
     </div>
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
-    {#each core.accounts as account (account.account_id)}
+    {#each listedAccounts as account (account.account_id)}
       {@const active = account.account_id === activeAccountId}
       {@const identity = accountProfiles.identity(account.user_id)}
       <article class="account-row choice" data-selected={active ? 'true' : undefined}>
@@ -245,9 +259,11 @@
         {/if}
       </article>
     {/each}
-    <Button variant="secondary" onclick={() => void goto(resolve('login?addAccount=1'))}
-      >{$i18n.t('nav.addAccount')}</Button
-    >
+    {#if accountSwitching}
+      <Button variant="secondary" onclick={() => void goto(resolve('login?addAccount=1'))}
+        >{$i18n.t('nav.addAccount')}</Button
+      >
+    {/if}
   </section>
 </main>
 

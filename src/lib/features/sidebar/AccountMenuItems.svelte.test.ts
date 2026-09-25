@@ -145,3 +145,27 @@ test('loads the profile avatar of every account', async () => {
   expect(avatar?.textContent).toBe('Z');
   await unmount(instance);
 });
+
+test('a deployment without account switching offers neither switching nor adding', async () => {
+  const instance = mount(AccountMenuItemsHarness, {
+    target: document.body,
+    props: {
+      accounts,
+      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
+      onSwitch: vi.fn(),
+      onLogoutAccount: vi.fn(),
+      accountSwitching: false,
+    },
+  });
+  await tick();
+
+  const outerMenu = document.querySelector('.account-menu-trigger');
+  expect(outerMenu).not.toBeNull();
+  if (outerMenu) await press(outerMenu);
+
+  const labels = [...document.querySelectorAll('.menu-item')].map((item) => item.textContent);
+  expect(labels.some((label) => label.includes('nav.editProfile'))).toBe(true);
+  expect(labels.some((label) => label.includes('nav.switchAccount'))).toBe(false);
+  expect(labels.some((label) => label.includes('nav.addAccount'))).toBe(false);
+  await unmount(instance);
+});

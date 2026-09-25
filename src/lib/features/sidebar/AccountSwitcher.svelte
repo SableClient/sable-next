@@ -1,8 +1,10 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import type { ProfileView } from '#src/generated/protocol';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
@@ -37,6 +39,7 @@
   const accountProfiles = new AccountDirectory(core);
   const signOut = new SignOutGuard(core);
   let switching = $state(false);
+  let accountSwitching = $state(true);
   let logoutAccountId = $state<string | null>(null);
   let accountToLogout = $derived(
     core.accounts.find((account) => account.account_id === logoutAccountId) ?? null
@@ -49,6 +52,12 @@
   );
   let avatarUrl = $derived(activeProfile?.avatar_url ?? null);
   let ownPresence = $derived(preferences.sendPresence ? preferences.presence : null);
+
+  onMount(() => {
+    void runtimeConfig().then((config) => {
+      accountSwitching = !config.disableAccountSwitcher;
+    });
+  });
 
   $effect(() => {
     const userId = core.session?.user_id;
@@ -176,6 +185,7 @@
         onLogoutAccount={requestLogout}
         onLogout={logout}
         onAddAccount={openAddAccount}
+        {accountSwitching}
       />
     </ActionMenu>
   {/snippet}

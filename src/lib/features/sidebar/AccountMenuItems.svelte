@@ -25,6 +25,7 @@
     onLogoutAccount: (accountId: string) => void;
     onLogout: () => void;
     onAddAccount: () => void;
+    accountSwitching?: boolean;
   }
 
   let {
@@ -37,6 +38,7 @@
     onLogoutAccount,
     onLogout,
     onAddAccount,
+    accountSwitching = true,
   }: Props = $props();
   let presence = $derived(preferences.presence);
   const surface = useActionMenuSurface();
@@ -62,58 +64,62 @@
   </ActionMenuSub>
   <ActionMenuSeparator />
 {/if}
-<ActionMenuSub label={$i18n.t('nav.switchAccount')} class="account-switcher-popover">
-  {#snippet trigger()}
-    <UserIcon aria-hidden="true" />
-    <span>{$i18n.t('nav.switchAccount')}</span>
-  {/snippet}
-  <div class="account-list" role="group">
-    {#each accounts as account (account.account_id)}
-      {@const active = account.account_id === currentAccountId}
-      {@const identity = profiles.identity(account.user_id)}
-      <div class="account-row" data-active={active ? 'true' : undefined}>
-        <button
-          class="account-select"
-          type="button"
-          role="menuitemradio"
-          aria-checked={active}
-          disabled={active || account.needs_reauth || switching}
-          onclick={() => {
-            onSwitch(account.account_id);
-            surface.close();
-          }}
-        >
-          <Avatar
+{#if accountSwitching}
+  <ActionMenuSub label={$i18n.t('nav.switchAccount')} class="account-switcher-popover">
+    {#snippet trigger()}
+      <UserIcon aria-hidden="true" />
+      <span>{$i18n.t('nav.switchAccount')}</span>
+    {/snippet}
+    <div class="account-list" role="group">
+      {#each accounts as account (account.account_id)}
+        {@const active = account.account_id === currentAccountId}
+        {@const identity = profiles.identity(account.user_id)}
+        <div class="account-row" data-active={active ? 'true' : undefined}>
+          <button
+            class="account-select"
+            type="button"
+            role="menuitemradio"
+            aria-checked={active}
+            disabled={active || account.needs_reauth || switching}
+            onclick={() => {
+              onSwitch(account.account_id);
+              surface.close();
+            }}
+          >
+            <Avatar
+              size="small"
+              id={account.user_id}
+              name={identity.displayName}
+              src={identity.avatarUrl}
+            />
+            <span class="account-identity">
+              <strong>{account.user_id}</strong>
+              <small>{active ? $i18n.t('nav.currentAccount') : account.homeserver}</small>
+            </span>
+            {#if active}<CheckIcon
+                class="active-account"
+                aria-label={$i18n.t('nav.currentAccount')}
+              />{/if}
+          </button>
+          <Button
+            variant="danger"
             size="small"
-            id={account.user_id}
-            name={identity.displayName}
-            src={identity.avatarUrl}
-          />
-          <span class="account-identity">
-            <strong>{account.user_id}</strong>
-            <small>{active ? $i18n.t('nav.currentAccount') : account.homeserver}</small>
-          </span>
-          {#if active}<CheckIcon
-              class="active-account"
-              aria-label={$i18n.t('nav.currentAccount')}
-            />{/if}
-        </button>
-        <Button
-          variant="danger"
-          size="small"
-          disabled={switching}
-          onclick={() => {
-            onLogoutAccount(account.account_id);
-            surface.close();
-          }}>{$i18n.t('settings.logout')}</Button
-        >
-      </div>
-    {/each}
-  </div>
-</ActionMenuSub>
-<ActionMenuSeparator />
+            disabled={switching}
+            onclick={() => {
+              onLogoutAccount(account.account_id);
+              surface.close();
+            }}>{$i18n.t('settings.logout')}</Button
+          >
+        </div>
+      {/each}
+    </div>
+  </ActionMenuSub>
+  <ActionMenuSeparator />
+{/if}
 <ActionMenuItem onSelect={onProfile}>{$i18n.t('nav.editProfile')}</ActionMenuItem>
-<ActionMenuItem onSelect={onAddAccount}>{$i18n.t('nav.addAccount')}</ActionMenuItem>
+{#if accountSwitching}
+  <ActionMenuItem onSelect={onAddAccount}>{$i18n.t('nav.addAccount')}</ActionMenuItem>
+{/if}
 <ActionMenuSeparator />
 <ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>
 

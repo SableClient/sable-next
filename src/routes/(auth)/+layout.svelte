@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import AuthFlow from '#lib/features/auth/flow/AuthFlow.svelte';
 
@@ -13,9 +14,21 @@
   let authEntry = $derived(
     page.url.pathname.startsWith(loginPath) || page.url.pathname.startsWith(registerPath)
   );
+  let accountSwitching = $state(true);
+  let addingAccount = $derived(
+    page.url.searchParams.has('addAccount') &&
+      (accountSwitching || page.url.searchParams.has('reauth'))
+  );
+
+  onMount(() => {
+    void runtimeConfig().then((config) => {
+      accountSwitching = !config.disableAccountSwitcher;
+    });
+  });
 
   $effect(() => {
-    if (core.status === 'ready' && !authEntry && !page.url.searchParams.has('addAccount')) {
+    if (core.status !== 'ready' || addingAccount) return;
+    if (!authEntry || page.url.searchParams.has('addAccount')) {
       void goto(resolve('/(app)/rooms'), { replace: true });
     }
   });

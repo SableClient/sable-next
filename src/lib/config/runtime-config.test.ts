@@ -169,3 +169,11 @@ test('a deployment fallback focus is read, and a blank one is no focus', () => {
     expect(parseRuntimeConfig(raw).calls.livekitServiceUrl).toBeNull();
   }
 });
+
+test('the account switcher is disabled only by an explicit true', () => {
+  expect(parseRuntimeConfig({ disableAccountSwitcher: true }).disableAccountSwitcher).toBe(true);
+
+  for (const raw of [null, {}, { disableAccountSwitcher: 'true' }, { disableAccountSwitcher: 1 }]) {
+    expect(parseRuntimeConfig(raw).disableAccountSwitcher).toBe(false);
+  }
+});

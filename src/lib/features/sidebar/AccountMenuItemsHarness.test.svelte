@@ -9,9 +9,10 @@
     profiles: AccountDirectory;
     onSwitch: (accountId: string) => void;
     onLogoutAccount: (accountId: string) => void;
+    accountSwitching?: boolean;
   }
 
-  let { accounts, profiles, onSwitch, onLogoutAccount }: Props = $props();
+  let { accounts, profiles, onSwitch, onLogoutAccount, accountSwitching }: Props = $props();
 </script>
 
 <ActionMenu label="Account options">
@@ -28,5 +29,6 @@
     {onLogoutAccount}
     onLogout={() => {}}
     onAddAccount={() => {}}
+    {accountSwitching}
   />
 </ActionMenu>
