@@ -909,6 +909,7 @@
     position: absolute;
     top: 0;
     touch-action: none;
+    transition: background-color 0s;
     user-select: none;
     width: 0.5rem;
   }
@@ -917,6 +918,15 @@
   .resize-handle.dragging,
   .resize-handle:focus-visible {
     background: var(--primary-main);
+  }
+
+  .resize-handle:hover {
+    transition-delay: var(--motion-normal);
+  }
+
+  .resize-handle.dragging,
+  .resize-handle:focus-visible {
+    transition: none;
   }
 
   .resize-handle:focus-visible {
