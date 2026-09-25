@@ -4,8 +4,11 @@
   import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
+  import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
   interface Props {
     open?: boolean;
@@ -15,6 +18,8 @@
   }
 
   let { open = $bindable(false), personas, current, onChoose }: Props = $props();
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let desktop = $derived(appLayout.matches);
 
   function choose(persona: PersonaView | null): void {
     open = false;
@@ -22,13 +27,9 @@
   }
 </script>
 
-<BottomSheet
-  bind:open
-  label={$i18n.t('timeline.reproxyTitle')}
-  closeLabel={$i18n.t('timeline.closeMenu')}
->
+{#snippet content()}
   <h2>{$i18n.t('timeline.reproxyTitle')}</h2>
-  <ul class="reproxy-options">
+  <ul class="reproxy-options" class:dialog={desktop}>
     <li>
       <button
         type="button"
@@ -63,7 +64,21 @@
       </li>
     {/each}
   </ul>
-</BottomSheet>
+{/snippet}
+
+{#if desktop}
+  <DialogFrame bind:open variant="verification" label={$i18n.t('timeline.reproxyTitle')}>
+    {@render content()}
+  </DialogFrame>
+{:else}
+  <BottomSheet
+    bind:open
+    label={$i18n.t('timeline.reproxyTitle')}
+    closeLabel={$i18n.t('timeline.closeMenu')}
+  >
+    {@render content()}
+  </BottomSheet>
+{/if}
 
 <style>
   h2 {
@@ -79,6 +94,10 @@
     max-height: 60vh;
     overflow-y: auto;
     padding: 0;
+  }
+
+  .reproxy-options.dialog {
+    width: min(22rem, calc(100vw - 2rem));
   }
 
   .reproxy-option {
