@@ -1711,6 +1711,7 @@
     "timezone": "Fuseau horaire",
     "timezonePlaceholder": "Europe/Paris",
     "biography": "Biographie",
+    "biographyHint": "Le Markdown est pris en charge.",
     "otherProfileFields": "Autres champs de profil",
     "animalIdentity": "Identité animale",
     "animalIdentityWhatIs": "Que êtes-vous ?",

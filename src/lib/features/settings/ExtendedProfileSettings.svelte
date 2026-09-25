@@ -16,6 +16,7 @@
   import ColorSetting from './ColorSetting.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import { bioMarkdown, bioTexts } from './bio-markdown.js';
 
   interface Props {
     profile: ProfileView;
@@ -100,12 +101,7 @@
       write: (snapshot) => {
         bio = snapshot.bio ?? '';
       },
-      fields: () => [
-        [
-          'gay.fomx.biography',
-          bio ? { 'm.text': [{ body: bio, mimetype: 'text/html' }, { body: bio }] } : null,
-        ],
-      ],
+      fields: () => [['gay.fomx.biography', bio ? { 'm.text': bioTexts(bio) } : null]],
     },
     animal: {
       name: 'settings.animalIdentity',
@@ -171,7 +167,7 @@
     void core.session?.user_id;
     untrack(() => {
       status = profile.status?.text ?? '';
-      bio = profile.bio ?? '';
+      bio = bioMarkdown(profile.bio ?? '');
       pronouns = profile.pronouns
         .map(({ summary, language }) => `${summary}${language ? ` (${language})` : ''}`)
         .join(', ');
@@ -413,8 +409,11 @@
       </form>
     </SettingsSection>
 
-    <!-- very sloppy fix, WILL NEED A PROPER IMPLEMENTATION LATER i just cba to figure it out rnrn -->
-    <SettingsSection title={$i18n.t('settings.biography')} headingId="profile-bio">
+    <SettingsSection
+      title={$i18n.t('settings.biography')}
+      description={$i18n.t('settings.biographyHint')}
+      headingId="profile-bio"
+    >
       <form class="settings-form form-stack" onfocusout={leaving('bio')}>
         <TextArea
           bind:value={bio}

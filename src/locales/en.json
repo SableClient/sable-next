@@ -1949,6 +1949,7 @@
     "timezone": "Timezone",
     "timezonePlaceholder": "America/Halifax",
     "biography": "Biography",
+    "biographyHint": "Markdown is supported.",
     "otherProfileFields": "Other profile fields",
     "otherProfileFieldsEmpty": "No misc. keys found",
     "otherProfileFieldsTitle": "Add, modify or delete fields",
