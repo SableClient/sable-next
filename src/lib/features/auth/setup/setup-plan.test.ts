@@ -43,10 +43,11 @@ describe('planSetup', () => {
     expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device', 'done']);
   });
 
-  test('a new account creates recovery and a profile', () => {
+  test('a new account creates recovery and a profile, and picks how chats look', () => {
     expect(planSetup(state({ registering: true, recovery: 'disabled' }), true)).toEqual([
       'recovery',
       'profile',
+      'appearance',
       'done',
     ]);
   });
@@ -61,7 +62,7 @@ describe('planSetup', () => {
       }),
       true
     );
-    expect(plan).toEqual(['device', 'done']);
+    expect(plan).toEqual(['device', 'appearance', 'done']);
   });
 
   test('a key from an identity reset is shown even when the account finished recovery', () => {

@@ -21,6 +21,7 @@
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
   import NotificationsSetupCard from './NotificationsSetupCard.svelte';
+  import AppearanceSetupCard from './AppearanceSetupCard.svelte';
   import SettingsSyncCard from './SettingsSyncCard.svelte';
   import SetupDoneCard from './SetupDoneCard.svelte';
   import {
@@ -47,6 +48,7 @@
     recovery: 'auth.stageRecoveryLabel',
     profile: 'auth.stageProfileLabel',
     notifications: 'setup.stageNotificationsLabel',
+    appearance: 'setup.stageAppearanceLabel',
     sync: 'setup.stageSyncLabel',
     done: 'setup.stageDoneLabel',
     consent: 'auth.stageConsentLabel',
@@ -263,6 +265,15 @@
             onSkip={() => {
               permissionAskable = false;
               advance('notifications');
+            }}
+          />
+        {:else if step === 'appearance'}
+          <AppearanceSetupCard
+            onComplete={() => {
+              advance('appearance');
+            }}
+            onSkip={() => {
+              advance('appearance');
             }}
           />
         {:else if step === 'sync'}

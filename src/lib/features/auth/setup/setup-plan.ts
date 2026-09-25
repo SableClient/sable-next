@@ -5,6 +5,7 @@ export type SetupStep =
   | 'recovery'
   | 'profile'
   | 'notifications'
+  | 'appearance'
   | 'sync'
   | 'consent'
   | 'done';
@@ -49,6 +50,7 @@ export function planSetup(state: SetupState, full: boolean): SetupStep[] {
     if (!state.accountFinished.includes('notifications') || state.permissionAskable) {
       steps.push('notifications');
     }
+    if (state.registering) steps.push('appearance');
     if (!state.syncEnabled) steps.push('sync');
   }
   if (state.consentPending) steps.push('consent');
