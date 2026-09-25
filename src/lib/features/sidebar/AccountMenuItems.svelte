@@ -49,7 +49,7 @@
 {#if preferences.sendPresence}
   <ActionMenuSub label={$i18n.t('presence.title')}>
     {#snippet trigger()}
-      <PresenceDot {presence} label={$i18n.t(`presence.${presence}`)} />
+      <PresenceDot {presence} size="large" label={$i18n.t(`presence.${presence}`)} />
       <span class="presence-name">{$i18n.t(`presence.${presence}`)}</span>
     {/snippet}
     {#each PRESENCE_OPTIONS as option (option)}
@@ -135,6 +135,11 @@
 <ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>
 
 <style>
+  :global(.account-popover .menu-item .presence-dot) {
+    /* margin: (size of menu item icon - size of large presence dot) / 2 */
+    margin: 0 calc((var(--size-x200) - var(--space-250)) / 2);
+  }
+
   .account-row {
     align-items: center;
     border-radius: var(--radius-inner);
