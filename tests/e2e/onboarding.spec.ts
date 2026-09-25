@@ -192,3 +192,30 @@ test('touch: a swipe towards a step that is not reachable yet does not move', as
   await page.waitForTimeout(400);
   await expect(page).toHaveURL(/\/setup\/profile$/);
 });
+
+test('a rail knocked off the current step by a relayout settles back onto it', async ({
+  auth,
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.goto('/settings/about');
+  await page.getByRole('button', { name: 'Run setup again' }).click();
+  await expect(page).toHaveURL(/\/setup\/profile$/, { timeout: 20_000 });
+  await auth.setupCard.getByRole('button', { name: 'Skip for now' }).click();
+  await expect(page).toHaveURL(/\/setup\/notifications$/);
+
+  const offset = () =>
+    page.evaluate(() => {
+      const rail = document.querySelector<HTMLElement>('.rail');
+      const card = rail?.querySelector<HTMLElement>(':scope > .auth-card.active');
+      if (!rail || !card) return null;
+      return Math.round(
+        rail.scrollLeft - (card.offsetLeft - (rail.clientWidth - card.offsetWidth) / 2)
+      );
+    });
+  await expect.poll(offset).toBe(0);
+  await page.screenshot({ fullPage: true });
+  await expect.poll(offset).toBe(0);
+  await expect(page).toHaveURL(/\/setup\/notifications$/);
+});

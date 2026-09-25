@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import CaretLeftIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import { cubicOut } from 'svelte/easing';
@@ -180,8 +180,23 @@
     }, 0);
 
     if (nearestIndex < activeIndex && canBack) onBack();
-    if (nearestIndex > activeIndex && canForward) onForward();
+    else if (nearestIndex > activeIndex && canForward) onForward();
+    else settleToCard(activeIndex);
   }
+
+  $effect(() => {
+    const rail = railElement;
+    if (!rail) return;
+    const observer = new ResizeObserver(() => {
+      if (isDragging || isNavigating || swipeGesture) return;
+      const card = cardElements(rail)[untrack(() => activeIndex)] as HTMLElement | undefined;
+      if (card) rail.scrollLeft = cardTarget(rail, card);
+    });
+    observer.observe(rail);
+    return () => {
+      observer.disconnect();
+    };
+  });
 
   $effect(() => {
     const index = activeIndex;
