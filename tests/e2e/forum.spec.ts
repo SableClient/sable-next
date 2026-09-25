@@ -55,6 +55,26 @@ test('a forum post with no replies is listed as a topic', async ({ page, admin }
   await expect(threads).toContainText('A topic nobody answered');
 });
 
+test('a forum topic can be deleted from its list', async ({ page, admin }) => {
+  const roomId = await admin.createRoom({
+    name: `Forum actions ${String(Date.now())}`,
+    roomType: 'pl.chrome.forum',
+  });
+  const topic = 'Remove this rogue topic';
+  await admin.sendMessage(roomId, topic);
+
+  await page.goto(`/rooms/${encodeURIComponent(roomId)}`);
+
+  const threads = page.getByRole('list', { name: 'Threads' });
+  const thread = threads.getByRole('listitem').filter({ hasText: topic });
+  await expect(thread).toBeVisible({ timeout: 30_000 });
+  await thread.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete message' }).click();
+  await page.getByRole('button', { name: 'Delete message' }).click();
+
+  await expect(thread).toHaveCount(0, { timeout: 30_000 });
+});
+
 test('a forum inside a space opens on its thread list', async ({ page, admin }) => {
   const spaceId = await admin.createRoom({ name: `Space ${String(Date.now())}`, isSpace: true });
   const roomId = await admin.createRoom({

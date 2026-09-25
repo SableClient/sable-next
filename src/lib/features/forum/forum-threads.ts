@@ -6,6 +6,10 @@ export interface ForumThread {
   sender: string | null;
   senderName: string | null;
   senderAvatar: string | null;
+  isOwn: boolean;
+  editable: boolean;
+  html: string | null;
+  mediaCaption: boolean;
   createdAt: number;
   preview: string;
   replyCount: number;
@@ -31,6 +35,10 @@ const POST_KINDS = new Set<TimelineItemContentView['kind']>([
 
 function bodyOf(content: TimelineItemContentView): string {
   return 'body' in content ? content.body : '';
+}
+
+function htmlOf(content: TimelineItemContentView): string | null {
+  return content.kind === 'message' ? content.html : null;
 }
 
 function isPost(item: TimelineItemView): boolean {
@@ -74,6 +82,10 @@ export function collectForumThreads(
       sender: root.sender,
       senderName: root.sender_name,
       senderAvatar: root.sender_avatar,
+      isOwn: root.is_own,
+      editable: root.is_own && (root.content.kind === 'message' || root.content.kind === 'image'),
+      html: htmlOf(root.content),
+      mediaCaption: root.content.kind === 'image',
       createdAt: root.timestamp,
       preview: bodyOf(root.content),
       replyCount: root.thread_summary?.num_replies ?? 0,

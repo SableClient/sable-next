@@ -1,6 +1,16 @@
 <script lang="ts">
+  import IconContext from 'phosphor-svelte/lib/IconContext';
+  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
+  import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+
+  import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import type { ForumThread } from './forum-threads';
@@ -8,9 +18,13 @@
   interface Props {
     thread: ForumThread;
     onOpen: (eventId: string) => void;
+    canDelete: boolean;
+    onEdit: (thread: ForumThread) => void;
+    onDelete: (eventId: string, reason: string | null) => void;
   }
 
-  let { thread, onOpen }: Props = $props();
+  let { thread, onOpen, canDelete, onEdit, onDelete }: Props = $props();
+  let deleteOpen = $state(false);
 
   let displayName = $derived(thread.senderName ?? thread.sender ?? '');
   let replyLabel = $derived(
@@ -26,39 +40,77 @@
 </script>
 
 <li class="forum-thread-item">
-  <button
-    type="button"
-    class="forum-thread-button"
-    aria-label={accessibleLabel}
-    onclick={() => onOpen(thread.eventId)}
-  >
-    <Avatar
-      class="forum-thread-avatar"
-      id={thread.sender}
-      src={thread.senderAvatar}
-      name={displayName}
-      size="medium"
-    />
-    <span class="forum-thread-body">
-      <span class="forum-thread-top">
-        <span class="forum-thread-sender">{displayName}</span>
-        <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
+  <div class="forum-thread-card">
+    <button
+      type="button"
+      class="forum-thread-button"
+      aria-label={accessibleLabel}
+      onclick={() => onOpen(thread.eventId)}
+    >
+      <Avatar
+        class="forum-thread-avatar"
+        id={thread.sender}
+        src={thread.senderAvatar}
+        name={displayName}
+        size="medium"
+      />
+      <span class="forum-thread-body">
+        <span class="forum-thread-top">
+          <span class="forum-thread-sender">{displayName}</span>
+          <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
+        </span>
+        <span class="forum-thread-preview">{thread.preview}</span>
+        <span class="forum-thread-meta">
+          <span class="forum-thread-replies">{replyLabel}</span>
+          {#if thread.lastBody}
+            <span class="forum-thread-last">
+              {thread.lastSenderName ?? displayName}: {thread.lastBody}
+            </span>
+          {/if}
+        </span>
       </span>
-      <span class="forum-thread-preview">{thread.preview}</span>
-      <span class="forum-thread-meta">
-        <span class="forum-thread-replies">{replyLabel}</span>
-        {#if thread.lastBody}
-          <span class="forum-thread-last">
-            {thread.lastSenderName ?? displayName}: {thread.lastBody}
-          </span>
-        {/if}
-      </span>
-    </span>
-    {#if thread.unread}
-      <span class="forum-thread-unread-dot" aria-hidden="true"></span>
+      {#if thread.unread}
+        <span class="forum-thread-unread-dot" aria-hidden="true"></span>
+      {/if}
+    </button>
+    {#if thread.editable || canDelete}
+      <ActionMenu label={$i18n.t('timeline.moreActions')}>
+        {#snippet trigger({ props })}
+          <IconButton
+            {...props}
+            class="forum-thread-actions"
+            size="small"
+            variant="ghost"
+            label={$i18n.t('timeline.moreActions')}
+          >
+            <DotsThreeIcon />
+          </IconButton>
+        {/snippet}
+        <IconContext values={{ 'aria-hidden': 'true' }}>
+          {#if thread.editable}
+            <ActionMenuItem onSelect={() => onEdit(thread)}>
+              <EditIcon />
+              <span>{$i18n.t('timeline.editMessage')}</span>
+            </ActionMenuItem>
+          {/if}
+          {#if canDelete}
+            {#if thread.editable}<ActionMenuSeparator />{/if}
+            <ActionMenuItem destructive onSelect={() => (deleteOpen = true)}>
+              <TrashIcon />
+              <span>{$i18n.t('timeline.deleteMessage')}</span>
+            </ActionMenuItem>
+          {/if}
+        </IconContext>
+      </ActionMenu>
     {/if}
-  </button>
+  </div>
 </li>
+
+<DeleteMessageDialog
+  bind:open={deleteOpen}
+  preview={thread.preview}
+  onConfirm={(reason) => onDelete(thread.eventId, reason)}
+/>
 
 <style>
   .forum-thread-item {
@@ -80,9 +132,31 @@
     width: 100%;
   }
 
+  .forum-thread-card {
+    align-items: center;
+    background: var(--surface-var-container);
+    border-radius: var(--radii-400);
+    display: flex;
+  }
+
+  .forum-thread-card:has(.forum-thread-button:hover),
+  .forum-thread-card:has(.forum-thread-button:focus-visible) {
+    background: var(--surface-container-hover);
+  }
+
+  :global(.forum-thread-actions) {
+    flex: 0 0 auto;
+    margin-inline-end: var(--space-200);
+  }
+
   @media (hover: hover) and (pointer: fine) {
-    .forum-thread-button:hover {
-      background: var(--surface-container-hover);
+    :global(.forum-thread-actions) {
+      opacity: 0;
+    }
+
+    .forum-thread-card:hover :global(.forum-thread-actions),
+    :global(.forum-thread-actions:focus-visible) {
+      opacity: 1;
     }
   }
 

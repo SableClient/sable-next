@@ -118,6 +118,20 @@
     threadRootId = eventId;
   }
 
+  function editThread(thread: (typeof forumThreads.threads)[number]): void {
+    conversation.edit(thread.eventId, thread.preview, thread.html, thread.mediaCaption);
+  }
+
+  function deleteThread(eventId: string, reason: string | null): void {
+    conversation.redact(eventId, reason);
+  }
+
+  function canDeleteThread(thread: (typeof forumThreads.threads)[number]): boolean {
+    return thread.isOwn
+      ? (permissions?.can_redact_own ?? true)
+      : (permissions?.can_redact_others ?? false);
+  }
+
   function closeThread(): void {
     threadRootId = null;
   }
@@ -195,6 +209,9 @@
         loading={forumThreads.loading || forumThreads.backwardPagination === 'loading'}
         canLoadMore={forumThreads.backwardPagination === 'idle'}
         onOpen={openThread}
+        canDelete={canDeleteThread}
+        onEdit={editThread}
+        onDelete={deleteThread}
         onLoadMore={loadMoreThreads}
       />
     </div>

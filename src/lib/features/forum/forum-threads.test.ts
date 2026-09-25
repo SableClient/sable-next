@@ -158,3 +158,28 @@ test('a thread you authored yourself is never unread', () => {
 
   expect(collectForumThreads([root], '@alice:example.org')[0]?.unread).toBe(false);
 });
+
+test('keeps the root details needed for its own forum actions', () => {
+  const root = item({
+    id: 'root',
+    is_own: true,
+    content: {
+      kind: 'message',
+      body: 'Original',
+      html: '<strong>Original</strong>',
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+  });
+
+  const thread = collectForumThreads([root], '@alice:example.org')[0];
+
+  expect(thread).toMatchObject({
+    eventId: '$root',
+    isOwn: true,
+    editable: true,
+    html: '<strong>Original</strong>',
+    mediaCaption: false,
+  });
+});

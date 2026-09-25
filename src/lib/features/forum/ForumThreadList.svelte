@@ -11,10 +11,14 @@
     loading: boolean;
     canLoadMore: boolean;
     onOpen: (eventId: string) => void;
+    canDelete: (thread: ForumThread) => boolean;
+    onEdit: (thread: ForumThread) => void;
+    onDelete: (eventId: string, reason: string | null) => void;
     onLoadMore: () => void;
   }
 
-  let { threads, loading, canLoadMore, onOpen, onLoadMore }: Props = $props();
+  let { threads, loading, canLoadMore, onOpen, canDelete, onEdit, onDelete, onLoadMore }: Props =
+    $props();
 </script>
 
 <div class="forum-thread-list">
@@ -23,7 +27,7 @@
   {:else if threads.length > 0}
     <ul aria-label={$i18n.t('forum.threads')}>
       {#each threads as thread (thread.id)}
-        <ForumThreadItem {thread} {onOpen} />
+        <ForumThreadItem {thread} {onOpen} canDelete={canDelete(thread)} {onEdit} {onDelete} />
       {/each}
     </ul>
   {/if}
