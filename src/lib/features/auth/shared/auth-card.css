@@ -92,6 +92,12 @@ html[data-reduced-motion='on'] .auth-page .auth-card-surface > * {
   position: absolute;
 }
 
+@media (pointer: coarse) {
+  .auth-page .auth-link-button::after {
+    inset: calc(var(--space-300) * -1);
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .auth-page .auth-link-button {
     transition:

@@ -113,14 +113,10 @@
       value={displayName}
       autocomplete="nickname"
       maxlength={255}
-      aria-describedby="profile-address"
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onDisplayName(event.currentTarget.value);
       }}
     />
-    <p id="profile-address" class="field-hint">
-      {$i18n.t('setup.profileAddress', { address: userId })}
-    </p>
   </FormField>
 
   <FormField dense fieldId="profile-pronouns" label={$i18n.t('settings.pronouns')}>
@@ -205,13 +201,6 @@
 <style>
   .profile-card {
     min-width: 0;
-  }
-
-  .field-hint {
-    color: var(--sec-main);
-    font-size: var(--font-size-small);
-    margin: 0;
-    overflow-wrap: anywhere;
   }
 
   .avatar-picker {
@@ -302,7 +291,7 @@
     cursor: pointer;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
-    padding-block: var(--space-200);
+    padding-block: var(--space-300);
   }
 
   .more-list {
