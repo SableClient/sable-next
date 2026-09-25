@@ -14,7 +14,8 @@ use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::message::VideoInfo;
 use matrix_sdk::ruma::events::room::message::{
-    AudioMessageEventContent, GalleryItemType, MessageType, UnstableAmplitude,
+    AudioMessageEventContent, GalleryItemType, GalleryMessageEventContent, MessageType,
+    UnstableAmplitude,
 };
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
@@ -1274,6 +1275,20 @@ fn gallery_item(
     })
 }
 
+pub(crate) fn gallery_filenames(gallery: &GalleryMessageEventContent) -> Vec<&str> {
+    gallery
+        .itemtypes
+        .iter()
+        .filter_map(|item| match item {
+            GalleryItemType::Image(image) => Some(image.filename()),
+            GalleryItemType::Video(video) => Some(video.filename()),
+            GalleryItemType::Audio(audio) => Some(audio.filename()),
+            GalleryItemType::File(file) => Some(file.filename()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn audio_duration_ms(audio: &AudioMessageEventContent) -> Option<u64> {
     audio
         .audio
@@ -1795,18 +1810,9 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
 fn body_of(content: &TimelineItemContent) -> Option<String> {
     match &msg_like(content)?.kind {
         MsgLikeKind::Message(message) => Some(match message.msgtype() {
-            MessageType::Gallery(gallery) if gallery.body.is_empty() => gallery
-                .itemtypes
-                .iter()
-                .filter_map(|item| match item {
-                    GalleryItemType::Image(image) => Some(image.filename()),
-                    GalleryItemType::Video(video) => Some(video.filename()),
-                    GalleryItemType::Audio(audio) => Some(audio.filename()),
-                    GalleryItemType::File(file) => Some(file.filename()),
-                    _ => None,
-                })
-                .collect::<Vec<_>>()
-                .join(", "),
+            MessageType::Gallery(gallery) if gallery.body.is_empty() => {
+                gallery_filenames(gallery).join(", ")
+            }
             _ => preview_body(message.body(), formatted_body(message.msgtype()).as_deref()),
         }),
         MsgLikeKind::Sticker(sticker) => Some(sticker.content().body.clone()),

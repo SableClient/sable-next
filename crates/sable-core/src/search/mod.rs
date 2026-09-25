@@ -798,6 +798,18 @@ fn indexable_body(body: &str) -> String {
     remove_plain_reply_fallback(body).to_owned()
 }
 
+fn message_text(msgtype: &MessageType) -> String {
+    let body = indexable_body(msgtype.body());
+    let MessageType::Gallery(gallery) = msgtype else {
+        return body;
+    };
+    std::iter::once(body.as_str())
+        .chain(crate::view::gallery_filenames(gallery))
+        .filter(|text| !text.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 const fn replacement_of(
     message: &OriginalSyncRoomMessageEvent,
 ) -> Option<&Replacement<RoomMessageEventContentWithoutRelation>> {
@@ -808,7 +820,7 @@ const fn replacement_of(
 }
 
 fn document_of(message: &OriginalSyncRoomMessageEvent) -> Document {
-    let body = indexable_body(message.content.body());
+    let body = message_text(&message.content.msgtype);
     Document {
         event_id: message.event_id.clone(),
         has_link: contains_link(&body),
@@ -849,7 +861,7 @@ fn with_edit(
     }
 
     let content = &replacement.new_content;
-    document.body = indexable_body(content.msgtype.body());
+    document.body = message_text(&content.msgtype);
     document.has_link = contains_link(&document.body);
     document.attachments = attachments_of(&content.msgtype);
     document.mentions = mentioned_users(content.mentions.as_ref());
@@ -3263,6 +3275,20 @@ mod tests {
         assert_eq!(files[0]["gallery_index"], 1);
         assert_eq!(files[0]["content"]["filename"], "notes.pdf");
         assert_eq!(files[0]["content"]["size"], 4096);
+
+        let filter = super::SearchFilter {
+            rooms: vec![room_id.clone()],
+            ..super::SearchFilter::default()
+        };
+        let hits = core
+            .search_messages("notes", &filter, super::SearchOrder::Rank, 10, 0)
+            .await;
+        assert_eq!(
+            hits.iter()
+                .map(|hit| hit.event_id.as_str())
+                .collect::<Vec<_>>(),
+            ["$gallery"]
+        );
 
         drop(room);
     }
