@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+
   import type { EncryptionStatusView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { DeviceVerification } from '#lib/core/device-verification.svelte.js';
@@ -22,7 +24,7 @@
   let { onComplete, onSkip }: Props = $props();
   const core = useCoreClient();
   let status = $state<EncryptionStatusView | null>(null);
-  let loading = $state(true);
+  let prompted = $state(false);
   let recovered = $state(false);
   let resettingIdentity = $state(false);
   const verification = new DeviceVerification(core);
@@ -30,14 +32,11 @@
   let passphrase = $derived(status?.recovery_passphrase ?? false);
 
   async function refresh(): Promise<void> {
-    loading = true;
     verification.error = null;
     try {
       status = await core.commands.encryptionStatus();
     } catch (cause) {
       verification.error = verificationErrorMessage(cause);
-    } finally {
-      loading = false;
     }
   }
 
@@ -58,6 +57,12 @@
       if (event.type === 'encryption_status') status = event.status;
     });
   });
+
+  $effect(() => {
+    if (!status || status.verification === 'unknown') return;
+    if (status.verification === 'verified' && !untrack(() => prompted)) onComplete();
+    else prompted = true;
+  });
 </script>
 
 <form
@@ -68,7 +73,12 @@
     void verify();
   }}
 >
-  {#if verified}
+  {#if !prompted}
+    <AuthField labelId="device-verification-title" label={$i18n.t('auth.verifyDevice')}>
+      <AuthInfoBox><Spinner small />{$i18n.t('settings.loadingEncryption')}</AuthInfoBox>
+    </AuthField>
+    <AuthStatusSlot message={verification.error} />
+  {:else if verified}
     <AuthField labelId="device-verification-title" label={$i18n.t('auth.deviceVerified')}>
       <AuthInfoBox>{$i18n.t('auth.deviceVerifiedDescription')}</AuthInfoBox>
     </AuthField>
@@ -79,12 +89,9 @@
   {:else}
     <AuthField labelId="device-verification-title" label={$i18n.t('auth.verifyDevice')}>
       <AuthInfoBox>
-        {#if loading}<Spinner small />{/if}
-        {loading
-          ? $i18n.t('settings.loadingEncryption')
-          : $i18n.t(
-              passphrase ? 'auth.verifyDeviceDescriptionPassphrase' : 'auth.verifyDeviceDescription'
-            )}
+        {$i18n.t(
+          passphrase ? 'auth.verifyDeviceDescriptionPassphrase' : 'auth.verifyDeviceDescription'
+        )}
       </AuthInfoBox>
     </AuthField>
 
@@ -118,7 +125,6 @@
       variant="primary"
       block
       loading={verification.requesting || verification.recovering}
-      disabled={loading || !status}
     >
       {$i18n.t('settings.verify')}
     </Button>
@@ -127,11 +133,12 @@
 
 {#if !verified}
   <AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} />
-  <AuthSecondaryAction
-    label={$i18n.t('settings.resetIdentityLost')}
-    onclick={() => (resettingIdentity = true)}
-    disabled={loading || !status}
-  />
+  {#if prompted}
+    <AuthSecondaryAction
+      label={$i18n.t('settings.resetIdentityLost')}
+      onclick={() => (resettingIdentity = true)}
+    />
+  {/if}
 {/if}
 
 <ResetIdentityDialog
