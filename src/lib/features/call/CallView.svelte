@@ -742,6 +742,7 @@
 
   .indicator.off {
     background: var(--crit-container);
+    box-shadow: inset 0 0 0 var(--border-width) var(--crit-main);
     color: var(--crit-on-container);
   }
 

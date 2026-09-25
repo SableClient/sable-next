@@ -100,7 +100,7 @@
     data-tone={grouped && menu ? tone : undefined}
     {@attach longPress({ enabled: () => onHold !== undefined, onPress: () => onHold?.() })}
   >
-    <Tooltip label={tip}>
+    <Tooltip label={tip} side={compact ? 'right' : 'top'}>
       {#snippet trigger({ props })}{@render button(props)}{/snippet}
     </Tooltip>
     {#if grouped && menu}<span class="divider" aria-hidden="true"></span>{/if}
@@ -356,6 +356,7 @@
     --ghost-hover: var(--crit-container-hover);
     --ghost-active: var(--crit-container-active);
 
+    border-color: var(--crit-main);
     color: var(--crit-on-container);
   }
 
@@ -390,6 +391,12 @@
     --button-container-active: var(--crit-main-active);
     --button-line: var(--crit-main-line);
     --button-on-container: var(--crit-on-main);
+
+    min-width: var(--button-height);
+  }
+
+  .controls :global(.btn-danger:not(.hang-up)) {
+    box-shadow: inset 0 0 0 var(--border-width) var(--crit-main);
   }
 
   .controls:not(.compact) .action {
@@ -420,9 +427,5 @@
   .controls.compact {
     gap: var(--space-100);
     justify-content: flex-start;
-  }
-
-  .controls.compact .control:last-child {
-    margin-inline-start: auto;
   }
 </style>

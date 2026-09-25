@@ -149,22 +149,45 @@
     justify-content: center;
   }
 
+  .call-bar:not(.collapsed) :global(.control:last-child) {
+    margin-inline-start: auto;
+  }
+
   .collapsed :global(.controls) {
     display: grid;
-    gap: var(--space-100);
-    grid-template-columns: repeat(2, var(--control-height-300));
+    gap: var(--space-200);
+    grid-template-columns: repeat(2, var(--avatar-size-400));
     justify-content: center;
   }
 
+  .collapsed :global(.controls .btn) {
+    --button-height: var(--avatar-size-400);
+    --button-icon-size: var(--size-x400);
+
+    border-radius: var(--radius);
+  }
+
+  .collapsed :global(.controls .btn-ghost) {
+    --button-line: var(--bg-container-line);
+  }
+
   .collapsed :global(.control:last-child) {
-    margin-inline-start: 0;
-  }
-
-  .collapsed :global(.control:last-child:nth-child(odd)) {
+    border-top: var(--border-width) solid var(--bg-container-line);
     grid-column: 1 / -1;
+    padding-top: var(--space-200);
   }
 
-  .collapsed :global(.control:last-child:nth-child(odd) .hang-up) {
+  .collapsed :global(.hang-up) {
     width: 100%;
+  }
+
+  .call-bar:not(.live, .reconnecting) .call-room :global(svg) {
+    animation: call-pending calc(var(--duration-slow) * 4) var(--motion-easing-standard) infinite;
+  }
+
+  @keyframes call-pending {
+    50% {
+      opacity: 0.4;
+    }
   }
 </style>
