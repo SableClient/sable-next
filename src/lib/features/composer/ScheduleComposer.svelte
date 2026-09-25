@@ -63,7 +63,9 @@
 >
   <div class="schedule">
     <h2>{$i18n.t('composer.scheduleTitle')}</h2>
-    <p class="explain">{$i18n.t('composer.scheduleExplain')}</p>
+    {#if encrypted !== true}
+      <p class="explain">{$i18n.t('composer.scheduleExplain')}</p>
+    {/if}
 
     {#if empty}
       <Alert variant="warning">{$i18n.t('composer.scheduleEmpty')}</Alert>
