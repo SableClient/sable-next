@@ -1208,7 +1208,16 @@
     "resetApprove": "Your account provider has to approve the reset. Approve it there, then come back.",
     "resetOpenApproval": "Open account provider",
     "resetWaiting": "Waiting for approval…",
-    "back": "Back"
+    "back": "Back",
+    "recoverySaveDescription": "Write down this recovery key somewhere safe, like a password manager, an encrypted note or a physical safe. You'll need it to read your messages on a new device, and it won't be shown again.",
+    "recoveryCopy": "Copy",
+    "recoveryCopied": "Copied",
+    "recoveryDownload": "Download",
+    "recoveryDownloaded": "Downloaded",
+    "recoveryWrittenDown": "I've written it down",
+    "recoverySaveFirst": "Copy, download or write down the key to continue.",
+    "recoveryCopyFailed": "The key couldn't be copied. Download it or write it down instead.",
+    "recoveryDownloadFailed": "The key couldn't be saved. Copy it or write it down instead."
   },
   "footer": {
     "sourceCode": "Source code",
