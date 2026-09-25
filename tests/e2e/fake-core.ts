@@ -28,7 +28,8 @@ export type RoomCoreMode =
   | 'delayed_layout_diff'
   | 'spaces'
   | 'tombstoned'
-  | 'voice';
+  | 'voice'
+  | 'unverified';
 
 type WorkerMode = RoomCoreMode;
 
@@ -1067,7 +1068,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'sign_out_safety',
         safety: {
           encryption: {
-            verification: 'verified',
+            verification: workerMode === 'unverified' ? 'unverified' : 'verified',
             recovery: 'enabled',
             cross_signing_ready: true,
             recovery_passphrase: false,

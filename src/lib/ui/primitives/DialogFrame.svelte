@@ -38,8 +38,11 @@
     onConfirm?.();
   }
 
-  function keepOpenOnTitleBar(event: PointerEvent): void {
-    if (event.target instanceof Element && event.target.closest('.titlebar'))
+  function keepOpenOnProtectedInteraction(event: PointerEvent): void {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('.titlebar, .dialog-content[data-state="open"]')
+    )
       event.preventDefault();
   }
 
@@ -61,7 +64,7 @@
       style={contentStyle}
       aria-label={label}
       {onOpenAutoFocus}
-      onInteractOutside={keepOpenOnTitleBar}
+      onInteractOutside={keepOpenOnProtectedInteraction}
     >
       {#if onConfirm}
         <form class="dialog-form" onsubmit={submit}>{@render children()}</form>
