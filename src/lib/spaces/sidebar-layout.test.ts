@@ -4,12 +4,15 @@ import {
   applyDrop,
   sameLayout,
   folderName,
+  layoutSpaceIds,
   mergeSpaces,
   orderedKnownSpaceIds,
   rememberSpaceIds,
   removeFromFolder,
   renameFolder,
   ungroupFolder,
+  withSpace,
+  withoutSpace,
   type SidebarItem,
 } from './sidebar-layout.js';
 
@@ -237,6 +240,26 @@ describe('removeFromFolder', () => {
     const items = [space('!a'), folder('f', ['!b']), space('!c')];
 
     expect(removeFromFolder(items, '!b', 'f')).toEqual([space('!a'), space('!b'), space('!c')]);
+  });
+});
+
+describe('pinning a space', () => {
+  it('lists every space the layout places, folders included', () => {
+    expect(layoutSpaceIds([space('!a'), folder('f', ['!b', '!c'])])).toEqual(['!a', '!b', '!c']);
+  });
+
+  it('appends a pinned space once', () => {
+    const items = [space('!a'), folder('f', ['!b'])];
+
+    expect(withSpace(items, '!c')).toEqual([...items, space('!c')]);
+    expect(withSpace(items, '!b')).toEqual(items);
+  });
+
+  it('unpins a space wherever it sits and drops a folder it emptied', () => {
+    const items = [space('!a'), folder('f', ['!b']), folder('g', ['!b', '!c'])];
+
+    expect(withoutSpace(items, '!b')).toEqual([space('!a'), folder('g', ['!c'])]);
+    expect(withoutSpace(items, '!a')).toEqual(items.slice(1));
   });
 });
 

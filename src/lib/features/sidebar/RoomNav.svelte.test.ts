@@ -155,7 +155,19 @@ test.each([
   ['room', false],
   ['space', true],
 ])('enables Invite in a %s context menu when the user can invite', async (_, isSpace) => {
-  const target = makeRoom({ room_id: '!plain:example.org', name: 'Plain', is_space: isSpace });
+  const leaf = {
+    room_id: '!leaf:example.org',
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+  };
+  const target = makeRoom({
+    room_id: '!plain:example.org',
+    name: 'Plain',
+    is_space: isSpace,
+    space_children: isSpace ? [leaf] : [],
+  });
   roomsFixture.rooms = isSpace
     ? [
         makeRoom({
@@ -173,6 +185,7 @@ test.each([
           ],
         }),
         target,
+        makeRoom({ room_id: leaf.room_id, name: 'Leaf' }),
       ]
     : [target];
   if (isSpace) {
@@ -218,7 +231,21 @@ test('a subspace context menu opens its lobby', async () => {
         },
       ],
     }),
-    makeRoom({ room_id: '!nested:example.org', name: 'Nested', is_space: true }),
+    makeRoom({
+      room_id: '!nested:example.org',
+      name: 'Nested',
+      is_space: true,
+      space_children: [
+        {
+          room_id: '!leaf:example.org',
+          via: [],
+          order: null,
+          origin_server_ts: 1,
+          suggested: false,
+        },
+      ],
+    }),
+    makeRoom({ room_id: '!leaf:example.org', name: 'Leaf' }),
   ];
   const onNavigate = vi.fn();
   const instance = await mountNav({ onNavigate });
@@ -237,6 +264,62 @@ test('a subspace context menu opens its lobby', async () => {
   lobby.click();
 
   expect(onNavigate).toHaveBeenCalledWith('/space/!nested%3Aexample.org/lobby');
+  await unmount(instance);
+});
+
+test('nests subspaces with thread lines and links past the depth limit to the lobby', async () => {
+  pageState.url.pathname = '/space/!root%3Aexample.org';
+  pageState.params = { spaceId: '!root:example.org' };
+  const edge = (roomId: string) => ({
+    room_id: roomId,
+    via: [],
+    order: null,
+    origin_server_ts: 1,
+    suggested: false,
+  });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!root:example.org',
+      name: 'Root',
+      is_space: true,
+      space_children: [edge('!one:example.org')],
+    }),
+    makeRoom({
+      room_id: '!one:example.org',
+      name: 'One',
+      is_space: true,
+      space_children: [edge('!two:example.org')],
+    }),
+    makeRoom({
+      room_id: '!two:example.org',
+      name: 'Two',
+      is_space: true,
+      space_children: [edge('!deep:example.org'), edge('!three:example.org')],
+    }),
+    makeRoom({
+      room_id: '!three:example.org',
+      name: 'Three',
+      is_space: true,
+      space_children: [edge('!deepest:example.org')],
+    }),
+    makeRoom({ room_id: '!deep:example.org', name: 'Deep' }),
+    makeRoom({ room_id: '!deepest:example.org', name: 'Deepest' }),
+  ];
+
+  const instance = await mountNav();
+  const deep = Array.from(document.querySelectorAll<HTMLElement>('.room-row')).find((row) =>
+    row.textContent.includes('Deep')
+  );
+  expect(deep?.style.getPropertyValue('--room-depth')).toBe('1');
+  expect(deep?.parentElement?.querySelectorAll('.thread-line, .thread-elbow')).toHaveLength(2);
+
+  const link = document.querySelector<HTMLAnchorElement>('.room-link');
+  expect(link?.textContent).toContain('Three');
+  expect(link?.getAttribute('href')).toBe('/space/!three%3Aexample.org/lobby');
+  expect(link?.parentElement?.querySelectorAll('.thread-line')).toHaveLength(0);
+  expect(link?.parentElement?.querySelectorAll('.thread-elbow')).toHaveLength(1);
+  expect(roomNames()).not.toContain('Deepest');
+
   await unmount(instance);
 });
 

@@ -11,6 +11,18 @@ export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
+export type SubspaceDepth = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
+export const SUBSPACE_DEPTHS = [
+  '2',
+  '3',
+  '4',
+  '5',
+  '6',
+  '7',
+  '8',
+  '9',
+  '10',
+] as const satisfies readonly SubspaceDepth[];
 export type PixelatedImages = 'always' | 'smart' | 'never';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
@@ -46,6 +58,7 @@ export interface Preferences {
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   roomBannerHeight: number;
+  subspaceHierarchyLimit: SubspaceDepth;
   showSearch: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
@@ -195,6 +208,7 @@ const ENUMS = {
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
+  subspaceHierarchyLimit: SUBSPACE_DEPTHS,
   pixelatedImages: ['always', 'smart', 'never'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],
@@ -250,6 +264,7 @@ const DEFAULTS: Preferences = {
   showRoomIcon: 'always',
   showRoomBanners: true,
   roomBannerHeight: 190,
+  subspaceHierarchyLimit: '3',
   showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,

@@ -59,6 +59,26 @@ export function mergeSpaces(
   return merged;
 }
 
+export function layoutSpaceIds(items: readonly SidebarItem[]): string[] {
+  return items.flatMap((item) => (item.kind === 'space' ? [item.room_id] : item.content));
+}
+
+export function withSpace(items: readonly SidebarItem[], roomId: string): SidebarItem[] {
+  if (layoutSpaceIds(items).includes(roomId)) return [...items];
+
+  return [...items, { kind: 'space', room_id: roomId }];
+}
+
+export function withoutSpace(items: readonly SidebarItem[], roomId: string): SidebarItem[] {
+  return items.flatMap((item): SidebarItem[] => {
+    if (item.kind === 'space') return item.room_id === roomId ? [] : [item];
+
+    const content = item.content.filter((id) => id !== roomId);
+
+    return content.length === 0 ? [] : [{ ...item, content }];
+  });
+}
+
 export function rememberSpaceIds(
   knownSpaceIds: readonly string[],
   currentSpaceIds: readonly string[]

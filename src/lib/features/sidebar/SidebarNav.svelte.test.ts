@@ -45,8 +45,11 @@ vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useRoomList: () => fixture.roomList,
 }));
+const sidebarFixture = vi.hoisted(() => ({
+  items: [] as { kind: 'space'; room_id: string }[],
+}));
 vi.mock('#lib/spaces/sidebar-layout.svelte.js', () => ({
-  useSpaceSidebar: () => ({ items: [], openFolders: new Set() }),
+  useSpaceSidebar: () => ({ items: sidebarFixture.items, openFolders: new Set() }),
 }));
 vi.mock('#lib/features/call/call-session.svelte.js', () => ({
   useCallSession: () => ({ active: false, roomId: null }),
@@ -68,6 +71,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 afterEach(() => {
   document.body.replaceChildren();
   localStorage.clear();
+  sidebarFixture.items = [];
 });
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
@@ -200,6 +204,45 @@ test('keeps the rail order when a room-list reset reorders spaces', async () => 
     await tick();
 
     expect(railOrder()).toEqual(['Alpha', 'Beta']);
+  } finally {
+    await unmount(instance);
+    roomList.stop();
+    fixture.roomList = null;
+  }
+});
+
+test('a subspace pinned in the stored layout joins the rail beside its parent', async () => {
+  const child = space('!child:example.org', 'Child');
+  const parent = {
+    ...space('!parent:example.org', 'Parent'),
+    space_children: [
+      { room_id: child.room_id, via: [], order: null, origin_server_ts: 1, suggested: false },
+    ],
+  };
+  const core = {
+    subscribeEvents: () => () => {},
+    commands: {
+      subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [parent, child] }),
+      roomNotificationModes: () => Promise.resolve([]),
+      unsubscribe: () => Promise.resolve(),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  await roomList.start();
+  const railOrder = () =>
+    [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
+
+  let instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+  try {
+    await tick();
+    expect(railOrder()).toEqual(['Parent']);
+    await unmount(instance);
+
+    sidebarFixture.items = [{ kind: 'space', room_id: child.room_id }];
+    instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
+    await tick();
+    expect(railOrder()).toEqual(['Child', 'Parent']);
   } finally {
     await unmount(instance);
     roomList.stop();

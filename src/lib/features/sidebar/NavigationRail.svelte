@@ -90,6 +90,8 @@
     onRemoveFromFolder?: (roomId: string, folderId: string) => void;
     onReorder?: (source: LayoutRef, target: LayoutRef, instruction: DropInstruction) => void;
     onMarkSectionRead?: (section: RailSection) => void;
+    pinnedSpaceIds?: ReadonlySet<string>;
+    onUnpin?: (roomId: string) => void;
   }
 
   let {
@@ -111,6 +113,8 @@
     onRemoveFromFolder,
     onReorder,
     onMarkSectionRead,
+    pinnedSpaceIds = new Set(),
+    onUnpin,
   }: Props = $props();
   const directRoot = resolve('direct');
   let spacePaths = $state(savedSpacePaths());
@@ -878,6 +882,11 @@
     onMoveDown={mobile && contextIndex !== -1 && contextIndex < entries.length - 1
       ? () => {
           moveContextSpace('down');
+        }
+      : undefined}
+    onUnpin={onUnpin && pinnedSpaceIds.has(contextSpace.room_id)
+      ? () => {
+          if (contextSpace) onUnpin(contextSpace.room_id);
         }
       : undefined}
   />

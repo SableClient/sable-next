@@ -51,6 +51,7 @@ import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TextAlignLeftIcon from 'phosphor-svelte/lib/TextAlignLeftIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
+import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
@@ -66,7 +67,7 @@ import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
-import { setPreference } from './preferences.svelte';
+import { setPreference, SUBSPACE_DEPTHS } from './preferences.svelte';
 import type { FreeTextPreference, Preferences, RangePreference } from './preferences.svelte';
 
 export type BooleanPreference = {
@@ -474,6 +475,15 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.showRoomBanners',
         description: 'settings.showRoomBannersHint',
         type: 'boolean',
+      },
+      {
+        key: 'subspaceHierarchyLimit',
+        section: 'sidebar',
+        icon: TreeStructureIcon,
+        name: 'settings.subspaceHierarchyLimit',
+        description: 'settings.subspaceHierarchyLimitHint',
+        type: 'select',
+        options: SUBSPACE_DEPTHS.map((depth) => ({ value: depth, label: depth, literal: true })),
       },
       {
         key: 'showSearch',

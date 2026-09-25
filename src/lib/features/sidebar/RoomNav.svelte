@@ -36,6 +36,7 @@
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
+  import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -80,6 +81,14 @@
   import { claimedRoomIds, markRoomsRead } from './nav-rooms.js';
   import { publishVisibleRoomOrder } from './visible-rooms.svelte.js';
   import { navSectionKind, navSectionLabels, type NavSectionKind } from './nav-section.js';
+  import {
+    flattenSpaceTree,
+    spaceTree as buildSpaceTree,
+    type SpaceTreeNode,
+    type SpaceTreeRoom,
+    type SpaceTreeSpace,
+    type Thread,
+  } from './space-tree.js';
 
   const MAX_VOICE_FACES = 3;
   let contextRoom = $state<RoomSummary | null>(null);
@@ -230,17 +239,10 @@
     depth: number;
     kind: 'room';
     key: string;
+    threads?: Thread[];
   };
 
-  type RoomNavCategory = {
-    children: RoomNavItem[];
-    depth: number;
-    kind: 'category';
-    key: string;
-    room: RoomSummary;
-  };
-
-  type RoomNavItem = RoomNavCategory | RoomNavRow;
+  type RoomNavItem = SpaceTreeSpace | RoomNavRow;
 
   const closedCategories = new SvelteSet<string>();
   const roomListId = $props.id();
@@ -267,7 +269,7 @@
     return space?.name ?? $i18n.t(labels.title);
   });
   let TitleIcon = $derived(SECTION_ICONS[section]);
-  let spaceTree = $derived.by<RoomNavItem[]>(() => {
+  let spaceTree = $derived.by<SpaceTreeNode[]>(() => {
     if (!page.url.pathname.startsWith('/space')) return [];
 
     const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
@@ -278,7 +280,7 @@
         .filter((room) => room.state === 'joined' && !room.is_tombstoned)
         .map((room) => [room.room_id, room])
     );
-    return spaceItems(space, roomsById, [space.room_id], space.room_id);
+    return buildSpaceTree(space, roomsById, Number(preferences.subspaceHierarchyLimit));
   });
   let spaceRootItems = $derived(withoutFavourites(spaceTree));
   let listedRooms = $derived.by<RoomNavRow[]>(() => {
@@ -290,7 +292,7 @@
     }
 
     if (page.url.pathname.startsWith('/space')) {
-      return spaceTree.filter(isRoom);
+      return spaceTree.filter((item): item is SpaceTreeRoom => item.kind === 'room');
     }
 
     const claimedByJoinedSpace = unspacedSection
@@ -348,8 +350,13 @@
   $effect(() => {
     publishVisibleRoomOrder(sectionRooms.map((row) => row.roomId));
   });
-  let subspaces = $derived(spaceRootItems.filter((item) => item.kind === 'category'));
-  let visibleSubspaces = $derived<RoomNavItem[]>(visibleItems(subspaces));
+  let subspaces = $derived(spaceRootItems.filter((item) => item.kind !== 'room'));
+  let visibleSubspaces = $derived<RoomNavItem[]>(
+    flattenSpaceTree(subspaces, {
+      closed: (key) => closedCategories.has(key),
+      keep: stillShownRow,
+    })
+  );
   let visibleFavourites = $derived(favouritesClosed ? stillShown(favourites) : favourites);
   let visibleRooms = $derived<RoomNavItem[]>([
     ...(roomsClosed ? stillShown(rooms) : rooms),
@@ -357,26 +364,30 @@
   ]);
 
   function stillShown(rows: RoomNavRow[]): RoomNavRow[] {
-    return rows.filter((item) => {
-      const room = item.room;
-      if (room === undefined) return false;
-      if (page.url.pathname === roomHref(item)) return true;
-      return hasUnread(roomList.unreadFor(room));
-    });
+    return rows.filter(stillShownRow);
+  }
+
+  function stillShownRow(item: RoomNavRow): boolean {
+    const room = item.room;
+    if (room === undefined) return false;
+    if (page.url.pathname === roomHref(item)) return true;
+    return hasUnread(roomList.unreadFor(room));
   }
 
   function isFavourite(row: RoomNavRow): boolean {
     return row.room?.tags.includes('favourite') ?? false;
   }
 
-  function treeRows(items: RoomNavItem[]): RoomNavRow[] {
+  function treeRows(items: SpaceTreeNode[]): RoomNavRow[] {
     return items.flatMap((item) => (item.kind === 'room' ? [item] : treeRows(item.children)));
   }
 
-  function withoutFavourites(items: RoomNavItem[]): RoomNavItem[] {
-    return items.flatMap<RoomNavItem>((item) => {
+  function withoutFavourites(items: SpaceTreeNode[]): SpaceTreeNode[] {
+    return items.flatMap<SpaceTreeNode>((item) => {
       if (item.kind === 'room') return isFavourite(item) ? [] : [item];
-      return [{ ...item, children: withoutFavourites(item.children) }];
+      if (item.kind === 'link') return [item];
+      const children = withoutFavourites(item.children);
+      return children.length === 0 ? [] : [{ ...item, children }];
     });
   }
 
@@ -386,47 +397,6 @@
 
   function byRecency(left: RoomNavRow, right: RoomNavRow): number {
     return (right.room?.latest_event?.timestamp ?? 0) - (left.room?.latest_event?.timestamp ?? 0);
-  }
-
-  function spaceItems(
-    space: RoomSummary,
-    roomsById: Map<string, RoomSummary>,
-    ancestry: string[],
-    rootSpaceId: string,
-    depth = 0
-  ): RoomNavItem[] {
-    const items: RoomNavItem[] = [];
-
-    for (const child of space.space_children) {
-      const room = roomsById.get(child.room_id);
-      if (!room || room.is_space) continue;
-
-      items.push({
-        room,
-        roomId: child.room_id,
-        parentSpaceId: rootSpaceId,
-        depth,
-        kind: 'room',
-        key: [...ancestry, child.room_id].join('/'),
-      });
-    }
-
-    for (const child of space.space_children) {
-      const room = roomsById.get(child.room_id);
-      if (!room?.is_space) continue;
-
-      items.push({
-        room,
-        depth,
-        kind: 'category',
-        key: [...ancestry, child.room_id].join('/'),
-        children: ancestry.includes(room.room_id)
-          ? []
-          : spaceItems(room, roomsById, [...ancestry, room.room_id], rootSpaceId),
-      });
-    }
-
-    return items;
   }
 
   function roomHref(row: RoomNavRow) {
@@ -506,19 +476,6 @@
   function toggleCategory(key: string) {
     if (closedCategories.has(key)) closedCategories.delete(key);
     else closedCategories.add(key);
-  }
-
-  function visibleItems(items: RoomNavItem[]): RoomNavItem[] {
-    const visible: RoomNavItem[] = [];
-
-    for (const item of items) {
-      visible.push(item);
-      if (item.kind === 'category' && !closedCategories.has(item.key)) {
-        visible.push(...visibleItems(item.children));
-      }
-    }
-
-    return visible;
   }
 
   function isRoom(item: RoomNavItem): item is RoomNavRow {
@@ -693,6 +650,17 @@
     {/if}
   {/snippet}
 
+  {#snippet threadLines(threads: readonly Thread[] | undefined)}
+    {#if !collapsed && threads}
+      {#each threads as thread (thread.level)}
+        <span class="thread" style:--thread-level={thread.level} aria-hidden="true">
+          {#if thread.kind !== 'last'}<span class="thread-line"></span>{/if}
+          {#if thread.kind !== 'through'}<span class="thread-elbow"></span>{/if}
+        </span>
+      {/each}
+    {/if}
+  {/snippet}
+
   {#snippet navRoom(item: RoomNavRow)}
     {@const room = item.room}
     {@const name = room ? roomLabel(room) : item.roomId}
@@ -715,6 +683,7 @@
     {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
     <div class="room-row-wrap">
+      {@render threadLines(item.threads)}
       {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
@@ -911,6 +880,69 @@
     {/if}
   {/snippet}
 
+  {#snippet navLink(item: SpaceTreeSpace)}
+    {@const room = item.room}
+    {@const name = roomLabel(room)}
+    {@const href = resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room) })}
+    {@const active = page.url.pathname === href}
+    <div class="room-row-wrap">
+      {@render threadLines(item.threads)}
+      {#snippet linkTrigger({ props }: { props: Record<string, unknown> })}
+        <a
+          {...props}
+          oncontextmenu={mouseContextMenu((event) => {
+            openContextMenu(event, room, null);
+          })}
+          {@attach longPress({
+            onPress: (event) => {
+              openContextMenu(event, room, null);
+            },
+          })}
+          class="room-row room-link selection-current selection-layer"
+          {href}
+          style:--room-depth={collapsed ? 0 : item.depth}
+          onclick={() => onNavigate?.(href)}
+          aria-label={collapsed ? name : undefined}
+          aria-current={active ? 'page' : undefined}
+        >
+          <span class="room-avatar">
+            <Avatar
+              class={['room-avatar-icon', { glyph: !room.avatar_url }]}
+              id={room.avatar_url ? room.room_id : null}
+              src={room.avatar_url}
+              size="small"
+              uniform
+            >
+              <RoomIcon
+                isSpace
+                isVoice={false}
+                joinRule={room.join_rule}
+                weight={active ? 'fill' : 'regular'}
+              />
+            </Avatar>
+          </span>
+          {#if !collapsed}
+            <span class="room-text"><span class="room-name">{name}</span></span>
+            <span class="room-link-icon" aria-hidden="true"><SquaresFourIcon /></span>
+          {/if}
+        </a>
+      {/snippet}
+      {#if collapsed}
+        <Tooltip label={name} side="right" trigger={linkTrigger} />
+      {:else}
+        {@render linkTrigger({ props: {} })}
+        <span class="room-options-slot">
+          <RoomOptionsMenu
+            {room}
+            onSettings={openSettings}
+            onLeave={openLeave}
+            onLobby={openLobby}
+          />
+        </span>
+      {/if}
+    </div>
+  {/snippet}
+
   <div class="room-nav-content">
     <RoomInvites {collapsed} {invites} />
 
@@ -1036,6 +1068,7 @@
               {@const name = roomLabel(item.room)}
               {@const isClosed = closedCategories.has(item.key)}
               <div class="room-row-wrap">
+                {@render threadLines(item.threads)}
                 {#snippet categoryTrigger({ props }: { props: Record<string, unknown> })}
                   <button
                     {...props}
@@ -1077,6 +1110,8 @@
                   </span>
                 {/if}
               </div>
+            {:else if item.kind === 'link'}
+              {@render navLink(item)}
             {:else if isRoom(item)}
               {@render navRoom(item)}
             {/if}
@@ -1485,6 +1520,52 @@
      break rather than as one more row. */
   .room-row-wrap:has(.room-category):not(:first-child) {
     margin-top: var(--space-300);
+  }
+
+  .thread {
+    display: contents;
+  }
+
+  .thread-line,
+  .thread-elbow {
+    border-color: var(--bg-container-line);
+    border-style: solid;
+    border-width: 0 0 0 var(--border-width-500);
+    left: calc(
+      var(--space-200) + var(--thread-level) * var(--space-400) + var(--space-400) / 2 -
+        var(--border-width-500) / 2
+    );
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+  }
+
+  .room-row-wrap:has(.room-category):not(:first-child) :is(.thread-line, .thread-elbow) {
+    top: calc(-1 * var(--space-300));
+  }
+
+  .thread-line {
+    bottom: 0;
+  }
+
+  .thread-elbow {
+    border-bottom-left-radius: var(--radii-300);
+    border-bottom-width: var(--border-width-500);
+    bottom: calc(50% - var(--border-width-500) / 2);
+    width: calc(var(--space-400) / 2 - var(--space-050));
+  }
+
+  .room-link-icon {
+    align-items: center;
+    display: flex;
+    flex: none;
+    opacity: var(--opacity-p300);
+    padding-right: var(--space-100);
+  }
+
+  .room-link-icon :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .room-row,

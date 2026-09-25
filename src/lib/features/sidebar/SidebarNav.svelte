@@ -18,12 +18,14 @@
   import {
     applyDrop,
     folderName,
+    layoutSpaceIds,
     mergeSpaces,
     orderedKnownSpaceIds,
     rememberSpaceIds,
     removeFromFolder,
     renameFolder,
     ungroupFolder,
+    withoutSpace,
     type DropInstruction,
     type LayoutRef,
     type SidebarFolder,
@@ -63,14 +65,28 @@
   let renamingFolder = $state<SidebarFolder | null>(null);
   let knownSpaceIds = $state.raw<string[]>([]);
   let collapsed = $derived(roomNavWidth < COLLAPSED_ROOM_NAV_WIDTH);
-  let spaces = $derived.by(() => {
-    const joinedSpaces = roomList.rooms.filter(isActiveSpace);
-    const childSpaceIds = joinedSpaces.flatMap((space) =>
-      space.space_children.map((child) => child.room_id)
+  let joinedSpaces = $derived(roomList.rooms.filter(isActiveSpace));
+  let orphanSpaces = $derived.by(() => {
+    const childSpaceIds = new Set(
+      joinedSpaces.flatMap((space) => space.space_children.map((child) => child.room_id))
     );
 
-    return joinedSpaces.filter((space) => !childSpaceIds.includes(space.room_id));
+    return joinedSpaces.filter((space) => !childSpaceIds.has(space.room_id));
   });
+  let pinnedSpaceIds = $derived.by(() => {
+    const stored = new Set(layoutSpaceIds(spaceSidebar.items));
+    const orphans = new Set(orphanSpaces.map((space) => space.room_id));
+
+    return new Set(
+      joinedSpaces
+        .filter((space) => stored.has(space.room_id) && !orphans.has(space.room_id))
+        .map((space) => space.room_id)
+    );
+  });
+  let spaces = $derived([
+    ...orphanSpaces,
+    ...joinedSpaces.filter((space) => pinnedSpaceIds.has(space.room_id)),
+  ]);
   let claimed = $derived(claimedRoomIds(roomList.rooms));
   let orderedSpaceIds = $derived(
     orderedKnownSpaceIds(
@@ -180,6 +196,12 @@
       spaceSidebar.write(applyDrop(entries, source, target, instruction));
     },
     onMarkSectionRead: markSectionRead,
+    get pinnedSpaceIds() {
+      return pinnedSpaceIds;
+    },
+    onUnpin: (roomId: string) => {
+      spaceSidebar.write(withoutSpace(entries, roomId));
+    },
   };
 </script>
 

@@ -9,6 +9,7 @@
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import StarIcon from 'phosphor-svelte/lib/StarIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
@@ -47,6 +48,7 @@
     onLobby?: (room: RoomSummary) => void;
     onMoveUp?: () => void;
     onMoveDown?: () => void;
+    onUnpin?: () => void;
   }
 
   let {
@@ -61,6 +63,7 @@
     onLobby,
     onMoveUp,
     onMoveDown,
+    onUnpin,
   }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -280,6 +283,12 @@
       <ActionMenuItem onSelect={onMoveDown}>
         <ArrowDownIcon />
         {$i18n.t('room.menuMoveDown')}
+      </ActionMenuItem>
+    {/if}
+    {#if onUnpin}
+      <ActionMenuItem onSelect={onUnpin}>
+        <PushPinSlashIcon />
+        {$i18n.t('nav.unpinFromSidebar')}
       </ActionMenuItem>
     {/if}
 

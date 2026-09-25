@@ -579,6 +579,41 @@ test('right-clicking a top-level space opens its options menu', async () => {
   await unmount(instance);
 });
 
+test.each([
+  ['a pinned subspace', true],
+  ['a top-level space', false],
+])('%s offers unpinning from its options menu only when pinned', async (_, pinned) => {
+  const onUnpin = vi.fn();
+  const instance = mount(NavigationRail, {
+    target: document.body,
+    props: {
+      spaces: [space('!a:example.org', 'Alpha')],
+      pinnedSpaceIds: new Set(pinned ? ['!a:example.org'] : []),
+      onUnpin,
+    },
+  });
+  await tick();
+
+  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
+    element.querySelector('.rail-slot')
+  );
+  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  await tick();
+
+  const unpin = [...document.querySelectorAll<HTMLElement>('.menu-item')].find((element) =>
+    element.textContent.includes('nav.unpinFromSidebar')
+  );
+  expect(unpin !== undefined).toBe(pinned);
+  unpin?.click();
+  await vi.waitFor(() => {
+    expect(onUnpin).toHaveBeenCalledTimes(pinned ? 1 : 0);
+  });
+  if (pinned) expect(onUnpin).toHaveBeenCalledWith('!a:example.org');
+
+  await unmount(instance);
+});
+
 test('long-pressing a top-level space opens its options menu', async () => {
   vi.useFakeTimers();
   const instance = mount(NavigationRail, {
