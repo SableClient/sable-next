@@ -2357,7 +2357,7 @@ impl Core {
                     Err(_) if let Ok(qr) = self.qr(&user_id, &flow_id).await => {
                         qr.cancel()
                             .await
-                            .map_err(|error| self.failed("cancel_verification: qr", error))?
+                            .map_err(|error| self.failed("cancel_verification: qr", error))?;
                     }
                     Err(_) => self
                         .verification_request(&user_id, &flow_id)
