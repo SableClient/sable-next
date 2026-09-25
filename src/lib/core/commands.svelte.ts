@@ -42,6 +42,7 @@ import type {
   RoomVersionsView,
   SearchFilter,
   SearchHitView,
+  SearchMetricsView,
   SearchOrder,
   RoomPreviewView,
   RoomStateEventView,
@@ -445,6 +446,11 @@ export function createCommands(transport: () => Transport) {
         event_type: eventType,
         content,
       });
+    },
+
+    async searchMetrics(): Promise<SearchMetricsView> {
+      const response = await transport().send({ type: 'search_metrics' });
+      return response.metrics;
     },
 
     async searchMessages(

@@ -1429,6 +1429,9 @@ impl Core {
             Command::SearchCoverage => Ok(CommandOk::SearchCoverage {
                 coverage: self.search_coverage(&self.client().await?).await,
             }),
+            Command::SearchMetrics => Ok(CommandOk::SearchMetrics {
+                metrics: self.search_metrics(&self.client().await?).await,
+            }),
 
             Command::Devices => {
                 let client = self.client().await?;

@@ -687,6 +687,7 @@ pub enum Command {
     EncryptionStatus,
     SyncStatus,
     SearchCoverage,
+    SearchMetrics,
     Devices,
     RecoverIdentity {
         recovery_key: String,
@@ -1298,6 +1299,9 @@ pub enum CommandOk {
     SearchCoverage {
         coverage: SearchCoverageView,
     },
+    SearchMetrics {
+        metrics: SearchMetricsView,
+    },
     Devices {
         devices: Vec<DeviceView>,
         account_management: bool,
@@ -1715,6 +1719,58 @@ pub struct SearchCoverageView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_failed: usize,
     pub state: SearchCoverageState,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SearchCrawlPhase {
+    #[default]
+    Starting,
+    Crawling,
+    Yielding,
+    BackingOff,
+    Idle,
+    BudgetSpent,
+    IndexFull,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchMetricsView {
+    pub phase: SearchCrawlPhase,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub documents: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub capacity: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_joined: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_indexed: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_pending: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_exhausted: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_failed: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_blind: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub rooms_unreadable: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub events_crawled: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub event_budget: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub batches: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub pushbacks: u64,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub last_request_ms: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub average_request_ms: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub running_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]

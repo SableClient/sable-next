@@ -17,21 +17,33 @@ pub(super) struct StoredRoom {
     version: u32,
     documents: Vec<Document>,
     classified: Vec<OwnedEventId>,
+    #[serde(default)]
+    edits: Vec<(OwnedEventId, OwnedEventId)>,
 }
 
 impl StoredRoom {
-    pub(super) const fn new(documents: Vec<Document>, classified: Vec<OwnedEventId>) -> Self {
+    pub(super) const fn new(
+        documents: Vec<Document>,
+        classified: Vec<OwnedEventId>,
+        edits: Vec<(OwnedEventId, OwnedEventId)>,
+    ) -> Self {
         Self {
             version: SCHEMA,
             documents,
             classified,
+            edits,
         }
     }
 }
 
 pub(super) enum Loaded {
-    Restored(Vec<Document>, Vec<OwnedEventId>),
+    Restored(
+        Vec<Document>,
+        Vec<OwnedEventId>,
+        Vec<(OwnedEventId, OwnedEventId)>,
+    ),
     Absent,
+    Discarded,
     Unreadable,
 }
 
@@ -51,7 +63,7 @@ pub(super) async fn load(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> 
 
     match serde_json::from_slice::<StoredRoom>(&bytes) {
         Ok(stored) if stored.version == SCHEMA => {
-            Loaded::Restored(stored.documents, stored.classified)
+            Loaded::Restored(stored.documents, stored.classified, stored.edits)
         }
         Ok(stored) => {
             info!(
@@ -61,12 +73,12 @@ pub(super) async fn load(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> 
                 "discarding a persisted search index written by another schema"
             );
             let _ = forget(client, room_id).await;
-            Loaded::Absent
+            Loaded::Discarded
         }
         Err(error) => {
             warn!(%room_id, "discarding a persisted search index that did not parse: {error}");
             let _ = forget(client, room_id).await;
-            Loaded::Absent
+            Loaded::Discarded
         }
     }
 }
@@ -158,10 +170,11 @@ pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
     }
 }
 
+#[must_use]
 pub(super) async fn save_crawl(
     client: &matrix_sdk::Client,
     rooms: BTreeMap<OwnedRoomId, StoredCrawlRoom>,
-) {
+) -> bool {
     let stored = StoredCrawl {
         version: CRAWL_SCHEMA,
         rooms,
@@ -170,15 +183,30 @@ pub(super) async fn save_crawl(
         Ok(bytes) => bytes,
         Err(error) => {
             warn!("serialising the crawl checkpoints failed: {error}");
-            return;
+            return false;
         }
     };
 
-    if let Err(error) = client
+    match client
         .state_store()
         .set_custom_value_no_read(&crawl_key(), bytes)
         .await
     {
-        warn!("persisting the crawl checkpoints failed: {error}");
+        Ok(()) => true,
+        Err(error) => {
+            warn!("persisting the crawl checkpoints failed: {error}");
+            false
+        }
+    }
+}
+
+#[must_use]
+pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
+    match client.state_store().remove_custom_value(&crawl_key()).await {
+        Ok(_) => true,
+        Err(error) => {
+            warn!("dropping the persisted crawl checkpoints failed: {error}");
+            false
+        }
     }
 }

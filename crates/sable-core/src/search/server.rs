@@ -5,6 +5,7 @@ use matrix_sdk::ruma::api::client::filter::RoomEventFilter;
 use matrix_sdk::ruma::api::client::search::search_events::v3::{
     Categories, Criteria, OrderBy, Request, SearchKeys, SearchResult,
 };
+use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::{AnyMessageLikeEvent, AnyTimelineEvent};
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UInt};
 
@@ -41,6 +42,11 @@ type Signature = (String, SearchFilter, SearchOrder, OwnedRoomId);
 #[derive(Default)]
 pub(crate) struct ServerSearch {
     signature: Option<Signature>,
+    progress: Progress,
+}
+
+#[derive(Clone, Default)]
+struct Progress {
     hits: Vec<Hit>,
     next_batch: Option<String>,
     exhausted: bool,
@@ -49,9 +55,17 @@ pub(crate) struct ServerSearch {
 impl ServerSearch {
     fn restart(&mut self, signature: Signature) {
         self.signature = Some(signature);
-        self.hits.clear();
-        self.next_batch = None;
-        self.exhausted = false;
+        self.progress = Progress::default();
+    }
+
+    fn progress(&self) -> Progress {
+        self.progress.clone()
+    }
+
+    fn adopt(&mut self, signature: &Signature, progress: Progress) {
+        if self.holds(signature) && progress.hits.len() >= self.progress.hits.len() {
+            self.progress = progress;
+        }
     }
 
     fn holds(&self, signature: &Signature) -> bool {
@@ -65,8 +79,12 @@ impl ServerSearch {
 
 pub(super) async fn target(
     client: &matrix_sdk::Client,
+    query: &str,
     filter: &SearchFilter,
 ) -> Option<OwnedRoomId> {
+    if query.trim().is_empty() {
+        return None;
+    }
     let [room_id] = filter.rooms.as_slice() else {
         return None;
     };
@@ -86,11 +104,13 @@ impl Core {
         query: ServerQuery<'_>,
     ) -> matrix_sdk::Result<Vec<Hit>> {
         let signature = query.signature();
-        let mut cursor = self.server_search.lock().await;
-
-        if query.offset == 0 || !cursor.holds(&signature) {
-            cursor.restart(signature);
-        }
+        let mut cursor = {
+            let mut shared = self.server_search.lock().await;
+            if query.offset == 0 || !shared.holds(&signature) {
+                shared.restart(signature.clone());
+            }
+            shared.progress()
+        };
 
         let wanted = query.offset.saturating_add(query.limit);
         let mut ignored: HashMap<OwnedUserId, bool> = HashMap::new();
@@ -130,13 +150,15 @@ impl Core {
             }
         }
 
-        Ok(cursor
+        let page = cursor
             .hits
             .iter()
             .skip(query.offset)
             .take(query.limit)
             .cloned()
-            .collect())
+            .collect();
+        self.server_search.lock().await.adopt(&signature, cursor);
+        Ok(page)
     }
 }
 
@@ -189,6 +211,9 @@ fn hit_from(result: &SearchResult) -> Option<Hit> {
         return None;
     };
     let original = message.as_original()?;
+    if matches!(original.content.relates_to, Some(Relation::Replacement(_))) {
+        return None;
+    }
 
     Some(Hit {
         room_id: original.room_id.clone(),
@@ -204,8 +229,34 @@ fn hit_from(result: &SearchResult) -> Option<Hit> {
 mod tests {
     use matrix_sdk::ruma::{room_id, user_id};
 
-    use super::expressible;
+    use matrix_sdk::ruma::api::client::search::search_events::v3::SearchResult;
+    use serde_json::json;
+
+    use super::{expressible, hit_from};
     use crate::protocol::{SearchAttachment, SearchFilter};
+
+    #[test]
+    fn test_an_edit_is_not_a_hit_of_its_own() {
+        let result: SearchResult = serde_json::from_value(json!({
+            "rank": 1.0,
+            "result": {
+                "type": "m.room.message",
+                "event_id": "$edit",
+                "room_id": "!plain:localhost",
+                "sender": "@erwan:localhost",
+                "origin_server_ts": 2_000,
+                "content": {
+                    "msgtype": "m.text",
+                    "body": "* deploy fixed",
+                    "m.new_content": { "msgtype": "m.text", "body": "deploy fixed" },
+                    "m.relates_to": { "rel_type": "m.replace", "event_id": "$original" }
+                }
+            }
+        }))
+        .expect("a search result");
+
+        assert!(hit_from(&result).is_none());
+    }
 
     fn scoped() -> SearchFilter {
         SearchFilter {
