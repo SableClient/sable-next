@@ -9,6 +9,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -128,13 +129,15 @@
         </div>
       {/each}
     </div>
+    <ActionMenuSeparator />
+    <ActionMenuItem onSelect={onAddAccount}>
+      <PlusIcon aria-hidden="true" />
+      <span>{$i18n.t('nav.addAccount')}</span>
+    </ActionMenuItem>
   </ActionMenuSub>
   <ActionMenuSeparator />
 {/if}
 <ActionMenuItem onSelect={onProfile}>{$i18n.t('nav.editProfile')}</ActionMenuItem>
-{#if accountSwitching}
-  <ActionMenuItem onSelect={onAddAccount}>{$i18n.t('nav.addAccount')}</ActionMenuItem>
-{/if}
 <ActionMenuSeparator />
 <ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>
 
