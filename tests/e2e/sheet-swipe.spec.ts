@@ -16,38 +16,39 @@ async function swipeDown(page: Page, x: number, fromY: number, toY: number): Pro
   await touch('touchEnd', toY);
 }
 
-async function openSettingsSheet(page: Page) {
-  await page.goto('/profile');
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  const sections = page.getByRole('navigation', { name: 'Settings sections' });
-  await expect(sections).toBeVisible();
-  return sections;
+async function openJumpSheet(page: Page) {
+  await page.goto('/settings/notifications');
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  const sections = page.getByRole('dialog', { name: 'On this page: Notifications' });
+  await expect(sections.getByRole('list')).toBeVisible();
+  return sections.getByRole('list');
 }
 
-test('mobile: swiping down on the settings sheet content closes it', async ({
+test('mobile: swiping down on the sheet content closes it', async ({
   page,
   installRoomCore,
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'touch is driven over CDP');
   await installRoomCore('ready');
-  const sections = await openSettingsSheet(page);
+  const sections = await openJumpSheet(page);
   const box = await sections.boundingBox();
-  if (!box) throw new Error('The settings sections are not laid out.');
+  if (!box) throw new Error('The sheet list is not laid out.');
 
   await swipeDown(page, box.x + box.width / 2, box.y + 40, box.y + 440);
 
   await expect(sections).toBeHidden();
 });
 
-test('mobile: a scrolled settings sheet scrolls back up instead of closing', async ({
+test('mobile: a scrolled sheet scrolls back up instead of closing', async ({
   page,
   installRoomCore,
   browserName,
 }) => {
   test.skip(browserName !== 'chromium', 'touch is driven over CDP');
+  await page.setViewportSize({ width: 412, height: 420 });
   await installRoomCore('ready');
-  const sections = await openSettingsSheet(page);
+  const sections = await openJumpSheet(page);
   const scrolled = await sections.evaluate((node) => {
     for (let element: Element | null = node; element; element = element.parentElement) {
       if (element.scrollHeight > element.clientHeight + 1) {
@@ -59,7 +60,7 @@ test('mobile: a scrolled settings sheet scrolls back up instead of closing', asy
   });
   expect(scrolled).toBe(true);
   const box = await sections.boundingBox();
-  if (!box) throw new Error('The settings sections are not laid out.');
+  if (!box) throw new Error('The sheet list is not laid out.');
 
   await swipeDown(
     page,

@@ -1,17 +1,17 @@
 <script lang="ts">
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
-  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import DesktopTowerIcon from 'phosphor-svelte/lib/DesktopTowerIcon';
+  import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import KeyIcon from 'phosphor-svelte/lib/KeyIcon';
-  import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
   import { SvelteSet } from 'svelte/reactivity';
 
   import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
-  import { buildSettingsLink } from '#lib/features/room/settings-link.js';
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import {
     openExternalAuthUrl,
@@ -19,7 +19,8 @@
     type ExternalAuthWindow,
   } from '#lib/platform/external-auth.js';
   import { i18n, t } from '#lib/i18n.js';
-  import { SETTINGS_DEVICES_SECTION } from '#lib/settings/registry.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -52,7 +53,6 @@
   let verificationOpen = $state(false);
   let resettingIdentity = $state(false);
   let verifying = $state<string | null>(null);
-  let linkCopied = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
   let cancelled = false;
 
@@ -136,16 +136,6 @@
   function cancelRemoval(): void {
     deleting = null;
     password = '';
-  }
-
-  async function copyDevicesLink(): Promise<void> {
-    await navigator.clipboard.writeText(
-      buildSettingsLink(location.origin, SETTINGS_DEVICES_SECTION)
-    );
-    linkCopied = true;
-    setTimeout(() => {
-      linkCopied = false;
-    }, 2000);
   }
 
   async function saveName(deviceId: string): Promise<void> {
@@ -282,23 +272,7 @@
   </IconButton>
 {/snippet}
 
-{#snippet devicesActions()}
-  <IconButton
-    variant="subtle"
-    size="small"
-    label={$i18n.t(linkCopied ? 'settings.linkCopied' : 'settings.copyLink')}
-    onclick={() => void copyDevicesLink()}
-  >
-    {#if linkCopied}<CheckIcon />{:else}<LinkIcon />{/if}
-  </IconButton>
-{/snippet}
-
-<AppPageShell
-  title={$i18n.t('settings.devicesTitle')}
-  density="compact"
-  class="devices-settings"
-  actions={refreshAction}
->
+<AppPageShell title={$i18n.t('settings.devicesTitle')} density="compact" class="devices-settings">
   {#if error}<Alert class="settings-error" variant="critical" role="alert">{error}</Alert>{/if}
 
   {#if newRecoveryKey}
@@ -411,7 +385,7 @@
     <SettingsSection
       headingId="devices-heading"
       title={$i18n.t('settings.signedInDevices')}
-      titleActions={devicesActions}
+      titleActions={refreshAction}
     >
       {#if loading}
         <div class="settings-form loading-state" role="status">
@@ -492,17 +466,20 @@
           {#each devices as device (device.device_id)}
             <li class="device">
               <div class="device-summary">
-                {#if !device.is_own}
-                  <input
-                    type="checkbox"
-                    class="device-select"
-                    checked={bulkSelected.has(device.device_id)}
-                    disabled={bulkBusy}
-                    aria-label={$i18n.t('settings.selectDevice', { name: deviceName(device) })}
-                    onchange={() => {
-                      toggleSelected(device.device_id);
-                    }}
-                  />
+                {#if device.is_own}
+                  {#if selectableDevices.length > 0}<span class="device-select"></span>{/if}
+                {:else}
+                  <label class="device-select">
+                    <input
+                      type="checkbox"
+                      checked={bulkSelected.has(device.device_id)}
+                      disabled={bulkBusy}
+                      aria-label={$i18n.t('settings.selectDevice', { name: deviceName(device) })}
+                      onchange={() => {
+                        toggleSelected(device.device_id);
+                      }}
+                    />
+                  </label>
                 {/if}
                 <span class="device-icon" aria-hidden="true"><DesktopTowerIcon /></span>
                 <div class="device-info">
@@ -529,12 +506,10 @@
                       })}
                     </span>
                   {/if}
-                </div>
-                {#if editing !== device.device_id && deleting !== device.device_id}
-                  <div class="device-actions">
-                    {#if !device.is_own && !device.is_verified && status?.verification === 'verified'}
+                  {#if !device.is_own && !device.is_verified && status?.verification === 'verified'}
+                    <div class="device-verify">
                       <Button
-                        variant="ghost"
+                        variant="secondary"
                         size="small"
                         loading={verifying === device.device_id}
                         onclick={() => {
@@ -543,26 +518,51 @@
                       >
                         {$i18n.t('settings.verifyDevice')}
                       </Button>
-                    {/if}
-                    <Button
-                      variant="ghost"
-                      size="small"
-                      onclick={() => {
-                        beginRename(device);
-                      }}
-                    >
-                      {$i18n.t('settings.rename')}
-                    </Button>
-                    {#if !device.is_own}
-                      <Button
-                        variant="danger"
+                    </div>
+                  {/if}
+                </div>
+                {#if editing !== device.device_id && deleting !== device.device_id}
+                  <div class="device-actions">
+                    {#if device.is_own}
+                      <IconButton
+                        variant="ghost"
                         size="small"
+                        label={$i18n.t('settings.renameDevice', { name: deviceName(device) })}
                         onclick={() => {
-                          beginRemoval(device.device_id);
-                        }}
+                          beginRename(device);
+                        }}><PencilSimpleIcon /></IconButton
                       >
-                        {$i18n.t('settings.remove')}
-                      </Button>
+                    {:else}
+                      <ActionMenu
+                        label={$i18n.t('settings.deviceOptions', { name: deviceName(device) })}
+                      >
+                        {#snippet trigger({ props })}
+                          <IconButton
+                            {...props}
+                            variant="ghost"
+                            size="small"
+                            label={$i18n.t('settings.deviceOptions', { name: deviceName(device) })}
+                            ><DotsThreeVerticalIcon /></IconButton
+                          >
+                        {/snippet}
+                        <ActionMenuItem
+                          onSelect={() => {
+                            beginRename(device);
+                          }}
+                        >
+                          <PencilSimpleIcon aria-hidden="true" />
+                          {$i18n.t('settings.rename')}
+                        </ActionMenuItem>
+                        <ActionMenuItem
+                          destructive
+                          onSelect={() => {
+                            beginRemoval(device.device_id);
+                          }}
+                        >
+                          <TrashIcon aria-hidden="true" />
+                          {$i18n.t('settings.remove')}
+                        </ActionMenuItem>
+                      </ActionMenu>
                     {/if}
                   </div>
                 {/if}
@@ -685,9 +685,11 @@
   }
 
   .device-name {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-normal);
+    font-weight: var(--font-weight-medium);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   dd {
@@ -752,7 +754,24 @@
   }
 
   .device-select {
+    align-items: center;
+    display: flex;
     flex: 0 0 auto;
+    inline-size: var(--icon-size-small);
+    justify-content: center;
+    position: relative;
+  }
+
+  .device-select::after {
+    content: '';
+    inset: calc((var(--icon-size-small) - var(--target-hit)) / 2);
+    position: absolute;
+  }
+
+  .device-select input {
+    block-size: var(--icon-size-small);
+    inline-size: var(--icon-size-small);
+    margin: 0;
   }
 
   .device-list {
@@ -766,10 +785,9 @@
   }
 
   .device-summary {
-    align-items: flex-start;
+    align-items: center;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-400);
+    gap: var(--space-300);
     min-height: calc(var(--control-height-medium) + var(--space-300));
     padding: var(--space-300) var(--space-400);
   }
@@ -778,7 +796,22 @@
     display: grid;
     flex: 1;
     gap: var(--space-150);
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
+  }
+
+  .device-name-line,
+  .device-meta {
+    min-width: 0;
+  }
+
+  .device-name-line :global(.status-badge),
+  .device-meta :global(.status-badge) {
+    flex: 0 0 auto;
+  }
+
+  .device-verify {
+    display: flex;
   }
 
   .device-name-line,
@@ -793,6 +826,7 @@
   .device-meta code {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -800,8 +834,7 @@
 
   .device-actions {
     flex: 0 0 auto;
-    padding-left: calc(var(--control-height-small) + var(--space-400));
-    width: 100%;
+    gap: var(--space-100);
   }
 
   .loading-state,
@@ -868,16 +901,6 @@
     }
 
     .setting-row > :global(.btn) {
-      width: auto;
-    }
-
-    .device-summary {
-      align-items: center;
-      flex-wrap: nowrap;
-    }
-
-    .device-actions {
-      padding-left: 0;
       width: auto;
     }
   }

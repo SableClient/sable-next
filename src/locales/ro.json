@@ -1482,8 +1482,6 @@
     "contactInformationNoEmail": "Nu ai adrese de email corelate la cont.",
     "blockedUsers": "Conturi blocate",
     "blockedUsersPlaceholder": "@cineva:example.org",
-    "customThemes": "Temă personalizată",
-    "customThemesHint": "Instalează o temă sau o modificare din catalogul Sable oficial, sau importă un fișier local .sable.css. O modificare se aplică deasupra temei active. Importă doar fișiere CSS în care te încrezi.",
     "customThemesBrowse": "Răsfoiește catalogul",
     "customThemesImport": "Importă fișier",
     "customThemesLightTheme": "Luminoasă",

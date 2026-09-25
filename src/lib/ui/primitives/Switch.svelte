@@ -2,16 +2,23 @@
   import { Switch } from 'bits-ui';
 
   interface Props {
+    id?: string;
     checked?: boolean;
     disabled?: boolean;
     label: string;
     onCheckedChange?: (checked: boolean) => void;
   }
 
-  let { checked = $bindable(false), disabled = false, label, onCheckedChange }: Props = $props();
+  let {
+    id,
+    checked = $bindable(false),
+    disabled = false,
+    label,
+    onCheckedChange,
+  }: Props = $props();
 </script>
 
-<Switch.Root bind:checked {disabled} {onCheckedChange} class="switch-root" aria-label={label}>
+<Switch.Root {id} bind:checked {disabled} {onCheckedChange} class="switch-root" aria-label={label}>
   <Switch.Thumb class="switch-thumb" />
 </Switch.Root>
 
@@ -81,7 +88,7 @@
     :global(.switch-thumb) {
       transition:
         translate var(--duration-fast) var(--ease-smooth-out),
-        scale var(--duration-fast) var(--ease-bounce);
+        scale var(--duration-fast) var(--ease-smooth-out);
     }
 
     :global(.switch-root:not([data-state='checked']) .switch-thumb) {

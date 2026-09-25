@@ -9,12 +9,11 @@
   interface Props {
     label: string;
     value?: string;
-    saving?: boolean;
-    onSave: () => void;
+    onCommit: () => void;
     onReset: () => void;
   }
 
-  let { label, value = $bindable(''), saving = false, onSave, onReset }: Props = $props();
+  let { label, value = $bindable(''), onCommit, onReset }: Props = $props();
   let hue = $state(0);
   let saturation = $state(100);
   let brightness = $state(100);
@@ -99,6 +98,7 @@
     <Popover.Root
       onOpenChange={(next) => {
         if (next) syncPicker();
+        else if (valid) onCommit();
       }}
     >
       <Popover.Trigger
@@ -151,11 +151,16 @@
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
-    <TextInput bind:value aria-label={`${label} hex value`} placeholder="Hex value" maxlength={7} />
-    <Button size="small" disabled={!valid} loading={saving} onclick={onSave}
-      >{$i18n.t('settings.saveButton')}</Button
-    >
-    <Button variant="danger" size="small" disabled={!value} onclick={onReset}
+    <TextInput
+      bind:value
+      aria-label={`${label} hex value`}
+      placeholder="Hex value"
+      maxlength={7}
+      onchange={() => {
+        if (valid) onCommit();
+      }}
+    />
+    <Button variant="ghost" size="small" disabled={!value} onclick={onReset}
       >{$i18n.t('settings.resetButton')}</Button
     >
   </div>

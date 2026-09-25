@@ -14,6 +14,7 @@
     class?: ClassValue;
     id?: string;
     'data-settings-focus'?: string;
+    control?: string;
     badge?: string;
     before?: Snippet;
     copy?: Snippet;
@@ -29,6 +30,7 @@
     class: className = '',
     id,
     'data-settings-focus': dataSettingsFocus,
+    control,
     badge,
     before,
     copy,
@@ -45,6 +47,7 @@
 >
   {#if before}<span class="row-before">{@render before()}</span>{/if}
   <div class="row-copy">
+    {#if control}<label class="row-hit" for={control}></label>{/if}
     {#if copy}
       {@render copy()}
     {:else}
@@ -91,8 +94,19 @@
   }
 
   .row-copy {
-    flex: 1;
+    flex: 1 1 12rem;
     min-width: 0;
+    position: relative;
+  }
+
+  .row-hit {
+    cursor: pointer;
+    inset: 0;
+    position: absolute;
+  }
+
+  .row-name :global(.anchor-link) {
+    position: relative;
   }
 
   .row-name {
@@ -139,6 +153,10 @@
     max-width: 100%;
     min-width: 0;
     width: auto;
+  }
+
+  .row-control:not(.wide) {
+    flex: 0 0 auto;
   }
 
   .row-control.wide {

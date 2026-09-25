@@ -8,10 +8,7 @@ function layer(surface: Locator): Promise<number> {
   return surface.evaluate((node) => Number(getComputedStyle(node).zIndex));
 }
 
-test('mobile: a dialog raised from the settings sheet takes the top', async ({
-  page,
-  installRoomCore,
-}) => {
+test('mobile: a dialog raised from settings takes the top', async ({ page, installRoomCore }) => {
   await page.setViewportSize({ width: 412, height: 915 });
   await installRoomCore('ready');
   await page.goto('/profile');
@@ -21,9 +18,10 @@ test('mobile: a dialog raised from the settings sheet takes the top', async ({
   await nav.getByText('Per-Message Profiles').click();
   await page.getByRole('button', { name: 'New profile' }).click();
 
-  const editor = page.locator('.dialog-content-settings');
-  await expect(editor).toBeVisible();
-  expect(await layer(editor)).toBeGreaterThan(await layer(page.locator('.dialog-content-sheet')));
+  const surfaces = page.locator('.dialog-content-settings');
+  await expect(surfaces).toHaveCount(2);
+  const editor = surfaces.last();
+  expect(await layer(editor)).toBeGreaterThan(await layer(surfaces.first()));
 
   const name = editor.locator('input[name="persona-name"]');
   await name.fill('Nadia');

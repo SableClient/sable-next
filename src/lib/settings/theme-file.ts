@@ -17,6 +17,12 @@ export interface ThemeFileMetadata {
 }
 
 const SWATCH_TOKENS = ['bg-container', 'surface-container', 'primary-main', 'bg-on-container'];
+const UNSAFE_SWATCH = /\b(?:url|var|env|attr|image|image-set|element|paint)\s*\(|[\\;{}<>]/i;
+
+export const DEFAULT_THEME_SWATCHES = {
+  light: ['#fff', '#f4f4f5', '#6e56cf', '#18181b'],
+  dark: ['#1b1a21', '#24232c', '#bdb6ec', '#eae8f0'],
+} as const;
 
 export function isThemeFileName(name: string): boolean {
   return name.toLowerCase().endsWith('.sable.css');
@@ -44,10 +50,15 @@ export function themeFileMetadata(css: string): ThemeFileMetadata {
   };
 }
 
+export function safeSwatch(value: string): boolean {
+  return value.length <= 64 && !UNSAFE_SWATCH.test(value) && CSS.supports('color', value);
+}
+
 export function themeSwatches(css: string): string[] {
+  if (css.length > MAX_THEME_FILE_BYTES) return [];
   return SWATCH_TOKENS.flatMap((token) => {
     const value = css.match(new RegExp(`--(?:sable-)?${token}\\s*:\\s*([^;}]+)`))?.[1]?.trim();
-    return value && CSS.supports('color', value) ? [value] : [];
+    return value && safeSwatch(value) ? [value] : [];
   });
 }
 

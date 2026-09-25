@@ -24,6 +24,7 @@
     showChevron?: boolean;
     large?: boolean;
     current?: Snippet<[SettingsNavEntry]>;
+    footer?: Snippet;
   }
 
   const uid = $props.id();
@@ -37,6 +38,7 @@
     showChevron = false,
     large = false,
     current,
+    footer,
   }: Props = $props();
   let sections = $derived(groups ?? [{ id: 'entries', entries }]);
 </script>
@@ -57,6 +59,7 @@
       {/each}
     </div>
   {/each}
+  {#if footer}<div class="settings-nav-group">{@render footer()}</div>{/if}
 </nav>
 
 {#snippet item(entry: SettingsNavEntry)}

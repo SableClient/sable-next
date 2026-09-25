@@ -92,6 +92,15 @@
     width: var(--space-500);
   }
 
+  @media (pointer: coarse) {
+    :global(.slider-thumb::after) {
+      border-radius: 100%;
+      content: '';
+      inset: calc((var(--space-500) - var(--target-hit)) / 2);
+      position: absolute;
+    }
+  }
+
   :global(.slider:hover .slider-thumb),
   :global(.slider-thumb[data-active]) {
     background: var(--primary-main-active);

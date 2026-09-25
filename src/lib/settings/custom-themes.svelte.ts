@@ -139,3 +139,15 @@ export function activeTweakCss(): string[] {
     .map((id) => customThemes.tweaks.find((tweak) => tweak.id === id)?.css)
     .filter((css): css is string => css !== undefined);
 }
+
+export type ThemePreview = { source: string; name: string; kind: ResolvedTheme; css: string };
+
+export const themePreview = $state<{ current: ThemePreview | null }>({ current: null });
+
+export function previewTheme(preview: ThemePreview): void {
+  themePreview.current = preview;
+}
+
+export function clearThemePreview(): void {
+  themePreview.current = null;
+}

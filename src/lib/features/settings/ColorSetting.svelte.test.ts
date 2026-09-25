@@ -15,7 +15,7 @@ test('opens the picker from its swatch', async () => {
     props: {
       label: 'Profile color',
       value: '',
-      onSave: vi.fn(),
+      onCommit: vi.fn(),
       onReset: vi.fn(),
     },
   });

@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { ThemeFileMetadata } from '#lib/settings/theme-file.js';
 
-import { filterCatalog, type CatalogEntry } from './theme-catalog';
+import { catalogFileUrl, filterCatalog, type CatalogEntry } from './theme-catalog';
 
 function entry(
   kind: CatalogEntry['kind'],
@@ -59,4 +59,23 @@ test('the search matches the name, the author and the tags', () => {
   expect(filterCatalog(entries, { ...all, query: 'shape' }).map((item) => item.meta.name)).toEqual([
     'Round corners',
   ]);
+});
+
+test.each([
+  'http://raw.githubusercontent.com/SableClient/themes/main/night.sable.css',
+  'https://raw.githubusercontent.com/someone/else/main/night.sable.css',
+  'https://evil.example/night.sable.css',
+  'https://raw.githubusercontent.com/SableClient/themes/main/night.sable.css?track=1',
+  'https://user:pass@raw.githubusercontent.com/SableClient/themes/main/x.sable.css',
+  'https://raw.githubusercontent.com/SableClient/themes/../other/x.sable.css',
+  'data:text/css,.x{}',
+  'javascript:alert(1)',
+  42,
+])('a catalogue file outside the catalogue repository is refused: %s', (url) => {
+  expect(catalogFileUrl(url)).toBeNull();
+});
+
+test('a catalogue file in the catalogue repository is accepted', () => {
+  const url = 'https://raw.githubusercontent.com/SableClient/themes/main/themes/night.sable.css';
+  expect(catalogFileUrl(url)).toBe(url);
 });

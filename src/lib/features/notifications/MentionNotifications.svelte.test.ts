@@ -37,10 +37,10 @@ test('shows every mention rule at its account mode', async () => {
   const instance = mount(MentionNotifications, { target: document.body });
 
   await vi.waitFor(() => {
-    expect(selector('Mention User ID ("@erwan:example.org")').textContent).toContain('Loud');
+    expect(selector('Mentions of your user ID (@erwan:example.org)').textContent).toContain('Loud');
   });
-  expect(selector('Contains Displayname ("Erwan")').textContent).toContain('Off');
-  expect(selector('Contains Username ("erwan")').textContent).toContain('Loud');
+  expect(selector('Messages with your display name (Erwan)').textContent).toContain('Off');
+  expect(selector('Messages with your username (erwan)').textContent).toContain('Loud');
   expect(selector('Mention @room').textContent).toContain('Notify');
 
   await unmount(instance);

@@ -10,6 +10,7 @@ import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
+import NotificationPermission from '#lib/features/notifications/NotificationPermission.svelte';
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
 import PersonaSettings from '#lib/features/settings/PersonaSettings.svelte';
 import PushGateway from '#lib/features/notifications/PushGateway.svelte';
@@ -28,16 +29,18 @@ import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagno
 export interface CategoryPanel {
   component: Component;
   section?: string;
+  start?: true;
   when?: () => boolean;
 }
 
 export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [
-    { component: CustomThemes, section: 'theme-language' },
-    { component: AppIconSettings, section: 'theme-language' },
+    { component: CustomThemes, section: 'themes' },
+    { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
   notifications: [
+    { component: NotificationPermission, section: 'alerts', start: true },
     { component: NotificationDefaults },
     { component: MentionNotifications },
     { component: NotificationKeywords },

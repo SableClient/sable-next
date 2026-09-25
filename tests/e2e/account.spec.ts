@@ -43,7 +43,8 @@ test('saves a display name onto the account', async ({ admin, page }) => {
 
   const name = `Updated ${String(Date.now())}`;
   await account.displayName.fill(name);
-  await account.saveDisplayName.click();
+  await account.displayName.press('Enter');
+  await expect(page.getByText('Display name saved')).toBeVisible();
 
   await expect.poll(() => admin.profile().then((profile) => profile.displayname)).toBe(name);
 });
@@ -54,8 +55,8 @@ test('a saved name color survives a reload', async ({ page }) => {
 
   await account.colorValue('Dark theme name color').fill('#336699');
   await expect(account.colorValue('Dark theme name color')).toHaveValue('#336699');
-  await expect(account.colorSave('Dark theme name color')).toBeEnabled();
-  await account.colorSave('Dark theme name color').click();
+  await account.colorValue('Dark theme name color').press('Enter');
+  await expect(page.getByText('Profile colors saved')).toBeVisible();
 
   await page.reload();
   await expect(account.colorValue('Dark theme name color')).toHaveValue('#336699');

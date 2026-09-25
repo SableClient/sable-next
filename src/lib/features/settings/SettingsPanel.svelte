@@ -36,6 +36,12 @@
     void goto(resolve(`settings/${nextSection}${query}`));
   }
 
+  function focusPanel(event: Event): void {
+    if (!matchMedia('(pointer: coarse)').matches) return;
+    event.preventDefault();
+    document.querySelector<HTMLElement>('.dialog-content-settings')?.focus({ preventScroll: true });
+  }
+
   function back(): void {
     void goto(resolve('settings'));
   }
@@ -53,6 +59,7 @@
   open
   ownsBack
   variant="settings"
+  onOpenAutoFocus={focusPanel}
   onOpenChange={(open) => {
     if (!open) close();
   }}

@@ -71,6 +71,7 @@
 
 <style>
   .action-menu-row {
+    --menu-item-height: max(var(--control-height-400), var(--target-hit));
     --menu-item-padding: var(--space-400);
 
     border-radius: 0;

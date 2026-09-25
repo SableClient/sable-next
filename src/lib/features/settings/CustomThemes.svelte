@@ -1,6 +1,7 @@
 <script lang="ts">
-  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import { onDestroy, untrack } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
 
   import {
     customThemes,
@@ -9,11 +10,17 @@
     installCustomTweak,
     removeCustomTheme,
     removeCustomTweak,
+    clearThemePreview,
+    previewTheme,
     selectCustomTheme,
     selectedCustomThemeId,
+    themePreview,
     type CustomTheme,
   } from '#lib/settings/custom-themes.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { resolveTheme, type ResolvedTheme } from '#lib/settings/theme.js';
   import {
+    DEFAULT_THEME_SWATCHES,
     isThemeFileName,
     parseThemeFile,
     themeFileBaseName,
@@ -21,84 +28,150 @@
     themeSwatches,
   } from '#lib/settings/theme-file.js';
   import { pickFiles } from '#lib/platform/files.js';
+  import { i18n, t } from '#lib/i18n.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Switch from '#lib/ui/primitives/Switch.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import ThemeSwatches from '#lib/ui/ThemeSwatches.svelte';
-  import { i18n } from '#lib/i18n.js';
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
+  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
   import '#lib/ui/primitives/settings-row.css';
 
-  import {
-    entryName,
-    filterCatalog,
-    loadCatalog,
-    type CatalogEntry,
-    type CatalogFilter,
-  } from './theme-catalog';
+  import ThemeCatalog from './ThemeCatalog.svelte';
+  import ThemeTile from './ThemeTile.svelte';
+  import { entryName, fetchCatalogFile, type CatalogEntry } from './theme-catalog';
 
-  let entries = $state.raw<CatalogEntry[]>([]);
-  let browsing = $state(false);
-  let loading = $state(false);
+  const SLOTS: readonly ResolvedTheme[] = ['light', 'dark'];
+  const systemDark = new MediaQuery('(prefers-color-scheme: dark)');
+
+  let catalogOpen = $state(false);
+  let catalogTab = $state<'theme' | 'tweak'>('theme');
   let installing = $state<string | null>(null);
   let error = $state<string | null>(null);
   let picker = $state<HTMLInputElement>();
-  const filter = $state<CatalogFilter>({ query: '', kind: 'all', highContrast: false });
   let pendingRemoval = $state.raw<{ kind: 'theme' | 'tweak'; id: string; name: string } | null>(
     null
   );
 
-  let shown = $derived(filterCatalog(entries, filter));
-  let shownThemes = $derived(shown.filter((entry) => entry.kind === 'theme'));
-  let shownTweaks = $derived(shown.filter((entry) => entry.kind === 'tweak'));
-  let tweaksShown = $derived(filter.kind === 'all' && !filter.highContrast);
-  let installedSources = $derived(
-    new Set(
-      [...customThemes.themes, ...customThemes.tweaks].flatMap((item) =>
-        item.source ? [item.source] : []
-      )
-    )
-  );
+  let showing = $derived(resolveTheme(preferences.theme, systemDark.current));
+  let tweaksInert = $derived(selectedCustomThemeId(showing) === null);
+  let previewing = $state<string | null>(null);
 
-  const kinds = [
-    { value: 'all', label: 'settings.themeCatalogAll' },
-    { value: 'light', label: 'settings.customThemesLightTheme' },
-    { value: 'dark', label: 'settings.customThemesDarkTheme' },
-  ] as const;
+  let pendingReverts: Array<() => void> = [];
+  let pendingToast: number | null = null;
 
-  function install(css: string, fallback: string, source?: string): void {
-    const parsed = parseThemeFile(css, fallback);
-    if (parsed === 'size') error = $i18n.t('settings.customThemesErrorSize');
-    else if (parsed === 'header') error = $i18n.t('settings.customThemesErrorHeader');
-    else if (parsed.kind === 'tweak') installCustomTweak({ ...parsed.tweak, source });
-    else installCustomTheme({ ...parsed.theme, source });
+  function slotLabel(kind: ResolvedTheme): string {
+    return kind === 'light'
+      ? $i18n.t('settings.customThemesLightSlot')
+      : $i18n.t('settings.customThemesDarkSlot');
   }
 
-  async function browse(): Promise<void> {
-    browsing = !browsing;
-    if (!browsing || entries.length > 0 || loading) return;
-    loading = true;
+  function settleUndo(): void {
+    if (pendingToast !== null) toasts.dismiss(pendingToast);
+  }
+
+  function offerUndo(message: string, revert: () => void): void {
+    const carried = pendingReverts;
+    if (pendingToast !== null) {
+      const previous = pendingToast;
+      pendingToast = null;
+      toasts.dismiss(previous);
+    }
+    pendingReverts = [...carried, revert];
+    const count = pendingReverts.length;
+    const id = toasts.undoable(count > 1 ? t('settings.themeChanges', { count }) : message, {
+      label: t('settings.undo'),
+      onUndo: () => {
+        const reverts = pendingReverts;
+        pendingReverts = [];
+        pendingToast = null;
+        for (const revert of reverts.slice().reverse()) revert();
+      },
+      onClose: () => {
+        if (pendingToast !== id) return;
+        pendingToast = null;
+        pendingReverts = [];
+      },
+    });
+    pendingToast = id;
+  }
+
+  function install(css: string, fallback: string, source?: string): boolean {
+    const parsed = parseThemeFile(css, fallback);
+    if (parsed === 'size') {
+      error = $i18n.t('settings.customThemesErrorSize');
+      return false;
+    }
+    if (parsed === 'header') {
+      error = $i18n.t('settings.customThemesErrorHeader');
+      return false;
+    }
+    if (parsed.kind === 'tweak') {
+      const tweak = { ...parsed.tweak, source };
+      installCustomTweak(tweak);
+      offerUndo(t('settings.themeInstalled', { name: tweak.name }), () => {
+        removeCustomTweak(tweak.id);
+      });
+      return true;
+    }
+    const theme = { ...parsed.theme, source };
+    const previous = selectedCustomThemeId(theme.kind);
+    installCustomTheme(theme);
+    offerUndo(
+      t('settings.themeSetFor', { name: theme.name, mode: slotLabel(theme.kind).toLowerCase() }),
+      () => {
+        removeCustomTheme(theme.id);
+        const restorable =
+          previous === null || customThemes.themes.some((item) => item.id === previous);
+        if (restorable && selectedCustomThemeId(theme.kind) === null) {
+          selectCustomTheme(theme.kind, previous);
+        }
+      }
+    );
+    return true;
+  }
+
+  async function tryFromCatalog(entry: CatalogEntry): Promise<void> {
+    if (entry.kind !== 'theme') return;
+    previewing = entry.fullUrl;
     error = null;
     try {
-      await loadCatalog((entry) => {
-        entries = [...entries, entry];
+      const css = await fetchCatalogFile(entry.fullUrl);
+      const parsed = parseThemeFile(css, entry.basename);
+      if (typeof parsed === 'string' || parsed.kind !== 'theme') throw new Error(String(parsed));
+      previewTheme({
+        source: entry.fullUrl,
+        name: parsed.theme.name,
+        kind: parsed.theme.kind,
+        css,
       });
-    } catch (reason) {
-      console.debug('[sable themes] catalog unavailable', reason);
-      error = $i18n.t('settings.customThemesErrorLoad');
+    } catch {
+      error = $i18n.t('settings.customThemesErrorInstall', { file: entryName(entry) });
     } finally {
-      loading = false;
+      previewing = null;
     }
   }
 
+  function keepPreview(): void {
+    const preview = themePreview.current;
+    if (!preview) return;
+    clearThemePreview();
+    install(preview.css, preview.name, preview.source);
+  }
+
+  $effect(() => {
+    if (!catalogOpen) untrack(clearThemePreview);
+  });
+
+  onDestroy(clearThemePreview);
+
   async function installFromCatalog(entry: CatalogEntry): Promise<void> {
     installing = entry.fullUrl;
+    error = null;
     try {
-      const response = await fetch(entry.fullUrl);
-      if (!response.ok) throw new Error('unavailable');
-      install(await response.text(), entry.basename, entry.fullUrl);
+      if (themePreview.current?.source === entry.fullUrl) clearThemePreview();
+      install(await fetchCatalogFile(entry.fullUrl), entry.basename, entry.fullUrl);
     } catch {
       error = $i18n.t('settings.customThemesErrorInstall', { file: entryName(entry) });
     } finally {
@@ -107,6 +180,7 @@
   }
 
   async function importFiles(files: FileList | File[]): Promise<void> {
+    error = null;
     for (const file of files) {
       if (!isThemeFileName(file.name)) {
         error = $i18n.t('settings.customThemesErrorChoose');
@@ -125,21 +199,18 @@
     }
   }
 
-  function inUse(theme: CustomTheme): boolean {
-    return selectedCustomThemeId(theme.kind) === theme.id;
+  function openCatalog(tab: 'theme' | 'tweak'): void {
+    catalogTab = tab;
+    catalogOpen = true;
   }
 
-  function entryDetail(entry: CatalogEntry): string {
-    const kind =
-      entry.kind === 'tweak'
-        ? entry.meta.description
-        : entry.meta.kind === 'dark'
-          ? $i18n.t('settings.customThemesDarkTheme')
-          : $i18n.t('settings.customThemesLightTheme');
-    const author = entry.meta.author
-      ? $i18n.t('settings.themeBy', { author: entry.meta.author })
-      : null;
-    return [kind, author].filter((part) => part !== null && part !== '').join(' · ');
+  function use(theme: CustomTheme): void {
+    selectCustomTheme(theme.kind, theme.id);
+  }
+
+  function askRemoval(kind: 'theme' | 'tweak', id: string, name: string): void {
+    settleUndo();
+    pendingRemoval = { kind, id, name };
   }
 
   function confirmRemoval(): void {
@@ -149,39 +220,75 @@
   }
 </script>
 
-{#snippet catalogCard(entry: CatalogEntry)}
-  {@const installed = installedSources.has(entry.fullUrl)}
-  <li class="card">
-    {#if entry.kind === 'theme'}<ThemeSwatches colors={entry.swatches} />{/if}
-    <span class="identity">
-      <span class="name">{entryName(entry)}</span>
-      <span class="meta">{entryDetail(entry)}</span>
-    </span>
-    <Button
-      size="small"
-      variant="secondary"
-      disabled={installed || installing === entry.fullUrl}
-      loading={installing === entry.fullUrl}
-      onclick={() => void installFromCatalog(entry)}
-    >
-      {installed ? $i18n.t('settings.themeFileInstalled') : $i18n.t('settings.themeFileInstall')}
-    </Button>
-  </li>
-{/snippet}
+<div class="custom-themes settings-form">
+  <p class="themes-hint">{$i18n.t('settings.customThemesSlotsHint')}</p>
 
-<section class="custom-themes settings-form" aria-labelledby="custom-themes-title">
-  <div>
-    <div class="settings-heading-row">
-      <h3 id="custom-themes-title" data-settings-outline>{$i18n.t('settings.customThemes')}</h3>
-      <SettingsAnchorLink anchor="custom-themes-title" />
+  {#each SLOTS as slot (slot)}
+    {@const themes = customThemes.themes.filter((theme) => theme.kind === slot)}
+    {@const selected = selectedCustomThemeId(slot)}
+    {@const slotName =
+      slot === 'light'
+        ? $i18n.t('settings.customThemesLightSlot')
+        : $i18n.t('settings.customThemesDarkSlot')}
+    <div class="slot">
+      <div class="slot-head">
+        <span class="slot-name" id={`theme-slot-${slot}`}>{slotName}</span>
+        {#if showing === slot}
+          <StatusBadge variant="primary" label={$i18n.t('settings.themeShowingNow')} />
+        {/if}
+      </div>
+      <ul class="tiles" role="radiogroup" aria-labelledby={`theme-slot-${slot}`}>
+        <li>
+          <ThemeTile
+            name={$i18n.t('settings.themeSableDefault')}
+            swatches={DEFAULT_THEME_SWATCHES[slot]}
+            selected={selected === null}
+            onselect={() => {
+              selectCustomTheme(slot, null);
+            }}
+          />
+        </li>
+        {#each themes as theme (theme.id)}
+          <li>
+            <ThemeTile
+              name={theme.name}
+              swatches={themeSwatches(theme.css)}
+              selected={selected === theme.id}
+              onselect={() => {
+                use(theme);
+              }}
+            >
+              {#snippet actions()}
+                <IconButton
+                  variant="ghost"
+                  size="small"
+                  label={$i18n.t('settings.customThemesRemove', { name: theme.name })}
+                  onclick={() => {
+                    askRemoval('theme', theme.id, theme.name);
+                  }}
+                >
+                  <TrashIcon />
+                </IconButton>
+              {/snippet}
+            </ThemeTile>
+          </li>
+        {/each}
+      </ul>
     </div>
-    <p>{$i18n.t('settings.customThemesHint')}</p>
-  </div>
+  {/each}
+
   <div class="actions">
-    <Button size="small" aria-expanded={browsing} onclick={() => void browse()}>
-      {browsing ? $i18n.t('settings.themeCatalogClose') : $i18n.t('settings.customThemesBrowse')}
+    <Button
+      variant="primary"
+      aria-haspopup="dialog"
+      aria-expanded={catalogOpen && catalogTab === 'theme'}
+      onclick={() => {
+        openCatalog('theme');
+      }}
+    >
+      {$i18n.t('settings.customThemesBrowse')}
     </Button>
-    <Button size="small" variant="secondary" onclick={() => void importTheme()}>
+    <Button variant="secondary" onclick={() => void importTheme()}>
       {$i18n.t('settings.customThemesImport')}
     </Button>
     <input
@@ -194,228 +301,196 @@
   </div>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 
-  {#if customThemes.themes.length > 0}
-    <h4>{$i18n.t('settings.customThemesInstalled')}</h4>
-    <ul class="cards">
-      {#each customThemes.themes as theme (theme.id)}
-        {@const used = inUse(theme)}
-        <li class="card">
-          <ThemeSwatches colors={themeSwatches(theme.css)} />
-          <span class="identity">
-            <span class="name">{theme.name}</span>
-            <span class="meta">
-              {theme.kind === 'light'
-                ? $i18n.t('settings.customThemesLightTheme')
-                : $i18n.t('settings.customThemesDarkTheme')}
-            </span>
-          </span>
-          <Button
-            size="small"
-            variant="secondary"
-            class="choice"
-            aria-pressed={used}
-            onclick={() => {
-              selectCustomTheme(theme.kind, used ? null : theme.id);
-            }}
-          >
-            {#if used}<CheckIcon />{/if}
-            {used ? $i18n.t('settings.themeInUse') : $i18n.t('settings.themeUse')}
-          </Button>
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={$i18n.t('settings.customThemesRemove', { name: theme.name })}
-            onclick={() => {
-              pendingRemoval = { kind: 'theme', id: theme.id, name: theme.name };
-            }}
-          >
-            <TrashIcon />
-          </IconButton>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  {#if customThemes.tweaks.length > 0}
-    <h4>{$i18n.t('settings.customTweaksInstalled')}</h4>
-    <ul class="cards">
-      {#each customThemes.tweaks as tweak (tweak.id)}
-        {@const description = themeFileMetadata(tweak.css).description}
-        <li class="card">
-          <span class="identity">
-            <span class="name">{tweak.name}</span>
-            {#if description}<span class="meta">{description}</span>{/if}
-          </span>
-          <Switch
-            label={tweak.name}
-            checked={customThemes.enabledTweakIds.includes(tweak.id)}
-            onCheckedChange={(checked) => {
-              enableCustomTweak(tweak.id, checked);
-            }}
-          />
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={$i18n.t('settings.customThemesRemove', { name: tweak.name })}
-            onclick={() => {
-              pendingRemoval = { kind: 'tweak', id: tweak.id, name: tweak.name };
-            }}
-          >
-            <TrashIcon />
-          </IconButton>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  {#if browsing}
-    <div class="catalog" aria-busy={loading}>
-      <TextInput
-        type="search"
-        bind:value={filter.query}
-        placeholder={$i18n.t('settings.themeCatalogSearch')}
-        aria-label={$i18n.t('settings.themeCatalogSearch')}
-      />
-      <div class="chips" role="group" aria-label={$i18n.t('settings.themeCatalogFilters')}>
-        {#each kinds as option (option.value)}
-          <Button
-            size="small"
-            variant="secondary"
-            class="choice"
-            aria-pressed={filter.kind === option.value}
-            onclick={() => (filter.kind = option.value)}
-          >
-            {$i18n.t(option.label)}
-          </Button>
-        {/each}
-        <Button
-          size="small"
-          variant="secondary"
-          class="choice"
-          aria-pressed={filter.highContrast}
-          onclick={() => (filter.highContrast = !filter.highContrast)}
-        >
-          {$i18n.t('settings.themeCatalogHighContrast')}
-        </Button>
-      </div>
-
-      <h4>{$i18n.t('settings.themeCatalogThemes')}</h4>
-      {#if shownThemes.length > 0}
-        <ul class="cards">
-          {#each shownThemes as entry (entry.fullUrl)}{@render catalogCard(entry)}{/each}
-        </ul>
-      {:else if !loading}
-        <p>{$i18n.t('settings.themeCatalogEmpty')}</p>
-      {/if}
-
-      {#if tweaksShown}
-        <h4>{$i18n.t('settings.themeCatalogTweaks')}</h4>
-        {#if shownTweaks.length > 0}
-          <ul class="cards">
-            {#each shownTweaks as entry (entry.fullUrl)}{@render catalogCard(entry)}{/each}
-          </ul>
-        {:else if !loading}
-          <p>{$i18n.t('settings.themeCatalogEmpty')}</p>
-        {/if}
-      {/if}
+  <section class="tweaks-block" aria-labelledby="custom-tweaks-title">
+    <div class="settings-heading-row">
+      <h3 id="custom-tweaks-title" data-settings-outline>{$i18n.t('settings.customTweaks')}</h3>
+      <SettingsAnchorLink anchor="custom-tweaks-title" />
     </div>
-  {/if}
-</section>
+    <p class="themes-hint">{$i18n.t('settings.themeCatalogTweaksHint')}</p>
+    {#if customThemes.tweaks.length > 0}
+      <ul class="tweaks">
+        {#each customThemes.tweaks as tweak (tweak.id)}
+          {@const description = themeFileMetadata(tweak.css).description}
+          <li class="tweak" class:inert-tweak={tweaksInert}>
+            <span class="tweak-copy">
+              <span class="tweak-name">{tweak.name}</span>
+              {#if description}<span class="tweak-detail">{description}</span>{/if}
+              {#if tweaksInert}
+                <span class="tweak-note">{$i18n.t('settings.tweakNeedsTheme')}</span>
+              {/if}
+            </span>
+            <IconButton
+              variant="ghost"
+              size="small"
+              label={$i18n.t('settings.customThemesRemove', { name: tweak.name })}
+              onclick={() => {
+                askRemoval('tweak', tweak.id, tweak.name);
+              }}
+            >
+              <TrashIcon />
+            </IconButton>
+            <Switch
+              label={tweak.name}
+              checked={customThemes.enabledTweakIds.includes(tweak.id)}
+              onCheckedChange={(checked) => {
+                enableCustomTweak(tweak.id, checked);
+              }}
+            />
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <div class="actions">
+      <Button
+        variant="secondary"
+        aria-haspopup="dialog"
+        aria-expanded={catalogOpen && catalogTab === 'tweak'}
+        onclick={() => {
+          openCatalog('tweak');
+        }}
+      >
+        {$i18n.t('settings.customThemesBrowseTweaks')}
+      </Button>
+    </div>
+  </section>
+</div>
 
-<ConfirmDialog
-  open={pendingRemoval !== null}
-  onOpenChange={(next: boolean) => {
-    if (!next) pendingRemoval = null;
-  }}
-  title={$i18n.t('settings.customThemesRemoveTitle', { name: pendingRemoval?.name ?? '' })}
-  description={$i18n.t('settings.customThemesRemoveHint')}
-  confirmLabel={$i18n.t('settings.customThemesRemove', { name: pendingRemoval?.name ?? '' })}
-  onConfirm={confirmRemoval}
-/>
+{#if catalogOpen}
+  <ThemeCatalog
+    bind:open={catalogOpen}
+    initialTab={catalogTab}
+    {installing}
+    {previewing}
+    preview={themePreview.current}
+    oninstall={(entry) => void installFromCatalog(entry)}
+    onpreview={(entry) => void tryFromCatalog(entry)}
+    onkeep={keepPreview}
+    onrevert={clearThemePreview}
+    onuse={use}
+    onimport={() => void importTheme()}
+  />
+{/if}
+
+{#if pendingRemoval !== null}
+  <ConfirmDialog
+    open={pendingRemoval !== null}
+    onOpenChange={(next: boolean) => {
+      if (!next) pendingRemoval = null;
+    }}
+    title={$i18n.t('settings.customThemesRemoveTitle', { name: pendingRemoval?.name ?? '' })}
+    description={$i18n.t('settings.customThemesRemoveHint')}
+    confirmLabel={$i18n.t('settings.customThemesRemove', { name: pendingRemoval?.name ?? '' })}
+    onConfirm={confirmRemoval}
+  />
+{/if}
 
 <style>
   .custom-themes {
     display: grid;
-    gap: var(--space-300);
+    gap: var(--space-400);
   }
 
   h3,
-  h4,
   p {
     margin: 0;
   }
 
-  h3 {
-    font-size: var(--font-size-body);
-  }
-
-  h4 {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
+  h3,
+  .slot-name {
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
   }
 
-  p {
+  .themes-hint {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+    max-width: 60ch;
   }
 
-  .actions,
-  .chips {
+  .slot {
+    display: grid;
+    gap: var(--space-200);
+  }
+
+  .slot-head {
+    align-items: center;
     display: flex;
-    flex-wrap: wrap;
     gap: var(--space-200);
   }
 
-  .catalog {
+  .tiles {
     display: grid;
-    gap: var(--space-300);
-  }
-
-  .cards {
-    display: grid;
-    gap: var(--space-200);
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+    gap: var(--space-400);
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
-  .card {
-    align-items: center;
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius);
+  .actions {
     display: flex;
-    gap: var(--space-300);
-    min-width: 0;
-    padding: var(--space-200) var(--space-300);
+    flex-wrap: wrap;
+    gap: var(--space-200);
   }
 
-  .identity {
+  .actions :global(.btn) {
+    min-height: max(var(--control-height-400), var(--target-hit));
+  }
+
+  .tweaks-block {
+    border-top: var(--border-width) solid var(--surface-container-line);
+    display: grid;
+    gap: var(--space-200);
+    padding-top: var(--space-400);
+  }
+
+  .tweaks {
+    display: grid;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .tweak {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+    min-height: var(--target-hit);
+  }
+
+  .tweak + .tweak {
+    border-top: var(--border-width) solid var(--surface-container-line);
+  }
+
+  .tweak-copy {
     display: grid;
     flex: 1;
     min-width: 0;
   }
 
-  .name,
-  .meta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .tweak-note {
+    color: var(--warn-on-container);
+    font-size: var(--font-size-small);
   }
 
-  .name {
-    font-size: var(--font-size-small);
+  .tweak-name {
+    font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
   }
 
-  .meta {
+  .tweak-detail {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+    overflow-wrap: anywhere;
+  }
+
+  .inert-tweak .tweak-name,
+  .inert-tweak .tweak-detail {
+    opacity: 0.65;
   }
 
   .error {
     color: var(--crit-main);
+    font-size: var(--font-size-small);
   }
 </style>

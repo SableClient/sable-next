@@ -20,10 +20,17 @@
     settingsCategories,
   } from '#lib/settings/registry.js';
   import { createMasterDetail } from '#lib/ui/master-detail.svelte.js';
-  import Button from '#lib/ui/primitives/Button.svelte';
+  import { shouldReduceMotion } from '#lib/ui/motion.js';
+  import {
+    finishSwipeGesture,
+    startSwipeGesture,
+    updateSwipeGesture,
+    type SwipeGesture,
+  } from '#lib/ui/swipe-gesture.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsNav from '#lib/ui/primitives/SettingsNav.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import SettingsJumpSheet from './SettingsJumpSheet.svelte';
   import SettingsOutline from './SettingsOutline.svelte';
   import { findStandaloneSection, settingsNavGroups } from './sections.js';
   import { OutlineTracker } from './settings-outline.svelte.js';
@@ -38,7 +45,8 @@
     content: Snippet<[string]>;
   }
 
-  let { section, onSelect, onBack, onClose, content }: Props = $props();
+  let { section, onSelect, onBack, onClose, content: renderContent }: Props = $props();
+  const SWIPE_IGNORE = '.slider, [data-sheet-no-drag]';
   const core = useCoreClient();
   const signOut = new SignOutGuard(core);
   const groups = settingsNavGroups.map((group) => ({
@@ -66,6 +74,44 @@
     trimmedQuery ? searchSettings(trimmedQuery, settingsCategories, $i18n.t) : []
   );
 
+  let swipe: SwipeGesture | undefined;
+  let swipeOffset = $state(0);
+  let swiping = $state(false);
+  let revealed = $state(false);
+  let content = $state<HTMLElement | null>(null);
+
+  function startSwipe(event: TouchEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    swipe = target?.closest(SWIPE_IGNORE) ? undefined : startSwipeGesture(event, 0);
+  }
+
+  function moveSwipe(event: TouchEvent): void {
+    if (!swipe) return;
+    const update = updateSwipeGesture(swipe, event);
+    if (!update || update.mode !== 'horizontal') return;
+    swiping = true;
+    revealed = true;
+    swipeOffset = Math.max(0, update.distanceX);
+  }
+
+  function finishSwipe(cancelled: boolean): void {
+    const active = swipe;
+    swipe = undefined;
+    swiping = false;
+    if (!active) return;
+    const offset = swipeOffset;
+    swipeOffset = 0;
+    const result = finishSwipeGesture(active, offset, cancelled);
+    if (!result.handled) return;
+    const width = content?.clientWidth ?? 0;
+    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
+      revealed = false;
+      onBack();
+      return;
+    }
+    if (offset === 0 || shouldReduceMotion()) revealed = false;
+  }
+
   function select(event: MouseEvent, nextSection: string, focus?: string): void {
     if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
 
@@ -80,12 +126,23 @@
   {/if}
 {/snippet}
 
+{#snippet logoutRow()}
+  <button
+    type="button"
+    class="settings-logout"
+    onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
+  >
+    <SignOutIcon aria-hidden="true" />
+    <span>{$i18n.t('settings.logout')}</span>
+  </button>
+{/snippet}
+
 <div class="settings-shell" class:paged={!pages.desktop}>
   <Dialog.Description class="screen-reader-only">
     {$i18n.t('settings.dialogDescription')}
   </Dialog.Description>
 
-  {#if pages.showList}
+  {#if pages.showList || revealed}
     <aside
       class="settings-nav"
       class:settings-nav-paged={!pages.desktop}
@@ -159,27 +216,40 @@
           showChevron={!pages.desktop}
           large={!pages.desktop}
           current={pages.desktop ? currentOutline : undefined}
+          footer={logoutRow}
         />
       {/if}
-      <Button
-        class="settings-logout"
-        variant="danger"
-        onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
-      >
-        <SignOutIcon />
-        <span class="logout-label">{$i18n.t('settings.logout')}</span>
-      </Button>
     </aside>
   {/if}
 
   {#if pages.showContent && pages.openSection}
-    <div class="settings-content">
+    <section
+      class="settings-content"
+      aria-label={$i18n.t(activeLabel)}
+      class:swiping
+      class:swiped={revealed}
+      style:transform={swipeOffset > 0 ? `translateX(${String(swipeOffset)}px)` : undefined}
+      bind:this={content}
+      ontouchstart={pages.desktop ? undefined : startSwipe}
+      ontouchmove={pages.desktop ? undefined : moveSwipe}
+      ontouchend={pages.desktop ? undefined : () => finishSwipe(false)}
+      ontouchcancel={pages.desktop ? undefined : () => finishSwipe(true)}
+      ontransitionend={(event) => {
+        if (event.target === event.currentTarget && !swiping) revealed = false;
+      }}
+    >
       {#if !pages.desktop}
         <div class="settings-title section-bar settings-nav-header">
           <IconButton variant="ghost" size="small" label={$i18n.t('settings.back')} onclick={onBack}
             ><ArrowLeftIcon /></IconButton
           >
-          <Dialog.Title class="settings-heading">{$i18n.t(activeLabel)}</Dialog.Title>
+          <Dialog.Title class="settings-heading">
+            {#if outline.entries.length > 1}
+              <SettingsJumpSheet {outline} title={$i18n.t(activeLabel)} />
+            {:else}
+              {$i18n.t(activeLabel)}
+            {/if}
+          </Dialog.Title>
           <IconButton
             variant="ghost"
             size="small"
@@ -190,10 +260,10 @@
       {/if}
       {#key pages.openSection}
         <div class="settings-scroll" {@attach outline.track}>
-          {@render content(pages.openSection)}
+          {@render renderContent(pages.openSection)}
         </div>
       {/key}
-    </div>
+    </section>
   {/if}
 </div>
 
@@ -326,12 +396,37 @@
     width: var(--icon-size-small);
   }
 
-  :global(.settings-logout) {
-    flex: 0 0 auto;
-    justify-content: flex-start;
-    margin: auto var(--space-200) 0;
+  .settings-logout {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--crit-main);
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-medium);
+    gap: var(--space-300);
     min-height: var(--control-height-medium);
-    width: auto;
+    padding: 0 var(--space-300);
+    text-align: start;
+    width: 100%;
+  }
+
+  .settings-logout:hover {
+    background: var(--bg-container-hover);
+  }
+
+  .settings-logout:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(var(--focus-ring-width) * -1);
+  }
+
+  .settings-logout :global(svg) {
+    flex: 0 0 auto;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .settings-content {
@@ -344,6 +439,20 @@
     height: 100%;
     min-width: 0;
     width: 100%;
+  }
+
+  .paged {
+    position: relative;
+  }
+
+  .paged .settings-content.swiped {
+    box-shadow: var(--shadow-dialog);
+    inset: 0;
+    position: absolute;
+  }
+
+  .paged .settings-content:not(.swiping) {
+    transition: transform var(--duration-fast) var(--ease-smooth-out);
   }
 
   .settings-scroll {
@@ -369,12 +478,27 @@
     white-space: nowrap;
   }
 
+  .paged .settings-scroll :global(.app-page-header) {
+    padding-inline: var(--space-400);
+  }
+
+  .paged .settings-scroll :global(.app-page-header h1) {
+    border: 0;
+    clip-path: inset(50%);
+    height: 1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
   .paged .search-results a {
     border-left: 0;
     min-height: var(--control-height-large);
   }
 
-  .paged :global(.settings-logout) {
+  .paged .settings-logout {
     min-height: var(--control-height-large);
   }
 </style>

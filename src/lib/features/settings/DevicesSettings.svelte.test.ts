@@ -130,8 +130,10 @@ test('renames the current device', async () => {
     expect(document.querySelectorAll('.device').length).toBe(3);
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.device-actions .btn')[0].click();
-  await tick();
+  document.querySelectorAll<HTMLButtonElement>('.device-actions .icon-button')[0].click();
+  await vi.waitFor(() => {
+    expect(document.querySelector('#device-OWN')).not.toBeNull();
+  });
 
   const input = document.querySelectorAll<HTMLInputElement>('#device-OWN')[0];
   input.value = 'Laptop';

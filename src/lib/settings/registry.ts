@@ -353,7 +353,8 @@ export const settingsCategories: SettingsCategory[] = [
     description: 'settings.appearanceDescription',
     icon: PaintBrushIcon,
     sections: [
-      { id: 'theme-language', name: 'settings.groups.themeLanguage' },
+      { id: 'themes', name: 'settings.groups.themes' },
+      { id: 'app-language', name: 'settings.groups.language' },
       { id: 'message-layout', name: 'settings.groups.messageLayout' },
       { id: 'sidebar', name: 'settings.groups.sidebar' },
       { id: 'unread-badges', name: 'settings.groups.unreadBadges' },
@@ -362,7 +363,7 @@ export const settingsCategories: SettingsCategory[] = [
     items: [
       {
         key: 'language',
-        section: 'theme-language',
+        section: 'app-language',
         icon: TranslateIcon,
         name: 'settings.language',
         description: 'settings.languageHint',
@@ -381,7 +382,7 @@ export const settingsCategories: SettingsCategory[] = [
       },
       {
         key: 'theme',
-        section: 'theme-language',
+        section: 'themes',
         icon: MoonIcon,
         name: 'settings.theme',
         description: 'settings.themeHint',

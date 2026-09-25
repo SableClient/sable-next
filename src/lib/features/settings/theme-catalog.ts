@@ -1,11 +1,13 @@
 import { isRecord } from '#lib/guards.js';
 import {
+  MAX_THEME_FILE_BYTES,
   themeFileMetadata,
   themeSwatches,
   type ThemeFileMetadata,
 } from '#lib/settings/theme-file.js';
 
 export const CATALOG_URL = 'https://raw.githubusercontent.com/SableClient/themes/main/catalog.json';
+const CATALOG_FILES = 'https://raw.githubusercontent.com/SableClient/themes/';
 const DESCRIBE_CONCURRENCY = 6;
 
 interface CatalogRow {
@@ -28,19 +30,45 @@ export interface CatalogFilter {
   highContrast: boolean;
 }
 
+export function catalogFileUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  const href = url.href;
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) {
+    return null;
+  }
+  return href.startsWith(CATALOG_FILES) && !href.includes('/../') ? href : null;
+}
+
 function rows(value: unknown): CatalogRow[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((row) => {
-    if (!isRecord(row) || typeof row.basename !== 'string' || typeof row.fullUrl !== 'string') {
-      return [];
-    }
-    const previewUrl = typeof row.previewUrl === 'string' ? row.previewUrl : null;
-    return [{ basename: row.basename, previewUrl, fullUrl: row.fullUrl }];
+    if (!isRecord(row) || typeof row.basename !== 'string') return [];
+    const fullUrl = catalogFileUrl(row.fullUrl);
+    if (fullUrl === null) return [];
+    return [
+      { basename: row.basename.slice(0, 128), previewUrl: catalogFileUrl(row.previewUrl), fullUrl },
+    ];
   });
 }
 
+export async function fetchCatalogFile(url: string): Promise<string> {
+  const safe = catalogFileUrl(url);
+  if (safe === null) throw new Error('catalog file outside the catalog');
+  const response = await fetch(safe, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+  if (!response.ok) throw new Error(`catalog file answered ${String(response.status)}`);
+  const css = await response.text();
+  if (css.length > MAX_THEME_FILE_BYTES) throw new Error('catalog file too large');
+  return css;
+}
+
 export async function fetchCatalog(): Promise<{ themes: CatalogRow[]; tweaks: CatalogRow[] }> {
-  const response = await fetch(CATALOG_URL);
+  const response = await fetch(CATALOG_URL, { credentials: 'omit', referrerPolicy: 'no-referrer' });
   if (!response.ok) throw new Error(`catalog answered ${String(response.status)}`);
   const data: unknown = await response.json();
   if (!isRecord(data) || !Array.isArray(data.themes)) throw new Error('catalog unreadable');
@@ -48,8 +76,7 @@ export async function fetchCatalog(): Promise<{ themes: CatalogRow[]; tweaks: Ca
 }
 
 async function describe(kind: CatalogEntry['kind'], row: CatalogRow): Promise<CatalogEntry> {
-  const response = await fetch(row.previewUrl ?? row.fullUrl);
-  const css = response.ok ? await response.text() : '';
+  const css = await fetchCatalogFile(row.previewUrl ?? row.fullUrl).catch(() => '');
   return {
     kind,
     basename: row.basename,

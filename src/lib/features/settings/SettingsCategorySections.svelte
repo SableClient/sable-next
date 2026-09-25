@@ -46,6 +46,10 @@
     );
   }
 
+  function gateName(setting: SettingDefinition): string {
+    return items.find((item) => item.key === setting.gatedBy)?.name ?? '';
+  }
+
   /** Sentry reads its consent once, at boot. */
   let reloadPending = $state(false);
 </script>
@@ -62,8 +66,13 @@
         title={$i18n.t(setting.name)}
         description={setting.description ? $i18n.t(setting.description) : undefined}
         {disabled}
-        badge={setting.unavailable ? $i18n.t('settings.notAvailableYet') : undefined}
+        badge={setting.unavailable
+          ? $i18n.t('settings.notAvailableYet')
+          : gate
+            ? $i18n.t('settings.needsSetting', { name: $i18n.t(gateName(setting)) })
+            : undefined}
         wide={setting.type !== 'boolean'}
+        control={setting.type === 'boolean' && !disabled ? `${anchor}-switch` : undefined}
         class={setting.gatedBy !== undefined ? 'gated' : undefined}
       >
         {#if setting.type === 'select'}
@@ -105,6 +114,7 @@
         {:else}
           {@const key = setting.key}
           <Switch
+            id={`${anchor}-switch`}
             {disabled}
             label={$i18n.t(setting.name)}
             checked={gate ? false : preferences[key]}
@@ -138,8 +148,13 @@
 
   {#each sections as { section, rows, panels: sectionPanels } (section.id)}
     <SettingsSection title={$i18n.t(section.name)} headingId={section.id}>
+      {#each sectionPanels.filter((panel) => panel.start) as panel (panel.component)}
+        <panel.component />
+      {/each}
       {#if rows.length > 0}{@render settingRows(rows)}{/if}
-      {#each sectionPanels as panel (panel.component)}<panel.component />{/each}
+      {#each sectionPanels.filter((panel) => !panel.start) as panel (panel.component)}
+        <panel.component />
+      {/each}
     </SettingsSection>
   {/each}
 

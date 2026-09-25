@@ -3,11 +3,15 @@
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { longPress } from '#lib/ui/long-press.svelte.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import { settingsAnchors } from './settings-anchors.js';
 
   interface Props {
     anchor: string;
   }
+
+  const HOSTS = '.setting-row, .settings-section-header, .settings-heading-row';
 
   let { anchor }: Props = $props();
   const link = settingsAnchors()?.link;
@@ -22,6 +26,18 @@
       copied = false;
     }, 2000);
   }
+
+  function pressToCopy(build: (anchor: string) => string) {
+    return (button: HTMLElement): (() => void) | undefined => {
+      const host = button.closest(HOSTS);
+      if (!host) return undefined;
+      return longPress({
+        onPress: () => {
+          void copy(build).then(() => toasts.info($i18n.t('settings.linkCopied')));
+        },
+      })(host);
+    };
+  }
 </script>
 
 {#if link}
@@ -30,6 +46,7 @@
     class="anchor-link"
     aria-label={$i18n.t(copied ? 'settings.linkCopied' : 'settings.copyLink')}
     onclick={() => void copy(link)}
+    {@attach pressToCopy(link)}
   >
     {#if copied}<CheckIcon />{:else}<LinkIcon />{/if}
   </button>
@@ -64,6 +81,17 @@
   .anchor-link :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  @media (pointer: coarse) {
+    .anchor-link {
+      display: none;
+    }
+
+    :global(:is(.setting-row, .settings-section-header, .settings-heading-row):has(.anchor-link)) {
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
   }
 
   @media (hover: hover) {

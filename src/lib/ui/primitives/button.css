@@ -155,3 +155,15 @@
   --button-line: transparent;
   --button-on-container: inherit;
 }
+
+@media (pointer: coarse) {
+  .btn-small:not(.icon-button) {
+    position: relative;
+  }
+
+  .btn-small:not(.icon-button)::after {
+    content: '';
+    inset: calc((var(--button-height) - var(--target-hit)) / 2) 0;
+    position: absolute;
+  }
+}

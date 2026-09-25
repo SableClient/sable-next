@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 import {
   MAX_THEME_FILE_BYTES,
   parseThemeFile,
+  safeSwatch,
   themeFileBaseName,
   themeFileMetadata,
   themeSwatches,
@@ -46,4 +47,25 @@ tags: dark, calm
     tags: ['dark', 'calm'],
   });
   expect(themeSwatches(css)).toEqual(['#2c2d32', '#5865f2']);
+});
+
+test.each([
+  'url(https://example.org/pixel.png)',
+  'var(--bg-container)',
+  'env(safe-area-inset-top)',
+  'image-set("x.png" 1x)',
+  `#${'0'.repeat(80)}`,
+])('a swatch that could reach outside the preview is refused: %s', (value) => {
+  expect(safeSwatch(value)).toBe(false);
+  expect(themeSwatches(`.x { --sable-bg-container: ${value}; }`)).toEqual([]);
+});
+
+test('a declaration smuggled after a colour stops at the colour', () => {
+  expect(safeSwatch('red; background: url(x)')).toBe(false);
+  expect(themeSwatches('.x { --sable-bg-container: red; background: url(x); }')).toEqual(['red']);
+});
+
+test('a plain colour is a safe swatch', () => {
+  expect(safeSwatch('#101018')).toBe(true);
+  expect(safeSwatch('rgb(16 16 24)')).toBe(true);
 });

@@ -95,7 +95,7 @@
           href={SABLE_DONATE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          variant="danger"
+          variant="primary"
           size="small"
         >
           <HeartIcon aria-hidden="true" />

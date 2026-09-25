@@ -2,7 +2,8 @@
   import { untrack } from 'svelte';
 
   import type { ProfileView } from '#src/generated/protocol';
-  import { i18n } from '#lib/i18n.js';
+  import { i18n, t } from '#lib/i18n.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { useCoreClient } from '#lib/core/context.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -24,7 +25,7 @@
 
   let { profile, onSaved, section }: Props = $props();
   const core = useCoreClient();
-  let bannerFile = $state<File | null>(null);
+  const BANNER_FIELD = 'chat.commet.profile_banner';
   let status = $state('');
   let bio = $state('');
   let pronouns = $state('');
@@ -44,6 +45,128 @@
   let banner = $derived(profile.banner_url?.startsWith('mxc://') ? profile.banner_url : null);
   let editKey = $state<{ key: string; value: string; original: string } | undefined>(undefined);
 
+  type Snapshot = Record<string, string>;
+  interface Group {
+    name: string;
+    read: () => Snapshot;
+    write: (snapshot: Snapshot) => void;
+    fields: () => Array<[string, unknown]>;
+  }
+
+  const groups = {
+    status: {
+      name: 'settings.status',
+      read: () => ({ status }),
+      write: (snapshot) => {
+        status = snapshot.status ?? '';
+      },
+      fields: () => [['m.status', status ? { text: status } : null]],
+    },
+    colors: {
+      name: 'settings.profileColors',
+      read: () => ({ lightColor, darkColor, heroColor, brightness }),
+      write: (snapshot) => {
+        lightColor = snapshot.lightColor ?? '';
+        darkColor = snapshot.darkColor ?? '';
+        heroColor = snapshot.heroColor ?? '';
+        brightness = snapshot.brightness === 'light' ? 'light' : 'dark';
+      },
+      fields: () => [
+        [
+          'eu.she-a.color',
+          lightColor || darkColor
+            ? { on_light: lightColor || null, on_dark: darkColor || null }
+            : null,
+        ],
+        ['chat.commet.profile_color_scheme', heroColor ? { color: heroColor, brightness } : null],
+      ],
+    },
+    identity: {
+      name: 'settings.pronounsAndTimezone',
+      read: () => ({ pronouns, timezone }),
+      write: (snapshot) => {
+        pronouns = snapshot.pronouns ?? '';
+        timezone = snapshot.timezone ?? '';
+      },
+      fields: () => [
+        ['io.fsky.nyx.pronouns', pronounSets()],
+        ['m.tz', timezone || null],
+        ['us.cloke.msc4175.tz', timezone || null],
+      ],
+    },
+    bio: {
+      name: 'settings.biography',
+      read: () => ({ bio }),
+      write: (snapshot) => {
+        bio = snapshot.bio ?? '';
+      },
+      fields: () => [
+        [
+          'gay.fomx.biography',
+          bio ? { 'm.text': [{ body: bio, mimetype: 'text/html' }, { body: bio }] } : null,
+        ],
+      ],
+    },
+    animal: {
+      name: 'settings.animalIdentity',
+      read: () => ({ isAnimal, hasAnimal, animalNeed }),
+      write: (snapshot) => {
+        isAnimal = snapshot.isAnimal ?? '';
+        hasAnimal = snapshot.hasAnimal ?? '';
+        animalNeed = snapshot.animalNeed ?? '';
+      },
+      fields: () => [
+        ['pet.plz.me', isAnimal || null],
+        ['pet.plz.my', hasAnimal || null],
+        ['pet.plz.gib', animalNeed || null],
+      ],
+    },
+  } satisfies Record<string, Group>;
+  type GroupKey = keyof typeof groups;
+
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- last-saved values, nothing renders them
+  const saved = new Map<GroupKey, Snapshot>();
+
+  function sameSnapshot(a: Snapshot, b: Snapshot): boolean {
+    return Object.keys(a).every((key) => a[key] === b[key]);
+  }
+
+  async function autosave(key: GroupKey): Promise<void> {
+    const group: Group = groups[key];
+    const before = saved.get(key);
+    const now = group.read();
+    if (before && sameSnapshot(before, now)) return;
+    saved.set(key, now);
+    if (!(await save(key, group.fields()))) {
+      if (before) saved.set(key, before);
+      return;
+    }
+    if (!before) return;
+    toasts.undoable(t('settings.savedField', { name: t(group.name) }), {
+      label: t('settings.undo'),
+      onUndo: () => {
+        group.write(before);
+        saved.set(key, before);
+        void save(key, group.fields());
+      },
+    });
+  }
+
+  function leaving(key: GroupKey) {
+    return (event: FocusEvent & { currentTarget: HTMLElement }): void => {
+      const next = event.relatedTarget;
+      if (next instanceof Node && event.currentTarget.contains(next)) return;
+      void autosave(key);
+    };
+  }
+
+  function submitting(key: GroupKey) {
+    return (event: SubmitEvent): void => {
+      event.preventDefault();
+      void autosave(key);
+    };
+  }
+
   $effect(() => {
     void core.session?.user_id;
     untrack(() => {
@@ -60,6 +183,7 @@
       isAnimal = profile.animal?.is_animal ?? '';
       hasAnimal = profile.animal?.has_animal ?? '';
       animalNeed = profile.animal?.animal_need ?? '';
+      for (const key of Object.keys(groups) as GroupKey[]) saved.set(key, groups[key].read());
     });
   });
 
@@ -81,37 +205,50 @@
     };
   });
 
-  async function save(key: string, fields: Array<[string, unknown]>): Promise<void> {
-    if (saving) return;
+  async function save(key: string, fields: Array<[string, unknown]>): Promise<boolean> {
     saving = key;
     error = null;
     try {
       for (const [field, value] of fields) await core.setProfileField(field, value);
       onSaved();
+      return true;
     } catch {
-      error = 'Could not save your profile changes.';
+      error = t('settings.profileSaveFailed');
+      return false;
+    } finally {
+      if (saving === key) saving = null;
+    }
+  }
+
+  function offerBannerUndo(previous: string | null): void {
+    toasts.undoable(t('settings.savedField', { name: t('settings.banner') }), {
+      label: t('settings.undo'),
+      onUndo: () => void save('banner', [[BANNER_FIELD, previous]]),
+    });
+  }
+
+  async function uploadBanner(file: File): Promise<void> {
+    const previous = profile.banner_url;
+    saving = 'banner';
+    error = null;
+    try {
+      const url = await core.commands.uploadMedia(
+        file.type || 'image/*',
+        new Uint8Array(await file.arrayBuffer())
+      );
+      await core.setProfileField(BANNER_FIELD, url);
+      onSaved();
+      offerBannerUndo(previous);
+    } catch {
+      error = t('settings.profileSaveFailed');
     } finally {
       saving = null;
     }
   }
 
-  async function saveBanner(): Promise<void> {
-    if (!bannerFile || saving) return;
-    saving = 'banner';
-    error = null;
-    try {
-      const url = await core.commands.uploadMedia(
-        bannerFile.type || 'image/*',
-        new Uint8Array(await bannerFile.arrayBuffer())
-      );
-      await core.setProfileField('chat.commet.profile_banner', url);
-      bannerFile = null;
-      onSaved();
-    } catch {
-      error = 'Could not save your profile changes.';
-    } finally {
-      saving = null;
-    }
+  async function removeBanner(): Promise<void> {
+    const previous = profile.banner_url;
+    if (await save('banner', [[BANNER_FIELD, null]])) offerBannerUndo(previous);
   }
 
   async function block(): Promise<void> {
@@ -176,23 +313,20 @@
           <input
             type="file"
             accept="image/*"
+            disabled={saving === 'banner'}
             onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-              bannerFile = event.currentTarget.files?.[0] ?? null;
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
+              if (file) void uploadBanner(file);
             }}
           />
           {profile.banner_url ? $i18n.t('settings.changeBanner') : $i18n.t('settings.saveBanner')}
         </label>
-        {#if bannerFile}<Button
-            size="small"
-            loading={saving === 'banner'}
-            onclick={() => void saveBanner()}>{$i18n.t('settings.saveButton')}</Button
-          >{/if}
         {#if profile.banner_url}<Button
-            variant="danger"
+            variant="ghost"
             size="small"
             loading={saving === 'banner'}
-            onclick={() => void save('banner', [['chat.commet.profile_banner', null]])}
-            >{$i18n.t('settings.removeButton')}</Button
+            onclick={() => void removeBanner()}>{$i18n.t('settings.removeButton')}</Button
           >{/if}
       </div>
     </div>{/if}
@@ -203,63 +337,46 @@
     >
       <form
         class="settings-form form-row"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void save('status', [['m.status', status ? { text: status } : null]]);
-        }}
+        onsubmit={submitting('status')}
+        onfocusout={leaving('status')}
       >
         <TextInput
           bind:value={status}
           placeholder={$i18n.t('settings.statusPlaceholder')}
           maxlength={256}
+          aria-label={$i18n.t('settings.status')}
         />
-        <Button type="submit" loading={saving === 'status'}>{$i18n.t('settings.saveButton')}</Button
-        >
       </form>
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.profileColors')} headingId="profile-colors">
-      <form
-        class="settings-form form-stack"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void save('colors', [
-            ['eu.she-a.color', { on_light: lightColor, on_dark: darkColor }],
-            ['chat.commet.profile_color_scheme', { color: heroColor, brightness }],
-          ]);
-        }}
-      >
+      <form class="settings-form form-stack" onsubmit={submitting('colors')}>
         <ColorSetting
           label={$i18n.t('settings.profileColorsOnDark')}
           bind:value={darkColor}
-          saving={saving === 'colors'}
-          onSave={() =>
-            void save('colors', [['eu.she-a.color', { on_light: lightColor, on_dark: darkColor }]])}
-          onReset={() =>
-            void save('colors', [
-              ['eu.she-a.color', { on_light: lightColor || null, on_dark: null }],
-            ])}
+          onCommit={() => void autosave('colors')}
+          onReset={() => {
+            darkColor = '';
+            void autosave('colors');
+          }}
         />
         <ColorSetting
           label={$i18n.t('settings.profileColorsOnLight')}
           bind:value={lightColor}
-          saving={saving === 'colors'}
-          onSave={() =>
-            void save('colors', [['eu.she-a.color', { on_light: lightColor, on_dark: darkColor }]])}
-          onReset={() =>
-            void save('colors', [
-              ['eu.she-a.color', { on_light: null, on_dark: darkColor || null }],
-            ])}
+          onCommit={() => void autosave('colors')}
+          onReset={() => {
+            lightColor = '';
+            void autosave('colors');
+          }}
         />
         <ColorSetting
           label={$i18n.t('settings.profileColorsBackground')}
           bind:value={heroColor}
-          saving={saving === 'colors'}
-          onSave={() =>
-            void save('colors', [
-              ['chat.commet.profile_color_scheme', { color: heroColor, brightness }],
-            ])}
-          onReset={() => void save('colors', [['chat.commet.profile_color_scheme', null]])}
+          onCommit={() => void autosave('colors')}
+          onReset={() => {
+            heroColor = '';
+            void autosave('colors');
+          }}
         />
         <label
           >{$i18n.t('settings.profileColorsBrightness')}<Select
@@ -268,9 +385,8 @@
               { value: 'light', label: $i18n.t('settings.profileColorsBrightnessLight') },
               { value: 'dark', label: $i18n.t('settings.profileColorsBrightnessDark') },
             ]}
+            onValueChange={() => void autosave('colors')}
           /></label
-        >
-        <Button type="submit" loading={saving === 'colors'}>{$i18n.t('settings.saveButton')}</Button
         >
       </form>
     </SettingsSection>
@@ -278,14 +394,8 @@
     <SettingsSection title={$i18n.t('settings.pronounsAndTimezone')} headingId="profile-identity">
       <form
         class="settings-form form-stack"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void save('identity', [
-            ['io.fsky.nyx.pronouns', pronounSets()],
-            ['m.tz', timezone || null],
-            ['us.cloke.msc4175.tz', timezone || null],
-          ]);
-        }}
+        onsubmit={submitting('identity')}
+        onfocusout={leaving('identity')}
       >
         <label
           >{$i18n.t('settings.pronouns')}
@@ -300,51 +410,26 @@
             placeholder={$i18n.t('settings.timezonePlaceholder')}
           /></label
         >
-        <Button type="submit" loading={saving === 'identity'}
-          >{$i18n.t('settings.saveButton')}</Button
-        >
       </form>
     </SettingsSection>
 
     <!-- very sloppy fix, WILL NEED A PROPER IMPLEMENTATION LATER i just cba to figure it out rnrn -->
     <SettingsSection title={$i18n.t('settings.biography')} headingId="profile-bio">
-      <form
-        class="settings-form form-stack"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void save('bio', [
-            [
-              'gay.fomx.biography',
-              bio
-                ? {
-                    'm.text': [
-                      { body: bio, mimetype: 'text/html' },
-                      {
-                        body: bio,
-                      },
-                    ],
-                  }
-                : null,
-            ],
-          ]);
-        }}
-      >
-        <TextArea bind:value={bio} rows={5} maxlength={5000} />
-        <Button type="submit" loading={saving === 'bio'}>{$i18n.t('settings.saveButton')}</Button>
+      <form class="settings-form form-stack" onfocusout={leaving('bio')}>
+        <TextArea
+          bind:value={bio}
+          rows={5}
+          maxlength={5000}
+          aria-label={$i18n.t('settings.biography')}
+        />
       </form>
     </SettingsSection>
 
     <SettingsSection title={$i18n.t('settings.animalIdentity')} headingId="profile-animal">
       <form
         class="settings-form form-stack"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void save('animal', [
-            ['pet.plz.me', isAnimal || null],
-            ['pet.plz.my', hasAnimal || null],
-            ['pet.plz.gib', animalNeed || null],
-          ]);
-        }}
+        onsubmit={submitting('animal')}
+        onfocusout={leaving('animal')}
       >
         <label
           >{$i18n.t('settings.animalIdentityWhatIs')}<TextInput
@@ -363,8 +448,6 @@
             bind:value={animalNeed}
             placeholder={$i18n.t('settings.animalIdentityWhatNeedsPlaceholder')}
           /></label
-        >
-        <Button type="submit" loading={saving === 'animal'}>{$i18n.t('settings.saveButton')}</Button
         >
       </form>
     </SettingsSection>

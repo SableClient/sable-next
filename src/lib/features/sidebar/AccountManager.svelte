@@ -21,7 +21,6 @@
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
-  import SettingsSheet from '#lib/features/settings/SettingsSheet.svelte';
   import { AccountDirectory } from './account-directory.svelte.js';
 
   const core = useCoreClient();
@@ -32,7 +31,6 @@
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
   let error = $state<string | null>(null);
-  let settingsOpen = $state(false);
   let profile = $state<ProfileView | null>(null);
   let activeAccountId = $derived(core.session?.account_id);
   let activeUserId = $derived(core.session?.user_id ?? '');
@@ -112,7 +110,7 @@
 </svelte:head>
 
 {#snippet profileActions()}
-  <Button variant="secondary" size="small" onclick={() => (settingsOpen = true)}
+  <Button variant="secondary" size="small" onclick={() => void goto(resolve('settings'))}
     >{$i18n.t('nav.settings')}</Button
   >
   <Button variant="secondary" size="small" onclick={() => void goto(resolve('settings/account'))}
@@ -276,10 +274,6 @@
     </DialogActions>
   </div>
 </DialogFrame>
-
-{#if settingsOpen}
-  <SettingsSheet bind:open={settingsOpen} />
-{/if}
 
 <style>
   .account-manager {

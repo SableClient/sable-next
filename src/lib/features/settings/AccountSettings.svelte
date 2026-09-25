@@ -4,7 +4,8 @@
   import type { ProfileView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { i18n } from '#lib/i18n.js';
+  import { i18n, t } from '#lib/i18n.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -71,48 +72,74 @@
     avatarPreview = file ? URL.createObjectURL(file) : null;
   }
 
+  function offerUndo(name: string, undo: () => Promise<void>): void {
+    toasts.undoable(t('settings.savedField', { name: t(name) }), {
+      label: t('settings.undo'),
+      onUndo: () => {
+        void undo().catch(() => {
+          error = t('settings.profileSaveFailed');
+        });
+      },
+    });
+  }
+
+  async function writeName(name: string | null): Promise<void> {
+    await core.commands.setDisplayName(name);
+    displayName = name ?? '';
+    if (profile) profile = { ...profile, display_name: name };
+  }
+
+  async function writeAvatar(url: string | null): Promise<void> {
+    await core.commands.setAvatarUrl(url);
+    if (profile) profile = { ...profile, avatar_url: url };
+  }
+
   async function saveName(): Promise<void> {
     if (!nameChanged || savingName) return;
+    const previous = profile?.display_name ?? null;
     savingName = true;
     error = null;
     try {
-      await core.commands.setDisplayName(displayName.trim() || null);
-      if (profile) profile = { ...profile, display_name: displayName.trim() || null };
+      await writeName(displayName.trim() || null);
+      offerUndo('settings.displayName', () => writeName(previous));
     } catch {
-      error = $i18n.t('settings.profileSaveFailed');
+      error = t('settings.profileSaveFailed');
     } finally {
       savingName = false;
     }
   }
 
-  async function saveAvatar(): Promise<void> {
-    if (!avatarFile || savingAvatar) return;
+  async function uploadAvatar(file: File): Promise<void> {
+    const previous = profile?.avatar_url ?? null;
+    setAvatar(file);
     savingAvatar = true;
     error = null;
     try {
-      const upright = await uprightJpeg(avatarFile);
+      const upright = await uprightJpeg(file);
       const url = await core.uploadAvatar(
         upright.type || 'image/*',
         new Uint8Array(await upright.arrayBuffer())
       );
       if (profile) profile = { ...profile, avatar_url: url };
-      setAvatar(null);
+      offerUndo('settings.avatar', () => writeAvatar(previous));
     } catch {
-      error = $i18n.t('settings.profileSaveFailed');
+      error = t('settings.profileSaveFailed');
     } finally {
+      setAvatar(null);
       savingAvatar = false;
     }
   }
 
   async function removeAvatar(): Promise<void> {
     if (savingAvatar || !profile?.avatar_url) return;
+    const previous = profile.avatar_url;
     savingAvatar = true;
     error = null;
     try {
-      await core.commands.setAvatarUrl(null);
-      profile = { ...profile, avatar_url: null };
+      await writeAvatar(null);
+      offerUndo('settings.avatar', () => writeAvatar(previous));
     } catch {
-      error = $i18n.t('settings.profileSaveFailed');
+      error = t('settings.profileSaveFailed');
     } finally {
       savingAvatar = false;
     }
@@ -162,18 +189,16 @@
                     accept="image/*"
                     disabled={savingAvatar}
                     onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-                      setAvatar(event.currentTarget.files?.[0] ?? null);
+                      const file = event.currentTarget.files?.[0];
+                      event.currentTarget.value = '';
+                      if (file) void uploadAvatar(file);
                     }}
                   />
                   {$i18n.t(profile?.avatar_url ? 'settings.changeAvatar' : 'settings.uploadAvatar')}
                 </label>
-                {#if avatarFile}
-                  <Button size="small" loading={savingAvatar} onclick={() => void saveAvatar()}>
-                    {$i18n.t('settings.save')}
-                  </Button>
-                {:else if profile?.avatar_url}
+                {#if profile?.avatar_url && !avatarFile}
                   <Button
-                    variant="danger"
+                    variant="ghost"
                     size="small"
                     loading={savingAvatar}
                     onclick={() => void removeAvatar()}
@@ -199,10 +224,8 @@
                 bind:value={displayName}
                 autocomplete="nickname"
                 maxlength={255}
+                onchange={() => void saveName()}
               />
-              <Button type="submit" loading={savingName} disabled={!nameChanged}>
-                {$i18n.t('settings.save')}
-              </Button>
             </div>
           </form>
         </div>

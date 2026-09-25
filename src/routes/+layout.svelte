@@ -30,7 +30,11 @@
     type TitleBarKind,
   } from '#lib/platform/window-decorations.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import { activeCustomThemeCss, activeTweakCss } from '#lib/settings/custom-themes.svelte.js';
+  import {
+    activeCustomThemeCss,
+    activeTweakCss,
+    themePreview,
+  } from '#lib/settings/custom-themes.svelte.js';
   import {
     applyCustomTheme,
     applyCustomTweaks,
@@ -105,6 +109,12 @@
   });
 
   $effect(() => {
+    const preview = themePreview.current;
+    if (preview) {
+      applyTheme(preview.kind, systemPrefersDark);
+      applyCustomTheme(preview.css);
+      return;
+    }
     applyTheme(preferences.theme, systemPrefersDark);
     applyCustomTheme(activeCustomThemeCss(resolveTheme(preferences.theme, systemPrefersDark)));
   });
