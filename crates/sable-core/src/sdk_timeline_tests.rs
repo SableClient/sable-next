@@ -1382,6 +1382,49 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
     assert_eq!(json[2]["size"], 4096);
 }
 
+#[tokio::test]
+async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!gallery-reply:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .gallery(
+                            String::new(),
+                            "beach.jpg".to_owned(),
+                            matrix_sdk::ruma::owned_mxc_uri!("mxc://example.org/beach"),
+                        )
+                        .event_id(event_id!("$gallery")),
+                )
+                .add_timeline_event(
+                    factory
+                        .text_msg("nice")
+                        .reply_to(event_id!("$gallery"))
+                        .event_id(event_id!("$reply")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let reply = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$reply")))
+        .and_then(|view| view.in_reply_to.as_ref())
+        .expect("a reply");
+
+    assert_eq!(reply.body.as_deref(), Some("beach.jpg"));
+}
+
 fn state_changes(
     views: &[crate::protocol::TimelineItemView],
 ) -> Vec<Option<crate::protocol::StateChangeView>> {

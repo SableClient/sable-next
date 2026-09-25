@@ -20,8 +20,11 @@ export function replyPreviewBody(content: TimelineItemContentView): string {
         ? content.filename
         : spoilerSafe(content.caption, content.html);
     case 'message':
-    case 'gallery':
       return spoilerSafe(content.body, content.html);
+    case 'gallery':
+      return content.body === ''
+        ? content.items.map((item) => item.filename).join(', ')
+        : spoilerSafe(content.body, content.html);
     case 'sticker':
     case 'location':
       return content.body;

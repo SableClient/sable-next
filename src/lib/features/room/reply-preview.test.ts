@@ -88,3 +88,32 @@ test('a spoiler stays hidden in the preview', () => {
     })
   ).toBe('[Spoiler]');
 });
+
+test('an uncaptioned gallery is quoted by its file names', () => {
+  expect(
+    replyPreviewBody({
+      kind: 'gallery',
+      body: '',
+      html: '',
+      items: [
+        {
+          kind: 'audio',
+          filename: 'memo.ogg',
+          caption: null,
+          source: '{}',
+          mime: null,
+          duration_ms: null,
+          waveform: null,
+        },
+        {
+          kind: 'file',
+          filename: 'notes.pdf',
+          caption: null,
+          source: '{}',
+          mime: 'application/pdf',
+          size: null,
+        },
+      ],
+    })
+  ).toBe('memo.ogg, notes.pdf');
+});

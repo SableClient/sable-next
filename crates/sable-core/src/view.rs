@@ -1794,10 +1794,21 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
 /// Plain text: a preview must not run untrusted HTML.
 fn body_of(content: &TimelineItemContent) -> Option<String> {
     match &msg_like(content)?.kind {
-        MsgLikeKind::Message(message) => Some(preview_body(
-            message.body(),
-            formatted_body(message.msgtype()).as_deref(),
-        )),
+        MsgLikeKind::Message(message) => Some(match message.msgtype() {
+            MessageType::Gallery(gallery) if gallery.body.is_empty() => gallery
+                .itemtypes
+                .iter()
+                .filter_map(|item| match item {
+                    GalleryItemType::Image(image) => Some(image.filename()),
+                    GalleryItemType::Video(video) => Some(video.filename()),
+                    GalleryItemType::Audio(audio) => Some(audio.filename()),
+                    GalleryItemType::File(file) => Some(file.filename()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+                .join(", "),
+            _ => preview_body(message.body(), formatted_body(message.msgtype()).as_deref()),
+        }),
         MsgLikeKind::Sticker(sticker) => Some(sticker.content().body.clone()),
         MsgLikeKind::Poll(state) => Some(state.results().question),
         _ => None,
