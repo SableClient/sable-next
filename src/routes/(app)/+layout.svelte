@@ -265,9 +265,12 @@
   let unreadTotal = $derived(
     countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
   );
+  let notifyingTotal = $derived(
+    countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).unread, 0)
+  );
 
   $effect(() => {
-    void setUnreadBadge(unreadTotal);
+    void setUnreadBadge(notifyingTotal);
   });
 
   $effect(() => {
