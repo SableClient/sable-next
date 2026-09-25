@@ -47,6 +47,7 @@
     "@tauri-apps/plugin-os": "2.3.2",
     "@tauri-apps/plugin-process": "2.3.1",
     "@tauri-apps/plugin-updater": "2.12.0",
+    "badwords-list": "2.0.1-4",
     "bits-ui": "^2.19.2",
     "blurhash": "2.0.5",
     "emojibase": "^17.0.0",
