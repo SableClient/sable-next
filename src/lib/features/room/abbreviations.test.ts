@@ -8,6 +8,7 @@ import {
   abbreviationPattern,
   ancestorSpaceIds,
   buildAbbreviationMap,
+  descendantRoomIds,
   markAbbreviations,
 } from './abbreviations';
 import type { AbbreviationEntry } from './settings/abbreviations';
@@ -112,4 +113,20 @@ test('stops on a cycle', () => {
     space('!b:example.org', ['!a:example.org']),
   ];
   expect(ancestorSpaceIds(rooms, '!a:example.org')).toEqual(['!b:example.org']);
+});
+
+test('walks every joined room and subspace below a space, nearest first', () => {
+  const room = (roomId: string) =>
+    ({ room_id: roomId, state: 'joined', space_children: [] }) as unknown as RoomSummary;
+  const rooms = [
+    space('!root:example.org', ['!mid:example.org', '!a:example.org', '!gone:example.org']),
+    space('!mid:example.org', ['!b:example.org', '!root:example.org']),
+    room('!a:example.org'),
+    room('!b:example.org'),
+  ];
+  expect(descendantRoomIds(rooms, '!root:example.org')).toEqual([
+    '!mid:example.org',
+    '!a:example.org',
+    '!b:example.org',
+  ]);
 });

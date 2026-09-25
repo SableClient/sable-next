@@ -22,7 +22,7 @@
 
   import '#lib/ui/primitives/settings-row.css';
 
-  import { ancestorSpaceIds } from '../abbreviations.js';
+  import { ancestorSpaceIds, descendantRoomIds } from '../abbreviations.js';
   import RoleTagIcon from '../RoleTagIcon.svelte';
   import {
     canSendState,
@@ -102,6 +102,13 @@
       ? syncChoice
       : (syncSpaceIds[0] ?? null)
   );
+
+  let childIds = $derived(
+    roomId && room?.is_space ? descendantRoomIds(roomList.rooms, roomId) : []
+  );
+  let childConfirm = $state(false);
+  let childSyncing = $state(false);
+  let childResult = $state<{ updated: number; skipped: number } | null>(null);
 
   $effect(() => {
     void roomId;
@@ -183,6 +190,47 @@
     } finally {
       syncing = false;
     }
+  }
+
+  async function syncChildren(): Promise<void> {
+    const space = levels;
+    const userId = core.session?.user_id;
+    if (!space || !userId || childSyncing) return;
+
+    childSyncing = true;
+    let updated = 0;
+    let skipped = 0;
+    for (const childId of childIds) {
+      try {
+        const current = await core.commands.roomPowerLevels(childId);
+        const own = current.users[userId] ?? current.users_default;
+        if (!canSendState(current, own, 'm.room.power_levels')) {
+          skipped += 1;
+          continue;
+        }
+        const next = syncedFromSpace(current, space, userId, own);
+        const content = toEventContent(next);
+        if (JSON.stringify(content) !== JSON.stringify(toEventContent(current))) {
+          await core.commands.sendStateEvent(childId, 'm.room.power_levels', '', content);
+        }
+        if (rawRoleTags && canSendState(next, own, POWER_LEVEL_TAGS_EVENT_TYPE)) {
+          const tags = await core.commands.roomStateEvent(childId, POWER_LEVEL_TAGS_EVENT_TYPE);
+          await core.commands.sendStateEvent(
+            childId,
+            POWER_LEVEL_TAGS_EVENT_TYPE,
+            '',
+            withPowerLevelTagsFrom(tags, rawRoleTags)
+          );
+        }
+        updated += 1;
+      } catch (error) {
+        console.warn('[sable room] child permission sync failed', error);
+        skipped += 1;
+      }
+    }
+    childResult = { updated, skipped };
+    childSyncing = false;
+    childConfirm = false;
   }
 
   function levelLabel(level: number): string {
@@ -420,6 +468,33 @@
       </SettingsSection>
     {/if}
 
+    {#if canEdit && childIds.length > 0}
+      <SettingsSection headingId="room-perm-children" title={$i18n.t('room.permChildrenTitle')}>
+        <ul class="settings-rows">
+          <SettingsRow
+            title={$i18n.t('room.permChildrenRow', { count: childIds.length })}
+            description={childResult
+              ? $i18n.t('room.permChildrenDone', {
+                  count: childResult.updated,
+                  skipped: childResult.skipped,
+                })
+              : $i18n.t('room.permChildrenHint')}
+          >
+            <Button
+              variant="secondary"
+              disabled={saving || childSyncing}
+              onclick={() => {
+                childResult = null;
+                childConfirm = true;
+              }}
+            >
+              {$i18n.t('room.permChildrenApply')}
+            </Button>
+          </SettingsRow>
+        </ul>
+      </SettingsSection>
+    {/if}
+
     {#each groups as group (group.label)}
       <SettingsSection headingId={`room-perm-${group.label}`} title={$i18n.t(group.label)}>
         <ul class="settings-rows">
@@ -569,6 +644,15 @@
   busy={syncing}
   error={syncFailed ? $i18n.t('room.permFailed') : null}
   onConfirm={() => void syncFromSpace()}
+/>
+
+<ConfirmDialog
+  bind:open={childConfirm}
+  title={$i18n.t('room.permChildrenConfirm', { count: childIds.length })}
+  description={$i18n.t('room.permSyncConfirmHint')}
+  confirmLabel={$i18n.t('room.permChildrenApply')}
+  busy={childSyncing}
+  onConfirm={() => void syncChildren()}
 />
 
 <ConfirmDialog

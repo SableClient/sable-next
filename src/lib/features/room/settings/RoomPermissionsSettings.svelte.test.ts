@@ -9,7 +9,8 @@ import type {
   RoomSummary,
 } from '#src/generated/protocol';
 
-const { pageState, space } = vi.hoisted(() => ({
+const { pageState, space, extraRooms } = vi.hoisted(() => ({
+  extraRooms: [] as { room_id: string; state: string; space_children: [] }[],
   pageState: {} as Record<string, unknown>,
   space: {
     room_id: '!space:example.org',
@@ -33,7 +34,7 @@ vi.mock('$app/navigation', () => ({
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({
-    rooms: [space],
+    rooms: [space, ...extraRooms],
     byId: (id: string) => (id === space.room_id ? space : undefined),
   }),
 }));
@@ -73,6 +74,7 @@ const permissions = {
 
 afterEach(() => {
   document.body.replaceChildren();
+  extraRooms.length = 0;
 });
 
 test('syncing copies the parent space levels and roles into the room', async () => {
@@ -225,5 +227,47 @@ test('opens a role editor for a power level that no permission currently uses', 
   expect(document.querySelector('#room-perm-role-level')).not.toBeNull();
   expect(document.querySelector('#room-perm-role-name')).not.toBeNull();
   expect(document.querySelector('#room-perm-role-icon')).not.toBeNull();
+  await unmount(instance);
+});
+
+test('a space applies its levels to the rooms below it that you can edit', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  extraRooms.push({ room_id: '!room:example.org', state: 'joined', space_children: [] });
+  const spaceLevels = { ...base, invite: 50 };
+  core.roomPowerLevels.mockImplementation((roomId: string) =>
+    Promise.resolve(roomId === space.room_id ? spaceLevels : base)
+  );
+  core.roomStateEvent.mockResolvedValue(null);
+  core.sendStateEvent.mockClear();
+
+  const instance = mount(RoomPermissionsSettings, {
+    target: document.body,
+    props: { room: space as RoomSummary, permissions },
+  });
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('Apply to 1 room');
+  });
+
+  [...document.querySelectorAll<HTMLButtonElement>('button')]
+    .find((button) => button.textContent.trim() === 'Apply')
+    ?.click();
+  await tick();
+  [
+    ...document.querySelectorAll<HTMLButtonElement>(
+      '[role="alertdialog"] button, [role="dialog"] button'
+    ),
+  ]
+    .find((button) => button.textContent.trim() === 'Apply')
+    ?.click();
+
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('Updated 1 room, 0 skipped.');
+  });
+  expect(core.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'm.room.power_levels',
+    '',
+    expect.objectContaining({ invite: 50 })
+  );
   await unmount(instance);
 });

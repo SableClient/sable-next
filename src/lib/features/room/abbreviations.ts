@@ -73,6 +73,30 @@ export function ancestorSpaceIds(rooms: readonly RoomSummary[], roomId: string):
   return levels.slice().reverse().flat();
 }
 
+export function descendantRoomIds(rooms: readonly RoomSummary[], spaceId: string): string[] {
+  const joined = new Map(
+    rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
+  );
+  const seen = new Set([spaceId]);
+  const found: string[] = [];
+  let frontier = [spaceId];
+
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      for (const child of joined.get(id)?.space_children ?? []) {
+        if (seen.has(child.room_id) || !joined.has(child.room_id)) continue;
+        seen.add(child.room_id);
+        found.push(child.room_id);
+        next.push(child.room_id);
+      }
+    }
+    frontier = next;
+  }
+
+  return found;
+}
+
 export function markAbbreviations(root: HTMLElement, map: AbbreviationMap, pattern: RegExp): void {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const texts: Text[] = [];
