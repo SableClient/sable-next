@@ -9,6 +9,7 @@
   import CellSignalLowIcon from 'phosphor-svelte/lib/CellSignalLowIcon';
   import CellSignalSlashIcon from 'phosphor-svelte/lib/CellSignalSlashIcon';
   import { untrack } from 'svelte';
+  import { on } from 'svelte/events';
   import type { Participant, Room as LivekitRoom } from 'livekit-client';
   import { Track } from 'livekit-client';
 
@@ -87,6 +88,29 @@
     applyVolume(0);
   }
 
+  function dismissVolume(panel: HTMLElement) {
+    const tile = panel.closest('li');
+    const offPointer = on(
+      document,
+      'pointerdown',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (panel.contains(target)) return;
+        if (tile?.contains(target) && target.closest('[data-volume-toggle]')) return;
+        volumeOpen = false;
+      },
+      { capture: true }
+    );
+    const offKey = on(document, 'keydown', (event) => {
+      if (event.key === 'Escape') volumeOpen = false;
+    });
+    return () => {
+      offPointer();
+      offKey();
+    };
+  }
+
   function attachVideo(node: HTMLVideoElement) {
     const identity = untrack(() => participant.identity);
     const trackSource = untrack(() => (screen ? Track.Source.ScreenShare : Track.Source.Camera));
@@ -151,6 +175,7 @@
         class="tile-action"
         label={$i18n.t('call.participantVolume', { name })}
         aria-expanded={volumeOpen}
+        data-volume-toggle
         onclick={() => (volumeOpen = !volumeOpen)}
       >
         {#if volume === 0}
@@ -186,7 +211,7 @@
   </div>
 
   {#if volumeOpen}
-    <div class="volume">
+    <div class="volume" {@attach dismissVolume}>
       <Slider
         min={0}
         max={MAX_PARTICIPANT_VOLUME}
