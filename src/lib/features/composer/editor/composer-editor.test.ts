@@ -413,6 +413,24 @@ test('iOS-style beforeinput removes an empty code block', () => {
   expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
 });
 
+test.each([true, false])(
+  'multi-line text committed by an IME keeps its line breaks (rich: %s)',
+  (rich) => {
+    preferences.richTextComposer = rich;
+    const editor = open();
+    const text = 'Wordle 1,924 4/6\n\n⬛🟨⬛⬛🟨\n⬛🟩⬛⬛⬛';
+
+    const event = new Event('beforeinput', { bubbles: true, cancelable: true });
+    Object.assign(event, { inputType: 'insertText', data: text });
+    surface().dispatchEvent(event);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(event.defaultPrevented).toBe(true);
+    expect((rich ? serializeComposer(doc) : serializePlain(doc)).body).toBe(text);
+  }
+);
+
 describe('Android enter', () => {
   const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 

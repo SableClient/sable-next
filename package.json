@@ -67,11 +67,11 @@
     "prosemirror-inputrules": "^1.5.1",
     "prosemirror-keymap": "^1.2.3",
     "prosemirror-markdown": "^1.13.7",
-    "prosemirror-model": "^1.25.11",
+    "prosemirror-model": "^1.25.12",
     "prosemirror-schema-list": "^1.5.1",
     "prosemirror-state": "^1.4.4",
     "prosemirror-transform": "^1.12.1",
-    "prosemirror-view": "^1.42.3",
+    "prosemirror-view": "^1.42.5",
     "svelte-i18next": "^2.2.2",
     "tauri-plugin-android-fs-api": "29.0.0"
   },

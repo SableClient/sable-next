@@ -702,6 +702,14 @@ export class ComposerEditor {
                 handleAndroidDeleteBackward(view);
                 return true;
               }
+              if (
+                event.inputType === 'insertText' &&
+                event.cancelable &&
+                event.data?.includes('\n')
+              ) {
+                event.preventDefault();
+                return view.pasteText(event.data);
+              }
               if (!hasAndroidCompositionQuirk()) return false;
               if (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') {
                 event.preventDefault();
