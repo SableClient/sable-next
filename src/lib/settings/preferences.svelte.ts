@@ -1,3 +1,5 @@
+import { untrack } from 'svelte';
+import { SvelteSet } from 'svelte/reactivity';
 import type { PresenceView, ProfilePropagationView } from '#src/generated/protocol';
 import type { GifProviderSetting } from '#lib/features/gif/providers.js';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
@@ -449,13 +451,22 @@ function mergeFontScale(stored: Record<string, unknown>, next: Preferences): Pre
   return next;
 }
 
+const explicit = new SvelteSet<keyof Preferences>();
+
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
   const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
   if (!stored) return { ...DEFAULTS };
 
-  return mergeFontScale(stored, mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS)));
+  const loaded = mergeFontScale(
+    stored,
+    mergeNotificationSwitch(stored, sanitize(stored, DEFAULTS))
+  );
+  for (const key of PREFERENCE_KEYS) {
+    if (key in stored || loaded[key] !== DEFAULTS[key]) explicit.add(key);
+  }
+  return loaded;
 }
 
 export const preferences = $state<Preferences>(load());
@@ -464,18 +475,40 @@ export function readReceiptIsPrivate(): boolean {
   return !preferences.sendReadReceipts;
 }
 
+export function isExplicitPreference(key: keyof Preferences): boolean {
+  return explicit.has(key);
+}
+
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
   preferences[key] = value;
+  explicit.add(key);
   persist();
 }
 
-export function applyPreferences(next: Preferences): void {
+export function applyPreferences(
+  next: Preferences,
+  keys: readonly (keyof Preferences)[] = PREFERENCE_KEYS
+): void {
   for (const key of PREFERENCE_KEYS) {
     (preferences as unknown as Record<string, unknown>)[key] = next[key];
   }
+  for (const key of keys) explicit.add(key);
   persist();
 }
 
+export function applyDeploymentDefaults(raw: Record<string, unknown>): void {
+  const defaults = sanitize(raw, preferences);
+  for (const key of PREFERENCE_KEYS) {
+    if (key in raw && !explicit.has(key)) {
+      (preferences as unknown as Record<string, unknown>)[key] = defaults[key];
+    }
+  }
+}
+
 function persist(): void {
-  writeJson(STORAGE_KEY, preferences, '[sable settings] preferences not persisted');
+  untrack(() => {
+    const stored: Partial<Record<keyof Preferences, unknown>> = {};
+    for (const key of explicit) stored[key] = preferences[key];
+    writeJson(STORAGE_KEY, stored, '[sable settings] preferences not persisted');
+  });
 }

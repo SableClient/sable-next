@@ -28,7 +28,8 @@
     titleBarKind,
     type TitleBarKind,
   } from '#lib/platform/window-decorations.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { runtimeConfig } from '#lib/config/runtime-config.js';
+  import { applyDeploymentDefaults, preferences } from '#lib/settings/preferences.svelte.js';
   import {
     activeCustomThemeCss,
     activeTweakCss,
@@ -70,6 +71,9 @@
     const stopSuppressingContextMenu = suppressNativeContextMenu();
     const stopBlockingEdgeNavigation = blockEdgeNavigation();
     void registerServiceWorker();
+    void runtimeConfig().then((config) => {
+      applyDeploymentDefaults(config.settingsDefaults);
+    });
     void core.start();
     return () => {
       stopListening();

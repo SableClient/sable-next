@@ -29,7 +29,7 @@ import type { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
 import type { SyncedDocument } from './account-sync.svelte.js';
 import { customThemes, replaceCustomThemes } from './custom-themes.svelte.js';
-import { applyPreferences, preferences } from './preferences.svelte.js';
+import { applyPreferences, isExplicitPreference, preferences } from './preferences.svelte.js';
 import { applySettings, prepareSettings, SETTINGS_ACCOUNT_DATA_TYPE } from './sync.js';
 
 export const WORKSPACE_ACCOUNT_DATA_TYPE = 'moe.sable.next.workspace';
@@ -46,7 +46,7 @@ export const settingsDocument: SyncedDocument = {
   eventType: SETTINGS_ACCOUNT_DATA_TYPE,
 
   snapshot() {
-    const prepared = prepareSettings(preferences, customThemes);
+    const prepared = prepareSettings(preferences, customThemes, isExplicitPreference);
     excludedThemeIds = prepared.excludedThemeIds;
     return { content: prepared.content, partial: prepared.excludedThemeIds.length > 0 };
   },
@@ -55,7 +55,7 @@ export const settingsDocument: SyncedDocument = {
     const applied = applySettings(content, preferences, customThemes, excludedThemeIds);
     if (applied === null) return false;
 
-    applyPreferences(applied.preferences);
+    applyPreferences(applied.preferences, applied.keys);
     replaceCustomThemes(applied.themes);
     return true;
   },

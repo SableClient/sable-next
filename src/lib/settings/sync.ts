@@ -52,10 +52,16 @@ export interface PreparedSettings {
   excludedThemeIds: string[];
 }
 
-export function prepareSettings(current: Preferences, themes: StoredThemes): PreparedSettings {
+export function prepareSettings(
+  current: Preferences,
+  themes: StoredThemes,
+  include: (key: keyof Preferences) => boolean = () => true
+): PreparedSettings {
   const settings: Partial<Preferences> = {};
   for (const key of PREFERENCE_KEYS) {
-    if (!NON_SYNCABLE_KEYS.has(key)) (settings as Record<string, unknown>)[key] = current[key];
+    if (!NON_SYNCABLE_KEYS.has(key) && include(key)) {
+      (settings as Record<string, unknown>)[key] = current[key];
+    }
   }
 
   const excludedThemeIds: string[] = [];
@@ -93,6 +99,7 @@ export function prepareSettings(current: Preferences, themes: StoredThemes): Pre
 
 export interface AppliedSettings {
   preferences: Preferences;
+  keys: (keyof Preferences)[];
   themes: StoredThemes;
 }
 
@@ -116,6 +123,7 @@ export function applySettings(
 
   return {
     preferences: merged,
+    keys: PREFERENCE_KEYS.filter((key) => key in remote && !NON_SYNCABLE_KEYS.has(key)),
     themes: mergeThemes(content.themes, currentThemes, excludedThemeIds),
   };
 }

@@ -177,3 +177,13 @@ test('the account switcher is disabled only by an explicit true', () => {
     expect(parseRuntimeConfig(raw).disableAccountSwitcher).toBe(false);
   }
 });
+
+test('settings defaults are read only from an object', () => {
+  expect(parseRuntimeConfig({ settingsDefaults: { theme: 'dark' } }).settingsDefaults).toEqual({
+    theme: 'dark',
+  });
+
+  for (const settingsDefaults of [null, 'dark', ['theme'], 42]) {
+    expect(parseRuntimeConfig({ settingsDefaults }).settingsDefaults).toEqual({});
+  }
+});
