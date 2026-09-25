@@ -9,6 +9,7 @@ const SECTIONS = [
   'Members',
   'Permissions',
   'Abbreviations',
+  'Your look',
   'Emojis & stickers',
   'Developer tools',
 ];

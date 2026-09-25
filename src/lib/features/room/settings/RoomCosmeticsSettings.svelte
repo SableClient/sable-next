@@ -216,32 +216,32 @@
       />
     </div>
     <ul class="settings-rows">
-      <SettingsRow title={$i18n.t('room.cosmeticsColorLight')} disabled={!canSetColor} wide>
-        <ColorSetting
-          label={$i18n.t('room.cosmeticsColorLight')}
-          bind:value={colorOnLight}
-          onCommit={() => {
-            saveColor('on_light', colorOnLight);
-          }}
-          onReset={() => {
-            colorOnLight = '';
-            saveColor('on_light', undefined);
-          }}
-        />
-      </SettingsRow>
-      <SettingsRow title={$i18n.t('room.cosmeticsColorDark')} disabled={!canSetColor} wide>
-        <ColorSetting
-          label={$i18n.t('room.cosmeticsColorDark')}
-          bind:value={colorOnDark}
-          onCommit={() => {
-            saveColor('on_dark', colorOnDark);
-          }}
-          onReset={() => {
-            colorOnDark = '';
-            saveColor('on_dark', undefined);
-          }}
-        />
-      </SettingsRow>
+      {#if canSetColor}
+        <li class="settings-form form-stack">
+          <ColorSetting
+            label={$i18n.t('room.cosmeticsColorLight')}
+            bind:value={colorOnLight}
+            onCommit={() => {
+              saveColor('on_light', colorOnLight);
+            }}
+            onReset={() => {
+              colorOnLight = '';
+              saveColor('on_light', undefined);
+            }}
+          />
+          <ColorSetting
+            label={$i18n.t('room.cosmeticsColorDark')}
+            bind:value={colorOnDark}
+            onCommit={() => {
+              saveColor('on_dark', colorOnDark);
+            }}
+            onReset={() => {
+              colorOnDark = '';
+              saveColor('on_dark', undefined);
+            }}
+          />
+        </li>
+      {/if}
       <SettingsRow
         title={$i18n.t('room.cosmeticsFont')}
         description={canSetFont ? undefined : $i18n.t('room.cosmeticsNotAllowed')}
