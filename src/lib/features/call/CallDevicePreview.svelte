@@ -123,39 +123,37 @@
 {/snippet}
 
 <div class="prescreen">
-  <div class="preview">
-    <div class="tile" class:video-on={wantsCamera && stream}>
-      {#if wantsCamera && stream}
-        <video
-          class="video"
-          autoplay
-          muted
-          playsinline
-          aria-label={$i18n.t('call.prescreenPreview')}
-          {@attach attachPreview}
-        ></video>
-      {:else}
-        <div class="camera-off">
-          {#if self}
-            <Avatar src={self.avatar} name={self.name} id={self.userId} size="large" />
-          {/if}
-          <p>
-            {cameraFailed ? $i18n.t('call.cameraUnavailable') : $i18n.t('call.prescreenNoCamera')}
-          </p>
-        </div>
-      {/if}
-      {#if self}
-        <span class="tag">
-          {#if !media.microphone}<MicrophoneSlashIcon aria-hidden="true" weight="fill" />{/if}
-          <span class="name">{self.name}</span>
-        </span>
-      {/if}
-      {#if testing && meterReady}
-        <span class="level" aria-hidden="true">
-          <span class="fill" style:scale="{level} 1"></span>
-        </span>
-      {/if}
-    </div>
+  <div class="tile" class:video-on={wantsCamera && stream}>
+    {#if wantsCamera && stream}
+      <video
+        class="video"
+        autoplay
+        muted
+        playsinline
+        aria-label={$i18n.t('call.prescreenPreview')}
+        {@attach attachPreview}
+      ></video>
+    {:else}
+      <div class="camera-off">
+        {#if self}
+          <Avatar src={self.avatar} name={self.name} id={self.userId} size="large" />
+        {/if}
+        <p>
+          {cameraFailed ? $i18n.t('call.cameraUnavailable') : $i18n.t('call.prescreenNoCamera')}
+        </p>
+      </div>
+    {/if}
+    {#if self}
+      <span class="tag">
+        {#if !media.microphone}<MicrophoneSlashIcon aria-hidden="true" weight="fill" />{/if}
+        <span class="name">{self.name}</span>
+      </span>
+    {/if}
+    {#if testing && meterReady}
+      <span class="level" aria-hidden="true">
+        <span class="fill" style:scale="{level} 1"></span>
+      </span>
+    {/if}
   </div>
 
   <div class="tray">
@@ -271,21 +269,11 @@
     padding: var(--space-300);
   }
 
-  .preview {
-    --radius-outer: var(--radii-500);
-    --radius-padding: var(--space-100);
-    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
-
-    background: var(--surface-container);
-    border-radius: var(--radius-outer);
-    padding: var(--radius-padding);
-  }
-
   .tile {
     align-items: center;
     aspect-ratio: 16 / 9;
     background: var(--surface-var-container);
-    border-radius: var(--radius-inner);
+    border-radius: var(--radii-500);
     container-type: size;
     display: flex;
     justify-content: center;
