@@ -14,11 +14,27 @@
     canDelete: (thread: ForumThread) => boolean;
     onEdit: (thread: ForumThread) => void;
     onDelete: (eventId: string, reason: string | null) => void;
+    roomId: string;
+    onReact: (eventId: string, key: string) => void;
+    loadImagePacks: (roomId: string) => Promise<import('#src/generated/protocol').ImagePackView[]>;
+    onCopyLink: (eventId: string) => void;
     onLoadMore: () => void;
   }
 
-  let { threads, loading, canLoadMore, onOpen, canDelete, onEdit, onDelete, onLoadMore }: Props =
-    $props();
+  let {
+    threads,
+    loading,
+    canLoadMore,
+    onOpen,
+    canDelete,
+    onEdit,
+    onDelete,
+    roomId,
+    onReact,
+    loadImagePacks,
+    onCopyLink,
+    onLoadMore,
+  }: Props = $props();
 </script>
 
 <div class="forum-thread-list">
@@ -27,7 +43,17 @@
   {:else if threads.length > 0}
     <ul aria-label={$i18n.t('forum.threads')}>
       {#each threads as thread (thread.id)}
-        <ForumThreadItem {thread} {onOpen} canDelete={canDelete(thread)} {onEdit} {onDelete} />
+        <ForumThreadItem
+          {thread}
+          {onOpen}
+          canDelete={canDelete(thread)}
+          {onEdit}
+          {onDelete}
+          {roomId}
+          {onReact}
+          {loadImagePacks}
+          {onCopyLink}
+        />
       {/each}
     </ul>
   {/if}

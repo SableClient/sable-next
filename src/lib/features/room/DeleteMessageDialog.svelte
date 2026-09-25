@@ -7,10 +7,20 @@
   interface Props {
     open?: boolean;
     preview?: string | null;
+    title?: string;
+    description?: string;
+    confirmLabel?: string;
     onConfirm: (reason: string | null) => void;
   }
 
-  let { open = $bindable(false), preview = null, onConfirm }: Props = $props();
+  let {
+    open = $bindable(false),
+    preview = null,
+    title = $i18n.t('timeline.deleteTitle'),
+    description = $i18n.t('timeline.deleteExplain'),
+    confirmLabel = $i18n.t('timeline.deleteMessage'),
+    onConfirm,
+  }: Props = $props();
   let reason = $state('');
 
   function confirm(): void {
@@ -27,9 +37,9 @@
 
 <ConfirmDialog
   bind:open
-  title={$i18n.t('timeline.deleteTitle')}
-  description={$i18n.t('timeline.deleteExplain')}
-  confirmLabel={$i18n.t('timeline.deleteMessage')}
+  {title}
+  {description}
+  {confirmLabel}
   cancelLabel={$i18n.t('timeline.cancel')}
   onConfirm={confirm}
   onCancel={cancel}

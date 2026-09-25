@@ -8,13 +8,16 @@
   import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
   import { leaveRoomView, searchInRoom } from '#lib/features/room/room-navigation.js';
   import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
+  import MessageContextMenu from '#lib/features/room/MessageContextMenu.svelte';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { ForumThreads } from './forum-threads.svelte.js';
   import ForumHeader from './ForumHeader.svelte';
@@ -123,13 +126,24 @@
   }
 
   function deleteThread(eventId: string, reason: string | null): void {
-    conversation.redact(eventId, reason);
+    void core.commands.deleteThread(resolvedRoomId, eventId, reason);
+  }
+
+  function copyEventLink(eventId: string): void {
+    void copyRoomLink(
+      core,
+      { room_id: resolvedRoomId, canonical_alias: resolvedRoom?.canonical_alias ?? null },
+      eventId
+    ).then((copied) => {
+      if (!copied) toasts.error($i18n.t('errors.copyFailed'));
+    });
   }
 
   function canDeleteThread(thread: (typeof forumThreads.threads)[number]): boolean {
-    return thread.isOwn
-      ? (permissions?.can_redact_own ?? true)
-      : (permissions?.can_redact_others ?? false);
+    return (
+      (permissions?.can_redact_others ?? false) ||
+      (thread.replyCount === 0 && thread.isOwn && (permissions?.can_redact_own ?? true))
+    );
   }
 
   function closeThread(): void {
@@ -183,6 +197,7 @@
   visibleEventId={latestEventId}
   onRead={markRead}
 />
+<MessageContextMenu />
 
 <main class="forum-page" aria-label={$i18n.t('forum.label')}>
   <div class="forum-main">
@@ -212,6 +227,10 @@
         canDelete={canDeleteThread}
         onEdit={editThread}
         onDelete={deleteThread}
+        roomId={resolvedRoomId}
+        onReact={conversation.toggleReaction}
+        loadImagePacks={core.commands.imagePacks}
+        onCopyLink={copyEventLink}
         onLoadMore={loadMoreThreads}
       />
     </div>

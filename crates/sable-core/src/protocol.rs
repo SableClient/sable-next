@@ -261,6 +261,13 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
     },
+    DeleteThread {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        root_event_id: OwnedEventId,
+        reason: Option<String>,
+    },
     BulkRedact {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1144,6 +1151,7 @@ pub enum CommandOk {
     EditMessage,
     FetchEventDetails,
     Redact,
+    DeleteThread,
     BulkRedact {
         redacted: u32,
     },

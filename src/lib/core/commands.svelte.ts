@@ -827,6 +827,19 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async deleteThread(
+      roomId: string,
+      rootEventId: string,
+      reason: string | null = null
+    ): Promise<void> {
+      await transport().send({
+        type: 'delete_thread',
+        room_id: roomId,
+        root_event_id: rootEventId,
+        reason,
+      });
+    },
+
     async bulkRedact(
       roomId: string,
       senders: string[],

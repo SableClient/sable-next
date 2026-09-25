@@ -1285,6 +1285,16 @@ impl Core {
                 Ok(CommandOk::Redact)
             }
 
+            Command::DeleteThread {
+                room_id,
+                root_event_id,
+                reason,
+            } => {
+                self.delete_thread(&room_id, &root_event_id, reason.as_deref())
+                    .await?;
+                Ok(CommandOk::DeleteThread)
+            }
+
             Command::BulkRedact {
                 room_id,
                 senders,

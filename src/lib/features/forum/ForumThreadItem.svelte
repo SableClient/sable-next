@@ -1,16 +1,13 @@
 <script lang="ts">
-  import IconContext from 'phosphor-svelte/lib/IconContext';
-  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
-  import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
-  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import { onDestroy } from 'svelte';
 
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
+  import MessageActions from '#lib/features/room/MessageActions.svelte';
+  import MessageActionSheet from '#lib/features/room/MessageActionSheet.svelte';
+  import { openMessageMenu } from '#lib/features/room/message-menu-open.svelte.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
-  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
-  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
-  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
 
   import type { ForumThread } from './forum-threads';
@@ -21,10 +18,25 @@
     canDelete: boolean;
     onEdit: (thread: ForumThread) => void;
     onDelete: (eventId: string, reason: string | null) => void;
+    roomId: string;
+    onReact: (eventId: string, key: string) => void;
+    loadImagePacks: (roomId: string) => Promise<import('#src/generated/protocol').ImagePackView[]>;
+    onCopyLink: (eventId: string) => void;
   }
 
-  let { thread, onOpen, canDelete, onEdit, onDelete }: Props = $props();
+  let {
+    thread,
+    onOpen,
+    canDelete,
+    onEdit,
+    onDelete,
+    roomId,
+    onReact,
+    loadImagePacks,
+    onCopyLink,
+  }: Props = $props();
   let deleteOpen = $state(false);
+  let sheetOpen = $state(false);
 
   let displayName = $derived(thread.senderName ?? thread.sender ?? '');
   let replyLabel = $derived(
@@ -37,10 +49,49 @@
       ? $i18n.t('forum.threadUnread', { name: displayName, preview: thread.preview })
       : $i18n.t('forum.thread', { name: displayName, preview: thread.preview })
   );
+  let actions = $derived({
+    loadImagePacks,
+    roomId,
+    onReact: (key: string) => onReact(thread.eventId, key),
+    onOpenThread: () => onOpen(thread.eventId),
+    onEdit: thread.editable ? () => onEdit(thread) : undefined,
+    onCopyText:
+      thread.preview === '' ? undefined : () => void navigator.clipboard.writeText(thread.preview),
+    onCopyLink: () => onCopyLink(thread.eventId),
+    onDelete: canDelete ? () => (deleteOpen = true) : undefined,
+  });
+  const rowPress = new LongPress({
+    enabled: () => true,
+    onPress: () => {
+      sheetOpen = true;
+    },
+  });
+
+  function openContextMenu(event: MouseEvent): void {
+    if (rowPress.touch || touchContextMenu(event)) {
+      event.preventDefault();
+      if (!rowPress.pending && !sheetOpen) rowPress.fire(event);
+      return;
+    }
+    event.preventDefault();
+    openMessageMenu.open(thread.id, { x: event.clientX, y: event.clientY }, () => actions);
+  }
+
+  onDestroy(() => {
+    rowPress.cancel();
+  });
 </script>
 
 <li class="forum-thread-item">
-  <div class="forum-thread-card">
+  <article
+    class:pressed={rowPress.pressing}
+    class="forum-thread-card"
+    onpointerdown={rowPress.start}
+    onpointermove={rowPress.move}
+    onpointerup={rowPress.end}
+    onpointercancel={rowPress.end}
+    oncontextmenu={openContextMenu}
+  >
     <button
       type="button"
       class="forum-thread-button"
@@ -73,44 +124,20 @@
         <span class="forum-thread-unread-dot" aria-hidden="true"></span>
       {/if}
     </button>
-    {#if thread.editable || canDelete}
-      <ActionMenu label={$i18n.t('timeline.moreActions')}>
-        {#snippet trigger({ props })}
-          <IconButton
-            {...props}
-            class="forum-thread-actions"
-            size="small"
-            variant="ghost"
-            label={$i18n.t('timeline.moreActions')}
-          >
-            <DotsThreeIcon />
-          </IconButton>
-        {/snippet}
-        <IconContext values={{ 'aria-hidden': 'true' }}>
-          {#if thread.editable}
-            <ActionMenuItem onSelect={() => onEdit(thread)}>
-              <EditIcon />
-              <span>{$i18n.t('timeline.editMessage')}</span>
-            </ActionMenuItem>
-          {/if}
-          {#if canDelete}
-            {#if thread.editable}<ActionMenuSeparator />{/if}
-            <ActionMenuItem destructive onSelect={() => (deleteOpen = true)}>
-              <TrashIcon />
-              <span>{$i18n.t('timeline.deleteMessage')}</span>
-            </ActionMenuItem>
-          {/if}
-        </IconContext>
-      </ActionMenu>
-    {/if}
-  </div>
+    <MessageActions {...actions} />
+  </article>
 </li>
 
 <DeleteMessageDialog
   bind:open={deleteOpen}
   preview={thread.preview}
+  title={$i18n.t('forum.deleteThreadTitle')}
+  description={$i18n.t('forum.deleteThreadExplain')}
+  confirmLabel={$i18n.t('forum.deleteThread')}
   onConfirm={(reason) => onDelete(thread.eventId, reason)}
 />
+
+<MessageActionSheet bind:open={sheetOpen} preview={thread.preview} {...actions} />
 
 <style>
   .forum-thread-item {
@@ -137,6 +164,7 @@
     background: var(--surface-var-container);
     border-radius: var(--radii-400);
     display: flex;
+    position: relative;
   }
 
   .forum-thread-card:has(.forum-thread-button:hover),
@@ -144,20 +172,16 @@
     background: var(--surface-container-hover);
   }
 
-  :global(.forum-thread-actions) {
-    flex: 0 0 auto;
-    margin-inline-end: var(--space-200);
+  @media (hover: hover) and (pointer: fine) {
+    .forum-thread-card:hover :global(.message-actions),
+    .forum-thread-card:focus-within :global(.message-actions) {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
 
-  @media (hover: hover) and (pointer: fine) {
-    :global(.forum-thread-actions) {
-      opacity: 0;
-    }
-
-    .forum-thread-card:hover :global(.forum-thread-actions),
-    :global(.forum-thread-actions:focus-visible) {
-      opacity: 1;
-    }
+  .forum-thread-card.pressed {
+    background: var(--surface-container-hover);
   }
 
   .forum-thread-body {

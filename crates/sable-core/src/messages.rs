@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
 use matrix_sdk::deserialized_responses::TimelineEvent;
-use matrix_sdk::room::MessagesOptions;
+use matrix_sdk::room::{IncludeRelations, MessagesOptions, RelationsOptions};
+use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::room::report_content;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::Relation;
@@ -23,6 +26,68 @@ pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Menti
 }
 
 impl Core {
+    pub(crate) async fn delete_thread(
+        &self,
+        room_id: &OwnedRoomId,
+        root_event_id: &OwnedEventId,
+        reason: Option<&str>,
+    ) -> Result<(), CommandErr> {
+        let room = self.room(room_id).await?;
+        let mut event_ids = vec![root_event_id.clone()];
+        let mut seen = HashSet::from([root_event_id.clone()]);
+        let mut from = None;
+
+        loop {
+            let relations = room
+                .relations(
+                    root_event_id.clone(),
+                    RelationsOptions {
+                        from,
+                        dir: Direction::Backward,
+                        limit: Some(UInt::from(100u16)),
+                        include_relations: IncludeRelations::RelationsOfType(RelationType::Thread),
+                        recurse: false,
+                    },
+                )
+                .await
+                .map_err(|error| self.failed("delete_thread", error))?;
+
+            for event in relations.chunk {
+                let Ok(raw) = serde_json::from_str::<serde_json::Value>(event.raw().json().get())
+                else {
+                    continue;
+                };
+                if raw
+                    .get("unsigned")
+                    .and_then(|unsigned| unsigned.get("redacted_because"))
+                    .is_some()
+                {
+                    continue;
+                }
+                let Some(event_id) = raw.get("event_id").and_then(serde_json::Value::as_str) else {
+                    continue;
+                };
+                let event_id = EventId::parse(event_id)
+                    .map_err(|error| self.failed("delete_thread", error))?;
+                if seen.insert(event_id.clone()) {
+                    event_ids.push(event_id);
+                }
+            }
+
+            let Some(next) = relations.next_batch_token else {
+                break;
+            };
+            from = Some(next);
+        }
+
+        for event_id in event_ids {
+            room.redact(&event_id, reason, None)
+                .await
+                .map_err(|error| self.failed("delete_thread", error))?;
+        }
+        Ok(())
+    }
+
     pub(crate) async fn bulk_redact(
         &self,
         room_id: &OwnedRoomId,

@@ -2475,6 +2475,9 @@
     "hangUp": "Quitter l’appel"
   },
   "forum": {
+    "deleteThread": "Supprimer le fil",
+    "deleteThreadExplain": "Cette action supprime tous les messages de ce fil.",
+    "deleteThreadTitle": "Supprimer le fil ?",
     "label": "Forum",
     "threads": "Fils de discussion",
     "empty": "Aucun fil de discussion pour le moment.",

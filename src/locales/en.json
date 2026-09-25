@@ -2696,6 +2696,9 @@
     "hangUp": "Leave the call"
   },
   "forum": {
+    "deleteThread": "Delete thread",
+    "deleteThreadExplain": "This deletes all messages in this thread.",
+    "deleteThreadTitle": "Delete thread?",
     "label": "Forum",
     "threads": "Threads",
     "empty": "No threads yet.",

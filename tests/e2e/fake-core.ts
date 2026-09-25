@@ -815,6 +815,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       account_contacts: () => ({ type: 'account_contacts', emails: [] }),
       ignored_users: () => ({ type: 'ignored_users', users: [] }),
       bulk_redact: () => ({ type: 'bulk_redact', redacted: 0 }),
+      delete_thread: () => ({ type: 'delete_thread' }),
       pinned_events: () => ({ type: 'pinned_events', event_ids: [] }),
       room_has_space_parent: () => ({ type: 'room_has_space_parent', has_space_parent: false }),
       room_open: (command, port) => {
