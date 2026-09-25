@@ -374,6 +374,7 @@
       onDelete:
         redactable && onDelete
           ? () => {
+              deleteTarget = null;
               deleteOpen = true;
             }
           : undefined,
@@ -581,6 +582,7 @@
   let pinned = $derived(pinnedEvents.has(item.event_id));
   let bookmarked = $derived(bookmarks.has(roomId, item.event_id));
   let deleteOpen = $state(false);
+  let deleteTarget = $state<string | null>(null);
   let reactionsOpen = $state(false);
   let reactionActive = $state(0);
   let receiptsOpen = $state(false);
@@ -668,7 +670,13 @@
   }
 
   function confirmDelete(reason: string | null): void {
-    if (item.event_id) onDelete?.(item.event_id, reason);
+    const eventId = deleteTarget ?? item.event_id;
+    if (eventId) onDelete?.(eventId, reason);
+  }
+
+  function deleteVersion(version: EditVersionView): void {
+    deleteTarget = version.event_id;
+    deleteOpen = true;
   }
 
   function openSenderProfileAt(anchor: HTMLElement): void {
@@ -721,6 +729,8 @@
         {senderTimezone}
         {onMatrixLink}
         onReply={onReply ? replyToVersion : undefined}
+        onThread={onOpenThread ? (version) => onOpenThread(version.event_id) : undefined}
+        onDelete={redactable && onDelete ? deleteVersion : undefined}
       />
     {/if}
     {#if reportOpen}

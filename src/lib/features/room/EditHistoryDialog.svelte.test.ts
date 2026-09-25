@@ -45,3 +45,34 @@ test('renders every version as a message body and replies to the one picked', as
 
   await unmount(instance);
 });
+
+test('only the original can start a thread, and any version can be deleted', async () => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+  const onThread = vi.fn();
+  const onDelete = vi.fn();
+  const instance = mount(EditHistoryDialog, {
+    target: document.body,
+    props: { open: true, versions, onThread, onDelete },
+  });
+  await tick();
+
+  const threads = document.querySelectorAll<HTMLButtonElement>('.edit-history-thread');
+  expect(threads).toHaveLength(1);
+  threads[0].click();
+  expect(onThread).toHaveBeenCalledWith(versions[0]);
+
+  await unmount(instance);
+  const again = mount(EditHistoryDialog, {
+    target: document.body,
+    props: { open: true, versions, onThread, onDelete },
+  });
+  await tick();
+  document.querySelectorAll<HTMLButtonElement>('.edit-history-delete')[1].click();
+  expect(onDelete).toHaveBeenCalledWith(versions[1]);
+
+  await unmount(again);
+});

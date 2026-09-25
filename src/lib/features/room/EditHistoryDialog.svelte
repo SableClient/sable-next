@@ -1,5 +1,7 @@
 <script lang="ts">
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
+  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import type { EditVersionView } from '#src/generated/protocol';
 
@@ -20,6 +22,8 @@
     senderTimezone?: string | null;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onReply?: (version: EditVersionView) => void;
+    onThread?: (version: EditVersionView) => void;
+    onDelete?: (version: EditVersionView) => void;
   }
 
   let {
@@ -28,13 +32,15 @@
     senderTimezone = null,
     onMatrixLink,
     onReply,
+    onThread,
+    onDelete,
   }: Props = $props();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
   let desktop = $derived(appLayout.matches);
 
-  function reply(version: EditVersionView): void {
+  function act(version: EditVersionView, action?: (version: EditVersionView) => void): void {
     open = false;
-    onReply?.(version);
+    action?.(version);
   }
 </script>
 
@@ -51,19 +57,47 @@
             {#if index === 0}
               <span class="edit-history-original">{$i18n.t('timeline.editHistoryOriginal')}</span>
             {/if}
-            {#if onReply}
-              <IconButton
-                class="edit-history-reply"
-                size="small"
-                variant="ghost"
-                label={$i18n.t('timeline.reply')}
-                onclick={() => {
-                  reply(version);
-                }}
-              >
-                <ReplyIcon />
-              </IconButton>
-            {/if}
+            <span class="edit-history-actions">
+              {#if onReply}
+                <IconButton
+                  class="edit-history-reply"
+                  size="small"
+                  variant="ghost"
+                  label={$i18n.t('timeline.reply')}
+                  onclick={() => {
+                    act(version, onReply);
+                  }}
+                >
+                  <ReplyIcon />
+                </IconButton>
+              {/if}
+              {#if onThread && index === 0}
+                <IconButton
+                  class="edit-history-thread"
+                  size="small"
+                  variant="ghost"
+                  label={$i18n.t('timeline.replyInThread')}
+                  onclick={() => {
+                    act(version, onThread);
+                  }}
+                >
+                  <ThreadIcon />
+                </IconButton>
+              {/if}
+              {#if onDelete}
+                <IconButton
+                  class="edit-history-delete"
+                  size="small"
+                  variant="ghost"
+                  label={$i18n.t('timeline.deleteMessage')}
+                  onclick={() => {
+                    act(version, onDelete);
+                  }}
+                >
+                  <TrashIcon />
+                </IconButton>
+              {/if}
+            </span>
           </div>
           <FormattedBody html={version.html} {senderTimezone} {onMatrixLink} />
         </li>
@@ -135,7 +169,8 @@
     padding: 0 var(--space-200);
   }
 
-  .edit-history-meta :global(.edit-history-reply) {
+  .edit-history-actions {
+    display: flex;
     margin-inline-start: auto;
   }
 </style>
