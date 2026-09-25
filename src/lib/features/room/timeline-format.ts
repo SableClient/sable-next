@@ -103,6 +103,10 @@ export function isAnnotation(item: TimelineItemView): boolean {
   return kind === 'date_divider' || kind === 'read_marker' || kind === 'timeline_start';
 }
 
+export function isEventRow(item: TimelineItemView): boolean {
+  return !isMessageRow(item.content) && !isAnnotation(item);
+}
+
 export interface TimelineFilterContext {
   readOnly?: boolean;
 }
@@ -278,6 +282,7 @@ export function isCollapsed(
   if (index === 0) return false;
   const current = items[index];
   const previous = items[index - 1];
+  if (isEventRow(current) && isEventRow(previous)) return true;
   if (replyPreviewStyle === 'connected' && current.in_reply_to) return false;
   return (
     isMessageRow(current.content) &&

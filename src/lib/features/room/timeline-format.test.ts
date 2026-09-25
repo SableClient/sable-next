@@ -108,7 +108,7 @@ const defaults: TimelinePreferences = {
 function aggregation(eventType: string, id: string): TimelineItemView {
   return {
     id,
-    content: { kind: 'hidden_event', event_type: eventType, content: null },
+    content: { kind: 'hidden_event', event_type: eventType, content: null, redacts: null },
   } as unknown as TimelineItemView;
 }
 
@@ -169,6 +169,7 @@ const topic = item({
   event_type: 'm.room.topic',
   state_key: '',
   content: null,
+  prev_content: null,
   change: null,
 });
 
@@ -263,6 +264,14 @@ test("keeps a persona message out of the account's collapsed run", () => {
   ] as TimelineItemView[];
 
   expect(isCollapsed(items, 1)).toBe(false);
+});
+
+test('stacks consecutive state rows without a group gap', () => {
+  expect(isCollapsed([joined, renamed, topic], 1)).toBe(true);
+  expect(isCollapsed([joined, renamed, topic], 2)).toBe(true);
+  expect(isCollapsed([message, joined], 1)).toBe(false);
+  expect(isCollapsed([joined, message], 1)).toBe(false);
+  expect(isCollapsed([divider, joined], 1)).toBe(false);
 });
 
 test('groups media with the messages around it', () => {
@@ -367,7 +376,7 @@ test('keeps an unclassified membership change out of the timeline', () => {
 
 test('slots aggregation rows into the timeline by timestamp', () => {
   const at = (id: string, timestamp: number): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null }, id),
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null, redacts: null }, id),
     timestamp,
   });
   const sent = { ...message, timestamp: 10 };
@@ -382,7 +391,7 @@ test('slots aggregation rows into the timeline by timestamp', () => {
 
 test('drops aggregation rows outside the loaded range', () => {
   const at = (id: string, timestamp: number): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null }, id),
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content: null, redacts: null }, id),
     timestamp,
   });
   const first = { ...message, id: 'first', event_id: '$first', timestamp: 10 };
@@ -464,6 +473,7 @@ function stateChange(change: StateChangeView): TimelineItemView {
       event_type: 'm.room.topic',
       state_key: '',
       content: null,
+      prev_content: null,
       change,
     }),
     sender: '@alice:example.org',
@@ -563,6 +573,7 @@ test('an unworded state event keeps its raw type and stays behind the dev toggle
     event_type: 'm.room.power_levels',
     state_key: '',
     content: null,
+    prev_content: null,
     change: null,
   });
 
@@ -649,6 +660,7 @@ test('leaves copy with no subject unlinked', () => {
         event_type: 'm.room.power_levels',
         state_key: '',
         content: null,
+        prev_content: null,
         change: null,
       }),
       (k) => k
@@ -765,7 +777,7 @@ test('formatMessageTimestamp includes the year for messages from another year', 
 test('a hidden event names its sender, as v1 does', () => {
   const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
   const hidden = (eventType: string, content: unknown): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: eventType, content }),
+    ...item({ kind: 'hidden_event', event_type: eventType, content, redacts: null }),
     sender: '@alice:example.org',
     sender_name: 'Alice',
   });
@@ -781,7 +793,7 @@ test('a hidden event names its sender, as v1 does', () => {
 test('a hidden reaction reports the key it carries', () => {
   const t: Translate = (key, values) => `${key}:${JSON.stringify(values)}`;
   const reaction = (content: unknown): TimelineItemView => ({
-    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content }),
+    ...item({ kind: 'hidden_event', event_type: 'm.reaction', content, redacts: null }),
     sender: '@alice:example.org',
     sender_name: 'Alice',
   });

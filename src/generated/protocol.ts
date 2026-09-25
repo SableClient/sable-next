@@ -1077,7 +1077,7 @@ event_type: string; state_key: string;
  *  Raw content, for the developer-only peek. Absent if the event's
  *  JSON is no longer around.
  */
-content: unknown;
+content: unknown; prev_content: unknown;
 /**  `None` leaves the UI with only `event_type` to show. */
 change: StateChangeView | null } |
 /**
@@ -1092,7 +1092,7 @@ event_type: string;
  *  Raw content, for the developer-only peek. Absent if the event's
  *  JSON is no longer around.
  */
-content: unknown } | { kind: "date_divider"; timestamp: number } | { kind: "read_marker" } | { kind: "timeline_start" } |
+content: unknown; redacts: string | null } | { kind: "date_divider"; timestamp: number } | { kind: "read_marker" } | { kind: "timeline_start" } |
 /**  Unmodelled, kept as a stub so wire indices stay aligned with the SDK's. */
 { kind: "unsupported"; description: string };
 

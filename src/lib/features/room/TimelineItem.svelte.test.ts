@@ -959,6 +959,7 @@ test('renders a redacted row and a worded state change without throwing', async 
       event_type: 'm.room.topic',
       state_key: '',
       content: null,
+      prev_content: null,
       change: { kind: 'room_topic', topic: 'what we do' },
     } as const,
     {
@@ -966,6 +967,7 @@ test('renders a redacted row and a worded state change without throwing', async 
       event_type: 'm.room.power_levels',
       state_key: '',
       content: { users: {} },
+      prev_content: null,
       change: null,
     } as const,
   ]) {

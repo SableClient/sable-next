@@ -7,13 +7,16 @@ import type {
 } from '#src/generated/protocol';
 
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
+import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import EnvelopeSimpleIcon from 'phosphor-svelte/lib/EnvelopeSimpleIcon';
 import HashIcon from 'phosphor-svelte/lib/HashIcon';
+import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
 import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserIcon from 'phosphor-svelte/lib/UserIcon';
 import UserMinusIcon from 'phosphor-svelte/lib/UserMinusIcon';
@@ -95,4 +98,20 @@ test('a redaction and an unreadable event are distinguishable', () => {
   expect(
     stateEventIcon({ content: { kind: 'malformed', event_type: 'x' } } as TimelineItemView)
   ).toBe(WarningIcon);
+});
+
+test('a hidden aggregation takes the icon of what it did', () => {
+  const hidden = (eventType: string, content: unknown): TimelineItemView =>
+    ({
+      content: { kind: 'hidden_event', event_type: eventType, content, redacts: null },
+    }) as TimelineItemView;
+
+  expect(stateEventIcon(hidden('m.reaction', {}))).toBe(SmileyIcon);
+  expect(stateEventIcon(hidden('m.room.redaction', {}))).toBe(TrashIcon);
+  expect(
+    stateEventIcon(
+      hidden('m.room.message', { 'm.relates_to': { rel_type: 'm.replace', event_id: '$m' } })
+    )
+  ).toBe(PencilSimpleIcon);
+  expect(stateEventIcon(hidden('org.example.custom', {}))).toBe(CodeIcon);
 });

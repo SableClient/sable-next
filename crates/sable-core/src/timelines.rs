@@ -243,7 +243,13 @@ pub(crate) fn aggregation_items(
                 return None;
             }
             let content = event.raw().get_field::<serde_json::Value>("content").ok()?;
-            Some(aggregation_item(&parsed, content, own_user_id))
+            let redacts = match &parsed {
+                AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomRedaction(
+                    redaction,
+                )) => redaction.redacts(&rules.redaction).map(ToOwned::to_owned),
+                _ => None,
+            };
+            Some(aggregation_item(&parsed, content, redacts, own_user_id))
         })
         .collect()
 }

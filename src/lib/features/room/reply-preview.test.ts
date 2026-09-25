@@ -65,6 +65,7 @@ test('an event with no body still yields a quotable empty preview', () => {
       kind: 'hidden_event',
       event_type: 'm.key.verification.start',
       content: null,
+      redacts: null,
     })
   ).toBe('m.key.verification.start');
 });

@@ -9,16 +9,21 @@ import type {
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import EnvelopeSimpleIcon from 'phosphor-svelte/lib/EnvelopeSimpleIcon';
 import HashIcon from 'phosphor-svelte/lib/HashIcon';
+import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
+import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
 import PhoneIcon from 'phosphor-svelte/lib/PhoneIcon';
 import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
+import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserIcon from 'phosphor-svelte/lib/UserIcon';
 import UserMinusIcon from 'phosphor-svelte/lib/UserMinusIcon';
 import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
 import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
+
+import { isEditEvent } from './timeline-event-index';
 
 const MEMBERSHIP_ICONS: Record<MembershipChangeView, Component> = {
   invited: UserPlusIcon,
@@ -51,6 +56,13 @@ function stateChangeIcon(change: StateChangeView): Component {
   }
 }
 
+function hiddenEventIcon(item: TimelineItemView): Component {
+  if (item.content.kind !== 'hidden_event') return CodeIcon;
+  if (item.content.event_type === 'm.reaction') return SmileyIcon;
+  if (item.content.event_type === 'm.room.redaction') return TrashIcon;
+  return isEditEvent(item) ? PencilSimpleIcon : CodeIcon;
+}
+
 export function stateEventIcon(item: TimelineItemView): Component {
   const content = item.content;
   switch (content.kind) {
@@ -64,6 +76,8 @@ export function stateEventIcon(item: TimelineItemView): Component {
       return PhoneIcon;
     case 'redacted':
       return TrashIcon;
+    case 'hidden_event':
+      return hiddenEventIcon(item);
     default:
       return WarningIcon;
   }

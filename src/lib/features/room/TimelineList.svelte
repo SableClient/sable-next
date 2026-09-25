@@ -24,11 +24,14 @@
 
   import MessageContextMenu from './MessageContextMenu.svelte';
   import TimelineItem from './TimelineItem.svelte';
+  import TimelineMemberGroup from './TimelineMemberGroup.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
   import TimelineAnnouncements from './TimelineAnnouncements.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import TypingIndicator from './TypingIndicator.svelte';
   import type { MatrixLink } from './matrix-link';
+  import { groupMemberEvents } from './member-groups';
+  import { TimelineEventIndex } from './timeline-event-index';
   import type { ReplyVersion } from './reply-preview';
   import {
     cumulativeReadBy,
@@ -147,6 +150,7 @@
 
   interface RowValue {
     item: TimelineItemView;
+    group: readonly TimelineItemView[] | null;
     collapsed: boolean;
     groupStart: boolean;
     unreadCount: number;
@@ -165,20 +169,33 @@
   );
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
-    return visibleItems.map((item, index) => {
-      const collapsed = isCollapsed(visibleItems, index, preferences.replyPreviewStyle);
+    const units = groupMemberEvents(visibleItems);
+    const unitItems = units.map((unit) => unit.item);
+    return units.map(({ item, index: source, group }, index) => {
+      const collapsed = isCollapsed(unitItems, index, preferences.replyPreviewStyle);
       return {
-        key: identity.key(visibleItems, index),
+        key: identity.key(visibleItems, source),
         value: {
           item,
+          group,
           collapsed,
           groupStart: index > 0 && !collapsed,
           unreadCount:
-            item.content.kind === 'read_marker' ? unreadCountAfter(visibleItems, index) : 0,
+            item.content.kind === 'read_marker' ? unreadCountAfter(visibleItems, source) : 0,
         },
       };
     });
   });
+  let events = $derived(new TimelineEventIndex(timeline.items, timeline.aggregations));
+  function holdsEvent({ item, group }: RowValue, eventId: string | null): boolean {
+    if (eventId === null) return false;
+    return (
+      item.event_id === eventId || (group?.some((member) => member.event_id === eventId) ?? false)
+    );
+  }
+  function entryFor(eventId: string | null): TimelineEntry<RowValue> | undefined {
+    return entries.find(({ value }) => holdsEvent(value, eventId));
+  }
   let rows = $state.raw<readonly TimelineRow<RowValue>[]>([]);
   let windowState = $state.raw<TimelineWindowState>({
     start: 0,
@@ -227,8 +244,8 @@
     return seen;
   });
   let readMarker = $derived.by(() => {
-    const index = visibleItems.findIndex((item) => item.content.kind === 'read_marker');
-    return index >= 0 ? { index, count: unreadCountAfter(visibleItems, index) } : null;
+    const index = entries.findIndex(({ value }) => value.item.content.kind === 'read_marker');
+    return index >= 0 ? { index, count: entries[index].value.unreadCount } : null;
   });
   let stuckUnreadCount = $derived(
     readMarker !== null &&
@@ -451,16 +468,13 @@
     await engine.update(entries);
     if (focusEventId) {
       const target = focusEventId;
-      const entry = entries.find(({ value }) => value.item.event_id === focusEventId);
+      const entry = entryFor(focusEventId);
       if (entry) handledFocus = target;
       revealed = true;
       if (entry) await positionFocus(engine, target, entry.key, false);
       return;
     }
-    const landingEntry = () =>
-      landingEventId === null
-        ? undefined
-        : entries.find(({ value }) => value.item.event_id === landingEventId);
+    const landingEntry = () => entryFor(landingEventId);
     const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
     if (!unread && !landingEntry()) revealed = true;
     filling = true;
@@ -485,7 +499,7 @@
       const notified = landingEntry();
       const landing = notified ?? unread;
       if (landing && !disposed && engine.state.pinned) {
-        if (notified) markLanded(notified.value.item.event_id);
+        if (notified) markLanded(landingEventId);
         await engine.jumpTo(landing.key, landing === unread ? 'start' : 'center');
       }
     } catch {
@@ -556,7 +570,7 @@
       handledFocus = null;
       return;
     }
-    const entry = entries.find(({ value }) => value.item.event_id === target);
+    const entry = entryFor(target);
     if (!entry) return;
     handledFocus = target;
     void positionFocus(engine, target, entry.key, !shouldReduceMotion());
@@ -585,7 +599,7 @@
       untrack(abandonLanding);
       return;
     }
-    const entry = entries.find(({ value }) => value.item.event_id === target);
+    const entry = entryFor(target);
     if (!entry) return;
     untrack(() => markLanded(target));
     void engine.jumpTo(entry.key, 'center', !shouldReduceMotion());
@@ -616,7 +630,7 @@
   }
   export function stepReply(direction: ReplyDirection): string | null {
     const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
-    const key = entries.find(({ value }) => value.item.event_id === target)?.key;
+    const key = entryFor(target)?.key;
     const row = key ? viewport?.querySelector(`[data-timeline-key="${CSS.escape(key)}"]`) : null;
     if (key && controller && viewport && !(row && withinViewport(row, viewport))) {
       focusNavigation?.abort();
@@ -701,7 +715,7 @@
         <div class={['items', `layout-${preferences.layout}`]}>
           <div class="window-rows">
             {#each rows as row (row.key)}
-              {@const { item, collapsed, groupStart } = row.value}
+              {@const { item, group, collapsed, groupStart } = row.value}
               <div
                 class={['item', { collapsed, 'group-start': groupStart }]}
                 data-event-id={item.event_id ?? undefined}
@@ -711,6 +725,8 @@
               >
                 {#if timelineStart && item.content.kind === 'timeline_start'}
                   {@render timelineStart()}
+                {:else if group}
+                  <TimelineMemberGroup items={group} {members} {onSenderProfile} />
                 {:else}
                   <TimelineItem
                     {item}
@@ -748,6 +764,7 @@
                     {onPersonaAvatarClick}
                     {onVotePoll}
                     {onEndPoll}
+                    {events}
                     onPersonaOpenChange={setPersonaOpen}
                     {roomId}
                   />

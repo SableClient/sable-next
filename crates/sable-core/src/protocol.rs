@@ -2783,6 +2783,8 @@ pub enum TimelineItemContentView {
         /// JSON is no longer around.
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: Option<serde_json::Value>,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        prev_content: Option<serde_json::Value>,
         /// `None` leaves the UI with only `event_type` to show.
         change: Option<StateChangeView>,
     },
@@ -2796,6 +2798,8 @@ pub enum TimelineItemContentView {
         /// JSON is no longer around.
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: Option<serde_json::Value>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        redacts: Option<OwnedEventId>,
     },
     DateDivider {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

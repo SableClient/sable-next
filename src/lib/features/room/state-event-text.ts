@@ -1,6 +1,9 @@
 import { isRecord } from '#lib/guards.js';
 import type { StateChangeView, TimelineItemView } from '#src/generated/protocol';
 
+import { isCustomReaction } from './reaction-emote-label';
+import { relationOf } from './timeline-event-index';
+
 export type Translate = (key: string, values?: Record<string, unknown>) => string;
 
 function stateChangeText(change: StateChangeView, user: string, t: Translate): string {
@@ -58,9 +61,24 @@ function hiddenEventText(
 ): string {
   if (content.event_type === 'm.reaction') {
     const key = reactionKey(content.content);
-    if (key) return t('timeline.hiddenReaction', { user, key });
+    if (key) {
+      return t('timeline.hiddenReaction', {
+        user,
+        key: isCustomReaction(key) ? t('timeline.customEmote') : key,
+      });
+    }
   }
-  if (content.event_type === 'm.room.redaction') return t('timeline.hiddenRedaction', { user });
+  if (content.event_type === 'm.room.redaction') {
+    const line = t('timeline.hiddenRedaction', { user });
+    const reason = isRecord(content.content) ? text(content.content.reason) : null;
+    return reason ? t('timeline.withReason', { text: line, reason }) : line;
+  }
+  if (
+    content.event_type === 'm.room.message' &&
+    relationOf(content.content)?.relType === 'm.replace'
+  ) {
+    return t('timeline.hiddenEdit', { user });
+  }
   return t('timeline.hiddenEvent', { user, type: content.event_type });
 }
 
@@ -152,7 +170,7 @@ export function stateEventSubject(
       name = content.display_name?.old ?? content.user_id;
       break;
     case 'state_event':
-      if (content.change === null) return null;
+    case 'hidden_event':
       userId = item.sender;
       name = item.sender_name ?? item.sender;
       break;

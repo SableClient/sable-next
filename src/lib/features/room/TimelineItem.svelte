@@ -45,6 +45,7 @@
   import MessageReactions from './MessageReactions.svelte';
   import { usePinnedEvents } from './pinned-events.svelte.js';
   import TimelineNotice from './TimelineNotice.svelte';
+  import type { TimelineEventIndex } from './timeline-event-index';
   import MessageActions from './MessageActions.svelte';
   import MessageActionSheet from './MessageActionSheet.svelte';
 
@@ -122,6 +123,7 @@
     onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
+    events?: TimelineEventIndex;
     onPersonaOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
@@ -161,6 +163,7 @@
     onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
+    events,
     onPersonaOpenChange,
     placeholder = false,
     placeholderCharacters = 35,
@@ -1187,7 +1190,15 @@
     </div>
   </article>
 {:else if isAnnotation(item)}
-  <TimelineNotice {item} {unreadCount} {onSenderProfile} />
+  <TimelineNotice
+    {item}
+    {unreadCount}
+    {roomId}
+    {events}
+    {members}
+    {onSenderProfile}
+    {onJumpToEvent}
+  />
 {:else}
   <article
     bind:this={messageRow}
@@ -1218,7 +1229,15 @@
       </div>
     {/if}
     {@render actionLayer()}
-    <TimelineNotice {item} {unreadCount} {onSenderProfile} />
+    <TimelineNotice
+      {item}
+      {unreadCount}
+      {roomId}
+      {events}
+      {members}
+      {onSenderProfile}
+      {onJumpToEvent}
+    />
     {#if item.reactions.length > 0}
       <div class="event-reactions">
         <span class="event-rail" aria-hidden="true"></span>

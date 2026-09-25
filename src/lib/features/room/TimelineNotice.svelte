@@ -1,24 +1,75 @@
 <script lang="ts">
   import { Collapsible } from 'bits-ui';
+  import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
 
-  import type { TimelineItemView } from '#src/generated/protocol';
+  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
 
+  import EditDiff from './EditDiff.svelte';
+  import EventTargetPreview from './EventTargetPreview.svelte';
+  import { isCustomReaction } from './reaction-emote-label';
+  import StateContentDiff from './StateContentDiff.svelte';
   import StateEventText from './StateEventText.svelte';
   import { stateEventIcon } from './state-event-icon';
+  import { reactionKey } from './state-event-text';
+  import {
+    isEditEvent,
+    redactionTarget,
+    relationOf,
+    type TimelineEventIndex,
+  } from './timeline-event-index';
   import { formatDate } from './timeline-format';
   import UndecryptableNotice from './UndecryptableNotice.svelte';
+
+  const MAX_PIN_PREVIEWS = 4;
 
   interface Props {
     item: TimelineItemView;
     unreadCount: number;
+    roomId?: string;
+    events?: TimelineEventIndex;
+    members?: readonly MemberView[];
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onJumpToEvent?: (eventId: string) => void;
   }
 
-  let { item, unreadCount, onSenderProfile }: Props = $props();
+  let {
+    item,
+    unreadCount,
+    roomId = '',
+    events,
+    members = [],
+    onSenderProfile,
+    onJumpToEvent,
+  }: Props = $props();
   let peekOpen = $state(false);
   let StateIcon = $derived(stateEventIcon(item));
+  let hiddenTarget = $derived.by((): string | null => {
+    const content = item.content;
+    if (content.kind !== 'hidden_event') return null;
+    if (content.event_type === 'm.room.redaction') return redactionTarget(item);
+    if (content.event_type === 'm.reaction' || isEditEvent(item)) {
+      return relationOf(content.content)?.eventId ?? null;
+    }
+    return null;
+  });
+  let customReaction = $derived.by((): string | null => {
+    const content = item.content;
+    if (content.kind !== 'hidden_event' || content.event_type !== 'm.reaction') return null;
+    const key = reactionKey(content.content);
+    return key !== null && isCustomReaction(key) ? key : null;
+  });
+  let pins = $derived.by(() => {
+    const content = item.content;
+    if (content.kind !== 'state_event' || content.change?.kind !== 'pinned_events') return [];
+    return [
+      ...content.change.added.map((eventId) => ({ eventId, pinned: true })),
+      ...content.change.removed.map((eventId) => ({ eventId, pinned: false })),
+    ].slice(0, MAX_PIN_PREVIEWS);
+  });
 </script>
 
 {#snippet stateGutter()}
@@ -28,14 +79,68 @@
 {#if item.content.kind === 'membership' || item.content.kind === 'profile_change' || (item.content.kind === 'state_event' && item.content.change !== null)}
   <p class="state">
     {@render stateGutter()}
-    <StateEventText {item} {onSenderProfile} />
+    <StateEventText {item} {members} {onSenderProfile} />
   </p>
-{:else if item.content.kind === 'state_event' || item.content.kind === 'hidden_event'}
+  {#if pins.length > 0}
+    <div class="state-detail">
+      {#each pins as pin (pin.eventId)}
+        <EventTargetPreview
+          eventId={pin.eventId}
+          {roomId}
+          {events}
+          {members}
+          icon={pin.pinned ? PushPinIcon : PushPinSlashIcon}
+          onJump={onJumpToEvent}
+        />
+      {/each}
+    </div>
+  {/if}
+{:else if item.content.kind === 'state_event'}
+  <p class="state">
+    {@render stateGutter()}
+    <StateEventText {item} {members} {onSenderProfile} />
+  </p>
+  {#if item.content.content !== null}
+    <div class="state-detail">
+      <StateContentDiff before={item.content.prev_content} after={item.content.content} />
+    </div>
+  {/if}
+{:else if hiddenTarget !== null}
+  <p class="state">
+    {@render stateGutter()}
+    <span
+      ><StateEventText {item} {members} {onSenderProfile} />{#if customReaction}
+        <MediaImage
+          class="state-emote"
+          source={customReaction}
+          alt={$i18n.t('timeline.customEmote')}
+          width={64}
+          height={64}
+          original
+        />{/if}</span
+    >
+  </p>
+  <div class="state-detail">
+    {#if isEditEvent(item)}
+      <EventTargetPreview eventId={hiddenTarget} {roomId} {events} {members} onJump={onJumpToEvent}>
+        {#snippet body()}<EditDiff {item} {roomId} {events} />{/snippet}
+      </EventTargetPreview>
+    {:else}
+      <EventTargetPreview
+        eventId={hiddenTarget}
+        {roomId}
+        {events}
+        {members}
+        onJump={onJumpToEvent}
+      />
+    {/if}
+  </div>
+{:else if item.content.kind === 'hidden_event'}
   {@const raw = item.content.content}
   <div class="debug-event">
     <code>{item.content.event_type}</code>
     <div class="debug-body">
-      <span><StateEventText {item} {onSenderProfile} /></span>
+      <span><StateEventText {item} {members} {onSenderProfile} /></span>
       {#if raw !== null}
         <Collapsible.Root bind:open={peekOpen}>
           <Collapsible.Trigger class="debug-peek-trigger">
@@ -53,7 +158,7 @@
 {:else if item.content.kind === 'call_invite' || item.content.kind === 'malformed'}
   <p class="state">
     {@render stateGutter()}
-    <StateEventText {item} {onSenderProfile} />
+    <StateEventText {item} {members} {onSenderProfile} />
   </p>
 {:else if item.content.kind === 'unsupported'}
   <p class="state">
@@ -120,6 +225,22 @@
   .state-icon :global(svg) {
     height: var(--icon-size-small);
     width: var(--icon-size-small);
+  }
+
+  .state-detail {
+    display: grid;
+    gap: var(--space-050);
+    margin-inline-start: calc(var(--avatar-size-small) + var(--timeline-row-gap));
+    min-width: 0;
+    padding-block: var(--space-050);
+  }
+
+  .state :global(.state-emote) {
+    height: 1lh;
+    margin-inline-start: var(--space-100);
+    object-fit: contain;
+    vertical-align: bottom;
+    width: auto;
   }
 
   .redacted-label {
