@@ -2981,8 +2981,8 @@ pub enum MentionRuleView {
 pub struct MentionNotificationsView {
     pub room: MentionNotificationModeView,
     pub user: MentionNotificationModeView,
-    pub display_name: MentionNotificationModeView,
-    pub username: MentionNotificationModeView,
+    pub display_name: Option<MentionNotificationModeView>,
+    pub username: Option<MentionNotificationModeView>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

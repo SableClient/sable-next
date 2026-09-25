@@ -4,6 +4,7 @@ import {
   parsePushPayload,
   alert,
   type PushPayload,
+  silencedByRoomMode,
   unreadCount,
   webPushValidation,
 } from './push-payload';
@@ -186,4 +187,15 @@ test('a push renders no preview while the reader has previews off', () => {
   expect(hidden?.line.body).toBe('New message from Ada');
 
   expect(alert(message, 'Design crew', true)?.body).toBe('Ada: the merger closes friday');
+});
+
+test('an encrypted push is silenced in a room that only wants mentions', () => {
+  const encrypted = payload({ room_id: '!room:example.org', type: 'm.room.encrypted' });
+  const plain = payload({ room_id: '!room:example.org', type: 'm.room.message' });
+
+  expect(silencedByRoomMode(encrypted, 'mentions')).toBe(true);
+  expect(silencedByRoomMode(plain, 'mentions')).toBe(false);
+  expect(silencedByRoomMode(encrypted, 'all')).toBe(false);
+  expect(silencedByRoomMode(encrypted, null)).toBe(false);
+  expect(silencedByRoomMode(plain, 'mute')).toBe(true);
 });

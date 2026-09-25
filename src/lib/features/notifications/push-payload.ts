@@ -1,3 +1,5 @@
+import type { NotificationModeView } from '#src/generated/protocol';
+
 import { isRecord } from '#lib/guards.js';
 
 import type { ConversationLine } from './conversation';
@@ -109,6 +111,14 @@ export type PushAlert = {
 
 export function unreadCount(payload: PushPayload): number | null {
   return payload.notification?.counts?.unread ?? null;
+}
+
+export function silencedByRoomMode(
+  payload: PushPayload,
+  mode: NotificationModeView | null
+): boolean {
+  if (mode === 'mute') return true;
+  return mode === 'mentions' && payload.notification?.type === 'm.room.encrypted';
 }
 
 /** `null` for a push that only carries counts, which is a badge update and not

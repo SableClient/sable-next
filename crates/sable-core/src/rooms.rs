@@ -99,6 +99,15 @@ impl Core {
         }
     }
 
+    pub(crate) async fn align_encrypted_defaults(&self) {
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        if let Err(error) = crate::notifications::align_encrypted_defaults(&client).await {
+            tracing::warn!("could not align the encrypted notification defaults: {error}");
+        }
+    }
+
     pub(crate) async fn reconcile_memberships(&self) {
         let Ok(client) = self.client().await else {
             return;

@@ -127,7 +127,7 @@ async fn healthy_space_summary_does_not_fetch_missing_tombstone_state() {
         &mut cache,
     )
     .await;
-    let summary = crate::view::room_summary(&item, &cache);
+    let summary = crate::view::room_summary(&item, &cache, false);
     assert!(summary.is_space);
     assert!(!summary.is_tombstoned);
 }

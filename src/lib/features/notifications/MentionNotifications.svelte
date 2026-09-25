@@ -47,6 +47,7 @@
       hint: $i18n.t('settings.mentionsRoomHint'),
     },
   ]);
+  let shown = $derived(rules.filter(({ key }) => current?.[key] !== null));
 
   $effect(() => {
     if (!userId) return;
@@ -109,7 +110,7 @@
   {/if}
 
   <div class="rows">
-    {#each rules as { rule, key, label, hint } (rule)}
+    {#each shown as { rule, key, label, hint } (rule)}
       <label>
         <span>
           {label}
@@ -118,7 +119,7 @@
         {#if current}
           <Select
             aria-label={label}
-            value={current[key]}
+            value={current[key] ?? undefined}
             items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
             onValueChange={(value) => {
               save(rule, key, value as MentionNotificationModeView);

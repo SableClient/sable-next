@@ -1,4 +1,3 @@
-use matrix_sdk::Client;
 use matrix_sdk::notification_settings::{IsEncrypted, IsOneToOne, RoomNotificationMode};
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::OwnedEventId;
@@ -8,17 +7,18 @@ use matrix_sdk::ruma::api::client::push::{
 };
 use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+use matrix_sdk::ruma::events::TimelineEventType;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::events::room::encrypted::OriginalSyncRoomEncryptedEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
 use matrix_sdk::ruma::push::{
-    Action, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule,
-    PredefinedContentRuleId, PredefinedOverrideRuleId, PushFormat, RuleKind, Ruleset,
-    SoundTweakValue, Tweak,
+    Action, AnyPushRuleRef, HighlightTweakValue, HttpPusherData, NewPatternedPushRule, NewPushRule,
+    PredefinedContentRuleId, PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushFormat,
+    RuleKind, Ruleset, SoundTweakValue, Tweak,
 };
-#[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
+use matrix_sdk::{Client, NotificationSettingsError};
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk_ui::notification_client::RawNotificationEvent;
 use matrix_sdk_ui::notification_client::{
@@ -60,6 +60,15 @@ fn push_account<'a>(
     })
 }
 
+#[cfg(not(target_family = "wasm"))]
+#[derive(Debug, PartialEq, Eq)]
+pub enum ColdPush {
+    Clear(String),
+    Discard,
+    NeedsKey { quietly: bool },
+    Undecryptable,
+}
+
 /// Decrypt an Android push.
 #[cfg(not(target_family = "wasm"))]
 pub async fn decrypt_cold_push(
@@ -69,7 +78,8 @@ pub async fn decrypt_cold_push(
     device_id: &str,
     room_id: &str,
     event_json: &str,
-) -> Option<String> {
+    fetch_keys: bool,
+) -> ColdPush {
     let store_dir = cold_push_store_dir(data_dir);
     if let Some(core) = core {
         let live = core
@@ -84,15 +94,33 @@ pub async fn decrypt_cold_push(
             .map(|session| (session.client.clone(), session.sync_service.clone()));
         return match live {
             Some((client, sync_service)) => {
-                decrypt_push_event(&client, KeyFetch::Live(sync_service), room_id, event_json).await
+                let key_fetch = if fetch_keys {
+                    KeyFetch::Live(sync_service)
+                } else {
+                    KeyFetch::Never
+                };
+                decrypt_push_event(&client, key_fetch, room_id, event_json).await
             }
             None => {
-                decrypt_push_from_store(&store_dir, user_id, device_id, room_id, event_json).await
+                match cold_push_from_store(&store_dir, user_id, device_id, room_id, event_json)
+                    .await
+                {
+                    ColdPush::NeedsKey { quietly: true } if fetch_keys => ColdPush::Discard,
+                    ColdPush::NeedsKey { .. } if fetch_keys => ColdPush::Undecryptable,
+                    result => result,
+                }
             }
         };
     }
-    let client = push_client(&store_dir, user_id, device_id).await?;
-    decrypt_push_event(&client, KeyFetch::Cold, room_id, event_json).await
+    let Some(client) = push_client(&store_dir, user_id, device_id).await else {
+        return ColdPush::Undecryptable;
+    };
+    let key_fetch = if fetch_keys {
+        KeyFetch::Cold
+    } else {
+        KeyFetch::Never
+    };
+    decrypt_push_event(&client, key_fetch, room_id, event_json).await
 }
 
 /// Decrypt using the same session and SDK stores as the application. Callers
@@ -105,8 +133,30 @@ pub async fn decrypt_push_from_store(
     room_id: &str,
     event_json: &str,
 ) -> Option<String> {
-    let client = push_client(store_dir, user_id, device_id).await?;
-    decrypt_push_event(&client, KeyFetch::Never, room_id, event_json).await
+    match cold_push_from_store(store_dir, user_id, device_id, room_id, event_json).await {
+        ColdPush::Clear(clear) => Some(clear),
+        ColdPush::Discard | ColdPush::NeedsKey { .. } | ColdPush::Undecryptable => None,
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn cold_push_from_store(
+    store_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &str,
+    event_json: &str,
+) -> ColdPush {
+    let Some(client) = push_client(store_dir, user_id, device_id).await else {
+        return ColdPush::Undecryptable;
+    };
+    Box::pin(decrypt_push_event(
+        &client,
+        KeyFetch::Never,
+        room_id,
+        event_json,
+    ))
+    .await
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -138,42 +188,82 @@ async fn decrypt_push_event(
     key_fetch: KeyFetch,
     room_id: &str,
     event_json: &str,
-) -> Option<String> {
-    let room_id = RoomId::parse(room_id).ok()?;
-    let room = client.get_room(&room_id)?;
-    let event =
-        Raw::<OriginalSyncRoomEncryptedEvent>::from_json_string(event_json.to_owned()).ok()?;
-    let decrypted = room.decrypt_event(&event, None).await.ok()?;
+) -> ColdPush {
+    let every_encrypted = every_encrypted_event_pushed(client).await;
+    let undecryptable = if every_encrypted {
+        ColdPush::Discard
+    } else {
+        ColdPush::Undecryptable
+    };
+    let Ok(room_id) = RoomId::parse(room_id) else {
+        return ColdPush::Undecryptable;
+    };
+    let Some(room) = client.get_room(&room_id) else {
+        return ColdPush::Undecryptable;
+    };
+    let Ok(event) = Raw::<OriginalSyncRoomEncryptedEvent>::from_json_string(event_json.to_owned())
+    else {
+        return ColdPush::Undecryptable;
+    };
+    let push_context = room.push_context().await.ok().flatten();
+    let Ok(decrypted) = room.decrypt_event(&event, push_context.as_ref()).await else {
+        return undecryptable;
+    };
 
-    match decrypted.kind {
-        matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(event) => {
-            return Some(event.event.json().get().to_owned());
+    match &decrypted.kind {
+        matrix_sdk::deserialized_responses::TimelineEventKind::Decrypted(clear) => {
+            return if decrypted
+                .push_actions()
+                .is_some_and(|actions| !notifies(actions))
+            {
+                ColdPush::Discard
+            } else {
+                ColdPush::Clear(clear.event.json().get().to_owned())
+            };
         }
         matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt {
             utd_info, ..
         } if utd_info.reason.is_missing_room_key() => {}
         matrix_sdk::deserialized_responses::TimelineEventKind::UnableToDecrypt { .. }
-        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => return None,
+        | matrix_sdk::deserialized_responses::TimelineEventKind::PlainText { .. } => {
+            return undecryptable;
+        }
     }
 
     let sync_service = match key_fetch {
-        KeyFetch::Never => return None,
+        KeyFetch::Never => {
+            return ColdPush::NeedsKey {
+                quietly: every_encrypted,
+            };
+        }
         KeyFetch::Live(sync_service) => sync_service,
-        KeyFetch::Cold => crate::session::build_sync(client.clone()).await.ok()?,
+        KeyFetch::Cold => match crate::session::build_sync(client.clone()).await {
+            Ok(sync_service) => sync_service,
+            Err(_) => return undecryptable,
+        },
     };
-    let event_id = event.get_field::<OwnedEventId>("event_id").ok()??;
+    let Some(event_id) = event.get_field::<OwnedEventId>("event_id").ok().flatten() else {
+        return undecryptable;
+    };
     let setup = NotificationProcessSetup::SingleProcess { sync_service };
-    let notifications = NotificationClient::new(client.clone(), setup).await.ok()?;
-    let Ok(NotificationStatus::Event(item)) =
-        notifications.get_notification(&room_id, &event_id).await
-    else {
-        return None;
+    let Ok(notifications) = NotificationClient::new(client.clone(), setup).await else {
+        return undecryptable;
     };
-    let RawNotificationEvent::Timeline(clear) = item.raw_event else {
-        return None;
-    };
-    (clear.get_field::<String>("type").ok()?? != "m.room.encrypted")
-        .then(|| clear.json().get().to_owned())
+    match notifications.get_notification(&room_id, &event_id).await {
+        Ok(NotificationStatus::Event(item)) => match item.raw_event {
+            RawNotificationEvent::Timeline(clear)
+                if clear.get_field::<String>("type").ok().flatten().as_deref()
+                    != Some("m.room.encrypted") =>
+            {
+                ColdPush::Clear(clear.json().get().to_owned())
+            }
+            _ => undecryptable,
+        },
+        Ok(NotificationStatus::EventFilteredOut | NotificationStatus::EventRedacted) => {
+            ColdPush::Discard
+        }
+        Ok(NotificationStatus::EventNotFound) | Err(_) => undecryptable,
+    }
 }
 
 impl From<NotificationModeView> for RoomNotificationMode {
@@ -330,8 +420,8 @@ fn mention_rule(rules: &Ruleset, rule: MentionRuleView) -> MentionRule {
     }
 }
 
-fn read_mention_mode(rules: &Ruleset, rule: &MentionRule) -> MentionNotificationModeView {
-    let found = if rule.kind == RuleKind::Content {
+fn find_mention_rule<'a>(rules: &'a Ruleset, rule: &MentionRule) -> Option<(bool, &'a [Action])> {
+    if rule.kind == RuleKind::Content {
         rules
             .content
             .iter()
@@ -343,9 +433,11 @@ fn read_mention_mode(rules: &Ruleset, rule: &MentionRule) -> MentionNotification
             .iter()
             .find(|entry| entry.rule_id == rule.id)
             .map(|entry| (entry.enabled, entry.actions.as_slice()))
-    };
+    }
+}
 
-    found.map_or(rule.fallback, |(enabled, actions)| {
+fn read_mention_mode(rules: &Ruleset, rule: &MentionRule) -> MentionNotificationModeView {
+    find_mention_rule(rules, rule).map_or(rule.fallback, |(enabled, actions)| {
         if enabled {
             mention_mode(actions)
         } else {
@@ -364,12 +456,16 @@ pub async fn mention_notifications(client: &Client) -> Result<MentionNotificatio
         .await
         .map_err(|error| error.to_string())?;
     let read = |view| read_mention_mode(&rules, &mention_rule(&rules, view));
+    let legacy = |view| {
+        let rule = mention_rule(&rules, view);
+        find_mention_rule(&rules, &rule).map(|_| read_mention_mode(&rules, &rule))
+    };
 
     Ok(MentionNotificationsView {
         room: read(MentionRuleView::Room),
         user: read(MentionRuleView::User),
-        display_name: read(MentionRuleView::DisplayName),
-        username: read(MentionRuleView::Username),
+        display_name: legacy(MentionRuleView::DisplayName),
+        username: legacy(MentionRuleView::Username),
     })
 }
 
@@ -418,13 +514,97 @@ pub async fn set_default_mode(
     mode: NotificationModeView,
 ) -> Result<(), String> {
     let settings = client.notification_settings().await;
-    for encrypted in [IsEncrypted::Yes, IsEncrypted::No] {
+    let one_to_one = IsOneToOne::from(direct);
+    settings
+        .set_default_room_notification_mode(IsEncrypted::No, one_to_one, mode.into())
+        .await
+        .map_err(|error| error.to_string())?;
+    match settings
+        .set_default_room_notification_mode(IsEncrypted::Yes, one_to_one, mode.into())
+        .await
+    {
+        Ok(()) | Err(NotificationSettingsError::RuleNotFound(_)) => Ok(()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+const fn default_rule_ids(direct: bool) -> (PredefinedUnderrideRuleId, PredefinedUnderrideRuleId) {
+    if direct {
+        (
+            PredefinedUnderrideRuleId::RoomOneToOne,
+            PredefinedUnderrideRuleId::EncryptedRoomOneToOne,
+        )
+    } else {
+        (
+            PredefinedUnderrideRuleId::Message,
+            PredefinedUnderrideRuleId::Encrypted,
+        )
+    }
+}
+
+fn split_defaults(rules: &Ruleset) -> Vec<(bool, NotificationModeView)> {
+    let notifies = |rule: AnyPushRuleRef<'_>| rule.enabled() && rule.triggers_notification();
+    [true, false]
+        .into_iter()
+        .filter_map(|direct| {
+            let (plain, encrypted) = default_rule_ids(direct);
+            let plain = notifies(rules.get(RuleKind::Underride, plain.as_str())?);
+            let encrypted = notifies(rules.get(RuleKind::Underride, encrypted.as_str())?);
+            (plain != encrypted).then_some((
+                direct,
+                if plain {
+                    NotificationModeView::All
+                } else {
+                    NotificationModeView::Mentions
+                },
+            ))
+        })
+        .collect()
+}
+
+/// # Errors
+///
+/// When the server rejects the push rule write.
+pub async fn align_encrypted_defaults(client: &Client) -> Result<(), String> {
+    let rules = client
+        .account()
+        .push_rules()
+        .await
+        .map_err(|error| error.to_string())?;
+    let settings = client.notification_settings().await;
+    for (direct, mode) in split_defaults(&rules) {
         settings
-            .set_default_room_notification_mode(encrypted, IsOneToOne::from(direct), mode.into())
+            .set_default_room_notification_mode(
+                IsEncrypted::Yes,
+                IsOneToOne::from(direct),
+                mode.into(),
+            )
             .await
             .map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+const ENCRYPTED_EVENT_RULES: [&str; 2] = [
+    ".m.rule.encrypted_event",
+    ".org.matrix.msc4028.encrypted_event",
+];
+
+#[must_use]
+pub fn pushes_every_encrypted_event(rules: &Ruleset) -> bool {
+    rules.override_.iter().any(|rule| {
+        rule.enabled
+            && ENCRYPTED_EVENT_RULES.contains(&rule.rule_id.as_str())
+            && notifies(&rule.actions)
+    })
+}
+
+pub async fn every_encrypted_event_pushed(client: &Client) -> bool {
+    client
+        .account()
+        .push_rules()
+        .await
+        .is_ok_and(|rules| pushes_every_encrypted_event(&rules))
 }
 
 /// # Errors
@@ -471,19 +651,36 @@ pub(crate) async fn foreground_notification(
     notifications: &NotificationClient,
     room: &matrix_sdk::Room,
     event_id: &EventId,
+    discard_undecryptable: bool,
 ) -> Option<NotificationView> {
     match notifications
         .get_notification_with_context(room.room_id(), event_id)
         .await
     {
-        Ok(NotificationStatus::Event(item)) => Some(view(
-            room.own_user_id().to_owned(),
-            room.room_id(),
-            event_id,
-            *item,
-        )),
+        Ok(NotificationStatus::Event(item))
+            if !(discard_undecryptable && still_encrypted(&item.event)) =>
+        {
+            Some(view(
+                room.own_user_id().to_owned(),
+                room.room_id(),
+                event_id,
+                *item,
+            ))
+        }
         _ => None,
     }
+}
+
+fn still_encrypted(event: &NotificationEvent) -> bool {
+    matches!(
+        event,
+        NotificationEvent::Timeline(event)
+            if event.event_type() == TimelineEventType::RoomEncrypted
+    )
+}
+
+pub(crate) fn raw_is_encrypted(raw: &Raw<AnySyncTimelineEvent>) -> bool {
+    raw.get_field::<String>("type").ok().flatten().as_deref() == Some("m.room.encrypted")
 }
 
 pub(crate) async fn invite_notification(
@@ -600,7 +797,7 @@ pub async fn keywords(client: &Client) -> Result<Vec<String>, String> {
     let mut keywords: Vec<String> = ruleset
         .content
         .iter()
-        .filter(|rule| !rule.default)
+        .filter(|rule| !rule.default && rule.enabled)
         .map(|rule| rule.pattern.clone())
         .collect();
     keywords.sort_unstable();
@@ -638,14 +835,34 @@ pub async fn add_keyword(client: &Client, keyword: String) -> Result<(), String>
 ///
 /// When the server rejects the removal.
 pub async fn remove_keyword(client: &Client, keyword: String) -> Result<(), String> {
-    client
-        .send(delete_pushrule::v3::Request::new(
-            RuleKind::Content,
-            keyword,
-        ))
+    let ruleset = client
+        .account()
+        .push_rules()
         .await
         .map_err(|error| error.to_string())?;
+    for rule_id in keyword_rule_ids(&ruleset, &keyword) {
+        client
+            .send(delete_pushrule::v3::Request::new(
+                RuleKind::Content,
+                rule_id,
+            ))
+            .await
+            .map_err(|error| error.to_string())?;
+    }
     Ok(())
+}
+
+fn keyword_rule_ids(ruleset: &Ruleset, keyword: &str) -> Vec<String> {
+    let mut ids: Vec<String> = ruleset
+        .content
+        .iter()
+        .filter(|rule| !rule.default && rule.pattern == keyword)
+        .map(|rule| rule.rule_id.clone())
+        .collect();
+    if ids.is_empty() {
+        ids.push(keyword.to_owned());
+    }
+    ids
 }
 
 const BACKFILL_GRACE_MS: u64 = 60_000;
@@ -742,7 +959,9 @@ fn room_message_body(content: &RoomMessageEventContent) -> String {
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::events::AnySyncTimelineEvent;
-    use matrix_sdk::ruma::push::{PredefinedOverrideRuleId, RuleKind, Ruleset};
+    use matrix_sdk::ruma::push::{
+        ConditionalPushRule, PredefinedOverrideRuleId, RuleKind, Ruleset,
+    };
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt, owned_device_id, room_id, user_id};
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
@@ -754,10 +973,11 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        cold_push_store_dir, decrypt_cold_push, gateway, is_backfill, mention_actions,
-        mention_rule, push_account, read_mention_mode, timeline_body,
+        ColdPush, cold_push_store_dir, decrypt_cold_push, gateway, is_backfill, keyword_rule_ids,
+        mention_actions, mention_rule, push_account, pushes_every_encrypted_event,
+        read_mention_mode, split_defaults, timeline_body,
     };
-    use crate::protocol::{MentionNotificationModeView, MentionRuleView};
+    use crate::protocol::{MentionNotificationModeView, MentionRuleView, NotificationModeView};
     use crate::session::{PersistedSession, restore_authenticated_client};
     use crate::store::{FileSessionStore, SessionStore};
 
@@ -805,98 +1025,303 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn a_cold_push_decrypts_from_androids_persisted_store() {
-        let data_dir =
-            std::env::temp_dir().join(format!("sable-cold-push-test-{}", std::process::id()));
-        let store_dir = cold_push_store_dir(&data_dir);
-        let server = MatrixMockServer::new().await;
-        server.mock_versions().ok().mount().await;
-        let persisted: PersistedSession = serde_json::from_value(json!({
-            "homeserver": server.uri(), "resolved_homeserver": server.uri(),
-            "credentials": {"kind": "password", "user_id": "@alice:example.org",
-                "device_id": "A", "access_token": "test-token"}
-        }))
-        .unwrap();
-        FileSessionStore::new(&store_dir)
-            .save(serde_json::to_vec(&persisted).unwrap())
-            .await
+    const COLD_ROOM: &str = "!cold:example.org";
+
+    struct ColdFixture {
+        data_dir: std::path::PathBuf,
+        client: Option<matrix_sdk::Client>,
+        outbound: OutboundGroupSession,
+        _server: MatrixMockServer,
+    }
+
+    impl ColdFixture {
+        async fn new(tag: &str, joined: JoinedRoomBuilder, rules: Option<Ruleset>) -> Self {
+            let data_dir =
+                std::env::temp_dir().join(format!("sable-cold-push-{tag}-{}", std::process::id()));
+            let store_dir = cold_push_store_dir(&data_dir);
+            let server = MatrixMockServer::new().await;
+            server.mock_versions().ok().mount().await;
+            let persisted: PersistedSession = serde_json::from_value(json!({
+                "homeserver": server.uri(), "resolved_homeserver": server.uri(),
+                "credentials": {"kind": "password", "user_id": "@alice:example.org",
+                    "device_id": "A", "access_token": "test-token"}
+            }))
             .unwrap();
-        let client = restore_authenticated_client(store_dir.to_str().unwrap(), &persisted)
-            .await
-            .unwrap();
-        let room = room_id!("!cold:example.org");
-        server
-            .mock_sync()
-            .ok_and_run(&client, |builder| {
-                builder.add_joined_room(JoinedRoomBuilder::new(room));
-            })
-            .await;
-        let sender = Account::new(user_id!("@sender:example.org"));
-        let keys = sender.identity_keys();
-        let outbound = OutboundGroupSession::new(
-            owned_device_id!("SENDER"),
-            std::sync::Arc::new(keys),
-            room,
-            EncryptionSettings::default(),
-        )
-        .unwrap();
-        let inbound = InboundGroupSession::new(
-            outbound.sender_key(),
-            keys.ed25519,
-            room,
-            &outbound.session_key().await,
-            SenderData::unknown(),
-            None,
-            EventEncryptionAlgorithm::MegolmV1AesSha2,
-            None,
-            false,
-        )
-        .unwrap();
-        client
-            .olm_machine_for_testing()
-            .await
-            .as_ref()
-            .unwrap()
-            .store()
-            .import_room_keys(vec![inbound.export().await], None, |_, _| ())
-            .await
-            .unwrap();
-        let content = outbound
-            .encrypt(
-                "m.room.message",
-                &serde_json::from_value(json!({"msgtype":"m.text", "body":"Cold preview 🔐"}))
-                    .unwrap(),
+            FileSessionStore::new(&store_dir)
+                .save(serde_json::to_vec(&persisted).unwrap())
+                .await
+                .unwrap();
+            let client = restore_authenticated_client(store_dir.to_str().unwrap(), &persisted)
+                .await
+                .unwrap();
+            server
+                .mock_sync()
+                .ok_and_run(&client, |builder| {
+                    if let Some(rules) = rules {
+                        builder.add_global_account_data(
+                            matrix_sdk_test::event_factory::EventFactory::new().push_rules(rules),
+                        );
+                    }
+                    builder.add_joined_room(joined);
+                })
+                .await;
+            let room = room_id!("!cold:example.org");
+            let sender = Account::new(user_id!("@sender:example.org"));
+            let keys = sender.identity_keys();
+            let outbound = OutboundGroupSession::new(
+                owned_device_id!("SENDER"),
+                std::sync::Arc::new(keys),
+                room,
+                EncryptionSettings::default(),
             )
-            .await
-            .content;
-        let event = json!({"type":"m.room.encrypted", "event_id":"$cold",
-            "sender":"@sender:example.org", "origin_server_ts":1, "content":content})
-        .to_string();
-        let cold = |device| {
+            .unwrap();
+            let inbound = InboundGroupSession::new(
+                outbound.sender_key(),
+                keys.ed25519,
+                room,
+                &outbound.session_key().await,
+                SenderData::unknown(),
+                None,
+                EventEncryptionAlgorithm::MegolmV1AesSha2,
+                None,
+                false,
+            )
+            .unwrap();
+            client
+                .olm_machine_for_testing()
+                .await
+                .as_ref()
+                .unwrap()
+                .store()
+                .import_room_keys(vec![inbound.export().await], None, |_, _| ())
+                .await
+                .unwrap();
+            Self {
+                data_dir,
+                client: Some(client),
+                outbound,
+                _server: server,
+            }
+        }
+
+        async fn push(&self, event_type: &str, content: serde_json::Value) -> String {
+            encrypted_push(&self.outbound, event_type, content).await
+        }
+
+        async fn decrypt(&self, device: &str, event: &str) -> ColdPush {
             decrypt_cold_push(
                 None,
-                &data_dir,
+                &self.data_dir,
                 "@alice:example.org",
                 device,
-                room.as_str(),
-                &event,
+                COLD_ROOM,
+                event,
+                true,
             )
-        };
-        // A second SDK client must coexist with the warm application's store owner.
-        let clear = cold("A")
             .await
-            .expect("cold decryption while the application has the store open");
+        }
+
+        async fn decrypt_locally(&self, event: &str) -> ColdPush {
+            decrypt_cold_push(
+                None,
+                &self.data_dir,
+                "@alice:example.org",
+                "A",
+                COLD_ROOM,
+                event,
+                false,
+            )
+            .await
+        }
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_decrypts_from_androids_persisted_store() {
+        let mut fixture = ColdFixture::new(
+            "store",
+            JoinedRoomBuilder::new(room_id!("!cold:example.org")),
+            None,
+        )
+        .await;
+        let event = fixture
+            .push(
+                "m.room.message",
+                json!({"msgtype":"m.text", "body":"Cold preview 🔐"}),
+            )
+            .await;
+        // A second SDK client must coexist with the warm application's store owner.
+        let ColdPush::Clear(clear) = fixture.decrypt("A", &event).await else {
+            panic!("cold decryption while the application has the store open");
+        };
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&clear).unwrap()["content"]["body"],
             "Cold preview 🔐"
         );
-        drop(client);
-        assert!(cold("A").await.is_some());
-        assert!(cold("OTHER").await.is_none());
-        assert!(!data_dir.join("session.json").exists());
+        drop(fixture.client.take());
+        assert!(matches!(
+            fixture.decrypt("A", &event).await,
+            ColdPush::Clear(_)
+        ));
+        assert_eq!(
+            fixture.decrypt("OTHER", &event).await,
+            ColdPush::Undecryptable
+        );
+        assert!(!fixture.data_dir.join("session.json").exists());
 
-        tokio::fs::remove_dir_all(&data_dir).await.unwrap();
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    async fn encrypted_push(
+        outbound: &OutboundGroupSession,
+        event_type: &str,
+        content: serde_json::Value,
+    ) -> String {
+        let content = outbound
+            .encrypt(event_type, &serde_json::from_value(content).unwrap())
+            .await
+            .content;
+        json!({"type":"m.room.encrypted", "event_id":"$cold",
+            "sender":"@sender:example.org", "origin_server_ts":1, "content":content})
+        .to_string()
+    }
+
+    fn cold_room_with_members() -> JoinedRoomBuilder {
+        let factory = matrix_sdk_test::event_factory::EventFactory::new()
+            .room(room_id!("!cold:example.org"))
+            .sender(user_id!("@sender:example.org"));
+        JoinedRoomBuilder::new(room_id!("!cold:example.org"))
+            .add_state_event(factory.member(user_id!("@alice:example.org")))
+            .add_state_event(factory.member(user_id!("@sender:example.org")))
+            .add_state_event(factory.default_power_levels())
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_the_push_rules_silence_is_discarded() {
+        use matrix_sdk::ruma::push::PredefinedUnderrideRuleId;
+
+        let fixture = ColdFixture::new("reaction", cold_room_with_members(), None).await;
+        let reaction = fixture
+            .push(
+                "m.reaction",
+                json!({"m.relates_to": {"rel_type": "m.annotation", "event_id": "$target", "key": "👍"}}),
+            )
+            .await;
+        let message = fixture
+            .push(
+                "m.room.message",
+                json!({"msgtype":"m.text", "body":"hello"}),
+            )
+            .await;
+
+        assert_eq!(fixture.decrypt("A", &reaction).await, ColdPush::Discard);
+        assert!(matches!(
+            fixture.decrypt("A", &message).await,
+            ColdPush::Clear(_)
+        ));
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+
+        let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
+        rules
+            .set_actions(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::Message.as_str(),
+                vec![],
+            )
+            .unwrap();
+        let fixture = ColdFixture::new("mentions", cold_room_with_members(), Some(rules)).await;
+        let message = fixture
+            .push(
+                "m.room.message",
+                json!({"msgtype":"m.text", "body":"hello"}),
+            )
+            .await;
+
+        assert_eq!(fixture.decrypt("A", &message).await, ColdPush::Discard);
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_in_an_all_messages_room_is_shown_under_a_mentions_default() {
+        use matrix_sdk::ruma::push::{NewPushRule, NewSimplePushRule, PredefinedUnderrideRuleId};
+
+        let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
+        rules
+            .set_actions(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::Message.as_str(),
+                vec![],
+            )
+            .unwrap();
+        rules
+            .insert(
+                NewPushRule::Room(NewSimplePushRule::new(
+                    room_id!("!cold:example.org").to_owned(),
+                    vec![matrix_sdk::ruma::push::Action::Notify],
+                )),
+                None,
+                None,
+            )
+            .unwrap();
+        let fixture = ColdFixture::new("all", cold_room_with_members(), Some(rules)).await;
+        let message = fixture
+            .push(
+                "m.room.message",
+                json!({"msgtype":"m.text", "body":"hello"}),
+            )
+            .await;
+
+        let ColdPush::Clear(clear) = fixture.decrypt("A", &message).await else {
+            panic!("an all-messages room must still notify");
+        };
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&clear).unwrap()["content"]["body"],
+            "hello"
+        );
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_local_decryption_asks_for_the_key_quietly_only_when_every_encrypted_event_is_pushed()
+    {
+        let stranger = OutboundGroupSession::new(
+            owned_device_id!("STRANGER"),
+            std::sync::Arc::new(Account::new(user_id!("@sender:example.org")).identity_keys()),
+            room_id!("!cold:example.org"),
+            EncryptionSettings::default(),
+        )
+        .unwrap();
+        let unknown = encrypted_push(
+            &stranger,
+            "m.room.message",
+            json!({"msgtype":"m.text", "body":"hello"}),
+        )
+        .await;
+
+        let fixture = ColdFixture::new("needs-key", cold_room_with_members(), None).await;
+        assert_eq!(
+            fixture.decrypt_locally(&unknown).await,
+            ColdPush::NeedsKey { quietly: false }
+        );
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+
+        let mut rules = Ruleset::server_default(user_id!("@alice:example.org"));
+        rules.override_.insert(
+            serde_json::from_value::<ConditionalPushRule>(json!({
+                "rule_id": ".org.matrix.msc4028.encrypted_event",
+                "default": true,
+                "enabled": true,
+                "conditions": [{"kind": "event_match", "key": "type", "pattern": "m.room.encrypted"}],
+                "actions": ["notify"],
+            }))
+            .unwrap(),
+        );
+        let fixture =
+            ColdFixture::new("needs-key-quietly", cold_room_with_members(), Some(rules)).await;
+        assert_eq!(
+            fixture.decrypt_locally(&unknown).await,
+            ColdPush::NeedsKey { quietly: true }
+        );
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
     }
 
     fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {
@@ -1120,5 +1545,105 @@ mod tests {
             read_mention_mode(&rules, &mention_rule(&rules, MentionRuleView::Username)),
             MentionNotificationModeView::Loud
         );
+    }
+
+    #[test]
+    fn a_default_left_notifying_for_encrypted_rooms_is_split() {
+        use matrix_sdk::ruma::push::PredefinedUnderrideRuleId;
+
+        let mut rules = Ruleset::server_default(user_id!("@me:example.org"));
+        assert!(split_defaults(&rules).is_empty());
+
+        rules
+            .set_actions(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::Message.as_str(),
+                vec![],
+            )
+            .unwrap();
+        rules
+            .set_actions(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::EncryptedRoomOneToOne.as_str(),
+                vec![],
+            )
+            .unwrap();
+
+        assert_eq!(
+            split_defaults(&rules),
+            vec![
+                (true, NotificationModeView::All),
+                (false, NotificationModeView::Mentions)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_disabled_default_reads_as_not_notifying() {
+        use matrix_sdk::ruma::push::PredefinedUnderrideRuleId;
+
+        let mut rules = Ruleset::server_default(user_id!("@me:example.org"));
+        rules
+            .set_enabled(
+                RuleKind::Underride,
+                PredefinedUnderrideRuleId::Encrypted.as_str(),
+                false,
+            )
+            .unwrap();
+
+        assert_eq!(
+            split_defaults(&rules),
+            vec![(false, NotificationModeView::All)]
+        );
+    }
+
+    #[test]
+    fn the_msc4028_rule_is_detected_only_while_it_notifies() {
+        let mut rules = Ruleset::server_default(user_id!("@me:example.org"));
+        assert!(!pushes_every_encrypted_event(&rules));
+
+        let rule = |enabled: bool, actions: serde_json::Value| {
+            serde_json::from_value::<ConditionalPushRule>(json!({
+                "rule_id": ".org.matrix.msc4028.encrypted_event",
+                "default": true,
+                "enabled": enabled,
+                "conditions": [{"kind": "event_match", "key": "type", "pattern": "m.room.encrypted"}],
+                "actions": actions,
+            }))
+            .unwrap()
+        };
+
+        rules.override_.insert(rule(true, json!(["notify"])));
+        assert!(pushes_every_encrypted_event(&rules));
+
+        rules
+            .override_
+            .shift_remove(".org.matrix.msc4028.encrypted_event");
+        rules.override_.insert(rule(false, json!(["notify"])));
+        assert!(!pushes_every_encrypted_event(&rules));
+
+        rules
+            .override_
+            .shift_remove(".org.matrix.msc4028.encrypted_event");
+        rules.override_.insert(rule(true, json!([])));
+        assert!(!pushes_every_encrypted_event(&rules));
+    }
+
+    #[test]
+    fn a_keyword_is_removed_by_the_rule_that_carries_it() {
+        let mut rules = Ruleset::server_default(user_id!("@me:example.org"));
+        rules.content.insert(
+            serde_json::from_value(json!({
+                "rule_id": "keyword-1",
+                "pattern": "sable",
+                "default": false,
+                "enabled": true,
+                "actions": ["notify"],
+            }))
+            .unwrap(),
+        );
+
+        assert_eq!(keyword_rule_ids(&rules, "sable"), vec!["keyword-1"]);
+        assert_eq!(keyword_rule_ids(&rules, "other"), vec!["other"]);
     }
 }

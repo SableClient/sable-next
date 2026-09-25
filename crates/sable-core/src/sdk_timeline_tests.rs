@@ -685,7 +685,7 @@ async fn a_room_read_elsewhere_reports_the_server_unread_count() {
         .await;
 
     let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
-    let summary = super::view::room_summary(&item, &std::collections::HashMap::new());
+    let summary = super::view::room_summary(&item, &std::collections::HashMap::new(), false);
 
     assert_eq!(item.num_unread_messages(), 2);
     assert_eq!(summary.unread, 0);
@@ -740,8 +740,66 @@ async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
 
     assert_eq!(item.num_unread_messages(), 1);
     assert_eq!(
-        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
         (9, 2)
+    );
+}
+
+#[tokio::test]
+async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unread() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!pushes-everything:example.org");
+    let me = client
+        .user_id()
+        .expect("the mock client is logged in")
+        .to_owned();
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(factory.room_encryption())
+                .add_timeline_bulk([
+                    factory
+                        .text_msg("one")
+                        .event_id(event_id!("$one"))
+                        .into_raw(),
+                    factory
+                        .text_msg("two")
+                        .event_id(event_id!("$two"))
+                        .into_raw(),
+                ])
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$one"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 9,
+                    "highlight_count": 0,
+                })),
+        )
+        .await;
+
+    let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
+
+    assert!(item.encryption_state().is_encrypted());
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (9, 0)
+    );
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), true),
+        (1, 0)
     );
 }
 
@@ -797,7 +855,7 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
 
     assert_eq!(item.num_unread_mentions(), 2);
     assert_eq!(
-        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
         (2, 0)
     );
 }
@@ -849,7 +907,7 @@ async fn a_receipt_on_the_latest_event_clears_a_stale_server_count() {
     let item = matrix_sdk_ui::room_list_service::RoomListItem::from(room);
 
     assert_eq!(
-        super::view::unread_counts(&item, Some(event_id!("$two"))),
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
         (0, 0)
     );
 }
@@ -1859,7 +1917,7 @@ async fn invited_direct_room_summary_is_direct() {
             &mut cache,
         )
         .await;
-        let summary = super::view::room_summary(&item, &cache);
+        let summary = super::view::room_summary(&item, &cache, false);
 
         assert!(summary.direct_targets.is_empty());
         assert_eq!(summary.is_direct, expected);
@@ -1904,7 +1962,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary = super::view::room_summary(&item, &cache);
+    let summary = super::view::room_summary(&item, &cache, false);
     assert!(summary.is_direct);
     assert_eq!(summary.avatar_url.as_deref(), Some(avatar.as_str()));
 
@@ -1939,7 +1997,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         )
         .await;
         assert_eq!(
-            super::view::room_summary(&item, &cache)
+            super::view::room_summary(&item, &cache, false)
                 .avatar_url
                 .as_deref(),
             expected
@@ -1964,7 +2022,7 @@ async fn direct_room_summary_uses_the_other_members_avatar() {
         &mut cache,
     )
     .await;
-    let summary = super::view::room_summary(&item, &cache);
+    let summary = super::view::room_summary(&item, &cache, false);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -1995,7 +2053,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
     assert_eq!(
-        super::view::room_summary(&item, &cache)
+        super::view::room_summary(&item, &cache, false)
             .avatar_url
             .as_deref(),
         Some(avatar.as_str())
@@ -2028,7 +2086,7 @@ async fn room_summary_clears_removed_avatars_when_rooms_are_reinserted() {
     )
     .await;
 
-    let summary = super::view::room_summary(&item, &cache);
+    let summary = super::view::room_summary(&item, &cache, false);
     assert!(!summary.is_direct);
     assert_eq!(summary.avatar_url, None);
 }
@@ -2124,7 +2182,7 @@ async fn sliding_sync_room_summary_prefers_avatar_state_over_the_avatar_property
         )
         .await;
         assert_eq!(
-            super::view::room_summary(&item, &cache)
+            super::view::room_summary(&item, &cache, false)
                 .avatar_url
                 .as_deref(),
             expected_avatar,

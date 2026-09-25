@@ -1,15 +1,17 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import type { RoomSummary } from '#src/generated/protocol';
+  import type { RoomSummary, UserDirectoryEntryView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
+  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import '#lib/ui/primitives/menu.css';
 
   interface Props {
     open: boolean;
@@ -28,6 +30,8 @@
   let failed = $state(false);
   let convertPrompt = $state(false);
   let converting = $state(false);
+  let directory = $state.raw<UserDirectoryEntryView[]>([]);
+  let lookup = 0;
 
   let roomId = $derived(room?.room_id ?? null);
   let isDirect = $derived(room?.is_direct ?? false);
@@ -45,9 +49,33 @@
     });
   });
 
-  async function invite(): Promise<void> {
+  $effect(() => {
+    const query = draft.trim();
+    const current = ++lookup;
+    if (!query) {
+      directory = [];
+      return;
+    }
+    const timer = setTimeout(() => {
+      void findUsers(query, current);
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+    };
+  });
+
+  async function findUsers(query: string, current: number): Promise<void> {
+    try {
+      const { results } = await core.commands.searchUserDirectory(query, 10);
+      if (current === lookup) directory = results;
+    } catch (error) {
+      console.warn('[sable room] user directory unavailable', error);
+      if (current === lookup) directory = [];
+    }
+  }
+
+  async function invite(candidate = draft.trim()): Promise<void> {
     const target = roomId;
-    const candidate = draft.trim();
     if (!target || inviting) return;
     if (!userIdPattern.test(candidate)) {
       invalid = true;
@@ -132,6 +160,34 @@
         />
       </FormField>
 
+      {#if directory.length > 0}
+        <ul class="suggestions">
+          {#each directory as entry (entry.user_id)}
+            <li>
+              <button
+                type="button"
+                class="menu-item"
+                disabled={inviting}
+                onclick={() => {
+                  void invite(entry.user_id);
+                }}
+              >
+                <Avatar
+                  size="small"
+                  id={entry.user_id}
+                  src={entry.avatar_url}
+                  name={entry.display_name ?? entry.user_id}
+                />
+                <span class="identity">
+                  <span class="name">{entry.display_name ?? entry.user_id}</span>
+                  <span class="user-id">{entry.user_id}</span>
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+
       {#if invalid}
         <Alert variant="critical" role="alert">{$i18n.t('room.createInviteInvalid')}</Alert>
       {:else if failed}
@@ -168,6 +224,7 @@
   .invite {
     display: grid;
     gap: var(--space-400);
+    width: min(24rem, calc(100vw - 2rem));
   }
 
   h2 {
@@ -179,5 +236,36 @@
   .explain {
     color: var(--surface-var-on-container);
     margin: 0;
+  }
+
+  .suggestions {
+    display: grid;
+    list-style: none;
+    margin: 0;
+    max-height: 16rem;
+    overflow: auto;
+    padding: 0;
+  }
+
+  .suggestions :global(.menu-item) {
+    --menu-item-height: var(--control-height-500);
+    --menu-item-gap: var(--space-200);
+  }
+
+  .identity {
+    display: grid;
+    min-width: 0;
+  }
+
+  .name,
+  .user-id {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-id {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
   }
 </style>

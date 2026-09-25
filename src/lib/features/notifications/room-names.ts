@@ -1,3 +1,5 @@
+import type { NotificationModeView } from '#src/generated/protocol';
+
 /** A service worker has no session to ask for a room's name, so the app leaves
     the names where it can read them. */
 const DATABASE = 'sable-notifications';
@@ -37,11 +39,15 @@ function transact<T>(
 }
 
 export async function putRoomNames(names: ReadonlyMap<string, string>): Promise<void> {
+  await putAll(names);
+}
+
+async function putAll(entries: Iterable<readonly [string, string]>): Promise<void> {
   const database = await open();
   await new Promise<void>((resolve, reject) => {
     const transaction = database.transaction(STORE, 'readwrite');
     const store = transaction.objectStore(STORE);
-    for (const [roomId, name] of names) store.put(name, roomId);
+    for (const [key, value] of entries) store.put(value, key);
     transaction.oncomplete = () => {
       resolve();
     };
@@ -54,6 +60,21 @@ export async function putRoomNames(names: ReadonlyMap<string, string>): Promise<
 export async function roomName(roomId: string): Promise<string | null> {
   try {
     return (await transact<unknown>('readonly', (store) => store.get(roomId))) as string | null;
+  } catch {
+    return null;
+  }
+}
+
+const MODE_PREFIX = '\u0000mode:';
+
+export async function putRoomModes(modes: ReadonlyMap<string, string>): Promise<void> {
+  await putAll([...modes].map(([roomId, mode]) => [MODE_PREFIX + roomId, mode] as const));
+}
+
+export async function roomMode(roomId: string): Promise<NotificationModeView | null> {
+  try {
+    const stored = await transact<unknown>('readonly', (store) => store.get(MODE_PREFIX + roomId));
+    return stored === 'all' || stored === 'mentions' || stored === 'mute' ? stored : null;
   } catch {
     return null;
   }

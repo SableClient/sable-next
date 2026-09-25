@@ -17,10 +17,11 @@ import {
   alert,
   parsePushPayload,
   type PushPayload,
+  silencedByRoomMode,
   unreadCount,
   webPushValidation,
 } from '#lib/features/notifications/push-payload.js';
-import { pushContentPolicy, roomName } from '#lib/features/notifications/room-names.js';
+import { pushContentPolicy, roomMode, roomName } from '#lib/features/notifications/room-names.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
@@ -116,6 +117,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   }
 
   if (await focused()) return;
+  if (silencedByRoomMode(payload, await roomMode(payload.notification?.room_id ?? ''))) return;
 
   const policy = await pushContentPolicy();
   const encrypted = payload.notification?.type === 'm.room.encrypted';

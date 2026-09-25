@@ -298,6 +298,7 @@ impl Core {
             warn!("could not fill in our own room memberships: {error}");
         }
         let stored = load(&client).await;
+        let every_encrypted = notifications::every_encrypted_event_pushed(&client).await;
         let mut candidates = Vec::new();
 
         for room in client.joined_rooms() {
@@ -364,6 +365,9 @@ impl Core {
                     let Some(actions) = event.push_actions() else {
                         continue;
                     };
+                    if every_encrypted && notifications::raw_is_encrypted(event.raw()) {
+                        continue;
+                    }
                     if let Some(entry) = self.inbox_entry(&room, event.raw(), actions).await {
                         fresh.push(entry);
                         missing = missing.saturating_sub(1);

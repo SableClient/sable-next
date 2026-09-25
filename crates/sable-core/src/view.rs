@@ -82,6 +82,7 @@ pub struct RoomInfo {
 pub fn room_summary<S: BuildHasher>(
     item: &RoomListItem,
     room_cache: &HashMap<OwnedRoomId, RoomInfo, S>,
+    every_encrypted: bool,
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
     let latest_event = latest_event(item);
@@ -90,6 +91,7 @@ pub fn room_summary<S: BuildHasher>(
         latest_event
             .as_ref()
             .and_then(|event| event.event_id.as_deref()),
+        every_encrypted,
     );
     RoomSummary {
         room_id: item.room_id().to_owned(),
@@ -150,7 +152,11 @@ fn call_participants(joined: Vec<OwnedUserId>) -> Vec<OwnedUserId> {
     participants
 }
 
-pub(crate) fn unread_counts(item: &RoomListItem, latest_event_id: Option<&EventId>) -> (u32, u32) {
+pub(crate) fn unread_counts(
+    item: &RoomListItem,
+    latest_event_id: Option<&EventId>,
+    every_encrypted: bool,
+) -> (u32, u32) {
     let count = |value: u64| u32::try_from(value).unwrap_or(u32::MAX);
     let counts = item.unread_notification_counts();
     let server = (
@@ -171,12 +177,16 @@ pub(crate) fn unread_counts(item: &RoomListItem, latest_event_id: Option<&EventI
         return local;
     }
 
-    let highlight = if item.encryption_state().is_encrypted() {
-        local.1
+    if item.encryption_state().is_encrypted() {
+        let unread = if every_encrypted {
+            local.0
+        } else {
+            local.0.max(server.0)
+        };
+        (unread, local.1)
     } else {
-        server.1
-    };
-    (local.0.max(server.0), highlight)
+        (local.0.max(server.0), server.1)
+    }
 }
 
 const fn join_rule_view(rule: Option<&JoinRule>) -> RoomJoinRuleView {
@@ -284,9 +294,10 @@ pub async fn enrich_room_fields<S: BuildHasher>(
 }
 
 pub async fn listless_room_summary(room: Room) -> RoomSummary {
+    let every_encrypted = crate::notifications::every_encrypted_event_pushed(&room.client()).await;
     let item = RoomListItem::from(room);
     let cache = HashMap::from([(item.room_id().to_owned(), room_info(&item).await)]);
-    room_summary(&item, &cache)
+    room_summary(&item, &cache, every_encrypted)
 }
 
 #[must_use]

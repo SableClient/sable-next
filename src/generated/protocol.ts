@@ -420,8 +420,8 @@ export type MentionNotificationModeView = "off" | "notify" | "loud";
 export type MentionNotificationsView = {
 	room: MentionNotificationModeView,
 	user: MentionNotificationModeView,
-	display_name: MentionNotificationModeView,
-	username: MentionNotificationModeView,
+	display_name: MentionNotificationModeView | null,
+	username: MentionNotificationModeView | null,
 };
 
 export type MentionRuleView = "room" | "user" | "display_name" | "username";

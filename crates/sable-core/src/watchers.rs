@@ -182,7 +182,11 @@ impl Core {
                 let mut alerted_events = std::collections::HashSet::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
-                    if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event {
+                    let every_encrypted =
+                        notifications::every_encrypted_event_pushed(&client).await;
+                    if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
+                        && !(every_encrypted && notifications::raw_is_encrypted(raw))
+                    {
                         core.record_live_inbox(&room, raw, &actions, generation)
                             .await;
                     }
@@ -213,6 +217,7 @@ impl Core {
                                 &notifications_client,
                                 &room,
                                 event.event_id(),
+                                every_encrypted,
                             )
                             .await
                         }

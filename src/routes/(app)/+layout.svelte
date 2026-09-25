@@ -76,7 +76,11 @@
   import { CallSession, provideCallSession } from '#lib/features/call/call-session.svelte.js';
   import { effectiveVolume } from '#lib/features/call/participant-volumes.svelte.js';
   import { ringtoneVolume, startRingback } from '#lib/features/call/ringtone.js';
-  import { putPushContentPolicy, RoomNameWriter } from '#lib/features/notifications/room-names.js';
+  import {
+    putPushContentPolicy,
+    putRoomModes,
+    RoomNameWriter,
+  } from '#lib/features/notifications/room-names.js';
   import {
     dropPushSubscription,
     syncPushSubscription,
@@ -486,8 +490,23 @@
     roomNames.remember(names);
   });
 
+  const roomModes = new RoomNameWriter(putRoomModes);
+
+  $effect(() => {
+    const modes = new Map(
+      roomList.rooms.flatMap((room) => {
+        const mode = roomList.notificationMode(room.room_id);
+        return mode === null ? [] : [[room.room_id, mode] as const];
+      })
+    );
+    if (modes.size === 0) return;
+
+    roomModes.remember(modes);
+  });
+
   onDestroy(() => {
     roomNames.dispose();
+    roomModes.dispose();
   });
 
   $effect(() => {

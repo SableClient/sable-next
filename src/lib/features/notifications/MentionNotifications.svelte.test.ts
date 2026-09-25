@@ -12,7 +12,7 @@ type Mode = 'off' | 'notify' | 'loud';
 const core = Object.assign(baseCore, {
   session: { user_id: '@erwan:example.org' },
   userProfile: vi.fn(() => Promise.resolve({ display_name: 'Erwan' })),
-  mentionNotifications: vi.fn<() => Promise<Record<string, Mode>>>(),
+  mentionNotifications: vi.fn<() => Promise<Record<string, Mode | null>>>(),
   setMentionNotifications: vi.fn<(rule: string, mode: Mode) => Promise<void>>(),
 });
 
@@ -42,6 +42,20 @@ test('shows every mention rule at its account mode', async () => {
   expect(selector('Contains Displayname ("Erwan")').textContent).toContain('Off');
   expect(selector('Contains Username ("erwan")').textContent).toContain('Loud');
   expect(selector('Mention @room').textContent).toContain('Notify');
+
+  await unmount(instance);
+});
+
+test('hides the legacy rules a server has removed', async () => {
+  core.mentionNotifications.mockResolvedValue({ ...loaded, display_name: null, username: null });
+
+  const instance = mount(MentionNotifications, { target: document.body });
+
+  await vi.waitFor(() => {
+    expect(selector('Mention @room').textContent).toContain('Notify');
+  });
+  expect(document.querySelector("[aria-label^='Contains Displayname']")).toBeNull();
+  expect(document.querySelector("[aria-label^='Contains Username']")).toBeNull();
 
   await unmount(instance);
 });
