@@ -264,6 +264,12 @@
     roleFailed = false;
   }
 
+  function revealRoleEditor(node: HTMLElement): void {
+    void editingLevel;
+    node.scrollIntoView({ block: 'nearest' });
+    node.querySelector('input')?.focus({ preventScroll: true });
+  }
+
   function cancelEditRole(): void {
     editingLevel = null;
     editingNewRole = false;
@@ -495,6 +501,7 @@
       <SettingsSection headingId="room-perm-role-editor" title={$i18n.t('room.permRoleEdit')}>
         <form
           class="settings-form"
+          {@attach revealRoleEditor}
           onsubmit={(event) => {
             event.preventDefault();
             void saveRole();

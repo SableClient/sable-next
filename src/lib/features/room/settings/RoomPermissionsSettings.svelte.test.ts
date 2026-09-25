@@ -193,10 +193,15 @@ test('uses tagged default roles in permission controls and opens their editor', 
   if (!row) throw new Error('tagged permission row missing');
   const edit = row.querySelector<HTMLButtonElement>('button[aria-label="Edit role"]');
   if (!edit) throw new Error('role edit button missing');
+  const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
   edit.click();
   await tick();
 
-  expect(document.querySelector<HTMLInputElement>('#room-perm-role-name')?.value).toBe('Test');
+  const name = document.querySelector<HTMLInputElement>('#room-perm-role-name');
+  expect(name?.value).toBe('Test');
+  expect(document.activeElement).toBe(name);
+  expect(scrollIntoView).toHaveBeenCalled();
+  scrollIntoView.mockRestore();
   await unmount(instance);
 });
 
