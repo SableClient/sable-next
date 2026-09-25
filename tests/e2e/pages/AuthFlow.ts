@@ -41,13 +41,17 @@ export class AuthFlow {
 
   async finishSetup(): Promise<void> {
     const rooms = /\/rooms$/;
-    for (let step = 0; step < 8; step += 1) {
+    for (let step = 0; step < 12; step += 1) {
       await expect(this.page).toHaveURL(/\/(setup\/[a-z]+|rooms)$/, { timeout: 30_000 });
       if (rooms.test(new URL(this.page.url()).pathname)) return;
+      const before = this.page.url();
       await this.setupCard
-        .getByRole('button', { name: /^(Skip anyway|Skip for now|Continue)$/ })
+        .getByRole('button', { name: /^(Skip anyway|Skip for now|Not now|Go to your chats)$/ })
         .first()
         .click();
+      await this.page
+        .waitForURL((url) => url.href !== before, { timeout: 5_000 })
+        .catch(() => undefined);
     }
     await expect(this.page).toHaveURL(rooms);
   }

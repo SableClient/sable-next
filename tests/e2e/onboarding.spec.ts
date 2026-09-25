@@ -120,3 +120,31 @@ test.describe('with motion', () => {
     expect(seen).toEqual(['0', '1']);
   });
 });
+
+test('About runs setup again for a device that already finished it', async ({
+  auth,
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.goto('/settings/about');
+  await page.getByRole('button', { name: 'Run setup again' }).click();
+
+  const card = auth.setupCard;
+  for (const [step, action] of [
+    ['profile', 'Skip for now'],
+    ['notifications', 'Skip for now'],
+    ['appearance', 'Skip for now'],
+    ['sync', 'Not now'],
+    ['done', 'Go to your chats'],
+  ] as const) {
+    await expect(page).toHaveURL(new RegExp(`/setup/${step}$`), { timeout: 20_000 });
+    await card.getByRole('button', { name: action }).click();
+  }
+
+  await expect(page).toHaveURL(/\/rooms$/);
+  const pending = await page.evaluate(() =>
+    Object.keys(localStorage).filter((key) => key.startsWith('sable-setup:'))
+  );
+  expect(pending).toEqual([]);
+});
