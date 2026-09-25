@@ -201,6 +201,7 @@
   .directory {
     display: grid;
     gap: var(--space-500);
+    margin-top: var(--space-500);
   }
 
   .filters {
