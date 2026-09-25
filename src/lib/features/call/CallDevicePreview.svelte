@@ -124,30 +124,38 @@
 
 <div class="prescreen">
   <div class="preview">
-    {#if wantsCamera && stream}
-      <video
-        class="video"
-        autoplay
-        muted
-        playsinline
-        aria-label={$i18n.t('call.prescreenPreview')}
-        {@attach attachPreview}
-      ></video>
-    {:else}
-      <div class="camera-off">
-        {#if self}
-          <Avatar src={self.avatar} name={self.name} id={self.userId} size="large" />
-        {/if}
-        <p>
-          {cameraFailed ? $i18n.t('call.cameraUnavailable') : $i18n.t('call.prescreenNoCamera')}
-        </p>
-      </div>
-    {/if}
-    {#if testing && meterReady}
-      <span class="level" aria-hidden="true">
-        <span class="fill" style:scale="{level} 1"></span>
-      </span>
-    {/if}
+    <div class="tile" class:video-on={wantsCamera && stream}>
+      {#if wantsCamera && stream}
+        <video
+          class="video"
+          autoplay
+          muted
+          playsinline
+          aria-label={$i18n.t('call.prescreenPreview')}
+          {@attach attachPreview}
+        ></video>
+      {:else}
+        <div class="camera-off">
+          {#if self}
+            <Avatar src={self.avatar} name={self.name} id={self.userId} size="large" />
+          {/if}
+          <p>
+            {cameraFailed ? $i18n.t('call.cameraUnavailable') : $i18n.t('call.prescreenNoCamera')}
+          </p>
+        </div>
+      {/if}
+      {#if self}
+        <span class="tag">
+          {#if !media.microphone}<MicrophoneSlashIcon aria-hidden="true" weight="fill" />{/if}
+          <span class="name">{self.name}</span>
+        </span>
+      {/if}
+      {#if testing && meterReady}
+        <span class="level" aria-hidden="true">
+          <span class="fill" style:scale="{level} 1"></span>
+        </span>
+      {/if}
+    </div>
   </div>
 
   <div class="tray">
@@ -264,15 +272,29 @@
   }
 
   .preview {
+    --radius-outer: var(--radii-500);
+    --radius-padding: var(--space-100);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
+    background: var(--surface-container);
+    border-radius: var(--radius-outer);
+    padding: var(--radius-padding);
+  }
+
+  .tile {
     align-items: center;
     aspect-ratio: 16 / 9;
     background: var(--surface-var-container);
-    border-radius: var(--radii-500);
+    border-radius: var(--radius-inner);
     container-type: size;
     display: flex;
     justify-content: center;
     overflow: hidden;
     position: relative;
+  }
+
+  .tile.video-on {
+    background: var(--picker-black);
   }
 
   .video {
@@ -300,11 +322,42 @@
     text-align: center;
   }
 
+  .tag {
+    align-items: center;
+    backdrop-filter: blur(0.5rem);
+    background: color-mix(in srgb, var(--picker-black) 62%, transparent);
+    border-radius: var(--radii-300);
+    box-sizing: border-box;
+    color: var(--picker-white);
+    display: flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    gap: var(--space-100);
+    inset: auto auto var(--space-200) var(--space-200);
+    max-inline-size: calc(100% - var(--space-400));
+    padding: var(--space-050) var(--space-200);
+    position: absolute;
+  }
+
+  .tag :global(svg) {
+    color: var(--crit-main);
+    flex: none;
+    height: 0.875rem;
+    width: 0.875rem;
+  }
+
+  .name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .level {
     background: color-mix(in srgb, var(--bg-container) 70%, transparent);
     block-size: var(--space-100);
     border-radius: var(--radii-pill);
-    inset: auto var(--space-300) var(--space-300);
+    inset: var(--space-200) var(--space-300) auto;
     overflow: hidden;
     position: absolute;
   }
