@@ -17,6 +17,7 @@ export type PronounPillLength = '12' | '16' | '24' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
+export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
 export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
@@ -61,6 +62,7 @@ export interface Preferences {
   hideReadReceipts: boolean;
   readReceiptPlacement: ReadReceiptPlacement;
   replyPreviewStyle: ReplyPreviewStyle;
+  captionPosition: CaptionPosition;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
   groupMembersByPresence: boolean;
@@ -197,6 +199,7 @@ const ENUMS = {
   pronounPillLength: ['12', '16', '24', 'all'],
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
+  captionPosition: ['above', 'below', 'inline', 'hidden'],
   callRingtoneVolume: ['quiet', 'normal', 'loud'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
@@ -262,6 +265,7 @@ const DEFAULTS: Preferences = {
   hideReadReceipts: false,
   readReceiptPlacement: 'message',
   replyPreviewStyle: 'connected',
+  captionPosition: 'below',
   hideTypingIndicators: false,
   memberSort: 'name-asc',
   groupMembersByPresence: true,

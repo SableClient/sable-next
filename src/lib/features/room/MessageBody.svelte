@@ -55,6 +55,7 @@
     JSON.stringify([item.id, 'source' in item.content ? item.content.source : null, spoiler])
   );
   let revealedSpoiler = $state<string | null>(null);
+  let showCaption = $derived(preferences.captionPosition !== 'hidden');
 </script>
 
 {#if spoiler !== null && revealedSpoiler !== spoilerKey}
@@ -90,29 +91,31 @@
   />
   {#if preferences.alwaysShowAltText}<p class="body">{item.content.body}</p>{/if}
 {:else if item.content.kind === 'image'}
-  <MediaImage
-    class="image privacy-media"
-    source={item.content.source}
-    thumbnail={item.content.thumbnail}
-    alt={item.content.caption ?? item.content.filename}
-    title={item.content.caption ?? item.content.filename}
-    width={800}
-    height={600}
-    intrinsicWidth={item.content.width}
-    intrinsicHeight={item.content.height}
-    mime={item.content.mime}
-    size={item.content.size}
-    blurhash={item.content.blurhash}
-    retryable
-    onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
-  />
-  {#if item.content.html}
-    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
-  {:else if item.content.caption}
-    <p class="body">{item.content.caption}</p>
-  {:else if preferences.alwaysShowAltText}
-    <p class="body">{item.content.filename}</p>
-  {/if}
+  <div class={['captioned', `caption-${preferences.captionPosition}`]}>
+    <MediaImage
+      class="image privacy-media"
+      source={item.content.source}
+      thumbnail={item.content.thumbnail}
+      alt={item.content.caption ?? item.content.filename}
+      title={item.content.caption ?? item.content.filename}
+      width={800}
+      height={600}
+      intrinsicWidth={item.content.width}
+      intrinsicHeight={item.content.height}
+      mime={item.content.mime}
+      size={item.content.size}
+      blurhash={item.content.blurhash}
+      retryable
+      onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
+    />
+    {#if showCaption && item.content.html}
+      <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
+    {:else if showCaption && item.content.caption}
+      <p class="body">{item.content.caption}</p>
+    {:else if !item.content.caption && preferences.alwaysShowAltText}
+      <p class="body">{item.content.filename}</p>
+    {/if}
+  </div>
 {:else if item.content.kind === 'gallery'}
   <TimelineGallery
     items={item.content.items}
@@ -143,26 +146,28 @@
     {onSenderProfile}
   />
 {:else if item.content.kind === 'video' || item.content.kind === 'audio' || item.content.kind === 'file'}
-  <MediaContent
-    class="media privacy-media"
-    source={item.content.source}
-    mime={item.content.mime}
-    filename={item.content.filename}
-    kind={item.content.kind}
-    width={item.content.kind === 'video' ? item.content.width : null}
-    height={item.content.kind === 'video' ? item.content.height : null}
-    size={item.content.kind === 'file' ? item.content.size : null}
-    blurhash={item.content.kind === 'video' ? item.content.blurhash : null}
-    thumbnail={item.content.kind === 'video' ? item.content.thumbnail : null}
-    durationMs={item.content.kind === 'audio' ? item.content.duration_ms : null}
-    waveform={item.content.kind === 'audio' ? item.content.waveform : null}
-    onOpen={item.event_id ? () => onOpenMedia?.(item.event_id ?? '') : undefined}
-  />
-  {#if item.content.html}
-    <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
-  {:else if item.content.caption}
-    <p class="body">{item.content.caption}</p>
-  {/if}
+  <div class={['captioned', `caption-${preferences.captionPosition}`]}>
+    <MediaContent
+      class="media privacy-media"
+      source={item.content.source}
+      mime={item.content.mime}
+      filename={item.content.filename}
+      kind={item.content.kind}
+      width={item.content.kind === 'video' ? item.content.width : null}
+      height={item.content.kind === 'video' ? item.content.height : null}
+      size={item.content.kind === 'file' ? item.content.size : null}
+      blurhash={item.content.kind === 'video' ? item.content.blurhash : null}
+      thumbnail={item.content.kind === 'video' ? item.content.thumbnail : null}
+      durationMs={item.content.kind === 'audio' ? item.content.duration_ms : null}
+      waveform={item.content.kind === 'audio' ? item.content.waveform : null}
+      onOpen={item.event_id ? () => onOpenMedia?.(item.event_id ?? '') : undefined}
+    />
+    {#if showCaption && item.content.html}
+      <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
+    {:else if showCaption && item.content.caption}
+      <p class="body">{item.content.caption}</p>
+    {/if}
+  </div>
 {/if}
 {#if previewLink}
   <LinkEmbed url={previewLink} {encrypted} />
@@ -173,6 +178,36 @@
     line-height: var(--line-height-body);
     margin: 0;
     white-space: pre-wrap;
+  }
+
+  .captioned {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-200);
+  }
+
+  .captioned > .body,
+  .captioned > :global(.formatted-body) {
+    margin-top: 0;
+  }
+
+  .caption-above {
+    flex-direction: column-reverse;
+  }
+
+  .caption-above > :global(.image) {
+    margin-top: 0;
+  }
+
+  .caption-inline {
+    align-items: center;
+    flex-flow: row wrap;
+  }
+
+  .caption-inline > .body,
+  .caption-inline > :global(.formatted-body) {
+    flex: 1 1 12rem;
+    min-width: 0;
   }
 
   .redacted {
@@ -204,8 +239,7 @@
     width: var(--timeline-sticker-width);
   }
 
-  :global(:is(.image, .sticker, .media)) + .body,
-  :global(:is(.image, .sticker, .media) + .formatted-body) {
+  :global(.sticker) + .body {
     margin-top: var(--space-200);
   }
 

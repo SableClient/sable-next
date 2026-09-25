@@ -48,6 +48,7 @@ import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
 import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
+import TextAlignLeftIcon from 'phosphor-svelte/lib/TextAlignLeftIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
@@ -599,6 +600,20 @@ export const settingsCategories: SettingsCategory[] = [
           { value: 'connected', label: 'settings.replyPreviewStyleConnected' },
           { value: 'compact', label: 'settings.replyPreviewStyleCompact' },
           { value: 'expanded', label: 'settings.replyPreviewStyleExpanded' },
+        ],
+      },
+      {
+        key: 'captionPosition',
+        section: 'messages',
+        icon: TextAlignLeftIcon,
+        name: 'settings.captionPosition',
+        description: 'settings.captionPositionHint',
+        type: 'select',
+        options: [
+          { value: 'above', label: 'settings.captionPositionAbove' },
+          { value: 'below', label: 'settings.captionPositionBelow' },
+          { value: 'inline', label: 'settings.captionPositionInline' },
+          { value: 'hidden', label: 'settings.captionPositionHidden' },
         ],
       },
       {

@@ -15,9 +15,12 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
 }));
 
+import { setPreference } from '#lib/settings/preferences.svelte.js';
+
 import MessageBody from './MessageBody.svelte';
 
 afterEach(() => {
+  setPreference('captionPosition', 'below');
   core.commands.fetchMedia.mockClear();
   document.body.replaceChildren();
 });
@@ -460,5 +463,37 @@ test('a deleted message keeps its reason', async () => {
   await tick();
 
   expect(document.querySelector('.redacted')?.textContent).toContain('spam');
+  await unmount(instance);
+});
+
+test.each(['above', 'below', 'inline'] as const)(
+  'places an attachment caption %s the media',
+  async (position) => {
+    setPreference('captionPosition', position);
+    const instance = mount(MessageBody, {
+      target: document.body,
+      props: { item: item(attachment('image')), canRedactOthers: false },
+    });
+    await tick();
+
+    const wrapper = document.querySelector('.captioned');
+    expect(wrapper?.classList.contains(`caption-${position}`)).toBe(true);
+    expect(wrapper?.querySelector('.formatted-body')).not.toBeNull();
+
+    await unmount(instance);
+  }
+);
+
+test.each(['image', 'file'] as const)('a hidden caption is not rendered for %s', async (kind) => {
+  setPreference('captionPosition', 'hidden');
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: { item: item(attachment(kind)), canRedactOthers: false },
+  });
+  await tick();
+
+  expect(document.querySelector('.formatted-body')).toBeNull();
+  expect(document.querySelector('.body')).toBeNull();
+
   await unmount(instance);
 });

@@ -25,6 +25,11 @@
   const revealed = new SvelteSet<string>();
 </script>
 
+{#if body && preferences.captionPosition === 'above'}
+  <div class="caption caption-above">
+    <FormattedBody {html} {senderTimezone} {onMatrixLink} />
+  </div>
+{/if}
 <div class="gallery" style:--gallery-columns={columns}>
   {#each items as item, index (index)}
     {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
@@ -75,7 +80,7 @@
     </div>
   {/each}
 </div>
-{#if body}
+{#if body && preferences.captionPosition !== 'above' && preferences.captionPosition !== 'hidden'}
   <div class="caption"><FormattedBody {html} {senderTimezone} {onMatrixLink} /></div>
 {/if}
 
@@ -101,5 +106,9 @@
 
   .caption {
     margin-block-start: var(--space-100);
+  }
+
+  .caption-above {
+    margin-block: 0 var(--space-100);
   }
 </style>
