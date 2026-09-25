@@ -11,7 +11,7 @@ use matrix_sdk::encryption::{
     CrossSigningResetAuthType, VerificationState, recovery::RecoveryState,
 };
 use matrix_sdk::executor::{JoinHandleExt, spawn};
-use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
+use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, OAuth, Password, UserIdentifier};
 use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
@@ -91,7 +91,11 @@ impl Core {
         };
 
         let auth = match (handle.auth_type(), password) {
-            (CrossSigningResetAuthType::OAuth(_), _) => None,
+            (CrossSigningResetAuthType::OAuth(info), _) => {
+                let mut oauth = OAuth::new();
+                oauth.session.clone_from(&info.session);
+                Some(AuthData::OAuth(oauth))
+            }
             (CrossSigningResetAuthType::Uiaa(uiaa), Some(password)) => {
                 let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
                 let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);

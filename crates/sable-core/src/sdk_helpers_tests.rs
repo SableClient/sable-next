@@ -1067,6 +1067,52 @@ async fn a_cancelled_oauth_identity_reset_hands_back_no_key() {
 }
 
 #[tokio::test]
+async fn an_approved_oauth_identity_reset_completes_its_session() {
+    use wiremock::matchers::{body_partial_json, path_regex};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    mount_identity_reset_endpoints(&server).await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/keys/device_signing/upload$"))
+        .and(body_partial_json(
+            json!({"auth": {"type": "m.oauth", "session": "approved"}}),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .with_priority(1)
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/keys/device_signing/upload$"))
+        .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+            "session": "approved",
+            "flows": [{"stages": ["m.oauth"]}],
+            "params": {"m.oauth": {"url": "https://auth.example.org/approve"}},
+        })))
+        .with_priority(2)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let Ok(CommandOk::ResetIdentity {
+        step: crate::protocol::IdentityResetStep::Approve { url },
+    }) = core.dispatch(Command::ResetIdentity).await
+    else {
+        panic!("an OAuth account is sent to approve the reset")
+    };
+    assert_eq!(url, "https://auth.example.org/approve");
+
+    let Ok(CommandOk::ContinueIdentityReset { recovery_key }) = core
+        .dispatch(Command::ContinueIdentityReset { password: None })
+        .await
+    else {
+        panic!("the approved session completes the reset")
+    };
+    assert!(!recovery_key.is_empty());
+}
+
+#[tokio::test]
 #[allow(clippy::unwrap_used)]
 async fn profile_updates_send_the_chosen_msc4466_propagation() {
     use crate::protocol::ProfilePropagationView;
