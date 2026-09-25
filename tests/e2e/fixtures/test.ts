@@ -131,8 +131,7 @@ async function signInThroughUi(page: Page, homeserverUrl: string, username: stri
   await expect(auth.moreMethodsButton).toBeVisible({ timeout: 60_000 });
   await auth.revealPasswordLogin();
   await auth.signInWithPassword(username, LOGIN_PASSWORD);
-  await expect(page).toHaveURL(/\/login\/verify$/, { timeout: 30_000 });
-  await auth.leaveVerificationButton.click();
+  await auth.finishSetup();
   await expect(page).toHaveURL(/\/rooms$/, { timeout: 30_000 });
 }
 
@@ -520,14 +519,12 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     await use(tree);
   },
 
-  signIn: async ({ auth, page, homeserver }, use) => {
+  signIn: async ({ auth, homeserver }, use) => {
     await use(async () => {
       await auth.open(homeserver.baseUrl);
       await auth.revealPasswordLogin();
       await auth.signInWithPassword(LOGIN_USERNAME, LOGIN_PASSWORD);
-      await expect(page).toHaveURL(/\/login\/verify$/);
-      await auth.leaveVerificationButton.click();
-      await expect(page).toHaveURL(/\/rooms$/);
+      await auth.finishSetup();
     });
   },
 });

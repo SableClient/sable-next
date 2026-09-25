@@ -27,6 +27,7 @@
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
   import { resetUrlPreviews } from '#lib/features/room/link-preview-cache.js';
   import { rememberAfterLogin } from '#lib/auth/after-login.js';
+  import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import {
     alertsNatively,
@@ -245,6 +246,14 @@
     if (core.status !== 'ready' || !preferences.settingsSync) return;
 
     return accountSync.start(core, syncDocuments);
+  });
+
+  $effect(() => {
+    const session = core.session;
+    if (core.status !== 'ready' || !session) return;
+    if (hasPendingSetup(localStorage, session.user_id, session.device_id)) {
+      void goto(resolve('setup'));
+    }
   });
 
   for (const synced of syncDocuments) {

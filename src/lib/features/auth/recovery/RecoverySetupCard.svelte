@@ -10,13 +10,15 @@
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
+    recoveryKey?: string | null;
     onComplete: () => void;
     onSkip: () => void;
   }
 
-  let { onComplete, onSkip }: Props = $props();
+  let { recoveryKey: givenKey = null, onComplete, onSkip }: Props = $props();
   const core = useCoreClient();
-  let recoveryKey = $state('');
+  let createdKey = $state('');
+  const recoveryKey = $derived(createdKey || givenKey || '');
   let creating = $state(false);
   let error = $state<string | null>(null);
 
@@ -24,7 +26,7 @@
     creating = true;
     error = null;
     try {
-      recoveryKey = await core.commands.enableRecovery();
+      createdKey = await core.commands.enableRecovery();
     } catch {
       error = t('settings.actionFailed');
     } finally {

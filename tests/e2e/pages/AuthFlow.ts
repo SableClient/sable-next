@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 export class AuthFlow {
   readonly heading: Locator;
@@ -8,8 +8,7 @@ export class AuthFlow {
   readonly password: Locator;
   readonly moreMethodsButton: Locator;
   readonly passwordSignInButton: Locator;
-  readonly verificationCard: Locator;
-  readonly leaveVerificationButton: Locator;
+  readonly setupCard: Locator;
   readonly previousStageButton: Locator;
   readonly nextStageButton: Locator;
 
@@ -21,11 +20,7 @@ export class AuthFlow {
     this.password = page.getByRole('textbox', { name: 'Password' });
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
-    // A first device comes back cross-signed, and that card offers Continue, not the skip.
-    this.verificationCard = page.getByRole('form', { name: /Verify your device|Device verified/ });
-    this.leaveVerificationButton = page
-      .getByRole('button', { name: /Skip for now|Continue/ })
-      .first();
+    this.setupCard = page.locator('.auth-card.active');
     this.previousStageButton = page.getByRole('button', { name: 'Back' });
     this.nextStageButton = page.getByRole('button', { name: 'Next' });
   }
@@ -42,6 +37,19 @@ export class AuthFlow {
   async revealPasswordLogin(): Promise<void> {
     await this.revealMoreMethods();
     await this.passwordSignInButton.click();
+  }
+
+  async finishSetup(): Promise<void> {
+    const rooms = /\/rooms$/;
+    for (let step = 0; step < 8; step += 1) {
+      await expect(this.page).toHaveURL(/\/(setup\/[a-z]+|rooms)$/, { timeout: 30_000 });
+      if (rooms.test(new URL(this.page.url()).pathname)) return;
+      await this.setupCard
+        .getByRole('button', { name: /^(Skip anyway|Skip for now|Continue)$/ })
+        .first()
+        .click();
+    }
+    await expect(this.page).toHaveURL(rooms);
   }
 
   async signInWithPassword(username: string, password: string): Promise<void> {

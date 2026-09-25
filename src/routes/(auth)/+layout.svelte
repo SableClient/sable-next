@@ -12,8 +12,11 @@
   const core = useCoreClient();
   const loginPath = resolve('login');
   const registerPath = resolve('register');
+  const setupPath = resolve('setup');
   let authEntry = $derived(
-    page.url.pathname.startsWith(loginPath) || page.url.pathname.startsWith(registerPath)
+    page.url.pathname.startsWith(loginPath) ||
+      page.url.pathname.startsWith(registerPath) ||
+      page.url.pathname.startsWith(setupPath)
   );
   let accountSwitching = $state(true);
   let addingAccount = $derived(

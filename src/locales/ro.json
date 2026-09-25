@@ -954,11 +954,7 @@
     "accountProviderSummary": "Contul tău este ținut pe {{server}}.",
     "setUpRecovery": "Setează rezervă",
     "recoverySetupDescription": "Crează o cheie de rezervă pentru a-ți putea restaura mesajele criptate pe dispozitive noi.",
-    "createRecoveryKey": "Crează cheia de rezervă",
-    "verifyDevice": "Verifică-ți dispozitivul",
-    "verifyDeviceDescription": "Folosește un alt dispozitiv conectat, sau introdu cheia de rezervă mai jos.",
-    "deviceVerified": "Dispozitiv verificat",
-    "deviceVerifiedDescription": "Acest dispozitiv poate accesa acum mesajele criptate."
+    "createRecoveryKey": "Crează cheia de rezervă"
   },
   "footer": {
     "sourceCode": "Cod sursă",

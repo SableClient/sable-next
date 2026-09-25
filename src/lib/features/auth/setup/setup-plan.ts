@@ -1,0 +1,51 @@
+import type { RecoveryStateView, VerificationStateView } from '#src/generated/protocol';
+
+export type SetupStep = 'device' | 'recovery' | 'profile' | 'consent';
+export type AccountStep = Extract<SetupStep, 'recovery' | 'profile'>;
+
+export const ACCOUNT_STEPS: readonly AccountStep[] = ['recovery', 'profile'];
+
+export interface SetupState {
+  registering: boolean;
+  verification: VerificationStateView;
+  recovery: RecoveryStateView;
+  newRecoveryKey: boolean;
+  accountFinished: readonly AccountStep[];
+  consentPending: boolean;
+}
+
+export function isAccountStep(step: SetupStep): step is AccountStep {
+  return (ACCOUNT_STEPS as readonly SetupStep[]).includes(step);
+}
+
+export function encryptionKnown(state: Pick<SetupState, 'verification' | 'recovery'>): boolean {
+  return state.verification !== 'unknown' && state.recovery !== 'unknown';
+}
+
+export function setupNeeded(state: SetupState): boolean {
+  return state.registering || state.verification === 'unverified' || state.recovery === 'disabled';
+}
+
+function recoveryWanted(state: SetupState): boolean {
+  if (state.newRecoveryKey) return true;
+  return state.recovery === 'disabled' && !state.accountFinished.includes('recovery');
+}
+
+export function planSetup(state: SetupState, full: boolean): SetupStep[] {
+  const steps: SetupStep[] = [];
+  if (full) {
+    if (state.verification === 'unverified') steps.push('device');
+    if (recoveryWanted(state)) steps.push('recovery');
+    if (state.registering && !state.accountFinished.includes('profile')) steps.push('profile');
+  }
+  if (state.consentPending) steps.push('consent');
+  return steps;
+}
+
+export function replan(
+  finished: readonly SetupStep[],
+  state: SetupState,
+  full: boolean
+): SetupStep[] {
+  return [...finished, ...planSetup(state, full).filter((step) => !finished.includes(step))];
+}

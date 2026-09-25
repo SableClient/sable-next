@@ -1,5 +1,5 @@
 const AFTER_LOGIN_KEY = 'sable-after-login-path';
-const AUTH_SEGMENTS = new Set(['login', 'register', 'reset-password']);
+const AUTH_SEGMENTS = new Set(['login', 'register', 'reset-password', 'setup']);
 const ORIGIN = 'https://sable.invalid';
 
 export function afterLoginPath(value: string): string | null {

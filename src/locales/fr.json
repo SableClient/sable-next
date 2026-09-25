@@ -1083,11 +1083,7 @@
     "accountProviderSummary": "Votre compte est hébergé par {{server}}.",
     "setUpRecovery": "Configurer la récupération",
     "recoverySetupDescription": "Créez une clé de récupération afin de restaurer vos messages chiffrés sur un nouvel appareil.",
-    "createRecoveryKey": "Créer une clé de récupération",
-    "verifyDevice": "Vérifier votre appareil",
-    "verifyDeviceDescription": "Utilisez un autre appareil connecté, ou saisissez votre clé de récupération ci-dessous.",
-    "deviceVerified": "Appareil vérifié",
-    "deviceVerifiedDescription": "Cet appareil peut maintenant accéder à vos messages chiffrés."
+    "createRecoveryKey": "Créer une clé de récupération"
   },
   "footer": {
     "sourceCode": "Code source",
