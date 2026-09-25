@@ -9,6 +9,7 @@ const state = (overrides: Partial<SetupState> = {}): SetupState => ({
   newRecoveryKey: false,
   accountFinished: ['notifications'],
   permissionAskable: false,
+  syncEnabled: true,
   consentPending: false,
   ...overrides,
 });
@@ -96,6 +97,19 @@ describe('the notifications step', () => {
 
   test('is skipped once the account chose and this device has nothing left to ask', () => {
     expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device']);
+  });
+});
+
+describe('the sync step', () => {
+  test('is offered on every device that has not turned sync on', () => {
+    expect(planSetup(state({ verification: 'unverified', syncEnabled: false }), true)).toEqual([
+      'device',
+      'sync',
+    ]);
+  });
+
+  test('is not planned for a login that needed no setup', () => {
+    expect(planSetup(state({ syncEnabled: false }), false)).toEqual([]);
   });
 });
 

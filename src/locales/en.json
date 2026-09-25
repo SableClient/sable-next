@@ -517,6 +517,10 @@
     "cosmeticsColorDark": "Name colour on dark themes",
     "cosmeticsName": "Name in this room",
     "cosmeticsNameHint": "Only people in this room see it. Leave it empty to use your profile name.",
+    "cosmeticsAvatar": "Picture in this room",
+    "cosmeticsAvatarHint": "Only people in this room see it.",
+    "cosmeticsAvatarChange": "Change picture",
+    "cosmeticsAvatarReset": "Use profile picture",
     "cosmeticsPronouns": "Pronouns",
     "cosmeticsPronounsHint": "Separate sets with commas.",
     "cosmeticsPronounsPlaceholder": "she/her, they/them",
@@ -1232,6 +1236,14 @@
     "notificationsMentionsHint": "When someone mentions you, replies to you or uses one of your keywords. Direct messages always notify.",
     "notificationsAllHint": "Every message in every group chat, unless you change a room.",
     "notificationsSaveFailed": "Your choice couldn't be saved. Try again, or skip and change it later in Settings."
+ ,
+    "stageSyncLabel": "Choose whether to sync settings",
+    "syncDescription": "Keep your preferences, themes, recent emoji and sidebar the same on every device. They're stored in your account data, which isn't encrypted: your homeserver can read them.",
+    "syncChecking": "Checking your account…",
+    "syncFound": "This account already has settings synced from another device. Using them replaces this device's settings.",
+    "syncAdopt": "Use synced settings",
+    "syncTurnOn": "Turn on sync",
+    "syncNotNow": "Not now"
   },
   "footer": {
     "sourceCode": "Source code",

@@ -10,6 +10,7 @@
   import { permissionState } from '#lib/features/notifications/present.js';
   import { i18n } from '#lib/i18n.js';
   import { telemetryConsentPending } from '#lib/platform/telemetry.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TelemetryConsentCard from '../consent/TelemetryConsentCard.svelte';
   import AuthRail from '../flow/AuthRail.svelte';
@@ -20,6 +21,7 @@
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
   import NotificationsSetupCard from './NotificationsSetupCard.svelte';
+  import SettingsSyncCard from './SettingsSyncCard.svelte';
   import {
     encryptionKnown,
     isAccountStep,
@@ -44,6 +46,7 @@
     recovery: 'auth.stageRecoveryLabel',
     profile: 'auth.stageProfileLabel',
     notifications: 'setup.stageNotificationsLabel',
+    sync: 'setup.stageSyncLabel',
     consent: 'auth.stageConsentLabel',
   };
 
@@ -91,6 +94,7 @@
       newRecoveryKey: newRecoveryKey !== null,
       accountFinished,
       permissionAskable,
+      syncEnabled: preferences.settingsSync,
       consentPending: telemetryConsentPending(),
     } satisfies SetupState;
   }
@@ -255,6 +259,15 @@
             onSkip={() => {
               permissionAskable = false;
               advance('notifications');
+            }}
+          />
+        {:else if step === 'sync'}
+          <SettingsSyncCard
+            onComplete={() => {
+              advance('sync');
+            }}
+            onSkip={() => {
+              advance('sync');
             }}
           />
         {:else if step === 'profile'}
