@@ -625,6 +625,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'submit_registration_email',
         result: { state: 'complete', user_id: session.user_id },
       }),
+      request_password_reset_email: (command) => ({
+        type: 'request_password_reset_email',
+        client_secret: command.client_secret ?? 'fake-secret',
+        sid: 'fake-sid',
+      }),
       start_oidc_login: () => ({
         type: 'start_oidc_login',
         authorization_url: 'https://example.test/authorize',

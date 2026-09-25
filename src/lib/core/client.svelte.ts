@@ -228,6 +228,41 @@ export class CoreClient {
     return response.flows;
   }
 
+  async requestPasswordResetEmail(
+    homeserver: string,
+    email: string,
+    clientSecret: string | null,
+    sendAttempt: number
+  ): Promise<{ clientSecret: string; sid: string }> {
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
+    const response = await this.ensureTransport().send({
+      type: 'request_password_reset_email',
+      homeserver: resolvedHomeserver,
+      email,
+      client_secret: clientSecret,
+      send_attempt: sendAttempt,
+    });
+    return { clientSecret: response.client_secret, sid: response.sid };
+  }
+
+  async resetPassword(
+    homeserver: string,
+    clientSecret: string,
+    sid: string,
+    newPassword: string,
+    logoutDevices: boolean
+  ): Promise<void> {
+    const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
+    await this.ensureTransport().send({
+      type: 'reset_password',
+      homeserver: resolvedHomeserver,
+      client_secret: clientSecret,
+      sid,
+      new_password: newPassword,
+      logout_devices: logoutDevices,
+    });
+  }
+
   async register(
     homeserver: string,
     username: string,

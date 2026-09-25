@@ -35,6 +35,19 @@ pub enum Command {
     },
     ContinueRegistration,
     CancelRegistration,
+    RequestPasswordResetEmail {
+        homeserver: String,
+        email: String,
+        client_secret: Option<String>,
+        send_attempt: u32,
+    },
+    ResetPassword {
+        homeserver: String,
+        client_secret: String,
+        sid: String,
+        new_password: String,
+        logout_devices: bool,
+    },
     StartOidcLogin {
         reauth_account_id: Option<String>,
         homeserver: String,
@@ -980,6 +993,11 @@ pub enum CommandOk {
         result: RegistrationResultView,
     },
     CancelRegistration,
+    RequestPasswordResetEmail {
+        client_secret: String,
+        sid: String,
+    },
+    ResetPassword,
     StartOidcLogin {
         authorization_url: String,
     },
@@ -1407,6 +1425,7 @@ pub enum CommandErr {
     UsernameTaken,
     InvalidUsername,
     InvalidEmail,
+    UnknownEmail,
     EmailVerificationFailed,
     WeakPassword,
     RegistrationStageFailed {

@@ -14,6 +14,7 @@ mod media;
 pub use media::GalleryAttachment;
 mod messages;
 pub mod notifications;
+mod password_reset;
 mod personas;
 pub mod polls;
 mod presence;

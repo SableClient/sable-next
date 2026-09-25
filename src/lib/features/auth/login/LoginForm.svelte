@@ -12,6 +12,7 @@
   import HomeserverPicker from '../shared/HomeserverPicker.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import LoginProviderButton from './LoginProviderButton.svelte';
+  import { resetPasswordHref } from '../reset-password/reset-password-url';
 
   type LoginField = 'homeserver' | 'username' | 'password';
   type LoginMethodType = 'oidc' | 'sso';
@@ -76,6 +77,9 @@
   });
   let isPasswordLoginVisible = $derived(
     loginFlows?.password === true && (showAllLoginMethods || preferredLoginMethod === 'password')
+  );
+  let forgotPasswordHref = $derived(
+    loginFlows?.password && !loginFlows.oidc ? resetPasswordHref(displayedHomeserver) : null
   );
   let hasLoginAction = $derived(loginFlows === null || preferredLoginMethod !== null);
   let statusError = $derived(
@@ -199,6 +203,7 @@
             {loginError}
             {isAuthenticating}
             isCheckingHomeserver={isLoginControlsDisabled}
+            resetPasswordHref={forgotPasswordHref}
             bind:username
             bind:password
             {onClearFieldError}

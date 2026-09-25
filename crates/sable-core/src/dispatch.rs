@@ -246,6 +246,27 @@ impl Core {
                 Ok(CommandOk::CancelRegistration)
             }
 
+            Command::RequestPasswordResetEmail {
+                homeserver,
+                email,
+                client_secret,
+                send_attempt,
+            } => {
+                self.request_password_reset_email(homeserver, email, client_secret, send_attempt)
+                    .await
+            }
+
+            Command::ResetPassword {
+                homeserver,
+                client_secret,
+                sid,
+                new_password,
+                logout_devices,
+            } => {
+                self.reset_password(homeserver, client_secret, sid, new_password, logout_devices)
+                    .await
+            }
+
             Command::StartOidcLogin {
                 reauth_account_id,
                 homeserver,

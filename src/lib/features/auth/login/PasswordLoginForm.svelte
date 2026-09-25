@@ -16,6 +16,7 @@
     loginError: string | null;
     isAuthenticating: boolean;
     isCheckingHomeserver: boolean;
+    resetPasswordHref: string | null;
     onClearFieldError: (field: 'username' | 'password') => void;
   }
 
@@ -27,6 +28,7 @@
     loginError,
     isAuthenticating,
     isCheckingHomeserver,
+    resetPasswordHref,
     onClearFieldError,
   }: Props = $props();
 
@@ -56,6 +58,11 @@
     />
   </FormField>
   <FormField dense fieldId="password" label={$i18n.t('auth.password')}>
+    {#snippet labelSuffix()}
+      {#if resetPasswordHref}
+        <a class="forgot-password" href={resetPasswordHref}>{$i18n.t('auth.forgotPassword')}</a>
+      {/if}
+    {/snippet}
     <PasswordField
       bind:value={password}
       bind:showPassword
@@ -86,6 +93,17 @@
   .password-form {
     display: grid;
     gap: var(--space-300);
+  }
+
+  .forgot-password {
+    color: var(--sec-main);
+    font-size: var(--font-size-small);
+    margin-inline-start: auto;
+    text-underline-offset: 0.15em;
+  }
+
+  .forgot-password:hover {
+    color: var(--sec-main-hover);
   }
 
   .submit-area {
