@@ -39,7 +39,7 @@ overrides:
       - libgbm1
       - libdrm2
       - libxkbcommon0
-      - libasound2
+      - libasound2t64 | libasound2
       - libcups2
       - xdg-utils
       - xwayland
