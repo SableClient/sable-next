@@ -31,6 +31,7 @@ import {
 beforeEach(() => {
   mocks.goto.mockClear();
   mocks.page.params = {};
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
 });
 
 test.each([
@@ -45,6 +46,16 @@ test.each([
   leaveRoomView();
 
   expect(mocks.goto).toHaveBeenCalledWith(expected);
+});
+
+test('leaving a space room on desktop opens the lobby rather than the index', () => {
+  vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) });
+  mocks.page.url = new URL('https://app.test/space/space/room');
+  mocks.page.params = { spaceId: '!space' };
+
+  leaveRoomView();
+
+  expect(mocks.goto).toHaveBeenCalledWith('/space/param:!space/lobby');
 });
 
 test('searching quotes a room label with a space in it', () => {

@@ -39,3 +39,27 @@ export function spaceNavigationHref(
 
   return savedPath;
 }
+
+const SPACE_PAGES = new Set(['create-room', 'create-space']);
+
+export function spaceIndexRedirect(
+  root: string,
+  savedPath: string | undefined,
+  lobby: string,
+  isJoinedRoom: (pathId: string) => boolean
+): string {
+  if (!savedPath?.startsWith(`${root}/`)) return lobby;
+
+  const segment = savedPath.slice(root.length + 1).split(/[/?#]/, 1)[0];
+  if (segment === 'lobby') return savedPath;
+  if (segment === '' || SPACE_PAGES.has(segment)) return lobby;
+
+  let pathId: string;
+  try {
+    pathId = decodeURIComponent(segment);
+  } catch {
+    return lobby;
+  }
+
+  return isJoinedRoom(pathId) ? savedPath : lobby;
+}

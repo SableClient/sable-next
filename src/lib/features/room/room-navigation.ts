@@ -5,6 +5,7 @@ import { page } from '$app/state';
 import type { RoomSummary } from '#src/generated/protocol';
 
 import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
+import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
 
 export function leaveRoomView(): void {
   if (page.url.pathname.startsWith('/direct/')) {
@@ -12,8 +13,11 @@ export function leaveRoomView(): void {
     return;
   }
   if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
+    const spaceId = roomPathParamFromId(page.params.spaceId);
     void goto(
-      resolve('/(app)/space/[spaceId]', { spaceId: roomPathParamFromId(page.params.spaceId) })
+      window.matchMedia(BREAKPOINTS.appLayout).matches
+        ? resolve('/(app)/space/[spaceId]/lobby', { spaceId })
+        : resolve('/(app)/space/[spaceId]', { spaceId })
     );
     return;
   }
