@@ -296,6 +296,7 @@
   }
 
   .thread-composer {
+    min-width: 0;
     padding-bottom: max(var(--space-200), var(--edge-inset-bottom));
   }
 
