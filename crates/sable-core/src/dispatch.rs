@@ -24,6 +24,7 @@ use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIden
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
+use matrix_sdk::ruma::events::location::LocationContent;
 use matrix_sdk::ruma::events::reaction::ReactionEventContent;
 use matrix_sdk::ruma::events::relation::{Annotation, InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
@@ -32,7 +33,8 @@ use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::room::message::{
-    AddMentions, ImageMessageEventContent, MessageType, Relation, ReplyWithinThread,
+    AddMentions, ImageMessageEventContent, LocationMessageEventContent, MessageType, Relation,
+    ReplyWithinThread,
 };
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
@@ -390,12 +392,23 @@ impl Core {
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
                 let content = match thread_reply(in_reply_to, thread_root.clone(), silent_reply) {
-                    Some(reply) => self
-                        .room(&room_id)
-                        .await?
-                        .make_reply_event(content.into(), reply)
-                        .await
-                        .map_err(|error| self.failed("send_reply", error))?,
+                    Some(reply) => {
+                        let fallback = content.clone();
+                        let event_id = reply.event_id.clone();
+                        let thread_root = thread_root.clone();
+                        match self
+                            .room(&room_id)
+                            .await?
+                            .make_reply_event(content.into(), reply)
+                            .await
+                        {
+                            Ok(content) => content,
+                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
+                                reply_relation_fallback(fallback, event_id, thread_root)
+                            }
+                            Err(error) => return Err(self.failed("send_reply", error)),
+                        }
+                    }
                     None => content,
                 };
 
@@ -539,13 +552,23 @@ impl Core {
                     ImageMessageEventContent::plain(body, url).info(Box::new(info)),
                 ));
 
-                let content = match thread_reply(in_reply_to, thread_root, false) {
-                    Some(reply) => self
-                        .room(&room_id)
-                        .await?
-                        .make_reply_event(content.into(), reply)
-                        .await
-                        .map_err(|error| self.failed("send_gif_reply", error))?,
+                let content = match thread_reply(in_reply_to, thread_root.clone(), false) {
+                    Some(reply) => {
+                        let fallback = content.clone();
+                        let event_id = reply.event_id.clone();
+                        match self
+                            .room(&room_id)
+                            .await?
+                            .make_reply_event(content.into(), reply)
+                            .await
+                        {
+                            Ok(content) => content,
+                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
+                                reply_relation_fallback(fallback, event_id, thread_root)
+                            }
+                            Err(error) => return Err(self.failed("send_gif_reply", error)),
+                        }
+                    }
                     None => content,
                 };
                 timeline
@@ -1349,11 +1372,42 @@ impl Core {
                     return Err(CommandErr::InvalidLocation);
                 }
 
-                self.timeline_for(&room_id, thread_root.as_ref())
-                    .await?
-                    .send_location(body, geo_uri, None, None, None, in_reply_to)
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                match timeline
+                    .send_location(
+                        body.clone(),
+                        geo_uri.clone(),
+                        None,
+                        None,
+                        None,
+                        in_reply_to.clone(),
+                    )
                     .await
-                    .map_err(|error| self.failed("send_location", error))?;
+                {
+                    Ok(_) => {}
+                    Err(matrix_sdk_ui::timeline::Error::ReplyError(
+                        matrix_sdk::room::reply::ReplyError::StateEvent,
+                    )) => {
+                        let mut location = LocationMessageEventContent::new(body, geo_uri.clone());
+                        location.location = Some(LocationContent::new(geo_uri));
+                        let Some(event_id) = in_reply_to else {
+                            return Err(self.failed(
+                                "send_location",
+                                "state-event reply error without an event id",
+                            ));
+                        };
+                        let content = reply_relation_fallback(
+                            RoomMessageEventContent::new(MessageType::Location(location)),
+                            event_id,
+                            thread_root,
+                        );
+                        timeline
+                            .send(content.into())
+                            .await
+                            .map_err(|error| self.failed("send_location", error))?;
+                    }
+                    Err(error) => return Err(self.failed("send_location", error)),
+                }
 
                 Ok(CommandOk::SendLocation)
             }
@@ -2627,6 +2681,18 @@ fn thread_reply(
     })
 }
 
+fn reply_relation_fallback(
+    mut content: RoomMessageEventContent,
+    event_id: matrix_sdk::ruma::OwnedEventId,
+    thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
+) -> RoomMessageEventContent {
+    content.relates_to = Some(match thread_root {
+        Some(root) => Relation::Thread(Thread::plain(root, event_id)),
+        None => Relation::Reply(Reply::with_event_id(event_id)),
+    });
+    content
+}
+
 fn message_content(
     body: String,
     formatted: Option<String>,
@@ -2923,6 +2989,27 @@ mod tests {
 
         let silent = super::thread_reply(Some(event_id), None, true).expect("a reply");
         assert_eq!(silent.add_mentions, super::AddMentions::No);
+    }
+
+    #[test]
+    fn a_state_event_reply_keeps_the_relation_without_a_fallback() {
+        let event_id = <&matrix_sdk::ruma::EventId>::try_from("$state:example.org")
+            .expect("an event id")
+            .to_owned();
+        let content = message_content(
+            "reply".to_owned(),
+            None,
+            MessageKind::Text,
+            Vec::new(),
+            false,
+        );
+
+        let content = super::reply_relation_fallback(content, event_id.clone(), None);
+        assert!(matches!(
+            content.relates_to,
+            Some(super::Relation::Reply(super::Reply { in_reply_to, .. }))
+                if in_reply_to.event_id == event_id
+        ));
     }
 
     #[test]
