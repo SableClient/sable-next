@@ -296,6 +296,9 @@
             {userId}
             displayName={profile.displayName}
             pronouns={profile.pronouns}
+            nameColor={profile.nameColor}
+            status={profile.status}
+            bannerPreview={profile.bannerPreview}
             avatarPreview={profile.avatarPreview}
             isSaving={profile.isSaving}
             error={index === activeIndex ? profile.error : null}
@@ -304,6 +307,15 @@
             }}
             onPronouns={(value: string) => {
               profile.setPronouns(value);
+            }}
+            onNameColor={(value: string) => {
+              profile.setNameColor(value);
+            }}
+            onStatus={(value: string) => {
+              profile.setStatus(value);
+            }}
+            onBanner={(file: File | null) => {
+              profile.setBanner(file);
             }}
             onAvatar={(file: File | null) => {
               profile.setAvatar(file);

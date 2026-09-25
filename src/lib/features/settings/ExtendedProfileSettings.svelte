@@ -16,6 +16,12 @@
   import ColorSetting from './ColorSetting.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import {
+    BANNER_FIELD,
+    NAME_COLOR_FIELD,
+    PRONOUNS_FIELD,
+    STATUS_FIELD,
+  } from '#lib/profile/fields.js';
   import { pronounSets } from '#lib/profile/pronouns.js';
   import { bioMarkdown, bioTexts } from './bio-markdown.js';
 
@@ -27,7 +33,6 @@
 
   let { profile, onSaved, section }: Props = $props();
   const core = useCoreClient();
-  const BANNER_FIELD = 'chat.commet.profile_banner';
   let status = $state('');
   let bio = $state('');
   let pronouns = $state('');
@@ -62,7 +67,7 @@
       write: (snapshot) => {
         status = snapshot.status ?? '';
       },
-      fields: () => [['m.status', status ? { text: status } : null]],
+      fields: () => [[STATUS_FIELD, status ? { text: status } : null]],
     },
     colors: {
       name: 'settings.profileColors',
@@ -75,7 +80,7 @@
       },
       fields: () => [
         [
-          'eu.she-a.color',
+          NAME_COLOR_FIELD,
           lightColor || darkColor
             ? { on_light: lightColor || null, on_dark: darkColor || null }
             : null,
@@ -91,7 +96,7 @@
         timezone = snapshot.timezone ?? '';
       },
       fields: () => [
-        ['io.fsky.nyx.pronouns', pronounSets(pronouns)],
+        [PRONOUNS_FIELD, pronounSets(pronouns)],
         ['m.tz', timezone || null],
         ['us.cloke.msc4175.tz', timezone || null],
       ],

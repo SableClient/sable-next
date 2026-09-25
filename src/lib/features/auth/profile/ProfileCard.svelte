@@ -1,5 +1,8 @@
 <script lang="ts">
   import CameraIcon from 'phosphor-svelte/lib/CameraIcon';
+  import { untrack } from 'svelte';
+
+  import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
 
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -13,11 +16,17 @@
     userId: string;
     displayName: string;
     pronouns: string;
+    nameColor: string;
+    status: string;
+    bannerPreview: string | null;
     avatarPreview: string | null;
     isSaving: boolean;
     error: string | null;
     onDisplayName: (value: string) => void;
     onPronouns: (value: string) => void;
+    onNameColor: (value: string) => void;
+    onStatus: (value: string) => void;
+    onBanner: (file: File | null) => void;
     onAvatar: (file: File | null) => void;
     onContinue: () => void;
     onSkip: () => void;
@@ -27,17 +36,24 @@
     userId,
     displayName,
     pronouns,
+    nameColor,
+    status,
+    bannerPreview,
     avatarPreview,
     isSaving,
     error,
     onDisplayName,
     onPronouns,
+    onNameColor,
+    onStatus,
+    onBanner,
     onAvatar,
     onContinue,
     onSkip,
   }: Props = $props();
 
   let moreOpen = $state(false);
+  let color = $state(untrack(() => nameColor));
 </script>
 
 <section class="profile-card auth-card-surface" aria-labelledby="profile-title">
@@ -120,10 +136,60 @@
 
   <details class="more-options" bind:open={moreOpen}>
     <summary>{$i18n.t('auth.moreProfileOptions')}</summary>
-    <div class="placeholder-list" aria-label={$i18n.t('auth.moreProfileOptions')}>
-      <span>{$i18n.t('auth.nameColor')}</span>
-      <span>{$i18n.t('auth.title')}</span>
-      <span>{$i18n.t('auth.banner')}</span>
+    <div class="more-list">
+      <ColorSetting
+        label={$i18n.t('auth.nameColor')}
+        bind:value={color}
+        onCommit={() => {
+          onNameColor(color);
+        }}
+        onReset={() => {
+          color = '';
+          onNameColor('');
+        }}
+      />
+      <FormField dense fieldId="profile-status" label={$i18n.t('settings.status')}>
+        <TextInput
+          id="profile-status"
+          value={status}
+          maxlength={255}
+          placeholder={$i18n.t('settings.statusPlaceholder')}
+          oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
+            onStatus(event.currentTarget.value);
+          }}
+        />
+      </FormField>
+      <div class="banner-setting">
+        <span class="avatar-label">{$i18n.t('auth.banner')}</span>
+        {#if bannerPreview}<img class="banner-preview" src={bannerPreview} alt="" />{/if}
+        <div class="avatar-buttons">
+          <label class="file-button btn btn-secondary btn-small">
+            <input
+              id="profile-banner"
+              type="file"
+              accept="image/*"
+              aria-label={$i18n.t(bannerPreview ? 'settings.changeBanner' : 'settings.saveBanner')}
+              onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+                onBanner(event.currentTarget.files?.[0] ?? null);
+              }}
+            />
+            {$i18n.t(bannerPreview ? 'settings.changeBanner' : 'settings.saveBanner')}
+          </label>
+          {#if bannerPreview}
+            <Button
+              variant="ghost"
+              size="small"
+              onclick={() => {
+                onBanner(null);
+                const input = document.getElementById('profile-banner');
+                if (input instanceof HTMLInputElement) input.value = '';
+              }}
+            >
+              {$i18n.t('settings.removeButton')}
+            </Button>
+          {/if}
+        </div>
+      </div>
     </div>
   </details>
 
@@ -246,16 +312,26 @@
     font-size: var(--font-size-small);
   }
 
-  .placeholder-list {
-    color: var(--sec-main);
+  .more-list {
     display: grid;
-    font-size: var(--font-size-small);
-    gap: var(--space-200);
-    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-300);
     padding-top: var(--space-300);
   }
 
-  .more-options[open] .placeholder-list {
+  .banner-setting {
+    display: grid;
+    gap: var(--space-150);
+  }
+
+  .banner-preview {
+    aspect-ratio: 8 / 3;
+    border-radius: var(--radius);
+    display: block;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  .more-options[open] .more-list {
     animation: disclosure-in var(--motion-normal) ease both;
   }
 
@@ -266,23 +342,16 @@
     }
   }
 
-  .placeholder-list span {
-    border: var(--border-width) dashed var(--surface-container-line);
-    border-radius: var(--radius);
-    padding: var(--space-250) var(--space-200);
-    text-align: center;
-  }
-
   @media (prefers-reduced-motion: reduce) {
     :global(.avatar-root.avatar-preview),
-    .more-options[open] .placeholder-list {
+    .more-options[open] .more-list {
       animation: none;
       transition: none;
     }
   }
 
   :global(html[data-reduced-motion='on'] .avatar-root.avatar-preview),
-  :global(html[data-reduced-motion='on']) .more-options[open] .placeholder-list {
+  :global(html[data-reduced-motion='on']) .more-options[open] .more-list {
     animation: none;
     transition: none;
   }
