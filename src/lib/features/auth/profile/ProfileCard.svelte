@@ -35,7 +35,7 @@
   let moreOpen = $state(false);
 </script>
 
-<section class="auth-card-surface" aria-labelledby="profile-title">
+<section class="profile-card auth-card-surface" aria-labelledby="profile-title">
   <div class="auth-card-heading">
     <div>
       <p class="eyebrow">{$i18n.t('auth.nextStep')}</p>
@@ -109,6 +109,10 @@
 </section>
 
 <style>
+  .profile-card {
+    min-width: 0;
+  }
+
   h2 {
     font-size: var(--font-size-heading);
   }
@@ -123,7 +127,11 @@
     align-items: center;
     display: grid;
     gap: var(--space-300);
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .avatar-picker input[type='file'] {
+    max-width: 100%;
   }
 
   :global(.avatar-root.avatar-preview) {
