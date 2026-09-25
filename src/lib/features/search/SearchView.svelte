@@ -918,7 +918,7 @@
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: var(--space-150);
+    gap: var(--space-300);
     padding: var(--space-200);
     text-align: left;
     width: 100%;

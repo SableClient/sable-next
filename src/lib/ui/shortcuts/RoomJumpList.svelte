@@ -159,6 +159,7 @@
 
   .option {
     --menu-item-height: var(--control-height-500);
+    --menu-item-gap: var(--space-300);
   }
 
   .jump-list :global(.jump-avatar.glyph) {

@@ -114,6 +114,10 @@
     padding: var(--space-200);
   }
 
+  .option {
+    --menu-item-gap: var(--space-300);
+  }
+
   .option:hover {
     background: var(--surface-container-hover);
     color: var(--surface-on-container);
