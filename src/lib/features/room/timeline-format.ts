@@ -215,6 +215,7 @@ const UNREAD_KINDS = new Set<TimelineItemContentView['kind']>([
   'sticker',
   'gallery',
   'location',
+  'live_location',
   'poll',
   'unable_to_decrypt',
 ]);

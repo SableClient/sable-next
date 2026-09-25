@@ -25,6 +25,7 @@ import {
   personaLookup,
   readReceiptEventId,
   replyTarget,
+  unreadCountAfter,
   visibleAggregations,
   visibleTimelineItems,
 } from './timeline-format';
@@ -403,6 +404,15 @@ test('drops aggregation rows outside the loaded range', () => {
     last,
   ]);
   expect(mergeAggregations([], aggregations, { start: false, end: true })).toEqual([]);
+});
+
+test('a live location share counts as unread', () => {
+  const marker = item({ kind: 'read_marker' }, 'marker');
+  const share = {
+    ...item({ kind: 'live_location' } as TimelineItemView['content'], '$share'),
+    is_own: false,
+  };
+  expect(unreadCountAfter([marker, share], 0)).toBe(1);
 });
 
 test('sizes emoji-only bodies by how many there are', () => {
