@@ -152,6 +152,7 @@
   :global(.dialog-content-sheet) {
     --sheet-inset-bottom: var(--safe-bottom);
 
+    max-height: calc(100dvh - var(--safe-top) - var(--space-300) * 2);
     overscroll-behavior: contain;
     padding: 0 0 var(--safe-bottom);
   }

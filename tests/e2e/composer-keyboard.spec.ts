@@ -1,4 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import en from '../../src/locales/en.json' with { type: 'json' };
 
 test.use({
   storageState: SIGNED_OUT,
@@ -134,4 +135,36 @@ test('mobile autocomplete does not subtract the keyboard twice on android', asyn
   });
   expect(share).toBeGreaterThan(0.25);
   expect(share).toBeLessThanOrEqual(0.34);
+});
+
+test('mobile emote sheet keeps its grid above the keyboard', async ({
+  page,
+  app,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) throw new Error('missing visual viewport');
+    Object.defineProperty(viewport, 'height', { get: () => window.innerHeight - 336 });
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  await expect(page.locator('html')).toHaveCSS('--keyboard-height', '336px');
+  await page.getByRole('button', { name: en.composer.emotesAndStickers }).tap();
+  const grid = page.locator('.board.sheet .grid').first();
+  await expect(grid).toBeVisible();
+
+  const measured = await page.evaluate(() => {
+    const board = document.querySelector('.board.sheet');
+    const firstGrid = document.querySelector('.board.sheet .grid');
+    if (!board || !firstGrid || !window.visualViewport) throw new Error('missing board');
+    return {
+      board: board.getBoundingClientRect().bottom,
+      grid: firstGrid.getBoundingClientRect().top,
+      visible: window.visualViewport.height,
+    };
+  });
+  expect(measured.board).toBeLessThanOrEqual(measured.visible + 1);
+  expect(measured.grid).toBeLessThan(measured.visible - 48);
 });

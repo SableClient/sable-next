@@ -708,6 +708,15 @@ export class ComposerEditor {
                 event.data?.includes('\n')
               ) {
                 event.preventDefault();
+                if (/^\r?\n$/.test(event.data)) {
+                  return this.enter(
+                    view.state,
+                    (tr) => {
+                      view.dispatch(tr);
+                    },
+                    view
+                  );
+                }
                 return view.pasteText(event.data);
               }
               if (!hasAndroidCompositionQuirk()) return false;

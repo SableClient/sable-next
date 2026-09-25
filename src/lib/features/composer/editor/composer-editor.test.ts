@@ -431,6 +431,20 @@ test.each([true, false])(
   }
 );
 
+test('a lone newline committed by an IME is an Enter press', () => {
+  const submit = vi.fn();
+  const editor = openWith({ onSubmit: submit });
+  editor.setText('hi');
+
+  const event = new Event('beforeinput', { bubbles: true, cancelable: true });
+  Object.assign(event, { inputType: 'insertText', data: '\n' });
+  surface().dispatchEvent(event);
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(submit).toHaveBeenCalledTimes(1);
+  expect(editor.doc()?.textContent).toBe('hi');
+});
+
 describe('Android enter', () => {
   const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 
