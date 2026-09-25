@@ -7,8 +7,12 @@
   "permissions": [
     "sharekit:default",
     {
+      "identifier": "fs:allow-mkdir",
+      "allow": [{ "path": "$APPCACHE/outgoing-share" }]
+    },
+    {
       "identifier": "fs:allow-write-file",
-      "allow": [{ "path": "$APPCACHE/*" }]
+      "allow": [{ "path": "$APPCACHE/outgoing-share/*" }]
     }
   ]
 }

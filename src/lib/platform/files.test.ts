@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   },
   dialogOpen: vi.fn(),
   dialogSave: vi.fn(),
+  fsMkdir: vi.fn(),
   fsReadFile: vi.fn(),
   fsRemove: vi.fn(),
   isTauri: vi.fn(),
@@ -42,6 +43,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.dialogOpen, save: mocks.dialogSave }));
 vi.mock('@tauri-apps/plugin-fs', () => ({
+  mkdir: mocks.fsMkdir,
   readFile: mocks.fsReadFile,
   remove: mocks.fsRemove,
   writeFile: mocks.fsWriteFile,
@@ -59,6 +61,8 @@ beforeEach(() => {
   mocks.osType.mockReturnValue('linux');
   mocks.dialogOpen.mockReset();
   mocks.dialogSave.mockReset();
+  mocks.fsMkdir.mockReset();
+  mocks.fsMkdir.mockResolvedValue(undefined);
   mocks.fsReadFile.mockReset();
   mocks.fsRemove.mockReset();
   mocks.invoke.mockReset();
@@ -293,8 +297,11 @@ test('sharing writes the media to the cache and hands over a file URL', async ()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
 
   expect(await shareFile('blob:media', 'holiday.png')).toBe('saved');
-  expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/holiday.png', new Uint8Array([1, 2, 3]));
-  expect(mocks.shareNative).toHaveBeenCalledWith('/cache/holiday.png', {
+  expect(mocks.fsWriteFile).toHaveBeenCalledWith(
+    '/cache/outgoing-share/holiday.png',
+    new Uint8Array([1, 2, 3])
+  );
+  expect(mocks.shareNative).toHaveBeenCalledWith('/cache/outgoing-share/holiday.png', {
     mimeType: 'image/png',
     title: 'holiday.png',
     position: undefined,
@@ -306,11 +313,11 @@ test('a name iOS could not parse as a URL is reduced to one that it can', async 
 
   await shareFile('blob:media', 'Screenshot 2026 09 06 at 14.32.png');
   expect(mocks.fsWriteFile).toHaveBeenCalledWith(
-    '/cache/Screenshot-2026-09-06-at-14.32.png',
+    '/cache/outgoing-share/Screenshot-2026-09-06-at-14.32.png',
     expect.anything()
   );
   expect(mocks.shareNative).toHaveBeenCalledWith(
-    '/cache/Screenshot-2026-09-06-at-14.32.png',
+    '/cache/outgoing-share/Screenshot-2026-09-06-at-14.32.png',
     expect.objectContaining({ title: 'Screenshot 2026 09 06 at 14.32.png' })
   );
 });
@@ -336,14 +343,14 @@ test('the sheet anchors from the top on iPad and from the bottom on macOS', asyn
   mocks.osType.mockReturnValue('ios');
   await shareFile('blob:media', 'holiday.png', 'image/png', anchor);
   expect(mocks.shareNative).toHaveBeenLastCalledWith(
-    '/cache/holiday.png',
+    '/cache/outgoing-share/holiday.png',
     expect.objectContaining({ position: { x: 20, y: 60 } })
   );
 
   mocks.osType.mockReturnValue('macos');
   expect(await shareFile('blob:media', 'holiday.png', 'image/png', anchor)).toBe('saved');
   expect(mocks.shareNative).toHaveBeenLastCalledWith(
-    '/cache/holiday.png',
+    '/cache/outgoing-share/holiday.png',
     expect.objectContaining({ position: { x: 20, y: 700 } })
   );
 });
@@ -352,7 +359,16 @@ test('a body carrying a path cannot write outside the cache directory', async ()
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
 
   await shareFile('blob:media', '../../etc/passwd', 'image/png');
-  expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/passwd', expect.anything());
+  expect(mocks.fsWriteFile).toHaveBeenCalledWith('/cache/outgoing-share/passwd', expect.anything());
+});
+
+test('the staged file never sits where the Android plugin copies it, which would truncate it', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))));
+  mocks.osType.mockReturnValue('android');
+
+  await shareFile('blob:media', 'holiday.png');
+  expect(mocks.fsMkdir).toHaveBeenCalledWith('/cache/outgoing-share', { recursive: true });
+  expect(mocks.shareNative).not.toHaveBeenCalledWith('/cache/holiday.png', expect.anything());
 });
 
 test('a refused share reports the failure rather than throwing', async () => {

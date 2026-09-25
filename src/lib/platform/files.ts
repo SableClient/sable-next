@@ -110,7 +110,7 @@ export async function shareFile(
   try {
     const name = filename.split(/[\\/]/).pop() || 'attachment';
     const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-    const [{ type }, { appCacheDir, join }, { writeFile }, { shareFile: shareNative }] =
+    const [{ type }, { appCacheDir, join }, { mkdir, writeFile }, { shareFile: shareNative }] =
       await Promise.all([
         import('@tauri-apps/plugin-os'),
         import('@tauri-apps/api/path'),
@@ -118,7 +118,9 @@ export async function shareFile(
         import('@choochmeque/tauri-plugin-sharekit-api'),
       ]);
 
-    const path = await join(await appCacheDir(), cacheName(name));
+    const directory = await join(await appCacheDir(), 'outgoing-share');
+    await mkdir(directory, { recursive: true });
+    const path = await join(directory, cacheName(name));
     await writeFile(path, bytes);
 
     await shareNative(path, {
