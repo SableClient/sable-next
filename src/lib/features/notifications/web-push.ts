@@ -6,6 +6,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { unregisterNativePush } from './native-push';
 import { hasCompleteOverride, pushConfig, type PushOverride, trimmed } from './push-config';
+import { forgetPushSession } from './room-names';
 
 const REGISTERED_ENDPOINT = 'sable-push-endpoint';
 
@@ -233,6 +234,11 @@ export async function dropPushSubscription(
 }
 
 export async function logoutWithPush(core: CoreClient, override: PushOverride): Promise<void> {
-  await Promise.allSettled([dropPushSubscription(core, override), unregisterNativePush()]);
+  const userId = core.session?.user_id;
+  await Promise.allSettled([
+    dropPushSubscription(core, override),
+    unregisterNativePush(),
+    userId === undefined ? undefined : forgetPushSession(userId),
+  ]);
   await core.logout();
 }

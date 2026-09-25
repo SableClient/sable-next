@@ -111,6 +111,62 @@ export async function pushContentPolicy(): Promise<PushContentPolicy> {
   }
 }
 
+export interface PushSession {
+  userId: string;
+  homeserver: string;
+  accessToken: string;
+}
+
+const SESSION_PREFIX = '\u0000session:';
+
+export async function putPushSession(session: PushSession): Promise<void> {
+  try {
+    await transact('readwrite', (store) => store.put(session, SESSION_PREFIX + session.userId));
+  } catch {
+    return;
+  }
+}
+
+export async function forgetPushSession(userId: string): Promise<void> {
+  try {
+    await transact('readwrite', (store) => store.delete(SESSION_PREFIX + userId));
+  } catch {
+    return;
+  }
+}
+
+export async function forgetPushSessions(): Promise<void> {
+  try {
+    await transact('readwrite', (store) =>
+      store.delete(IDBKeyRange.bound(SESSION_PREFIX, `${SESSION_PREFIX}\uffff`))
+    );
+  } catch {
+    return;
+  }
+}
+
+export async function pushSession(userId: string | undefined): Promise<PushSession | null> {
+  try {
+    const stored = await transact<unknown[]>('readonly', (store) =>
+      userId === undefined
+        ? store.getAll(IDBKeyRange.bound(SESSION_PREFIX, `${SESSION_PREFIX}\uffff`), 2)
+        : store.getAll(SESSION_PREFIX + userId)
+    );
+    return stored.length === 1 ? readPushSession(stored[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readPushSession(value: unknown): PushSession | null {
+  const session = value as Partial<PushSession> | undefined;
+  return typeof session?.userId === 'string' &&
+    typeof session.homeserver === 'string' &&
+    typeof session.accessToken === 'string'
+    ? { userId: session.userId, homeserver: session.homeserver, accessToken: session.accessToken }
+    : null;
+}
+
 export type RoomNameSink = (names: ReadonlyMap<string, string>) => Promise<void>;
 
 const WRITE_DELAY_MS = 1000;

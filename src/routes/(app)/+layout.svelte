@@ -79,6 +79,7 @@
   import { effectiveVolume } from '#lib/features/call/participant-volumes.svelte.js';
   import { ringtoneVolume, startRingback } from '#lib/features/call/ringtone.js';
   import {
+    forgetPushSessions,
     putPushContentPolicy,
     putRoomModes,
     RoomNameWriter,
@@ -87,6 +88,7 @@
     dropPushSubscription,
     syncPushSubscription,
   } from '#lib/features/notifications/web-push.js';
+  import { answerPushEvent, sharePushSession } from '#lib/features/notifications/push-session.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
   import ToastRegion from '#lib/ui/ToastRegion.svelte';
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
@@ -424,6 +426,31 @@
 
     void dropPushSubscription(core, pushOverride()).catch((error: unknown) => {
       console.debug('[sable notifications] push not dropped', error);
+    });
+  });
+
+  $effect(() => {
+    void core.session?.user_id;
+    if (core.status !== 'ready' || !deliversWebPush()) return;
+    if (preferences.richPushPayloads) {
+      void forgetPushSessions();
+      return;
+    }
+    return sharePushSession(core);
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready' || !hostsServiceWorker()) return;
+
+    return on(navigator.serviceWorker, 'message', (event) => {
+      const message = event as MessageEvent;
+      const port = message.ports[0];
+      if ((message.data as { type?: unknown } | undefined)?.type !== 'sable:push-event' || !port) {
+        return;
+      }
+      void answerPushEvent(core, message.data).then((fetched) => {
+        port.postMessage(fetched);
+      });
     });
   });
 

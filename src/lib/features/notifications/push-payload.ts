@@ -15,13 +15,22 @@ export type PushPayload = {
     room_name?: string;
     sender_display_name?: string;
     type?: string;
-    content?: { body?: string; membership?: string };
+    content?: PushContent;
     counts?: { unread?: number };
+    icon?: string;
+    decrypted?: boolean;
   };
 };
 
+export type PushContent = { body?: string; membership?: string };
+
 function text(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+export function pushContent(value: unknown): PushContent {
+  const content = isRecord(value) ? value : {};
+  return { body: text(content.body), membership: text(content.membership) };
 }
 
 export function parsePushPayload(raw: string | undefined): PushPayload | null {
@@ -49,7 +58,6 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
     }
     if (recipients.size > 1) return null;
     const [userId] = recipients;
-    const content = isRecord(notification.content) ? notification.content : {};
     const counts = isRecord(notification.counts) ? notification.counts : {};
     const counted = counts.unread ?? notification.unread;
     const unread =
@@ -66,7 +74,7 @@ export function parsePushPayload(raw: string | undefined): PushPayload | null {
         room_name: text(notification.room_name),
         sender_display_name: text(notification.sender_display_name),
         type: text(notification.type),
-        content: { body: text(content.body), membership: text(content.membership) },
+        content: pushContent(notification.content),
         counts: { unread },
       },
     };

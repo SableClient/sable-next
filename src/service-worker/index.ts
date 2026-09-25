@@ -22,7 +22,18 @@ import {
   unreadCount,
   webPushValidation,
 } from '#lib/features/notifications/push-payload.js';
-import { pushContentPolicy, roomMode, roomName } from '#lib/features/notifications/room-names.js';
+import {
+  completePushPayload,
+  namesOnlyItsEvent,
+  readPushFetch,
+} from '#lib/features/notifications/push-fetch.js';
+import {
+  pushContentPolicy,
+  pushSession,
+  roomMode,
+  roomName,
+} from '#lib/features/notifications/room-names.js';
+import type { PushFetchView } from '#src/generated/protocol';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
 
@@ -109,19 +120,22 @@ async function handShares(): Promise<void> {
   }
 }
 
-async function present(payload: PushPayload | undefined): Promise<void> {
-  if (!payload) return;
+async function present(pushed: PushPayload | undefined): Promise<void> {
+  if (!pushed) return;
 
-  const count = unreadCount(payload);
+  const count = unreadCount(pushed);
   if (count !== null && 'setAppBadge' in navigator) {
     await navigator.setAppBadge(count).catch(() => undefined);
   }
 
   if (await focused()) return;
+  const payload = namesOnlyItsEvent(pushed) ? await fetchEvent(pushed) : pushed;
+  if (!payload) return;
   if (silencedByRoomMode(payload, await roomMode(payload.notification?.room_id ?? ''))) return;
 
   const policy = await pushContentPolicy();
-  const encrypted = payload.notification?.type === 'm.room.encrypted';
+  const encrypted =
+    payload.notification?.type === 'm.room.encrypted' || payload.notification?.decrypted === true;
   const showContent = policy.content && (!encrypted || policy.encryptedContent);
   const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), showContent);
   if (!showing) return;
@@ -133,7 +147,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
     body: lines.length > 1 ? summarise(lines) : showing.body,
     tag: showing.tag,
     renotify: !policy.notifyOnce || held.length === 0,
-    icon: favicon,
+    icon: payload.notification?.icon ?? favicon,
     badge: favicon,
     timestamp: Date.now(),
     data: {
@@ -145,6 +159,45 @@ async function present(payload: PushPayload | undefined): Promise<void> {
   };
 
   await worker.registration.showNotification(showing.title, options);
+}
+
+async function fetchEvent(payload: PushPayload): Promise<PushPayload | null> {
+  const session = await pushSession(payload.notification?.user_id);
+  if (!session) return payload;
+  return completePushPayload(
+    { notification: { ...payload.notification, user_id: session.userId } },
+    {
+      session,
+      fetch: (input, init) => fetch(input, init),
+      roomName,
+      decrypt: (roomId, eventId) => decryptInTab(roomId, eventId, session.userId),
+    }
+  );
+}
+
+const DECRYPT_TIMEOUT_MS = 5000;
+
+async function decryptInTab(
+  roomId: string,
+  eventId: string,
+  userId: string
+): Promise<PushFetchView | null> {
+  const clients = await worker.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const client of clients) {
+    const answer = await new Promise<PushFetchView | null>((settle) => {
+      const channel = new MessageChannel();
+      const timer = setTimeout(() => {
+        settle(null);
+      }, DECRYPT_TIMEOUT_MS);
+      channel.port1.onmessage = (event) => {
+        clearTimeout(timer);
+        settle(readPushFetch(event.data));
+      };
+      client.postMessage({ type: 'sable:push-event', roomId, eventId, userId }, [channel.port2]);
+    });
+    if (answer !== null) return answer;
+  }
+  return null;
 }
 
 async function focused(): Promise<boolean> {
