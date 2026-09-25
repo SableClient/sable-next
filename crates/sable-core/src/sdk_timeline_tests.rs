@@ -656,6 +656,95 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
 }
 
 #[tokio::test]
+async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!send-gallery:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .mock_authenticated_media_config()
+        .ok_default()
+        .mount()
+        .await;
+    server
+        .mock_upload()
+        .ok(matrix_sdk::ruma::mxc_uri!("mxc://example.org/uploaded"))
+        .mount()
+        .await;
+    server
+        .mock_room_send()
+        .ok(event_id!("$gallery"))
+        .mount()
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    core.send_gallery(
+        room_id.to_string(),
+        vec![
+            crate::GalleryAttachment {
+                filename: "beach.png".to_owned(),
+                mime: "image/png".to_owned(),
+                bytes: vec![1, 2, 3],
+                info: None,
+            },
+            crate::GalleryAttachment {
+                filename: "report.pdf".to_owned(),
+                mime: "application/pdf".to_owned(),
+                bytes: vec![4, 5, 6, 7],
+                info: None,
+            },
+        ],
+        None,
+        None,
+        None,
+        None,
+        Vec::new(),
+        false,
+    )
+    .await
+    .unwrap();
+
+    let sent = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            let requests = server
+                .server()
+                .received_requests()
+                .await
+                .unwrap_or_default();
+            if let Some(request) = requests
+                .iter()
+                .find(|request| request.url.path().contains("/send/m.room.message/"))
+            {
+                break request
+                    .body_json::<serde_json::Value>()
+                    .expect("gallery body");
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("the send queue flushed the gallery");
+
+    assert_eq!(sent["itemtypes"][0]["itemtype"], "m.image");
+    assert_eq!(sent["itemtypes"][1]["itemtype"], "m.file");
+    assert_eq!(sent["itemtypes"][1]["body"], "report.pdf");
+    assert_eq!(sent["itemtypes"][1]["info"]["mimetype"], "application/pdf");
+    assert_eq!(sent["itemtypes"][1]["info"]["size"], 4);
+    assert_eq!(sent["itemtypes"][1]["url"], "mxc://example.org/uploaded");
+}
+
+#[tokio::test]
 async fn a_room_read_elsewhere_reports_the_server_unread_count() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
