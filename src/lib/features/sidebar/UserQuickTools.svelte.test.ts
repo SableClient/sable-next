@@ -22,7 +22,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [], notificationMode: () => 'all_messages' }),
 }));
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
+vi.mock('#lib/ui/primitives/Tooltip.svelte', () => import('./TooltipStub.test.svelte'));
 vi.mock('./AccountSwitcher.svelte', () => ({ default: () => null }));
 
 import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
@@ -37,10 +37,10 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-function render(): void {
+function render(props: { mobile?: boolean; compact?: boolean } = { mobile: true }): void {
   const target = document.createElement('div');
   document.body.append(target);
-  const component = mount(UserQuickTools, { target, props: { mobile: true } });
+  const component = mount(UserQuickTools, { target, props });
   dispose = () => void unmount(component);
 }
 
@@ -62,4 +62,11 @@ test('the mobile bar keeps a slot per tool', () => {
   const bar = document.querySelector<HTMLElement>('.mobile-tools');
   expect(bar?.style.getPropertyValue('--mobile-slot-count')).toBe('4');
   expect(document.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
+});
+
+test('the collapsed sidebar leaves message search to the rail', () => {
+  render({ compact: true });
+
+  expect(document.querySelector('.compact-tools')).not.toBeNull();
+  expect(document.querySelector('a[href="/search"]')).toBeNull();
 });

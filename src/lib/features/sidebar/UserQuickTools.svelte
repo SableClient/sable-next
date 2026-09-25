@@ -17,7 +17,6 @@
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import ListMagnifyingGlassIcon from 'phosphor-svelte/lib/ListMagnifyingGlassIcon';
-  import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import AccountSwitcher from './AccountSwitcher.svelte';
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
@@ -55,10 +54,6 @@
   const desktopTools = [
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
     { href: '/settings', icon: GearIcon, label: 'nav.settings' },
-  ] as const;
-  const compactTools = [
-    { href: '/search', icon: MagnifyingGlassIcon, label: 'search.title' },
-    ...desktopTools,
   ] as const;
 
   function activateTool(event: MouseEvent, href: string): void {
@@ -173,7 +168,7 @@
 {:else if compact}
   <nav class="compact-tools" aria-label={$i18n.t('nav.quickTools')}>
     {@render roomSwitcher('compact-tool nav-tab-side', 'right')}
-    {#each compactTools as item (item.href)}
+    {#each desktopTools as item (item.href)}
       {@const toolActive = isToolActive(item.href)}
       {#snippet trigger({ props }: { props: Record<string, unknown> })}
         <a
