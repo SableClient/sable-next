@@ -140,3 +140,37 @@ test('a mixed pack keeps uploaded images serving both tabs', async () => {
 
   await unmount(instance);
 });
+
+test('a new pack picture is saved as soon as it uploads', async () => {
+  mocks.uploadMedia.mockResolvedValue('mxc://example.org/icon');
+  const applied: PackDraft[] = [];
+  const instance = mount(ImagePackEditor, {
+    target: document.body,
+    props: {
+      pack: pack(['sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+  await tick();
+
+  const input = document.querySelector('input[accept="image/*"]:not([multiple])');
+  if (!(input instanceof HTMLInputElement)) throw new Error('the picture input was not found');
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [new File([new Uint8Array([1])], 'icon.png', { type: 'image/png' })],
+  });
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await vi.waitFor(() => {
+    expect(applied).toHaveLength(1);
+  });
+
+  expect(applied[0].avatarUrl).toBe('mxc://example.org/icon');
+  expect(applied[0].images.map((image) => image.shortcode)).toEqual(['wave']);
+  expect(button('Apply changes').disabled).toBe(true);
+
+  await unmount(instance);
+});

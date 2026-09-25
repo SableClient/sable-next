@@ -50,6 +50,7 @@
   let draft = $state<PackDraft | null>(null);
   let current = $derived(draft ?? saved);
   let busy = $state(false);
+  let avatarUploading = $state(false);
   let failed = $state(false);
   let renaming = $state<string | null>(null);
   let renameDraft = $state('');
@@ -144,18 +145,19 @@
     if (!file || busy) return;
 
     busy = true;
+    avatarUploading = true;
     failed = false;
     try {
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
-      edit({
-        ...current,
-        avatarUrl: await core.commands.uploadMedia(upright.type || 'image/*', bytes),
-      });
+      const avatarUrl = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
+      await onApply?.({ ...$state.snapshot(saved), avatarUrl });
+      if (draft !== null) draft = { ...draft, avatarUrl };
     } catch (error) {
-      console.warn('[sable emotes] the pack avatar could not be uploaded', error);
+      console.warn('[sable emotes] the pack avatar could not be saved', error);
       failed = true;
     } finally {
+      avatarUploading = false;
       busy = false;
     }
   }
@@ -269,7 +271,12 @@
           original
         />
         {#if canEdit}
-          <Button size="small" disabled={busy} onclick={() => avatarInput?.click()}>
+          <Button
+            size="small"
+            disabled={busy}
+            loading={avatarUploading}
+            onclick={() => avatarInput?.click()}
+          >
             {$i18n.t('emotes.changeAvatar')}
           </Button>
           <input
