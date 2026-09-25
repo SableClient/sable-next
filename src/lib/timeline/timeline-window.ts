@@ -279,6 +279,7 @@ export class TimelineWindow<T> {
       : viewport.scrollHeight - viewport.clientHeight;
     this.jumping = smooth;
     this.active = smooth;
+    this.missedDelta = 0;
     this.writeOffset(target, smooth);
     if (!smooth && this.atEnd()) this.pinned = true;
     if (smooth) this.scheduleSettle();
