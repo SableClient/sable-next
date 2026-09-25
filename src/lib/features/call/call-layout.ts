@@ -42,6 +42,9 @@ export function spotlightTile(tiles: readonly CallTile[], pinned: string | null)
   return screens.find((tile) => !tile.participant.local) ?? screens.at(0) ?? null;
 }
 
+export const GRID_GAP_PX = 8;
+export const NARROW_STAGE_PX = 560;
+
 export function bestGrid(
   count: number,
   width: number,

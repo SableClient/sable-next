@@ -25,7 +25,14 @@
   import CallControls from './CallControls.svelte';
   import CallPlayback from './CallPlayback.svelte';
   import CallParticipantTile from './CallParticipantTile.svelte';
-  import { bestGrid, callTiles, spotlightTile, type CallTile } from './call-layout';
+  import {
+    bestGrid,
+    callTiles,
+    GRID_GAP_PX,
+    NARROW_STAGE_PX,
+    spotlightTile,
+    type CallTile,
+  } from './call-layout';
   import type { CallSession } from './call-session.svelte.js';
   import { callFailureKey, callStatusKey } from './call-status';
 
@@ -39,8 +46,6 @@
   let { session, members, onInvite, onOpenSettings }: Props = $props();
 
   const CHROME_IDLE_MS = 3500;
-  const GRID_GAP = 8;
-  const NARROW_STAGE_PX = 560;
 
   let statusLabel = $derived(
     $i18n.t(
@@ -94,7 +99,7 @@
   let mediaWidth = $state(0);
   let mediaHeight = $state(0);
   let aspect = $derived(mediaWidth > 0 && mediaWidth < NARROW_STAGE_PX ? 1 : 16 / 9);
-  let grid = $derived(bestGrid(tiles.length, mediaWidth, mediaHeight, GRID_GAP, aspect));
+  let grid = $derived(bestGrid(tiles.length, mediaWidth, mediaHeight, GRID_GAP_PX, aspect));
 
   function togglePin(tile: CallTile): void {
     if (pinned === tile.key) {
@@ -370,7 +375,7 @@
         bind:clientWidth={mediaWidth}
         bind:clientHeight={mediaHeight}
         style:--tile-width="{Math.floor(grid.width)}px"
-        style:--grid-gap="{GRID_GAP}px"
+        style:--grid-gap="{GRID_GAP_PX}px"
       >
         {#each tiles as item (item.key)}
           {@render tile(item, false)}

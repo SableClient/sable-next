@@ -80,74 +80,85 @@ test('says the homeserver cannot host calls when it has no call server', async (
   await unmount(instance);
 });
 
-test('offers a single join button with the device preview underneath', async () => {
-  const instance = mount(VoiceLobbyHarness, {
+function mountJoinable(extra: Record<string, unknown> = {}) {
+  return mount(VoiceLobbyHarness, {
     target: document.body,
     props: {
-      participants: [],
-      members: [],
-      media: { microphone: true, camera: false },
-      joining: false,
-      canJoin: true,
-      hasPermission: true,
-      onChange: vi.fn(),
-      onJoin: vi.fn(),
-    },
-  });
-  await tick();
-
-  const join = Array.from(document.querySelectorAll('button')).filter((node) =>
-    node.textContent.includes('Join voice')
-  );
-  expect(join).toHaveLength(1);
-  expect(document.body.textContent).not.toContain('Check devices');
-  const preview = document.querySelector('.prescreen');
-  expect(preview).not.toBeNull();
-  expect(
-    join[0].compareDocumentPosition(preview as Node) & Node.DOCUMENT_POSITION_FOLLOWING
-  ).toBeTruthy();
-  expect(document.querySelectorAll('button[aria-label="Mute microphone"]')).toHaveLength(1);
-
-  await unmount(instance);
-});
-
-test('puts the mic test and call settings in the device row, grouped with their menus', async () => {
-  const onOpenSettings = vi.fn();
-  Object.defineProperty(navigator, 'mediaDevices', {
-    configurable: true,
-    value: { enumerateDevices: () => Promise.resolve([]) },
-  });
-  const instance = mount(VoiceLobbyHarness, {
-    target: document.body,
-    props: {
-      participants: [],
+      participants: ['@alice:example.org', '@bob:example.org'],
       members: [],
       media: { microphone: false, camera: false },
       joining: false,
       canJoin: true,
       hasPermission: true,
+      roomName: 'Hangout',
+      selfId: '@me:example.org',
       onChange: vi.fn(),
       onJoin: vi.fn(),
-      onOpenSettings,
+      ...extra,
     },
   });
+}
+
+test('lays the lobby out like the call: a tile per person and the call dock', async () => {
+  const instance = mountJoinable();
   await tick();
 
-  const row = document.querySelector('.tray');
-  expect(row?.textContent).toContain('Test mic');
-  expect(
-    row?.querySelector('.group[data-tone="danger"] button[aria-label="Unmute microphone"]')
-  ).not.toBeNull();
-  const groups = Array.from(row?.querySelectorAll('.group') ?? []);
-  expect(groups).toHaveLength(3);
+  const tiles = Array.from(document.querySelectorAll('.grid > .tile'));
+  expect(tiles).toHaveLength(3);
+  expect(tiles[0].textContent).toContain('@me:example.org');
+  expect(document.querySelector('.status')?.textContent).toContain('Hangout');
+
+  const dock = document.querySelector('.dock .controls');
+  expect(dock).not.toBeNull();
+  expect(dock?.querySelector('button[aria-label="Unmute microphone"]')?.classList).toContain(
+    'btn-danger'
+  );
+  expect(dock?.querySelector('button[aria-label="Deafen"]')).toBeNull();
+  expect(dock?.querySelector('button[aria-label="Hang up"]')).toBeNull();
+  const join = Array.from(dock?.querySelectorAll('button') ?? []).filter((node) =>
+    node.textContent.includes('Join voice')
+  );
+  expect(join).toHaveLength(1);
+  expect(dock?.textContent).toContain('Test mic');
+
+  await unmount(instance);
+});
+
+test('joins and opens call settings from the dock', async () => {
+  const onJoin = vi.fn();
+  const onOpenSettings = vi.fn();
+  const instance = mountJoinable({ onJoin, onOpenSettings });
+  await tick();
+
+  const dock = document.querySelector('.dock');
+  dock?.querySelector<HTMLButtonElement>('button[aria-label="Call settings"]')?.click();
+  expect(onOpenSettings).toHaveBeenCalledOnce();
+  Array.from(dock?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+    .find((node) => node.textContent.includes('Join voice'))
+    ?.click();
+  expect(onJoin).toHaveBeenCalledOnce();
+
+  await unmount(instance);
+});
+
+test('groups each device toggle with its menu in the dock', async () => {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { enumerateDevices: () => Promise.resolve([]) },
+  });
+  const instance = mountJoinable();
+  await tick();
+
+  const groups = Array.from(document.querySelectorAll('.dock .group'));
+  expect(groups.map((group) => group.getAttribute('data-tone'))).toEqual([
+    'danger',
+    'neutral',
+    'neutral',
+  ]);
   for (const group of groups) {
     expect(group.querySelectorAll('.device-caret')).toHaveLength(1);
     expect(group.querySelectorAll('.divider')).toHaveLength(1);
   }
-  expect(row?.querySelector('.device-speaker')).toBeNull();
-  const settings = row?.querySelector<HTMLButtonElement>('button[aria-label="Call settings"]');
-  settings?.click();
-  expect(onOpenSettings).toHaveBeenCalledOnce();
 
   await unmount(instance);
   Reflect.deleteProperty(navigator, 'mediaDevices');

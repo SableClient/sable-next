@@ -7,6 +7,7 @@
   import CameraRotateIcon from 'phosphor-svelte/lib/CameraRotateIcon';
   import MonitorArrowUpIcon from 'phosphor-svelte/lib/MonitorArrowUpIcon';
   import HeadphonesIcon from 'phosphor-svelte/lib/HeadphonesIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
   import PhoneDisconnectIcon from 'phosphor-svelte/lib/PhoneDisconnectIcon';
   import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
@@ -22,6 +23,7 @@
   import { longPress } from '#lib/ui/long-press.svelte.js';
 
   import CallDeviceMenu from './CallDeviceMenu.svelte';
+  import { supportsDeviceSelection } from './devices';
 
   interface Props {
     microphoneEnabled: boolean;
@@ -34,11 +36,13 @@
     onToggleMicrophone: () => void;
     onToggleCamera: () => void;
     onToggleScreenShare: () => void;
-    onToggleDeafen: () => void;
-    onHangUp: () => void;
+    onToggleDeafen?: () => void;
+    onHangUp?: () => void;
     onSwitchDevice?: (kind: MediaDeviceKind, deviceId: string) => void;
     onSwitchCamera?: () => void;
     onOpenSettings?: (event: MouseEvent) => void;
+    extra?: Snippet;
+    action?: Snippet;
   }
 
   let {
@@ -57,11 +61,15 @@
     onSwitchDevice,
     onSwitchCamera,
     onOpenSettings,
+    extra,
+    action,
   }: Props = $props();
 
   let size = $derived<'small' | 'medium'>(compact ? 'small' : 'medium');
   let neutral = $derived<'ghost' | 'secondary'>(compact ? 'ghost' : 'secondary');
   let devices = $derived(compact ? undefined : onSwitchDevice);
+  const selectable = supportsDeviceSelection();
+  let grouped = $derived(devices !== undefined && selectable);
   let pending = $derived(ready ? '' : ` · ${$i18n.t('call.waitingForMedia')}`);
   let micMenu = $state(false);
   let outputMenu = $state(false);
@@ -84,15 +92,18 @@
   tip: string,
   button: Snippet<[Record<string, unknown>]>,
   menu?: Snippet,
-  onHold?: () => void
+  onHold?: () => void,
+  tone?: 'neutral' | 'danger' | 'primary'
 )}
   <div
-    class="control"
+    class={['control', grouped && menu && 'group']}
+    data-tone={grouped && menu ? tone : undefined}
     {@attach longPress({ enabled: () => onHold !== undefined, onPress: () => onHold?.() })}
   >
     <Tooltip label={tip}>
       {#snippet trigger({ props })}{@render button(props)}{/snippet}
     </Tooltip>
+    {#if grouped && menu}<span class="divider" aria-hidden="true"></span>{/if}
     {@render menu?.()}
   </div>
 {/snippet}
@@ -101,7 +112,7 @@
   {#snippet micButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={microphoneEnabled ? neutral : 'danger'}
+      variant={grouped ? 'ghost' : microphoneEnabled ? neutral : 'danger'}
       {size}
       label={micLabel}
       aria-disabled={ready ? undefined : 'true'}
@@ -128,23 +139,36 @@
     `${micLabel}${shortcut('call.toggleMute')}${pending}`,
     micButton,
     micMenuSnippet,
-    devices ? () => (micMenu = true) : undefined
+    devices ? () => (micMenu = true) : undefined,
+    microphoneEnabled ? 'neutral' : 'danger'
   )}
 
   {#snippet deafenButton(props: Record<string, unknown>)}
-    <IconButton
-      {...props}
-      variant={deafened ? 'danger' : neutral}
-      {size}
-      label={deafenLabel}
-      onclick={onToggleDeafen}
-    >
-      {#if deafened}
-        <SpeakerSlashIcon weight="fill" />
-      {:else}
-        <HeadphonesIcon />
-      {/if}
-    </IconButton>
+    {#if onToggleDeafen}
+      <IconButton
+        {...props}
+        variant={grouped ? 'ghost' : deafened ? 'danger' : neutral}
+        {size}
+        label={deafenLabel}
+        onclick={onToggleDeafen}
+      >
+        {#if deafened}
+          <SpeakerSlashIcon weight="fill" />
+        {:else}
+          <HeadphonesIcon />
+        {/if}
+      </IconButton>
+    {:else}
+      <IconButton
+        {...props}
+        variant={grouped ? 'ghost' : neutral}
+        {size}
+        label={$i18n.t('call.outputDevices')}
+        onclick={() => (outputMenu = true)}
+      >
+        <SpeakerHighIcon />
+      </IconButton>
+    {/if}
   {/snippet}
   {#snippet deafenMenu()}
     {#if devices}
@@ -157,16 +181,19 @@
     {/if}
   {/snippet}
   {@render control(
-    `${deafenLabel}${shortcut('call.toggleDeafen')}`,
+    onToggleDeafen
+      ? `${deafenLabel}${shortcut('call.toggleDeafen')}`
+      : $i18n.t('call.outputDevices'),
     deafenButton,
     deafenMenu,
-    devices ? () => (outputMenu = true) : undefined
+    devices ? () => (outputMenu = true) : undefined,
+    deafened ? 'danger' : 'neutral'
   )}
 
   {#snippet cameraButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={cameraEnabled ? 'primary' : neutral}
+      variant={grouped ? 'ghost' : cameraEnabled ? 'primary' : neutral}
       {size}
       label={cameraLabel}
       aria-disabled={ready ? undefined : 'true'}
@@ -193,7 +220,8 @@
     `${cameraLabel}${shortcut('call.toggleCamera')}${pending}`,
     cameraButton,
     cameraMenuSnippet,
-    devices ? () => (cameraMenu = true) : undefined
+    devices ? () => (cameraMenu = true) : undefined,
+    cameraEnabled ? 'primary' : 'neutral'
   )}
 
   {#if onSwitchCamera && !compact}
@@ -229,6 +257,10 @@
     {@render control(`${screenLabel}${shortcut('call.toggleScreenShare')}${pending}`, screenButton)}
   {/if}
 
+  {#if extra}
+    <div class="control">{@render extra()}</div>
+  {/if}
+
   {#if onOpenSettings}
     {#snippet settingsButton(props: Record<string, unknown>)}
       <IconButton
@@ -256,7 +288,11 @@
       <PhoneDisconnectIcon weight="fill" />
     </IconButton>
   {/snippet}
-  {@render control(`${$i18n.t('call.hangUp')}${shortcut('call.hangUp')}`, hangUpButton)}
+  {#if action}
+    <div class="control action">{@render action()}</div>
+  {:else if onHangUp}
+    {@render control(`${$i18n.t('call.hangUp')}${shortcut('call.hangUp')}`, hangUpButton)}
+  {/if}
 </div>
 
 <style>
@@ -297,12 +333,67 @@
     --button-icon-size: var(--size-x400);
   }
 
+  .group {
+    --radius-outer: var(--radius-inner);
+    --radius-padding: var(--space-050);
+    --tone: var(--sec-container);
+    --tone-line: var(--sec-container-line);
+    --ghost-hover: var(--sec-container-hover);
+    --ghost-active: var(--sec-container-active);
+
+    background: var(--tone);
+    border: var(--border-width) solid var(--tone-line);
+    border-radius: var(--radius-outer);
+    box-sizing: border-box;
+    color: var(--sec-on-container);
+    gap: 0;
+    padding: var(--radius-padding);
+  }
+
+  .group[data-tone='danger'] {
+    --tone: var(--crit-container);
+    --tone-line: var(--crit-container-line);
+    --ghost-hover: var(--crit-container-hover);
+    --ghost-active: var(--crit-container-active);
+
+    color: var(--crit-on-container);
+  }
+
+  .group[data-tone='primary'] {
+    --tone: var(--primary-main);
+    --tone-line: var(--primary-main-line);
+    --ghost-hover: var(--primary-main-hover);
+    --ghost-active: var(--primary-main-active);
+
+    color: var(--primary-on-main);
+  }
+
+  .controls:not(.compact) .group :global(.btn) {
+    --button-height: calc(
+      var(--control-height-500) - var(--space-050) * 2 - var(--border-width) * 2
+    );
+
+    border-radius: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+  }
+
+  .divider {
+    align-self: stretch;
+    background: var(--tone-line);
+    flex: none;
+    inline-size: var(--border-width);
+    margin: var(--space-150) var(--space-050);
+  }
+
   .controls :global(.hang-up) {
     --button-container: var(--crit-main);
     --button-container-hover: var(--crit-main-hover);
     --button-container-active: var(--crit-main-active);
     --button-line: var(--crit-main-line);
     --button-on-container: var(--crit-on-main);
+  }
+
+  .controls:not(.compact) .action {
+    margin-inline-start: var(--space-200);
   }
 
   .controls:not(.compact) :global(.hang-up) {
@@ -315,7 +406,8 @@
       gap: var(--space-100);
     }
 
-    .controls:not(.compact) :global(.device-caret) {
+    .controls:not(.compact) :global(.device-caret),
+    .divider {
       display: none;
     }
 
