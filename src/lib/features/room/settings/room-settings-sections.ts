@@ -1,6 +1,7 @@
 import type { Component } from 'svelte';
 import GearIcon from 'phosphor-svelte/lib/GearSixIcon';
 import InfoIcon from 'phosphor-svelte/lib/InfoIcon';
+import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
 import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
@@ -13,6 +14,7 @@ export type RoomSettingsSectionId =
   | 'permissions'
   | 'abbreviations'
   | 'appearance'
+  | 'cosmetics'
   | 'emojis-stickers'
   | 'developer-tools';
 
@@ -28,6 +30,7 @@ const ALL: readonly (RoomSettingsSection & { spaceOnly?: boolean })[] = [
   { id: 'permissions', label: 'room.settingsPermissions', icon: LockIcon },
   { id: 'abbreviations', label: 'room.settingsAbbreviations', icon: InfoIcon },
   { id: 'appearance', label: 'room.settingsAppearance', icon: PaletteIcon, spaceOnly: true },
+  { id: 'cosmetics', label: 'room.settingsCosmetics', icon: PaintBrushIcon },
   { id: 'emojis-stickers', label: 'room.settingsEmojis', icon: SmileyIcon },
   { id: 'developer-tools', label: 'room.settingsDeveloper', icon: TerminalIcon },
 ];

@@ -14,6 +14,7 @@
 
   import RoomAbbreviationsSettings from './settings/RoomAbbreviationsSettings.svelte';
   import RoomAppearanceSettings from './settings/RoomAppearanceSettings.svelte';
+  import RoomCosmeticsSettings from './settings/RoomCosmeticsSettings.svelte';
   import RoomDeveloperSettings from './settings/RoomDeveloperSettings.svelte';
   import RoomEmojiSettings from './settings/RoomEmojiSettings.svelte';
   import RoomGeneralSettings from './settings/RoomGeneralSettings.svelte';
@@ -134,6 +135,8 @@
     <RoomAbbreviationsSettings {room} {permissions} {levels} />
   {:else if active === 'appearance'}
     <RoomAppearanceSettings {room} />
+  {:else if active === 'cosmetics'}
+    <RoomCosmeticsSettings {room} {permissions} {levels} />
   {:else if active === 'emojis-stickers'}
     <RoomEmojiSettings {room} {permissions} {levels} />
   {:else}

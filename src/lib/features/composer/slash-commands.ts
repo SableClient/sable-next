@@ -303,7 +303,9 @@ function isReset(text: string): boolean {
 // Unstable prefix for the `m.color_preference` field from MSC4522.
 const MEMBER_COLOR_FIELD = 'eu.she-a.color';
 
-type ColorUpdate = { kind: 'clear' } | { kind: 'set'; colors: Record<string, string | undefined> };
+export type ColorUpdate =
+  | { kind: 'clear' }
+  | { kind: 'set'; colors: Record<string, string | undefined> };
 
 function colorUpdate(text: string): ColorUpdate | null {
   const parts = words(text);
@@ -327,13 +329,13 @@ function colorUpdate(text: string): ColorUpdate | null {
     : { kind: 'set', colors: { on_dark: value } };
 }
 
-function fontContent(text: string): Record<string, unknown> | null {
+export function fontContent(text: string): Record<string, unknown> | null {
   if (isReset(text)) return {};
   const font = text.replaceAll(/[;{}<>]/g, '').slice(0, 32);
   return font === '' ? null : { font };
 }
 
-function pronounContent(text: string): Record<string, unknown> | null {
+export function pronounContent(text: string): Record<string, unknown> | null {
   if (isReset(text)) return {};
   const pronouns = text.split(',').map((entry) => {
     const trimmed = entry.trim();
@@ -343,7 +345,7 @@ function pronounContent(text: string): Record<string, unknown> | null {
   return { pronouns };
 }
 
-const COSMETIC_EVENT_TYPES = {
+export const COSMETIC_EVENT_TYPES = {
   color: 'moe.sable.room.cosmetics.color',
   font: 'moe.sable.room.cosmetics.font',
   pronoun: 'moe.sable.room.cosmetics.pronouns',
@@ -383,6 +385,28 @@ function ownCosmetic(
 }
 
 // The legacy vendor event write clears deprecated colours for other clients.
+export async function writeMemberColors(
+  commands: Pick<SlashCommandApi, 'roomStateEvent' | 'sendStateEvent'>,
+  roomId: string,
+  userId: string,
+  update: ColorUpdate
+): Promise<void> {
+  const existing = objectValue(await commands.roomStateEvent(roomId, 'm.room.member', userId));
+  // Omitting the colour field replaces it; spreading it back would keep the old value.
+  const source: Record<string, unknown> = { ...existing, membership: 'join' };
+  const { [MEMBER_COLOR_FIELD]: legacyColors, ...content } = source;
+
+  if (update.kind === 'set') {
+    const colors = { ...objectValue(legacyColors), ...update.colors };
+    if (Object.values(colors).some((color) => typeof color === 'string' && color !== '')) {
+      content[MEMBER_COLOR_FIELD] = colors;
+    }
+  }
+
+  await commands.sendStateEvent(roomId, 'm.room.member', userId, content);
+  await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES.color, userId, {});
+}
+
 function ownColor(name: string, scope: CosmeticScope): SlashCommand {
   return {
     name,
@@ -393,20 +417,7 @@ function ownColor(name: string, scope: CosmeticScope): SlashCommand {
       if (update === null) return usageError(name);
 
       const roomId = await cosmeticTarget(scope, currentRoomId, commands);
-      const existing = objectValue(await commands.roomStateEvent(roomId, 'm.room.member', userId));
-      // Omitting the colour field replaces it; spreading it back would keep the old value.
-      const source: Record<string, unknown> = { ...existing, membership: 'join' };
-      const { [MEMBER_COLOR_FIELD]: legacyColors, ...content } = source;
-
-      if (update.kind === 'set') {
-        const colors = { ...objectValue(legacyColors), ...update.colors };
-        if (Object.values(colors).some((color) => typeof color === 'string' && color !== '')) {
-          content[MEMBER_COLOR_FIELD] = colors;
-        }
-      }
-
-      await commands.sendStateEvent(roomId, 'm.room.member', userId, content);
-      await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES.color, userId, {});
+      await writeMemberColors(commands, roomId, userId, update);
       return { kind: 'done' };
     },
   };
