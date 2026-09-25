@@ -1,7 +1,9 @@
 import type { NotificationView } from '#src/generated/protocol';
 
 import {
+  alertsNatively,
   nativeNotificationPermission,
+  type NotificationGrant,
   requestNativeNotificationPermission,
 } from '#lib/platform/native-notifications.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -26,6 +28,15 @@ export async function requestPermission(): Promise<NotificationPermission> {
 export async function permissionGranted(): Promise<boolean> {
   if (presentsInApp()) return permission() === 'granted';
   return (await nativeNotificationPermission()) === 'granted';
+}
+
+export async function permissionState(): Promise<NotificationGrant | 'unsupported'> {
+  if (presentsInApp()) {
+    const current = permission();
+    return current === 'default' ? 'prompt' : current;
+  }
+  if (!alertsNatively()) return 'unsupported';
+  return nativeNotificationPermission();
 }
 
 export async function grantPermission(): Promise<boolean> {

@@ -1,9 +1,9 @@
 import type { RecoveryStateView, VerificationStateView } from '#src/generated/protocol';
 
-export type SetupStep = 'device' | 'recovery' | 'profile' | 'consent';
-export type AccountStep = Extract<SetupStep, 'recovery' | 'profile'>;
+export type SetupStep = 'device' | 'recovery' | 'profile' | 'notifications' | 'consent';
+export type AccountStep = Extract<SetupStep, 'recovery' | 'profile' | 'notifications'>;
 
-export const ACCOUNT_STEPS: readonly AccountStep[] = ['recovery', 'profile'];
+export const ACCOUNT_STEPS: readonly AccountStep[] = ['recovery', 'profile', 'notifications'];
 
 export interface SetupState {
   registering: boolean;
@@ -11,6 +11,7 @@ export interface SetupState {
   recovery: RecoveryStateView;
   newRecoveryKey: boolean;
   accountFinished: readonly AccountStep[];
+  permissionAskable: boolean;
   consentPending: boolean;
 }
 
@@ -37,6 +38,9 @@ export function planSetup(state: SetupState, full: boolean): SetupStep[] {
     if (state.verification === 'unverified') steps.push('device');
     if (recoveryWanted(state)) steps.push('recovery');
     if (state.registering && !state.accountFinished.includes('profile')) steps.push('profile');
+    if (!state.accountFinished.includes('notifications') || state.permissionAskable) {
+      steps.push('notifications');
+    }
   }
   if (state.consentPending) steps.push('consent');
   return steps;

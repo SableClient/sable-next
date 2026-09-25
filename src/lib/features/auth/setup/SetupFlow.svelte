@@ -7,6 +7,7 @@
   import type { EncryptionStatusView } from '#src/generated/protocol';
   import { takeAfterLogin } from '#lib/auth/after-login.js';
   import { useCoreClient } from '#lib/core/context.js';
+  import { permissionState } from '#lib/features/notifications/present.js';
   import { i18n } from '#lib/i18n.js';
   import { telemetryConsentPending } from '#lib/platform/telemetry.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
@@ -18,6 +19,7 @@
   import RecoverySetupCard from '../recovery/RecoverySetupCard.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
   import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
+  import NotificationsSetupCard from './NotificationsSetupCard.svelte';
   import {
     encryptionKnown,
     isAccountStep,
@@ -41,12 +43,14 @@
     device: 'setup.stageDeviceLabel',
     recovery: 'auth.stageRecoveryLabel',
     profile: 'auth.stageProfileLabel',
+    notifications: 'setup.stageNotificationsLabel',
     consent: 'auth.stageConsentLabel',
   };
 
   const core = useCoreClient();
   let record = $state<SetupRecord | null>(null);
-  let accountFinished: AccountStep[] = [];
+  let accountFinished = $state.raw<AccountStep[]>([]);
+  let permissionAskable = false;
   let newRecoveryKey = $state<string | null>(null);
   let started = false;
 
@@ -86,6 +90,7 @@
       recovery: encryption.recovery,
       newRecoveryKey: newRecoveryKey !== null,
       accountFinished,
+      permissionAskable,
       consentPending: telemetryConsentPending(),
     } satisfies SetupState;
   }
@@ -110,10 +115,13 @@
   }
 
   async function start(key: string, encryption: EncryptionStatusView): Promise<void> {
-    accountFinished = await readAccountFinished(core).catch((error: unknown) => {
-      console.warn('[sable setup] account progress unavailable', error);
-      return [];
-    });
+    [accountFinished, permissionAskable] = await Promise.all([
+      readAccountFinished(core).catch((error: unknown) => {
+        console.warn('[sable setup] account progress unavailable', error);
+        return [];
+      }),
+      permissionState().then((state) => state === 'prompt'),
+    ]);
     const base = readSetupRecord(localStorage, key) ?? freshRecord(encryption);
     localStorage.removeItem(profileOnboardingMarker(userId));
     settle(key, base);
@@ -235,6 +243,18 @@
             }}
             onSkip={() => {
               advance('recovery');
+            }}
+          />
+        {:else if step === 'notifications'}
+          <NotificationsSetupCard
+            askDefault={!accountFinished.includes('notifications')}
+            onComplete={() => {
+              permissionAskable = false;
+              advance('notifications');
+            }}
+            onSkip={() => {
+              permissionAskable = false;
+              advance('notifications');
             }}
           />
         {:else if step === 'profile'}

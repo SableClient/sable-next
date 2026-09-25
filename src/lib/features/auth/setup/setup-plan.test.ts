@@ -7,7 +7,8 @@ const state = (overrides: Partial<SetupState> = {}): SetupState => ({
   verification: 'verified',
   recovery: 'enabled',
   newRecoveryKey: false,
-  accountFinished: [],
+  accountFinished: ['notifications'],
+  permissionAskable: false,
   consentPending: false,
   ...overrides,
 });
@@ -54,7 +55,7 @@ describe('planSetup', () => {
         verification: 'unverified',
         recovery: 'disabled',
         registering: true,
-        accountFinished: ['recovery', 'profile'],
+        accountFinished: ['recovery', 'profile', 'notifications'],
       }),
       true
     );
@@ -63,7 +64,11 @@ describe('planSetup', () => {
 
   test('a key from an identity reset is shown even when the account finished recovery', () => {
     const plan = planSetup(
-      state({ recovery: 'enabled', newRecoveryKey: true, accountFinished: ['recovery'] }),
+      state({
+        recovery: 'enabled',
+        newRecoveryKey: true,
+        accountFinished: ['recovery', 'notifications'],
+      }),
       true
     );
     expect(plan).toEqual(['recovery']);
@@ -72,6 +77,25 @@ describe('planSetup', () => {
   test('a login that needs no setup still asks for consent, and only that', () => {
     expect(planSetup(state({ consentPending: true }), false)).toEqual(['consent']);
     expect(planSetup(state({ verification: 'unverified' }), false)).toEqual([]);
+  });
+});
+
+describe('the notifications step', () => {
+  test('asks an account that never chose its group default', () => {
+    expect(planSetup(state({ verification: 'unverified', accountFinished: [] }), true)).toEqual([
+      'device',
+      'notifications',
+    ]);
+  });
+
+  test('a second device still asks for its own permission once the account chose', () => {
+    expect(planSetup(state({ verification: 'unverified', permissionAskable: true }), true)).toEqual(
+      ['device', 'notifications']
+    );
+  });
+
+  test('is skipped once the account chose and this device has nothing left to ask', () => {
+    expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device']);
   });
 });
 

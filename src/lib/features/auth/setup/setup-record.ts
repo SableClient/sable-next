@@ -4,7 +4,7 @@ import { ACCOUNT_STEPS, type AccountStep, type SetupStep } from './setup-plan';
 
 export const ONBOARDING_ACCOUNT_DATA_TYPE = 'moe.sable.next.onboarding';
 
-const STEPS: readonly SetupStep[] = ['device', 'recovery', 'profile', 'consent'];
+const STEPS: readonly SetupStep[] = ['device', 'recovery', 'profile', 'notifications', 'consent'];
 
 export interface SetupRecord {
   full: boolean;
