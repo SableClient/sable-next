@@ -10,7 +10,7 @@
   $effect(() => {
     if (core.status === 'idle' || core.status === 'starting') return;
     void goto(core.status === 'ready' ? resolve('/(app)/rooms') : resolve('login'), {
-      replaceState: true,
+      replace: true,
     });
   });
 </script>

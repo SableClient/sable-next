@@ -78,7 +78,7 @@
     try {
       const joined = await core.commands.joinRoom(address, await routingFor());
       const target = roomSectionPath(roomList.rooms, joined, eventId);
-      await goto(target, { replaceState: true });
+      await goto(target, { replace: true });
     } catch (error) {
       console.warn('[sable room] join failed', error);
       failedAction = 'join';

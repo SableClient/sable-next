@@ -46,7 +46,7 @@
       const path = roomSectionPath(roomList.rooms, roomId);
       await inbox.clear();
       await afterOverlayPops();
-      await goto(path, { replaceState: true });
+      await goto(path, { replace: true });
     } catch (error) {
       console.warn('[sable share-target] staging failed', error);
       failed = true;

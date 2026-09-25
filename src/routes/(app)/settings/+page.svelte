@@ -10,6 +10,6 @@
   // Phones stay on the section list.
   $effect(() => {
     if (!appLayout.matches) return;
-    void goto(resolve(`settings/${defaultSettingsSection()}`), { replaceState: true });
+    void goto(resolve(`settings/${defaultSettingsSection()}`), { replace: true });
   });
 </script>

@@ -80,7 +80,7 @@
     try {
       const roomId = await core.commands.createDm(userId);
       const target = roomSectionPath(roomList.rooms, roomId);
-      await goto(target, { replaceState: true });
+      await goto(target, { replace: true });
     } catch (error) {
       console.warn('[sable profile] could not open a chat', error);
       failed = true;

@@ -358,7 +358,7 @@
 
     const encoded = parts.join('&');
     void goto(encoded === '' ? page.url.pathname : `${page.url.pathname}?${encoded}`, {
-      replaceState: true,
+      replace: true,
       shallow: true,
     });
   }

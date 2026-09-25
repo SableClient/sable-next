@@ -31,7 +31,7 @@
     else url.searchParams.set('filter', value);
 
     void goto(`${url.pathname}${url.search}`, {
-      replaceState: true,
+      replace: true,
       reset: false,
     });
   }

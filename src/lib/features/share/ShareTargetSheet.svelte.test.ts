@@ -69,7 +69,7 @@ test('picking a room navigates there only once the sheet has popped its history 
   popped();
   await vi.waitFor(() => {
     expect(mocks.goto).toHaveBeenCalledWith(expect.stringContaining('/rooms/'), {
-      replaceState: true,
+      replace: true,
     });
   });
   await unmount(instance);
