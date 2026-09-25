@@ -7,6 +7,7 @@ import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
+import { ScheduledOriginalKept } from '#lib/features/composer/send-failure.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import { Conversation } from './conversation.svelte';
@@ -205,6 +206,87 @@ test('with the preference off an encrypted room refuses the schedule instead of 
     'encrypted'
   );
   expect(scheduledQueue()).toHaveLength(0);
+});
+
+function rescheduling(
+  scheduleMessage: () => Promise<unknown> = () => Promise.resolve('$new'),
+  cancelScheduledMessage: () => Promise<unknown> = () => Promise.resolve()
+) {
+  const calls: string[] = [];
+  const schedule = vi.fn(() => {
+    calls.push('schedule');
+    return scheduleMessage();
+  });
+  const cancel = vi.fn((_delayId: string) => {
+    calls.push('cancel');
+    return cancelScheduledMessage();
+  });
+  const core = {
+    session: { user_id: '@kris:example.org', device_id: 'DEV' },
+    commands: { scheduleMessage: schedule, cancelScheduledMessage: cancel },
+  } as unknown as CoreClient;
+  const conversation = new Conversation({
+    core,
+    personas: { personas: [] } as unknown as PersonaStore,
+    timeline: { items: [] } as unknown as RoomTimeline,
+    roomId: () => ROOM,
+  });
+
+  return { conversation, schedule, cancel, calls };
+}
+
+test('saving an edited server-side schedule books the new one before cancelling the old', async () => {
+  const { conversation, cancel, calls } = rescheduling();
+  const dueTs = Date.now() + 60_000;
+  conversation.editScheduled('old', 'typo', null, { source: 'server', dueTs });
+
+  await conversation.schedule(ROOM, 'fixed', null, dueTs + 60_000);
+
+  expect(calls).toEqual(['schedule', 'cancel']);
+  expect(cancel).toHaveBeenCalledWith('old');
+  expect(conversation.context).toBeNull();
+  expect(conversation.scheduledRevision).toBe(1);
+});
+
+test('a failed reschedule keeps the original and the edit', async () => {
+  const { conversation, cancel } = rescheduling(() => Promise.reject(new Error('offline')));
+  conversation.editScheduled('old', 'typo', null, { source: 'server', dueTs: null });
+
+  await expect(conversation.schedule(ROOM, 'fixed', null, Date.now() + 60_000)).rejects.toThrow(
+    'offline'
+  );
+
+  expect(cancel).not.toHaveBeenCalled();
+  expect(conversation.context?.kind).toBe('schedule');
+});
+
+test('an original that cannot be cancelled is reported, not dropped silently', async () => {
+  const { conversation, schedule } = rescheduling(undefined, () =>
+    Promise.reject(new Error('gone'))
+  );
+  conversation.editScheduled('old', 'typo', null, { source: 'server', dueTs: null });
+
+  await expect(
+    conversation.schedule(ROOM, 'fixed', null, Date.now() + 60_000)
+  ).rejects.toBeInstanceOf(ScheduledOriginalKept);
+
+  expect(schedule).toHaveBeenCalledOnce();
+  expect(conversation.context).toBeNull();
+  expect(conversation.scheduledRevision).toBe(1);
+});
+
+test('saving an edited queued message replaces its queue entry', async () => {
+  const conversation = scheduling();
+  const dueTs = Date.now() + 60_000;
+  adoptQueue([{ id: 'old', roomId: ROOM, body: 'typo', formatted: null, dueTs, owner: 'DEV' }]);
+  conversation.editScheduled('old', 'typo', null, { source: 'queue', dueTs });
+
+  await conversation.schedule(ROOM, 'fixed', '<b>fixed</b>', dueTs + 60_000);
+
+  expect(scheduledQueue()).toEqual([
+    expect.objectContaining({ body: 'fixed', formatted: '<b>fixed</b>', dueTs: dueTs + 60_000 }),
+  ]);
+  expect(conversation.context).toBeNull();
 });
 
 test('a reply the SDK cannot embed takes its preview from the event source', async () => {

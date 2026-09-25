@@ -1109,6 +1109,43 @@ test('right-clicking the send button opens the schedule dialog', async () => {
   void unmount(instance);
 });
 
+test('an edited scheduled message loads its text and saves through its own time', async () => {
+  const send = vi.fn(async () => {});
+  const schedule = vi.fn(async () => {});
+  const dueTs = new Date('2099-09-20T14:30:00').getTime();
+  const instance = render({
+    roomId: '!room:example.org',
+    onSend: send,
+    onSchedule: schedule,
+    context: {
+      kind: 'schedule',
+      eventId: 'delay',
+      body: 'see you tomorow',
+      scheduled: { source: 'server', dueTs },
+    },
+  });
+  await tick();
+
+  expect(editorText()).toBe('see you tomorow');
+
+  submit();
+  await tick();
+
+  expect(send).not.toHaveBeenCalled();
+  const time = document.querySelector('input[type="time"]');
+  expect(time instanceof HTMLInputElement && time.value).toBe('14:30');
+
+  document
+    .querySelector('.schedule')
+    ?.closest('form')
+    ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  await tick();
+
+  expect(schedule).toHaveBeenCalledWith('!room:example.org', 'see you tomorow', null, dueTs);
+
+  void unmount(instance);
+});
+
 test('a press beside the text focuses the editor, and one on a button does not', async () => {
   const instance = render({ roomId: '!room:example.org' });
   await tick();

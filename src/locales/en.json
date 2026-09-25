@@ -2055,6 +2055,7 @@
     "roomMention": "Notify everyone in this room",
     "replyingTo": "Replying to {{name}}",
     "editing": "Editing",
+    "editingScheduled": "Editing scheduled message",
     "cancelContext": "Cancel",
     "muteReply": "Mute reply notification",
     "unmuteReply": "Send reply notification",
@@ -2334,6 +2335,9 @@
     "scheduledCount_one": "{{count, number}} message scheduled",
     "scheduledCount_other": "{{count, number}} messages scheduled",
     "scheduledCancel": "Cancel",
+    "scheduledEdit": "Edit",
+    "scheduledSave": "Save scheduled message",
+    "scheduledOriginalKept": "The new version is scheduled, but the original could not be cancelled and may still go out. Cancel it from the scheduled list.",
     "scheduledSendNow": "Send now",
     "scheduledFor": "Sends {{when}}",
     "scheduledPending": "Waiting for a device to be open"

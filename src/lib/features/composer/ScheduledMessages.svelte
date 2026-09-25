@@ -1,6 +1,7 @@
 <script lang="ts">
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
+  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import type { ScheduledMessageView } from '#src/generated/protocol';
@@ -9,29 +10,35 @@
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
+  import type { ScheduledTarget } from './composer-context';
   import { dequeue, queueFor } from './scheduled-queue.svelte.js';
 
   interface Props {
     roomId: string;
+    revision?: number;
+    editing?: string | null;
+    onEdit?: (id: string, body: string, formatted: string | null, target: ScheduledTarget) => void;
   }
 
-  let { roomId }: Props = $props();
+  let { roomId, revision = 0, editing = null, onEdit }: Props = $props();
 
   const core = useCoreClient();
-  let remote = $state.raw<ScheduledMessageView[]>([]);
+  let fetched = $state.raw<ScheduledMessageView[]>([]);
   let expanded = $state(false);
 
-  let local = $derived(queueFor(roomId));
+  let remote = $derived(fetched.filter((message) => message.delay_id !== editing));
+  let local = $derived(queueFor(roomId).filter((message) => message.id !== editing));
   let total = $derived(remote.length + local.length);
 
   $effect(() => {
     const room = roomId;
+    void revision;
     let alive = true;
 
     void core.commands
       .scheduledMessages(room)
       .then((messages) => {
-        if (alive) remote = messages ?? [];
+        if (alive) fetched = messages ?? [];
       })
       .catch((error: unknown) => {
         console.debug('[sable composer] scheduled messages unavailable', error);
@@ -50,14 +57,14 @@
   }
 
   function cancelRemote(delayId: string): void {
-    remote = remote.filter((message) => message.delay_id !== delayId);
+    fetched = fetched.filter((message) => message.delay_id !== delayId);
     void core.commands.cancelScheduledMessage(delayId).catch((error: unknown) => {
       console.warn('[sable composer] cancelling a scheduled message failed', error);
     });
   }
 
   function sendRemote(delayId: string): void {
-    remote = remote.filter((message) => message.delay_id !== delayId);
+    fetched = fetched.filter((message) => message.delay_id !== delayId);
     void core.commands.sendScheduledMessage(delayId).catch((error: unknown) => {
       console.warn('[sable composer] sending a scheduled message failed', error);
     });
@@ -84,6 +91,21 @@
           <li>
             <span class="body">{message.body}</span>
             <span class="when">{when(message.delivery_ts)}</span>
+            {#if onEdit}
+              <IconButton
+                variant="ghost"
+                size="small"
+                label={$i18n.t('composer.scheduledEdit')}
+                onclick={() => {
+                  onEdit(message.delay_id, message.body, message.formatted, {
+                    source: 'server',
+                    dueTs: message.delivery_ts,
+                  });
+                }}
+              >
+                <PencilSimpleIcon />
+              </IconButton>
+            {/if}
             <IconButton
               variant="ghost"
               size="small"
@@ -110,6 +132,21 @@
           <li>
             <span class="body">{message.body}</span>
             <span class="when">{when(message.dueTs)}</span>
+            {#if onEdit}
+              <IconButton
+                variant="ghost"
+                size="small"
+                label={$i18n.t('composer.scheduledEdit')}
+                onclick={() => {
+                  onEdit(message.id, message.body, message.formatted, {
+                    source: 'queue',
+                    dueTs: message.dueTs,
+                  });
+                }}
+              >
+                <PencilSimpleIcon />
+              </IconButton>
+            {/if}
             <IconButton
               variant="ghost"
               size="small"

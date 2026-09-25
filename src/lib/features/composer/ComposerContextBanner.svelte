@@ -22,6 +22,8 @@
 <div class="context">
   {#if context.kind === 'edit'}
     <span class="context-kind">{$i18n.t('composer.editing')}</span>
+  {:else if context.kind === 'schedule'}
+    <span class="context-kind">{$i18n.t('composer.editingScheduled')}</span>
   {:else}
     <span
       class="context-kind context-reply"
@@ -66,8 +68,9 @@
     font-size: var(--font-size-small);
     gap: var(--space-200);
     margin-inline: calc(
-      var(--space-100) + (var(--control-height-small) - var(--icon-size-small)) / 2
-    ) var(--space-150);
+        var(--space-100) + (var(--control-height-small) - var(--icon-size-small)) / 2
+      )
+      var(--space-150);
     min-width: 0;
     padding: var(--space-150) 0 var(--space-150);
   }

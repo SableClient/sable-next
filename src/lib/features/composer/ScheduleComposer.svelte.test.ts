@@ -45,6 +45,29 @@ test('picking a date moves focus to the time, which closes the native picker', a
   void unmount(instance);
 });
 
+test('a scheduled message being edited opens on its own time and can be saved as is', async () => {
+  const dueTs = new Date('2099-09-20T14:30:00').getTime();
+  const onSchedule = vi.fn();
+  const instance = mount(ScheduleComposer, {
+    target: document.body,
+    props: { open: true, empty: false, dueTs, onSchedule },
+  });
+  await tick();
+
+  expect(input('date').value).toBe('2099-09-20');
+  expect(input('time').value).toBe('14:30');
+
+  const confirm = document.querySelector('button[type="submit"]');
+  if (!(confirm instanceof HTMLButtonElement)) throw new Error('confirm button not found');
+  expect(confirm.disabled).toBe(false);
+  confirm.click();
+  await tick();
+
+  expect(onSchedule).toHaveBeenCalledWith(dueTs);
+
+  void unmount(instance);
+});
+
 function presetButton(): HTMLButtonElement {
   const element = document.querySelector('.presets button');
   if (!(element instanceof HTMLButtonElement)) throw new Error('preset button not found');

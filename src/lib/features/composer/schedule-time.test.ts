@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { presetOffsets, scheduleAt, tomorrowMorning } from './schedule-time.js';
+import { presetOffsets, scheduleAt, scheduleInputs, tomorrowMorning } from './schedule-time.js';
 
 const NOON = new Date('2026-08-30T12:00:00').getTime();
 
@@ -32,4 +32,17 @@ test('tomorrow morning lands on 9am the next day, whatever the hour now', () => 
 
 test('every preset is in the future', () => {
   for (const preset of presetOffsets) expect(preset.at(NOON)).toBeGreaterThan(NOON);
+});
+
+test('a scheduled time fills the inputs it would be read back from', () => {
+  const at = new Date('2026-09-05T08:07:00').getTime();
+  const { date, time } = scheduleInputs(at);
+
+  expect(date).toBe('2026-09-05');
+  expect(time).toBe('08:07');
+  expect(scheduleAt(date, time, NOON)).toBe(at);
+});
+
+test('an unknown time leaves the inputs empty', () => {
+  expect(scheduleInputs(null)).toEqual({ date: '', time: '' });
 });

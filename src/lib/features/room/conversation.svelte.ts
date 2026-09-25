@@ -14,11 +14,12 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { t } from '#lib/i18n.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
-import type { ComposerContext } from '#lib/features/composer/composer-context.js';
-import { enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
+import type { ComposerContext, ScheduledTarget } from '#lib/features/composer/composer-context.js';
+import { dequeue, enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import {
   isEncryptedScheduleUnsupported,
   isServerScheduleUnsupported,
+  ScheduledOriginalKept,
 } from '#lib/features/composer/send-failure.js';
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
@@ -51,6 +52,7 @@ export type ConversationDeps = {
 
 export class Conversation {
   context = $state<ComposerContext | null>(null);
+  scheduledRevision = $state(0);
 
   readonly #core: CoreClient;
   readonly #personas: PersonaStore;
@@ -272,6 +274,31 @@ export class Conversation {
     const delayMs = dueTs - Date.now();
     if (delayMs <= 0) return;
 
+    const replacing = this.context?.kind === 'schedule' ? this.context : null;
+    await this.#scheduleNew(targetRoomId, body, formatted, dueTs, delayMs);
+    if (replacing === null) {
+      this.scheduledRevision += 1;
+      return;
+    }
+
+    this.context = null;
+    try {
+      if (replacing.scheduled?.source === 'queue') dequeue(replacing.eventId);
+      else await this.#core.commands.cancelScheduledMessage(replacing.eventId);
+    } catch (error) {
+      throw new ScheduledOriginalKept(error);
+    } finally {
+      this.scheduledRevision += 1;
+    }
+  };
+
+  async #scheduleNew(
+    targetRoomId: string,
+    body: string,
+    formatted: string | null,
+    dueTs: number,
+    delayMs: number
+  ): Promise<void> {
     try {
       await this.#core.commands.scheduleMessage(targetRoomId, body, formatted, delayMs);
       return;
@@ -290,6 +317,15 @@ export class Conversation {
       dueTs,
       owner: this.#core.session?.device_id ?? '',
     });
+  }
+
+  readonly editScheduled = (
+    id: string,
+    body: string,
+    html: string | null,
+    scheduled: ScheduledTarget
+  ): void => {
+    this.context = { kind: 'schedule', eventId: id, body, html, scheduled };
   };
 
   readonly setTyping = async (targetRoomId: string, typing: boolean): Promise<void> => {

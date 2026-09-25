@@ -8,20 +8,27 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { presetOffsets, scheduleAt } from './schedule-time.js';
+  import { presetOffsets, scheduleAt, scheduleInputs } from './schedule-time.js';
 
   interface Props {
     open?: boolean;
     empty: boolean;
     encrypted?: boolean | null;
+    dueTs?: number | null;
     onSchedule: (dueTs: number) => void;
   }
 
-  let { open = $bindable(false), empty, encrypted = null, onSchedule }: Props = $props();
+  let {
+    open = $bindable(false),
+    empty,
+    encrypted = null,
+    dueTs = null,
+    onSchedule,
+  }: Props = $props();
 
   const uid = $props.id();
-  let date = $state('');
-  let time = $state('');
+  let date = $derived(scheduleInputs(dueTs).date);
+  let time = $derived(scheduleInputs(dueTs).time);
   let timeInput: HTMLInputElement | null = null;
 
   let chosen = $derived(scheduleAt(date, time, Date.now()));
@@ -29,8 +36,7 @@
   let unavailable = $derived(empty || blocked);
 
   function reset(): void {
-    date = '';
-    time = '';
+    ({ date, time } = scheduleInputs(dueTs));
   }
 
   function confirm(dueTs: number): void {

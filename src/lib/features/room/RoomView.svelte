@@ -879,7 +879,12 @@
       />
     {:else}
       {#key resolvedRoomId}
-        <ScheduledMessages roomId={resolvedRoomId} />
+        <ScheduledMessages
+          roomId={resolvedRoomId}
+          revision={conversation.scheduledRevision}
+          editing={conversation.context?.kind === 'schedule' ? conversation.context.eventId : null}
+          onEdit={conversation.editScheduled}
+        />
         <ConversationComposer
           bind:this={composer}
           {conversation}

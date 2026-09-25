@@ -4,6 +4,12 @@ import { SlashError } from './slash-commands';
 
 export type SendFailure = { key: string; values?: Record<string, string> };
 
+export class ScheduledOriginalKept extends Error {
+  constructor(cause: unknown) {
+    super('the replaced scheduled message could not be cancelled', { cause });
+  }
+}
+
 function detailOf(cause: unknown): CommandErr | null {
   if (!(cause instanceof Error) || !('detail' in cause)) return null;
   const detail = (cause as { detail: unknown }).detail;

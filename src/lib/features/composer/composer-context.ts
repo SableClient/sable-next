@@ -1,5 +1,10 @@
+export interface ScheduledTarget {
+  source: 'server' | 'queue';
+  dueTs: number | null;
+}
+
 export interface ComposerContext {
-  kind: 'reply' | 'edit';
+  kind: 'reply' | 'edit' | 'schedule';
   eventId: string;
   timelineItemId?: string;
   sender?: string | null;
@@ -7,6 +12,7 @@ export interface ComposerContext {
   body: string;
   html?: string | null;
   mediaCaption?: boolean;
+  scheduled?: ScheduledTarget;
 }
 
 export function formattedForEditing(html: string | null | undefined): string | null {

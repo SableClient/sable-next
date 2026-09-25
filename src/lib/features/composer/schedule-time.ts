@@ -29,3 +29,17 @@ export function scheduleAt(date: string, time: string, now: number): number | nu
   if (Number.isNaN(ts) || ts <= now) return null;
   return ts;
 }
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function scheduleInputs(ts: number | null): { date: string; time: string } {
+  if (ts === null) return { date: '', time: '' };
+
+  const at = new Date(ts);
+  return {
+    date: `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`,
+    time: `${pad(at.getHours())}:${pad(at.getMinutes())}`,
+  };
+}

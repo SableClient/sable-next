@@ -76,7 +76,7 @@
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import { serializeComposer, serializePlain } from './editor/serialize';
-  import { sendFailure } from './send-failure';
+  import { ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
   import VoiceRecorder from './VoiceRecorder.svelte';
@@ -234,6 +234,7 @@
   let sending = $derived(inFlight > 0);
   let hasContent = $derived(!empty || staged.length > 0);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
+  let editingScheduled = $derived(context?.kind === 'schedule');
   let primaryAction = $derived(
     !hasContent &&
       !canDeleteEdited &&
@@ -424,7 +425,10 @@
   });
 
   $effect(() => {
-    if (context?.kind === 'edit' && prefilledFor !== context.eventId) {
+    if (
+      (context?.kind === 'edit' || context?.kind === 'schedule') &&
+      prefilledFor !== context.eventId
+    ) {
       if (prefilledFor === null && !editor.isEmpty()) preEdit = editor.doc();
       prefilledFor = context.eventId;
       /* In plain-text mode the body already is the markdown source, so
@@ -448,7 +452,7 @@
     if (context === previousContext) return;
 
     const wasActive = previousContext !== null;
-    const wasEditing = previousContext?.kind === 'edit';
+    const wasEditing = previousContext?.kind === 'edit' || previousContext?.kind === 'schedule';
     previousContext = context;
     const frame = requestAnimationFrame(() => {
       if (context !== null) {
@@ -529,7 +533,7 @@
 
   function cancelContext(): void {
     onCancelContext?.();
-    if (context?.kind === 'edit' || !desktop) blurEditor();
+    if (context?.kind === 'edit' || editingScheduled || !desktop) blurEditor();
   }
 
   function updateTyping(): void {
@@ -552,6 +556,10 @@
 
   async function send(): Promise<void> {
     if (readOnly) return;
+    if (editingScheduled) {
+      if (canSchedule) scheduleOpen = true;
+      return;
+    }
     if (!hasContent) {
       if (canDeleteEdited) {
         deleteEditTarget = context;
@@ -664,6 +672,11 @@
       error = null;
     } catch (cause) {
       console.debug('[sable composer] schedule failed', cause);
+      if (cause instanceof ScheduledOriginalKept) {
+        editor.clearHistory();
+        error = $i18n.t('composer.scheduledOriginalKept');
+        return;
+      }
       if (editor.isEmpty()) editor.setDoc(doc);
       error = $i18n.t('composer.scheduleFailed');
     }
@@ -874,7 +887,14 @@
   };
 
   function stepReply(event: KeyboardEvent): void {
-    if (!onReplyStep || panelOpen || context?.kind === 'edit' || event.defaultPrevented) return;
+    if (
+      !onReplyStep ||
+      panelOpen ||
+      context?.kind === 'edit' ||
+      editingScheduled ||
+      event.defaultPrevented
+    )
+      return;
     const isMac = isMacPlatform();
     const shortcut = effectiveShortcuts().find(
       (candidate) => REPLY_STEPS[candidate.id] && matchesBinding(candidate.binding, event, isMac)
@@ -1086,7 +1106,9 @@
                 disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
                 label={primaryAction === 'record'
                   ? $i18n.t('composer.voiceRecord')
-                  : $i18n.t('timeline.sendMessage')}
+                  : editingScheduled
+                    ? $i18n.t('composer.scheduledSave')
+                    : $i18n.t('timeline.sendMessage')}
                 onclick={primaryAction === 'record'
                   ? () => {
                       recording = true;
@@ -1169,6 +1191,7 @@
     bind:open={scheduleOpen}
     empty={!hasContent || readOnly}
     {encrypted}
+    dueTs={context?.scheduled?.dueTs ?? null}
     onSchedule={(dueTs: number) => {
       void scheduleDraft(dueTs);
     }}
