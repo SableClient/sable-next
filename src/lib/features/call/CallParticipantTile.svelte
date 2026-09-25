@@ -18,7 +18,8 @@
   import Slider from '#lib/ui/primitives/Slider.svelte';
 
   import { cameraVisible, type CallTileSource } from './call-layout';
-  import type { CallParticipant } from './call-transport';
+  import type { CallParticipant, CallVideoOverlay } from './call-transport';
+  import { nativeVideoSlot } from './native-video-overlay';
   import {
     MAX_PARTICIPANT_VOLUME,
     participantVolume,
@@ -29,6 +30,7 @@
     participant: CallParticipant;
     source: CallTileSource;
     room: LivekitRoom | undefined;
+    localVideo?: CallVideoOverlay;
     name: string;
     userId: string;
     avatar: string | null;
@@ -42,6 +44,7 @@
     participant,
     source,
     room,
+    localVideo,
     name,
     userId,
     avatar,
@@ -136,7 +139,9 @@
   onpointerup={reveal}
   oncontextmenu={openVolume}
 >
-  {#if videoOn}
+  {#if videoOn && localVideo && !screen}
+    <div class="video" {@attach nativeVideoSlot(localVideo)}></div>
+  {:else if videoOn}
     <video
       class="video"
       class:mirrored={participant.local && !screen}

@@ -56,8 +56,22 @@ export type CallAudioRoute = {
   current: boolean;
 };
 
+export type CallVideoRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  devicePixelRatio: number;
+};
+
+export type CallVideoOverlay = {
+  place: (rect: CallVideoRect) => Promise<void>;
+  clear: () => Promise<void>;
+};
+
 export type CallTransportCapabilities = {
   camera?: { switch: () => Promise<void> };
+  localVideo?: CallVideoOverlay;
   audioRoutes?: {
     list: () => Promise<CallAudioRoute[]>;
     select: (routeId: string) => Promise<void>;

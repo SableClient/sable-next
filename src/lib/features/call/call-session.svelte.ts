@@ -14,7 +14,7 @@ import { CallTelemetry } from './call-telemetry';
 import { cameraVisible, screenShareVisible } from './call-layout';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
-import type { CallBackendGrant } from './call-transport';
+import type { CallBackendGrant, CallVideoOverlay } from './call-transport';
 
 export type CallLifecycle = 'idle' | 'joining' | 'connecting' | 'active' | 'leaving' | 'failed';
 
@@ -123,6 +123,10 @@ export class CallSession {
     return this.#media?.capabilities.screenShare !== undefined;
   }
 
+  get localVideo(): CallVideoOverlay | undefined {
+    return this.#media?.capabilities.localVideo;
+  }
+
   get canSwitchCamera(): boolean {
     return this.#media?.capabilities.camera !== undefined;
   }
@@ -212,7 +216,7 @@ export class CallSession {
         async () =>
           this.#deps.createTransport?.(grant.encryptMedia) ??
           (grant.mode === undefined || grant.mode === 'legacy'
-            ? await createNativeTransport(String(grant.session))
+            ? await createNativeTransport(String(grant.session), grant.identity)
             : null) ??
           (grant.backends?.length
             ? (await import('./multi-sfu-transport')).createMultiSfuTransport(

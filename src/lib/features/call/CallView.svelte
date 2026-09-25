@@ -411,6 +411,7 @@
     participant={item.participant}
     source={item.source}
     room={session.roomFor(item.participant.backendId)}
+    localVideo={item.participant.local ? session.localVideo : undefined}
     name={profile.name}
     userId={profile.userId}
     avatar={profile.avatar}

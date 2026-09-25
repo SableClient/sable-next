@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import CallParticipantTile from './CallParticipantTile.svelte';
 
@@ -57,6 +57,37 @@ test('closes the volume panel on Escape', async () => {
   expect(panel()).toBeNull();
 
   await unmount(instance);
+});
+
+test('our own camera on a native call is a slot for the native view', async () => {
+  const localVideo = {
+    place: vi.fn(() => Promise.resolve()),
+    clear: vi.fn(() => Promise.resolve()),
+  };
+  const instance = mount(CallParticipantTile, {
+    target: document.body,
+    props: {
+      participant: {
+        identity: '@erwan:example.org:PHONE',
+        local: true,
+        camera: { id: 'camera', muted: false, subscribed: true },
+      },
+      source: 'camera',
+      room: undefined,
+      localVideo,
+      name: 'Erwan',
+      userId: '@erwan:example.org',
+      avatar: null,
+    },
+  });
+  flushSync();
+
+  expect(document.querySelector('video')).toBeNull();
+  expect(document.querySelector('div.video')).not.toBeNull();
+  expect(document.body.textContent).toContain('Erwan');
+
+  await unmount(instance);
+  expect(localVideo.clear).toHaveBeenCalled();
 });
 
 test('the volume button still toggles the panel closed', async () => {

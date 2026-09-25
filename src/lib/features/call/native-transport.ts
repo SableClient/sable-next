@@ -56,9 +56,18 @@ const participantOf = (participant: NativeCallRemoteParticipant): CallParticipan
   connectionQuality: qualityOf(participant.connectionQuality),
 });
 
-const stateOf = (snapshot: NativeCallSnapshot): CallTransportState => ({
+const selfOf = (snapshot: NativeCallSnapshot, identity: string): CallParticipant => ({
+  identity,
+  local: true,
+  camera: snapshot.cameraEnabled ? { id: 'camera', muted: false, subscribed: true } : undefined,
+  microphone: { id: 'microphone', muted: !snapshot.microphoneEnabled, subscribed: true },
+  connectionQuality: qualityOf(snapshot.localConnectionQuality),
+});
+
+const stateOf = (snapshot: NativeCallSnapshot, identity: string): CallTransportState => ({
   connection: connectionOf(snapshot.connectionState),
   participants: (snapshot.remoteParticipants ?? []).map(participantOf),
+  self: selfOf(snapshot, identity),
   microphoneEnabled: snapshot.microphoneEnabled,
   cameraEnabled: snapshot.cameraEnabled,
   screenShareEnabled: snapshot.screenShareEnabled,
@@ -67,7 +76,10 @@ const stateOf = (snapshot: NativeCallSnapshot): CallTransportState => ({
 
 export type NativeTransport = CallTransport & { readonly callId: string };
 
-export async function createNativeTransport(callId: string): Promise<NativeTransport | null> {
+export async function createNativeTransport(
+  callId: string,
+  identity: string
+): Promise<NativeTransport | null> {
   const plugin: Plugin | null = await loadNativeCalls();
   if (!plugin) return null;
 
@@ -81,7 +93,7 @@ export async function createNativeTransport(callId: string): Promise<NativeTrans
   const adopt = (snapshot: NativeCallSnapshot): void => {
     if (snapshot.revision <= revision) return;
     revision = snapshot.revision;
-    state = stateOf(snapshot);
+    state = stateOf(snapshot, identity);
     const view: CallTransportState = { ...state, participants: [...state.participants] };
     for (const listener of listeners) {
       try {
@@ -175,6 +187,14 @@ export async function createNativeTransport(callId: string): Promise<NativeTrans
       camera: {
         switch: async () => {
           adopt(await plugin.switchNativeCallCamera({ callId }));
+        },
+      },
+      localVideo: {
+        place: async (rect) => {
+          adopt(await plugin.setNativeCallLocalVideoOverlay({ callId, ...rect }));
+        },
+        clear: async () => {
+          adopt(await plugin.clearNativeCallLocalVideoOverlay({ callId }));
         },
       },
       audioRoutes: {
