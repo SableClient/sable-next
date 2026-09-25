@@ -1,10 +1,8 @@
 #![allow(clippy::large_futures)]
 
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use matrix_sdk::{
-    ruma::room_id, send_queue::RoomSendQueueUpdate, test_utils::mocks::MatrixMockServer,
-};
+use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
 use matrix_sdk_ui::sync_service::SyncService;
 use serde_json::json;
 use wiremock::{
@@ -79,16 +77,8 @@ async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events()
     })
     .await
     .unwrap();
-    tokio::time::timeout(Duration::from_secs(2), async {
-        loop {
-            if matches!(
-                updates.recv().await.unwrap(),
-                RoomSendQueueUpdate::SentEvent { .. }
-            ) {
-                break;
-            }
-        }
-    })
-    .await
-    .expect("the typed decline is sent from the queue");
+    assert!(
+        updates.try_recv().is_err(),
+        "a decline must not leave a local echo the timeline filter never replaces"
+    );
 }

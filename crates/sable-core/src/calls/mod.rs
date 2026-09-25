@@ -433,11 +433,7 @@ impl Core {
             return;
         };
 
-        if let Err(error) = room
-            .send_queue()
-            .send_raw(raw, notify::NOTIFICATION_EVENT_TYPE.to_owned())
-            .await
-        {
+        if let Err(error) = room.send_raw(notify::NOTIFICATION_EVENT_TYPE, raw).await {
             tracing::warn!(?error, "could not announce the call");
         }
     }
@@ -466,8 +462,7 @@ impl Core {
             )
             .map_err(|error| self.failed("decline_call", error))?
             .cast_unchecked();
-        room.send_queue()
-            .send_raw(content, notify::DECLINE_EVENT_TYPE.to_owned())
+        room.send_raw(notify::DECLINE_EVENT_TYPE, content)
             .await
             .map_err(|error| self.failed("decline_call", error))?;
 
