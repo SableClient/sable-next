@@ -1022,7 +1022,7 @@ test('lifts trailing pronouns out of the display name into a pill', async () => 
   await unmount(instance);
 });
 
-test('prefers structured pronoun sets over the display name suffix', async () => {
+test('adds the display name pronouns after the structured sets', async () => {
   core.userProfile.mockResolvedValue({
     pronouns: [{ summary: 'they/them', language: null }],
   });
@@ -1037,8 +1037,7 @@ test('prefers structured pronoun sets over the display name suffix', async () =>
     const name = document.querySelector('header .sender-identity-name');
     expect(name?.textContent).toBe('sugary');
     const pills = document.querySelectorAll('header .sender-identity-pronoun');
-    expect(pills).toHaveLength(1);
-    expect(pills[0].textContent).toBe('they/them');
+    expect([...pills].map((pill) => pill.textContent)).toEqual(['they/them', 'she/it']);
   });
   await unmount(instance);
 });

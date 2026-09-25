@@ -5,35 +5,53 @@ import {
   pronounPillLimit,
   splitDisplayNamePronouns,
   visiblePronouns,
+  withDisplayNamePronouns,
 } from './pronouns';
 
 const set = (summary: string, language: string | null) => ({ summary, language });
 
 describe('splitDisplayNamePronouns', () => {
-  it('splits a trailing parenthetical into a pronoun set', () => {
+  it('splits a parenthesised pronoun set out of the name', () => {
     expect(splitDisplayNamePronouns('sugary (she/it)')).toEqual({
       name: 'sugary',
       pronouns: [set('she/it', null)],
     });
   });
 
-  it('keeps unrelated parts of the name untouched', () => {
+  it('detects a bracketed set anywhere in the name', () => {
+    expect(splitDisplayNamePronouns('[they/them/theirs] sugary ✨')).toEqual({
+      name: 'sugary ✨',
+      pronouns: [set('they/them/theirs', null)],
+    });
     expect(splitDisplayNamePronouns('sugary (she/it) ✨')).toEqual({
-      name: 'sugary (she/it) ✨',
-      pronouns: [],
+      name: 'sugary ✨',
+      pronouns: [set('she/it', null)],
     });
   });
 
-  it('keeps a name that is only a parenthetical', () => {
+  it('keeps a name that is only a pronoun set', () => {
     expect(splitDisplayNamePronouns('(she/it)')).toEqual({ name: '(she/it)', pronouns: [] });
   });
 
-  it('ignores empty or numeric parentheticals', () => {
-    expect(splitDisplayNamePronouns('sugary ()')).toEqual({ name: 'sugary ()', pronouns: [] });
-    expect(splitDisplayNamePronouns('sugary (2019)')).toEqual({
-      name: 'sugary (2019)',
-      pronouns: [],
-    });
+  it('ignores parentheticals that are not pronoun sets', () => {
+    for (const name of ['sugary ()', 'sugary (2019)', 'sugary (away)', 'sugary (a/b/c/d)']) {
+      expect(splitDisplayNamePronouns(name)).toEqual({ name, pronouns: [] });
+    }
+  });
+});
+
+describe('withDisplayNamePronouns', () => {
+  it('appends a set from the name that the profile lacks', () => {
+    expect(withDisplayNamePronouns([set('she/her', 'en')], [set('they/them', null)])).toEqual([
+      set('she/her', 'en'),
+      set('they/them', null),
+    ]);
+  });
+
+  it('skips a set the profile already has, ignoring case', () => {
+    expect(withDisplayNamePronouns([set('She/Her', 'en')], [set('she/her', null)])).toEqual([
+      set('She/Her', 'en'),
+    ]);
   });
 });
 
