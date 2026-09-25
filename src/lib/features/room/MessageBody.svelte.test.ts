@@ -151,6 +151,50 @@ test('opens the selected gallery image', async () => {
   await unmount(instance);
 });
 
+test('opens a gallery pdf in the viewer', async () => {
+  const onOpenMedia = vi.fn();
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: {
+      item: item({
+        kind: 'gallery',
+        body: '',
+        html: '',
+        items: [
+          {
+            kind: 'image',
+            body: 'one.png',
+            source: 'mxc://example.org/one',
+            mime: 'image/png',
+            width: 100,
+            height: 100,
+            blurhash: null,
+            thumbnail: null,
+          },
+          {
+            kind: 'file',
+            body: 'report.pdf',
+            source: 'mxc://example.org/report',
+            mime: 'application/pdf',
+          },
+        ],
+      }),
+      canRedactOthers: false,
+      onOpenMedia,
+    },
+  });
+  await tick();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('.gallery .pdf-thumbnail')?.click();
+
+  expect(onOpenMedia).toHaveBeenCalledWith('$item:gallery:1');
+  await unmount(instance);
+});
+
 test('keeps an image filename hidden without the alt-text preference', async () => {
   const instance = mount(MessageBody, {
     target: document.body,

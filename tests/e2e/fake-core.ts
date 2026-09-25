@@ -434,6 +434,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     const servedBytes = new Map<string, Promise<Uint8Array>>();
     function servedPng(source: string): Promise<Uint8Array> {
       if (source.includes('undecodable-')) return Promise.resolve(new Uint8Array([0, 1, 2, 3]));
+      if (source.includes('.pdf')) {
+        return Promise.resolve(
+          new TextEncoder().encode(
+            '%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n'
+          )
+        );
+      }
       const [width, height] = source.includes('wide-') ? [1000, 400] : [80, 60];
       const key = `${String(width)}x${String(height)}`;
       let bytes = servedBytes.get(key);

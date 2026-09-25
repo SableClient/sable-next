@@ -175,6 +175,51 @@ test('a gallery in a bubble keeps its columns on mobile', async ({
   expect(box.sideways).toBe(0);
 });
 
+test('a pdf in a gallery opens in the viewer', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await core.setTimelineItemById(await core.subscription(), 'general-19', {
+    ...picture(800, 600),
+    content: {
+      kind: 'gallery',
+      body: '',
+      html: '',
+      items: [
+        {
+          kind: 'image',
+          body: 'one',
+          source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+          mime: 'image/png',
+          width: 800,
+          height: 600,
+          blurhash: null,
+          thumbnail: null,
+        },
+        {
+          kind: 'file',
+          body: 'report.pdf',
+          source: JSON.stringify({ Plain: 'mxc://example.test/report.pdf' }),
+          mime: 'application/pdf',
+        },
+      ],
+    },
+  });
+
+  await page.getByRole('button', { name: 'Open report.pdf' }).click();
+
+  const viewer = page.getByRole('dialog');
+  await expect(viewer.locator('.pdf-canvas-frame')).toBeVisible();
+  await expect(viewer.locator('.pdf-error')).toHaveCount(0);
+});
+
 test('a video in a bubble fills its bubble on mobile', async ({
   page,
   app,

@@ -48,6 +48,7 @@
         height={item.kind === 'video' ? item.height : null}
         blurhash={item.kind === 'video' ? item.blurhash : null}
         thumbnail={item.kind === 'video' ? item.thumbnail : null}
+        onOpen={() => onOpen?.(index)}
       />
     {/if}
   {/each}
