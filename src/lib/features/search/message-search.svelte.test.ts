@@ -196,3 +196,48 @@ test('interleaved rooms produce distinct group keys', async () => {
     '!one:example.org',
   ]);
 });
+
+test('a hit repeated across pages is kept once and the cursor still advances by page', async () => {
+  const firstPage = Array.from({ length: 30 }, (_, index) => hit(`$first${String(index)}`));
+  const secondPage = [
+    hit('$first29'),
+    ...Array.from({ length: 29 }, (_, index) => hit(`$second${String(index)}`)),
+  ];
+  const searchMessages = vi
+    .fn()
+    .mockResolvedValueOnce(firstPage)
+    .mockResolvedValueOnce(secondPage)
+    .mockResolvedValueOnce([]);
+  const { core } = coreReturning(searchMessages);
+  const search = new MessageSearch(core, () => resolvers);
+
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  await search.loadMore();
+
+  const ids = search.hits.map((entry) => entry.event_id);
+  expect(ids).toHaveLength(59);
+  expect(new Set(ids).size).toBe(59);
+
+  await search.loadMore();
+  expect(searchMessages).toHaveBeenLastCalledWith(
+    'deploy',
+    expect.objectContaining({ offset: 60 })
+  );
+});
+
+test('a space with no joined rooms finds nothing instead of searching everywhere', async () => {
+  const searchMessages = vi.fn().mockResolvedValue([hit('$a')]);
+  const { core } = coreReturning(searchMessages);
+  const search = new MessageSearch(core, () => ({ ...resolvers, spaceRooms: () => [] }));
+
+  search.query = 'space:empty deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+
+  expect(searchMessages).not.toHaveBeenCalled();
+  expect(search.hits).toEqual([]);
+  expect(search.searching).toBe(false);
+  expect(search.unresolved).toEqual([]);
+});

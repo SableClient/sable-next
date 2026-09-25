@@ -273,3 +273,26 @@ test('a negated quoted phrase excludes the phrase, not its quotes', () => {
   expect(parsed.text).toBe('deploy');
   expect(parsed.phrases).toEqual([]);
 });
+
+test('an unclosed phrase keeps every character typed so far', () => {
+  expect(parseSearchQuery('"deplo').phrases).toEqual(['deplo']);
+  expect(parseSearchQuery('fix -"deplo').exclude).toEqual(['deplo']);
+});
+
+test('date bounds intersect whatever order they are written in', () => {
+  const later = filterFor('during:2025 after:2025-06-01');
+  expect(later.after_ts).toBe(Date.parse('2025-06-01T00:00:00'));
+  expect(later.before_ts).toBe(Date.parse('2026-01-01T00:00:00') - 1);
+
+  const earlier = filterFor('after:2025-06-01 during:2025 before:2025-07-01');
+  expect(earlier.after_ts).toBe(Date.parse('2025-06-01T00:00:00'));
+  expect(earlier.before_ts).toBe(Date.parse('2025-07-01T00:00:00'));
+});
+
+test('a space with no joined rooms matches nothing, and excluding it excludes nothing', () => {
+  const empty = { ...resolve, spaceRooms: () => [] };
+
+  expect(toSearchFilter(parseSearchQuery('space:new deploy'), empty).matchesNothing).toBe(true);
+  expect(toSearchFilter(parseSearchQuery('-space:new deploy'), empty).matchesNothing).toBe(false);
+  expect(resolveFor('space:eng deploy').matchesNothing).toBe(false);
+});

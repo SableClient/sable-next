@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { applySuggestion, partialAt, suggestionsFor } from './search-suggestions';
+import { applySuggestion, enterAccepts, partialAt, suggestionsFor } from './search-suggestions';
 
 const sources = {
   rooms: [
@@ -138,4 +138,26 @@ test('applying a suggestion replaces only the token being typed', () => {
 
 test('an unknown operator suggests no values', () => {
   expect(suggestionsFor('colour:re', sources)).toEqual([]);
+});
+
+test('a room or space without an alias is inserted by id so a shared name cannot pick another', () => {
+  const rooms = [
+    { id: '!first:example.org', alias: null, name: 'general', avatarUrl: null },
+    { id: '!second:example.org', alias: null, name: 'general', avatarUrl: null },
+  ];
+
+  const [, second] = suggestionsFor('in:gen', { rooms, senders: [] });
+  expect(second.label).toBe('general');
+  expect(second.insert).toBe('in:!second:example.org ');
+
+  const [, social] = suggestionsFor('space:', sources);
+  expect(social.label).toBe('Social');
+  expect(social.insert).toBe('space:!social:example.org ');
+});
+
+test('enter completes a value, but a bare word only once a suggestion was picked', () => {
+  expect(enterAccepts('turn on', false)).toBe(false);
+  expect(enterAccepts('what is', false)).toBe(false);
+  expect(enterAccepts('turn on', true)).toBe(true);
+  expect(enterAccepts('has:im', false)).toBe(true);
 });

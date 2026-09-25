@@ -254,7 +254,7 @@ test('an unknown from: yields nothing rather than every message', async ({ page 
   await expect(page.getByText(/No match for from:nobody/)).toBeVisible();
 });
 
-test('typing an operator prefix offers completions and Enter accepts one', async ({ page }) => {
+test('typing an operator prefix offers completions and Tab accepts one', async ({ page }) => {
   await page.goto('/search');
   const field = searchField(page);
 
@@ -262,8 +262,20 @@ test('typing an operator prefix offers completions and Enter accepts one', async
   const listbox = page.getByRole('listbox', { name: 'Search suggestions' });
   await expect(listbox.getByRole('option', { name: 'from:' })).toBeVisible();
 
-  await field.press('Enter');
+  await field.press('Tab');
   await expect(field).toHaveValue('from:');
+});
+
+test('Enter searches a word that merely starts an operator', async ({ page }) => {
+  await page.goto('/search');
+  const field = searchField(page);
+
+  await field.fill('turn on');
+  await expect(page.getByRole('option', { name: /^on:/ })).toBeVisible();
+
+  await field.press('Enter');
+  await expect(field).toHaveValue('turn on');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
 test('in: offers rooms and accepting one inserts its alias', async ({ page }) => {

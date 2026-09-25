@@ -22,6 +22,7 @@ import { CoreError } from '../../transport';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
+import { clearRecentSearches } from '#lib/features/search/recent-searches.svelte.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -523,6 +524,7 @@ export class CoreClient {
 
   async removeAccount(accountId: string): Promise<void> {
     const transport = this.ensureTransport();
+    const userId = this.accounts.find((account) => account.account_id === accountId)?.user_id;
     await transport.send({
       type: 'remove_account',
       account_id: accountId,
@@ -530,11 +532,13 @@ export class CoreClient {
     await this.refreshAccounts();
     discardAccountStore(transport, accountId);
     clearRoomListSnapshot(accountId);
+    if (userId !== undefined) clearRecentSearches(userId);
   }
 
   async logout(): Promise<void> {
     const transport = this.ensureTransport();
     const accountId = this.session?.account_id ?? null;
+    const userId = this.session?.user_id ?? null;
     await transport.send({ type: 'logout' });
     this.generation += 1;
     this.replaceSession(null);
@@ -544,6 +548,7 @@ export class CoreClient {
       discardAccountStore(transport, accountId);
       clearRoomListSnapshot(accountId);
     }
+    if (userId !== null) clearRecentSearches(userId);
 
     try {
       await this.refreshAccounts();

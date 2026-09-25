@@ -34,6 +34,7 @@ export class MessageSearch {
   #resolvers: () => QueryResolvers;
   #debounce: ReturnType<typeof setTimeout> | undefined;
   #generation = 0;
+  #served = 0;
 
   constructor(core: CoreClient, resolvers: () => QueryResolvers) {
     this.#core = core;
@@ -81,7 +82,7 @@ export class MessageSearch {
       return;
     }
 
-    if (this.unresolved.length > 0) {
+    if (this.unresolved.length > 0 || this.resolved.matchesNothing) {
       this.hits = [];
       this.searching = false;
       this.failed = false;
@@ -103,7 +104,7 @@ export class MessageSearch {
     if (this.searching || this.exhausted) return;
 
     this.searching = true;
-    await this.#run(this.#generation, this.hits.length);
+    await this.#run(this.#generation, this.#served);
   }
 
   dispose(): void {
@@ -124,7 +125,14 @@ export class MessageSearch {
 
       if (generation !== this.#generation) return;
 
-      this.hits = offset === 0 ? page : [...this.hits, ...page];
+      if (offset === 0) {
+        this.hits = page;
+      } else {
+        const loaded = this.hits;
+        const unseen = page.filter((hit) => !loaded.some((kept) => kept.event_id === hit.event_id));
+        this.hits = [...loaded, ...unseen];
+      }
+      this.#served = offset + page.length;
       this.exhausted = page.length < PAGE_SIZE;
       this.failed = false;
     } catch {

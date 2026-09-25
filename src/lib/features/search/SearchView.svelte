@@ -31,7 +31,7 @@
   import { snippetAround } from './highlight';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
   import type { Suggestion } from '../composer/autocomplete';
-  import { applySuggestion, suggestionsFor } from './search-suggestions';
+  import { applySuggestion, enterAccepts, suggestionsFor } from './search-suggestions';
   import type { SearchToken } from './search-query';
   import { chipText, composeQuery, splitTokenField } from './token-field';
   import { SenderDirectory, type SenderIdentity } from './sender-directory.svelte.js';
@@ -48,16 +48,27 @@
       resolveDirectRooms(roomList.rooms, resolveUserTarget(knownSenders(), value) ?? value),
   }));
 
+  const LOOKUP_DELAY_MS = 300;
+  const PEOPLE_OPERATORS: readonly string[] = ['from', 'mentions', 'with'];
+  let lookupTimer: ReturnType<typeof setTimeout> | undefined;
+  let destroyed = false;
+
   search.query = page.url.searchParams.get('q') ?? '';
   search.order = orderFrom(page.url.searchParams.get('order'));
-  if (search.query !== '') search.schedule();
+  if (search.query !== '') {
+    search.schedule();
+    scheduleLookup();
+  }
 
   onDestroy(() => {
+    destroyed = true;
     search.dispose();
+    clearTimeout(lookupTimer);
   });
 
   let suggestionsOpen = $state(false);
   let activeSuggestion = $state(0);
+  let navigated = false;
   const listboxId = $props.id();
   const optionId = (index: number): string => `${listboxId}-${String(index)}`;
 
@@ -165,6 +176,7 @@
     search.query = applySuggestion(search.query, suggestion);
     suggestionsOpen = false;
     activeSuggestion = 0;
+    navigated = false;
     runSearch();
   }
 
@@ -200,8 +212,7 @@
   );
 
   function spaceTokenValue(space: (typeof spaces)[number]): string {
-    const target = space.canonical_alias ?? space.name ?? space.room_id;
-    return target.includes(' ') ? `"${target}"` : target;
+    return space.canonical_alias ?? space.room_id;
   }
 
   function setScopeToken(value: string | null): void {
@@ -265,13 +276,23 @@
 
     if (event.key === 'ArrowDown') {
       event.preventDefault();
+      navigated = true;
       activeSuggestion = (activeSuggestion + 1) % suggestions.length;
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
+      navigated = true;
       activeSuggestion = (activeSuggestion - 1 + suggestions.length) % suggestions.length;
-    } else if (event.key === 'Enter' || event.key === 'Tab') {
+    } else if (event.key === 'Tab') {
       event.preventDefault();
       accept(suggestions[activeSuggestion]);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (showingRecent || enterAccepts(search.query, navigated)) {
+        accept(suggestions[activeSuggestion]);
+        return;
+      }
+      suggestionsOpen = false;
+      remember();
     }
   }
 
@@ -287,6 +308,7 @@
     suggestionsOpen = true;
     showOperatorList = false;
     activeSuggestion = 0;
+    navigated = false;
     runSearch();
   }
 
@@ -302,6 +324,24 @@
   function runSearch(): void {
     search.schedule();
     syncUrl();
+    scheduleLookup();
+  }
+
+  function scheduleLookup(): void {
+    clearTimeout(lookupTimer);
+    lookupTimer = setTimeout(lookUpUnresolvedPeople, LOOKUP_DELAY_MS);
+  }
+
+  function lookUpUnresolvedPeople(): void {
+    const terms = search.unresolved
+      .filter((token) => PEOPLE_OPERATORS.includes(token.operator))
+      .map((token) => token.value);
+
+    for (const term of terms) {
+      void senders.lookup(term).then((found) => {
+        if (found && !destroyed) search.schedule();
+      });
+    }
   }
 
   function clearQuery(): void {

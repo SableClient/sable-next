@@ -116,7 +116,7 @@ export function suggestionsFor(
             matches(room.name ?? '', partial.value)
         )
         .map((room) => {
-          const target = room.alias ?? room.name ?? room.id;
+          const target = room.alias ?? room.id;
           return {
             id: `room:${room.id}`,
             label: room.name ?? target,
@@ -136,7 +136,7 @@ export function suggestionsFor(
             matches(space.name ?? '', partial.value)
         )
         .map((space) => {
-          const target = space.alias ?? space.name ?? space.id;
+          const target = space.alias ?? space.id;
           return {
             id: `space:${space.id}`,
             label: space.name ?? target,
@@ -190,6 +190,10 @@ function valueSuggestions(
     .filter((value) => typed === '' || value.startsWith(typed.toLocaleLowerCase()))
     .map((value) => ({ id: `${operator}:${value}`, label: value, insert: `${prefix}${value} ` }))
     .slice(0, MAX_SUGGESTIONS);
+}
+
+export function enterAccepts(query: string, navigated: boolean): boolean {
+  return navigated || partialAt(query).hasColon;
 }
 
 export function applySuggestion(query: string, suggestion: Suggestion): string {

@@ -81,7 +81,7 @@ export function parseSearchQuery(input: string): ParsedQuery {
     if (term === '') continue;
 
     if (term.startsWith('"')) {
-      const phrase = term.slice(1, -1);
+      const phrase = term.length > 1 && term.endsWith('"') ? term.slice(1, -1) : term.slice(1);
       if (phrase.trim() !== '') {
         if (negated) parsed.exclude.push(phrase);
         else parsed.phrases.push(phrase);
@@ -152,10 +152,20 @@ export interface QueryResolvers {
 export interface ResolvedQuery {
   filter: SearchFilter;
   unresolved: SearchToken[];
+  matchesNothing: boolean;
+}
+
+function laterOf(current: number | null, next: number): number {
+  return current === null ? next : Math.max(current, next);
+}
+
+function earlierOf(current: number | null, next: number): number {
+  return current === null ? next : Math.min(current, next);
 }
 
 export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): ResolvedQuery {
   const unresolved: SearchToken[] = [];
+  let matchesNothing = false;
   const filter: SearchFilter = {
     rooms: [],
     senders: [],
@@ -183,8 +193,10 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
       }
       case 'space': {
         const roomIds = resolve.spaceRooms(token.value);
-        if (roomIds) (token.negated ? filter.not_rooms : filter.rooms).push(...roomIds);
-        else unresolved.push(token);
+        if (roomIds === undefined) unresolved.push(token);
+        else if (token.negated) filter.not_rooms.push(...roomIds);
+        else if (roomIds.length === 0) matchesNothing = true;
+        else filter.rooms.push(...roomIds);
         break;
       }
       case 'from': {
@@ -210,13 +222,13 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
       case 'after': {
         const day = startOfDay(token.value);
         if (day === null) unresolved.push(token);
-        else filter.after_ts = day;
+        else filter.after_ts = laterOf(filter.after_ts, day);
         break;
       }
       case 'before': {
         const day = startOfDay(token.value);
         if (day === null) unresolved.push(token);
-        else filter.before_ts = day;
+        else filter.before_ts = earlierOf(filter.before_ts, day);
         break;
       }
       case 'during':
@@ -228,7 +240,8 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
         if (period === null) {
           unresolved.push(token);
         } else {
-          [filter.after_ts, filter.before_ts] = period;
+          filter.after_ts = laterOf(filter.after_ts, period[0]);
+          filter.before_ts = earlierOf(filter.before_ts, period[1]);
         }
         break;
       }
@@ -253,5 +266,5 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
     }
   }
 
-  return { filter, unresolved };
+  return { filter, unresolved, matchesNothing };
 }

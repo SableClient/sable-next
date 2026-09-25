@@ -3,6 +3,8 @@ import { expect, test, vi } from 'vitest';
 import type { CoreEvent, SessionInfo } from '#src/generated/protocol';
 import type { Transport } from '#src/transport';
 
+import { recentSearches, rememberSearch } from '#lib/features/search/recent-searches.svelte.js';
+
 import { createCoreClient } from './client.svelte.js';
 
 const session: SessionInfo = {
@@ -86,6 +88,55 @@ test('logging out selects another saved account instead of returning to sign-in'
   expect(core.accounts).toEqual([otherSession]);
   expect(core.status).toBe('ready');
   expect(fake.sent).toContainEqual({ type: 'switch_account', account_id: otherSession.account_id });
+});
+
+test("logging out forgets that account's recent searches and keeps the others'", async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: accounts,
+    logout: {},
+    switch_account: { session: otherSession },
+  });
+  const core = createCoreClient(() => fake.transport);
+  rememberSearch(session.user_id, 'salary review');
+  rememberSearch(otherSession.user_id, 'rollback plan');
+
+  await core.start();
+  accounts.accounts = [otherSession];
+  await core.logout();
+
+  expect(recentSearches(session.user_id)).toEqual([]);
+  expect(recentSearches(otherSession.user_id)).toEqual(['rollback plan']);
+});
+
+test('removing an account forgets its recent searches', async () => {
+  const accounts = { accounts: [session, otherSession] };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: accounts,
+    remove_account: {},
+  });
+  const core = createCoreClient(() => fake.transport);
+  rememberSearch(otherSession.user_id, 'rollback plan');
+
+  await core.start();
+  accounts.accounts = [session];
+  await core.removeAccount(otherSession.account_id);
+
+  expect(recentSearches(otherSession.user_id)).toEqual([]);
+});
+
+test("a restore that fails keeps every account's recent searches", async () => {
+  const fake = fakeTransport();
+  fake.transport.send = vi.fn(() => Promise.reject(new Error('worker gone')));
+  const core = createCoreClient(() => fake.transport);
+  rememberSearch(session.user_id, 'rollback plan');
+
+  await core.start();
+
+  expect(core.status).toBe('signed-out');
+  expect(recentSearches(session.user_id)).toContain('rollback plan');
 });
 
 test('a restore that returns no session reports signed out, not an error', async () => {

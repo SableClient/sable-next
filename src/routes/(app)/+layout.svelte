@@ -17,7 +17,6 @@
   import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
-  import { clearRecentSearches } from '#lib/features/search/recent-searches.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
@@ -204,7 +203,6 @@
     const login = resolve('login');
     if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
       untrack(clearDrafts);
-      untrack(clearRecentSearches);
       resetUrlPreviews();
       const account = core.accounts.find(
         (account) => account.account_id === core.reauthenticationAccountId
