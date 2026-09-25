@@ -1828,6 +1828,10 @@ impl Core {
                 Ok(CommandOk::IgnoredUsers { users })
             }
 
+            Command::InviteTriage => Ok(CommandOk::InviteTriage {
+                invites: crate::invites::triage(&self.client().await?).await,
+            }),
+
             Command::IgnoreUser { user_id } => {
                 self.client()
                     .await?

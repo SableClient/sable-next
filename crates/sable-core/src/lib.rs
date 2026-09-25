@@ -9,6 +9,7 @@ mod dispatch;
 mod errors;
 pub mod image_packs;
 mod inbox;
+mod invites;
 pub mod matrix_html;
 mod media;
 pub use media::GalleryAttachment;

@@ -2,6 +2,7 @@ import type {
   BookmarkView,
   InboxFilter,
   InboxItemView,
+  InviteTriageView,
   ImageSourcePackView,
   ImageSourcePackReferenceView,
   PackImageInfoView,
@@ -1583,6 +1584,11 @@ export function createCommands(transport: () => Transport) {
         type: 'ignored_users',
       });
       return response.users;
+    },
+
+    async inviteTriage(): Promise<InviteTriageView[]> {
+      const response = await transport().send({ type: 'invite_triage' });
+      return response.invites;
     },
 
     async ignoreUser(userId: string): Promise<void> {

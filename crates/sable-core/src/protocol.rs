@@ -778,6 +778,7 @@ pub enum Command {
     },
     AccountContacts,
     IgnoredUsers,
+    InviteTriage,
     /// `m.direct` is client-owned account data. Nothing else will correct it.
     SetDirect {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1141,6 +1142,9 @@ pub enum CommandOk {
     IgnoredUsers {
         #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
         users: Vec<OwnedUserId>,
+    },
+    InviteTriage {
+        invites: Vec<InviteTriageView>,
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
@@ -3313,6 +3317,18 @@ pub struct MutualRoomView {
     pub room_id: OwnedRoomId,
     pub name: Option<String>,
     pub is_space: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct InviteTriageView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub inviter: Option<OwnedUserId>,
+    pub reason: Option<String>,
+    pub shares_room: bool,
+    pub inviter_banned: bool,
 }
 
 /// MSC4426 `m.status`. The emoji is optional here even though the MSC requires
