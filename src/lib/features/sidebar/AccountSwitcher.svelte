@@ -20,6 +20,8 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import AccountMenuItems from './AccountMenuItems.svelte';
   import { AccountDirectory } from './account-directory.svelte.js';
+  import { SignOutGuard } from './sign-out-guard.svelte.js';
+  import SignOutWarningDialog from './SignOutWarningDialog.svelte';
   import '#lib/ui/primitives/nav-tab.css';
   import './sidebar-tools.css';
 
@@ -33,6 +35,7 @@
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
   const accountProfiles = new AccountDirectory(core);
+  const signOut = new SignOutGuard(core);
   let switching = $state(false);
   let logoutAccountId = $state<string | null>(null);
   let accountToLogout = $derived(
@@ -87,8 +90,10 @@
     switching = true;
     try {
       if (accountId !== core.session?.account_id) await core.switchAccount(accountId);
-      await logoutWithPush(core, pushOverride());
-      if (core.status === 'ready') await goto(resolve('/(app)/rooms'));
+      await signOut.request(async () => {
+        await logoutWithPush(core, pushOverride());
+        if (core.status === 'ready') await goto(resolve('/(app)/rooms'));
+      });
     } finally {
       switching = false;
     }
@@ -99,7 +104,7 @@
   }
 
   function logout(): void {
-    void logoutWithPush(core, pushOverride());
+    void signOut.request(() => logoutWithPush(core, pushOverride()));
   }
 </script>
 
@@ -210,6 +215,8 @@
     </div>
   {/if}
 </DialogFrame>
+
+<SignOutWarningDialog guard={signOut} />
 
 <style>
   .account-tool {

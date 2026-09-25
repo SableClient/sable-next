@@ -1152,6 +1152,18 @@
     "security": "Security",
     "close": "Close",
     "logout": "Log out",
+    "logoutWarning": {
+      "title": "You could lose your encrypted messages",
+      "unverified": "This session is not verified. Logging out deletes its message keys, so you may lose access to your encrypted messages.",
+      "no_recovery": "Recovery is not set up. This device may hold the only copy of your message keys, and logging out deletes them.",
+      "no_backup": "Key backup is off for this session. Some message keys exist only on this device, and logging out deletes them.",
+      "backup_pending": "Some message keys are still uploading to your key backup. Wait a moment before logging out.",
+      "unknown": "Sable could not check whether your message keys are backed up. This device may hold the only copy.",
+      "verify": "Verify this session",
+      "setUpRecovery": "Set up recovery",
+      "exportKeys": "Export keys",
+      "confirm": "Log out anyway"
+    },
     "comingSoon": "Coming soon",
     "notAvailable": "This settings section is not available yet.",
     "devicesTitle": "Devices & encryption",

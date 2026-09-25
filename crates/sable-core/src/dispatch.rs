@@ -69,7 +69,7 @@ use crate::messages::outgoing_mentions;
 use crate::presence;
 use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
-use crate::verification::encryption_status;
+use crate::verification::{encryption_status, sign_out_safety};
 use crate::{Core, SubscriptionKind};
 use crate::{notifications, session, spaces, view, webpush};
 
@@ -1495,6 +1495,10 @@ impl Core {
 
             Command::EncryptionStatus => Ok(CommandOk::EncryptionStatus {
                 status: encryption_status(&self.client().await?).await,
+            }),
+
+            Command::SignOutSafety => Ok(CommandOk::SignOutSafety {
+                safety: sign_out_safety(&self.client().await?).await,
             }),
 
             Command::SyncStatus => Ok(CommandOk::SyncStatus {

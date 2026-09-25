@@ -1,6 +1,8 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures_util::StreamExt;
+use matrix_sdk::EncryptionState;
 use matrix_sdk::encryption::verification::{
     SasState, SasVerification, VerificationRequest, VerificationRequestState,
 };
@@ -12,10 +14,12 @@ use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, RecoveryStateView,
-    VerificationStateView, VerificationView,
+    SignOutSafetyView, VerificationStateView, VerificationView,
 };
 
 use crate::Core;
+
+const BACKUP_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl Core {
     /// Self-verification travels to-device, verifying someone else as a DM
@@ -335,5 +339,27 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             .cross_signing_status()
             .await
             .is_some_and(|status| status.is_complete()),
+    }
+}
+
+pub(crate) async fn sign_out_safety(client: &matrix_sdk::Client) -> SignOutSafetyView {
+    let encryption = client.encryption();
+    let backups = encryption.backups();
+    let backup_uploaded = tokio::select! {
+        uploaded = async {
+            encryption.wait_for_e2ee_initialization_tasks().await;
+            backups.are_enabled().await && backups.wait_for_steady_state().await.is_ok()
+        } => uploaded,
+        () = matrix_sdk::sleep::sleep(BACKUP_SETTLE_TIMEOUT) => false,
+    };
+
+    SignOutSafetyView {
+        encryption: encryption_status(client).await,
+        backup_enabled: backups.are_enabled().await,
+        backup_uploaded,
+        has_encrypted_rooms: client
+            .joined_rooms()
+            .iter()
+            .any(|room| !matches!(room.encryption_state(), EncryptionState::NotEncrypted)),
     }
 }

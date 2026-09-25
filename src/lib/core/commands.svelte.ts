@@ -43,6 +43,7 @@ import type {
   SearchFilter,
   SearchHitView,
   SearchMetricsView,
+  SignOutSafetyView,
   SearchOrder,
   RoomPreviewView,
   RoomStateEventView,
@@ -1406,6 +1407,11 @@ export function createCommands(transport: () => Transport) {
         type: 'encryption_status',
       });
       return response.status;
+    },
+
+    async signOutSafety(): Promise<SignOutSafetyView> {
+      const response = await transport().send({ type: 'sign_out_safety' });
+      return response.safety;
     },
 
     async syncStatus(): Promise<SyncStatus> {

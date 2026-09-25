@@ -698,6 +698,7 @@ pub enum Command {
     },
 
     EncryptionStatus,
+    SignOutSafety,
     SyncStatus,
     SearchCoverage,
     SearchMetrics,
@@ -1314,6 +1315,9 @@ pub enum CommandOk {
 
     EncryptionStatus {
         status: EncryptionStatusView,
+    },
+    SignOutSafety {
+        safety: SignOutSafetyView,
     },
     SyncStatus {
         status: SyncStatus,
@@ -1939,6 +1943,15 @@ pub struct EncryptionStatusView {
     /// All three keys held locally, so this device can sign others. False means
     /// verification must come from another session.
     pub cross_signing_ready: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SignOutSafetyView {
+    pub encryption: EncryptionStatusView,
+    pub backup_enabled: bool,
+    pub backup_uploaded: bool,
+    pub has_encrypted_rooms: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

@@ -13,6 +13,8 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import { SignOutGuard } from './sign-out-guard.svelte.js';
+  import SignOutWarningDialog from './SignOutWarningDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import type { OptionCard } from '#lib/ui/primitives/option-card.js';
@@ -25,6 +27,7 @@
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
   const accountProfiles = new AccountDirectory(core);
+  const signOut = new SignOutGuard(core);
   let switching = $state(false);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
@@ -229,7 +232,8 @@
           <Button
             variant="danger"
             size="small"
-            onclick={() => void logoutWithPush(core, pushOverride())}
+            loading={signOut.checking}
+            onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
             >{$i18n.t('settings.logout')}</Button
           >
         {:else}
@@ -248,6 +252,8 @@
     >
   </section>
 </main>
+
+<SignOutWarningDialog guard={signOut} />
 
 <DialogFrame
   open={accountToRemove !== null}

@@ -10,6 +10,8 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
+  import SignOutWarningDialog from '#lib/features/sidebar/SignOutWarningDialog.svelte';
+  import { SignOutGuard } from '#lib/features/sidebar/sign-out-guard.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import {
     canonicalSection,
@@ -38,6 +40,7 @@
 
   let { section, onSelect, onBack, onClose, content }: Props = $props();
   const core = useCoreClient();
+  const signOut = new SignOutGuard(core);
   const groups = settingsNavGroups.map((group) => ({
     id: group.id,
     label: group.label,
@@ -161,7 +164,7 @@
       <Button
         class="settings-logout"
         variant="danger"
-        onclick={() => void logoutWithPush(core, pushOverride())}
+        onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
       >
         <SignOutIcon />
         <span class="logout-label">{$i18n.t('settings.logout')}</span>
@@ -193,6 +196,8 @@
     </div>
   {/if}
 </div>
+
+<SignOutWarningDialog guard={signOut} />
 
 <style>
   .settings-shell {

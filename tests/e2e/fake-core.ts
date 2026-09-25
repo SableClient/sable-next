@@ -1044,6 +1044,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           cross_signing_ready: true,
         },
       }),
+      sign_out_safety: () => ({
+        type: 'sign_out_safety',
+        safety: {
+          encryption: {
+            verification: 'verified',
+            recovery: 'enabled',
+            cross_signing_ready: true,
+          },
+          backup_enabled: true,
+          backup_uploaded: true,
+          has_encrypted_rooms: true,
+        },
+      }),
       search_coverage: () => ({
         type: 'search_coverage',
         coverage: { documents: 0, rooms_pending: 0, rooms_failed: 0, state: 'complete' },
