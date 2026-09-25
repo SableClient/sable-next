@@ -4,6 +4,7 @@
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import VideoCameraSlashIcon from 'phosphor-svelte/lib/VideoCameraSlashIcon';
+  import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
   import type { Snippet } from 'svelte';
 
   import type { MemberIdentity } from '#lib/features/room/members.js';
@@ -22,9 +23,10 @@
     media: CallMedia;
     onChange: (media: CallMedia) => void;
     self?: MemberIdentity | null;
+    onOpenSettings?: (event: MouseEvent) => void;
   }
 
-  let { media, onChange, self = null }: Props = $props();
+  let { media, onChange, self = null, onOpenSettings }: Props = $props();
 
   let micLabel = $derived(
     media.microphone ? $i18n.t('call.microphoneOn') : $i18n.t('call.microphoneOff')
@@ -137,84 +139,109 @@
         </p>
       </div>
     {/if}
-
-    <div class="toggles">
-      <div class="group">
-        {#snippet micButton(props: Record<string, unknown>)}
-          <IconButton
-            {...props}
-            variant={media.microphone ? 'secondary' : 'danger'}
-            label={micLabel}
-            onclick={() => onChange({ ...media, microphone: !media.microphone })}
-          >
-            {#if media.microphone}
-              <MicrophoneIcon />
-            {:else}
-              <MicrophoneSlashIcon weight="fill" />
-            {/if}
-          </IconButton>
-        {/snippet}
-        {@render tip(micLabel, micButton)}
-        <CallDeviceMenu
-          kinds={['audioinput']}
-          label={$i18n.t('call.microphoneDevices')}
-          onSelect={selectDevice}
-        />
-      </div>
-      <div class="group">
-        {#snippet cameraButton(props: Record<string, unknown>)}
-          <IconButton
-            {...props}
-            variant={media.camera ? 'primary' : 'secondary'}
-            label={cameraLabel}
-            onclick={() => onChange({ ...media, camera: !media.camera })}
-          >
-            {#if media.camera}
-              <VideoCameraIcon weight="fill" />
-            {:else}
-              <VideoCameraSlashIcon />
-            {/if}
-          </IconButton>
-        {/snippet}
-        {@render tip(cameraLabel, cameraButton)}
-        <CallDeviceMenu
-          kinds={['videoinput']}
-          label={$i18n.t('call.cameraDevices')}
-          onSelect={selectDevice}
-        />
-      </div>
-      <div class="group">
-        <CallDeviceMenu
-          kinds={['audiooutput']}
-          label={$i18n.t('call.outputDevices')}
-          speaker
-          onSelect={selectDevice}
-        />
-      </div>
-    </div>
+    {#if testing && meterReady}
+      <span class="level" aria-hidden="true">
+        <span class="fill" style:scale="{level} 1"></span>
+      </span>
+    {/if}
   </div>
 
-  <div class="meter">
-    {#if media.microphone}
-      {#if testing && meterReady}
-        <MicrophoneIcon aria-hidden="true" weight="fill" />
-        <span class="track" aria-hidden="true">
-          <span class="fill" style:scale="{level} 1"></span>
-        </span>
+  <div class="tray">
+    <div class="group" data-tone={media.microphone ? 'neutral' : 'danger'}>
+      {#snippet micButton(props: Record<string, unknown>)}
+        <IconButton
+          {...props}
+          variant="ghost"
+          label={micLabel}
+          onclick={() => onChange({ ...media, microphone: !media.microphone })}
+        >
+          {#if media.microphone}
+            <MicrophoneIcon />
+          {:else}
+            <MicrophoneSlashIcon weight="fill" />
+          {/if}
+        </IconButton>
+      {/snippet}
+      {@render tip(micLabel, micButton)}
+      <span class="divider" aria-hidden="true"></span>
+      <CallDeviceMenu
+        kinds={['audioinput']}
+        label={$i18n.t('call.microphoneDevices')}
+        onSelect={selectDevice}
+      />
+    </div>
+    <div class="group" data-tone={media.camera ? 'primary' : 'neutral'}>
+      {#snippet cameraButton(props: Record<string, unknown>)}
+        <IconButton
+          {...props}
+          variant="ghost"
+          label={cameraLabel}
+          onclick={() => onChange({ ...media, camera: !media.camera })}
+        >
+          {#if media.camera}
+            <VideoCameraIcon weight="fill" />
+          {:else}
+            <VideoCameraSlashIcon />
+          {/if}
+        </IconButton>
+      {/snippet}
+      {@render tip(cameraLabel, cameraButton)}
+      <span class="divider" aria-hidden="true"></span>
+      <CallDeviceMenu
+        kinds={['videoinput']}
+        label={$i18n.t('call.cameraDevices')}
+        onSelect={selectDevice}
+      />
+    </div>
+    <div class="group" data-tone="neutral">
+      <CallDeviceMenu
+        kinds={['audiooutput']}
+        label={$i18n.t('call.outputDevices')}
+        speaker
+        onSelect={selectDevice}
+      />
+    </div>
+
+    <div class="tray-end">
+      {#snippet testButton(props: Record<string, unknown>)}
+        <Button
+          {...props}
+          variant="secondary"
+          aria-disabled={media.microphone ? undefined : 'true'}
+          aria-pressed={testing}
+          onclick={() => {
+            if (media.microphone) testing = !testing;
+          }}
+        >
+          {testing && media.microphone ? $i18n.t('call.stopMicTest') : $i18n.t('call.testMic')}
+        </Button>
+      {/snippet}
+      {#if media.microphone}
+        {@render testButton({})}
+      {:else}
+        {@render tip($i18n.t('call.testMicNeedsMic'), testButton)}
       {/if}
-      <Button variant="ghost" onclick={() => (testing = !testing)}>
-        {testing ? $i18n.t('call.stopMicTest') : $i18n.t('call.testMic')}
-      </Button>
-    {:else}
-      <p class="hint">{$i18n.t('call.testMicNeedsMic')}</p>
-    {/if}
+      {#if onOpenSettings}
+        {#snippet settingsButton(props: Record<string, unknown>)}
+          <IconButton
+            {...props}
+            variant="secondary"
+            label={$i18n.t('call.settings')}
+            onclick={onOpenSettings}
+          >
+            <GearSixIcon />
+          </IconButton>
+        {/snippet}
+        {@render tip($i18n.t('call.settings'), settingsButton)}
+      {/if}
+    </div>
   </div>
 </div>
 
 <style>
   .prescreen {
     display: grid;
-    gap: var(--space-200);
+    gap: var(--space-300);
     padding: var(--space-300);
   }
 
@@ -242,7 +269,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-200);
-    padding-block-end: var(--space-800);
   }
 
   .camera-off :global(.avatar-root) {
@@ -256,50 +282,13 @@
     text-align: center;
   }
 
-  .toggles {
-    display: flex;
-    gap: var(--space-200);
-    inset: auto 0 var(--space-300);
-    justify-content: center;
-    position: absolute;
-  }
-
-  .group {
-    --radius-outer: var(--radii-500);
-    --radius-padding: var(--space-100);
-    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
-
-    align-items: center;
-    backdrop-filter: blur(0.75rem);
-    background: color-mix(in srgb, var(--bg-container) 86%, transparent);
-    border-radius: var(--radius-outer);
-    display: flex;
-    gap: var(--space-050);
-    padding: var(--radius-padding);
-  }
-
-  .meter {
-    align-items: center;
-    color: var(--success-main);
-    display: flex;
-    gap: var(--space-200);
-    justify-content: flex-end;
-    min-block-size: var(--control-height-300);
-    padding-inline: var(--space-100);
-  }
-
-  .meter :global(svg) {
-    flex: none;
-    height: var(--size-x200);
-    width: var(--size-x200);
-  }
-
-  .track {
-    background: var(--surface-var-container);
-    block-size: 0.375rem;
+  .level {
+    background: color-mix(in srgb, var(--bg-container) 70%, transparent);
+    block-size: var(--space-100);
     border-radius: var(--radii-pill);
-    flex: 1;
+    inset: auto var(--space-300) var(--space-300);
     overflow: hidden;
+    position: absolute;
   }
 
   .fill {
@@ -310,9 +299,72 @@
     transition: scale var(--duration-micro) linear;
   }
 
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
+  .tray {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+  }
+
+  .group {
+    --radius-outer: var(--radii-400);
+    --radius-padding: var(--space-050);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+    --tone: var(--sec-container);
+    --tone-line: var(--sec-container-line);
+    --ghost-hover: var(--sec-container-hover);
+    --ghost-active: var(--sec-container-active);
+
+    align-items: center;
+    background: var(--tone);
+    border: var(--border-width) solid var(--tone-line);
+    border-radius: var(--radius-outer);
+    color: var(--sec-on-container);
+    display: flex;
+    padding: var(--radius-padding);
+  }
+
+  .group[data-tone='danger'] {
+    --tone: var(--crit-container);
+    --tone-line: var(--crit-container-line);
+    --ghost-hover: var(--crit-container-hover);
+    --ghost-active: var(--crit-container-active);
+
+    color: var(--crit-on-container);
+  }
+
+  .group[data-tone='primary'] {
+    --tone: var(--primary-main);
+    --tone-line: var(--primary-main-line);
+    --ghost-hover: var(--primary-main-hover);
+    --ghost-active: var(--primary-main-active);
+
+    color: var(--primary-on-main);
+  }
+
+  .group :global(.btn) {
+    --button-height: var(--control-height-300);
+  }
+
+  .divider {
+    align-self: stretch;
+    background: var(--tone-line);
+    flex: none;
+    inline-size: var(--border-width);
+    margin: var(--space-100) var(--space-050);
+  }
+
+  .tray-end {
+    --button-height: calc(
+      var(--control-height-300) + var(--space-050) * 2 + var(--border-width) * 2
+    );
+
+    display: flex;
+    gap: var(--space-200);
+    margin-inline-start: auto;
+  }
+
+  .tray-end :global(.btn[aria-disabled='true']) {
+    pointer-events: auto;
   }
 </style>

@@ -110,3 +110,33 @@ test('offers a single join button with the device preview underneath', async () 
 
   await unmount(instance);
 });
+
+test('puts the mic test and call settings in the device row, grouped with their menus', async () => {
+  const onOpenSettings = vi.fn();
+  const instance = mount(VoiceLobbyHarness, {
+    target: document.body,
+    props: {
+      participants: [],
+      members: [],
+      media: { microphone: false, camera: false },
+      joining: false,
+      canJoin: true,
+      hasPermission: true,
+      onChange: vi.fn(),
+      onJoin: vi.fn(),
+      onOpenSettings,
+    },
+  });
+  await tick();
+
+  const row = document.querySelector('.tray');
+  expect(row?.textContent).toContain('Test mic');
+  expect(
+    row?.querySelector('.group[data-tone="danger"] button[aria-label="Unmute microphone"]')
+  ).not.toBeNull();
+  const settings = row?.querySelector<HTMLButtonElement>('button[aria-label="Call settings"]');
+  settings?.click();
+  expect(onOpenSettings).toHaveBeenCalledOnce();
+
+  await unmount(instance);
+});

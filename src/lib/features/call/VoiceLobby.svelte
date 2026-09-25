@@ -24,6 +24,7 @@
     selfId?: string | null;
     onChange: (media: CallMedia) => void;
     onJoin: () => void;
+    onOpenSettings?: (event: MouseEvent) => void;
   }
 
   let {
@@ -38,6 +39,7 @@
     selfId = null,
     onChange,
     onJoin,
+    onOpenSettings,
   }: Props = $props();
 
   const SHOWN = 6;
@@ -87,7 +89,7 @@
         {joining ? $i18n.t('call.joining') : $i18n.t('call.joinVoice')}
       </Button>
       <div class="devices">
-        <CallDevicePreview {media} {onChange} {self} />
+        <CallDevicePreview {media} {onChange} {self} {onOpenSettings} />
       </div>
     {:else if !hasPermission}
       <Alert variant="warning" title={$i18n.t('call.lobbyNoPermission')}>

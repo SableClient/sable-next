@@ -1043,6 +1043,7 @@
           selfId={core.session?.user_id ?? null}
           onChange={(media: CallMedia) => (prescreenMedia = media)}
           onJoin={joinCall}
+          onOpenSettings={(event: MouseEvent) => openSettingsOver(event, 'calls')}
         />
       {/if}
     {:else}
