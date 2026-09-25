@@ -3,6 +3,14 @@ import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
 
 import type { MediaItem } from './MediaViewer.svelte';
 
+export function galleryItemId(eventId: string, index: number): string {
+  return `${eventId}:gallery:${String(index)}`;
+}
+
+export function galleryEventId(id: string): string {
+  return id.replace(/:gallery:\d+$/, '');
+}
+
 export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaItem[] {
   return entries.flatMap((entry): MediaItem[] => {
     const eventId = entry.event_id;
@@ -17,7 +25,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
           html: null,
           source: item.source,
           mime: item.mime,
-          eventId: `${eventId}:gallery:${index}`,
+          eventId: galleryItemId(eventId, index),
           sender,
         };
         if (item.kind === 'image') {

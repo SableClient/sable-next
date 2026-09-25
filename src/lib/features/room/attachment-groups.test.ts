@@ -7,6 +7,7 @@ import { groupByMonth } from './attachment-groups';
 function at(eventId: string, timestamp: number): RoomAttachmentView {
   return {
     event_id: eventId,
+    gallery_index: null,
     sender: '@ana:example.org',
     timestamp,
     content: { kind: 'link', urls: ['https://example.org'], body: 'https://example.org' },

@@ -6,7 +6,7 @@ use tracing::{info, warn};
 
 use super::Document;
 
-const SCHEMA: u32 = 2;
+const SCHEMA: u32 = 3;
 
 fn key_for(room_id: &OwnedRoomId) -> Vec<u8> {
     format!("sable.search.documents.{room_id}").into_bytes()
@@ -125,7 +125,7 @@ pub(super) async fn forget(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -
     }
 }
 
-const CRAWL_SCHEMA: u32 = 2;
+const CRAWL_SCHEMA: u32 = 3;
 
 fn crawl_key() -> Vec<u8> {
     b"sable.search.crawl".to_vec()

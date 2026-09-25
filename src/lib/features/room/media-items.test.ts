@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
-import { timelineMediaItems } from './media-items.js';
+import { galleryEventId, galleryItemId, timelineMediaItems } from './media-items.js';
 
 function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }>['items']) {
   return {
@@ -73,4 +73,9 @@ test('lists a gallery pdf as a file the viewer can open, and skips other files',
       size: 4096,
     },
   ]);
+});
+
+test('a gallery item id leads back to its event', () => {
+  expect(galleryEventId(galleryItemId('$gallery', 3))).toBe('$gallery');
+  expect(galleryEventId('$plain:example.org')).toBe('$plain:example.org');
 });

@@ -5,7 +5,10 @@ use matrix_sdk::ruma::{
     OwnedRoomId, UInt,
     events::{
         AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
-        room::message::MessageType,
+        room::message::{
+            AudioMessageEventContent, FileMessageEventContent, GalleryItemType,
+            ImageMessageEventContent, MessageType, VideoMessageEventContent,
+        },
     },
 };
 
@@ -41,9 +44,9 @@ impl Core {
         let items = match kind {
             RoomAttachmentKind::Link => hits.into_iter().filter_map(link_view).collect(),
             RoomAttachmentKind::Media | RoomAttachmentKind::File => {
-                stream::iter(hits.into_iter().map(|hit| media_view(&room, hit)))
+                stream::iter(hits.into_iter().map(|hit| media_views(&room, hit, kind)))
                     .buffered(CONCURRENT_EVENT_READS)
-                    .filter_map(|view| async move { view })
+                    .flat_map(stream::iter)
                     .collect()
                     .await
             }
@@ -79,6 +82,7 @@ fn link_view(hit: Hit) -> Option<RoomAttachmentView> {
 
     Some(RoomAttachmentView {
         event_id: hit.event_id,
+        gallery_index: None,
         sender: hit.sender,
         timestamp: hit.origin_server_ts,
         content: RoomAttachmentContentView::Link {
@@ -88,13 +92,15 @@ fn link_view(hit: Hit) -> Option<RoomAttachmentView> {
     })
 }
 
-async fn media_view(room: &Room, hit: Hit) -> Option<RoomAttachmentView> {
-    let event = room.load_or_fetch_event(&hit.event_id, None).await.ok()?;
-    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
+async fn media_views(room: &Room, hit: Hit, kind: RoomAttachmentKind) -> Vec<RoomAttachmentView> {
+    let Some(event) = room.load_or_fetch_event(&hit.event_id, None).await.ok() else {
+        return Vec::new();
+    };
+    let Some(AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
         SyncMessageLikeEvent::Original(message),
-    )) = event.raw().deserialize().ok()?
+    ))) = event.raw().deserialize().ok()
     else {
-        return None;
+        return Vec::new();
     };
     let raw_content = event
         .raw()
@@ -102,48 +108,107 @@ async fn media_view(room: &Room, hit: Hit) -> Option<RoomAttachmentView> {
         .ok()
         .flatten();
     let spoiler = spoiler_reason(raw_content.as_ref());
-    let dimension = |value: Option<UInt>| value.map(u64::from);
 
-    let content = match message.content.msgtype {
-        MessageType::Image(image) => RoomAttachmentContentView::Image {
-            filename: image.filename().to_owned(),
-            source: media_source(&image.source),
-            mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(image.info.as_ref().and_then(|info| info.width)),
-            height: dimension(image.info.as_ref().and_then(|info| info.height)),
-            blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
-            thumbnail: image.info.as_deref().and_then(image_thumbnail),
-            spoiler,
-        },
-        MessageType::Video(video) => RoomAttachmentContentView::Video {
-            filename: video.filename().to_owned(),
-            source: media_source(&video.source),
-            mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
-            width: dimension(video.info.as_ref().and_then(|info| info.width)),
-            height: dimension(video.info.as_ref().and_then(|info| info.height)),
-            blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
-            thumbnail: video.info.as_deref().and_then(video_thumbnail),
-            spoiler,
-        },
-        MessageType::File(file) => RoomAttachmentContentView::File {
-            filename: file.filename().to_owned(),
-            source: media_source(&file.source),
-            mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
-            size: dimension(file.info.as_ref().and_then(|info| info.size)),
-        },
-        MessageType::Audio(audio) => RoomAttachmentContentView::File {
-            filename: audio.filename().to_owned(),
-            source: media_source(&audio.source),
-            mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
-            size: dimension(audio.info.as_ref().and_then(|info| info.size)),
-        },
-        _ => return None,
+    let contents: Vec<(Option<u32>, RoomAttachmentContentView)> = match &message.content.msgtype {
+        MessageType::Image(image) => vec![(None, image_view(image, spoiler))],
+        MessageType::Video(video) => vec![(None, video_view(video, spoiler))],
+        MessageType::File(file) => vec![(None, file_view(file))],
+        MessageType::Audio(audio) => vec![(None, audio_view(audio))],
+        MessageType::Gallery(gallery) => gallery
+            .itemtypes
+            .iter()
+            .enumerate()
+            .filter_map(|(position, item)| {
+                let spoiler = spoiler_reason(
+                    raw_content
+                        .as_ref()
+                        .and_then(|content| content.get("itemtypes"))
+                        .and_then(|items| items.get(position)),
+                );
+                match item {
+                    GalleryItemType::Image(image) => Some(image_view(image, spoiler)),
+                    GalleryItemType::Video(video) => Some(video_view(video, spoiler)),
+                    GalleryItemType::File(file) => Some(file_view(file)),
+                    GalleryItemType::Audio(audio) => Some(audio_view(audio)),
+                    _ => None,
+                }
+            })
+            .enumerate()
+            .map(|(index, content)| (u32::try_from(index).ok(), content))
+            .collect(),
+        _ => Vec::new(),
     };
 
-    Some(RoomAttachmentView {
-        event_id: hit.event_id,
-        sender: hit.sender,
-        timestamp: hit.origin_server_ts,
-        content,
-    })
+    contents
+        .into_iter()
+        .filter(|(_, content)| match kind {
+            RoomAttachmentKind::Media => matches!(
+                content,
+                RoomAttachmentContentView::Image { .. } | RoomAttachmentContentView::Video { .. }
+            ),
+            RoomAttachmentKind::File => matches!(content, RoomAttachmentContentView::File { .. }),
+            RoomAttachmentKind::Link => false,
+        })
+        .map(|(gallery_index, content)| RoomAttachmentView {
+            event_id: hit.event_id.clone(),
+            gallery_index,
+            sender: hit.sender.clone(),
+            timestamp: hit.origin_server_ts,
+            content,
+        })
+        .collect()
+}
+
+fn dimension(value: Option<UInt>) -> Option<u64> {
+    value.map(u64::from)
+}
+
+fn image_view(
+    image: &ImageMessageEventContent,
+    spoiler: Option<String>,
+) -> RoomAttachmentContentView {
+    RoomAttachmentContentView::Image {
+        filename: image.filename().to_owned(),
+        source: media_source(&image.source),
+        mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
+        width: dimension(image.info.as_ref().and_then(|info| info.width)),
+        height: dimension(image.info.as_ref().and_then(|info| info.height)),
+        blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
+        thumbnail: image.info.as_deref().and_then(image_thumbnail),
+        spoiler,
+    }
+}
+
+fn video_view(
+    video: &VideoMessageEventContent,
+    spoiler: Option<String>,
+) -> RoomAttachmentContentView {
+    RoomAttachmentContentView::Video {
+        filename: video.filename().to_owned(),
+        source: media_source(&video.source),
+        mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
+        width: dimension(video.info.as_ref().and_then(|info| info.width)),
+        height: dimension(video.info.as_ref().and_then(|info| info.height)),
+        blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
+        thumbnail: video.info.as_deref().and_then(video_thumbnail),
+        spoiler,
+    }
+}
+
+fn file_view(file: &FileMessageEventContent) -> RoomAttachmentContentView {
+    RoomAttachmentContentView::File {
+        filename: file.filename().to_owned(),
+        source: media_source(&file.source),
+        mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+        size: dimension(file.info.as_ref().and_then(|info| info.size)),
+    }
+}
+
+fn audio_view(audio: &AudioMessageEventContent) -> RoomAttachmentContentView {
+    RoomAttachmentContentView::File {
+        filename: audio.filename().to_owned(),
+        source: media_source(&audio.source),
+        mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+        size: dimension(audio.info.as_ref().and_then(|info| info.size)),
+    }
 }

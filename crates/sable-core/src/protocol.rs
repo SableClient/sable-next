@@ -2278,6 +2278,7 @@ pub enum RoomAttachmentKind {
 pub struct RoomAttachmentView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub event_id: OwnedEventId,
+    pub gallery_index: Option<u32>,
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub sender: OwnedUserId,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]

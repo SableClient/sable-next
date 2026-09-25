@@ -27,7 +27,7 @@ function attachment(
   content: RoomAttachmentContentView,
   timestamp = MARCH
 ): RoomAttachmentView {
-  return { event_id: eventId, sender: '@ana:example.org', timestamp, content };
+  return { event_id: eventId, gallery_index: null, sender: '@ana:example.org', timestamp, content };
 }
 
 function file(eventId: string, filename: string, timestamp = MARCH): RoomAttachmentView {
@@ -263,6 +263,33 @@ test('an item the next page repeats is shown once', async () => {
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.media-tile')).toHaveLength(3);
   });
+  await unmount(instance);
+});
+
+test('each gallery item gets its own tile and opens by its own id', async () => {
+  roomAttachments.mockResolvedValueOnce({
+    items: [
+      { ...image('$gallery'), gallery_index: 0 },
+      { ...image('$gallery'), gallery_index: 2 },
+    ],
+    exhausted: true,
+  });
+  const onOpenMedia = vi.fn();
+  const instance = render({ onOpenMedia });
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.media-tile')).toHaveLength(2);
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.media-tile')[1]?.click();
+  flushSync();
+
+  expect(onOpenMedia).toHaveBeenCalledWith(
+    [
+      expect.objectContaining({ eventId: '$gallery:gallery:0' }),
+      expect.objectContaining({ eventId: '$gallery:gallery:2' }),
+    ],
+    '$gallery:gallery:2'
+  );
   await unmount(instance);
 });
 

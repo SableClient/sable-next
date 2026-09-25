@@ -35,6 +35,7 @@
   import { groupByMonth } from './attachment-groups';
   import { parseMatrixLink, type MatrixLink } from './matrix-link';
   import type { MediaItem } from './MediaViewer.svelte';
+  import { galleryItemId } from './media-items.js';
   import { memberName } from './members';
   import { formatDate } from './timeline-format';
 
@@ -85,9 +86,11 @@
   let groups = $derived(groupByMonth(items));
   let viewerItems = $derived(items.flatMap((item) => mediaItem(item)));
   let focusableTile = $derived(
-    activeTile !== null && items.some((item) => item.event_id === activeTile)
+    activeTile !== null && items.some((item) => attachmentKey(item) === activeTile)
       ? activeTile
-      : (items[0]?.event_id ?? null)
+      : items[0]
+        ? attachmentKey(items[0])
+        : null
   );
   let showEmpty = $derived(items.length === 0 && !loading && !failed && exhausted);
 
@@ -123,8 +126,14 @@
   }
 
   function unseen(page: readonly RoomAttachmentView[]): RoomAttachmentView[] {
-    const loaded = new Set(items.map((item) => item.event_id));
-    return page.filter((item) => !loaded.has(item.event_id));
+    const loaded = new Set(items.map(attachmentKey));
+    return page.filter((item) => !loaded.has(attachmentKey(item)));
+  }
+
+  function attachmentKey(item: RoomAttachmentView): string {
+    return item.gallery_index === null
+      ? item.event_id
+      : galleryItemId(item.event_id, item.gallery_index);
   }
 
   function loadMore(): void {
@@ -187,7 +196,12 @@
 
   function mediaItem(item: RoomAttachmentView): MediaItem[] {
     const content = item.content;
-    const shared = { eventId: item.event_id, sender: senderOf(item), caption: null, html: null };
+    const shared = {
+      eventId: attachmentKey(item),
+      sender: senderOf(item),
+      caption: null,
+      html: null,
+    };
     switch (content.kind) {
       case 'image':
         return [
@@ -251,7 +265,7 @@
   }
 
   function open(item: RoomAttachmentView): void {
-    onOpenMedia(viewerItems, item.event_id);
+    onOpenMedia(viewerItems, attachmentKey(item));
   }
 
   function afterClosing(action: () => void): void {
@@ -375,9 +389,9 @@
       type="button"
       class="media-tile"
       aria-label={itemLabel(item, mediaName(content))}
-      tabindex={focusableTile === item.event_id ? 0 : -1}
+      tabindex={focusableTile === attachmentKey(item) ? 0 : -1}
       onfocus={() => {
-        activeTile = item.event_id;
+        activeTile = attachmentKey(item);
       }}
       onkeydown={tileKeydown}
       onclick={() => {
@@ -547,13 +561,13 @@
             <h3 class="group-heading" id={`attachments-month-${group.key}`}>{group.label}</h3>
             {#if kind === 'media'}
               <ul class="media-grid">
-                {#each group.items as item (item.event_id)}
+                {#each group.items as item (attachmentKey(item))}
                   <li>{@render mediaTile(item)}</li>
                 {/each}
               </ul>
             {:else}
               <ul class="attachment-list">
-                {#each group.items as item (item.event_id)}
+                {#each group.items as item (attachmentKey(item))}
                   <li>{@render row(item)}</li>
                 {/each}
               </ul>

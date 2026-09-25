@@ -15,6 +15,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import LinkEmbed from './embeds/LinkEmbed.svelte';
   import TimelineGallery from './TimelineGallery.svelte';
+  import { galleryItemId } from './media-items.js';
   import TimelineLocation from './TimelineLocation.svelte';
   import TimelineLiveLocation from './TimelineLiveLocation.svelte';
   import TimelinePoll from './TimelinePoll.svelte';
@@ -120,7 +121,7 @@
     {senderTimezone}
     {onMatrixLink}
     onOpen={item.event_id
-      ? (index) => onOpenMedia?.(`${item.event_id}:gallery:${index}`)
+      ? (index) => onOpenMedia?.(galleryItemId(item.event_id ?? '', index))
       : undefined}
   />
 {:else if item.content.kind === 'location'}

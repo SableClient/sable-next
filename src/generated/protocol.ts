@@ -705,6 +705,7 @@ export type RoomAttachmentKind = "media" | "file" | "link";
 
 export type RoomAttachmentView = {
 	event_id: string,
+	gallery_index: number | null,
 	sender: string,
 	timestamp: number,
 	content: RoomAttachmentContentView,

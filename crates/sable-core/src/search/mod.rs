@@ -20,8 +20,8 @@ use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::ignored_user_list::IgnoredUserListEventContent;
 use matrix_sdk::ruma::events::relation::{RelationType, Replacement};
 use matrix_sdk::ruma::events::room::message::{
-    MessageType, OriginalSyncRoomMessageEvent, Relation, RoomMessageEventContentWithoutRelation,
-    sanitize::remove_plain_reply_fallback,
+    GalleryItemType, MessageType, OriginalSyncRoomMessageEvent, Relation,
+    RoomMessageEventContentWithoutRelation, sanitize::remove_plain_reply_fallback,
 };
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncTimelineEvent, Mentions, SyncMessageLikeEvent,
@@ -62,7 +62,7 @@ struct Document {
     folded: String,
     sender: OwnedUserId,
     origin_server_ts: u64,
-    attachment: Option<SearchAttachment>,
+    attachments: Vec<SearchAttachment>,
     has_link: bool,
     mentions: Vec<OwnedUserId>,
     in_thread: bool,
@@ -74,7 +74,7 @@ impl Document {
     fn same_metadata(&self, other: &Self) -> bool {
         self.sender == other.sender
             && self.origin_server_ts == other.origin_server_ts
-            && self.attachment == other.attachment
+            && self.attachments == other.attachments
             && self.has_link == other.has_link
             && self.mentions == other.mentions
             && self.in_thread == other.in_thread
@@ -84,7 +84,7 @@ impl Document {
     fn carries(&self, attachment: SearchAttachment) -> bool {
         match attachment {
             SearchAttachment::Link => self.has_link,
-            other => self.attachment == Some(other),
+            other => self.attachments.contains(&other),
         }
     }
 
@@ -816,7 +816,7 @@ fn document_of(message: &OriginalSyncRoomMessageEvent) -> Document {
         body,
         sender: message.sender.clone(),
         origin_server_ts: message.origin_server_ts.get().into(),
-        attachment: attachment_of(&message.content.msgtype),
+        attachments: attachments_of(&message.content.msgtype),
         mentions: mentioned_users(message.content.mentions.as_ref()),
         in_thread: matches!(message.content.relates_to, Some(Relation::Thread(_))),
         edited_at: None,
@@ -830,7 +830,7 @@ fn provisional_edit(edit: &OriginalSyncRoomMessageEvent, target: OwnedEventId) -
         folded: String::new(),
         sender: edit.sender.clone(),
         origin_server_ts: edit.origin_server_ts.get().into(),
-        attachment: None,
+        attachments: Vec::new(),
         has_link: false,
         mentions: Vec::new(),
         in_thread: false,
@@ -851,7 +851,7 @@ fn with_edit(
     let content = &replacement.new_content;
     document.body = indexable_body(content.msgtype.body());
     document.has_link = contains_link(&document.body);
-    document.attachment = attachment_of(&content.msgtype);
+    document.attachments = attachments_of(&content.msgtype);
     document.mentions = mentioned_users(content.mentions.as_ref());
     document.edited_at = Some(edited_at);
     document
@@ -867,20 +867,36 @@ fn adopt_edit(mut document: Document, existing: Option<&Document>) -> Document {
 
     document.body.clone_from(&existing.body);
     document.has_link = existing.has_link;
-    document.attachment = existing.attachment;
+    document.attachments.clone_from(&existing.attachments);
     document.mentions.clone_from(&existing.mentions);
     document.edited_at = existing.edited_at;
     document
 }
 
-const fn attachment_of(msgtype: &MessageType) -> Option<SearchAttachment> {
-    Some(match msgtype {
-        MessageType::Image(_) => SearchAttachment::Image,
-        MessageType::Video(_) => SearchAttachment::Video,
-        MessageType::Audio(_) => SearchAttachment::Audio,
-        MessageType::File(_) => SearchAttachment::File,
-        _ => return None,
-    })
+fn attachments_of(msgtype: &MessageType) -> Vec<SearchAttachment> {
+    match msgtype {
+        MessageType::Image(_) => vec![SearchAttachment::Image],
+        MessageType::Video(_) => vec![SearchAttachment::Video],
+        MessageType::Audio(_) => vec![SearchAttachment::Audio],
+        MessageType::File(_) => vec![SearchAttachment::File],
+        MessageType::Gallery(gallery) => {
+            let mut attachments = Vec::new();
+            for item in &gallery.itemtypes {
+                let attachment = match item {
+                    GalleryItemType::Image(_) => SearchAttachment::Image,
+                    GalleryItemType::Video(_) => SearchAttachment::Video,
+                    GalleryItemType::Audio(_) => SearchAttachment::Audio,
+                    GalleryItemType::File(_) => SearchAttachment::File,
+                    _ => continue,
+                };
+                if !attachments.contains(&attachment) {
+                    attachments.push(attachment);
+                }
+            }
+            attachments
+        }
+        _ => Vec::new(),
+    }
 }
 
 fn contains_link(body: &str) -> bool {
@@ -1325,7 +1341,7 @@ mod tests {
             folded: String::new(),
             sender: matrix_sdk::ruma::UserId::parse(sender).expect("user id"),
             origin_server_ts: ts,
-            attachment,
+            attachments: attachment.into_iter().collect(),
             mentions,
             in_thread: false,
             edited_at: None,
@@ -3169,6 +3185,89 @@ mod tests {
     }
 
     #[async_test]
+    async fn test_room_attachments_list_each_gallery_item_under_its_tab() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room_id!("!gallery-attachments:localhost").to_owned();
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    serde_json::from_value::<
+                        matrix_sdk::ruma::serde::Raw<
+                            matrix_sdk::ruma::events::AnySyncTimelineEvent,
+                        >,
+                    >(serde_json::json!({
+                        "type": "m.room.message",
+                        "event_id": "$gallery",
+                        "sender": "@erwan:localhost",
+                        "origin_server_ts": 1,
+                        "content": {
+                            "msgtype": "dm.filament.gallery",
+                            "body": "",
+                            "itemtypes": [
+                                {
+                                    "itemtype": "m.image",
+                                    "body": "beach.png",
+                                    "url": "mxc://localhost/beach",
+                                    "page.codeberg.everypizza.msc4193.spoiler": true
+                                },
+                                {
+                                    "itemtype": "m.file",
+                                    "body": "notes.pdf",
+                                    "url": "mxc://localhost/notes",
+                                    "info": { "mimetype": "application/pdf", "size": 4096 }
+                                },
+                                {
+                                    "itemtype": "m.video",
+                                    "body": "wave.mp4",
+                                    "url": "mxc://localhost/wave"
+                                }
+                            ]
+                        }
+                    }))
+                    .expect("gallery event"),
+                ),
+            )
+            .await;
+
+        let core = logged_in(&server, &client, "gallery-attachments").await;
+        let (cache, _drop_handles) = client
+            .event_cache()
+            .room(&room_id)
+            .await
+            .expect("room event cache");
+        reingest_whole_room(&mut *core.search_index.lock().await, &cache, &room_id).await;
+
+        let (media, _) = core
+            .room_attachments(&room_id, crate::protocol::RoomAttachmentKind::Media, 10, 0)
+            .await
+            .expect("media");
+        let media = serde_json::to_value(&media).expect("media json");
+        assert_eq!(media.as_array().map(Vec::len), Some(2));
+        assert_eq!(media[0]["event_id"], "$gallery");
+        assert_eq!(media[0]["gallery_index"], 0);
+        assert_eq!(media[0]["content"]["spoiler"], "");
+        assert_eq!(media[1]["gallery_index"], 2);
+        assert_eq!(media[1]["content"]["kind"], "video");
+
+        let (files, _) = core
+            .room_attachments(&room_id, crate::protocol::RoomAttachmentKind::File, 10, 0)
+            .await
+            .expect("files");
+        let files = serde_json::to_value(&files).expect("files json");
+        assert_eq!(files.as_array().map(Vec::len), Some(1));
+        assert_eq!(files[0]["gallery_index"], 1);
+        assert_eq!(files[0]["content"]["filename"], "notes.pdf");
+        assert_eq!(files[0]["content"]["size"], 4096);
+
+        drop(room);
+    }
+
+    #[async_test]
     async fn test_a_homeserver_that_cannot_search_falls_back_to_the_local_index() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
@@ -3801,7 +3900,7 @@ mod stress {
             body,
             sender: matrix_sdk::ruma::user_id!("@erwan:localhost").to_owned(),
             origin_server_ts: 0,
-            attachment: None,
+            attachments: Vec::new(),
             has_link: false,
             mentions: Vec::new(),
             in_thread: false,

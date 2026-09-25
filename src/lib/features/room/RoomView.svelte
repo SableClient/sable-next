@@ -80,7 +80,7 @@
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
   import TimelineList from './TimelineList.svelte';
   import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
-  import { timelineMediaItems } from './media-items.js';
+  import { galleryEventId, timelineMediaItems } from './media-items.js';
   import { parsePowerLevelTags, type PowerLevelTagMap } from './settings/power-level-tags.js';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
@@ -676,7 +676,7 @@
     closeMedia();
     if (!desktop) attachmentsOpen = false;
     void afterOverlayPops().then(() => {
-      jumpToEvent(eventId);
+      jumpToEvent(galleryEventId(eventId));
     });
   }
 
