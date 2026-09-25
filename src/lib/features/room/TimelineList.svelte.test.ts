@@ -7,6 +7,7 @@ import type { TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
+import { TimelineWindow } from '#lib/timeline/timeline-window.js';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
 vi.mock('#lib/core/context.js');
@@ -672,6 +673,141 @@ test('keeps a timeline with an unread marker hidden until it has landed on it', 
   await runAnimationFrames();
 
   expect(timelineViewport().classList.contains('initial')).toBe(false);
+  await unmount(instance);
+});
+
+test('a notification lands on its event in the live timeline, not on the unread marker', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('first'), item('notified'), item('latest')];
+  const future = vi.fn(() => Promise.resolve());
+  const landed = vi.fn();
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$notified',
+        onLanded: landed,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: future,
+        onRead: () => Promise.resolve(),
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(jumps).toHaveBeenCalledWith(expect.stringContaining('notified'), 'center');
+  expect(jumps).not.toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
+  expect(document.querySelector('.message.highlighted')?.textContent).toContain('notified');
+  expect(roomTimeline.mode.kind).toBe('live');
+  expect(future).not.toHaveBeenCalled();
+  expect(landed).toHaveBeenCalledTimes(1);
+  await unmount(instance);
+});
+
+test('a notification lands on its event once it arrives after the room opened', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const landed = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$late',
+        onLanded: landed,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+  expect(jumps).toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
+  expect(landed).not.toHaveBeenCalled();
+
+  roomTimeline.items = [...roomTimeline.items, item('late')];
+  await tick();
+  await runAnimationFrames();
+
+  expect(jumps).toHaveBeenCalledWith(
+    expect.stringContaining('late'),
+    'center',
+    expect.any(Boolean)
+  );
+  expect(landed).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('.message.highlighted')?.textContent).toContain('late');
+  await unmount(instance);
+});
+
+test('a notification whose event arrives after the reader scrolled leaves them alone', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const landed = vi.fn();
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$late',
+        onLanded: landed,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+      },
+    },
+  });
+
+  const element = viewport();
+  await tick();
+  await runAnimationFrames();
+  element.dispatchEvent(new WheelEvent('wheel', { deltaY: -50 }));
+  expect(landed).toHaveBeenCalledTimes(1);
+
+  roomTimeline.items = [...roomTimeline.items, item('late')];
+  await tick();
+  await runAnimationFrames();
+
+  expect(jumps).not.toHaveBeenCalledWith(
+    expect.stringContaining('late'),
+    'center',
+    expect.any(Boolean)
+  );
+  expect(document.querySelector('.message.highlighted')).toBeNull();
+  await unmount(instance);
+});
+
+test('a notification whose event is not loaded falls back to the unread marker', async () => {
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  const roomTimeline = timeline();
+  roomTimeline.items = [readMarker('marker'), item('latest')];
+  const instance = mount(TimelineListHarness, {
+    target: document.body,
+    props: {
+      list: {
+        timeline: roomTimeline,
+        landingEventId: '$elsewhere',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(jumps).toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
   await unmount(instance);
 });
 

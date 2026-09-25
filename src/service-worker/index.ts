@@ -135,7 +135,12 @@ async function present(payload: PushPayload | undefined): Promise<void> {
     icon: favicon,
     badge: favicon,
     timestamp: Date.now(),
-    data: { roomId: showing.roomId, userId: payload.notification?.user_id, lines },
+    data: {
+      roomId: showing.roomId,
+      userId: payload.notification?.user_id,
+      eventId: showing.eventId,
+      lines,
+    },
   };
 
   await worker.registration.showNotification(showing.title, options);
@@ -154,11 +159,17 @@ async function conversation(tag: string): Promise<ReturnType<typeof readLines>> 
 
 worker.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const data = event.notification.data as { roomId?: string; userId?: string } | undefined;
-  event.waitUntil(open(data?.roomId, data?.userId));
+  const data = event.notification.data as
+    | { roomId?: string; userId?: string; eventId?: string | null }
+    | undefined;
+  event.waitUntil(open(data?.roomId, data?.userId, data?.eventId ?? undefined));
 });
 
-async function open(roomId: string | undefined, userId: string | undefined): Promise<void> {
+async function open(
+  roomId: string | undefined,
+  userId: string | undefined,
+  eventId: string | undefined
+): Promise<void> {
   const clients = await worker.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
@@ -166,18 +177,19 @@ async function open(roomId: string | undefined, userId: string | undefined): Pro
 
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-room', roomId, userId });
+    client.postMessage({ type: 'sable:open-room', roomId, userId, eventId });
     await client.focus();
     return;
   }
 
-  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId));
+  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId, eventId));
 }
 
-function permalink(roomId: string): string {
-  return resolve('/(app)/to/[...permalink]', {
+function permalink(roomId: string, eventId: string | undefined): string {
+  const path = resolve('/(app)/to/[...permalink]', {
     permalink: encodeURIComponent(roomId),
   });
+  return eventId === undefined ? path : `${path}?${new URLSearchParams({ notified: eventId })}`;
 }
 
 /** Only the app can re-register a replaced subscription, so it is told to. */

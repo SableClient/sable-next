@@ -22,7 +22,7 @@ export const [useNotificationCenter, provideNotificationCenter] =
 
 const AVATAR_SIZE = 96;
 const POSTED_RETIRE_DELAY_MS = 1000;
-type OpenRoom = (roomId: string) => void;
+type OpenRoom = (roomId: string, eventId: string | null) => void;
 
 export class NotificationCenter {
   private stopEvents: (() => void) | null = null;
@@ -245,7 +245,7 @@ export class NotificationCenter {
     notification.addEventListener('click', () => {
       globalThis.focus();
       notification.close();
-      open(view.room_id);
+      open(view.room_id, view.event_id);
     });
     notification.addEventListener('close', () => {
       if (this.presented.get(view.room_id) === notification) this.presented.delete(view.room_id);

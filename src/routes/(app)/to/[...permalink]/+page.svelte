@@ -42,7 +42,8 @@
         return;
       }
 
-      await goto(target.path, { replaceState: true });
+      const notified = page.url.searchParams.get('notified');
+      await goto(target.path, { replace: true, state: notified === null ? {} : { notified } });
     };
 
     void open();

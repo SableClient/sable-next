@@ -33,10 +33,10 @@ async function selectNotificationAccount(core: AccountSwitcher, userId: string):
 export async function openNativeNotification(
   core: AccountSwitcher,
   target: NativeNotificationTarget,
-  open: (roomId: string) => void | Promise<void>
+  open: (roomId: string, eventId: string | null) => void | Promise<void>
 ): Promise<void> {
   if (!(await selectNotificationAccount(core, target.userId))) return;
-  await open(target.roomId);
+  await open(target.roomId, target.eventId);
 }
 
 export async function performNotificationAction(

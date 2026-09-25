@@ -15,6 +15,8 @@ declare global {
       inbox?: true;
       /** Phone room-list drawer state, kept in history for native back gestures. */
       mobileDrawer?: 'open' | 'closed';
+      /** Event a notification tap lands the live timeline on, once. */
+      notified?: string;
     }
   }
 

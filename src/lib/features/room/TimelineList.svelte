@@ -56,7 +56,9 @@
   interface Props {
     timeline: RoomTimeline;
     focusEventId?: string | null;
+    landingEventId?: string | null;
     replyEventId?: string | null;
+    onLanded?: () => void;
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
@@ -101,7 +103,9 @@
   let {
     timeline,
     focusEventId = null,
+    landingEventId = null,
     replyEventId = null,
+    onLanded,
     onRequestHistory,
     onRequestFuture,
     onRead,
@@ -341,7 +345,10 @@
       },
       onChange: windowChanged,
       onScroll: readerScrolled,
-      onInteraction: () => focusNavigation?.abort(),
+      onInteraction: () => {
+        focusNavigation?.abort();
+        abandonLanding();
+      },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
     });
@@ -449,8 +456,12 @@
       if (entry) await positionFocus(engine, target, entry.key, false);
       return;
     }
+    const landingEntry = () =>
+      landingEventId === null
+        ? undefined
+        : entries.find(({ value }) => value.item.event_id === landingEventId);
     const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
-    if (!unread) revealed = true;
+    if (!unread && !landingEntry()) revealed = true;
     filling = true;
     try {
       while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
@@ -470,7 +481,12 @@
           if (historyExhausted) break;
         }
       }
-      if (unread && !disposed && engine.state.pinned) await engine.jumpTo(unread.key, 'start');
+      const notified = landingEntry();
+      const landing = notified ?? unread;
+      if (landing && !disposed && engine.state.pinned) {
+        if (notified) markLanded(notified.value.item.event_id);
+        await engine.jumpTo(landing.key, landing === unread ? 'start' : 'center');
+      }
     } catch {
       historyExhausted = false;
     } finally {
@@ -543,6 +559,35 @@
     if (!entry) return;
     handledFocus = target;
     void positionFocus(engine, target, entry.key, !shouldReduceMotion());
+  });
+  let handledLanding: string | null = null;
+  let landedEventId = $state<string | null>(null);
+  function markLanded(eventId: string | null): void {
+    handledLanding = landingEventId;
+    landedEventId = eventId;
+    onLanded?.();
+  }
+  function abandonLanding(): void {
+    if (!revealed || landingEventId === null || landingEventId === handledLanding) return;
+    handledLanding = landingEventId;
+    onLanded?.();
+  }
+  $effect(() => {
+    const target = landingEventId;
+    const engine = controller;
+    if (target === null) {
+      handledLanding = null;
+      return;
+    }
+    if (!engine || !revealed || target === handledLanding) return;
+    if (focusEventId !== null || timeline.mode.kind !== 'live') {
+      untrack(abandonLanding);
+      return;
+    }
+    const entry = entries.find(({ value }) => value.item.event_id === target);
+    if (!entry) return;
+    untrack(() => markLanded(target));
+    void engine.jumpTo(entry.key, 'center', !shouldReduceMotion());
   });
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
@@ -674,7 +719,8 @@
                     threadPersona={item.thread_summary
                       ? personas(item.thread_summary.latest_event_id)
                       : null}
-                    highlighted={focusEventId !== null && item.event_id === focusEventId}
+                    highlighted={item.event_id !== null &&
+                      item.event_id === (focusEventId ?? landedEventId)}
                     selected={replyEventId !== null && item.event_id === replyEventId}
                     {onMatrixLink}
                     {onCopyLink}

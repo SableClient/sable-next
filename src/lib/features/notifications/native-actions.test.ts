@@ -97,6 +97,6 @@ test('opening an inactive account notification switches before navigating', asyn
   await openNativeNotification(client, target({ userId: '@other:example.org' }), open);
 
   expect(switchAccount).toHaveBeenCalledWith('account-other');
-  expect(open).toHaveBeenCalledWith('!room:example.org');
+  expect(open).toHaveBeenCalledWith('!room:example.org', '$event:example.org');
   expect(switchAccount).toHaveBeenCalledBefore(open);
 });

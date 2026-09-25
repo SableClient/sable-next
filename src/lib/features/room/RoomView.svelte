@@ -30,6 +30,7 @@
     RoomAbbreviations,
   } from './room-abbreviations.svelte.js';
   import { provideRoomMemberNames } from './room-member-names.js';
+  import { notifiedRelation } from './notified-relation.js';
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import { useBookmarks } from './bookmarks.svelte.js';
   import ConversationComposer from './ConversationComposer.svelte';
@@ -90,10 +91,11 @@
   interface Props {
     roomId: string;
     eventId?: string | null;
+    notifiedEventId?: string | null;
     room?: RoomSummary;
   }
 
-  let { roomId, eventId = null, room }: Props = $props();
+  let { roomId, eventId = null, notifiedEventId = null, room }: Props = $props();
   const core = useCoreClient();
   const personas = usePersonaStore();
   const roomList = useRoomList();
@@ -235,6 +237,33 @@
   function closeThread(): void {
     threadRootId = null;
   }
+
+  let notifiedTarget = $state<{ eventId: string; target: string } | null>(null);
+  let landingEventId = $derived(
+    notifiedTarget !== null && notifiedTarget.eventId === notifiedEventId
+      ? notifiedTarget.target
+      : notifiedEventId
+  );
+  $effect(() => {
+    const eventId = notifiedEventId;
+    const target = resolvedRoomId;
+    if (eventId === null) return;
+    let active = true;
+    core.commands
+      .eventSource(target, eventId)
+      .then((source) => {
+        const relation = notifiedRelation(source);
+        if (!active || relation === null) return;
+        notifiedTarget = { eventId, target: relation.eventId };
+        if (relation.thread) openThread(relation.eventId);
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] notified event unavailable', error);
+      });
+    return () => {
+      active = false;
+    };
+  });
   onMount(() => {
     void bookmarks.load();
     const storedWidth = Number.parseInt(localStorage.getItem(VOICE_CHAT_WIDTH_KEY) ?? '', 10);
@@ -611,6 +640,11 @@
     return `${url.pathname}${url.search}`;
   }
 
+  function landed(): void {
+    if (notifiedEventId === null) return;
+    void goto('', { shallow: true, replace: true, state: { ...page.state, notified: undefined } });
+  }
+
   function jumpToLive(): void {
     void goto(roomUrl(null), { replace: true });
   }
@@ -775,6 +809,8 @@
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
       focusEventId={eventId}
+      {landingEventId}
+      onLanded={landed}
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}

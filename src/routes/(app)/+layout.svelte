@@ -451,17 +451,25 @@
     });
   });
 
-  let pushedRoom = $state<{ roomId: string; userId: string | null } | null>(null);
+  let pushedRoom = $state<{
+    roomId: string;
+    userId: string | null;
+    eventId: string | null;
+  } | null>(null);
 
   $effect(() => {
     if (!hostsServiceWorker()) return;
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string; userId?: string }
+        | { type?: string; roomId?: string; userId?: string; eventId?: string }
         | undefined;
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
-        pushedRoom = { roomId: message.roomId, userId: message.userId ?? null };
+        pushedRoom = {
+          roomId: message.roomId,
+          userId: message.userId ?? null,
+          eventId: message.eventId ?? null,
+        };
       }
     });
   });
@@ -469,12 +477,12 @@
   $effect(() => {
     if (core.status !== 'ready' || pushedRoom === null) return;
 
-    const { roomId, userId } = pushedRoom;
+    const { roomId, userId, eventId } = pushedRoom;
     pushedRoom = null;
     const opened =
       userId === null
-        ? openNotification(roomId)
-        : openNativeNotification(core, { userId, roomId, eventId: null }, openNotification);
+        ? openNotification(roomId, eventId)
+        : openNativeNotification(core, { userId, roomId, eventId }, openNotification);
     void opened.catch((error: unknown) => {
       console.debug('[sable notifications] notification not opened', error);
     });
@@ -554,10 +562,12 @@
     };
   });
 
-  async function openNotification(roomId: string): Promise<void> {
+  async function openNotification(roomId: string, eventId: string | null): Promise<void> {
     await tick();
     await roomList.start();
-    await goto(roomSectionPath(roomList.rooms, roomId));
+    await goto(roomSectionPath(roomList.rooms, roomId), {
+      state: eventId === null ? {} : { notified: eventId },
+    });
   }
 
   $effect(() => {

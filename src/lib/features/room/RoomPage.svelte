@@ -13,6 +13,7 @@
 
   let roomId = $derived(page.params.roomId ?? '');
   let eventId = $derived(page.url.searchParams.get('event'));
+  let notifiedEventId = $derived(page.state.notified ?? null);
   let joined = $derived(findRoomByPathId(roomList.rooms, roomId) !== undefined);
 
   /* An empty room list means "not loaded yet" as much as "not a member", and
@@ -45,7 +46,7 @@
 </script>
 
 {#if joined || !listed || unlistedRoom}
-  <RoomView {roomId} {eventId} room={unlistedRoom} />
+  <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
 {:else}
   <JoinBeforeNavigate {roomId} {eventId} via={page.url.searchParams.getAll('via')} />
 {/if}

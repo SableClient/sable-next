@@ -921,7 +921,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       account_data_types: () => ({ type: 'account_data_types', event_types: [] }),
       access_token: () => ({ type: 'access_token', token: 'e2e-access-token' }),
       account_data: () => ({ type: 'account_data', content: null }),
-      event_source: () => ({ type: 'event_source', source: '{}' }),
+      event_source: (command) => ({
+        type: 'event_source',
+        source:
+          command.event_id === '$edit:example.test'
+            ? JSON.stringify({
+                type: 'm.room.message',
+                content: {
+                  'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                },
+              })
+            : '{}',
+      }),
       personas: () => ({
         type: 'personas',
         catalog: { personas: [], account: null, rooms: {}, disabled_rooms: [] },
