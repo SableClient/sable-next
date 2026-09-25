@@ -2178,6 +2178,9 @@ pub struct DeviceView {
     pub device_id: OwnedDeviceId,
     pub display_name: Option<String>,
     pub is_verified: bool,
+    /// Signed by the account's own identity, whether or not this device trusts
+    /// that identity yet. What a new device can be confirmed from.
+    pub cross_signed: bool,
     /// The session this core is running in.
     pub is_own: bool,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]

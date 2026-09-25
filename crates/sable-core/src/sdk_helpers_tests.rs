@@ -49,6 +49,7 @@ async fn devices_without_uploaded_crypto_keys_remain_visible() {
         .find(|device| device.device_id == "NO_KEYS")
         .expect("server device is visible without crypto keys");
     assert!(!device.is_verified);
+    assert!(!device.cross_signed);
     assert_eq!(device.display_name.as_deref(), Some("New phone"));
     assert_eq!(device.last_seen_ts, Some(123));
 }

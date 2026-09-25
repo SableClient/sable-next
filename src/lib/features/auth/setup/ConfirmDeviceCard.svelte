@@ -38,7 +38,7 @@
   const passphrase = $derived(status?.recovery_passphrase ?? false);
   const canUseRecovery = $derived(status !== null && status.recovery !== 'disabled');
   const canUseAnotherDevice = $derived(
-    core.deviceList.some((device) => !device.is_own && device.is_verified)
+    core.deviceList.some((device) => !device.is_own && device.cross_signed)
   );
   const resetOnly = $derived(!canUseRecovery && !canUseAnotherDevice);
 

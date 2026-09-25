@@ -299,6 +299,11 @@ export type DeviceView = {
 	device_id: string,
 	display_name: string | null,
 	is_verified: boolean,
+	/**
+	 *  Signed by the account's own identity, whether or not this device trusts
+	 *  that identity yet. What a new device can be confirmed from.
+	 */
+	cross_signed: boolean,
 	/**  The session this core is running in. */
 	is_own: boolean,
 	last_seen_ts: number | null,

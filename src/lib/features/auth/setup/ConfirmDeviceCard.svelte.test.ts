@@ -47,10 +47,11 @@ const status = (
   recovery_passphrase: false,
 });
 
-const device = (device_id: string, is_own: boolean, is_verified: boolean): DeviceView => ({
+const device = (device_id: string, is_own: boolean, cross_signed: boolean): DeviceView => ({
   device_id,
   display_name: null,
-  is_verified,
+  is_verified: false,
+  cross_signed,
   is_own,
   last_seen_ts: null,
   last_seen_ip: null,
@@ -83,7 +84,7 @@ test('waits for the status instead of offering anything', async () => {
   await unmount(instance);
 });
 
-test('offers another device only when a confirmed one exists', async () => {
+test('offers another device only when one is cross-signed by the account', async () => {
   live.encryption = status('unverified');
   live.deviceList = [device('THIS', true, false), device('OLD', false, false)];
   const { instance } = render();
