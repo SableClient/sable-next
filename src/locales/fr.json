@@ -2339,6 +2339,7 @@
     "microphoneDevices": "Choisir le micro",
     "outputDevices": "Choisir la sortie audio",
     "cameraDevices": "Choisir la caméra",
+    "switchCamera": "Changer de caméra",
     "settings": "Paramètres d’appel",
     "stageShare": "L’appel occupe {{percent}} % de la hauteur",
     "live": "Direct",

@@ -2429,6 +2429,7 @@
     "microphoneDevices": "Choose microphone",
     "outputDevices": "Choose speaker",
     "cameraDevices": "Choose camera",
+    "switchCamera": "Switch camera",
     "settings": "Call settings",
     "stageShare": "Call takes {{percent}}% of the height",
     "live": "Live",

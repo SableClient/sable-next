@@ -123,6 +123,10 @@ export class CallSession {
     return this.#media?.capabilities.screenShare !== undefined;
   }
 
+  get canSwitchCamera(): boolean {
+    return this.#media?.capabilities.camera !== undefined;
+  }
+
   readonly voiceStates = $derived.by(() => {
     /* eslint-disable svelte/prefer-svelte-reactivity -- rebuilt whole on every change, never mutated after */
     const userIds = new Map(this.members.map((member) => [member.identity, member.user_id]));
@@ -401,6 +405,10 @@ export class CallSession {
         this.rooms.map(({ room }) => room.switchActiveDevice(kind, deviceId || 'default'))
       );
     });
+  }
+
+  async switchCamera(): Promise<void> {
+    await this.#device('camera', () => this.#media?.capabilities.camera?.switch());
   }
 
   async setCameraEnabled(enabled: boolean): Promise<void> {

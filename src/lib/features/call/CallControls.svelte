@@ -4,6 +4,7 @@
   import MicrophoneSlashIcon from 'phosphor-svelte/lib/MicrophoneSlashIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import VideoCameraSlashIcon from 'phosphor-svelte/lib/VideoCameraSlashIcon';
+  import CameraRotateIcon from 'phosphor-svelte/lib/CameraRotateIcon';
   import MonitorArrowUpIcon from 'phosphor-svelte/lib/MonitorArrowUpIcon';
   import HeadphonesIcon from 'phosphor-svelte/lib/HeadphonesIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
@@ -36,6 +37,7 @@
     onToggleDeafen: () => void;
     onHangUp: () => void;
     onSwitchDevice?: (kind: MediaDeviceKind, deviceId: string) => void;
+    onSwitchCamera?: () => void;
     onOpenSettings?: (event: MouseEvent) => void;
   }
 
@@ -53,6 +55,7 @@
     onToggleDeafen,
     onHangUp,
     onSwitchDevice,
+    onSwitchCamera,
     onOpenSettings,
   }: Props = $props();
 
@@ -199,6 +202,23 @@
     cameraMenuSnippet,
     devices ? () => (cameraMenu = true) : undefined
   )}
+
+  {#if onSwitchCamera && !compact}
+    {#snippet switchCameraButton(props: Record<string, unknown>)}
+      <IconButton
+        {...props}
+        variant="ghost"
+        class="toggle"
+        {size}
+        label={$i18n.t('call.switchCamera')}
+        disabled={!ready || !cameraEnabled}
+        onclick={onSwitchCamera}
+      >
+        <CameraRotateIcon />
+      </IconButton>
+    {/snippet}
+    {@render control($i18n.t('call.switchCamera'), switchCameraButton)}
+  {/if}
 
   {#if canScreenShare}
     {#snippet screenButton(props: Record<string, unknown>)}

@@ -283,7 +283,10 @@
           void session.setScreenShareEnabled(!session.transport.screenShareEnabled)}
         onToggleDeafen={() => session.setDeafened(!session.deafened)}
         onHangUp={() => void session.leave()}
-        onSwitchDevice={(kind, deviceId) => void session.switchDevice(kind, deviceId)}
+        onSwitchDevice={session.canSwitchCamera
+          ? undefined
+          : (kind, deviceId) => void session.switchDevice(kind, deviceId)}
+        onSwitchCamera={session.canSwitchCamera ? () => void session.switchCamera() : undefined}
         onOpenSettings={onOpenSettings ? openCallSettings : undefined}
       />
       {#if busy}

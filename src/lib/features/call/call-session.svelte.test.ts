@@ -746,3 +746,20 @@ test('a camera that cannot start is reported, not swallowed', async () => {
   session.clearDeviceError();
   expect(session.deviceError).toBeNull();
 });
+
+test('a transport with a camera switch flips the camera through it', async () => {
+  const { client, transport } = harness();
+  const flip = vi.fn(() => Promise.resolve());
+  const session = new CallSession(client, { createTransport: () => transport });
+  expect(session.canSwitchCamera).toBe(false);
+  transport.capabilities.camera = { switch: flip };
+  await session.join('!room:example.org', { microphone: true, camera: true });
+
+  expect(session.canSwitchCamera).toBe(true);
+  await session.switchCamera();
+  expect(flip).toHaveBeenCalledOnce();
+
+  flip.mockRejectedValueOnce(new Error('media_failed'));
+  await session.switchCamera();
+  expect(session.deviceError).toBe('camera');
+});
