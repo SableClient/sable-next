@@ -98,9 +98,9 @@ test('a room override set here shows before the push rules echo back', async () 
 test('a stale notification-mode refresh cannot overwrite a room override', async () => {
   const room = { room_id: '!room:example.org' } as RoomSummary;
   const eventListeners: ((event: unknown) => void)[] = [];
-  let resolveRefresh:
-    | ((value: { room_id: string; room: 'mentions'; default: 'all' }[]) => void)
-    | null = null;
+  let resolveRefresh: (
+    value: { room_id: string; room: 'mentions'; default: 'all' }[]
+  ) => void = () => {};
   let loads = 0;
   const roomNotificationModes = vi.fn((roomIds: readonly string[]) => {
     loads += 1;
@@ -137,7 +137,7 @@ test('a stale notification-mode refresh cannot overwrite a room override', async
   });
 
   roomList.setNotificationOverride(room.room_id, 'all');
-  resolveRefresh?.([{ room_id: room.room_id, room: 'mentions', default: 'all' }]);
+  resolveRefresh([{ room_id: room.room_id, room: 'mentions', default: 'all' }]);
   await new Promise((resolve) => setTimeout(resolve, 0));
   expect(roomList.notificationOverride(room.room_id)).toBe('all');
   roomList.stop();
