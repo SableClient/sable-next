@@ -136,7 +136,7 @@ const deleteInlineAtomBackward: Command = (state, dispatch) => {
   return true;
 };
 
-const ANDROID_DELETE_WINDOW_MS = 500;
+const ANDROID_DELETE_WINDOW_MS = 200;
 
 function selectsAtomBeforeCursor(state: EditorState, tr: Transaction): boolean {
   if (tr.docChanged || tr.getMeta('pointer') === true) return false;
@@ -836,6 +836,7 @@ export class ComposerEditor {
     const last = this.androidDelete;
     if (!last || Date.now() - last.at > ANDROID_DELETE_WINDOW_MS) return false;
     if (!selectsAtomBeforeCursor(view.state, tr)) return false;
+    this.androidDelete = null;
     const { from, to } = tr.selection;
     if (to === last.pos) view.dispatch(view.state.tr.delete(from, to).scrollIntoView());
     view.focus();

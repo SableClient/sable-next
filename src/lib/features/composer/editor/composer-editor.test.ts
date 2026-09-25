@@ -327,6 +327,28 @@ describe('Android backspace fallback', () => {
     expect(editorView.state.selection.head).toBe(from - 1);
   });
 
+  test('only swallows the first selection of a mention after a backspace', () => {
+    setUserAgent(androidUserAgent);
+    const editor = open();
+    editor.setText('hi ');
+    editor.insert(composerSchema.nodes.mention.create({ userId: '@me:example.org', name: 'Me' }));
+    const editorView = view(editor);
+    const { from } = editorView.state.selection;
+
+    beforeInput(surface(), 'deleteContentBackward', false);
+    editorView.dispatch(editorView.state.tr.delete(from - 1, from));
+    const selectMention = () => {
+      editorView.dispatch(
+        editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, from - 2))
+      );
+    };
+    selectMention();
+    selectMention();
+
+    expect(hasMention(editor)).toBe(true);
+    expect(editorView.state.selection).toBeInstanceOf(NodeSelection);
+  });
+
   test('still selects a tapped mention', () => {
     setUserAgent(androidUserAgent);
     const editor = open();
