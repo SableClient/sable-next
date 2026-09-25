@@ -46,7 +46,7 @@ fn profile_text(value: Option<&serde_json::Value>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-fn profile_hex_color(value: Option<&serde_json::Value>) -> Option<String> {
+pub(crate) fn profile_hex_color(value: Option<&serde_json::Value>) -> Option<String> {
     profile_text(value).filter(|color| {
         let digits = color.strip_prefix('#').unwrap_or_default();
         matches!(digits.len(), 3 | 6) && digits.bytes().all(|digit| digit.is_ascii_hexdigit())

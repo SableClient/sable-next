@@ -5,6 +5,7 @@ mod attachments;
 mod auth;
 mod bookmarks;
 mod calls;
+mod cosmetics;
 mod dispatch;
 mod errors;
 pub mod image_packs;
@@ -84,6 +85,7 @@ pub struct Core {
     probed_pinned_rooms: std::sync::Mutex<
         HashMap<matrix_sdk::ruma::OwnedRoomId, Vec<matrix_sdk::ruma::OwnedEventId>>,
     >,
+    cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
@@ -208,6 +210,7 @@ impl Core {
             account_clients: Mutex::new(HashMap::new()),
             session_handlers: std::sync::Mutex::new(Vec::new()),
             probed_pinned_rooms: std::sync::Mutex::new(HashMap::new()),
+            cosmetics: std::sync::Mutex::new(cosmetics::CosmeticsCache::default()),
             notification_routes: Mutex::new(HashMap::new()),
             session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),

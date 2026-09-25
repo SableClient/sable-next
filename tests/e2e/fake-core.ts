@@ -925,6 +925,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       account_data_types: () => ({ type: 'account_data_types', event_types: [] }),
       access_token: () => ({ type: 'access_token', token: 'e2e-access-token' }),
       push_event: () => ({ type: 'push_event', fetched: { kind: 'unavailable' } }),
+      room_cosmetics: () => ({ type: 'room_cosmetics', space_id: null, users: [] }),
       account_data: () => ({ type: 'account_data', content: null }),
       event_source: (command) => ({
         type: 'event_source',

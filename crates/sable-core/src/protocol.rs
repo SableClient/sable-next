@@ -347,6 +347,13 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    RoomCosmetics {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        space_id: Option<OwnedRoomId>,
+    },
     RoomOpen {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1216,6 +1223,7 @@ pub enum CommandOk {
     RoomHasSpaceParent {
         has_space_parent: bool,
     },
+    RoomCosmetics(RoomCosmeticsView),
     RoomOpen(RoomOpenView),
     RoomSummary {
         room: RoomSummary,
@@ -1655,6 +1663,11 @@ pub enum CoreEvent {
 
     SpaceSidebarChanged {
         items: Vec<SidebarItemView>,
+    },
+
+    RoomCosmeticsChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
     },
 
     /// An incoming request arrives unsolicited. There is no other prompt.
@@ -2431,6 +2444,25 @@ pub struct RoomOpenView {
     #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
     pub pinned_event_ids: Vec<OwnedEventId>,
     pub predecessor: Option<PredecessorRoomView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RoomCosmeticsView {
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub space_id: Option<OwnedRoomId>,
+    pub users: Vec<SenderCosmeticsView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SenderCosmeticsView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub user_id: OwnedUserId,
+    pub color_on_light: Option<String>,
+    pub color_on_dark: Option<String>,
+    pub font: Option<String>,
+    pub pronouns: Vec<PronounView>,
 }
 
 #[derive(Debug, Clone, Serialize)]

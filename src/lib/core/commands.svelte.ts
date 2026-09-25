@@ -38,6 +38,7 @@ import type {
   OpenIdTokenView,
   ScheduledMessageView,
   UserDirectoryEntryView,
+  RoomCosmeticsView,
   RoomOpenView,
   RoomPermissionsView,
   CallSupportView,
@@ -346,6 +347,15 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
       });
       return response.has_space_parent;
+    },
+
+    async roomCosmetics(roomId: string, spaceId: string | null): Promise<RoomCosmeticsView> {
+      const response = await transport().send({
+        type: 'room_cosmetics',
+        room_id: roomId,
+        space_id: spaceId,
+      });
+      return response;
     },
 
     async roomOpen(roomId: string): Promise<RoomOpenView> {

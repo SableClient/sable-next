@@ -8,6 +8,7 @@ use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
+use crate::cosmetics;
 use crate::image_packs;
 use crate::search;
 use crate::session;
@@ -553,6 +554,11 @@ impl Core {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
+        *self
+            .cosmetics
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            cosmetics::CosmeticsCache::default();
         *self.search_index.lock().await = search::MessageIndex::new();
         self.search_crawl.lock().await.reset();
         self.server_search.lock().await.reset();
@@ -616,6 +622,7 @@ impl Core {
         self.watch_notifications(&client, generation).await;
         self.watch_notification_settings(&client, generation);
         self.watch_space_sidebar(&client, generation);
+        self.watch_cosmetics(&client, generation);
         self.watch_joined_invites(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
