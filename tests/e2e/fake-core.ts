@@ -129,6 +129,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supports_knock_restricted: false,
       space_children: [],
       unread: 2,
+      notifying: 2,
       highlight: 1,
       marked_unread: false,
       latest_event: {
@@ -144,6 +145,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       room_id: '!second:example.test',
       name: 'Random',
       unread: 3,
+      notifying: 3,
       highlight: 0,
     };
     const invitedRoom: RoomSummary = {
@@ -153,6 +155,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       topic: 'Where the redesign happens.',
       state: 'invited',
       unread: 0,
+      notifying: 0,
       highlight: 0,
       latest_event: {
         sender: '@ada:example.test',
@@ -171,6 +174,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_space: true,
       encrypted: false,
       unread: 0,
+      notifying: 0,
       highlight: 0,
       latest_event: null,
     };
@@ -185,6 +189,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       room_id: '!successor:example.test',
       name: 'Successor',
       unread: 0,
+      notifying: 0,
       highlight: 0,
     };
     const tombstonedRoom: RoomSummary = {
@@ -193,6 +198,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       name: 'Old Room',
       is_tombstoned: true,
       unread: 0,
+      notifying: 0,
       highlight: 0,
     };
     const voiceRoom: RoomSummary = {
@@ -202,6 +208,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_voice: true,
       room_type: 'org.matrix.msc3417.call',
       unread: 0,
+      notifying: 0,
       highlight: 0,
     };
     const joinedRooms: RoomSummary[] =

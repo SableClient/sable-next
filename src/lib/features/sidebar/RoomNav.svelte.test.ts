@@ -108,6 +108,7 @@ function makeRoom(overrides: Partial<RoomSummary>): RoomSummary {
     supports_knock_restricted: true,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     marked_unread: false,
     latest_event: null,
@@ -957,7 +958,7 @@ test('a muted room marked unread by hand keeps its dot and no count', async () =
 
 test('a room set to all messages badges its unread messages in green', async () => {
   roomsFixture.rooms = [
-    makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6 }),
+    makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6, notifying: 6 }),
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),
   ];
   roomsFixture.notificationMode = (roomId: string) =>

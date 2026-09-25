@@ -33,11 +33,10 @@ export function roomNotifications(
   room: RoomSummary,
   mode: NotificationModeView | null = null
 ): UnreadCount {
-  const { unread, highlight, marked } = counts(room);
+  const { highlight, marked } = counts(room);
 
   if (mode === 'mute') return { unread: 0, highlight: 0, marked };
-  if (mode === 'mentions') return { unread: highlight, highlight, marked };
-  return { unread: Math.max(unread, highlight), highlight, marked };
+  return { unread: Math.max(room.notifying || 0, highlight), highlight, marked };
 }
 
 export function hasUnread(count: UnreadCount): boolean {

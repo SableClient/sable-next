@@ -27,6 +27,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     supports_knock_restricted: true,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     marked_unread: false,
     latest_event: null,
@@ -86,8 +87,8 @@ test('sums the mentions of a space across its nested rooms, counting each room o
       },
     ],
   });
-  const deep = room({ room_id: '!deep:example.org', unread: 4, highlight: 1 });
-  const shared = room({ room_id: '!shared:example.org', unread: 2, highlight: 2 });
+  const deep = room({ room_id: '!deep:example.org', unread: 4, notifying: 4, highlight: 1 });
+  const shared = room({ room_id: '!shared:example.org', unread: 2, notifying: 2, highlight: 2 });
 
   expect(spaceUnreadCounts([root, sub], [root, sub, deep, shared])).toEqual(
     new Map([
@@ -209,7 +210,7 @@ test('a space totals how much of its unread notified', () => {
       },
     ],
   });
-  const loud = room({ room_id: '!loud:example.org', unread: 4 });
+  const loud = room({ room_id: '!loud:example.org', unread: 4, notifying: 4 });
   const quiet = room({ room_id: '!quiet:example.org', unread: 5 });
   const mode = (roomId: string) => (roomId === '!loud:example.org' ? 'all' : 'mentions');
 

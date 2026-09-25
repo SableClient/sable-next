@@ -97,6 +97,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
     supports_knock_restricted: true,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     marked_unread: false,
     latest_event: null,
@@ -135,6 +136,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     const incoming = {
       ...room,
       unread: 1,
+      notifying: 1,
       latest_event: {
         sender: '@alice:example.org',
         body: 'Hello',
@@ -320,7 +322,12 @@ test('a muted room marked unread by hand still marks its section as unread', asy
 });
 
 test('a section totals its notifying rooms in green', async () => {
-  const room: RoomSummary = { ...space('!loud:example.org', 'Loud'), is_space: false, unread: 4 };
+  const room: RoomSummary = {
+    ...space('!loud:example.org', 'Loud'),
+    is_space: false,
+    unread: 4,
+    notifying: 4,
+  };
   const core = {
     subscribeEvents: () => () => {},
     commands: {

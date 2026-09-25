@@ -89,13 +89,11 @@ pub fn room_summary<S: BuildHasher>(
 ) -> RoomSummary {
     let info = room_cache.get(item.room_id());
     let latest_event = latest_event(item);
-    let (unread, highlight) = unread_counts(
-        item,
-        latest_event
-            .as_ref()
-            .and_then(|event| event.event_id.as_deref()),
-        every_encrypted,
-    );
+    let latest_event_id = latest_event
+        .as_ref()
+        .and_then(|event| event.event_id.as_deref());
+    let (unread, highlight) = unread_counts(item, latest_event_id, every_encrypted);
+    let notifying = notifying_count(item, latest_event_id, every_encrypted);
     RoomSummary {
         room_id: item.room_id().to_owned(),
         canonical_alias: info.and_then(|info| info.canonical_alias.clone()),
@@ -138,6 +136,7 @@ pub fn room_summary<S: BuildHasher>(
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
         space_children: info.map(|i| i.children.clone()).unwrap_or_default(),
         unread,
+        notifying,
         highlight,
         marked_unread: item.is_marked_unread(),
         latest_event,
@@ -178,6 +177,28 @@ pub(crate) fn unread_counts(
         (unread, local.1)
     } else {
         (local.0.max(server.0), server.1)
+    }
+}
+
+pub(crate) fn notifying_count(
+    item: &RoomListItem,
+    latest_event_id: Option<&EventId>,
+    every_encrypted: bool,
+) -> u32 {
+    let count = |value: u64| u32::try_from(value).unwrap_or(u32::MAX);
+    let server = count(item.unread_notification_counts().notification_count);
+
+    let Some(receipt) = item.read_receipts().latest_active else {
+        return server;
+    };
+
+    let local = count(item.num_unread_notifications());
+    if latest_event_id == Some(&*receipt.event_id)
+        || (every_encrypted && item.encryption_state().is_encrypted())
+    {
+        local
+    } else {
+        local.max(server)
     }
 }
 

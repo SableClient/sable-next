@@ -864,6 +864,7 @@ export type RoomSummary = {
 	/**  Already sorted by `order`, then the child event's age. */
 	space_children: SpaceChildEdge[],
 	unread: number,
+	notifying: number,
 	highlight: number,
 	marked_unread: boolean,
 	latest_event: LatestEventView | null,

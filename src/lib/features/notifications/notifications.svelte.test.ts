@@ -51,6 +51,7 @@ function room(unread: number): RoomSummary {
     room_id: '!room:example.org',
     state: 'joined',
     unread,
+    notifying: unread,
     highlight: 0,
     marked_unread: false,
   } as RoomSummary;
@@ -163,7 +164,7 @@ test('an Android push for an unread message stands until the room is read', () =
   mocks.retire.mockClear();
 
   push('$new');
-  notifications.retireRead([{ ...readThrough('$new'), unread: 1 }]);
+  notifications.retireRead([{ ...readThrough('$new'), unread: 1, notifying: 1 }]);
   expect(mocks.retire).not.toHaveBeenCalled();
 
   notifications.retireRead([readThrough('$new')]);

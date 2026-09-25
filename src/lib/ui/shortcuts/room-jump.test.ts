@@ -32,6 +32,7 @@ function room(overrides: Partial<RoomSummary> & { room_id: string }): RoomSummar
     supports_knock_restricted: false,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     marked_unread: false,
     latest_event: null,

@@ -38,6 +38,7 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
     supports_knock_restricted: true,
     space_children: [],
     unread: 0,
+    notifying: 0,
     highlight: 0,
     marked_unread: false,
     latest_event: null,
@@ -53,9 +54,9 @@ test('an unknown filter falls back to showing everything', () => {
 
 test('all-message mode counts ordinary messages in channels and chats', () => {
   const rooms = [
-    room({ room_id: '!chat', is_direct: true, unread: 3 }),
-    room({ room_id: '!quiet-room', unread: 7 }),
-    room({ room_id: '!loud-room', unread: 7, highlight: 2 }),
+    room({ room_id: '!chat', is_direct: true, unread: 3, notifying: 3 }),
+    room({ room_id: '!quiet-room', unread: 7, notifying: 7 }),
+    room({ room_id: '!loud-room', unread: 7, notifying: 7, highlight: 2 }),
   ];
 
   const mode = () => 'all' as const;
@@ -83,7 +84,7 @@ test('mentions-only and muted rooms do not contribute ordinary unread messages',
 
 test('filters narrow to mentions or to chats', () => {
   const rooms = [
-    room({ room_id: '!chat', is_direct: true, unread: 1 }),
+    room({ room_id: '!chat', is_direct: true, unread: 1, notifying: 1 }),
     room({ room_id: '!mention', highlight: 1 }),
   ];
 
@@ -219,8 +220,8 @@ test('a marked direct chat shows under the direct filter', () => {
   expect(notifications([marked], 'mentions')).toEqual([]);
 });
 
-test('a channel whose mode has not loaded yet still shows its unread messages', () => {
-  const channel = room({ room_id: '!channel', unread: 4 });
+test('a channel whose mode has not loaded yet still shows what notified', () => {
+  const channel = room({ room_id: '!channel', unread: 4, notifying: 4 });
 
   expect(notifications([channel], 'all').map((entry) => entry.room_id)).toEqual(['!channel']);
   expect(countNotifications([channel])).toBe(4);

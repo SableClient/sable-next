@@ -2033,6 +2033,7 @@ pub struct RoomSummary {
     /// Already sorted by `order`, then the child event's age.
     pub space_children: Vec<SpaceChildEdge>,
     pub unread: u32,
+    pub notifying: u32,
     pub highlight: u32,
     pub marked_unread: bool,
     pub latest_event: Option<LatestEventView>,

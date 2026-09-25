@@ -832,6 +832,10 @@ async fn a_count_truncated_by_the_local_cache_falls_back_to_the_server_count() {
         super::view::unread_counts(&item, Some(event_id!("$two")), false),
         (9, 2)
     );
+    assert_eq!(
+        super::view::notifying_count(&item, Some(event_id!("$two")), false),
+        9
+    );
 }
 
 #[tokio::test]
@@ -889,6 +893,14 @@ async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unrea
     assert_eq!(
         super::view::unread_counts(&item, Some(event_id!("$two")), true),
         (1, 0)
+    );
+    assert_eq!(
+        super::view::notifying_count(&item, Some(event_id!("$two")), true),
+        u32::try_from(item.num_unread_notifications()).unwrap()
+    );
+    assert_eq!(
+        super::view::notifying_count(&item, Some(event_id!("$two")), false),
+        9
     );
 }
 

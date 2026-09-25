@@ -143,12 +143,12 @@ test('a stale notification-mode refresh cannot overwrite a room override', async
   roomList.stop();
 });
 
-test('inbox counts follow room overrides and default changes', async () => {
+test('inbox counts follow what notified, and a mute silences it at once', async () => {
   const rooms = [
-    { room_id: '!inherited', state: 'joined', unread: 2, highlight: 0 },
-    { room_id: '!override', state: 'joined', unread: 3, highlight: 0 },
+    { room_id: '!loud', state: 'joined', unread: 2, notifying: 2, highlight: 0 },
+    { room_id: '!quiet', state: 'joined', unread: 3, notifying: 0, highlight: 0 },
   ] as RoomSummary[];
-  let fallback = 'mentions' as 'all' | 'mentions';
+  let loudMode = 'all' as 'all' | 'mute';
   const listeners: ((event: unknown) => void)[] = [];
   const core = {
     subscribeEvents: (listener: (event: unknown) => void) => {
@@ -161,8 +161,8 @@ test('inbox counts follow room overrides and default changes', async () => {
         Promise.resolve(
           rooms.map((room) => ({
             room_id: room.room_id,
-            room: room.room_id === '!override' ? 'all' : null,
-            default: fallback,
+            room: room.room_id === '!loud' ? loudMode : null,
+            default: 'all',
           }))
         ),
       unsubscribe: async () => {},
@@ -172,18 +172,15 @@ test('inbox counts follow room overrides and default changes', async () => {
   const mode = (roomId: string) => roomList.notificationMode(roomId);
   await roomList.start();
   await vi.waitFor(() => {
-    expect(countNotifications(roomList.rooms, mode)).toBe(3);
+    expect(countNotifications(roomList.rooms, mode)).toBe(2);
   });
-  expect(notifications(roomList.rooms, 'all', mode).map((room) => room.room_id)).toEqual([
-    '!override',
-  ]);
+  expect(notifications(roomList.rooms, 'all', mode).map((room) => room.room_id)).toEqual(['!loud']);
 
-  fallback = 'all';
+  loudMode = 'mute';
   for (const listener of listeners) listener({ type: 'notification_settings_changed' });
   await vi.waitFor(() => {
-    expect(countNotifications(roomList.rooms, mode)).toBe(5);
+    expect(countNotifications(roomList.rooms, mode)).toBe(0);
   });
-  expect(notifications(roomList.rooms, 'mentions', mode)).toEqual([]);
   roomList.stop();
 });
 
