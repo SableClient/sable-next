@@ -80,7 +80,7 @@
   {/if}
   <Avatar.Fallback
     class="avatar-fallback"
-    style={plate ? `background: ${plate}; color: var(--surface-container)` : undefined}
+    style={plate ? `background: ${plate}; color: var(--avatar-identity-on-plate)` : undefined}
   >
     {#if children}{@render children()}{:else}{fallback}{/if}
   </Avatar.Fallback>

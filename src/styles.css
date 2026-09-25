@@ -372,6 +372,7 @@ html {
   --avatar-size-small: var(--avatar-size-300);
   --avatar-size-medium: var(--avatar-size-400);
   --avatar-size-large: var(--avatar-size-500);
+  --avatar-identity-on-plate: #24232c;
   --focus-ring-width: var(--border-width-600);
   --focus-ring-offset: 0;
   --target: 2.5rem;

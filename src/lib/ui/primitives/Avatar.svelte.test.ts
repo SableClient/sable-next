@@ -41,6 +41,7 @@ test('derives the fallback colour from the id when the caller names none', () =>
   });
 
   expect(fallback()?.style.background).toBe(identityColor('@sable:example.org'));
+  expect(fallback()?.style.color).toBe('var(--avatar-identity-on-plate)');
 });
 
 test('tints the picture box until the picture paints, and never the root', () => {
