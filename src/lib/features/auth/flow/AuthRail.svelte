@@ -69,8 +69,23 @@
     scrollAnimation = window.requestAnimationFrame(frame);
   }
 
+  function scrollBounds(rail: HTMLDivElement): [number, number] {
+    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
+    const card = cardElements(rail)[activeIndex] as HTMLElement | undefined;
+    const here = card ? cardTarget(rail, card) : rail.scrollLeft;
+    return [canBack ? 0 : here, canForward ? maxScroll : here];
+  }
+
   function handleScroll(): void {
     if (isDragging || isNavigating || swipeGesture) return;
+    const rail = railElement;
+    if (rail) {
+      const [min, max] = scrollBounds(rail);
+      if (rail.scrollLeft < min - 1 || rail.scrollLeft > max + 1) {
+        rail.scrollLeft = Math.max(min, Math.min(max, rail.scrollLeft));
+        return;
+      }
+    }
     window.clearTimeout(scrollTimer);
     scrollTimer = window.setTimeout(activateNearestCard, 120);
   }
@@ -115,8 +130,8 @@
 
     isDragging = true;
     swipeOffset = update.distanceX;
-    const maxScroll = Math.max(0, rail.scrollWidth - rail.clientWidth);
-    rail.scrollLeft = Math.max(0, Math.min(maxScroll, swipeStartScroll - swipeOffset));
+    const [min, max] = scrollBounds(rail);
+    rail.scrollLeft = Math.max(min, Math.min(max, swipeStartScroll - swipeOffset));
   }
 
   function finishTouchGesture(cancelled: boolean): void {

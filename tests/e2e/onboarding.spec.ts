@@ -148,3 +148,47 @@ test('About runs setup again for a device that already finished it', async ({
   );
   expect(pending).toEqual([]);
 });
+
+test('touch: a swipe towards a step that is not reachable yet does not move', async ({
+  page,
+  installRoomCore,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installRoomCore('ready');
+  await page.goto('/settings/about');
+  await page.getByRole('button', { name: 'Run setup again' }).click();
+  await expect(page).toHaveURL(/\/setup\/profile$/, { timeout: 20_000 });
+  await page.waitForTimeout(500);
+
+  const moved = await page.evaluate(async () => {
+    const rail = document.querySelector<HTMLElement>('.rail');
+    const card = document.querySelector<HTMLElement>('.auth-card.active');
+    if (!rail || !card) return null;
+    const box = card.getBoundingClientRect();
+    const touch = (x: number) =>
+      new Touch({ identifier: 1, target: card, clientX: x, clientY: box.top + 40 });
+    const before = rail.scrollLeft;
+    const start = box.left + box.width / 2;
+    card.dispatchEvent(
+      new TouchEvent('touchstart', { touches: [touch(start)], bubbles: true, cancelable: true })
+    );
+    let furthest = 0;
+    for (let step = 1; step <= 10; step += 1) {
+      card.dispatchEvent(
+        new TouchEvent('touchmove', {
+          touches: [touch(start - step * 20)],
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      furthest = Math.max(furthest, Math.abs(rail.scrollLeft - before));
+    }
+    card.dispatchEvent(new TouchEvent('touchend', { touches: [], bubbles: true }));
+    return furthest;
+  });
+
+  expect(moved).toBe(0);
+  await page.waitForTimeout(400);
+  await expect(page).toHaveURL(/\/setup\/profile$/);
+});
