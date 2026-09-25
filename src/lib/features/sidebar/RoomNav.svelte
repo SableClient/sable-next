@@ -72,6 +72,7 @@
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
+  import MentionProfile from '#lib/features/room/MentionProfile.svelte';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -135,6 +136,17 @@
     event.preventDefault();
     volumeTarget = { userId, name, anchor: event.currentTarget };
     volumeOpen = true;
+  }
+
+  let participantTarget = $state<{ userId: string; roomId: string; anchor: HTMLElement } | null>(
+    null
+  );
+  let participantOpen = $state(false);
+
+  function openParticipant(event: MouseEvent, roomId: string, userId: string): void {
+    if (!(event.currentTarget instanceof HTMLElement)) return;
+    participantTarget = { userId, roomId, anchor: event.currentTarget };
+    participantOpen = true;
   }
   const roomList = useRoomList();
   const core = useCoreClient();
@@ -840,40 +852,48 @@
               requestPeerProfile(userId);
             })}
           >
-            <Avatar
-              src={profile?.avatar_url ?? null}
-              name={profile?.display_name ?? userId}
-              id={userId}
-              size="small"
-              alt={collapsed ? (profile?.display_name ?? userId) : undefined}
-            />
-            {#if !collapsed}
-              <span>{profile?.display_name ?? userId}</span>
-              {#if voice && (voice.muted || voice.deafened || voice.camera || voice.screen)}
-                <span class="voice-badges">
-                  {#if voice.screen}
-                    <span class="voice-stream">{$i18n.t('call.live')}</span>
-                  {/if}
-                  {#if voice.camera}
-                    <span title={$i18n.t('call.cameraOnLabel')}>
-                      <VideoCameraIcon aria-hidden="true" weight="fill" />
-                      <span class="screen-reader-only">{$i18n.t('call.cameraOnLabel')}</span>
-                    </span>
-                  {/if}
-                  {#if voice.deafened}
-                    <span class="voice-off" title={$i18n.t('call.deafened')}>
-                      <SpeakerSlashIcon aria-hidden="true" weight="fill" />
-                      <span class="screen-reader-only">{$i18n.t('call.deafened')}</span>
-                    </span>
-                  {:else if voice.muted}
-                    <span class="voice-off" title={$i18n.t('call.muted')}>
-                      <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
-                      <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-                    </span>
-                  {/if}
-                </span>
+            <button
+              type="button"
+              class="call-participant"
+              onclick={(event) => {
+                openParticipant(event, room.room_id, userId);
+              }}
+            >
+              <Avatar
+                src={profile?.avatar_url ?? null}
+                name={profile?.display_name ?? userId}
+                id={userId}
+                size="small"
+                alt={collapsed ? (profile?.display_name ?? userId) : undefined}
+              />
+              {#if !collapsed}
+                <span>{profile?.display_name ?? userId}</span>
+                {#if voice && (voice.muted || voice.deafened || voice.camera || voice.screen)}
+                  <span class="voice-badges">
+                    {#if voice.screen}
+                      <span class="voice-stream">{$i18n.t('call.live')}</span>
+                    {/if}
+                    {#if voice.camera}
+                      <span title={$i18n.t('call.cameraOnLabel')}>
+                        <VideoCameraIcon aria-hidden="true" weight="fill" />
+                        <span class="screen-reader-only">{$i18n.t('call.cameraOnLabel')}</span>
+                      </span>
+                    {/if}
+                    {#if voice.deafened}
+                      <span class="voice-off" title={$i18n.t('call.deafened')}>
+                        <SpeakerSlashIcon aria-hidden="true" weight="fill" />
+                        <span class="screen-reader-only">{$i18n.t('call.deafened')}</span>
+                      </span>
+                    {:else if voice.muted}
+                      <span class="voice-off" title={$i18n.t('call.muted')}>
+                        <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+                        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
+                      </span>
+                    {/if}
+                  </span>
+                {/if}
               {/if}
-            {/if}
+            </button>
           </li>
         {/each}
       </ul>
@@ -1129,6 +1149,17 @@
     userId={volumeTarget.userId}
     name={volumeTarget.name}
     onVolumeChange={onCallVolume}
+  />
+{/if}
+
+{#if participantTarget}
+  <MentionProfile
+    bind:open={participantOpen}
+    userId={participantTarget.userId}
+    member={null}
+    roomId={participantTarget.roomId}
+    profile={peerProfiles.get(participantTarget.userId) ?? null}
+    anchor={participantTarget.anchor}
   />
 {/if}
 
@@ -1815,24 +1846,37 @@
   }
 
   .call-participant-list li {
+    min-width: 0;
+  }
+
+  .call-participant {
     align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
     color: var(--surface-var-on-container);
+    cursor: pointer;
     display: flex;
-    font-size: var(--font-size-small);
+    font: inherit;
     gap: var(--space-200);
     min-width: 0;
-    padding: var(--space-050) var(--space-200);
+    padding: var(--space-100) var(--space-200);
+    text-align: start;
+    width: 100%;
+  }
+
+  .call-participant:hover {
+    background: var(--bg-container-hover);
   }
 
   .call-participant-list :global(.avatar-root) {
     --avatar-size: var(--avatar-size-200);
 
-    border-radius: var(--radii-pill);
     flex: none;
     transition: box-shadow var(--motion-normal) var(--motion-easing-emphasized);
   }
 
-  .call-participant-list li.speaking {
+  .speaking .call-participant {
     color: var(--bg-on-container);
   }
 
@@ -1853,6 +1897,11 @@
 
   .voice-badges > span {
     display: inline-flex;
+  }
+
+  .voice-badges :global(svg) {
+    height: var(--size-x50);
+    width: var(--size-x50);
   }
 
   .voice-off {
@@ -1881,7 +1930,7 @@
     padding: 0;
   }
 
-  .call-participant-list.collapsed li {
+  .call-participant-list.collapsed .call-participant {
     padding: var(--space-050) 0;
   }
 
