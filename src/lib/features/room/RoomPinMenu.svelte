@@ -9,6 +9,7 @@
   import { i18n } from '#lib/i18n.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import {
@@ -178,18 +179,12 @@
 </script>
 
 {#snippet pinTrigger({ props }: { props: Record<string, unknown> })}
-  <IconButton
-    {...props}
-    class="pin-button selection-open"
-    variant="ghost"
-    size="medium"
-    label={$i18n.t('room.pinsTitle')}
-  >
+  <PanelHeaderButton {...props} class="pin-button selection-open" label={$i18n.t('room.pinsTitle')}>
     <PushPinIcon weight={open ? 'fill' : 'regular'} />
     {#if unreadCount > 0}
       <span class="pin-badge" aria-hidden="true">{unreadCount}</span>
     {/if}
-  </IconButton>
+  </PanelHeaderButton>
 {/snippet}
 
 <ActionMenu

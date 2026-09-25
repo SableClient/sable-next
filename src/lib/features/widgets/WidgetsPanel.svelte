@@ -5,6 +5,8 @@
   import { i18n } from '#lib/i18n.js';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
 
   import type { RoomWidget } from './widget-content.js';
@@ -111,12 +113,13 @@
       onCommit={() => localStorage.setItem(WIDTH_STORAGE_KEY, String(width))}
     />
   {/if}
-  <header class="widgets-header">
-    <h2>{$i18n.t('widgets.title')}</h2>
-    <IconButton variant="ghost" size="small" label={$i18n.t('widgets.close')} onclick={onClose}>
-      <XIcon />
-    </IconButton>
-  </header>
+  <PanelHeader class="widgets-header" title={$i18n.t('widgets.title')}>
+    {#snippet suffix()}
+      <PanelHeaderButton label={$i18n.t('widgets.close')} onclick={onClose}>
+        <XIcon />
+      </PanelHeaderButton>
+    {/snippet}
+  </PanelHeader>
 
   {#if widgets.length === 0}
     <p class="widgets-empty">{$i18n.t('widgets.empty')}</p>
@@ -212,27 +215,6 @@
   .widgets-panel :global(.resize-handle) {
     left: -0.25rem;
     z-index: 1;
-  }
-
-  .widgets-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    display: flex;
-    gap: var(--space-300);
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-400);
-  }
-
-  .widgets-header h2 {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
-  }
-
-  .widgets-header :global(.icon-button) {
-    min-height: 2.75rem;
-    min-width: 2.75rem;
   }
 
   .widgets-empty {

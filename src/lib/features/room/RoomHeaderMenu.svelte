@@ -19,7 +19,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
 
   import RoomNotificationSubmenu from './RoomNotificationSubmenu.svelte';
 
@@ -73,15 +73,13 @@
   }}
 >
   {#snippet trigger({ props })}
-    <IconButton
+    <PanelHeaderButton
       {...props}
       class="room-menu-button selection-open"
-      variant="ghost"
-      size="small"
       label={$i18n.t('room.menuMoreOptions')}
     >
       <DotsThreeVerticalIcon weight={open ? 'fill' : 'regular'} />
-    </IconButton>
+    </PanelHeaderButton>
   {/snippet}
 
   <IconContext values={{ 'aria-hidden': 'true' }}>

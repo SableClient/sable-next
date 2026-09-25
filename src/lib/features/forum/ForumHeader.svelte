@@ -4,7 +4,8 @@
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
 
   interface Props {
     roomId: string;
@@ -17,48 +18,16 @@
   let { roomId, roomName, roomAvatar, onBack, onSearch }: Props = $props();
 </script>
 
-<header class="forum-header">
-  <IconButton
-    class="back-button"
-    variant="ghost"
-    size="medium"
-    label={$i18n.t('timeline.back')}
-    onclick={onBack}
-  >
-    <BackIcon />
-  </IconButton>
-  <Avatar class="forum-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
-  <h1>{roomName}</h1>
-  <IconButton
-    class="search-button"
-    variant="ghost"
-    size="medium"
-    label={$i18n.t('search.open')}
-    onclick={onSearch}
-  >
-    <MagnifyingGlassIcon />
-  </IconButton>
-</header>
-
-<style>
-  .forum-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--surface-container-line);
-    display: flex;
-    flex: 0 0 auto;
-    gap: var(--space-300);
-    min-height: var(--header-height);
-    padding: 0 var(--space-400);
-  }
-
-  .forum-header h1 {
-    flex: 1;
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-</style>
+<PanelHeader class="forum-header" title={roomName} titleSize="h1">
+  {#snippet prefix()}
+    <PanelHeaderButton class="back-button" label={$i18n.t('timeline.back')} onclick={onBack}>
+      <BackIcon />
+    </PanelHeaderButton>
+    <Avatar class="forum-avatar" id={roomId} src={roomAvatar} name={roomName} size="small" />
+  {/snippet}
+  {#snippet suffix()}
+    <PanelHeaderButton class="search-button" label={$i18n.t('search.open')} onclick={onSearch}>
+      <MagnifyingGlassIcon />
+    </PanelHeaderButton>
+  {/snippet}
+</PanelHeader>

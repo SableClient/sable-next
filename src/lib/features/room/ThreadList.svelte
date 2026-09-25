@@ -7,7 +7,8 @@
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import { memberName } from './members';
@@ -57,20 +58,16 @@
 
 {#snippet body()}
   <aside class={['thread-list', { modal }]} aria-label={$i18n.t('timeline.threadsTitle')}>
-    <header class="thread-list-header">
-      <div class="thread-list-title">
+    <PanelHeader class="thread-list-header" title={$i18n.t('timeline.threadsTitle')}>
+      {#snippet prefix()}
         <ChatsIcon aria-hidden="true" />
-        <h2>{$i18n.t('timeline.threadsTitle')}</h2>
-      </div>
-      <IconButton
-        variant="ghost"
-        size="small"
-        label={$i18n.t('timeline.threadsClose')}
-        onclick={onClose}
-      >
-        <XIcon />
-      </IconButton>
-    </header>
+      {/snippet}
+      {#snippet suffix()}
+        <PanelHeaderButton label={$i18n.t('timeline.threadsClose')} onclick={onClose}>
+          <XIcon />
+        </PanelHeaderButton>
+      {/snippet}
+    </PanelHeader>
 
     <div class="thread-list-body">
       {#if roots.length > 0}
@@ -148,29 +145,6 @@
     border-left: none;
     height: 100%;
     width: 100%;
-  }
-
-  .thread-list-header {
-    align-items: center;
-    border-bottom: var(--border-width) solid var(--bg-container-line);
-    display: flex;
-    gap: var(--space-300);
-    justify-content: space-between;
-    min-height: var(--header-height);
-    padding: 0 var(--space-200) 0 var(--space-400);
-  }
-
-  .thread-list-title {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    min-width: 0;
-  }
-
-  .thread-list-header h2 {
-    font-size: var(--font-size-heading);
-    font-weight: var(--font-weight-bold);
-    margin: 0;
   }
 
   .thread-list-body {
