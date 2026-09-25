@@ -1,6 +1,7 @@
 <script lang="ts">
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
   import BellSlashIcon from 'phosphor-svelte/lib/BellSlashIcon';
+  import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
@@ -19,11 +20,17 @@
 </script>
 
 <div class="context">
-  <span class="context-kind">
-    {context.kind === 'edit'
-      ? $i18n.t('composer.editing')
-      : $i18n.t('composer.replyingTo', { name: context.sender ?? '' })}
-  </span>
+  {#if context.kind === 'edit'}
+    <span class="context-kind">{$i18n.t('composer.editing')}</span>
+  {:else}
+    <span
+      class="context-kind context-reply"
+      aria-label={$i18n.t('composer.replyingTo', { name: context.sender ?? '' })}
+    >
+      <span class="context-reply-icon" aria-hidden="true"><ReplyIcon /></span>
+      <span class="context-sender">{context.sender}</span>
+    </span>
+  {/if}
   <span class="context-body">{context.body}</span>
   {#if context.kind === 'reply'}
     <IconButton
@@ -58,7 +65,9 @@
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
-    margin-inline: var(--space-150);
+    margin-inline: calc(
+      var(--space-100) + (var(--control-height-small) - var(--icon-size-small)) / 2
+    ) var(--space-150);
     min-width: 0;
     padding: var(--space-150) 0 var(--space-150);
   }
@@ -68,6 +77,30 @@
     flex: 0 1 auto;
     font-weight: var(--font-weight-medium);
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .context-reply {
+    align-items: center;
+    display: flex;
+    gap: var(--space-100);
+  }
+
+  .context-reply-icon {
+    flex: 0 0 auto;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .context-reply-icon :global(svg) {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+
+  .context-sender {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

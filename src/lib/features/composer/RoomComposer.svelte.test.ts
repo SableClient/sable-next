@@ -98,6 +98,7 @@ interface ComposerProps {
   ) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
   context?: ComposerContext;
+  onCancelContext?: () => void;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
   onReplyStep?: (direction: 'older' | 'newer') => void;
   threadRoot?: string | null;
@@ -1143,6 +1144,21 @@ function pressInEditor(init: KeyboardEventInit): void {
     .querySelector('[role="combobox"]')
     ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
 }
+
+test('Escape cancels a reply context', async () => {
+  const cancel = vi.fn();
+  const instance = render({
+    roomId: '!room:example.org',
+    context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+    onCancelContext: cancel,
+  });
+  await tick();
+
+  pressInEditor({ key: 'Escape' });
+
+  expect(cancel).toHaveBeenCalledOnce();
+  void unmount(instance);
+});
 
 test('Ctrl+Up and Ctrl+Down step the reply unless an edit is in flight', async () => {
   const step = vi.fn();
