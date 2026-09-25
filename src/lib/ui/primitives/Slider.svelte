@@ -6,6 +6,7 @@
     max: number;
     step?: number;
     disabled?: boolean;
+    requireThumbForTouch?: boolean;
     label: string;
     value: number;
     oninput?: (value: number) => void;
@@ -17,6 +18,7 @@
     max = 2,
     step = 1,
     disabled = false,
+    requireThumbForTouch = false,
     label,
     value = $bindable(1),
     oninput,
@@ -34,6 +36,15 @@
   class="slider"
   onValueChange={(next) => oninput?.(next)}
   onValueCommit={(next) => oncommit?.(next)}
+  onpointerdown={(event) => {
+    if (
+      requireThumbForTouch &&
+      event.pointerType === 'touch' &&
+      !(event.target as Element).closest('.slider-thumb')
+    ) {
+      event.stopPropagation();
+    }
+  }}
 >
   <span class="slider-track">
     <Slider.Range class="slider-range" />

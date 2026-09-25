@@ -96,6 +96,7 @@
           <div class="range">
             <Slider
               {disabled}
+              requireThumbForTouch
               min={PREFERENCE_RANGES[key].min}
               max={PREFERENCE_RANGES[key].max}
               step={setting.step}
