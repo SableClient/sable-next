@@ -1207,8 +1207,6 @@
     "openServerPage": "Open provider page",
     "iFinished": "I finished",
     "registrationStage": "Waiting for {{stage}}, step {{current}} of {{total}}",
-    "nextStep": "One last thing",
-    "makeItYours": "Make it yours",
     "profileIntro": "Choose how other people will see you. Everything here is optional.",
     "avatar": "Avatar",
     "replaceAvatar": "Replace avatar",
@@ -1245,6 +1243,7 @@
   },
   "setup": {
     "title": "Set up this device",
+    "profileTitle": "Your profile",
     "checking": "Checking this device…",
     "stageDeviceLabel": "Confirm it's you",
     "confirmTitle": "Confirm it's you",

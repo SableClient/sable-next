@@ -363,7 +363,7 @@
     }}
   />
   <section class="auth-content" aria-labelledby="sable-title">
-    <AuthHeader {hasLoggedInBefore} />
+    <AuthHeader {hasLoggedInBefore} title={isSetupRoute ? $i18n.t('setup.title') : undefined} />
     <div class="auth-main">
       {#if core.status === 'starting' || core.status === 'idle' || (core.status === 'signed-out' && !hasCompletedInitialHomeserverCheck)}
         <div class="bootstrap" role="status">

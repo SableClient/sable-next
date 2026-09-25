@@ -4,15 +4,16 @@
 
   interface Props {
     hasLoggedInBefore: boolean;
+    title?: string;
   }
 
-  let { hasLoggedInBefore }: Props = $props();
+  let { hasLoggedInBefore, title }: Props = $props();
 </script>
 
 <header class="auth-heading">
   <SableBrandMark />
   <h1 id="sable-title">
-    {hasLoggedInBefore ? $i18n.t('auth.welcomeBack') : $i18n.t('auth.welcome')}
+    {title ?? (hasLoggedInBefore ? $i18n.t('auth.welcomeBack') : $i18n.t('auth.welcome'))}
   </h1>
 </header>
 

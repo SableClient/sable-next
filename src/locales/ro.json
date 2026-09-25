@@ -937,8 +937,6 @@
     "openServerPage": "Deschide pagina furnizorului",
     "iFinished": "Am finalizat",
     "registrationStage": "Se așteaptă {{stage}}, pasul {{current}} din {{total}}",
-    "nextStep": "Încă un pas",
-    "makeItYours": "Personalizează",
     "profileIntro": "Alege cum alte persoane te vor vedea. Nimic de aici nu este obligatoriu.",
     "avatar": "Iconiță",
     "replaceAvatar": "Schimbă iconița",

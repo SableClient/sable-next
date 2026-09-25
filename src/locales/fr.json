@@ -1124,8 +1124,6 @@
     "openServerPage": "Ouvrir la page du fournisseur",
     "iFinished": "J’ai terminé",
     "registrationStage": "En attente de {{stage}}, étape {{current}} sur {{total}}",
-    "nextStep": "Une dernière chose",
-    "makeItYours": "Personnalisez-le",
     "profileIntro": "Choisissez comment les autres vous verront. Tout est facultatif ici.",
     "avatar": "Avatar",
     "replaceAvatar": "Remplacer l’avatar",

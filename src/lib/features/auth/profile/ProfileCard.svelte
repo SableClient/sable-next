@@ -10,6 +10,8 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
+  import AuthField from '../shared/AuthField.svelte';
+  import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
 
   interface Props {
@@ -57,14 +59,9 @@
 </script>
 
 <section class="profile-card auth-card-surface" aria-labelledby="profile-title">
-  <div class="auth-card-heading">
-    <div>
-      <p class="eyebrow">{$i18n.t('auth.nextStep')}</p>
-      <h2 id="profile-title">{$i18n.t('auth.makeItYours')}</h2>
-    </div>
-  </div>
-
-  <p class="intro">{$i18n.t('auth.profileIntro')}</p>
+  <AuthField labelId="profile-title" label={$i18n.t('setup.profileTitle')}>
+    <AuthInfoBox>{$i18n.t('auth.profileIntro')}</AuthInfoBox>
+  </AuthField>
   <p class="user-id">{userId}</p>
 
   <div class="avatar-picker">
@@ -207,12 +204,7 @@
     min-width: 0;
   }
 
-  h2 {
-    font-size: var(--font-size-heading);
-  }
-
-  .user-id,
-  .intro {
+  .user-id {
     color: var(--sec-main);
     font-size: var(--font-size-small);
   }
