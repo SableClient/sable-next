@@ -159,7 +159,7 @@
     display: flex;
     gap: var(--space-300);
     min-height: var(--control-height-500);
-    padding: 0 var(--space-200);
+    padding: var(--space-150) var(--space-200);
   }
 
   .account-list {
