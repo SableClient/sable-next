@@ -249,30 +249,31 @@
                 onSaved={refreshProfile}
                 section="profile"
               />{/if}
+            <SettingsSection title={$i18n.t('settings.matrixId')} headingId="account-matrix-id">
+              <div class="settings-form matrix-id">
+                <code>{userId}</code>
+                <Button variant="secondary" size="small" onclick={() => void copyUserId()}>
+                  {$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
+                </Button>
+              </div>
+            </SettingsSection>
+            {#if profile}<ExtendedProfileSettings
+                {profile}
+                onSaved={refreshProfile}
+                section="account"
+              />{/if}
+            {#if category}<SettingsCategorySections {category} />{/if}
           </div>
         </div>
       </div>
-      <SettingsSection title={$i18n.t('settings.matrixId')} headingId="account-matrix-id">
-        <div class="settings-form matrix-id">
-          <code>{userId}</code>
-          <Button variant="secondary" size="small" onclick={() => void copyUserId()}>
-            {$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
-          </Button>
-        </div>
-      </SettingsSection>
-      {#if profile}<ExtendedProfileSettings
-          {profile}
-          onSaved={refreshProfile}
-          section="account"
-        />{/if}
-      {#if category}<SettingsCategorySections {category} />{/if}
     {/if}
   </div>
 </AppPageShell>
 
 <style>
-  :global(.app-page-shell.account-settings) {
+  :global(main.app-page-shell.account-settings) {
     max-width: 56rem;
+    overflow: clip;
   }
 
   .settings-stack {
@@ -305,7 +306,7 @@
       grid-column: 2;
       grid-row: 1;
       position: sticky;
-      top: 0;
+      top: var(--space-400);
     }
   }
 
