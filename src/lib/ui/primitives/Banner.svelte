@@ -46,9 +46,12 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
-    display: flex;
-    flex-flow: column wrap;
-    gap: var(--space-400);
+    display: grid;
+    gap: var(--space-300) var(--space-200);
+    grid-template-areas:
+      'icon copy close'
+      'actions actions actions';
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: var(--space-400);
     pointer-events: auto;
   }
@@ -58,22 +61,21 @@
   }
 
   .description {
-    display: flex;
-    flex-grow: 1;
-    gap: var(--space-200);
-    width: 100%;
+    display: contents;
   }
 
   .close {
-    flex-grow: 0;
+    align-self: start;
+    grid-area: close;
     translate: 0.25rem -0.25rem;
   }
 
   .icon {
     align-items: center;
+    align-self: start;
     color: var(--surface-var-on-container);
     display: flex;
-    flex-grow: 0;
+    grid-area: icon;
     height: var(--control-height-medium);
     justify-content: center;
     width: var(--control-height-medium);
@@ -89,7 +91,7 @@
   }
 
   .copy {
-    flex-grow: 1;
+    grid-area: copy;
     min-width: 0;
   }
 
@@ -106,19 +108,16 @@
 
   .actions {
     display: flex;
-    flex: 0 0 auto;
     gap: var(--space-300);
+    grid-area: actions;
     justify-content: flex-end;
-    width: 100%;
   }
 
   @media (width >= 42rem) {
     .banner {
-      flex-wrap: nowrap;
-    }
-
-    .actions {
-      justify-content: right;
+      column-gap: var(--space-300);
+      grid-template-areas: 'icon copy actions close';
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
     }
   }
 </style>
