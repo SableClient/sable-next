@@ -199,7 +199,7 @@
   let emptyRefills = 0;
   let focusFilling = false;
   let focusNavigation: AbortController | null = null;
-  let visibleItemCount = 0;
+  let loadedItemCount = 0;
   let personas = $derived(personaLookup(timeline.items));
   let readersByItem = $derived(cumulativeReadBy(timeline.items));
   let personaOpen = $state(false);
@@ -480,8 +480,9 @@
   }
   $effect(() => {
     const count = visibleItems.length;
-    if (count < visibleItemCount) historyExhausted = false;
-    visibleItemCount = count;
+    const loaded = timeline.items.length;
+    if (loaded < loadedItemCount) historyExhausted = false;
+    loadedItemCount = loaded;
     const engine = controller;
     const node = viewport;
     if (
