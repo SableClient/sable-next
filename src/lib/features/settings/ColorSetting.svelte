@@ -103,7 +103,7 @@
     >
       <Popover.Trigger
         class="swatch-button"
-        aria-label={`Choose ${label}`}
+        aria-label={$i18n.t('settings.colorChoose', { label })}
         style={`background: ${swatchColor}`}
       >
         <span aria-hidden="true"></span>
@@ -120,7 +120,7 @@
             type="button"
             class="saturation-picker"
             style:--picker-color={hsvToHex(hue, 100, 100)}
-            aria-label={`${label} saturation and brightness`}
+            aria-label={$i18n.t('settings.colorSaturation', { label })}
             onpointerdown={(event) => {
               event.currentTarget.setPointerCapture(event.pointerId);
               event.currentTarget.focus();
@@ -140,7 +140,7 @@
           <input
             class="hue-slider"
             type="range"
-            aria-label={`${label} hue`}
+            aria-label={$i18n.t('settings.colorHue', { label })}
             min="0"
             max="360"
             value={hue}
@@ -153,8 +153,8 @@
     </Popover.Root>
     <TextInput
       bind:value
-      aria-label={`${label} hex value`}
-      placeholder="Hex value"
+      aria-label={$i18n.t('settings.colorHexLabel', { label })}
+      placeholder={$i18n.t('settings.colorHexPlaceholder')}
       maxlength={7}
       onchange={() => {
         if (valid) onCommit();

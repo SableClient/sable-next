@@ -19,10 +19,12 @@
     canForward: boolean;
     onBack: () => void;
     onForward: () => void;
+    progress?: string;
     children: Snippet;
   }
 
-  let { activeIndex, total, canBack, canForward, onBack, onForward, children }: Props = $props();
+  let { activeIndex, total, canBack, canForward, onBack, onForward, progress, children }: Props =
+    $props();
   let railElement = $state<HTMLDivElement>();
   let motionReady = $state(false);
   let isNavigating = $state(false);
@@ -222,6 +224,9 @@
   });
 </script>
 
+{#if progress}
+  <p class="rail-progress" aria-live="polite">{progress}</p>
+{/if}
 <div class="rail-shell">
   {#if total > 1}
     <nav class="mobile-nav" aria-label={$i18n.t('auth.stageNavigation')}>
@@ -266,6 +271,13 @@
 </div>
 
 <style>
+  .rail-progress {
+    color: var(--sec-main);
+    font-size: var(--font-size-small);
+    margin: 0 0 var(--space-200);
+    text-align: center;
+  }
+
   .rail-shell {
     --auth-card-width: min(24rem, calc(100vw - 3rem));
     --auth-rail-edge-fade: 1.5rem;

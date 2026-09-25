@@ -5,7 +5,6 @@
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
 
   import { i18n } from '#lib/i18n.js';
-  import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -13,6 +12,7 @@
   import AuthField from '../shared/AuthField.svelte';
   import AuthInfoBox from '../shared/AuthInfoBox.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
+  import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
     userId: string;
@@ -58,7 +58,14 @@
   let color = $state(untrack(() => nameColor));
 </script>
 
-<section class="profile-card auth-card-surface" aria-labelledby="profile-title">
+<form
+  class="profile-card auth-card-surface"
+  aria-labelledby="profile-title"
+  onsubmit={(event) => {
+    event.preventDefault();
+    onContinue();
+  }}
+>
   <AuthField labelId="profile-title" label={$i18n.t('setup.profileTitle')}>
     <AuthInfoBox>{$i18n.t('auth.profileIntro')}</AuthInfoBox>
   </AuthField>
@@ -189,12 +196,12 @@
     </div>
   </details>
 
-  {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
+  <AuthStatusSlot message={error} />
 
-  <Button variant="primary" block onclick={onContinue} loading={isSaving}>
+  <Button type="submit" variant="primary" block loading={isSaving}>
     {$i18n.t('auth.continue')}
   </Button>
-</section>
+</form>
 
 <AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} disabled={isSaving} />
 
@@ -264,6 +271,12 @@
     opacity: 0;
     position: absolute;
     width: 1px;
+  }
+
+  @media (pointer: coarse) {
+    .file-button {
+      min-height: 2.75rem;
+    }
   }
 
   .file-button:focus-within {

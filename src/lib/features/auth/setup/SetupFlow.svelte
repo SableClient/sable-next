@@ -214,6 +214,9 @@
     total={steps.length}
     canBack={activeIndex > 0}
     canForward={activeIndex < pendingIndex}
+    progress={steps.length > 1
+      ? $i18n.t('setup.progress', { current: activeIndex + 1, total: steps.length })
+      : undefined}
     onBack={() => {
       activate(activeIndex - 1);
     }}
