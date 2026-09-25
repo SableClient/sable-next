@@ -67,6 +67,7 @@
     onCreateIn: (roomId: string, kind: 'create-room' | 'create-space') => void;
     onTogglePin: (roomId: string) => void;
     onSetSuggested: (parentId: string, roomId: string, suggested: boolean) => void;
+    onRetry: (levelId: string) => void;
     onMoveSubspace: (section: HierarchySection, delta: number) => void;
     onRemoveSubspace: (section: HierarchySection) => void;
     onMoveTo: (section: HierarchySection, entry: HierarchyRoom, target: string) => void;
@@ -98,6 +99,7 @@
     onCreateIn,
     onTogglePin,
     onSetSuggested,
+    onRetry,
     onMoveSubspace,
     onRemoveSubspace,
     onMoveTo,
@@ -428,7 +430,16 @@
         <LobbyRoomPlaceholder rows={placeholderRows(section)} divided={section.rooms.length > 0} />
       {/if}
       {#if section.failed}
-        <p class="section-failed">{$i18n.t('room.lobbyFailed')}</p>
+        <p class="section-failed">
+          <span>{$i18n.t('room.lobbyFailed')}</span>
+          <Button
+            variant="ghost"
+            size="small"
+            onclick={() => {
+              onRetry(section.parentId);
+            }}>{$i18n.t('room.lobbyRetry')}</Button
+          >
+        </p>
       {/if}
     </div>
   {/if}
@@ -641,8 +652,12 @@
   }
 
   .section-failed {
+    align-items: center;
     color: var(--surface-var-on-container);
+    display: flex;
+    flex-wrap: wrap;
     font-size: var(--font-size-small);
+    gap: var(--space-200);
     margin: 0;
     padding: var(--space-300) var(--space-400);
   }

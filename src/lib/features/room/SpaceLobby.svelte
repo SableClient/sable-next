@@ -6,7 +6,10 @@
     SpaceHierarchyRoomView,
   } from '#src/generated/protocol';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import HashIcon from 'phosphor-svelte/lib/HashIcon';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
@@ -20,6 +23,8 @@
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { layoutSpaceIds, withoutSpace, withSpace } from '#lib/spaces/sidebar-layout.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -27,6 +32,7 @@
   import { longPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -55,6 +61,8 @@
 
   import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
 
+  import AddExistingDialog from './AddExistingDialog.svelte';
+  import type { AddExistingKind } from './add-existing';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
   import RoomSettingsDialog from './RoomSettingsDialog.svelte';
@@ -85,6 +93,8 @@
   let fetched = $state.raw<SpaceHierarchyRoomView[]>([]);
   let overrides = $state.raw<ChildOrderOverride[]>([]);
   let suggestedOverrides = $state.raw<SuggestedOverride[]>([]);
+  let addOpen = $state(false);
+  let addKind = $state<AddExistingKind>('rooms');
   let failed = $state(false);
   let topicOpen = $state(false);
   let permissions = $state<RoomPermissionsView | null>(null);
@@ -300,6 +310,36 @@
       console.warn('[sable lobby] suggestion not saved', error);
       suggestedOverrides = suggestedOverrides.filter((candidate) => candidate !== override);
       toasts.error($i18n.t('room.lobbySuggestedFailed'));
+    }
+  }
+
+  async function addExisting(
+    parentId: string,
+    roomIds: readonly string[],
+    suggested: boolean
+  ): Promise<void> {
+    let failures = 0;
+    for (const roomId of roomIds) {
+      try {
+        await core.commands.addToSpace(parentId, roomId, suggested);
+      } catch (error) {
+        failures += 1;
+        console.warn('[sable lobby] room not added', error);
+      }
+    }
+    if (failures > 0) toasts.error($i18n.t('room.lobbyAddFailed', { count: failures }));
+  }
+
+  function retry(levelId: string): void {
+    if (levelId === spaceId) failed = false;
+    failedLevels.delete(levelId);
+    loadedLevels.delete(levelId);
+    pendingLevels.add(levelId);
+    queue.push(levelId);
+    const mine = generation;
+    if (drainingFor !== mine) {
+      drainingFor = mine;
+      void drain(mine);
     }
   }
 
@@ -545,34 +585,67 @@
     />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
     {#if canManage && space}
+      {@const managed = space}
       <div class="hero-actions">
-        <Button
-          variant="primary"
-          size="small"
-          class="hero-action"
-          onclick={() => {
-            void goto(
-              resolve('/(app)/space/[spaceId]/create-room', { spaceId: roomPathParam(space) })
-            );
-          }}
-        >
-          <PlusIcon />
-          {$i18n.t('nav.createRoomInSpace')}
-        </Button>
-        <Button
-          variant="ghost"
-          size="small"
-          class="hero-action hero-action-subspace"
-          onclick={() => {
-            void goto(
-              resolve('/(app)/space/[spaceId]/create-space', { spaceId: roomPathParam(space) })
-            );
-          }}
-        >
-          <UsersThreeIcon />
-          {$i18n.t('nav.createSubspace')}
-        </Button>
+        <ActionMenu label={$i18n.t('room.lobbyAdd')}>
+          {#snippet trigger({ props })}
+            <Button {...props} variant="primary" size="small" class="hero-action">
+              <PlusIcon />
+              {$i18n.t('room.lobbyAdd')}
+            </Button>
+          {/snippet}
+          <IconContext values={{ 'aria-hidden': 'true', size: 16 }}>
+            <ActionMenuItem
+              onSelect={() => {
+                void goto(
+                  resolve('/(app)/space/[spaceId]/create-room', {
+                    spaceId: roomPathParam(managed),
+                  })
+                );
+              }}
+            >
+              <PlusIcon />{$i18n.t('nav.createRoomInSpace')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              onSelect={() => {
+                void goto(
+                  resolve('/(app)/space/[spaceId]/create-space', {
+                    spaceId: roomPathParam(managed),
+                  })
+                );
+              }}
+            >
+              <UsersThreeIcon />{$i18n.t('nav.createSubspace')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              onSelect={() => {
+                addKind = 'rooms';
+                addOpen = true;
+              }}
+            >
+              <HashIcon />{$i18n.t('room.lobbyAddExistingRooms')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              onSelect={() => {
+                addKind = 'spaces';
+                addOpen = true;
+              }}
+            >
+              <SquaresFourIcon />{$i18n.t('room.lobbyAddExistingSpaces')}
+            </ActionMenuItem>
+          </IconContext>
+        </ActionMenu>
       </div>
+      {#if addOpen}
+        <AddExistingDialog
+          bind:open={addOpen}
+          space={managed}
+          kind={addKind}
+          onAdd={(roomIds, suggested) => {
+            void addExisting(managed.room_id, roomIds, suggested);
+          }}
+        />
+      {/if}
     {/if}
     {#if space?.topic}
       <button
@@ -588,19 +661,42 @@
   </header>
 
   {#if failed}
-    <Alert variant="critical" role="alert">{$i18n.t('room.lobbyFailed')}</Alert>
+    <Alert variant="critical" role="alert">
+      <p>{$i18n.t('room.lobbyFailed')}</p>
+      {#if spaceId}
+        {@const target = spaceId}
+        <div>
+          <Button
+            variant="secondary"
+            size="small"
+            onclick={() => {
+              retry(target);
+            }}>{$i18n.t('room.lobbyRetry')}</Button
+          >
+        </div>
+      {/if}
+    </Alert>
   {/if}
 
   {#if phase === 'loading'}
-    <p class="loading-note" role="status">
-      <Spinner />
-      <span>{$i18n.t('room.lobbyLoading')}</span>
-    </p>
-    <div class="placeholder">
+    <div class="placeholder" role="status" aria-label={$i18n.t('room.lobbyLoading')}>
       <LobbyRoomPlaceholder rows={3} />
     </div>
   {:else if phase === 'empty'}
-    <p class="empty">{$i18n.t('room.lobbyEmpty')}</p>
+    {#if canManage}
+      <EmptyState title={$i18n.t('room.lobbyEmpty')} description={$i18n.t('room.lobbyEmptyManage')}>
+        {#snippet actions()}
+          <Button
+            onclick={() => {
+              addKind = 'rooms';
+              addOpen = true;
+            }}>{$i18n.t('room.lobbyAddRooms')}</Button
+          >
+        {/snippet}
+      </EmptyState>
+    {:else}
+      <p class="empty">{$i18n.t('room.lobbyEmpty')}</p>
+    {/if}
   {:else}
     {#each sections as section (section.key)}
       <SpaceLobbySection
@@ -634,6 +730,7 @@
         onOpenLobby={openLobby}
         onCreateIn={createIn}
         onTogglePin={togglePin}
+        onRetry={retry}
         onSetSuggested={(parentId: string, roomId: string, suggested: boolean) => {
           void setSuggested(parentId, roomId, suggested);
         }}
