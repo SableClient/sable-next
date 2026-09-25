@@ -10,20 +10,46 @@
     type PinnedEventCommands,
   } from './pinned-events.svelte.js';
   import MessageContextMenu from './MessageContextMenu.svelte';
+  import MessageDialogHost from './MessageDialogHost.svelte';
+  import { MessageDialogs, provideMessageDialogs } from './message-dialogs.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
 
   interface Props {
     core: PinnedEventCommands & BookmarkCommands;
     item: ComponentProps<typeof TimelineItem>;
+    readers?: readonly string[];
+    showItem?: boolean;
   }
 
-  let { core, item }: Props = $props();
+  let { core, item, readers, showItem = true }: Props = $props();
 
   providePinnedEvents(new PinnedEvents(untrack(() => core)));
   provideBookmarks(new Bookmarks(untrack(() => core)));
+  const dialogs = provideMessageDialogs(new MessageDialogs());
+  let events = $derived({
+    get: (eventId: string) => (item.item.event_id === eventId ? item.item : null),
+  });
 </script>
 
 <TooltipProvider>
-  <TimelineItem {...item} />
+  {#if showItem}
+    <TimelineItem {...item} />
+  {/if}
   <MessageContextMenu />
+  <MessageDialogHost
+    {dialogs}
+    {events}
+    roomId={item.roomId}
+    members={item.members}
+    currentUserId={item.currentUserId}
+    readers={readers ? () => readers : undefined}
+    canRedactOwn={item.canRedactOwn}
+    canRedactOthers={item.canRedactOthers}
+    onMatrixLink={item.onMatrixLink}
+    onSenderProfile={item.onSenderProfile}
+    onToggleReaction={item.onToggleReaction}
+    onReply={item.onReply}
+    onOpenThread={item.onOpenThread}
+    onDelete={item.onDelete}
+  />
 </TooltipProvider>

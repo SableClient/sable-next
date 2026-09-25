@@ -367,8 +367,8 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
         collapsed: false,
         members,
         currentUserId: '@alice:example.org',
-        readersForDialog: ['@bob:example.org', '@carol:example.org'],
       },
+      readers: ['@bob:example.org', '@carol:example.org'],
     },
   });
   await tick();
@@ -395,6 +395,36 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
 
   await unmount(instance);
   vi.unstubAllGlobals();
+});
+
+test('an open message dialog outlives its row leaving the window', async () => {
+  const props = $state({
+    core,
+    item: { item: item(false), collapsed: false },
+    readers: ['@bob:example.org'],
+    showItem: true,
+  });
+  const instance = mount(TimelineItemHarness, { target: document.body, props });
+  await tick();
+
+  document
+    .querySelector('.message')
+    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await tick();
+  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find((row) =>
+    row.textContent.includes('Read receipts')
+  );
+  if (!entry) throw new Error('read receipts entry was not rendered');
+  (entry as HTMLElement).click();
+  await tick();
+  expect(document.querySelector('.receipts-dialog')).not.toBeNull();
+
+  props.showItem = false;
+  await tick();
+
+  expect(document.querySelector('.message')).toBeNull();
+  expect(document.querySelector('.receipts-dialog')).not.toBeNull();
+  await unmount(instance);
 });
 
 test('keeps the sender header for an ordinary message', async () => {

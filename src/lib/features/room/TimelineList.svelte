@@ -23,6 +23,8 @@
   import { isEditableTarget } from '#lib/ui/shortcuts/binding.js';
 
   import MessageContextMenu from './MessageContextMenu.svelte';
+  import MessageDialogHost from './MessageDialogHost.svelte';
+  import { MessageDialogs, provideMessageDialogs } from './message-dialogs.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineMemberGroup from './TimelineMemberGroup.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
@@ -147,6 +149,8 @@
     footTrailingVisible = false,
     timelineStart,
   }: Props = $props();
+
+  const dialogs = provideMessageDialogs(new MessageDialogs());
 
   interface RowValue {
     item: TimelineItemView;
@@ -657,6 +661,22 @@
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} onRead={markRead} />
 <TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu />
+<MessageDialogHost
+  {dialogs}
+  {events}
+  {roomId}
+  {members}
+  {currentUserId}
+  readers={(item) => readersByItem.get(item.id) ?? item.read_by}
+  {canRedactOwn}
+  {canRedactOthers}
+  {onMatrixLink}
+  {onSenderProfile}
+  {onToggleReaction}
+  {onReply}
+  {onOpenThread}
+  {onDelete}
+/>
 
 {#if timeline.error && !emptyFailure}
   <Alert class="timeline-error" variant="critical" role="alert"
@@ -756,7 +776,6 @@
                     {canRedactOthers}
                     {encrypted}
                     {members}
-                    readersForDialog={readersByItem.get(item.id) ?? item.read_by}
                     layout={preferences.layout}
                     alignOwn={preferences.alignOwnMessages}
                     {onJumpToEvent}

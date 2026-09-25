@@ -2,11 +2,8 @@
   import { onDestroy } from 'svelte';
 
   import type {
-    EditVersionView,
     MemberView,
-    MessageKind,
     PerMessageProfileView,
-    PersonaView,
     ProfileView,
     TimelineItemView,
   } from '#src/generated/protocol';
@@ -26,7 +23,6 @@
   import LinkEmbed from './embeds/LinkEmbed.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { projectPersona } from '#lib/personas/persona.js';
   import {
     pronounPillLength,
     pronounPillLimit,
@@ -48,33 +44,23 @@
   import TimelineNotice from './TimelineNotice.svelte';
   import type { TimelineEventIndex } from './timeline-event-index';
   import MessageActions from './MessageActions.svelte';
-  import MessageActionSheet from './MessageActionSheet.svelte';
 
-  import StealEmotesDialog from '#lib/features/emotes/StealEmotesDialog.svelte';
   import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
   import { saveBytes, savesNatively } from '#lib/platform/files.js';
 
-  import MessageForwardDialog from './MessageForwardDialog.svelte';
-  import MessageReportDialog from './MessageReportDialog.svelte';
-  import MessageSourceDialog from './MessageSourceDialog.svelte';
-  import EditHistoryDialog from './EditHistoryDialog.svelte';
-  import ReactionSheet from './ReactionSheet.svelte';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from './bookmarks.svelte.js';
   import { openMessageMenu } from './message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
-  import ReactionsDialog from './ReactionsDialog.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
   import { trailingReceipt } from './receipt-fit';
-  import ReceiptsDialog from './ReceiptsDialog.svelte';
   import SenderName from './SenderName.svelte';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
-  import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import ForwardedLine from './ForwardedLine.svelte';
-  import MessageReproxyDialog from './MessageReproxyDialog.svelte';
   import type { MatrixLink } from './matrix-link';
-  import { replyPreviewBody, type ReplyVersion } from './reply-preview';
+  import type { ReplyVersion } from './reply-preview';
+  import { useMessageDialogs } from './message-dialogs.svelte.js';
   import './sender-identity.css';
   import {
     formatMessageTimestamp,
@@ -121,7 +107,6 @@
     layout?: TimelineLayout;
     alignOwn?: boolean;
     members?: readonly MemberView[];
-    readersForDialog?: readonly string[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
     onPersonaAvatarClick?: (source: string, displayName: string) => void;
@@ -161,7 +146,6 @@
     layout = 'modern',
     alignOwn = true,
     members = [],
-    readersForDialog,
     onJumpToEvent,
     onOpenMedia,
     onPersonaAvatarClick,
@@ -178,6 +162,7 @@
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   const roomCosmetics = useRoomCosmetics();
+  const dialogs = useMessageDialogs();
   let profile = $state<ProfileView | null>(null);
   let senderCosmetics = $derived(roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);
@@ -356,17 +341,17 @@
         : undefined,
       onAddReaction: onToggleReaction
         ? () => {
-            emoteOpen = true;
+            dialogs.open(item, { kind: 'react', anchor: emoteAnchor ?? messageRow });
           }
         : undefined,
       onViewReactions:
         item.reactions.length > 0
           ? () => {
-              reactionsOpen = true;
+              dialogs.open(item, { kind: 'reactions', active: 0 });
             }
           : undefined,
       onReadReceipts: () => {
-        receiptsOpen = true;
+        dialogs.open(item, { kind: 'receipts' });
       },
       onMarkUnread:
         onMarkUnread && eventId !== ''
@@ -389,14 +374,13 @@
         editable && item.content.kind === 'message' && eventId !== ''
           ? () => {
               void personaStore.load();
-              reproxyOpen = true;
+              dialogs.open(item, { kind: 'reproxy' });
             }
           : undefined,
       onDelete:
         redactable && onDelete
           ? () => {
-              deleteTarget = null;
-              deleteOpen = true;
+              dialogs.open(item, { kind: 'delete', target: eventId });
             }
           : undefined,
       onCopyText:
@@ -419,7 +403,7 @@
       onForward:
         roomId && eventId && canForward(item.content)
           ? () => {
-              forwardOpen = true;
+              dialogs.open(item, { kind: 'forward' });
             }
           : undefined,
       onDownload: media ? () => void downloadMedia(media) : undefined,
@@ -427,7 +411,7 @@
       onStealEmotes:
         stealable.length > 0
           ? () => {
-              stealOpen = true;
+              dialogs.open(item, { kind: 'steal' });
             }
           : undefined,
       onDownloadEmotes:
@@ -444,7 +428,7 @@
       onReport:
         roomId && eventId && !item.is_own
           ? () => {
-              reportOpen = true;
+              dialogs.open(item, { kind: 'report' });
             }
           : undefined,
     };
@@ -510,8 +494,8 @@
 
   async function openSource(eventId: string): Promise<void> {
     try {
-      source = await core.commands.eventSource(roomId, eventId);
-      sourceOpen = true;
+      const source = await core.commands.eventSource(roomId, eventId);
+      dialogs.open(item, { kind: 'source', source });
     } catch (error) {
       console.warn('[sable timeline] source unavailable', error);
       toasts.error($i18n.t('errors.actionFailed'));
@@ -520,98 +504,24 @@
 
   async function openEditHistory(eventId: string): Promise<void> {
     try {
-      editHistory = await core.commands.editHistory(roomId, eventId);
-      editHistoryOpen = true;
+      const versions = await core.commands.editHistory(roomId, eventId);
+      dialogs.open(item, { kind: 'edit-history', versions, senderTimezone });
     } catch (error) {
       console.warn('[sable timeline] edit history unavailable', error);
       toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 
-  function replyToVersion(version: EditVersionView): void {
-    const eventId = item.event_id;
-    if (!eventId || !onReply) return;
-    const body = replyPreviewBody({
-      kind: 'message',
-      body: version.body,
-      html: version.html,
-      emote: false,
-      notice: false,
-      edited: false,
-    });
-    onReply(version.event_id, { of: eventId, body });
-  }
-
-  function report(reason: string | null): void {
-    const eventId = item.event_id;
-    if (!eventId) return;
-    void core.commands.reportMessage(roomId, eventId, reason).catch((error: unknown) => {
-      console.warn('[sable timeline] report failed', error);
-      toasts.error($i18n.t('errors.actionFailed'));
-    });
-  }
-
-  function forward(toRoomIds: string[]): void {
-    const eventId = item.event_id;
-    if (!eventId) return;
-    for (const toRoomId of toRoomIds) {
-      void core.commands.forwardMessage(roomId, eventId, toRoomId).catch((error: unknown) => {
-        console.warn('[sable timeline] forward failed', error);
-        toasts.error($i18n.t('errors.actionFailed'));
-      });
-    }
-  }
-
-  function reproxyKind(content: TimelineItemView['content']): MessageKind {
-    if (content.kind !== 'message') return 'text';
-    if (content.emote) return 'emote';
-    return content.notice ? 'notice' : 'text';
-  }
-
-  async function reproxy(newPersona: PersonaView | null): Promise<void> {
-    const eventId = item.event_id;
-    if (!eventId || item.content.kind !== 'message') return;
-    try {
-      await core.commands.editMessage(roomId, eventId, item.content.body, {
-        formatted: item.content.html,
-        kind: reproxyKind(item.content),
-        threadRoot: item.thread_root ?? null,
-        persona: newPersona ? projectPersona(newPersona, preferences.personaFallback) : null,
-      });
-    } catch (error) {
-      console.warn('[sable timeline] reproxy failed', error);
-      toasts.error($i18n.t('errors.actionFailed'));
-    }
-  }
-
-  let sheetOpen = $state(false);
-  let emoteOpen = $state(false);
   let emoteAnchor = $state.raw<CursorAnchor | null>(null);
-  let sourceOpen = $state(false);
-  let reportOpen = $state(false);
-  let forwardOpen = $state(false);
-  let stealOpen = $state(false);
   let stealable = $derived(emoteCandidates(item.content));
-  let reproxyOpen = $state(false);
-  let source = $state('');
-  let editHistoryOpen = $state(false);
-  let editHistory = $state.raw<EditVersionView[]>([]);
   let threadTarget = $derived(item.thread_root ?? item.event_id);
   let threadSummary = $derived(item.thread_summary);
   const pinnedEvents = usePinnedEvents();
   const bookmarks = useBookmarks();
   let pinned = $derived(pinnedEvents.has(item.event_id));
   let bookmarked = $derived(bookmarks.has(roomId, item.event_id));
-  let deleteOpen = $state(false);
-  let deleteTarget = $state<string | null>(null);
-  let reactionsOpen = $state(false);
-  let reactionActive = $state(0);
-  let receiptsOpen = $state(false);
   let messageRow = $state<HTMLElement | null>(null);
   let receiptReaders = $derived(item.read_by.filter((readerId) => readerId !== currentUserId));
-  let dialogReaders = $derived(
-    (readersForDialog ?? item.read_by).filter((readerId) => readerId !== currentUserId)
-  );
   let showReceiptBadge = $derived(
     !preferences.hideReadReceipts &&
       preferences.readReceiptPlacement === 'message' &&
@@ -638,7 +548,10 @@
 
   const rowPress = new LongPress({
     enabled: () => actionable,
-    onPress: () => (sheetOpen = true),
+    onPress: () => {
+      openMessageMenu.set(item.id, false);
+      dialogs.open(item, { kind: 'sheet', actions: () => actions });
+    },
   });
 
   let engaged = $state(false);
@@ -666,7 +579,7 @@
   function openContextMenu(event: MouseEvent): void {
     if (rowPress.touch || touchContextMenu(event)) {
       event.preventDefault();
-      if (actionable && !rowPress.pending && !sheetOpen) rowPress.fire(event);
+      if (actionable && !rowPress.pending && !dialogs.isOpen(item, 'sheet')) rowPress.fire(event);
       return;
     }
     if (!actionable) return;
@@ -675,10 +588,6 @@
     openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => actions);
   }
 
-  $effect(() => {
-    if (sheetOpen) openMessageMenu.set(item.id, false);
-  });
-
   // A virtualised row can unmount mid-press, so the pending timer has to go.
   onDestroy(() => {
     rowPress.cancel();
@@ -686,16 +595,6 @@
 
   async function copyText(): Promise<void> {
     if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
-  }
-
-  function confirmDelete(reason: string | null): void {
-    const eventId = deleteTarget ?? item.event_id;
-    if (eventId) onDelete?.(eventId, reason);
-  }
-
-  function deleteVersion(version: EditVersionView): void {
-    deleteTarget = version.event_id;
-    deleteOpen = true;
   }
 
   function openSenderProfileAt(anchor: HTMLElement): void {
@@ -721,9 +620,9 @@
     <ReadReceiptStack
       readers={receiptReaders}
       {members}
-      expanded={receiptsOpen}
+      expanded={dialogs.isOpen(item, 'receipts')}
       onOpen={() => {
-        receiptsOpen = true;
+        dialogs.open(item, { kind: 'receipts' });
       }}
     />
   </span>
@@ -736,81 +635,6 @@
       onOverflowOpenChange={pinActions}
       {...actions}
     />
-  {/if}
-  {#if actionable}
-    {#if sourceOpen}
-      <MessageSourceDialog bind:open={sourceOpen} {source} />
-    {/if}
-    {#if editHistoryOpen}
-      <EditHistoryDialog
-        bind:open={editHistoryOpen}
-        versions={editHistory}
-        {senderTimezone}
-        {onMatrixLink}
-        onReply={onReply ? replyToVersion : undefined}
-        onThread={onOpenThread ? (version) => onOpenThread(version.event_id) : undefined}
-        onDelete={redactable && onDelete ? deleteVersion : undefined}
-      />
-    {/if}
-    {#if reportOpen}
-      <MessageReportDialog bind:open={reportOpen} onReport={report} />
-    {/if}
-    {#if stealOpen}
-      <StealEmotesDialog bind:open={stealOpen} candidates={stealable} />
-    {/if}
-    {#if forwardOpen}
-      <MessageForwardDialog bind:open={forwardOpen} fromRoomId={roomId} onForward={forward} />
-    {/if}
-    {#if reproxyOpen}
-      <MessageReproxyDialog
-        bind:open={reproxyOpen}
-        personas={personaStore.personas}
-        current={item.per_message_profile}
-        onChoose={(next) => void reproxy(next)}
-      />
-    {/if}
-    {#if emoteOpen}
-      <ReactionSheet
-        bind:open={emoteOpen}
-        {roomId}
-        anchor={emoteAnchor ?? messageRow}
-        onPick={(key, sourcePack) => {
-          onToggleReaction?.(item.event_id ?? '', key, sourcePack);
-        }}
-      />
-    {/if}
-    {#if sheetOpen}
-      <MessageActionSheet
-        bind:open={sheetOpen}
-        preview={item.content.kind === 'message' ? item.content.body : null}
-        {...actions}
-      />
-    {/if}
-    {#if deleteOpen}
-      <DeleteMessageDialog
-        bind:open={deleteOpen}
-        preview={item.content.kind === 'message' ? item.content.body : null}
-        onConfirm={confirmDelete}
-      />
-    {/if}
-    {#if reactionsOpen}
-      <ReactionsDialog
-        bind:open={reactionsOpen}
-        bind:active={reactionActive}
-        reactions={item.reactions}
-        {roomId}
-        {members}
-        onMemberProfile={onSenderProfile}
-      />
-    {/if}
-    {#if receiptsOpen}
-      <ReceiptsDialog
-        bind:open={receiptsOpen}
-        readers={dialogReaders}
-        {members}
-        onMemberProfile={onSenderProfile}
-      />
-    {/if}
   {/if}
 {/snippet}
 
@@ -1173,8 +997,7 @@
             onReact={actions.onReact}
             {onToggleReaction}
             onViewReactions={(index: number) => {
-              reactionActive = index;
-              reactionsOpen = true;
+              dialogs.open(item, { kind: 'reactions', active: index });
             }}
           />
         {/if}
@@ -1303,8 +1126,7 @@
           onReact={actions.onReact}
           {onToggleReaction}
           onViewReactions={(index: number) => {
-            reactionActive = index;
-            reactionsOpen = true;
+            dialogs.open(item, { kind: 'reactions', active: index });
           }}
         />
       </div>
