@@ -600,7 +600,9 @@ export class CoreClient {
   }
 
   async resetCaches(): Promise<void> {
-    await this.ensureTransport().resetCaches(this.accounts.map((account) => account.account_id));
+    const accountIds = this.accounts.map((account) => account.account_id);
+    await this.ensureTransport().resetCaches(accountIds);
+    for (const accountId of accountIds) clearRoomListSnapshot(accountId);
   }
 
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {

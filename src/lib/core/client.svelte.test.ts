@@ -26,12 +26,14 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
   const sent: { type: string }[] = [];
   const close = vi.fn();
+  const resetCaches = vi.fn().mockResolvedValue(undefined);
   const send = vi.fn((command: { type: string }) => {
     sent.push(command);
     return Promise.resolve(responses[command.type] ?? {});
   });
   const transport = {
     send,
+    resetCaches,
     deleteAccountStore: vi.fn().mockResolvedValue(undefined),
     subscribe: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
@@ -52,6 +54,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     send,
     sent,
     close,
+    resetCaches,
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
@@ -67,6 +70,32 @@ test('a restore that returns a session leaves the client ready', async () => {
   expect(core.status).toBe('ready');
   expect(core.session?.user_id).toBe('@erwan:example.org');
   expect(core.accounts).toHaveLength(1);
+});
+
+test('resetting caches also drops the persisted room list snapshot', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+  const stored = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => stored.get(key) ?? null,
+    removeItem: (key: string) => {
+      stored.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      stored.set(key, value);
+    },
+  });
+  stored.set(`sable.room-list.${session.account_id}`, JSON.stringify([{ room_id: '!room' }]));
+
+  try {
+    await core.start();
+    await core.resetCaches();
+
+    expect(fake.resetCaches).toHaveBeenCalledWith([session.account_id]);
+    expect(stored.get(`sable.room-list.${session.account_id}`)).toBeUndefined();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 test('logging out selects another saved account instead of returning to sign-in', async () => {
