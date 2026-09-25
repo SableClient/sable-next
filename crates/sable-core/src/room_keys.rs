@@ -1,10 +1,12 @@
 use matrix_sdk::encryption::{KeyExportError, RoomKeyImportError};
+#[cfg(not(target_family = "wasm"))]
 use tempfile::NamedTempFile;
 
 use crate::Core;
 use crate::protocol::{CommandErr, CommandOk};
 
 impl Core {
+    #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn export_room_keys(&self, passphrase: &str) -> Result<CommandOk, CommandErr> {
         let client = self.client().await?;
         let file = self.room_key_file()?;
@@ -22,6 +24,7 @@ impl Core {
         Ok(CommandOk::ExportRoomKeys { export })
     }
 
+    #[cfg(not(target_family = "wasm"))]
     pub(crate) async fn import_room_keys(
         &self,
         export: &str,
@@ -46,6 +49,74 @@ impl Core {
         })
     }
 
+    #[cfg(target_family = "wasm")]
+    pub(crate) async fn export_room_keys(&self, passphrase: &str) -> Result<CommandOk, CommandErr> {
+        let base = self.base_client().await?;
+        let machine = base.olm_machine().await;
+        let machine = machine.as_ref().ok_or(CommandErr::NotLoggedIn)?;
+
+        let keys = machine
+            .store()
+            .export_room_keys(|_| true)
+            .await
+            .map_err(|error| self.failed("export_room_keys", error))?;
+        let export = matrix_sdk_base::crypto::encrypt_room_key_export(&keys, passphrase, 500_000)
+            .map_err(|error| self.failed("export_room_keys", error))?;
+
+        Ok(CommandOk::ExportRoomKeys { export })
+    }
+
+    #[cfg(target_family = "wasm")]
+    pub(crate) async fn import_room_keys(
+        &self,
+        export: &str,
+        passphrase: &str,
+    ) -> Result<CommandOk, CommandErr> {
+        let base = self.base_client().await?;
+        let machine = base.olm_machine().await;
+        let machine = machine.as_ref().ok_or(CommandErr::NotLoggedIn)?;
+
+        let keys = matrix_sdk_base::crypto::decrypt_room_key_export(export.as_bytes(), passphrase)
+            .map_err(|error| self.room_key_import_error(RoomKeyImportError::Export(error)))?;
+        let result = machine
+            .store()
+            .import_exported_room_keys(keys, |_, _| {})
+            .await
+            .map_err(|error| self.failed("import_room_keys", error))?;
+
+        Ok(CommandOk::ImportRoomKeys {
+            imported: result.imported_count as u64,
+            total: result.total_count as u64,
+        })
+    }
+
+    #[cfg(target_family = "wasm")]
+    async fn base_client(&self) -> Result<std::rc::Rc<matrix_sdk_base::BaseClient>, CommandErr> {
+        let account_id = self
+            .session
+            .read()
+            .await
+            .as_ref()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .account_id
+            .clone();
+        let store_id = self
+            .accounts
+            .lock()
+            .await
+            .as_ref()
+            .and_then(|registry| {
+                registry
+                    .accounts
+                    .iter()
+                    .find(|account| account.account_id == account_id)
+                    .map(|account| account.store_id.clone())
+            })
+            .ok_or(CommandErr::NotLoggedIn)?;
+        crate::session::base_client(&store_id).ok_or(CommandErr::Unavailable)
+    }
+
+    #[cfg(not(target_family = "wasm"))]
     fn room_key_file(&self) -> Result<NamedTempFile, CommandErr> {
         tempfile::Builder::new()
             .prefix(".room-keys-")
@@ -62,7 +133,7 @@ impl Core {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 #[allow(
     clippy::unwrap_used,
     clippy::expect_used,

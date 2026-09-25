@@ -152,10 +152,10 @@ test('asks for confirmation before resetting the recovery key', async () => {
   core.resetRecoveryKey.mockResolvedValue('NEW KEY');
   const instance = mount(DevicesSettings, { target: document.body });
   await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row .btn')).not.toBeNull();
+    expect(document.querySelector('div.setting-row .btn')).not.toBeNull();
   });
 
-  document.querySelector<HTMLButtonElement>('.setting-row .btn')?.click();
+  document.querySelector<HTMLButtonElement>('div.setting-row .btn')?.click();
   await vi.waitFor(() => {
     expect(document.querySelector('.confirm')).not.toBeNull();
   });

@@ -63,6 +63,12 @@ webpki-roots = "1"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 matrix-sdk = { workspace = true, features = ["indexeddb", "js"] }
+matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83", default-features = false, features = [
+  "e2e-encryption",
+  "state-store",
+  "event-cache-store",
+  "media-store",
+] }
 matrix-sdk-ui = { workspace = true, features = ["js"] }
 tokio = { version = "1", default-features = false, features = ["sync", "macros"] }
 wasm-bindgen-futures = "0.4"

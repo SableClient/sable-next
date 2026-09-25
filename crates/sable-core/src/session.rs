@@ -229,9 +229,7 @@ pub async fn build_client(
     store_id: &str,
     homeserver: &str,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    account_builder(apply_server(Client::builder(), homeserver), store_id)
-        .build()
-        .await
+    build_account_client(apply_server(Client::builder(), homeserver), store_id).await
 }
 
 /// # Errors
@@ -243,7 +241,7 @@ pub async fn build_client_at(
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
     let builder = crate::tls::apply_sdk(Client::builder()).homeserver_url(homeserver_url.as_str());
 
-    account_builder(builder, store_id).build().await
+    build_account_client(builder, store_id).await
 }
 
 /// # Errors
@@ -290,7 +288,10 @@ pub async fn restore_authenticated_client(
     Ok(client)
 }
 
-fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
+async fn build_account_client(
+    builder: ClientBuilder,
+    store_id: &str,
+) -> Result<Client, matrix_sdk::ClientBuildError> {
     let builder = builder
         .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
         .handle_refresh_tokens()
@@ -322,10 +323,51 @@ fn account_builder(builder: ClientBuilder, store_id: &str) -> ClientBuilder {
             )
     };
 
-    #[cfg(target_family = "wasm")]
-    let builder = builder.indexeddb_store(store_id, None);
+    #[cfg(not(target_family = "wasm"))]
+    return builder.build().await;
 
-    builder
+    #[cfg(target_family = "wasm")]
+    {
+        let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::multi_process("main");
+        let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
+        let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
+            .state_store(stores.state)
+            .event_cache_store(stores.event_cache)
+            .media_store(stores.media)
+            .crypto_store(stores.crypto);
+        let base = std::rc::Rc::new(matrix_sdk_base::BaseClient::new(
+            config,
+            THREADING_SUPPORT,
+            matrix_sdk_base::DmRoomDefinition::MatrixSpec,
+        ));
+        let client = builder
+            .cross_process_store_config(lock)
+            .base_client((*base).clone())
+            .build()
+            .await?;
+        BASE_CLIENTS.with_borrow_mut(|bases| {
+            bases.insert(store_id.to_owned(), std::rc::Rc::downgrade(&base));
+        });
+        client.add_event_handler(
+            move |_: matrix_sdk::ruma::events::dummy::ToDeviceDummyEvent| {
+                let _owner = &base;
+                async {}
+            },
+        );
+        Ok(client)
+    }
+}
+
+#[cfg(target_family = "wasm")]
+thread_local! {
+    static BASE_CLIENTS: std::cell::RefCell<
+        std::collections::HashMap<String, std::rc::Weak<matrix_sdk_base::BaseClient>>,
+    > = std::cell::RefCell::default();
+}
+
+#[cfg(target_family = "wasm")]
+pub(crate) fn base_client(store_id: &str) -> Option<std::rc::Rc<matrix_sdk_base::BaseClient>> {
+    BASE_CLIENTS.with_borrow(|bases| bases.get(store_id)?.upgrade())
 }
 
 /// For dynamic client registration. The redirect URI must match the one handed

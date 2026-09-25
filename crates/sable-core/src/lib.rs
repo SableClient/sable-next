@@ -21,7 +21,6 @@ mod presence;
 pub mod profiles;
 pub mod protocol;
 mod registration;
-#[cfg(not(target_family = "wasm"))]
 mod room_keys;
 mod rooms;
 mod scheduled;

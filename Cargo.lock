@@ -6635,6 +6635,7 @@ dependencies = [
  "matrix-sdk",
  "matrix-sdk-base",
  "matrix-sdk-common",
+ "matrix-sdk-indexeddb",
  "matrix-sdk-test",
  "matrix-sdk-test-utils",
  "matrix-sdk-ui",

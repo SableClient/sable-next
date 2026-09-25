@@ -6,7 +6,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { CoreError } from '#src/transport';
 
 const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
-const platform = vi.hoisted(() => ({ transfers: true }));
 const files = vi.hoisted(() => ({
   pickFiles: vi.fn<(accept: string) => Promise<File[] | null>>(),
   saveBytes:
@@ -29,7 +28,6 @@ vi.mock('$app/navigation', () => ({
   },
 }));
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/platform/room-keys.js', () => ({ transfersRoomKeys: () => platform.transfers }));
 vi.mock('#lib/platform/files.js', () => files);
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -45,7 +43,6 @@ import RoomKeyFile from './RoomKeyFile.svelte';
 const EXPORT = '-----BEGIN MEGOLM SESSION DATA-----\nAAAA\n-----END MEGOLM SESSION DATA-----';
 
 beforeEach(() => {
-  platform.transfers = true;
   core.exportRoomKeys.mockReset();
   core.importRoomKeys.mockReset();
   files.pickFiles.mockReset();
@@ -79,15 +76,6 @@ async function pickKeyFile(): Promise<void> {
   fill('#room-keys-import-passphrase', 'secret');
   await tick();
 }
-
-test('offers nothing where the core cannot write a key file', () => {
-  platform.transfers = false;
-  const instance = mount(RoomKeyFile, { target: document.body });
-
-  expect(document.querySelector('#room-keys-heading')).toBeNull();
-
-  void unmount(instance);
-});
 
 test('exports only once the passphrase is confirmed, then saves the armored file', async () => {
   core.exportRoomKeys.mockResolvedValue(EXPORT);
