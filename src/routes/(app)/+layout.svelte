@@ -626,7 +626,11 @@
       watchNativeNotificationActions((action) => {
         const call = callNotificationAction(action);
         if (call !== null) {
-          answerFromNotification(action.roomId, action.eventId, call);
+          void openNativeNotification(core, action, (roomId, eventId) => {
+            answerFromNotification(roomId, eventId, call);
+          }).catch((error: unknown) => {
+            console.debug('[sable notifications] call not answered', error);
+          });
           return;
         }
         void performNotificationAction(core, action, readReceiptIsPrivate()).catch(
