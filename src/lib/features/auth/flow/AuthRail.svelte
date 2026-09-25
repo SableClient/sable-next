@@ -28,6 +28,7 @@
   let isNavigating = $state(false);
   let lastActiveIndex: number | null = null;
   let scrollTimer: number | undefined;
+  let leavingCard: HTMLElement | undefined;
   let scrollAnimation: number | undefined;
   let motionReadyFrame: number | undefined;
   let isDragging = $state(false);
@@ -174,6 +175,12 @@
     if (index < 0 || index >= cards.length) return;
     const card = cards.item(index);
     const shouldFocus = lastActiveIndex !== null && lastActiveIndex !== index;
+    leavingCard?.removeAttribute('data-leaving');
+    leavingCard =
+      lastActiveIndex === null || lastActiveIndex === index
+        ? undefined
+        : cards.item(lastActiveIndex);
+    leavingCard?.setAttribute('data-leaving', '');
     lastActiveIndex = index;
 
     if (motionReady) {
@@ -344,7 +351,8 @@
     transform: translateX(0) scale(1);
   }
 
-  .rail:not(.is-navigating, .is-dragging) :global(.auth-card:not(.active)) {
+  .rail:not(.is-navigating, .is-dragging) :global(.auth-card:not(.active)),
+  .rail.is-navigating:not(.is-dragging) :global(.auth-card:not(.active, [data-leaving])) {
     visibility: hidden;
   }
 

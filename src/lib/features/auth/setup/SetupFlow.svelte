@@ -58,6 +58,7 @@
   let permissionAskable = false;
   let newRecoveryKey = $state<string | null>(null);
   let started = false;
+  let leaving = false;
 
   const userId = $derived(core.session?.user_id ?? '');
   const deviceId = $derived(core.session?.device_id ?? '');
@@ -152,6 +153,7 @@
   }
 
   function leave(target: string, reload: boolean): void {
+    leaving = true;
     if (reload) location.assign(target);
     else void goto(target);
   }
@@ -192,7 +194,7 @@
   });
 
   $effect(() => {
-    if (!record || !pending) return;
+    if (!record || !pending || leaving) return;
     if (requestedIndex >= 0 && requestedIndex <= pendingIndex) return;
     void goto(stepRoute(pending), { replaceState: true });
   });
