@@ -455,7 +455,7 @@
   {/if}
 
   <Button type="submit" variant="primary" disabled={!canSubmit} loading={submitting}>
-    {kind === 'space' ? $i18n.t('room.createSubmitSpace') : $i18n.t('room.createSubmit')}
+    {effectiveKind === 'space' ? $i18n.t('room.createSubmitSpace') : $i18n.t('room.createSubmit')}
   </Button>
 </form>
 
