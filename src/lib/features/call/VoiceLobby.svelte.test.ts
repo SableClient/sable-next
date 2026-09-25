@@ -113,6 +113,10 @@ test('offers a single join button with the device preview underneath', async () 
 
 test('puts the mic test and call settings in the device row, grouped with their menus', async () => {
   const onOpenSettings = vi.fn();
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { enumerateDevices: () => Promise.resolve([]) },
+  });
   const instance = mount(VoiceLobbyHarness, {
     target: document.body,
     props: {
@@ -134,9 +138,17 @@ test('puts the mic test and call settings in the device row, grouped with their 
   expect(
     row?.querySelector('.group[data-tone="danger"] button[aria-label="Unmute microphone"]')
   ).not.toBeNull();
+  const groups = Array.from(row?.querySelectorAll('.group') ?? []);
+  expect(groups).toHaveLength(3);
+  for (const group of groups) {
+    expect(group.querySelectorAll('.device-caret')).toHaveLength(1);
+    expect(group.querySelectorAll('.divider')).toHaveLength(1);
+  }
+  expect(row?.querySelector('.device-speaker')).toBeNull();
   const settings = row?.querySelector<HTMLButtonElement>('button[aria-label="Call settings"]');
   settings?.click();
   expect(onOpenSettings).toHaveBeenCalledOnce();
 
   await unmount(instance);
+  Reflect.deleteProperty(navigator, 'mediaDevices');
 });

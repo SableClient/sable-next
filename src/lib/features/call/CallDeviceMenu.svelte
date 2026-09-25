@@ -1,13 +1,11 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
-  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
-  import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import {
@@ -22,10 +20,9 @@
     label: string;
     onSelect: (kind: MediaDeviceKind, deviceId: string) => void;
     open?: boolean;
-    speaker?: boolean;
   }
 
-  let { kinds, label, onSelect, open = $bindable(false), speaker = false }: Props = $props();
+  let { kinds, label, onSelect, open = $bindable(false) }: Props = $props();
 
   const HEADING = {
     audioinput: 'settings.callInputDevice',
@@ -48,16 +45,9 @@
 {#if supportsDeviceSelection()}
   <ActionMenu bind:open {label} side="top" align="center">
     {#snippet trigger({ props })}
-      {#if speaker}
-        <Button {...props} variant="ghost" class="device-speaker" aria-label={label}>
-          <SpeakerHighIcon aria-hidden="true" />
-          <CaretUpIcon aria-hidden="true" weight="bold" />
-        </Button>
-      {:else}
-        <IconButton {...props} variant="ghost" size="small" class="device-caret" {label}>
-          <CaretUpIcon weight="bold" />
-        </IconButton>
-      {/if}
+      <IconButton {...props} variant="ghost" size="small" class="device-caret" {label}>
+        <CaretUpIcon weight="bold" />
+      </IconButton>
     {/snippet}
     {#each kinds as kind, index (kind)}
       {#if index > 0}<ActionMenuSeparator />{/if}
@@ -78,16 +68,6 @@
 {/if}
 
 <style>
-  :global(.btn-ghost.device-speaker) {
-    --button-container: transparent;
-    --button-container-hover: var(--ghost-hover, var(--bg-container-hover));
-    --button-container-active: var(--ghost-active, var(--bg-container-active));
-    --button-line: transparent;
-    --button-on-container: inherit;
-    --button-gap: var(--space-100);
-    --button-padding-inline: var(--space-200);
-  }
-
   .heading {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);

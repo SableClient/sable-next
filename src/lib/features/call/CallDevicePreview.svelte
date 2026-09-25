@@ -5,6 +5,7 @@
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
   import VideoCameraSlashIcon from 'phosphor-svelte/lib/VideoCameraSlashIcon';
   import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
+  import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import type { Snippet } from 'svelte';
 
   import type { MemberIdentity } from '#lib/features/room/members.js';
@@ -15,7 +16,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import CallDeviceMenu from './CallDeviceMenu.svelte';
-  import { DEVICE_PREFERENCE } from './devices';
+  import { DEVICE_PREFERENCE, supportsDeviceSelection } from './devices';
   import type { CallMedia } from './call-session.svelte.js';
   import { startInputMeter } from './input-meter';
 
@@ -32,6 +33,9 @@
     media.microphone ? $i18n.t('call.microphoneOn') : $i18n.t('call.microphoneOff')
   );
   let cameraLabel = $derived(media.camera ? $i18n.t('call.cameraOn') : $i18n.t('call.cameraOff'));
+
+  const selectable = supportsDeviceSelection();
+  let speakerOpen = $state(false);
 
   function selectDevice(kind: MediaDeviceKind, deviceId: string): void {
     setPreference(DEVICE_PREFERENCE[kind], deviceId);
@@ -163,7 +167,7 @@
         </IconButton>
       {/snippet}
       {@render tip(micLabel, micButton)}
-      <span class="divider" aria-hidden="true"></span>
+      {#if selectable}<span class="divider" aria-hidden="true"></span>{/if}
       <CallDeviceMenu
         kinds={['audioinput']}
         label={$i18n.t('call.microphoneDevices')}
@@ -186,21 +190,35 @@
         </IconButton>
       {/snippet}
       {@render tip(cameraLabel, cameraButton)}
-      <span class="divider" aria-hidden="true"></span>
+      {#if selectable}<span class="divider" aria-hidden="true"></span>{/if}
       <CallDeviceMenu
         kinds={['videoinput']}
         label={$i18n.t('call.cameraDevices')}
         onSelect={selectDevice}
       />
     </div>
-    <div class="group" data-tone="neutral">
-      <CallDeviceMenu
-        kinds={['audiooutput']}
-        label={$i18n.t('call.outputDevices')}
-        speaker
-        onSelect={selectDevice}
-      />
-    </div>
+    {#if selectable}
+      <div class="group" data-tone="neutral">
+        {#snippet speakerButton(props: Record<string, unknown>)}
+          <IconButton
+            {...props}
+            variant="ghost"
+            label={$i18n.t('call.outputDevices')}
+            onclick={() => (speakerOpen = true)}
+          >
+            <SpeakerHighIcon />
+          </IconButton>
+        {/snippet}
+        {@render tip($i18n.t('call.outputDevices'), speakerButton)}
+        <span class="divider" aria-hidden="true"></span>
+        <CallDeviceMenu
+          bind:open={speakerOpen}
+          kinds={['audiooutput']}
+          label={$i18n.t('call.outputDevices')}
+          onSelect={selectDevice}
+        />
+      </div>
+    {/if}
 
     <div class="tray-end">
       {#snippet testButton(props: Record<string, unknown>)}
