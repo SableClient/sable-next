@@ -952,6 +952,7 @@ fn room_message_body(content: &RoomMessageEventContent) -> String {
         MessageType::Video(_) => "sent a video".to_owned(),
         MessageType::Audio(_) => "sent an audio file".to_owned(),
         MessageType::File(_) => "sent a file".to_owned(),
+        MessageType::Gallery(_) => "sent a gallery".to_owned(),
         _ => content.body().to_owned(),
     }
 }
@@ -1344,6 +1345,10 @@ mod tests {
             stub(
                 "m.room.message",
                 &json!({"msgtype": "m.image", "body": "cat.png", "url": "mxc://example.org/2"}),
+            ),
+            stub(
+                "m.room.message",
+                &json!({"msgtype": "dm.filament.gallery", "body": "", "itemtypes": [{"itemtype": "m.image", "body": "cat.png", "url": "mxc://example.org/3"}]}),
             ),
             stub(
                 "m.room.encrypted",
