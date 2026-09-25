@@ -56,6 +56,8 @@
 
   const errorId = $props.id();
   let error = $derived(fieldError && invalidField !== 'homeserver' ? fieldError : null);
+  let serverName = $derived(/^[a-z0-9.-]+(?::\d+)?$/i.test(serverLabel) ? serverLabel : null);
+  let localpart = $derived(username.trim().replace(/^@/, '').split(':')[0]);
 
   function errorFor(field: Field): string | undefined {
     return error && invalidField === field ? errorId : undefined;
@@ -78,12 +80,17 @@
       required
       disabled={isRegistering}
       aria-invalid={invalidField === 'username'}
-      aria-describedby={errorFor('username')}
+      aria-describedby={[errorFor('username'), `${errorId}-address`].filter(Boolean).join(' ')}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onUsernameInput(event.currentTarget.value);
         onClearFieldError('username');
       }}
     />
+    <p id={`${errorId}-address`} class="address-hint">
+      {localpart && serverName
+        ? $i18n.t('auth.addressPreview', { address: `@${localpart}:${serverName}` })
+        : $i18n.t('auth.addressExplained')}
+    </p>
   </FormField>
   <FormField dense fieldId="registration-password" label={$i18n.t('auth.password')}>
     <PasswordField
@@ -185,6 +192,13 @@
 </form>
 
 <style>
+  .address-hint {
+    color: var(--sec-main);
+    font-size: var(--font-size-small);
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
   .legacy-form {
     display: grid;
     gap: var(--space-300);
