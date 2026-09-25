@@ -754,7 +754,7 @@
   }
 
   .profile-meta-item :global(.presence-dot) {
-    margin: 0.25em;
+    margin: var(--space-100);
   }
 
   .profile-meta-aside {
