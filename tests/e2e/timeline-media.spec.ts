@@ -150,7 +150,8 @@ test('a gallery in a bubble keeps its columns on mobile', async ({
       items: [
         {
           kind: 'image',
-          body: 'one',
+          filename: 'one',
+          caption: null,
           source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
           mime: 'image/png',
           width: 800,
@@ -158,7 +159,8 @@ test('a gallery in a bubble keeps its columns on mobile', async ({
         },
         {
           kind: 'image',
-          body: 'two',
+          filename: 'two',
+          caption: null,
           source: JSON.stringify({ Plain: 'mxc://example.test/wide-history-image' }),
           mime: 'image/png',
           width: 1000,
@@ -195,19 +197,23 @@ test('a pdf in a gallery opens in the viewer', async ({
       items: [
         {
           kind: 'image',
-          body: 'one',
+          filename: 'one',
+          caption: null,
           source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
           mime: 'image/png',
           width: 800,
           height: 600,
+          size: null,
           blurhash: null,
           thumbnail: null,
         },
         {
           kind: 'file',
-          body: 'report.pdf',
+          filename: 'report.pdf',
+          caption: null,
           source: JSON.stringify({ Plain: 'mxc://example.test/report.pdf' }),
           mime: 'application/pdf',
+          size: null,
         },
       ],
     },

@@ -1301,9 +1301,11 @@ test('fills one bar across a gallery and names the item uploading', async () => 
       html: '',
       items: ['a', 'b', 'c', 'd'].map((name) => ({
         kind: 'file' as const,
-        body: `${name}.zip`,
+        filename: `${name}.zip`,
+        caption: null,
         source: `mxc://example.org/${name}`,
         mime: null,
+        size: null,
       })),
     },
   };

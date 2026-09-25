@@ -13,7 +13,9 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::join_rules::JoinRule;
 use matrix_sdk::ruma::events::room::member::{MembershipState, RoomMemberEventContent};
 use matrix_sdk::ruma::events::room::message::VideoInfo;
-use matrix_sdk::ruma::events::room::message::{GalleryItemType, MessageType, UnstableAmplitude};
+use matrix_sdk::ruma::events::room::message::{
+    AudioMessageEventContent, GalleryItemType, MessageType, UnstableAmplitude,
+};
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, UserPowerLevel};
 use matrix_sdk::ruma::events::room::{ImageInfo, MediaSource};
 use matrix_sdk::ruma::events::space::child::{
@@ -1222,19 +1224,23 @@ pub(crate) fn video_thumbnail(info: &VideoInfo) -> Option<String> {
 
 fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
     let dimension = |value: Option<UInt>| value.map(u64::from);
+    let caption = |caption: Option<&str>| caption.map(ToOwned::to_owned);
 
     Some(match item {
         GalleryItemType::Image(image) => GalleryItemView::Image {
-            body: image.body.clone(),
+            filename: image.filename().to_owned(),
+            caption: caption(image.caption()),
             source: media_source(&image.source),
             mime: image.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(image.info.as_ref().and_then(|info| info.width)),
             height: dimension(image.info.as_ref().and_then(|info| info.height)),
+            size: dimension(image.info.as_ref().and_then(|info| info.size)),
             blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
             thumbnail: image.info.as_deref().and_then(image_thumbnail),
         },
         GalleryItemType::Video(video) => GalleryItemView::Video {
-            body: video.body.clone(),
+            filename: video.filename().to_owned(),
+            caption: caption(video.caption()),
             source: media_source(&video.source),
             mime: video.info.as_ref().and_then(|info| info.mimetype.clone()),
             width: dimension(video.info.as_ref().and_then(|info| info.width)),
@@ -1243,18 +1249,47 @@ fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
             thumbnail: video.info.as_deref().and_then(video_thumbnail),
         },
         GalleryItemType::Audio(audio) => GalleryItemView::Audio {
-            body: audio.body.clone(),
+            filename: audio.filename().to_owned(),
+            caption: caption(audio.caption()),
             source: media_source(&audio.source),
             mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
+            duration_ms: audio_duration_ms(audio),
+            waveform: audio_waveform(audio),
         },
         GalleryItemType::File(file) => GalleryItemView::File {
-            body: file.body.clone(),
+            filename: file.filename().to_owned(),
+            caption: caption(file.caption()),
             source: media_source(&file.source),
             mime: file.info.as_ref().and_then(|info| info.mimetype.clone()),
+            size: dimension(file.info.as_ref().and_then(|info| info.size)),
         },
         // The caption already describes the set, so an unrenderable item is
         // dropped instead of leaving a gap.
         _ => return None,
+    })
+}
+
+fn audio_duration_ms(audio: &AudioMessageEventContent) -> Option<u64> {
+    audio
+        .audio
+        .as_ref()
+        .map(|details| details.duration)
+        .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+}
+
+fn audio_waveform(audio: &AudioMessageEventContent) -> Option<Vec<f32>> {
+    audio.audio.as_ref().map(|details| {
+        details
+            .waveform
+            .iter()
+            .map(|amplitude| {
+                let value = u64::from(amplitude.get());
+                #[allow(clippy::cast_precision_loss)]
+                let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
+                normalised
+            })
+            .collect()
     })
 }
 
@@ -1492,24 +1527,8 @@ fn message_content(
                 html: caption_html,
                 source: media_source(&audio.source),
                 mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
-                duration_ms: audio
-                    .audio
-                    .as_ref()
-                    .map(|details| details.duration)
-                    .or_else(|| audio.info.as_ref().and_then(|info| info.duration))
-                    .and_then(|duration| u64::try_from(duration.as_millis()).ok()),
-                waveform: audio.audio.as_ref().map(|details| {
-                    details
-                        .waveform
-                        .iter()
-                        .map(|amplitude| {
-                            let value = u64::from(amplitude.get());
-                            #[allow(clippy::cast_precision_loss)]
-                            let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
-                            normalised
-                        })
-                        .collect()
-                }),
+                duration_ms: audio_duration_ms(audio),
+                waveform: audio_waveform(audio),
                 voice: audio.voice.is_some(),
             }
         }

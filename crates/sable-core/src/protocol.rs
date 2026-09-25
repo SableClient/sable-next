@@ -2811,18 +2811,22 @@ pub enum StateChangeView {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum GalleryItemView {
     Image {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         source: String,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         width: Option<u64>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         height: Option<u64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        size: Option<u64>,
         blurhash: Option<String>,
         thumbnail: Option<String>,
     },
     Video {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         source: String,
         mime: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
@@ -2833,14 +2837,22 @@ pub enum GalleryItemView {
         thumbnail: Option<String>,
     },
     Audio {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         source: String,
         mime: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        duration_ms: Option<u64>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<Vec<specta_typescript::Number>>))]
+        waveform: Option<Vec<f32>>,
     },
     File {
-        body: String,
+        filename: String,
+        caption: Option<String>,
         source: String,
         mime: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        size: Option<u64>,
     },
 }
 

@@ -116,21 +116,25 @@ test('opens the selected gallery image', async () => {
         items: [
           {
             kind: 'image',
-            body: 'one.png',
+            filename: 'one.png',
+            caption: null,
             source: 'mxc://example.org/one',
             mime: 'image/png',
             width: 100,
             height: 100,
+            size: null,
             blurhash: null,
             thumbnail: null,
           },
           {
             kind: 'image',
-            body: 'two.png',
+            filename: 'two.png',
+            caption: null,
             source: 'mxc://example.org/two',
             mime: 'image/png',
             width: 100,
             height: 100,
+            size: null,
             blurhash: null,
             thumbnail: null,
           },
@@ -163,19 +167,23 @@ test('opens a gallery pdf in the viewer', async () => {
         items: [
           {
             kind: 'image',
-            body: 'one.png',
+            filename: 'one.png',
+            caption: null,
             source: 'mxc://example.org/one',
             mime: 'image/png',
             width: 100,
             height: 100,
+            size: null,
             blurhash: null,
             thumbnail: null,
           },
           {
             kind: 'file',
-            body: 'report.pdf',
+            filename: 'report.pdf',
+            caption: null,
             source: 'mxc://example.org/report',
             mime: 'application/pdf',
+            size: null,
           },
         ],
       }),
@@ -192,6 +200,64 @@ test('opens a gallery pdf in the viewer', async () => {
   document.querySelector<HTMLButtonElement>('.gallery .pdf-thumbnail')?.click();
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item:gallery:1');
+  await unmount(instance);
+});
+
+test('renders gallery items with their captions, sizes and waveforms', async () => {
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: {
+      item: item({
+        kind: 'gallery',
+        body: '',
+        html: '',
+        items: [
+          {
+            kind: 'image',
+            filename: 'beach.jpg',
+            caption: 'the beach',
+            source: 'mxc://example.org/beach',
+            mime: 'image/jpeg',
+            width: 100,
+            height: 100,
+            size: 2048,
+            blurhash: null,
+            thumbnail: null,
+          },
+          {
+            kind: 'audio',
+            filename: 'memo.ogg',
+            caption: null,
+            source: 'mxc://example.org/memo',
+            mime: 'audio/ogg',
+            duration_ms: 4000,
+            waveform: [0, 1],
+          },
+          {
+            kind: 'file',
+            filename: 'archive.zip',
+            caption: null,
+            source: 'mxc://example.org/archive',
+            mime: 'application/zip',
+            size: 1_500_000,
+          },
+        ],
+      }),
+      canRedactOthers: false,
+    },
+  });
+  await tick();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await tick();
+
+  expect(document.querySelector('.gallery .media-image')?.getAttribute('aria-label')).toBe(
+    'Open the beach'
+  );
+  expect(document.querySelector('.gallery .item-caption')?.textContent).toBe('the beach');
+  expect(document.querySelector('.gallery .voice-message-player')).not.toBeNull();
+  expect(document.querySelector('.gallery .media-file-size')?.textContent).toBe('1.5 MB');
   await unmount(instance);
 });
 

@@ -3,6 +3,7 @@
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -22,35 +23,47 @@
 
 <div class="gallery" style:--gallery-columns={columns}>
   {#each items as item, index (index)}
-    {#if item.kind === 'image'}
-      <MediaImage
-        class="tile privacy-media"
-        source={item.source}
-        thumbnail={item.thumbnail}
-        alt={item.body}
-        width={800}
-        height={600}
-        intrinsicWidth={item.width}
-        intrinsicHeight={item.height}
-        mime={item.mime}
-        blurhash={item.blurhash}
-        retryable
-        onclick={() => onOpen?.(index)}
-      />
-    {:else}
-      <MediaContent
-        class="tile privacy-media"
-        source={item.source}
-        mime={item.mime}
-        filename={item.body}
-        kind={item.kind}
-        width={item.kind === 'video' ? item.width : null}
-        height={item.kind === 'video' ? item.height : null}
-        blurhash={item.kind === 'video' ? item.blurhash : null}
-        thumbnail={item.kind === 'video' ? item.thumbnail : null}
-        onOpen={() => onOpen?.(index)}
-      />
-    {/if}
+    <div class="cell">
+      {#if item.kind === 'image'}
+        <MediaImage
+          class="tile privacy-media"
+          source={item.source}
+          thumbnail={item.thumbnail}
+          alt={item.caption ?? item.filename}
+          title={item.caption ?? item.filename}
+          width={800}
+          height={600}
+          intrinsicWidth={item.width}
+          intrinsicHeight={item.height}
+          mime={item.mime}
+          size={item.size}
+          blurhash={item.blurhash}
+          retryable
+          onclick={() => onOpen?.(index)}
+        />
+      {:else}
+        <MediaContent
+          class="tile privacy-media"
+          source={item.source}
+          mime={item.mime}
+          filename={item.filename}
+          kind={item.kind}
+          width={item.kind === 'video' ? item.width : null}
+          height={item.kind === 'video' ? item.height : null}
+          size={item.kind === 'file' ? item.size : null}
+          blurhash={item.kind === 'video' ? item.blurhash : null}
+          thumbnail={item.kind === 'video' ? item.thumbnail : null}
+          durationMs={item.kind === 'audio' ? item.duration_ms : null}
+          waveform={item.kind === 'audio' ? item.waveform : null}
+          onOpen={() => onOpen?.(index)}
+        />
+      {/if}
+      {#if item.caption}
+        <p class="item-caption">{item.caption}</p>
+      {:else if item.kind === 'image' && preferences.alwaysShowAltText}
+        <p class="item-caption">{item.filename}</p>
+      {/if}
+    </div>
   {/each}
 </div>
 {#if body}
@@ -64,6 +77,17 @@
     grid-template-columns: repeat(var(--gallery-columns), minmax(0, 1fr));
     max-width: 100%;
     width: min(var(--timeline-media-fill), var(--timeline-media-max));
+  }
+
+  .cell {
+    display: grid;
+    min-width: 0;
+  }
+
+  .item-caption {
+    line-height: var(--line-height-body);
+    margin: var(--space-100) 0 0;
+    white-space: pre-wrap;
   }
 
   .caption {

@@ -12,8 +12,8 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
     if (content.kind === 'gallery') {
       return content.items.flatMap((item, index): MediaItem[] => {
         const shared = {
-          filename: item.body,
-          caption: null,
+          filename: item.filename,
+          caption: item.caption,
           html: null,
           source: item.source,
           mime: item.mime,
@@ -27,15 +27,15 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
               kind: 'image',
               width: item.width,
               height: item.height,
-              size: null,
+              size: item.size,
               blurhash: item.blurhash,
               thumbnail: item.thumbnail,
               spoiler: null,
             },
           ];
         }
-        if (item.kind === 'file' && isPdfAttachment(item.mime, item.body)) {
-          return [{ ...shared, kind: 'file', size: null }];
+        if (item.kind === 'file' && isPdfAttachment(item.mime, item.filename)) {
+          return [{ ...shared, kind: 'file', size: item.size }];
         }
         return [];
       });

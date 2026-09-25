@@ -1300,8 +1300,83 @@ async fn a_gallery_reaches_the_view_as_one_item_per_attachment() {
     assert_eq!(gallery.0, "holiday");
     assert!(matches!(
         gallery.1.as_slice(),
-        [crate::protocol::GalleryItemView::Image { body, .. }] if body == "beach.jpg"
+        [crate::protocol::GalleryItemView::Image { filename, .. }] if filename == "beach.jpg"
     ));
+}
+
+#[tokio::test]
+async fn a_gallery_item_carries_what_a_single_attachment_does() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!gallery-items:example.org");
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                serde_json::from_value::<
+                    matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
+                >(json!({
+                    "type": "m.room.message",
+                    "event_id": "$gallery",
+                    "sender": *ALICE,
+                    "origin_server_ts": 1,
+                    "content": {
+                        "msgtype": "dm.filament.gallery",
+                        "body": "",
+                        "itemtypes": [
+                            {
+                                "itemtype": "m.image",
+                                "body": "the beach",
+                                "filename": "beach.jpg",
+                                "url": "mxc://example.org/beach",
+                                "info": { "mimetype": "image/jpeg", "size": 2048 }
+                            },
+                            {
+                                "itemtype": "m.audio",
+                                "body": "memo.ogg",
+                                "url": "mxc://example.org/memo",
+                                "info": { "mimetype": "audio/ogg" },
+                                "org.matrix.msc1767.audio": { "duration": 4000, "waveform": [0, 1024] }
+                            },
+                            {
+                                "itemtype": "m.file",
+                                "body": "report.pdf",
+                                "url": "mxc://example.org/report",
+                                "info": { "mimetype": "application/pdf", "size": 4096 }
+                            }
+                        ]
+                    }
+                }))
+                .unwrap(),
+            ),
+        )
+        .await;
+
+    let items = contents(
+        &timeline_views(&client, &room, false)
+            .await
+            .expect("a timeline for a joined room"),
+    )
+    .into_iter()
+    .find_map(|content| match content {
+        crate::protocol::TimelineItemContentView::Gallery { items, .. } => Some(items),
+        _ => None,
+    })
+    .expect("a gallery on the timeline");
+
+    let json = serde_json::to_value(&items).unwrap();
+    assert_eq!(json[0]["filename"], "beach.jpg");
+    assert_eq!(json[0]["caption"], "the beach");
+    assert_eq!(json[0]["size"], 2048);
+    assert_eq!(json[1]["filename"], "memo.ogg");
+    assert_eq!(json[1]["caption"], serde_json::Value::Null);
+    assert_eq!(json[1]["duration_ms"], 4000);
+    assert_eq!(json[1]["waveform"], json!([0.0, 1.0]));
+    assert_eq!(json[2]["filename"], "report.pdf");
+    assert_eq!(json[2]["size"], 4096);
 }
 
 fn state_changes(
