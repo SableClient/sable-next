@@ -31,6 +31,11 @@
   }: Props = $props();
   let open = $state(false);
   let anchor = $state<HTMLElement | null>(null);
+  let side = $derived.by((): 'left' | 'right' => {
+    if (!anchor) return 'right';
+    const rect = anchor.getBoundingClientRect();
+    return rect.left + rect.width / 2 > window.innerWidth / 2 ? 'left' : 'right';
+  });
 
   function openAccount(): void {
     open = false;
@@ -43,11 +48,17 @@
     onOpenChange?.(false);
     onAvatarClick?.(source, displayName);
   }
+
+  function handleCloseAutoFocus(event: Event): void {
+    event.preventDefault();
+    anchor?.focus({ preventScroll: true });
+  }
 </script>
 
 <ResponsivePopover
   bind:open
   {anchor}
+  {side}
   collisionPadding={12}
   sideOffset={10}
   closeOnAnchorHidden
@@ -57,6 +68,7 @@
   handleOpacity={1}
   contentInset={false}
   {onOpenChange}
+  onCloseAutoFocus={handleCloseAutoFocus}
 >
   {#snippet trigger({ props })}
     <button {...props} bind:this={anchor} class="avatar-button selection-open" aria-label={label}>
