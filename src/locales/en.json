@@ -1244,6 +1244,19 @@
     "syncAdopt": "Use synced settings",
     "syncTurnOn": "Turn on sync",
     "syncNotNow": "Not now"
+ ,
+    "stageDoneLabel": "Finish setting up",
+    "doneTitle": "This device is set up",
+    "doneConfirmed": "Confirmed as yours",
+    "doneUnconfirmed": "Not confirmed yet",
+    "doneRecovery": "Recovery is set up",
+    "doneNoRecovery": "No recovery key yet",
+    "doneNotifying": "Notifications are on",
+    "doneNotNotifying": "Notifications are off",
+    "doneSyncing": "Settings sync across devices",
+    "doneNotSyncing": "Settings stay on this device",
+    "doneHint": "You can change any of these in Settings.",
+    "doneAction": "Go to your chats"
   },
   "footer": {
     "sourceCode": "Source code",

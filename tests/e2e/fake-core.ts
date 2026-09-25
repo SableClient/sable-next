@@ -4,6 +4,7 @@ import type {
   Command,
   CommandOk,
   CoreEvent,
+  EncryptionStatusView,
   MentionNotificationsView,
   ProfileView,
   RoomSummary,
@@ -29,7 +30,8 @@ export type RoomCoreMode =
   | 'spaces'
   | 'tombstoned'
   | 'voice'
-  | 'unverified';
+  | 'unverified'
+  | 'onboarding';
 
 type WorkerMode = RoomCoreMode;
 
@@ -429,7 +431,28 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [voiceRoom.room_id, voiceRoom],
     ]);
     let nextSubscription = 2;
-    let signedOut = false;
+    const ONBOARDING_KEY = 'sable-e2e-onboarding';
+    const onboarded = JSON.parse(sessionStorage.getItem(ONBOARDING_KEY) ?? 'null') as {
+      signedOut: boolean;
+      identityConfirmed: boolean;
+      accountData: [string, unknown][];
+    } | null;
+    let signedOut = onboarded?.signedOut ?? workerMode === 'onboarding';
+    let identityConfirmed = onboarded?.identityConfirmed ?? workerMode !== 'onboarding';
+    const accountData = new Map<string, unknown>(onboarded?.accountData ?? []);
+    const saveOnboarding = () => {
+      if (workerMode !== 'onboarding') return;
+      sessionStorage.setItem(
+        ONBOARDING_KEY,
+        JSON.stringify({ signedOut, identityConfirmed, accountData: [...accountData] })
+      );
+    };
+    const encryption = (): EncryptionStatusView => ({
+      verification: identityConfirmed ? 'verified' : 'unverified',
+      recovery: identityConfirmed ? 'enabled' : 'disabled',
+      cross_signing_ready: identityConfirmed,
+      recovery_passphrase: false,
+    });
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     const notificationKeywords: string[] = [];
     const mentionNotificationModes: MentionNotificationsView = {
@@ -609,7 +632,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'discover_homeserver',
         homeserver: 'https://example.test',
       }),
-      login: () => ({ type: 'login', user_id: session.user_id }),
+      login: () => {
+        signedOut = false;
+        saveOnboarding();
+        return { type: 'login', user_id: session.user_id };
+      },
       login_flows: () => ({
         type: 'login_flows',
         flows: {
@@ -659,7 +686,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       restore: () => {
         if (workerMode === 'loading') return NO_REPLY;
         if (workerMode === 'error') throw new FakeCoreError('failed');
-        return { type: 'restore', session };
+        return { type: 'restore', session: signedOut ? null : session };
       },
       logout: () => {
         signedOut = true;
@@ -934,7 +961,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       access_token: () => ({ type: 'access_token', token: 'e2e-access-token' }),
       push_event: () => ({ type: 'push_event', fetched: { kind: 'unavailable' } }),
       room_cosmetics: () => ({ type: 'room_cosmetics', space_id: null, users: [] }),
-      account_data: () => ({ type: 'account_data', content: null }),
+      account_data: (command) => ({
+        type: 'account_data',
+        content: accountData.get(command.event_type) ?? null,
+      }),
+      set_account_data: (command) => {
+        if (workerMode === 'onboarding') accountData.set(command.event_type, command.content);
+        saveOnboarding();
+        return { type: 'set_account_data' };
+      },
       event_source: (command) => ({
         type: 'event_source',
         source:
@@ -1018,6 +1053,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       },
       room_timeline_events: () => ({ type: 'room_timeline_events', events: [] }),
       room_state_events_raw: () => ({ type: 'room_state_events_raw', events: [] }),
+      room_full_state: () => ({ type: 'room_full_state', events: [] }),
       search_user_directory: () => ({
         type: 'search_user_directory',
         limited: false,
@@ -1069,15 +1105,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'sync_status',
         status: { state: 'live' },
       }),
-      encryption_status: () => ({
-        type: 'encryption_status',
-        status: {
-          verification: 'verified',
-          recovery: 'enabled',
-          cross_signing_ready: true,
-          recovery_passphrase: false,
-        },
-      }),
+      encryption_status: () => ({ type: 'encryption_status', status: encryption() }),
       sign_out_safety: () => ({
         type: 'sign_out_safety',
         safety: {
@@ -1125,7 +1153,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           {
             device_id: session.device_id,
             display_name: 'This browser',
-            is_verified: true,
+            is_verified: identityConfirmed,
             is_own: true,
             last_seen_ts: null,
             last_seen_ip: null,
@@ -1142,10 +1170,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       enable_recovery: () => ({ type: 'enable_recovery', recovery_key: 'e2e-recovery-key' }),
       reset_recovery_key: () => ({ type: 'reset_recovery_key', recovery_key: 'e2e-recovery-key' }),
-      reset_identity: () => ({
-        type: 'reset_identity',
-        step: { step: 'done', recovery_key: 'e2e-recovery-key' },
-      }),
+      reset_identity: (_command, port) => {
+        if (workerMode === 'onboarding') {
+          identityConfirmed = true;
+          saveOnboarding();
+          window.setTimeout(() => {
+            port.emit({ type: 'encryption_status', status: encryption() });
+          }, 50);
+        }
+        return {
+          type: 'reset_identity',
+          step: { step: 'done', recovery_key: 'e2e-recovery-key' },
+        };
+      },
       continue_identity_reset: () => ({
         type: 'continue_identity_reset',
         recovery_key: 'e2e-recovery-key',

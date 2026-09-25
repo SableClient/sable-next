@@ -1,6 +1,13 @@
 import type { RecoveryStateView, VerificationStateView } from '#src/generated/protocol';
 
-export type SetupStep = 'device' | 'recovery' | 'profile' | 'notifications' | 'sync' | 'consent';
+export type SetupStep =
+  | 'device'
+  | 'recovery'
+  | 'profile'
+  | 'notifications'
+  | 'sync'
+  | 'consent'
+  | 'done';
 export type AccountStep = Extract<SetupStep, 'recovery' | 'profile' | 'notifications'>;
 
 export const ACCOUNT_STEPS: readonly AccountStep[] = ['recovery', 'profile', 'notifications'];
@@ -45,6 +52,7 @@ export function planSetup(state: SetupState, full: boolean): SetupStep[] {
     if (!state.syncEnabled) steps.push('sync');
   }
   if (state.consentPending) steps.push('consent');
+  if (full) steps.push('done');
   return steps;
 }
 

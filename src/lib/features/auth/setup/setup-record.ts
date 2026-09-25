@@ -11,6 +11,7 @@ const STEPS: readonly SetupStep[] = [
   'notifications',
   'sync',
   'consent',
+  'done',
 ];
 
 export interface SetupRecord {

@@ -50,10 +50,7 @@ getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 matrix-sdk-common.workspace = true
-matrix-sdk = { workspace = true, features = [
-  "bundled-sqlite",
-  "automatic-room-key-forwarding",
-] }
+matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = "3"
 tokio = { workspace = true }
 

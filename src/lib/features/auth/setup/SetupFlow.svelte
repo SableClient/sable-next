@@ -22,6 +22,7 @@
   import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
   import NotificationsSetupCard from './NotificationsSetupCard.svelte';
   import SettingsSyncCard from './SettingsSyncCard.svelte';
+  import SetupDoneCard from './SetupDoneCard.svelte';
   import {
     encryptionKnown,
     isAccountStep,
@@ -47,6 +48,7 @@
     profile: 'auth.stageProfileLabel',
     notifications: 'setup.stageNotificationsLabel',
     sync: 'setup.stageSyncLabel',
+    done: 'setup.stageDoneLabel',
     consent: 'auth.stageConsentLabel',
   };
 
@@ -268,6 +270,12 @@
             }}
             onSkip={() => {
               advance('sync');
+            }}
+          />
+        {:else if step === 'done'}
+          <SetupDoneCard
+            onComplete={() => {
+              advance('done');
             }}
           />
         {:else if step === 'profile'}

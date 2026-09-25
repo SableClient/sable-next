@@ -95,28 +95,30 @@
   {/if}
 
   {#if askDefault}
-    <OptionCards
-      label={$i18n.t('setup.notificationsGroupLabel')}
-      value={groupMode}
-      disabled={saving}
-      options={[
-        {
-          value: 'mentions',
-          label: $i18n.t('room.notifyMentions'),
-          hint: $i18n.t('setup.notificationsMentionsHint'),
-          icon: BellSimpleIcon,
-        },
-        {
-          value: 'all',
-          label: $i18n.t('room.notifyAll'),
-          hint: $i18n.t('setup.notificationsAllHint'),
-          icon: BellRingingIcon,
-        },
-      ]}
-      onSelect={(mode) => {
-        groupMode = mode;
-      }}
-    />
+    <AuthField labelId="notifications-group-title" label={$i18n.t('setup.notificationsGroupLabel')}>
+      <OptionCards
+        label={$i18n.t('setup.notificationsGroupLabel')}
+        value={groupMode}
+        disabled={saving}
+        options={[
+          {
+            value: 'mentions',
+            label: $i18n.t('room.notifyMentions'),
+            hint: $i18n.t('setup.notificationsMentionsHint'),
+            icon: BellSimpleIcon,
+          },
+          {
+            value: 'all',
+            label: $i18n.t('room.notifyAll'),
+            hint: $i18n.t('setup.notificationsAllHint'),
+            icon: BellRingingIcon,
+          },
+        ]}
+        onSelect={(mode) => {
+          groupMode = mode;
+        }}
+      />
+    </AuthField>
   {/if}
 
   <AuthStatusSlot message={error} />

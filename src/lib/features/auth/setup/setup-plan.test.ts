@@ -40,13 +40,14 @@ describe('encryptionKnown', () => {
 
 describe('planSetup', () => {
   test('an unverified login confirms the device and nothing it does not need', () => {
-    expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device']);
+    expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device', 'done']);
   });
 
   test('a new account creates recovery and a profile', () => {
     expect(planSetup(state({ registering: true, recovery: 'disabled' }), true)).toEqual([
       'recovery',
       'profile',
+      'done',
     ]);
   });
 
@@ -60,7 +61,7 @@ describe('planSetup', () => {
       }),
       true
     );
-    expect(plan).toEqual(['device']);
+    expect(plan).toEqual(['device', 'done']);
   });
 
   test('a key from an identity reset is shown even when the account finished recovery', () => {
@@ -72,7 +73,15 @@ describe('planSetup', () => {
       }),
       true
     );
-    expect(plan).toEqual(['recovery']);
+    expect(plan).toEqual(['recovery', 'done']);
+  });
+
+  test('a full setup lands on done after consent, and a consent-only one does not', () => {
+    expect(planSetup(state({ verification: 'unverified', consentPending: true }), true)).toEqual([
+      'device',
+      'consent',
+      'done',
+    ]);
   });
 
   test('a login that needs no setup still asks for consent, and only that', () => {
@@ -86,17 +95,18 @@ describe('the notifications step', () => {
     expect(planSetup(state({ verification: 'unverified', accountFinished: [] }), true)).toEqual([
       'device',
       'notifications',
+      'done',
     ]);
   });
 
   test('a second device still asks for its own permission once the account chose', () => {
     expect(planSetup(state({ verification: 'unverified', permissionAskable: true }), true)).toEqual(
-      ['device', 'notifications']
+      ['device', 'notifications', 'done']
     );
   });
 
   test('is skipped once the account chose and this device has nothing left to ask', () => {
-    expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device']);
+    expect(planSetup(state({ verification: 'unverified' }), true)).toEqual(['device', 'done']);
   });
 });
 
@@ -105,6 +115,7 @@ describe('the sync step', () => {
     expect(planSetup(state({ verification: 'unverified', syncEnabled: false }), true)).toEqual([
       'device',
       'sync',
+      'done',
     ]);
   });
 
@@ -116,11 +127,11 @@ describe('the sync step', () => {
 describe('replan', () => {
   test('keeps what is finished in place and drops a step the state no longer needs', () => {
     const next = replan(['device'], state({ verification: 'verified', recovery: 'enabled' }), true);
-    expect(next).toEqual(['device']);
+    expect(next).toEqual(['device', 'done']);
   });
 
   test('appends a step the state now needs after the finished ones', () => {
     const next = replan(['device'], state({ newRecoveryKey: true }), true);
-    expect(next).toEqual(['device', 'recovery']);
+    expect(next).toEqual(['device', 'recovery', 'done']);
   });
 });
