@@ -387,6 +387,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
         let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
         #[cfg(desktop)]
         let builder = window_geometry::restore(app.handle(), builder, &config.label);
+        #[cfg(target_os = "android")]
+        let builder = builder.on_navigation(|url| url.as_str().parse::<tauri::http::Uri>().is_ok());
         builder.build()?;
     }
 
