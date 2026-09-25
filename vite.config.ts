@@ -76,6 +76,7 @@ export default defineConfig({
       adapter: adapter({
         assets: 'dist',
         pages: 'dist',
+        fallback: '404.html',
       }),
     }),
   ],
