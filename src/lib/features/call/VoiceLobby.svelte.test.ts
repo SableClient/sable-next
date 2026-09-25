@@ -47,7 +47,9 @@ test('shows the permission error when joining is forbidden', async () => {
   });
   await tick();
 
-  expect(document.body.textContent).toContain("You don't have permission to join.");
+  expect(document.querySelector('.alert-warning')?.textContent).toContain(
+    "You don't have permission to join."
+  );
 
   await unmount(instance);
 });
@@ -69,7 +71,9 @@ test('says the homeserver cannot host calls when it has no call server', async (
   });
   await tick();
 
-  expect(document.body.textContent).toContain("This homeserver can't host calls.");
+  expect(document.querySelector('.alert-warning')?.textContent).toContain(
+    "This homeserver can't host calls."
+  );
   expect(document.body.textContent).not.toContain("You don't have permission to join.");
 
   await unmount(instance);

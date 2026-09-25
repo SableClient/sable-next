@@ -247,7 +247,7 @@
   .tile {
     --tile-scrim: color-mix(in srgb, var(--picker-black) 62%, transparent);
 
-    background: var(--call-tile-bg, var(--surface-var-container));
+    background: var(--surface-var-container);
     border-radius: var(--radii-400);
     box-sizing: border-box;
     container-type: size;
@@ -311,7 +311,7 @@
 
   .speaking:not(.video-on) .placeholder :global(.avatar-root) {
     box-shadow:
-      0 0 0 0.1875rem var(--call-tile-bg, var(--surface-var-container)),
+      0 0 0 0.1875rem var(--surface-var-container),
       0 0 0 0.375rem var(--success-main);
   }
 

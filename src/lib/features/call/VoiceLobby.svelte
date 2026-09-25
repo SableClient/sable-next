@@ -10,6 +10,7 @@
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity } from '#lib/features/room/members.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -81,7 +82,7 @@
   </Tooltip>
 {/snippet}
 
-<section class="lobby call-stage-theme" aria-label={$i18n.t('call.title')}>
+<section class="lobby" aria-label={$i18n.t('call.title')}>
   <div class="panel">
     {#if roomName}<h2>{roomName}</h2>{/if}
 
@@ -111,9 +112,8 @@
         {#snippet micButton(props: Record<string, unknown>)}
           <IconButton
             {...props}
-            variant="ghost"
+            variant={media.microphone ? 'secondary' : 'danger'}
             size="large"
-            class={['toggle', !media.microphone && 'off']}
             label={micLabel}
             onclick={() => onChange({ ...media, microphone: !media.microphone })}
           >
@@ -129,9 +129,8 @@
         {#snippet cameraButton(props: Record<string, unknown>)}
           <IconButton
             {...props}
-            variant="ghost"
+            variant={media.camera ? 'primary' : 'secondary'}
             size="large"
-            class={['toggle', media.camera && 'on']}
             label={cameraLabel}
             onclick={() => onChange({ ...media, camera: !media.camera })}
           >
@@ -144,14 +143,7 @@
         {/snippet}
         {@render tip(cameraLabel, cameraButton)}
 
-        <Button
-          variant="primary"
-          size="large"
-          class="join"
-          disabled={joining}
-          loading={joining}
-          onclick={join}
-        >
+        <Button variant="primary" size="large" disabled={joining} loading={joining} onclick={join}>
           <PhoneIcon aria-hidden="true" weight="fill" />
           {joining ? $i18n.t('call.joining') : $i18n.t('call.joinVoice')}
         </Button>
@@ -160,39 +152,35 @@
           bind:open={devicesOpen}
           side="top"
           align="center"
-          class="call-stage-theme call-devices-popover"
           label={$i18n.t('call.checkDevices')}
           closeLabel={$i18n.t('call.dismiss')}
         >
           {#snippet trigger({ props })}
-            <Button {...props} variant="ghost" size="large" class="toggle devices-button">
+            <Button {...props} variant="secondary" size="large">
               <SlidersHorizontalIcon aria-hidden="true" />
               {$i18n.t('call.checkDevices')}
             </Button>
           {/snippet}
-          <div class="devices call-stage-theme">
-            <CallDevicePreview {media} {onChange} {self} surface="call-stage-theme" />
+          <div class="devices">
+            <CallDevicePreview {media} {onChange} {self} />
           </div>
         </ResponsivePopover>
       </div>
     {:else if !hasPermission}
-      <div class="closed">
-        <p class="notice">{$i18n.t('call.lobbyNoPermission')}</p>
-        <p class="hint">{$i18n.t('call.lobbyNoPermissionHint')}</p>
-      </div>
+      <Alert variant="warning" title={$i18n.t('call.lobbyNoPermission')}>
+        <p>{$i18n.t('call.lobbyNoPermissionHint')}</p>
+      </Alert>
     {:else if !hasFocus}
-      <div class="closed">
-        <p class="notice">{$i18n.t('call.lobbyNoFocus')}</p>
-        <p class="hint">{$i18n.t('call.lobbyNoFocusHint')}</p>
-      </div>
+      <Alert variant="warning" title={$i18n.t('call.lobbyNoFocus')}>
+        <p>{$i18n.t('call.lobbyNoFocusHint')}</p>
+      </Alert>
     {/if}
   </div>
 </section>
 
 <style>
   .lobby {
-    background: var(--call-stage-bg);
-    color: var(--bg-on-container);
+    color: var(--surface-on-container);
     display: flex;
     flex: 1;
     justify-content: center;
@@ -239,7 +227,7 @@
   }
 
   .face-name {
-    color: color-mix(in srgb, var(--bg-on-container) 78%, transparent);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     max-inline-size: 100%;
     overflow: hidden;
@@ -283,13 +271,12 @@
   }
 
   .names {
-    color: color-mix(in srgb, var(--bg-on-container) 72%, transparent);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
   }
 
-  .empty,
-  .hint {
-    color: color-mix(in srgb, var(--bg-on-container) 72%, transparent);
+  .empty {
+    color: var(--surface-var-on-container);
     margin: 0;
   }
 
@@ -302,56 +289,11 @@
     margin-block-start: var(--space-200);
   }
 
-  .join-row :global(.toggle) {
-    --button-container: var(--surface-var-container);
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-container-active: var(--surface-var-container-active);
-    --button-line: transparent;
-    --button-on-container: var(--surface-var-on-container);
-
-    border-radius: var(--radii-pill);
-  }
-
-  .join-row :global(.toggle.off) {
-    --button-container: var(--crit-container);
-    --button-container-hover: var(--crit-container-hover);
-    --button-container-active: var(--crit-container-active);
-    --button-on-container: var(--crit-on-container);
-  }
-
-  .join-row :global(.toggle.on) {
-    --button-container: var(--call-on-container);
-    --button-container-hover: var(--call-on-container-hover);
-    --button-container-active: var(--call-on-container-hover);
-    --button-on-container: var(--call-on-ink);
-  }
-
-  .join-row :global(.join) {
-    --button-container: var(--success-main);
-    --button-container-hover: var(--success-main-hover);
-    --button-container-active: var(--success-main-active);
-    --button-line: transparent;
-    --button-on-container: var(--success-on-main);
-
-    border-radius: var(--radii-pill);
-    min-inline-size: 11rem;
-  }
-
   .devices {
     background: var(--bg-container);
     border-radius: var(--radii-500);
     color: var(--bg-on-container);
     inline-size: min(28rem, calc(100vw - 2rem));
     overflow: hidden;
-  }
-
-  .closed {
-    display: grid;
-    gap: var(--space-100);
-  }
-
-  .notice {
-    color: var(--crit-main);
-    margin: 0;
   }
 </style>

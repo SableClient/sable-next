@@ -62,7 +62,6 @@
   let size = $derived<'small' | 'medium'>(compact ? 'small' : 'medium');
   let devices = $derived(compact ? undefined : onSwitchDevice);
   let pending = $derived(ready ? '' : ` · ${$i18n.t('call.waitingForMedia')}`);
-  let surface = $derived(compact ? undefined : 'call-stage-theme');
   let micMenu = $state(false);
   let outputMenu = $state(false);
   let cameraMenu = $state(false);
@@ -88,7 +87,6 @@
 )}
   <div
     class="control"
-    class:grouped={menu !== undefined}
     {@attach longPress({ enabled: () => onHold !== undefined, onPress: () => onHold?.() })}
   >
     <Tooltip label={tip}>
@@ -102,8 +100,7 @@
   {#snippet micButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant="ghost"
-      class={['toggle', !microphoneEnabled && 'off']}
+      variant={microphoneEnabled ? 'secondary' : 'danger'}
       {size}
       label={micLabel}
       disabled={!ready}
@@ -120,7 +117,6 @@
     {#if devices}
       <CallDeviceMenu
         bind:open={micMenu}
-        {surface}
         kinds={['audioinput']}
         label={$i18n.t('call.microphoneDevices')}
         onSelect={devices}
@@ -137,8 +133,7 @@
   {#snippet deafenButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant="ghost"
-      class={['toggle', deafened && 'off']}
+      variant={deafened ? 'danger' : 'secondary'}
       {size}
       label={deafenLabel}
       onclick={onToggleDeafen}
@@ -154,7 +149,6 @@
     {#if devices}
       <CallDeviceMenu
         bind:open={outputMenu}
-        {surface}
         kinds={['audiooutput']}
         label={$i18n.t('call.outputDevices')}
         onSelect={devices}
@@ -171,8 +165,7 @@
   {#snippet cameraButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant="ghost"
-      class={['toggle', cameraEnabled && 'on']}
+      variant={cameraEnabled ? 'primary' : 'secondary'}
       {size}
       label={cameraLabel}
       disabled={!ready}
@@ -189,7 +182,6 @@
     {#if devices}
       <CallDeviceMenu
         bind:open={cameraMenu}
-        {surface}
         kinds={['videoinput']}
         label={$i18n.t('call.cameraDevices')}
         onSelect={devices}
@@ -207,8 +199,7 @@
     {#snippet switchCameraButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant="ghost"
-        class="toggle"
+        variant="secondary"
         {size}
         label={$i18n.t('call.switchCamera')}
         disabled={!ready || !cameraEnabled}
@@ -224,8 +215,7 @@
     {#snippet screenButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant="ghost"
-        class={['toggle', screenShareEnabled && 'on']}
+        variant={screenShareEnabled ? 'primary' : 'secondary'}
         {size}
         label={screenLabel}
         disabled={!ready}
@@ -241,8 +231,7 @@
     {#snippet settingsButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant="ghost"
-        class="toggle"
+        variant="secondary"
         {size}
         label={$i18n.t('call.settings')}
         onclick={onOpenSettings}
@@ -277,58 +266,22 @@
   }
 
   .controls:not(.compact) {
+    --radius-outer: var(--radii-500);
+    --radius-padding: var(--space-150);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
     backdrop-filter: blur(0.75rem);
     background: color-mix(in srgb, var(--bg-container) 88%, transparent);
-    border-radius: var(--radii-pill);
-    box-shadow: var(--call-pill-shadow, var(--shadow-float));
-    padding: var(--space-150);
+    border: var(--border-width) solid var(--bg-container-line);
+    border-radius: var(--radius-outer);
+    box-shadow: var(--shadow-float);
+    padding: var(--radius-padding);
   }
 
   .control {
     align-items: center;
     display: flex;
-  }
-
-  .control.grouped {
-    background: var(--surface-var-container);
-    border-radius: var(--radii-pill);
-  }
-
-  .control.grouped:has(:global(.toggle.off)) {
-    --surface-var-container-hover: var(--crit-container-hover);
-    --surface-var-on-container: var(--crit-on-container);
-
-    background: var(--crit-container);
-  }
-
-  .controls.compact .control.grouped {
-    background: none;
-  }
-
-  .control :global(.device-caret) {
-    --button-container: transparent;
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-on-container: var(--surface-var-on-container);
-
-    border-radius: var(--radii-pill);
-    margin-inline: calc(-1 * var(--space-050)) var(--space-050);
-    width: 1.75rem;
-  }
-
-  .controls:not(.compact) .control :global(.device-caret) {
-    --button-height: var(--control-height-500);
-  }
-
-  .controls :global(.toggle) {
-    --button-container: var(--surface-var-container);
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-container-active: var(--surface-var-container-active);
-    --button-line: transparent;
-    --button-on-container: var(--surface-var-on-container);
-  }
-
-  .controls:not(.compact) :global(.btn) {
-    border-radius: var(--radii-pill);
+    gap: var(--space-050);
   }
 
   .controls:not(.compact) :global(.icon-button:not(.device-caret)) {
@@ -336,26 +289,12 @@
     --button-icon-size: var(--size-x400);
   }
 
-  .controls :global(.toggle.off) {
-    --button-container: var(--crit-container);
-    --button-container-hover: var(--crit-container-hover);
-    --button-container-active: var(--crit-container-active);
-    --button-on-container: var(--crit-on-container);
-  }
-
-  .controls :global(.toggle.on) {
-    --button-container: var(--call-on-container, var(--primary-container));
-    --button-container-hover: var(--call-on-container-hover, var(--primary-container-hover));
-    --button-container-active: var(--call-on-container-hover, var(--primary-container-active));
-    --button-on-container: var(--call-on-ink, var(--primary-on-container));
-  }
-
   .controls :global(.hang-up) {
-    --button-container: var(--call-hangup, var(--crit-main));
-    --button-container-hover: var(--call-hangup-hover, var(--crit-main-hover));
-    --button-container-active: var(--call-hangup-active, var(--crit-main-active));
-    --button-line: transparent;
-    --button-on-container: var(--call-hangup-ink, var(--crit-on-main));
+    --button-container: var(--crit-main);
+    --button-container-hover: var(--crit-main-hover);
+    --button-container-active: var(--crit-main-active);
+    --button-line: var(--crit-main-line);
+    --button-on-container: var(--crit-on-main);
   }
 
   .controls:not(.compact) :global(.hang-up) {
@@ -366,7 +305,6 @@
   @container call-dock (width < 34rem) {
     .controls:not(.compact) {
       gap: var(--space-100);
-      padding: var(--space-100);
     }
 
     .controls:not(.compact) :global(.device-caret) {

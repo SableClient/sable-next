@@ -21,11 +21,10 @@
   interface Props {
     media: CallMedia;
     onChange: (media: CallMedia) => void;
-    surface?: string;
     self?: MemberIdentity | null;
   }
 
-  let { media, onChange, surface, self = null }: Props = $props();
+  let { media, onChange, self = null }: Props = $props();
 
   let micLabel = $derived(
     media.microphone ? $i18n.t('call.microphoneOn') : $i18n.t('call.microphoneOff')
@@ -140,12 +139,11 @@
     {/if}
 
     <div class="toggles">
-      <div class="group" class:muted={!media.microphone}>
+      <div class="group">
         {#snippet micButton(props: Record<string, unknown>)}
           <IconButton
             {...props}
-            variant="ghost"
-            class={['toggle', !media.microphone && 'off']}
+            variant={media.microphone ? 'secondary' : 'danger'}
             label={micLabel}
             onclick={() => onChange({ ...media, microphone: !media.microphone })}
           >
@@ -160,7 +158,6 @@
         <CallDeviceMenu
           kinds={['audioinput']}
           label={$i18n.t('call.microphoneDevices')}
-          {surface}
           onSelect={selectDevice}
         />
       </div>
@@ -168,8 +165,7 @@
         {#snippet cameraButton(props: Record<string, unknown>)}
           <IconButton
             {...props}
-            variant="ghost"
-            class={['toggle', media.camera && 'on']}
+            variant={media.camera ? 'primary' : 'secondary'}
             label={cameraLabel}
             onclick={() => onChange({ ...media, camera: !media.camera })}
           >
@@ -184,7 +180,6 @@
         <CallDeviceMenu
           kinds={['videoinput']}
           label={$i18n.t('call.cameraDevices')}
-          {surface}
           onSelect={selectDevice}
         />
       </div>
@@ -192,7 +187,6 @@
         <CallDeviceMenu
           kinds={['audiooutput']}
           label={$i18n.t('call.outputDevices')}
-          {surface}
           speaker
           onSelect={selectDevice}
         />
@@ -227,7 +221,7 @@
   .preview {
     align-items: center;
     aspect-ratio: 16 / 9;
-    background: var(--call-tile-bg, var(--surface-var-container));
+    background: var(--surface-var-container);
     border-radius: var(--radii-500);
     container-type: size;
     display: flex;
@@ -271,65 +265,17 @@
   }
 
   .group {
+    --radius-outer: var(--radii-500);
+    --radius-padding: var(--space-100);
+    --radius-inner: max(0px, calc(var(--radius-outer) - var(--radius-padding)));
+
     align-items: center;
     backdrop-filter: blur(0.75rem);
     background: color-mix(in srgb, var(--bg-container) 86%, transparent);
-    border-radius: var(--radii-pill);
+    border-radius: var(--radius-outer);
     display: flex;
-    padding: var(--space-050);
-  }
-
-  .group.muted {
-    background: color-mix(in srgb, var(--crit-container) 92%, transparent);
-  }
-
-  .group.muted :global(.device-caret) {
-    --button-on-container: var(--crit-on-container);
-  }
-
-  .group :global(.device-speaker) {
-    --button-container: var(--surface-var-container);
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-container-active: var(--surface-var-container-active);
-    --button-line: transparent;
-    --button-on-container: var(--surface-var-on-container);
-    --button-gap: var(--space-100);
-    --button-padding-inline: var(--space-300);
-
-    border-radius: var(--radii-pill);
-  }
-
-  .group :global(.toggle) {
-    --button-container: var(--surface-var-container);
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-container-active: var(--surface-var-container-active);
-    --button-line: transparent;
-    --button-on-container: var(--surface-var-on-container);
-
-    border-radius: var(--radii-pill);
-  }
-
-  .group :global(.toggle.off) {
-    --button-container: var(--crit-container);
-    --button-container-hover: var(--crit-container-hover);
-    --button-container-active: var(--crit-container-active);
-    --button-on-container: var(--crit-on-container);
-  }
-
-  .group :global(.toggle.on) {
-    --button-container: var(--call-on-container, var(--primary-container));
-    --button-container-hover: var(--call-on-container-hover, var(--primary-container-hover));
-    --button-container-active: var(--call-on-container-hover, var(--primary-container-active));
-    --button-on-container: var(--call-on-ink, var(--primary-on-container));
-  }
-
-  .group :global(.device-caret) {
-    --button-container: transparent;
-    --button-container-hover: var(--surface-var-container-hover);
-    --button-on-container: var(--bg-on-container);
-
-    border-radius: var(--radii-pill);
-    width: 1.5rem;
+    gap: var(--space-050);
+    padding: var(--radius-padding);
   }
 
   .meter {

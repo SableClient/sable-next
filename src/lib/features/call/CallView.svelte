@@ -16,7 +16,9 @@
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity, type MemberIdentity } from '#lib/features/room/members.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -188,7 +190,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <section
-  class="stage call-stage-theme"
+  class="stage"
   class:resting={!chromeVisible}
   aria-label={$i18n.t('call.title')}
   bind:this={stage}
@@ -236,9 +238,8 @@
     <div class="top-actions">
       {#if canSpotlight}
         <IconButton
-          variant="ghost"
+          variant="secondary"
           size="small"
-          class="stage-action"
           label={$i18n.t(spotlight ? 'call.gridView' : 'call.focusView')}
           onclick={toggleLayout}
         >
@@ -251,9 +252,8 @@
       {/if}
       {#if fullscreenAvailable}
         <IconButton
-          variant="ghost"
+          variant="secondary"
           size="small"
-          class="stage-action"
           label={$i18n.t(fullscreen ? 'call.exitFullscreen' : 'call.fullscreen')}
           onclick={toggleFullscreen}
         >
@@ -297,7 +297,7 @@
 
   <div class="notices" bind:clientHeight={noticeHeight}>
     {#if session.deviceError}
-      <div class="notice critical" role="alert">
+      <Alert variant="critical" class="notice" role="alert">
         <WarningCircleIcon aria-hidden="true" weight="fill" />
         <p>{$i18n.t(DEVICE_ERROR_KEY[session.deviceError])}</p>
         <div class="notice-actions">
@@ -316,7 +316,7 @@
             </Button>
           {/if}
         </div>
-      </div>
+      </Alert>
     {/if}
     <CallPlayback rooms={session.rooms} telemetry={session.telemetry} />
   </div>
@@ -329,20 +329,20 @@
     style:--notice-height="{noticeHeight}px"
   >
     {#if session.failure}
-      <div class="failed-panel" role="alert">
-        <span class="failed-mark"><WarningCircleIcon aria-hidden="true" weight="fill" /></span>
-        <h2>{$i18n.t('call.failed')}</h2>
-        <p>{$i18n.t(callFailureKey(session.failure))}</p>
-        <div class="failed-actions">
-          <Button variant="secondary" onclick={() => session.clearFailure()}>
-            {$i18n.t('call.leave')}
-          </Button>
-          {#if session.failure !== 'busy'}
-            <Button variant="primary" onclick={() => void session.retry()}>
-              {$i18n.t('call.retry')}
+      {@const failure = session.failure}
+      <div class="failed" role="alert">
+        <EmptyState title={$i18n.t('call.failed')} description={$i18n.t(callFailureKey(failure))}>
+          {#snippet actions()}
+            <Button variant="secondary" onclick={() => session.clearFailure()}>
+              {$i18n.t('call.leave')}
             </Button>
-          {/if}
-        </div>
+            {#if failure !== 'busy'}
+              <Button variant="primary" onclick={() => void session.retry()}>
+                {$i18n.t('call.retry')}
+              </Button>
+            {/if}
+          {/snippet}
+        </EmptyState>
       </div>
     {:else if tiles.length === 0}
       <p class="empty">{$i18n.t('call.noParticipants')}</p>
@@ -424,14 +424,9 @@
 
 <style>
   .stage {
-    --stage-bg: var(--call-stage-bg);
-    --stage-scrim: var(--call-stage-scrim);
-    --call-tile-bg: var(--call-stage-tile);
-
-    background: var(--stage-bg);
+    background: var(--surface-container);
     box-sizing: border-box;
-    color: var(--picker-white);
-    color-scheme: dark;
+    color: var(--surface-on-container);
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -490,7 +485,7 @@
   .meta {
     align-items: center;
     border-inline-start: var(--border-width) solid var(--bg-container-line);
-    color: color-mix(in srgb, var(--bg-on-container) 78%, transparent);
+    color: var(--surface-var-on-container);
     display: inline-flex;
     font-variant-numeric: tabular-nums;
     gap: var(--space-100);
@@ -525,14 +520,6 @@
     gap: var(--space-100);
   }
 
-  .top-actions :global(.stage-action) {
-    --button-container: var(--bg-container);
-    --button-container-hover: var(--bg-container-hover);
-    --button-container-active: var(--bg-container-active);
-
-    color: var(--bg-on-container);
-  }
-
   .notices {
     align-items: center;
     display: flex;
@@ -549,13 +536,9 @@
     pointer-events: auto;
   }
 
-  .notice {
+  .notices :global(.notice) {
     align-items: center;
-    background: var(--bg-container);
-    border: var(--border-width) solid var(--crit-container-line, var(--bg-container-line));
-    border-radius: var(--radii-400);
-    box-shadow: var(--call-stage-notice-shadow);
-    color: var(--bg-on-container);
+    box-shadow: var(--shadow-float);
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);
@@ -563,17 +546,15 @@
     padding: var(--space-200) var(--space-200) var(--space-200) var(--space-300);
   }
 
-  .notice > :global(svg) {
-    color: var(--crit-main);
+  .notices :global(.notice > svg) {
     flex: none;
     height: var(--size-x400);
     width: var(--size-x400);
   }
 
-  .notice p {
+  .notices :global(.notice p) {
     flex: 1 1 12rem;
     font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .notice-actions {
@@ -589,7 +570,10 @@
     flex: 1;
     min-height: 0;
     padding: calc(var(--space-200) + var(--control-height-300) + var(--space-200)) var(--space-300)
-      calc(var(--control-height-500) + var(--space-150) * 2 + var(--space-300) * 2);
+      calc(
+        var(--control-height-500) + var(--space-150) * 2 + var(--border-width) * 2 +
+          var(--space-300) * 2
+      );
   }
 
   .media.with-notice {
@@ -600,54 +584,22 @@
 
   .media.locked {
     padding-block-end: calc(
-      var(--control-height-500) + var(--space-150) * 3 + var(--space-300) * 2 + var(--space-500)
+      var(--control-height-500) + var(--space-150) * 3 + var(--border-width) * 2 +
+        var(--space-300) * 2 + var(--space-500)
     );
   }
 
-  .failed-panel {
-    align-items: center;
+  .failed {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-200);
-    margin: auto;
-    max-inline-size: 26rem;
-    text-align: center;
+    flex: 1;
   }
 
-  .failed-mark {
-    align-items: center;
-    background: var(--crit-container);
-    block-size: var(--control-height-500);
-    border-radius: var(--radii-pill);
-    color: var(--crit-on-container);
-    display: inline-flex;
-    inline-size: var(--control-height-500);
-    justify-content: center;
-  }
-
-  .failed-mark :global(svg) {
-    height: var(--size-x400);
-    width: var(--size-x400);
-  }
-
-  .failed-panel h2 {
-    font-size: var(--font-size-heading);
-    margin: var(--space-100) 0 0;
-  }
-
-  .failed-panel p {
-    color: color-mix(in srgb, var(--bg-on-container) 75%, transparent);
-    margin: 0;
-  }
-
-  .failed-actions {
-    display: flex;
-    gap: var(--space-200);
-    margin-block-start: var(--space-300);
+  .failed > :global(.empty-state) {
+    flex: 1;
   }
 
   .empty {
-    color: color-mix(in srgb, var(--picker-white) 70%, transparent);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: auto;
   }
@@ -687,7 +639,7 @@
   }
 
   .waiting p {
-    color: color-mix(in srgb, var(--picker-white) 78%, transparent);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-body);
     margin: 0;
   }
@@ -789,8 +741,8 @@
   }
 
   .indicator.live {
-    background: var(--call-on-container);
-    color: var(--call-on-ink);
+    background: var(--primary-main);
+    color: var(--primary-on-main);
   }
 
   .dock {
@@ -808,7 +760,7 @@
   }
 
   .securing {
-    color: color-mix(in srgb, var(--bg-on-container) 75%, transparent);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     order: -1;

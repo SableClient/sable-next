@@ -22,18 +22,10 @@
     label: string;
     onSelect: (kind: MediaDeviceKind, deviceId: string) => void;
     open?: boolean;
-    surface?: string;
     speaker?: boolean;
   }
 
-  let {
-    kinds,
-    label,
-    onSelect,
-    open = $bindable(false),
-    surface,
-    speaker = false,
-  }: Props = $props();
+  let { kinds, label, onSelect, open = $bindable(false), speaker = false }: Props = $props();
 
   const HEADING = {
     audioinput: 'settings.callInputDevice',
@@ -54,10 +46,10 @@
 </script>
 
 {#if supportsDeviceSelection()}
-  <ActionMenu bind:open {label} class={surface} side="top" align="center">
+  <ActionMenu bind:open {label} side="top" align="center">
     {#snippet trigger({ props })}
       {#if speaker}
-        <Button {...props} variant="ghost" class="device-speaker" aria-label={label}>
+        <Button {...props} variant="secondary" aria-label={label}>
           <SpeakerHighIcon aria-hidden="true" />
           <CaretUpIcon aria-hidden="true" weight="bold" />
         </Button>

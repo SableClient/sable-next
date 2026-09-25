@@ -73,13 +73,19 @@
     align-items: center;
     background: transparent;
     border: 0;
-    column-gap: var(--space-150);
+    border-radius: var(--radius);
+    column-gap: var(--space-200);
     cursor: pointer;
     display: grid;
     font: inherit;
     grid-template-columns: auto minmax(0, 1fr);
-    padding: 0;
+    padding: var(--space-100) var(--space-200);
     text-align: left;
+  }
+
+  .call-room:hover,
+  .call-room:focus-visible {
+    background: var(--bg-container-hover);
   }
 
   .call-room :global(svg) {
@@ -104,11 +110,6 @@
     white-space: nowrap;
   }
 
-  .call-room:hover .room {
-    color: var(--bg-on-container);
-    text-decoration: underline;
-  }
-
   .collapsed .call-room {
     justify-content: center;
   }
@@ -120,10 +121,5 @@
 
   .collapsed :global(.hang-up) {
     margin-inline-start: 0;
-  }
-
-  .call-room:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
   }
 </style>

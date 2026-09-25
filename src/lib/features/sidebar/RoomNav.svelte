@@ -51,6 +51,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import RoomIcon from '#lib/ui/primitives/RoomIcon.svelte';
+  import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import TypingDots from '#lib/ui/primitives/TypingDots.svelte';
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
@@ -791,7 +792,7 @@
                     />
                   {/each}
                 </span>
-                <span class="voice-badge">{live}</span>
+                <StatusBadge label={String(live)} variant="primary" />
               </span>
             {/if}
             <span class="room-status">
@@ -1826,20 +1827,6 @@
     margin-left: calc(-1 * var(--space-150));
   }
 
-  .voice-badge {
-    align-items: center;
-    background: var(--primary-main);
-    border-radius: var(--radii-300);
-    color: var(--primary-on-main);
-    display: flex;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    justify-content: center;
-    line-height: 1;
-    min-width: 1.25rem;
-    padding: var(--space-050) var(--space-150);
-  }
-
   .call-participant-list {
     display: grid;
     gap: var(--space-050);
@@ -1886,7 +1873,7 @@
   .call-participant-list li.speaking :global(.avatar-root) {
     box-shadow:
       0 0 0 0.125rem var(--bg-container),
-      0 0 0 0.25rem var(--success-main);
+      0 0 0 0.3125rem var(--success-main);
   }
 
   .voice-badges {

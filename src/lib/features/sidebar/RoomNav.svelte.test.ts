@@ -712,7 +712,9 @@ test('a voice room shows a speaker icon and the live count', async () => {
   expect(icons.every((icon) => icon.classList.contains('voice'))).toBe(true);
   expect(icons.every((icon) => icon.querySelector('svg') !== null)).toBe(true);
   expect(
-    Array.from(document.querySelectorAll('.voice-badge')).map((node) => node.textContent)
+    Array.from(document.querySelectorAll('.voice-live .status-badge')).map(
+      (node) => node.textContent
+    )
   ).toEqual(['2']);
   await unmount(instance);
 });
@@ -769,7 +771,7 @@ test('an active call in a text room shows the live count without the voice icon'
   expect(document.querySelector('.room-list .room-avatar-icon')?.classList.contains('voice')).toBe(
     false
   );
-  expect(document.querySelector('.voice-badge')?.textContent).toBe('1');
+  expect(document.querySelector('.voice-live .status-badge')?.textContent).toBe('1');
   await unmount(instance);
 });
 
