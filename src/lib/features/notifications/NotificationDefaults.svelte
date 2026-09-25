@@ -27,7 +27,13 @@
     { key: 'group', label: 'settings.notificationDefaultGroup', direct: false },
   ];
 
+  const membershipItems = [
+    { value: 'on', label: 'settings.mentionsNotify' },
+    { value: 'off', label: 'settings.mentionsOff' },
+  ];
+
   let current = $state<DefaultNotificationModesView | null>(null);
+  let membership = $state<boolean | null>(null);
   let failed = $state(false);
   $effect(() => {
     void settingsChanges.version;
@@ -43,6 +49,12 @@
       .catch(() => {
         if (alive) failed = true;
       });
+    void core.commands.membershipNotifications().then(
+      (enabled) => {
+        if (alive) membership = enabled;
+      },
+      () => undefined
+    );
 
     return () => {
       alive = false;
@@ -57,6 +69,14 @@
     if (current) current = { ...current, [key]: mode };
 
     void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
+      failed = true;
+    });
+  }
+
+  function saveMembership(enabled: boolean): void {
+    membership = enabled;
+
+    void core.commands.setMembershipNotifications(enabled).catch(() => {
       failed = true;
     });
   }
@@ -93,6 +113,19 @@
         {/if}
       </label>
     {/each}
+    {#if membership !== null}
+      <label>
+        <span>{$i18n.t('settings.notificationMembership')}</span>
+        <Select
+          aria-label={$i18n.t('settings.notificationMembership')}
+          value={membership ? 'on' : 'off'}
+          items={membershipItems.map((item) => ({ value: item.value, label: $i18n.t(item.label) }))}
+          onValueChange={(value) => {
+            saveMembership(value === 'on');
+          }}
+        />
+      </label>
+    {/if}
   </div>
 </section>
 

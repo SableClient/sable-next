@@ -455,6 +455,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     });
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     const notificationKeywords: string[] = [];
+    let membershipNotifications: boolean | null = false;
     const mentionNotificationModes: MentionNotificationsView = {
       room: 'notify',
       user: 'loud',
@@ -827,6 +828,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       mention_notifications: () => ({
         type: 'mention_notifications',
         modes: mentionNotificationModes,
+      }),
+      membership_notifications: () => ({
+        type: 'membership_notifications',
+        enabled: membershipNotifications,
       }),
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
@@ -1212,6 +1217,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       set_mention_notifications: (command) => {
         mentionNotificationModes[command.rule] = command.mode;
         return { type: 'set_mention_notifications' };
+      },
+      set_membership_notifications: (command) => {
+        membershipNotifications = command.enabled;
+        return { type: 'set_membership_notifications' };
       },
       send_state_event: (command) => {
         if (command.event_type === 'im.vector.modular.widgets')

@@ -1369,6 +1369,15 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_mention_notifications', rule, mode });
     },
 
+    async membershipNotifications(): Promise<boolean | null> {
+      const response = await transport().send({ type: 'membership_notifications' });
+      return response.enabled;
+    },
+
+    async setMembershipNotifications(enabled: boolean): Promise<void> {
+      await transport().send({ type: 'set_membership_notifications', enabled });
+    },
+
     async setDefaultNotificationMode(direct: boolean, mode: NotificationModeView): Promise<void> {
       await transport().send({
         type: 'set_default_notification_mode',

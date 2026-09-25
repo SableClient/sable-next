@@ -1905,6 +1905,14 @@ impl Core {
                 Ok(CommandOk::MentionNotifications { modes })
             }
 
+            Command::MembershipNotifications => {
+                let enabled = notifications::membership_notifications(&self.client().await?)
+                    .await
+                    .map_err(|error| self.failed("membership_notifications", error))?;
+
+                Ok(CommandOk::MembershipNotifications { enabled })
+            }
+
             Command::SetPusher { pusher } => {
                 notifications::set_pusher(&self.client().await?, pusher)
                     .await
@@ -2028,6 +2036,15 @@ impl Core {
 
                 self.emit(CoreEvent::NotificationSettingsChanged);
                 Ok(CommandOk::SetMentionNotifications)
+            }
+
+            Command::SetMembershipNotifications { enabled } => {
+                notifications::set_membership_notifications(&self.client().await?, enabled)
+                    .await
+                    .map_err(|error| self.failed("set_membership_notifications", error))?;
+
+                self.emit(CoreEvent::NotificationSettingsChanged);
+                Ok(CommandOk::SetMembershipNotifications)
             }
 
             Command::Notification { room_id, event_id } => {

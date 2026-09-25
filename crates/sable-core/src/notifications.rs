@@ -586,6 +586,58 @@ pub async fn set_mention_notifications(
 
 /// # Errors
 ///
+/// When the server rejects the read, or no session is signed in.
+pub async fn membership_notifications(client: &Client) -> Result<Option<bool>, String> {
+    let rules = client
+        .account()
+        .push_rules()
+        .await
+        .map_err(|error| error.to_string())?;
+
+    Ok(membership_mode(&rules))
+}
+
+fn membership_mode(rules: &Ruleset) -> Option<bool> {
+    rules
+        .override_
+        .iter()
+        .find(|rule| rule.rule_id == PredefinedOverrideRuleId::MemberEvent.as_str())
+        .map(|rule| rule.enabled && notifies(&rule.actions))
+}
+
+/// # Errors
+///
+/// When the server rejects the write, or no session is signed in.
+pub async fn set_membership_notifications(client: &Client, enabled: bool) -> Result<(), String> {
+    let id = PredefinedOverrideRuleId::MemberEvent.to_string();
+    let actions = if enabled {
+        vec![Action::Notify]
+    } else {
+        vec![]
+    };
+
+    client
+        .send(set_pushrule_actions::v3::Request::new(
+            RuleKind::Override,
+            id.clone(),
+            actions,
+        ))
+        .await
+        .map_err(|error| error.to_string())?;
+
+    client
+        .send(set_pushrule_enabled::v3::Request::new(
+            RuleKind::Override,
+            id,
+            true,
+        ))
+        .await
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+/// # Errors
+///
 /// When the server rejects the push rule write.
 pub async fn set_default_mode(
     client: &Client,
@@ -1040,7 +1092,7 @@ fn room_message_body(content: &RoomMessageEventContent) -> String {
 mod tests {
     use matrix_sdk::ruma::events::AnySyncTimelineEvent;
     use matrix_sdk::ruma::push::{
-        ConditionalPushRule, PredefinedOverrideRuleId, RuleKind, Ruleset,
+        Action, ConditionalPushRule, PredefinedOverrideRuleId, RuleKind, Ruleset,
     };
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{MilliSecondsSinceUnixEpoch, UInt, owned_device_id, room_id, user_id};
@@ -1054,8 +1106,9 @@ mod tests {
 
     use super::{
         ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
-        is_backfill, keyword_rule_ids, mention_actions, mention_rule, push_account,
-        pushes_every_encrypted_event, read_mention_mode, split_defaults, timeline_body,
+        is_backfill, keyword_rule_ids, membership_mode, mention_actions, mention_rule,
+        push_account, pushes_every_encrypted_event, read_mention_mode, split_defaults,
+        timeline_body,
     };
     use crate::protocol::{
         MentionNotificationModeView, MentionRuleView, NotificationModeView, PushFetchView,
@@ -1653,6 +1706,34 @@ mod tests {
         rules.override_.replace(room);
 
         assert_eq!(read(&rules), MentionNotificationModeView::Off);
+    }
+
+    #[test]
+    fn a_notifying_member_event_rule_reads_as_on() {
+        let user = user_id!("@me:example.org");
+        let mut rules = Ruleset::server_default(user);
+
+        assert_eq!(membership_mode(&rules), Some(false));
+
+        let mut member = rules
+            .override_
+            .iter()
+            .find(|rule| rule.rule_id == PredefinedOverrideRuleId::MemberEvent.as_str())
+            .expect("the server default carries the member event rule")
+            .clone();
+        member.actions = vec![Action::Notify];
+        rules.override_.replace(member.clone());
+
+        assert_eq!(membership_mode(&rules), Some(true));
+
+        member.enabled = false;
+        rules.override_.replace(member);
+
+        assert_eq!(membership_mode(&rules), Some(false));
+
+        rules.override_.clear();
+
+        assert_eq!(membership_mode(&rules), None);
     }
 
     #[test]

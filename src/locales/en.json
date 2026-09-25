@@ -1960,6 +1960,7 @@
     "notificationDefaultsHint": "Default notification level for all messages in rooms where no per-room override is set.",
     "notificationDefaultDirect": "Direct Messages",
     "notificationDefaultGroup": "Rooms",
+    "notificationMembership": "Joins, leaves and profile changes",
     "notificationDefaultsFailed": "Those notification settings could not be saved.",
     "mentions": "Mentions and keywords",
     "mentionsHint": "Overrides the All Messages level for messages that mention you or match a keyword.",
