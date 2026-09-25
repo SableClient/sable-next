@@ -353,6 +353,8 @@
 
   .rail:not(.is-navigating, .is-dragging) :global(.auth-card:not(.active)),
   .rail.is-navigating:not(.is-dragging) :global(.auth-card:not(.active, [data-leaving])) {
+    max-height: 0;
+    overflow: hidden;
     visibility: hidden;
   }
 
