@@ -18,6 +18,8 @@ export interface ThemeFileMetadata {
 
 const SWATCH_TOKENS = ['bg-container', 'surface-container', 'primary-main', 'bg-on-container'];
 const UNSAFE_SWATCH = /\b(?:url|var|env|attr|image|image-set|element|paint)\s*\(|[\\;{}<>]/i;
+const UNSAFE_RADIUS = /\b(?:url|env|attr|image|image-set|element|paint)\s*\(|[\\;{}<>]/i;
+type RadiusToken = 'radius' | 'radius-inner';
 
 export const DEFAULT_THEME_SWATCHES = {
   light: ['#fff', '#f4f4f5', '#6e56cf', '#18181b'],
@@ -54,12 +56,22 @@ export function safeSwatch(value: string): boolean {
   return value.length <= 64 && !UNSAFE_SWATCH.test(value) && CSS.supports('color', value);
 }
 
+export function safeRadius(value: string): boolean {
+  return value.length <= 64 && !UNSAFE_RADIUS.test(value) && CSS.supports('border-radius', value);
+}
+
 export function themeSwatches(css: string): string[] {
   if (css.length > MAX_THEME_FILE_BYTES) return [];
   return SWATCH_TOKENS.flatMap((token) => {
     const value = css.match(new RegExp(`--(?:sable-)?${token}\\s*:\\s*([^;}]+)`))?.[1]?.trim();
     return value && safeSwatch(value) ? [value] : [];
   });
+}
+
+export function themeRadius(css: string, token: RadiusToken = 'radius'): string | undefined {
+  if (css.length > MAX_THEME_FILE_BYTES) return undefined;
+  const value = css.match(new RegExp(`--(?:sable-)?${token}\\s*:\\s*([^;}]+)`))?.[1]?.trim();
+  return value && safeRadius(value) ? value : undefined;
 }
 
 export function parseThemeFile(css: string, fallback: string): ThemeFile | ThemeFileError {

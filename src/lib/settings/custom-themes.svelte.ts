@@ -77,9 +77,9 @@ function persist(): void {
   writeJson(STORAGE_KEY, customThemes, '[sable themes] themes not persisted');
 }
 
-export function installCustomTheme(theme: CustomTheme): void {
+export function installCustomTheme(theme: CustomTheme, activate = true): void {
   customThemes.themes = [...customThemes.themes.filter((item) => item.id !== theme.id), theme];
-  customThemes[`${theme.kind}ThemeId`] = theme.id;
+  if (activate) customThemes[`${theme.kind}ThemeId`] = theme.id;
   persist();
 }
 

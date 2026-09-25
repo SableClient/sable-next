@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import { untrack } from 'svelte';
 
@@ -29,13 +30,12 @@
     open?: boolean;
     installing: string | null;
     previewing: string | null;
+    failedEntry: string | null;
     preview: ThemePreview | null;
     oninstall: (entry: CatalogEntry) => void;
     onpreview: (entry: CatalogEntry) => void;
     onkeep: () => void;
     onrevert: () => void;
-    onuse: (theme: CustomTheme) => void;
-    onimport: () => void;
     initialTab?: 'theme' | 'tweak';
   }
 
@@ -43,13 +43,12 @@
     open = $bindable(false),
     installing,
     previewing,
+    failedEntry,
     preview,
     oninstall,
     onpreview,
     onkeep,
     onrevert,
-    onuse,
-    onimport,
     initialTab = 'theme',
   }: Props = $props();
 
@@ -105,8 +104,8 @@
 
   const kinds = [
     { value: 'all', label: 'settings.themeCatalogAll' },
-    { value: 'light', label: 'settings.customThemesLightTheme' },
-    { value: 'dark', label: 'settings.customThemesDarkTheme' },
+    { value: 'light', label: 'settings.customThemesLightSlot' },
+    { value: 'dark', label: 'settings.customThemesDarkSlot' },
   ] as const;
 
   $effect(() => {
@@ -143,8 +142,8 @@
       entry.kind === 'tweak'
         ? entry.meta.description
         : entry.meta.kind === 'dark'
-          ? $i18n.t('settings.customThemesDarkTheme')
-          : $i18n.t('settings.customThemesLightTheme');
+          ? $i18n.t('settings.customThemesDarkSlot')
+          : $i18n.t('settings.customThemesLightSlot');
     const author = entry.meta.author
       ? $i18n.t('settings.themeBy', { author: entry.meta.author })
       : null;
@@ -166,7 +165,6 @@
           }}><XIcon /></IconButton
         >
       </div>
-      <p class="catalog-hint">{$i18n.t('settings.themeCatalogTrust')}</p>
       <div class="tabs" role="tablist" aria-label={$i18n.t('settings.themeCatalogTitle')}>
         {#each tabs as option (option.value)}
           {@const count = option.value === 'theme' ? themes.length : tweaks.length}
@@ -182,40 +180,44 @@
             onkeydown={moveTab}
           >
             {$i18n.t(option.label)}
-            {#if count > 0}<span class="tab-count">{count}</span>{/if}
+            {#if !failed}<span class="tab-count">{count > 0 ? count : ''}</span>{/if}
           </button>
         {/each}
       </div>
-      <TextInput
-        type="search"
-        bind:value={filter.query}
-        placeholder={$i18n.t('settings.themeCatalogSearch')}
-        aria-label={$i18n.t('settings.themeCatalogSearch')}
-      />
-      {#if tab === 'theme'}<div
-          class="chips"
-          role="group"
-          aria-label={$i18n.t('settings.themeCatalogFilters')}
-        >
-          {#each kinds as option (option.value)}
+      <div class="filters">
+        <div class="search">
+          <TextInput
+            type="search"
+            bind:value={filter.query}
+            placeholder={$i18n.t('settings.themeCatalogSearch')}
+            aria-label={$i18n.t('settings.themeCatalogSearch')}
+          />
+        </div>
+        {#if tab === 'theme'}<div
+            class="chips"
+            role="group"
+            aria-label={$i18n.t('settings.themeCatalogFilters')}
+          >
+            {#each kinds as option (option.value)}
+              <button
+                type="button"
+                class="chip"
+                aria-pressed={filter.kind === option.value}
+                onclick={() => (filter.kind = option.value)}
+              >
+                {$i18n.t(option.label)}
+              </button>
+            {/each}
             <button
               type="button"
               class="chip"
-              aria-pressed={filter.kind === option.value}
-              onclick={() => (filter.kind = option.value)}
+              aria-pressed={filter.highContrast}
+              onclick={() => (filter.highContrast = !filter.highContrast)}
             >
-              {$i18n.t(option.label)}
+              {$i18n.t('settings.themeCatalogHighContrast')}
             </button>
-          {/each}
-          <button
-            type="button"
-            class="chip"
-            aria-pressed={filter.highContrast}
-            onclick={() => (filter.highContrast = !filter.highContrast)}
-          >
-            {$i18n.t('settings.themeCatalogHighContrast')}
-          </button>
-        </div>{/if}
+          </div>{/if}
+      </div>
     </header>
 
     {#if failed}
@@ -232,18 +234,18 @@
           id="catalog-panel-theme"
           aria-labelledby="catalog-tab-theme"
         >
+          <Alert variant="warning"><p>{$i18n.t('settings.themeCatalogTrust')}</p></Alert>
           {#if shownThemes.length > 0}
             <ul class="tiles">
               {#each shownThemes as entry (entry.fullUrl)}
                 {@const theme = installedTheme(entry)}
-                {@const used =
-                  theme !== undefined && selectedCustomThemeId(theme.kind) === theme.id}
-                {@const kind = entry.meta.kind}
                 <li>
                   <ThemeTile
                     name={entryName(entry)}
                     detail={detail(entry)}
                     swatches={entry.swatches}
+                    radius={entry.radius}
+                    innerRadius={entry.innerRadius}
                     selected={preview?.source === entry.fullUrl}
                     role="button"
                     onselect={() => {
@@ -251,25 +253,29 @@
                     }}
                   >
                     {#snippet actions()}
-                      {#if used}
+                      {#if theme}
                         <span class="state">
-                          {$i18n.t('settings.themeInUseFor', { mode: modeName(kind) })}
+                          <CheckIcon weight="bold" />
+                          {selectedCustomThemeId(theme.kind) === theme.id
+                            ? $i18n.t('settings.themeInUseFor', { mode: modeName(theme.kind) })
+                            : $i18n.t('settings.themeFileInstalled')}
                         </span>
                       {:else}
                         <Button
                           size="small"
                           variant="secondary"
-                          loading={installing === entry.fullUrl || previewing === entry.fullUrl}
-                          disabled={installing !== null}
+                          block
+                          loading={installing === entry.fullUrl}
+                          disabled={installing !== null || previewing !== null}
                           onclick={() => {
-                            if (theme) onuse(theme);
-                            else oninstall(entry);
+                            oninstall(entry);
                           }}
                         >
-                          {theme
-                            ? $i18n.t('settings.themeUseFor', { mode: modeName(kind) })
-                            : $i18n.t('settings.themeInstallUse')}
+                          {$i18n.t('settings.themeFileInstall')}
                         </Button>
+                      {/if}
+                      {#if failedEntry === entry.fullUrl}
+                        <p class="failed" role="alert">{$i18n.t('settings.themeCatalogFailed')}</p>
                       {/if}
                     {/snippet}
                   </ThemeTile>
@@ -298,6 +304,7 @@
           id="catalog-panel-tweak"
           aria-labelledby="catalog-tab-tweak"
         >
+          <Alert variant="warning"><p>{$i18n.t('settings.themeCatalogTrust')}</p></Alert>
           <p class="catalog-hint">{$i18n.t('settings.themeCatalogTweaksHint')}</p>
           {#if shownTweaks.length > 0}
             <ul class="tweaks">
@@ -307,9 +314,17 @@
                   <span class="tweak-copy">
                     <span class="tweak-name">{entryName(entry)}</span>
                     <span class="tweak-detail">{detail(entry)}</span>
+                    {#if failedEntry === entry.fullUrl}
+                      <span class="failed" role="alert"
+                        >{$i18n.t('settings.themeCatalogFailed')}</span
+                      >
+                    {/if}
                   </span>
                   {#if installed}
-                    <span class="state">{$i18n.t('settings.themeFileInstalled')}</span>
+                    <span class="state">
+                      <CheckIcon weight="bold" />
+                      {$i18n.t('settings.themeFileInstalled')}
+                    </span>
                   {:else}
                     <Button
                       size="small"
@@ -345,20 +360,16 @@
             mode: modeName(preview.kind),
           })}
         </span>
-        <Button variant="ghost" size="small" onclick={onrevert}>
-          {$i18n.t('settings.themePreviewRevert')}
-        </Button>
-        <Button variant="primary" size="small" onclick={onkeep}>
-          {$i18n.t('settings.themePreviewKeep')}
-        </Button>
+        <span class="preview-actions">
+          <Button variant="ghost" size="small" onclick={onrevert}>
+            {$i18n.t('settings.themePreviewRevert')}
+          </Button>
+          <Button variant="primary" size="small" onclick={onkeep}>
+            {$i18n.t('settings.themeUseFor', { mode: modeName(preview.kind) })}
+          </Button>
+        </span>
       </div>
     {/if}
-
-    <footer class="catalog-foot">
-      <Button variant="ghost" size="small" onclick={onimport}>
-        {$i18n.t('settings.customThemesImportFile')}
-      </Button>
-    </footer>
   </div>
 </DialogFrame>
 
@@ -366,8 +377,10 @@
   .catalog {
     --catalog-inset: var(--space-400);
 
+    block-size: min(46rem, 80dvh);
     display: grid;
     gap: var(--space-400);
+    grid-template-rows: auto minmax(0, 1fr) auto;
     width: min(44rem, calc(100vw - 2rem));
   }
 
@@ -455,7 +468,21 @@
     border-radius: var(--radii-pill);
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+    font-variant-numeric: tabular-nums;
+    min-inline-size: 2ch;
     padding: 0 var(--space-200);
+    text-align: center;
+  }
+
+  .filters {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200) var(--space-300);
+  }
+
+  .search {
+    flex: 1 1 14rem;
   }
 
   .skeleton-row {
@@ -471,19 +498,39 @@
   }
 
   .chip {
+    align-items: center;
     background: transparent;
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radii-pill);
-    color: inherit;
+    box-sizing: border-box;
+    color: var(--surface-var-on-container);
     cursor: pointer;
+    display: inline-flex;
     font: inherit;
     font-size: var(--font-size-small);
-    min-height: max(var(--control-height-300), var(--target-hit));
-    padding: 0 var(--space-400);
+    justify-content: center;
+    min-height: var(--control-height-300);
+    padding: 0 var(--control-padding-300);
+  }
+
+  @media (pointer: coarse) {
+    .chip {
+      position: relative;
+    }
+
+    .chip::after {
+      content: '';
+      inset: calc((var(--control-height-300) - var(--target-hit)) / 2) 0;
+      position: absolute;
+    }
   }
 
   .chip:hover {
     background: var(--surface-container-hover);
+  }
+
+  .chip:active {
+    background: var(--surface-container-active);
   }
 
   .chip:focus-visible {
@@ -499,8 +546,15 @@
   }
 
   .catalog-group {
+    align-content: start;
     display: grid;
     gap: var(--space-300);
+    margin-inline: calc(var(--space-100) * -1);
+    min-block-size: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-100);
+    scrollbar-gutter: stable;
   }
 
   .tiles {
@@ -525,9 +579,25 @@
   }
 
   .state {
+    align-items: center;
     color: var(--primary-main);
+    display: inline-flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
+    gap: var(--space-100);
+    min-block-size: var(--control-height-300);
+  }
+
+  .state :global(svg) {
+    block-size: var(--icon-size-small);
+    flex: none;
+    inline-size: var(--icon-size-small);
+  }
+
+  .failed {
+    color: var(--crit-main);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .tweaks {
@@ -580,6 +650,12 @@
     z-index: 1;
   }
 
+  .preview-actions {
+    display: flex;
+    gap: var(--space-200);
+    margin-inline-start: auto;
+  }
+
   .preview-copy {
     flex: 1 1 12rem;
     font-size: var(--font-size-label);
@@ -599,10 +675,5 @@
 
   .catalog-head :global(.text-input) {
     min-height: max(var(--control-height-medium), var(--target-hit));
-  }
-
-  .catalog-foot {
-    display: flex;
-    justify-content: flex-start;
   }
 </style>

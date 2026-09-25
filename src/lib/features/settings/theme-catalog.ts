@@ -1,6 +1,7 @@
 import { isRecord } from '#lib/guards.js';
 import {
   MAX_THEME_FILE_BYTES,
+  themeRadius,
   themeFileMetadata,
   themeSwatches,
   type ThemeFileMetadata,
@@ -22,6 +23,8 @@ export interface CatalogEntry {
   fullUrl: string;
   meta: ThemeFileMetadata;
   swatches: string[];
+  radius?: string;
+  innerRadius?: string;
 }
 
 export interface CatalogFilter {
@@ -83,6 +86,8 @@ async function describe(kind: CatalogEntry['kind'], row: CatalogRow): Promise<Ca
     fullUrl: row.fullUrl,
     meta: themeFileMetadata(css),
     swatches: themeSwatches(css),
+    radius: themeRadius(css),
+    innerRadius: themeRadius(css, 'radius-inner'),
   };
 }
 

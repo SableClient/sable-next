@@ -68,7 +68,7 @@
   function install(): void {
     confirming = false;
     if (file === null) return;
-    if (file.kind === 'theme') installCustomTheme(file.theme);
+    if (file.kind === 'theme') installCustomTheme(file.theme, false);
     else installCustomTweak(file.tweak);
   }
 </script>

@@ -33,6 +33,16 @@ test('removing the selected theme falls back to the built-in one', () => {
   expect(localStorage.getItem('sable-custom-themes')).not.toContain('night');
 });
 
+test('installing a theme without activation preserves the current selection', () => {
+  installCustomTheme(
+    { id: 'night', name: 'Night', kind: 'dark', css: '/* @sable-theme */' },
+    false
+  );
+
+  expect(customThemes.themes.map((theme) => theme.id)).toEqual(['night']);
+  expect(customThemes.darkThemeId).toBeNull();
+});
+
 test('removing a tweak also disables it', () => {
   installCustomTweak({ id: 'round', name: 'Round', css: '/* @sable-tweak */' });
   expect(customThemes.enabledTweakIds).toEqual(['round']);

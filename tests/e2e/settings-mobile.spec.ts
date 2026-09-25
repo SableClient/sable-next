@@ -217,7 +217,7 @@ async function routeCatalogue(page: Page, requested: string[] = []): Promise<voi
   });
 }
 
-test('mobile: a catalogue theme installs into its slot and can be undone', async ({
+test('mobile: a catalogue theme installs into its mode and can be undone', async ({
   page,
   installRoomCore,
 }) => {
@@ -226,27 +226,30 @@ test('mobile: a catalogue theme installs into its slot and can be undone', async
   await installRoomCore('ready');
   await page.goto('/settings/appearance');
 
-  await page.getByRole('button', { name: 'Browse themes' }).click();
+  await page.getByRole('button', { name: 'Theme catalogue' }).click();
   const catalogue = page.getByRole('dialog', { name: 'Theme catalogue' });
-  await catalogue.getByRole('button', { name: 'Install & use' }).click();
-  await expect(catalogue.getByText('In use')).toBeVisible();
+  await catalogue.getByRole('button', { name: 'Install', exact: true }).click();
+  await expect(catalogue.getByText('Installed')).toBeVisible();
   expect(requested.some((url) => url.includes('/else/where/'))).toBe(false);
 
   await expect(catalogue.getByText('Compact rows')).toHaveCount(0);
   await catalogue.getByRole('tab', { name: /Tweaks/ }).click();
   await expect(catalogue.getByText('Compact rows')).toBeVisible();
-  await expect(catalogue.getByRole('button', { name: 'Dark theme' })).toHaveCount(0);
+  await expect(catalogue.getByRole('button', { name: 'Dark mode' })).toHaveCount(0);
 
   await catalogue.getByRole('button', { name: 'Close catalogue' }).click();
   const dark = page.getByRole('radiogroup', { name: 'Dark mode' });
   await expect(dark.getByRole('radio', { name: 'Dracula' })).toHaveAttribute(
     'aria-checked',
-    'true'
+    'false'
   );
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(dark.getByRole('radio', { name: 'Dracula' })).toHaveCount(0);
-  await expect(dark.getByRole('radio', { name: 'Sable' })).toHaveAttribute('aria-checked', 'true');
+  await expect(dark.getByRole('radio', { name: 'Sable (default)' })).toHaveAttribute(
+    'aria-checked',
+    'true'
+  );
 });
 
 test('mobile: tapping a catalogue theme tries it on until it is kept', async ({
@@ -257,13 +260,13 @@ test('mobile: tapping a catalogue theme tries it on until it is kept', async ({
   await installRoomCore('ready');
   await page.goto('/settings/appearance');
 
-  await page.getByRole('button', { name: 'Browse themes' }).click();
+  await page.getByRole('button', { name: 'Theme catalogue' }).click();
   const catalogue = page.getByRole('dialog', { name: 'Theme catalogue' });
   await catalogue.getByRole('button', { name: /^Dracula/ }).click();
   await expect(catalogue.getByText('Previewing Dracula in dark mode')).toBeVisible();
   await page.screenshot({ path: '/tmp/fx/pv-mobile.png' });
 
-  await catalogue.getByRole('button', { name: 'Keep theme' }).click();
+  await catalogue.getByRole('button', { name: 'Use for dark mode' }).click();
   await expect(catalogue.getByText('In use for dark mode')).toBeVisible();
   await catalogue.getByRole('button', { name: 'Close catalogue' }).click();
   const dark = page.getByRole('radiogroup', { name: 'Dark mode' });

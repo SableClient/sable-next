@@ -5,9 +5,11 @@ import { expect, test } from 'vitest';
 import {
   MAX_THEME_FILE_BYTES,
   parseThemeFile,
+  safeRadius,
   safeSwatch,
   themeFileBaseName,
   themeFileMetadata,
+  themeRadius,
   themeSwatches,
 } from './theme-file';
 
@@ -68,4 +70,22 @@ test('a declaration smuggled after a colour stops at the colour', () => {
 test('a plain colour is a safe swatch', () => {
   expect(safeSwatch('#101018')).toBe(true);
   expect(safeSwatch('rgb(16 16 24)')).toBe(true);
+});
+
+test('reads a theme radius for previews', () => {
+  expect(themeRadius('.x { --radius: 0; }')).toBe('0');
+  expect(themeRadius('.x { --sable-radius: var(--radii-0); }')).toBe('var(--radii-0)');
+  expect(themeRadius('.x { --radius-inner: 2px; }', 'radius-inner')).toBe('2px');
+});
+
+test.each(['url(https://example.org/shape)', '0{ color: red}'])(
+  'refuses an unsafe preview radius: %s',
+  (value) => {
+    expect(safeRadius(value)).toBe(false);
+    expect(themeRadius(`.x { --radius: ${value}; }`)).toBeUndefined();
+  }
+);
+
+test('a declaration smuggled after a radius stops at the radius', () => {
+  expect(themeRadius('.x { --radius: 0; color: red; }')).toBe('0');
 });

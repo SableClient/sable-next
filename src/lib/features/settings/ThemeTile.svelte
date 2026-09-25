@@ -8,9 +8,14 @@
     name: string;
     detail?: string;
     swatches: readonly string[];
+    radius?: string;
+    innerRadius?: string;
     selected?: boolean;
     role?: 'radio' | 'button';
+    tabindex?: number;
+    keyshortcuts?: string;
     onselect?: () => void;
+    trailing?: Snippet;
     actions?: Snippet;
   }
 
@@ -18,21 +23,28 @@
     name,
     detail,
     swatches,
+    radius,
+    innerRadius,
     selected = false,
     role = 'radio',
+    tabindex,
+    keyshortcuts,
     onselect,
+    trailing,
     actions,
   }: Props = $props();
 
   let colors = $derived(swatches.map((color) => (safeSwatch(color) ? color : undefined)));
 </script>
 
-<div class="tile" class:selected>
+<div class="tile" class:selected class:has-trailing={trailing !== undefined}>
   <button
     type="button"
     class="tile-hit"
     {role}
     aria-checked={role === 'radio' ? selected : undefined}
+    aria-keyshortcuts={keyshortcuts}
+    {tabindex}
     title={name}
     onclick={onselect}
   >
@@ -43,6 +55,8 @@
       style:--tile-surface={colors[1]}
       style:--tile-accent={colors[2]}
       style:--tile-ink={colors[3]}
+      style:--tile-radius={radius}
+      style:--tile-radius-inner={innerRadius}
     >
       <span class="preview-side">
         <span class="preview-dot"></span>
@@ -53,13 +67,16 @@
         <span class="preview-line wide"></span>
         <span class="preview-bubble"></span>
         <span class="preview-line"></span>
-        <span class="preview-pill"></span>
+        <span class="preview-button"></span>
       </span>
       {#if selected}<span class="tile-check"><CheckIcon weight="bold" /></span>{/if}
     </span>
     <span class="tile-name">{name}</span>
     {#if detail}<span class="tile-detail">{detail}</span>{/if}
   </button>
+  {#if trailing}<div class="tile-trailing">
+      <div class="tile-trailing-row">{@render trailing()}</div>
+    </div>{/if}
   {#if actions}<div class="tile-actions">{@render actions()}</div>{/if}
 </div>
 
@@ -70,6 +87,7 @@
     grid-template-rows: 1fr auto;
     height: 100%;
     min-width: 0;
+    position: relative;
   }
 
   .tile-hit {
@@ -94,7 +112,7 @@
   .preview {
     aspect-ratio: 16 / 10;
     background: var(--tile-bg, var(--bg-container));
-    border-radius: var(--radius);
+    border-radius: var(--tile-radius, var(--radius));
     box-shadow:
       0 0 0 var(--border-width) var(--surface-container-line),
       var(--shadow-e100);
@@ -147,7 +165,7 @@
 
   .preview-line,
   .preview-bubble,
-  .preview-pill {
+  .preview-button {
     border-radius: var(--radii-pill);
     display: block;
   }
@@ -166,13 +184,14 @@
   .preview-bubble {
     background: var(--tile-surface, var(--surface-container));
     block-size: 0.9rem;
-    border-radius: var(--radius-inner);
+    border-radius: var(--tile-radius, var(--radius));
     inline-size: 90%;
   }
 
-  .preview-pill {
+  .preview-button {
     background: var(--tile-accent, var(--primary-main));
     block-size: 0.5rem;
+    border-radius: var(--tile-radius-inner, var(--radius-inner));
     inline-size: 38%;
     justify-self: end;
   }
@@ -197,9 +216,34 @@
   }
 
   .tile-name {
+    align-content: center;
+    display: grid;
     font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
+    min-block-size: var(--control-height-300);
     overflow-wrap: anywhere;
+  }
+
+  .has-trailing .tile-name {
+    padding-inline-end: calc(var(--control-height-300) + var(--space-100));
+  }
+
+  .tile-trailing {
+    aspect-ratio: 16 / 10;
+    inset-block-start: 0;
+    inset-inline: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .tile-trailing-row {
+    align-items: center;
+    block-size: var(--control-height-300);
+    display: flex;
+    inset-block-start: calc(100% + var(--space-100));
+    inset-inline-end: 0;
+    pointer-events: auto;
+    position: absolute;
   }
 
   .selected .tile-name {
