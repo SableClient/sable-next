@@ -48,6 +48,7 @@
     useRoomList,
   } from '#lib/rooms/room-list.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
+  import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -348,6 +349,21 @@
   const abbreviations = new RoomAbbreviations(core.commands);
   provideRoomAbbreviations(abbreviations);
   provideRoomMemberNames({ displayName: memberDisplayName });
+
+  const cosmetics = new RoomCosmetics(core);
+  provideRoomCosmetics(cosmetics);
+  let routeSpace = $derived(findRoomByPathId(roomList.rooms, page.params.spaceId));
+  let cosmeticsSpaceId = $derived(
+    routeSpace?.space_children.some((child) => child.room_id === resolvedRoomId)
+      ? routeSpace.room_id
+      : null
+  );
+
+  onMount(() => cosmetics.watch());
+
+  $effect(() => {
+    void cosmetics.load(resolvedRoomId, cosmeticsSpaceId);
+  });
 
   let ancestorSpaceKey = $derived(ancestorSpaceIds(roomList.rooms, resolvedRoomId).join(','));
 

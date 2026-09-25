@@ -25,6 +25,7 @@
     statusEmoji?: string | null;
     nameColorLight?: string | null;
     nameColorDark?: string | null;
+    nameFont?: string | null;
     variant?: 'popover' | 'sheet';
     class?: ClassValue;
     meta?: Snippet;
@@ -48,6 +49,7 @@
     statusEmoji = null,
     nameColorLight = null,
     nameColorDark = null,
+    nameFont = null,
     variant = 'popover',
     class: className = '',
     meta,
@@ -133,7 +135,11 @@
     {/if}
   </div>
   <div class="profile-card-identity">
-    <h2 class="profile-card-name" class:tinted={nameColor}>
+    <h2
+      class="profile-card-name"
+      class:tinted={nameColor}
+      style:font-family={nameFont ?? undefined}
+    >
       {displayName}
     </h2>
     <button

@@ -27,6 +27,7 @@
 
   import { goto } from '$app/navigation';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
+  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -91,6 +92,7 @@
     variant = 'popover',
   }: Props = $props();
   const core = useCoreClient();
+  const roomCosmetics = useRoomCosmetics();
   const roomList = useRoomList();
   const presenceStore = usePresenceStore();
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
@@ -118,15 +120,16 @@
   let displayName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
+  let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
+  let pronounSets = $derived(
+    cosmetics?.pronouns.length ? cosmetics.pronouns : (currentProfile?.pronouns ?? [])
+  );
   let pronouns = $derived(
     !preferences.showPronouns
       ? ''
       : (preferences.filterPronounsByLanguage
-          ? preferredPronouns(
-              currentProfile?.pronouns ?? [],
-              $i18n.resolvedLanguage ?? $i18n.language
-            )
-          : (currentProfile?.pronouns ?? [])
+          ? preferredPronouns(pronounSets, $i18n.resolvedLanguage ?? $i18n.language)
+          : pronounSets
         )
           .map((pronoun) =>
             clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
@@ -676,8 +679,9 @@
   bannerUrl={currentProfile?.banner_url}
   status={userStatus?.text}
   statusEmoji={userStatus?.emoji}
-  nameColorLight={currentProfile?.name_color_light ?? roleTag?.color}
-  nameColorDark={currentProfile?.name_color_dark ?? roleTag?.color}
+  nameColorLight={cosmetics?.colorOnLight ?? currentProfile?.name_color_light ?? roleTag?.color}
+  nameColorDark={cosmetics?.colorOnDark ?? currentProfile?.name_color_dark ?? roleTag?.color}
+  nameFont={cosmetics?.font}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
   children={showFailure || currentProfile?.bio ? bioPanel : undefined}

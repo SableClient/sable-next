@@ -421,6 +421,14 @@ html {
   /* Font families */
   --font-family-emoji: 'Twemoji_DISABLED';
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
+  --font-family-cosmetic-arial: arial, helvetica, sans-serif;
+  --font-family-cosmetic-verdana: verdana, geneva, sans-serif;
+  --font-family-cosmetic-trebuchet: 'Trebuchet MS', 'Lucida Grande', sans-serif;
+  --font-family-cosmetic-georgia: georgia, 'Times New Roman', serif;
+  --font-family-cosmetic-times: 'Times New Roman', times, serif;
+  --font-family-cosmetic-courier: 'Courier New', courier, monospace;
+  --font-family-cosmetic-comic: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+  --font-family-cosmetic-impact: impact, haettenschweiler, 'Arial Narrow Bold', sans-serif;
 
   /* Typography scale */
   --font-size-x-small: calc(0.75rem * var(--text-scale));

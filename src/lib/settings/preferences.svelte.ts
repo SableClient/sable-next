@@ -50,6 +50,8 @@ export interface Preferences {
   timelineEmoteSize: TimelineEmoteSize;
   theme: ThemeMode;
   underlineLinks: boolean;
+  renderRoomColors: boolean;
+  renderRoomFonts: boolean;
   reducedMotion: boolean;
   pageZoom: number;
   textScale: number;
@@ -256,6 +258,8 @@ const DEFAULTS: Preferences = {
   timelineEmoteSize: 'default',
   theme: 'system',
   underlineLinks: true,
+  renderRoomColors: true,
+  renderRoomFonts: true,
   reducedMotion: prefersReducedMotion(),
   pageZoom: 1,
   textScale: 1,

@@ -13,6 +13,7 @@
     displayName: string;
     accountName?: string;
     colors: SenderDisplayColors;
+    font?: string | null;
     pronouns?: { visible: readonly PronounView[]; overflow: readonly PronounView[] };
     nameClass?: ClassValue;
     mentionLabel?: string;
@@ -27,6 +28,7 @@
     displayName,
     accountName,
     colors,
+    font = null,
     pronouns = { visible: [], overflow: [] },
     nameClass = 'sender',
     mentionLabel,
@@ -46,6 +48,7 @@
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}
+      style:font-family={font ?? undefined}
       type="button"
       aria-label={mentionLabel ?? $i18n.t('timeline.mentionSender', { name: displayName })}
       onclick={onMention}>{displayName}</button
@@ -57,6 +60,7 @@
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}
+      style:font-family={font ?? undefined}
       type="button"
       aria-label={profileLabel ?? $i18n.t('timeline.senderProfile', { name: displayName })}
       onclick={(event) => {
@@ -70,6 +74,7 @@
       style:color={colors.tinted ? undefined : colors.nameColor}
       style:--name-color-on-light={colors.nameColorLight ?? undefined}
       style:--name-color-on-dark={colors.nameColorDark ?? undefined}
+      style:font-family={font ?? undefined}
     >
       {displayName}
     </span>

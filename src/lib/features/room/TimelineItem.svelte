@@ -68,6 +68,7 @@
   import { trailingReceipt } from './receipt-fit';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import SenderName from './SenderName.svelte';
+  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import ForwardedLine from './ForwardedLine.svelte';
   import MessageReproxyDialog from './MessageReproxyDialog.svelte';
@@ -175,7 +176,9 @@
   let timelineEmoteSize = $derived(defaultEmoteSize ? '1lh' : `${preferences.timelineEmoteSize}px`);
   const core = useCoreClient();
   const personaStore = usePersonaStore();
+  const roomCosmetics = useRoomCosmetics();
   let profile = $state<ProfileView | null>(null);
+  let senderCosmetics = $derived(roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);
   // Only a fallback: the core fills both fields, so most rows never scan.
   let senderMember = $derived(
@@ -208,9 +211,11 @@
       preferences.showPronouns
         ? persona?.pronouns?.length
           ? persona.pronouns
-          : profile?.pronouns?.length
-            ? profile.pronouns
-            : senderIdentity.pronouns
+          : senderCosmetics?.pronouns.length
+            ? senderCosmetics.pronouns
+            : profile?.pronouns?.length
+              ? profile.pronouns
+              : senderIdentity.pronouns
         : [],
       {
         language: $i18n.resolvedLanguage ?? $i18n.language,
@@ -232,6 +237,18 @@
     replyIsPinged && !replyNameBase.startsWith('@') ? `@${replyNameBase}` : replyNameBase
   );
   let replyBody = $derived(stripReplyFallback(item.in_reply_to?.body ?? '', replyPersona));
+  let replyCosmetics = $derived(
+    replyPersona ? null : (roomCosmetics?.for(item.in_reply_to?.sender) ?? null)
+  );
+  let replyTint = $derived(
+    personaWithColor(replyPersona) ??
+      (replyCosmetics && (replyCosmetics.colorOnLight || replyCosmetics.colorOnDark)
+        ? {
+            color_on_light: replyCosmetics.colorOnLight ?? replyCosmetics.colorOnDark,
+            color_on_dark: replyCosmetics.colorOnDark ?? replyCosmetics.colorOnLight,
+          }
+        : null)
+  );
   let replyNameColor = $derived(
     currentUserId !== null && item.in_reply_to?.sender === currentUserId
       ? 'var(--primary-on-container)'
@@ -283,8 +300,9 @@
     onEdit: () => actions.onEdit?.(),
   });
   let senderColors = $derived(
-    senderDisplayColors(item.sender ?? '', profile, persona, item.is_own)
+    senderDisplayColors(item.sender ?? '', profile, persona, item.is_own, senderCosmetics)
   );
+  let senderFont = $derived(persona ? null : (senderCosmetics?.font ?? null));
 
   let senderId = $derived(item.sender);
   $effect(() => {
@@ -893,6 +911,7 @@
           <SenderName
             displayName={senderName}
             colors={senderColors}
+            font={senderFont}
             {pronouns}
             nameClass="compact-name"
             onMention={mentionSender}
@@ -902,6 +921,7 @@
           <SenderName
             displayName={senderName}
             colors={senderColors}
+            font={senderFont}
             {pronouns}
             nameClass="compact-name"
             compact={layout === 'compact'}
@@ -961,7 +981,7 @@
         : undefined}
     >
       {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
-        {@const tint = personaWithColor(replyPersona)}
+        {@const tint = replyTint}
         {@const target = item.in_reply_to.event_id}
         <button
           class={['reply-preview', 'reply-connected', { persona: tint }]}
@@ -974,7 +994,9 @@
           }}
         >
           <span class="reply-copy"
-            ><span class="reply-name">{replyName}</span>
+            ><span class="reply-name" style:font-family={replyCosmetics?.font ?? undefined}
+              >{replyName}</span
+            >
             <span class="reply-body">{replyBody}</span></span
           >
         </button>
@@ -986,6 +1008,7 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
+              font={senderFont}
               {pronouns}
               onMention={onMentionUser && item.sender ? mentionSender : undefined}
               onViaProfile={persona ? openSenderProfileAt : undefined}
@@ -1008,7 +1031,7 @@
       {/if}
       <div class="message-main">
         {#if item.in_reply_to && preferences.replyPreviewStyle !== 'connected'}
-          {@const tint = personaWithColor(replyPersona)}
+          {@const tint = replyTint}
           {@const target = item.in_reply_to.event_id}
           <button
             class={['reply-preview', `reply-${preferences.replyPreviewStyle}`, { persona: tint }]}
@@ -1022,7 +1045,9 @@
           >
             <ReplyIcon class="reply-icon" />
             <span class="reply-copy"
-              ><span class="reply-name">{replyName}</span>
+              ><span class="reply-name" style:font-family={replyCosmetics?.font ?? undefined}
+                >{replyName}</span
+              >
               <span class="reply-body">{replyBody}</span></span
             >
           </button>
@@ -1039,7 +1064,7 @@
             <span
               class={['sender', 'sender-identity-name', { tinted: senderColors.tinted }]}
               style:color={senderColors.tinted ? undefined : senderColors.nameColor}
-              >* {senderName}</span
+              style:font-family={senderFont ?? undefined}>* {senderName}</span
             >
             <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             {#if inlineReceipts}

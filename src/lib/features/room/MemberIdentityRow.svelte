@@ -5,6 +5,9 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { pronounPillLength, pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
+  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -36,12 +39,14 @@
   }: Props = $props();
   const core = useCoreClient();
   const presenceStore = usePresenceStore();
+  const roomCosmetics = useRoomCosmetics();
   let profile = $state<ProfileView | null>(null);
   let member = $derived(findMember(members, userId));
   let displayName = $derived(member?.display_name ?? profile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? profile?.avatar_url ?? null);
+  let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let colors = $derived.by(() => {
-    const profileColors = senderDisplayColors(userId, profile);
+    const profileColors = senderDisplayColors(userId, profile, null, false, cosmetics);
     if (profileColors.tinted || !powerTag?.color) return profileColors;
     return {
       ...profileColors,
@@ -50,6 +55,21 @@
       tinted: true,
     };
   });
+  let pronouns = $derived(
+    visiblePronouns(
+      preferences.showPronouns
+        ? cosmetics?.pronouns.length
+          ? cosmetics.pronouns
+          : (profile?.pronouns ?? [])
+        : [],
+      {
+        language: $i18n.resolvedLanguage ?? $i18n.language,
+        filterByLanguage: preferences.filterPronounsByLanguage,
+        limit: pronounPillLimit(preferences.pronounPillLimit),
+        maxLength: pronounPillLength(preferences.pronounPillLength),
+      }
+    )
+  );
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.get(userId));
   let userStatus = $derived(showStatus ? resolveUserStatus(profile, presence) : null);
@@ -87,7 +107,14 @@
   </span>
   <div class="member-identity-main">
     <span class="member-identity-text">
-      <SenderName {displayName} {colors} nameClass="member-name" compact />
+      <SenderName
+        {displayName}
+        {colors}
+        {pronouns}
+        font={cosmetics?.font}
+        nameClass="member-name"
+        compact={pronouns.visible.length === 0}
+      />
       {#if powerTag?.icon}
         <RoleTagIcon icon={powerTag.icon} class="member-identity-role-icon" />
       {/if}

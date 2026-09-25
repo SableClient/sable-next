@@ -1,5 +1,7 @@
 import type { MemberView, PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 
+import type { SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+
 import { senderColor } from './timeline-format';
 
 export interface SenderDisplayColors {
@@ -13,13 +15,22 @@ export function senderDisplayColors(
   userId: string,
   profile: ProfileView | null,
   persona: PerMessageProfileView | null = null,
-  isOwn = false
+  isOwn = false,
+  room: SenderCosmetics | null = null
 ): SenderDisplayColors {
   const personaTint = personaWithColor(persona);
   const nameColorLight =
-    personaTint?.color_on_light ?? profile?.name_color_light ?? profile?.name_color_dark ?? null;
+    personaTint?.color_on_light ??
+    room?.colorOnLight ??
+    profile?.name_color_light ??
+    profile?.name_color_dark ??
+    null;
   const nameColorDark =
-    personaTint?.color_on_dark ?? profile?.name_color_dark ?? profile?.name_color_light ?? null;
+    personaTint?.color_on_dark ??
+    room?.colorOnDark ??
+    profile?.name_color_dark ??
+    profile?.name_color_light ??
+    null;
   const tinted = nameColorLight !== null || nameColorDark !== null;
   const nameColor = isOwn ? 'var(--primary-on-container)' : senderColor(userId);
 
