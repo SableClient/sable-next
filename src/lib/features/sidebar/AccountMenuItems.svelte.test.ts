@@ -169,3 +169,38 @@ test('a deployment without account switching offers neither switching nor adding
   expect(labels.some((label) => label.includes('nav.addAccount'))).toBe(false);
   await unmount(instance);
 });
+
+test('a signed-out account says so and offers to sign in again', async () => {
+  const onSwitch = vi.fn();
+  const onReauth = vi.fn();
+  const signedOut = { ...accounts[1], needs_reauth: true };
+  const instance = mount(AccountMenuItemsHarness, {
+    target: document.body,
+    props: {
+      accounts: [accounts[0], signedOut],
+      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
+      onSwitch,
+      onLogoutAccount: vi.fn(),
+      onReauth,
+    },
+  });
+  await tick();
+
+  const outerMenu = document.querySelector('.account-menu-trigger');
+  expect(outerMenu).not.toBeNull();
+  if (outerMenu) await press(outerMenu);
+  const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
+    item.textContent.includes('nav.switchAccount')
+  );
+  expect(switcher).not.toBeUndefined();
+  if (switcher) await press(switcher);
+
+  const row = document.querySelectorAll('.account-row').item(1);
+  const select = row.querySelector('.account-select') as HTMLButtonElement;
+  expect(select.disabled).toBe(false);
+  expect(select.textContent).toContain('nav.accountSignedOut');
+  await press(select);
+  expect(onReauth).toHaveBeenCalledWith(signedOut);
+  expect(onSwitch).not.toHaveBeenCalled();
+  await unmount(instance);
+});

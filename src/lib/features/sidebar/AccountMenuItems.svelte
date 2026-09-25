@@ -23,6 +23,7 @@
     onSwitch: (accountId: string) => void;
     onProfile: () => void;
     onLogoutAccount: (accountId: string) => void;
+    onReauth: (account: SessionInfo) => void;
     onLogout: () => void;
     onAddAccount: () => void;
     accountSwitching?: boolean;
@@ -36,6 +37,7 @@
     onSwitch,
     onProfile,
     onLogoutAccount,
+    onReauth,
     onLogout,
     onAddAccount,
     accountSwitching = true,
@@ -80,9 +82,10 @@
             type="button"
             role="menuitemradio"
             aria-checked={active}
-            disabled={active || account.needs_reauth || switching}
+            disabled={active || switching}
             onclick={() => {
-              onSwitch(account.account_id);
+              if (account.needs_reauth) onReauth(account);
+              else onSwitch(account.account_id);
               surface.close();
             }}
           >
@@ -94,7 +97,15 @@
             />
             <span class="account-identity">
               <strong>{account.user_id}</strong>
-              <small>{active ? $i18n.t('nav.currentAccount') : account.homeserver}</small>
+              <small>
+                {#if account.needs_reauth}
+                  {$i18n.t('nav.accountSignedOut')}
+                {:else if active}
+                  {$i18n.t('nav.currentAccount')}
+                {:else}
+                  {account.homeserver}
+                {/if}
+              </small>
             </span>
             {#if active}<CheckIcon
                 class="active-account"

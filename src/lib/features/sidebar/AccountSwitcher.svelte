@@ -3,7 +3,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import type { ProfileView } from '#src/generated/protocol';
+  import type { ProfileView, SessionInfo } from '#src/generated/protocol';
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { pushOverride } from '#lib/features/notifications/push-config.js';
@@ -87,6 +87,14 @@
 
   function openAddAccount(): void {
     void goto(resolve('login?addAccount=1'));
+  }
+
+  function reauthenticate(account: SessionInfo): void {
+    void goto(
+      resolve(
+        `login?addAccount=1&reauth=${encodeURIComponent(account.account_id)}&server=${encodeURIComponent(account.homeserver)}`
+      )
+    );
   }
 
   function openProfile(): void {
@@ -183,6 +191,7 @@
         onSwitch={switchAccount}
         onProfile={openProfile}
         onLogoutAccount={requestLogout}
+        onReauth={reauthenticate}
         onLogout={logout}
         onAddAccount={openAddAccount}
         {accountSwitching}
