@@ -5,6 +5,7 @@
   import type { RoomSummary } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { inviter, senderName } from '#lib/features/inbox/inbox.js';
   import { i18n } from '#lib/i18n.js';
   import { InviteActions } from '#lib/rooms/invites.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -17,24 +18,36 @@
 
   let { invites, collapsed = false }: Props = $props();
   const answers = new InviteActions(useCoreClient());
+  const headingId = $props.id();
 </script>
 
 {#if invites.length > 0 && !collapsed}
-  <section class="invites" aria-label={$i18n.t('room.invitesTitle')}>
-    <h3>{$i18n.t('room.invitesTitle')}</h3>
+  <section class="invites" aria-labelledby={headingId}>
+    <h3 id={headingId}>
+      {$i18n.t('room.invitesTitle')}
+      <span class="count">{invites.length}</span>
+    </h3>
     <ul>
       {#each invites as invite (invite.room_id)}
         {@const name = invite.name ?? invite.room_id}
+        {@const from = inviter(invite)}
         {@const busy = answers.isAnswering(invite.room_id)}
         <li>
           <Avatar class="invite-icon" id={invite.room_id} src={invite.avatar_url} {name} />
-          <span class="invite-name" title={name}>{name}</span>
+          <span class="invite-text">
+            <span class="invite-name" title={name}>{name}</span>
+            {#if from}
+              <span class="invite-from" title={from}>
+                {$i18n.t('inbox.invitedBy', { name: senderName(from) })}
+              </span>
+            {/if}
+          </span>
           <div class="invite-actions">
             <IconButton
               variant="ghost"
               size="medium"
               disabled={busy}
-              label={$i18n.t('room.inviteAccept')}
+              label={$i18n.t('room.inviteAcceptLabel', { room: name })}
               onclick={() => {
                 void answers.accept(invite);
               }}
@@ -45,7 +58,7 @@
               variant="ghost"
               size="medium"
               disabled={busy}
-              label={$i18n.t('room.inviteDecline')}
+              label={$i18n.t('room.inviteDeclineLabel', { room: name })}
               onclick={() => {
                 answers.decline(invite);
               }}
@@ -65,11 +78,18 @@
   }
 
   h3 {
+    align-items: center;
+    display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-500);
+    gap: var(--space-200);
     margin: 0;
     padding: 0 var(--space-200);
     text-transform: uppercase;
+  }
+
+  .count {
+    font-variant-numeric: tabular-nums;
   }
 
   ul {
@@ -106,11 +126,21 @@
     font-size: var(--font-size-small);
   }
 
-  .invite-name {
+  .invite-text {
+    display: grid;
     flex: 1;
     min-width: 0;
+  }
+
+  .invite-name,
+  .invite-from {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .invite-from {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
   }
 </style>

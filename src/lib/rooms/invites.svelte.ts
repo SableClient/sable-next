@@ -69,6 +69,58 @@ export class InviteActions {
     );
   }
 
+  declineAll(rooms: readonly RoomSummary[]): void {
+    const pending = rooms.filter(
+      (room) => !this.answering.has(room.room_id) && !declining.has(room.room_id)
+    );
+    if (pending.length === 0) return;
+    for (const room of pending) declining.add(room.room_id);
+    toasts.undoable(t('inbox.invitesDeclined', { count: pending.length }), {
+      label: t('inbox.undo'),
+      onUndo: () => {
+        for (const room of pending) declining.delete(room.room_id);
+      },
+      onClose: () => {
+        void this.leaveAll(pending);
+      },
+    });
+  }
+
+  async blockAndDecline(rooms: readonly RoomSummary[], senders: readonly string[]): Promise<void> {
+    let failed = 0;
+    for (const sender of senders) {
+      try {
+        await this.core.commands.ignoreUser(sender);
+      } catch (error) {
+        failed += 1;
+        console.warn('[sable room] blocking an inviter failed', error);
+      }
+    }
+    if (failed > 0) toasts.error(t('inbox.blockSendersFailed', { count: failed }));
+    const pending = rooms.filter(
+      (room) => !this.answering.has(room.room_id) && !declining.has(room.room_id)
+    );
+    for (const room of pending) declining.add(room.room_id);
+    await this.leaveAll(pending);
+  }
+
+  private async leaveAll(rooms: readonly RoomSummary[]): Promise<void> {
+    for (const room of rooms) this.answering.add(room.room_id);
+    let failed = 0;
+    for (const room of rooms) {
+      try {
+        await this.core.commands.leaveRoom(room.room_id);
+      } catch (error) {
+        failed += 1;
+        console.warn('[sable room] declining the invitation failed', error);
+      } finally {
+        this.answering.delete(room.room_id);
+        declining.delete(room.room_id);
+      }
+    }
+    if (failed > 0) toasts.error(t('inbox.declineAllFailed', { count: failed }));
+  }
+
   private async answer(room: RoomSummary, run: () => Promise<void>): Promise<void> {
     if (this.answering.has(room.room_id)) return;
     this.answering.add(room.room_id);
