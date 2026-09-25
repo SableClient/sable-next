@@ -564,10 +564,10 @@ export class TimelineWindow<T> {
       }
       if (!this.active || (this.scrollingUp && !this.jumping && this.top < -EPSILON)) {
         const top = Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight);
-        const target = viewport.scrollTop + top - this.top;
-        this.setTop(top);
+        const shift = Math.ceil(top - this.top);
+        this.setTop(this.top + shift);
         this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
-        this.writeOffset(target);
+        this.writeOffset(viewport.scrollTop + shift);
       }
       this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
       if (anchor?.element) {
