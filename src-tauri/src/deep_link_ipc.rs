@@ -86,12 +86,11 @@ struct ActivationDelivery {
 
 impl ActivationDelivery {
     fn push(&mut self) -> Option<ActivationHandler> {
-        match &self.handler {
-            Some(handler) => Some(handler.clone()),
-            None => {
-                self.pending = true;
-                None
-            }
+        if let Some(handler) = &self.handler {
+            Some(handler.clone())
+        } else {
+            self.pending = true;
+            None
         }
     }
 
@@ -128,11 +127,11 @@ fn dispatch_url(url: String) {
 }
 
 fn dispatch_activation() {
-    if let Some(handler) = activation()
+    let handler = activation()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .push()
-    {
+        .push();
+    if let Some(handler) = handler {
         handler();
     }
 }
@@ -218,11 +217,11 @@ pub fn install_handler<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
             let _ = window.set_focus();
         }
     });
-    if let Some(handler) = activation()
+    let handler = activation()
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .install(activate)
-    {
+        .install(activate);
+    if let Some(handler) = handler {
         handler();
     }
 
