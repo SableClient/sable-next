@@ -145,15 +145,26 @@
   }
 
   .collapsed .call-room {
+    grid-template-columns: auto;
     justify-content: center;
   }
 
   .collapsed :global(.controls) {
-    flex-wrap: wrap;
+    display: grid;
+    gap: var(--space-100);
+    grid-template-columns: repeat(2, var(--control-height-300));
     justify-content: center;
   }
 
   .collapsed :global(.control:last-child) {
     margin-inline-start: 0;
+  }
+
+  .collapsed :global(.control:last-child:nth-child(odd)) {
+    grid-column: 1 / -1;
+  }
+
+  .collapsed :global(.control:last-child:nth-child(odd) .hang-up) {
+    width: 100%;
   }
 </style>
