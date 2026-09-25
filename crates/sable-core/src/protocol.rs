@@ -963,7 +963,20 @@ pub enum Command {
         user_id: OwnedUserId,
         flow_id: String,
     },
-    /// The emoji matched.
+    /// The bytes read from the other device's code, base64 encoded.
+    ScanVerificationQr {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        flow_id: String,
+        data: String,
+    },
+    /// Leaves the codes for emoji.
+    StartSasVerification {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        flow_id: String,
+    },
+    /// The emoji matched, or the other device showed that it scanned our code.
     ConfirmVerification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
@@ -1462,6 +1475,8 @@ pub enum CommandOk {
         flow_id: String,
     },
     AcceptVerification,
+    ScanVerificationQr,
+    StartSasVerification,
     ConfirmVerification,
     CancelVerification,
 }
@@ -1489,6 +1504,8 @@ pub enum CommandErr {
         stages: Vec<String>,
     },
     UnknownVerification,
+    /// A scanned code that is not a Matrix verification code.
+    InvalidVerificationCode,
     InvalidMedia,
     /// A poll needs a question and between 1 and 20 answers.
     InvalidPoll,
@@ -2108,6 +2125,15 @@ pub enum VerificationView {
     /// Nothing to do but wait. The side that accepted drives the transition to
     /// SAS.
     Waiting,
+    /// Both sides are ready and support codes. `qr` is ours to show, and
+    /// `can_scan` says the other device shows one we can read.
+    Choose {
+        qr: Option<QrCodeView>,
+        can_scan: bool,
+        can_compare: bool,
+    },
+    /// The other device read our code and waits for us to say it shows success.
+    Scanned,
     /// `decimals` is the fallback when the other side refused emoji.
     Compare {
         emojis: Vec<EmojiView>,
@@ -2119,6 +2145,14 @@ pub enum VerificationView {
     Cancelled {
         reason: String,
     },
+}
+
+/// A square of `width` rows, `modules` holding `1` for a dark module.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct QrCodeView {
+    pub width: u32,
+    pub modules: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

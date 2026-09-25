@@ -1577,6 +1577,23 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async scanVerificationQr(userId: string, flowId: string, data: string): Promise<void> {
+      await transport().send({
+        type: 'scan_verification_qr',
+        user_id: userId,
+        flow_id: flowId,
+        data,
+      });
+    },
+
+    async startSasVerification(userId: string, flowId: string): Promise<void> {
+      await transport().send({
+        type: 'start_sas_verification',
+        user_id: userId,
+        flow_id: flowId,
+      });
+    },
+
     async confirmVerification(userId: string, flowId: string): Promise<void> {
       await transport().send({
         type: 'confirm_verification',

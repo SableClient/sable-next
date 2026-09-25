@@ -7,18 +7,48 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
+  import VerificationQrCode from './VerificationQrCode.svelte';
+  import VerificationQrScanner from './VerificationQrScanner.svelte';
 
   const core = useCoreClient();
   let error = $state<string | null>(null);
+  let scanning = $state(false);
 
   // This app-level component keeps verification events flowing even when no
   // route-specific feature currently subscribes to the core transport.
   $effect(() => core.subscribeEvents(() => {}));
 
+  $effect(() => {
+    if (core.verification?.state.phase !== 'choose') scanning = false;
+  });
+
   async function accept(): Promise<void> {
     if (!core.verification || !core.session?.user_id) return;
     try {
       await core.commands.acceptVerification(core.session.user_id, core.verification.flowId);
+    } catch (cause) {
+      error = verificationErrorMessage(cause);
+    }
+  }
+
+  async function scanned(data: Uint8Array): Promise<void> {
+    if (!core.verification || !core.session?.user_id) return;
+    scanning = false;
+    try {
+      await core.commands.scanVerificationQr(
+        core.session.user_id,
+        core.verification.flowId,
+        btoa(String.fromCharCode(...data))
+      );
+    } catch (cause) {
+      error = verificationErrorMessage(cause);
+    }
+  }
+
+  async function compareEmoji(): Promise<void> {
+    if (!core.verification || !core.session?.user_id) return;
+    try {
+      await core.commands.startSasVerification(core.session.user_id, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
@@ -77,6 +107,49 @@
           >{$i18n.t('settings.acceptVerification')}</Button
         >
       {/if}
+    {:else if core.verification.state.phase === 'choose'}
+      {@const choice = core.verification.state}
+      <Dialog.Description class="verification-description">
+        {$i18n.t(
+          scanning || !choice.qr
+            ? 'settings.verificationScanTheirs'
+            : 'settings.verificationShowOurs'
+        )}
+      </Dialog.Description>
+      <div class="verification-code">
+        {#if scanning || !choice.qr}
+          <VerificationQrScanner onScan={(data: Uint8Array) => void scanned(data)} />
+        {:else}
+          <VerificationQrCode code={choice.qr} label={$i18n.t('settings.verificationQrLabel')} />
+        {/if}
+      </div>
+      <div class="verification-actions">
+        {#if choice.can_scan && choice.qr}
+          <Button class="verification-action" onclick={() => (scanning = !scanning)}>
+            {$i18n.t(scanning ? 'settings.showOurCode' : 'settings.scanTheirCode')}
+          </Button>
+        {/if}
+        {#if choice.can_compare}
+          <Button class="verification-action" onclick={() => void compareEmoji()}>
+            {$i18n.t('settings.compareEmojiInstead')}
+          </Button>
+        {/if}
+      </div>
+    {:else if core.verification.state.phase === 'scanned'}
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.verificationScannedPrompt')}
+      </Dialog.Description>
+      <div class="verification-actions">
+        <Button variant="primary" class="verification-action" onclick={confirm}>
+          {$i18n.t('settings.verificationScannedYes')}
+        </Button>
+        <Button
+          variant="danger"
+          size="small"
+          class="verification-action"
+          onclick={() => void cancel(true)}>{$i18n.t('settings.verificationScannedNo')}</Button
+        >
+      </div>
     {:else if core.verification.state.phase === 'waiting'}
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.startingEmojiComparison')}
@@ -181,6 +254,13 @@
   .verification-actions {
     display: grid;
     gap: var(--space-200);
+  }
+
+  .verification-code {
+    display: grid;
+    gap: var(--space-200);
+    justify-items: center;
+    margin: var(--space-300) 0 var(--space-400);
   }
 
   :global(.verification-action) {

@@ -6641,6 +6641,7 @@ dependencies = [
  "matrix-sdk-ui",
  "mime",
  "probly-search",
+ "qrcode",
  "reqwest",
  "ruma",
  "rust-stemmers",

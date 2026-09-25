@@ -13,7 +13,8 @@ name = "generate-types"
 required-features = ["typegen"]
 
 [dependencies]
-matrix-sdk = { workspace = true }
+matrix-sdk = { workspace = true, features = ["qrcode"] }
+qrcode = { version = "0.14.1", default-features = false }
 matrix-sdk-ui = { workspace = true }
 matrix-sdk-base = { workspace = true }
 ruma.workspace = true
@@ -52,7 +53,6 @@ matrix-sdk-common.workspace = true
 matrix-sdk = { workspace = true, features = [
   "bundled-sqlite",
   "automatic-room-key-forwarding",
-  "qrcode",
 ] }
 tempfile = "3"
 tokio = { workspace = true }

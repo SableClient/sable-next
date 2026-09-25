@@ -19,6 +19,9 @@ export function verificationErrorMessage(
       );
     }
     if (cause.detail.code === 'unavailable') return t('settings.verificationUnavailable');
+    if (cause.detail.code === 'invalid_verification_code') {
+      return t('settings.invalidVerificationCode');
+    }
   }
   return t('settings.actionFailed');
 }

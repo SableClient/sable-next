@@ -101,6 +101,8 @@ html {
   --media-scrim-solid: rgb(0 0 0 / 100%);
   --media-scrim-hover: rgb(255 255 255 / 20%);
   --media-on-scrim: #fff;
+  --qr-dark: #000;
+  --qr-light: #fff;
 }
 
 @media (prefers-color-scheme: dark) {

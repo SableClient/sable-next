@@ -1,11 +1,13 @@
 use std::sync::{Arc, atomic::Ordering};
 use std::time::Duration;
 
+use base64::Engine;
 use futures_util::StreamExt;
 use matrix_sdk::EncryptionState;
 use matrix_sdk::encryption::recovery::{IdentityResetHandle, RecoveryError};
 use matrix_sdk::encryption::verification::{
-    SasState, SasVerification, VerificationRequest, VerificationRequestState,
+    QrVerification, QrVerificationData, QrVerificationState, SasState, SasVerification,
+    VerificationRequest, VerificationRequestState,
 };
 use matrix_sdk::encryption::{
     CrossSigningResetAuthType, VerificationState, recovery::RecoveryState,
@@ -13,14 +15,17 @@ use matrix_sdk::encryption::{
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, OAuth, Password, UserIdentifier};
 use matrix_sdk::ruma::events::GlobalAccountDataEventType;
+use matrix_sdk::ruma::events::key::verification::VerificationMethod;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
 use matrix_sdk::ruma::events::secret_storage::default_key::SecretStorageDefaultKeyEventContent;
 use matrix_sdk::ruma::{OwnedUserId, UserId};
+use qrcode::bits::Bits;
+use qrcode::{Color, EcLevel, QrCode, Version};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
-    RecoveryStateView, SignOutSafetyView, VerificationStateView, VerificationView,
+    QrCodeView, RecoveryStateView, SignOutSafetyView, VerificationStateView, VerificationView,
 };
 
 use crate::Core;
@@ -214,31 +219,54 @@ impl Core {
 
             while let Some(state) = changes.next().await {
                 match state {
-                    VerificationRequestState::Ready { .. } => {
-                        if request.we_started()
-                            && let Err(error) = request.start_sas().await
-                        {
-                            core.failed("verification: start_sas", error);
+                    VerificationRequestState::Ready {
+                        their_methods,
+                        our_methods,
+                        ..
+                    } => {
+                        let can_scan = their_methods.contains(&VerificationMethod::QrCodeShowV1)
+                            && our_methods.contains(&VerificationMethod::QrCodeScanV1);
+                        let can_compare = their_methods.contains(&VerificationMethod::SasV1)
+                            && our_methods.contains(&VerificationMethod::SasV1);
+                        let qr = match request.generate_qr_code().await {
+                            Ok(qr) => qr,
+                            Err(error) => {
+                                core.failed("verification: generate_qr_code", error);
+                                None
+                            }
+                        };
+
+                        if qr.is_none() && !can_scan {
+                            if request.we_started()
+                                && let Err(error) = request.start_sas().await
+                            {
+                                core.failed("verification: start_sas", error);
+                            }
+
+                            core.emit_verification(&user_id, &flow_id, VerificationView::Waiting);
+                            continue;
                         }
 
-                        core.emit_verification(&user_id, &flow_id, VerificationView::Waiting);
+                        let shown = qr.as_ref().and_then(qr_code_view);
+                        if let Some(qr) = qr {
+                            core.watch_qr(user_id.clone(), flow_id.clone(), qr);
+                        }
+                        core.emit_verification(
+                            &user_id,
+                            &flow_id,
+                            VerificationView::Choose {
+                                qr: shown,
+                                can_scan,
+                                can_compare,
+                            },
+                        );
                     }
 
                     VerificationRequestState::Transitioned { verification, .. } => {
-                        // QR is not compiled in, so any other flow is
-                        // undriveable. Say so instead of spinning.
-                        match verification.sas() {
-                            Some(sas) => core.watch_sas(user_id.clone(), flow_id.clone(), sas),
-                            None => core.emit_verification(
-                                &user_id,
-                                &flow_id,
-                                VerificationView::Cancelled {
-                                    reason: "unsupported verification method".to_owned(),
-                                },
-                            ),
+                        if let Some(sas) = verification.sas() {
+                            core.watch_sas(user_id.clone(), flow_id.clone(), sas);
+                            break;
                         }
-
-                        break;
                     }
 
                     other => {
@@ -289,6 +317,43 @@ impl Core {
         self.track_session_task(task);
     }
 
+    pub(crate) fn watch_qr(
+        self: &Arc<Self>,
+        user_id: OwnedUserId,
+        flow_id: String,
+        qr: QrVerification,
+    ) {
+        let core = self.clone();
+        let task = spawn(async move {
+            let mut changes = qr.changes();
+
+            while let Some(state) = changes.next().await {
+                let view = match state {
+                    QrVerificationState::Started => continue,
+                    QrVerificationState::Scanned => VerificationView::Scanned,
+                    QrVerificationState::Confirmed | QrVerificationState::Reciprocated => {
+                        VerificationView::Confirmed
+                    }
+                    QrVerificationState::Done { .. } => VerificationView::Done,
+                    QrVerificationState::Cancelled(info) => VerificationView::Cancelled {
+                        reason: info.reason().to_owned(),
+                    },
+                };
+                let done = matches!(
+                    view,
+                    VerificationView::Done | VerificationView::Cancelled { .. }
+                );
+                core.emit_verification(&user_id, &flow_id, view);
+
+                if done {
+                    break;
+                }
+            }
+        })
+        .abort_on_drop();
+        self.track_session_task(task);
+    }
+
     fn emit_verification(&self, user_id: &UserId, flow_id: &str, state: VerificationView) {
         tracing::info!(
             operation = "verification",
@@ -312,6 +377,42 @@ impl Core {
             .encryption()
             .get_verification_request(user_id, flow_id)
             .await
+            .ok_or(CommandErr::UnknownVerification)
+    }
+
+    pub(crate) async fn scan_verification_qr(
+        self: &Arc<Self>,
+        user_id: OwnedUserId,
+        flow_id: String,
+        data: &str,
+    ) -> Result<(), CommandErr> {
+        let data = base64::engine::general_purpose::STANDARD
+            .decode(data)
+            .ok()
+            .and_then(|bytes| QrVerificationData::from_bytes(bytes).ok())
+            .ok_or(CommandErr::InvalidVerificationCode)?;
+        let qr = self
+            .verification_request(&user_id, &flow_id)
+            .await?
+            .scan_qr_code(data)
+            .await
+            .map_err(|error| self.failed("scan_verification_qr", error))?
+            .ok_or(CommandErr::Unavailable)?;
+        self.watch_qr(user_id, flow_id, qr);
+        Ok(())
+    }
+
+    pub(crate) async fn qr(
+        &self,
+        user_id: &UserId,
+        flow_id: &str,
+    ) -> Result<QrVerification, CommandErr> {
+        self.client()
+            .await?
+            .encryption()
+            .get_verification(user_id, flow_id)
+            .await
+            .and_then(matrix_sdk::encryption::verification::Verification::qr)
             .ok_or(CommandErr::UnknownVerification)
     }
 
@@ -378,10 +479,33 @@ fn sas_view(sas: &SasVerification, state: &SasState) -> VerificationView {
     }
 }
 
+fn qr_code_view(qr: &QrVerification) -> Option<QrCodeView> {
+    level_h_code(&qr.to_bytes().ok()?)
+}
+
+fn level_h_code(data: &[u8]) -> Option<QrCodeView> {
+    let code = (7..=40).find_map(|version| {
+        let mut bits = Bits::new(Version::Normal(version));
+        bits.push_byte_data(data).ok()?;
+        bits.push_terminator(EcLevel::H).ok()?;
+        QrCode::with_bits(bits, EcLevel::H).ok()
+    })?;
+    Some(QrCodeView {
+        width: u32::try_from(code.width()).ok()?,
+        modules: code
+            .to_colors()
+            .into_iter()
+            .map(|color| if color == Color::Dark { '1' } else { '0' })
+            .collect(),
+    })
+}
+
 const fn verification_phase(state: &VerificationView) -> &'static str {
     match state {
         VerificationView::Requested { .. } => "requested",
         VerificationView::Waiting => "waiting",
+        VerificationView::Choose { .. } => "choose",
+        VerificationView::Scanned => "scanned",
         VerificationView::Compare { .. } => "compare",
         VerificationView::Confirmed => "confirmed",
         VerificationView::Done => "done",
@@ -511,4 +635,60 @@ async fn recovery_passphrase(client: &matrix_sdk::Client) -> bool {
     };
     key.get_field::<serde_json::Value>("passphrase")
         .is_ok_and(|passphrase| passphrase.is_some_and(|value| !value.is_null()))
+}
+
+#[cfg(test)]
+mod tests {
+    use qrcode::{EcLevel, Version};
+
+    use super::level_h_code;
+
+    fn payload() -> Vec<u8> {
+        let mut data = b"MATRIX\x02\x01".to_vec();
+        let flow_id = b"a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+        data.extend_from_slice(&u16::try_from(flow_id.len()).unwrap().to_be_bytes());
+        data.extend_from_slice(flow_id);
+        data.extend((0..64).map(|byte: u8| byte.wrapping_mul(37)));
+        data.extend((0..16).map(|byte: u8| byte.wrapping_mul(91)));
+        data
+    }
+
+    #[test]
+    fn a_verification_code_is_drawn_at_the_highest_correction_level() {
+        let view = level_h_code(&payload()).unwrap();
+        let width = usize::try_from(view.width).unwrap();
+
+        assert_eq!(view.modules.len(), width * width);
+        assert!(
+            view.modules
+                .chars()
+                .all(|module| module == '0' || module == '1')
+        );
+        let smallest = (7..=40)
+            .map(Version::Normal)
+            .find(|version| {
+                let mut bits = qrcode::bits::Bits::new(*version);
+                bits.push_byte_data(&payload()).is_ok() && bits.push_terminator(EcLevel::H).is_ok()
+            })
+            .unwrap();
+        assert_eq!(width, usize::try_from(smallest.width()).unwrap());
+    }
+
+    #[test]
+    #[ignore = "writes the fixture the web decoder test reads"]
+    fn write_the_web_fixture() {
+        let view = level_h_code(&payload()).unwrap();
+        let fixture = serde_json::json!({
+            "payload": payload(),
+            "code": { "width": view.width, "modules": view.modules },
+        });
+        std::fs::write(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../src/lib/features/settings/verification-qr.fixture.json"
+            ),
+            serde_json::to_string(&fixture).unwrap(),
+        )
+        .unwrap();
+    }
 }

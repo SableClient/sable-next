@@ -54,6 +54,7 @@
     "emojibase-data": "^17.0.0",
     "i18next": "^26.4.2",
     "i18next-browser-languagedetector": "^8.2.1",
+    "jsqr": "1.4.0",
     "katex": "0.18.7",
     "leaflet": "1.9.4",
     "livekit-client": "2.22.3",

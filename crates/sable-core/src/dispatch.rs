@@ -2305,12 +2305,33 @@ impl Core {
                 Ok(CommandOk::AcceptVerification)
             }
 
-            Command::ConfirmVerification { user_id, flow_id } => {
-                self.sas(&user_id, &flow_id)
+            Command::ScanVerificationQr {
+                user_id,
+                flow_id,
+                data,
+            } => {
+                self.scan_verification_qr(user_id, flow_id, &data).await?;
+
+                Ok(CommandOk::ScanVerificationQr)
+            }
+
+            Command::StartSasVerification { user_id, flow_id } => {
+                self.verification_request(&user_id, &flow_id)
                     .await?
-                    .confirm()
+                    .start_sas()
                     .await
-                    .map_err(|error| self.failed("confirm_verification", error))?;
+                    .map_err(|error| self.failed("start_sas_verification", error))?
+                    .ok_or(CommandErr::Unavailable)?;
+
+                Ok(CommandOk::StartSasVerification)
+            }
+
+            Command::ConfirmVerification { user_id, flow_id } => {
+                match self.sas(&user_id, &flow_id).await {
+                    Ok(sas) => sas.confirm().await,
+                    Err(_) => self.qr(&user_id, &flow_id).await?.confirm().await,
+                }
+                .map_err(|error| self.failed("confirm_verification", error))?;
 
                 Ok(CommandOk::ConfirmVerification)
             }
@@ -2330,6 +2351,11 @@ impl Core {
                         .cancel()
                         .await
                         .map_err(|error| self.failed("cancel_verification: sas", error))?,
+                    Err(_) if let Ok(qr) = self.qr(&user_id, &flow_id).await => {
+                        qr.cancel()
+                            .await
+                            .map_err(|error| self.failed("cancel_verification: qr", error))?
+                    }
                     Err(_) => self
                         .verification_request(&user_id, &flow_id)
                         .await?
