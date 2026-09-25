@@ -1042,6 +1042,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           verification: 'verified',
           recovery: 'enabled',
           cross_signing_ready: true,
+          recovery_passphrase: false,
         },
       }),
       sign_out_safety: () => ({
@@ -1051,6 +1052,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             verification: 'verified',
             recovery: 'enabled',
             cross_signing_ready: true,
+            recovery_passphrase: false,
           },
           backup_enabled: true,
           backup_uploaded: true,

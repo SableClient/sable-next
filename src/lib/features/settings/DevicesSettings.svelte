@@ -595,6 +595,7 @@
   <VerifyDeviceDialog
     bind:open={verificationOpen}
     recovery={status.recovery}
+    recoveryPassphrase={status.recovery_passphrase}
     onVerified={refresh}
   />
 {/if}

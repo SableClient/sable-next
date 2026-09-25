@@ -26,7 +26,7 @@ export class DeviceVerification {
     }
   }
 
-  async recoverIdentity(onRecovered?: Continuation): Promise<void> {
+  async recoverIdentity(onRecovered?: Continuation, recoveryPassphrase = false): Promise<void> {
     const key = this.recoveryKey.trim();
     if (!key) return;
     this.recovering = true;
@@ -36,7 +36,10 @@ export class DeviceVerification {
       this.recoveryKey = '';
       await onRecovered?.();
     } catch (cause) {
-      this.error = verificationErrorMessage(cause, { invalidRecoveryKey: true });
+      this.error = verificationErrorMessage(cause, {
+        invalidRecoveryKey: true,
+        recoveryPassphrase,
+      });
     } finally {
       this.recovering = false;
     }

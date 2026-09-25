@@ -21,7 +21,12 @@ import { SignOutGuard } from './sign-out-guard.svelte.js';
 import SignOutWarningDialog from './SignOutWarningDialog.svelte';
 
 const safe: SignOutSafetyView = {
-  encryption: { verification: 'verified', recovery: 'enabled', cross_signing_ready: true },
+  encryption: {
+    verification: 'verified',
+    recovery: 'enabled',
+    cross_signing_ready: true,
+    recovery_passphrase: false,
+  },
   backup_enabled: true,
   backup_uploaded: true,
   has_encrypted_rooms: true,

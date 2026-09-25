@@ -11,10 +11,16 @@
   interface Props {
     open?: boolean;
     recovery: RecoveryStateView;
+    recoveryPassphrase?: boolean;
     onVerified?: () => void | Promise<void>;
   }
 
-  let { open = $bindable(false), recovery, onVerified }: Props = $props();
+  let {
+    open = $bindable(false),
+    recovery,
+    recoveryPassphrase = false,
+    onVerified,
+  }: Props = $props();
 
   function close(): void {
     open = false;
@@ -41,6 +47,7 @@
 
   <VerifyDeviceOptions
     {recovery}
+    {recoveryPassphrase}
     inputId="settings-recovery-key"
     onRequested={close}
     onRecovered={completeRecovery}

@@ -14,12 +14,19 @@
 
   interface Props {
     recovery: RecoveryStateView;
+    recoveryPassphrase?: boolean;
     inputId?: string;
     onRequested?: () => void | Promise<void>;
     onRecovered?: () => void | Promise<void>;
   }
 
-  let { recovery, inputId = 'device-recovery-key', onRequested, onRecovered }: Props = $props();
+  let {
+    recovery,
+    recoveryPassphrase = false,
+    inputId = 'device-recovery-key',
+    onRequested,
+    onRecovered,
+  }: Props = $props();
   const verification = new DeviceVerification(useCoreClient());
   let selectedMethod = $state<'recovery' | null>(null);
 </script>
@@ -41,7 +48,9 @@
       {#if recovery !== 'disabled'}
         <Button block variant="secondary" onclick={() => (selectedMethod = 'recovery')}>
           <KeyIcon aria-hidden="true" />
-          {$i18n.t('settings.useRecoveryKey')}
+          {$i18n.t(
+            recoveryPassphrase ? 'settings.useRecoveryKeyOrPassphrase' : 'settings.useRecoveryKey'
+          )}
         </Button>
       {/if}
     </div>
@@ -63,10 +72,14 @@
       class="verification-method recovery-method"
       onsubmit={(event) => {
         event.preventDefault();
-        void verification.recoverIdentity(onRecovered);
+        void verification.recoverIdentity(onRecovered, recoveryPassphrase);
       }}
     >
-      <Label for={inputId}>{$i18n.t('settings.useRecoveryKey')}</Label>
+      <Label for={inputId}
+        >{$i18n.t(
+          recoveryPassphrase ? 'settings.useRecoveryKeyOrPassphrase' : 'settings.useRecoveryKey'
+        )}</Label
+      >
       <div class="recovery-controls">
         <TextInput
           id={inputId}
@@ -77,7 +90,11 @@
           autofocus
           spellcheck={false}
           type="password"
-          placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
+          placeholder={$i18n.t(
+            recoveryPassphrase
+              ? 'settings.recoveryKeyOrPassphrasePlaceholder'
+              : 'settings.recoveryKeyPlaceholder'
+          )}
         />
         <Button
           type="submit"

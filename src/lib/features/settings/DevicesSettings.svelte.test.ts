@@ -34,6 +34,7 @@ const status: EncryptionStatusView = {
   verification: 'verified',
   recovery: 'enabled',
   cross_signing_ready: true,
+  recovery_passphrase: false,
 };
 
 const own: DeviceView = {

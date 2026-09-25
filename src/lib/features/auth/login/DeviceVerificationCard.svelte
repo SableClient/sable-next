@@ -25,6 +25,7 @@
   let recovered = $state(false);
   const verification = new DeviceVerification(core);
   let verified = $derived(status?.verification === 'verified' || recovered);
+  let passphrase = $derived(status?.recovery_passphrase ?? false);
 
   async function refresh(): Promise<void> {
     loading = true;
@@ -43,7 +44,7 @@
     if (verification.recoveryKey.trim()) {
       await verification.recoverIdentity(() => {
         recovered = true;
-      });
+      }, passphrase);
       return;
     }
     await verification.requestVerification();
@@ -77,12 +78,20 @@
     <AuthField labelId="device-verification-title" label={$i18n.t('auth.verifyDevice')}>
       <AuthInfoBox>
         {#if loading}<Spinner small />{/if}
-        {loading ? $i18n.t('settings.loadingEncryption') : $i18n.t('auth.verifyDeviceDescription')}
+        {loading
+          ? $i18n.t('settings.loadingEncryption')
+          : $i18n.t(
+              passphrase ? 'auth.verifyDeviceDescriptionPassphrase' : 'auth.verifyDeviceDescription'
+            )}
       </AuthInfoBox>
     </AuthField>
 
     {#if status?.recovery !== 'disabled'}
-      <FormField dense fieldId="login-recovery-key" label={$i18n.t('settings.recoveryKey')}>
+      <FormField
+        dense
+        fieldId="login-recovery-key"
+        label={$i18n.t(passphrase ? 'settings.recoveryKeyOrPassphrase' : 'settings.recoveryKey')}
+      >
         <TextInput
           id="login-recovery-key"
           bind:value={verification.recoveryKey}
@@ -91,7 +100,11 @@
           disabled={verification.requesting || verification.recovering}
           spellcheck={false}
           type="password"
-          placeholder={$i18n.t('settings.recoveryKeyPlaceholder')}
+          placeholder={$i18n.t(
+            passphrase
+              ? 'settings.recoveryKeyOrPassphrasePlaceholder'
+              : 'settings.recoveryKeyPlaceholder'
+          )}
         />
       </FormField>
     {/if}

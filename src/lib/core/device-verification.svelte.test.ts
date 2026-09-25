@@ -40,6 +40,17 @@ test('a denied recovery key reads as an invalid key and keeps what was typed', a
   expect(onRecovered).not.toHaveBeenCalled();
 });
 
+test('a denied passphrase names both ways to unlock', async () => {
+  const { verification } = verificationWith({
+    recoverIdentity: () => Promise.reject(new CoreError({ code: 'denied' })),
+  });
+  verification.recoveryKey = 'correct horse';
+
+  await verification.recoverIdentity(undefined, true);
+
+  expect(verification.error).toBe(t('settings.invalidRecoveryKeyOrPassphrase'));
+});
+
 test('a request is sent for the signed-in user and continues', async () => {
   const requestVerification = vi.fn(() => Promise.resolve('flow'));
   const { verification } = verificationWith({

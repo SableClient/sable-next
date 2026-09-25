@@ -314,6 +314,8 @@ export type EncryptionStatusView = {
 	 *  verification must come from another session.
 	 */
 	cross_signing_ready: boolean,
+	/**  The default secret storage key can also be unlocked with a passphrase. */
+	recovery_passphrase: boolean,
 };
 
 export type GalleryItemView = { kind: "image"; body: string; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null } | { kind: "video"; body: string; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null } | { kind: "audio"; body: string; source: string; mime: string | null } | { kind: "file"; body: string; source: string; mime: string | null };

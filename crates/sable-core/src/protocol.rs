@@ -1943,6 +1943,8 @@ pub struct EncryptionStatusView {
     /// All three keys held locally, so this device can sign others. False means
     /// verification must come from another session.
     pub cross_signing_ready: bool,
+    /// The default secret storage key can also be unlocked with a passphrase.
+    pub recovery_passphrase: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

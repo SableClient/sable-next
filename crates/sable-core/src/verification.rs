@@ -8,8 +8,10 @@ use matrix_sdk::encryption::verification::{
 };
 use matrix_sdk::encryption::{VerificationState, recovery::RecoveryState};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
+use matrix_sdk::ruma::events::secret_storage::default_key::SecretStorageDefaultKeyEventContent;
 use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::protocol::{
@@ -339,6 +341,7 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             .cross_signing_status()
             .await
             .is_some_and(|status| status.is_complete()),
+        recovery_passphrase: recovery_passphrase(client).await,
     }
 }
 
@@ -362,4 +365,27 @@ pub(crate) async fn sign_out_safety(client: &matrix_sdk::Client) -> SignOutSafet
             .iter()
             .any(|room| !matches!(room.encryption_state(), EncryptionState::NotEncrypted)),
     }
+}
+
+async fn recovery_passphrase(client: &matrix_sdk::Client) -> bool {
+    let account = client.account();
+    let Ok(Some(default_key)) = account
+        .account_data::<SecretStorageDefaultKeyEventContent>()
+        .await
+    else {
+        return false;
+    };
+    let Ok(default_key) = default_key.deserialize() else {
+        return false;
+    };
+    let Ok(Some(key)) = account
+        .account_data_raw(GlobalAccountDataEventType::SecretStorageKey(
+            default_key.key_id,
+        ))
+        .await
+    else {
+        return false;
+    };
+    key.get_field::<serde_json::Value>("passphrase")
+        .is_ok_and(|passphrase| passphrase.is_some_and(|value| !value.is_null()))
 }

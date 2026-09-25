@@ -691,3 +691,93 @@ async fn forgetting_an_invalid_uri_is_refused() {
         Err(CommandErr::InvalidMedia)
     ));
 }
+
+#[allow(clippy::unwrap_used)]
+async fn sync_secret_storage_key(
+    server: &MatrixMockServer,
+    client: &matrix_sdk::Client,
+    key: &matrix_sdk_base::crypto::secret_storage::SecretStorageKey,
+) {
+    let content = serde_json::to_value(key.event_content()).unwrap();
+    let key_id = key.key_id().to_owned();
+    server
+        .mock_sync()
+        .ok_and_run(client, |builder| {
+            builder
+                .add_custom_global_account_data(json!({
+                    "type": "m.secret_storage.default_key",
+                    "content": {"key": key_id},
+                }))
+                .add_custom_global_account_data(json!({
+                    "type": format!("m.secret_storage.key.{key_id}"),
+                    "content": content,
+                }));
+        })
+        .await;
+}
+
+#[tokio::test]
+async fn encryption_status_reports_a_passphrase_on_the_default_key() {
+    use matrix_sdk_base::crypto::secret_storage::SecretStorageKey;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    sync_secret_storage_key(
+        &server,
+        &client,
+        &SecretStorageKey::new_from_passphrase("correct horse"),
+    )
+    .await;
+    assert!(
+        crate::verification::encryption_status(&client)
+            .await
+            .recovery_passphrase
+    );
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    sync_secret_storage_key(&server, &client, &SecretStorageKey::new()).await;
+    assert!(
+        !crate::verification::encryption_status(&client)
+            .await
+            .recovery_passphrase
+    );
+}
+
+#[tokio::test]
+async fn recover_identity_accepts_the_passphrase_as_well_as_the_key() {
+    use matrix_sdk_base::crypto::secret_storage::SecretStorageKey;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let key = SecretStorageKey::new_from_passphrase("correct horse");
+    let user_id = client.user_id().unwrap().to_owned();
+    server
+        .mock_get_default_secret_storage_key()
+        .ok(&user_id, key.key_id())
+        .mount()
+        .await;
+    server
+        .mock_get_secret_storage_key()
+        .ok(&user_id, key.event_content())
+        .mount()
+        .await;
+    let core = core(&server, client).await;
+    let recover = async |recovery_key: String| {
+        core.dispatch(Command::RecoverIdentity { recovery_key })
+            .await
+    };
+
+    assert!(matches!(
+        recover("wrong horse".to_owned()).await,
+        Err(CommandErr::Denied)
+    ));
+    assert!(matches!(
+        recover("correct horse".to_owned()).await,
+        Err(CommandErr::Failed { .. })
+    ));
+    assert!(matches!(
+        recover(key.to_base58()).await,
+        Err(CommandErr::Failed { .. })
+    ));
+}
