@@ -8,10 +8,12 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import type { ScheduledTarget } from './composer-context';
-  import { dequeue, queueFor } from './scheduled-queue.svelte.js';
+  import { dequeue, enqueue, queueFor, type QueuedMessage } from './scheduled-queue.svelte.js';
 
   interface Props {
     roomId: string;
@@ -24,9 +26,13 @@
 
   const core = useCoreClient();
   let fetched = $state.raw<ScheduledMessageView[]>([]);
+  let pending = $state.raw<string[]>([]);
+  let failure = $state<string | null>(null);
   let expanded = $state(false);
 
-  let remote = $derived(fetched.filter((message) => message.delay_id !== editing));
+  let remote = $derived(
+    fetched.filter((message) => message.delay_id !== editing && !pending.includes(message.delay_id))
+  );
   let local = $derived(queueFor(roomId).filter((message) => message.id !== editing));
   let total = $derived(remote.length + local.length);
 
@@ -56,17 +62,61 @@
     });
   }
 
-  function cancelRemote(delayId: string): void {
-    fetched = fetched.filter((message) => message.delay_id !== delayId);
-    void core.commands.cancelScheduledMessage(delayId).catch((error: unknown) => {
+  function settle(delayId: string): void {
+    pending = pending.filter((id) => id !== delayId);
+  }
+
+  function hold(delayId: string): void {
+    failure = null;
+    pending = [...pending, delayId];
+  }
+
+  async function cancelRemote(delayId: string): Promise<void> {
+    try {
+      await core.commands.cancelScheduledMessage(delayId);
+      fetched = fetched.filter((message) => message.delay_id !== delayId);
+    } catch (error) {
       console.warn('[sable composer] cancelling a scheduled message failed', error);
+      failure = $i18n.t('composer.scheduledDeleteFailed');
+    } finally {
+      settle(delayId);
+    }
+  }
+
+  function deleteRemote(delayId: string): void {
+    hold(delayId);
+    toasts.undoable($i18n.t('composer.scheduledDeleted'), {
+      label: $i18n.t('composer.undo'),
+      onUndo: () => {
+        settle(delayId);
+      },
+      onClose: () => {
+        void cancelRemote(delayId);
+      },
     });
   }
 
-  function sendRemote(delayId: string): void {
-    fetched = fetched.filter((message) => message.delay_id !== delayId);
-    void core.commands.sendScheduledMessage(delayId).catch((error: unknown) => {
+  async function sendRemote(delayId: string): Promise<void> {
+    hold(delayId);
+    try {
+      await core.commands.sendScheduledMessage(delayId);
+      fetched = fetched.filter((message) => message.delay_id !== delayId);
+    } catch (error) {
       console.warn('[sable composer] sending a scheduled message failed', error);
+      failure = $i18n.t('composer.scheduledSendFailed');
+    } finally {
+      settle(delayId);
+    }
+  }
+
+  function deleteLocal(message: QueuedMessage): void {
+    failure = null;
+    dequeue(message.id);
+    toasts.undoable($i18n.t('composer.scheduledDeleted'), {
+      label: $i18n.t('composer.undo'),
+      onUndo: () => {
+        enqueue(message);
+      },
     });
   }
 </script>
@@ -84,6 +134,10 @@
       <ClockIcon size={16} aria-hidden="true" />
       {$i18n.t('composer.scheduledCount', { count: total })}
     </button>
+
+    {#if failure !== null}
+      <Alert variant="critical" role="alert">{failure}</Alert>
+    {/if}
 
     {#if expanded}
       <ul>
@@ -111,7 +165,7 @@
               size="small"
               label={$i18n.t('composer.scheduledSendNow')}
               onclick={() => {
-                sendRemote(message.delay_id);
+                void sendRemote(message.delay_id);
               }}
             >
               <PaperPlaneTiltIcon />
@@ -119,9 +173,9 @@
             <IconButton
               variant="ghost"
               size="small"
-              label={$i18n.t('composer.scheduledCancel')}
+              label={$i18n.t('composer.scheduledDelete')}
               onclick={() => {
-                cancelRemote(message.delay_id);
+                deleteRemote(message.delay_id);
               }}
             >
               <TrashIcon />
@@ -150,9 +204,9 @@
             <IconButton
               variant="ghost"
               size="small"
-              label={$i18n.t('composer.scheduledCancel')}
+              label={$i18n.t('composer.scheduledDelete')}
               onclick={() => {
-                dequeue(message.id);
+                deleteLocal(message);
               }}
             >
               <TrashIcon />
