@@ -57,13 +57,13 @@ use crate::matrix_html::{
 };
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
-    AvatarChangeView, DisplayNameChangeView, GalleryItemView, LatestEventView, MemberView,
-    MembershipChangeView, MembershipView, MentionView, PerMessageProfileView, PollAnswerView,
-    PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView, RoomJoinRuleView,
-    RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView, RoomSummary, RoomTag,
-    SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
-    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView,
-    UrlPreviewView, UtdCauseView, VectorDiff,
+    AvatarChangeView, DisplayNameChangeView, ForwardedView, GalleryItemView, LatestEventView,
+    MemberView, MembershipChangeView, MembershipView, MentionView, PerMessageProfileView,
+    PollAnswerView, PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView,
+    RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView,
+    RoomSummary, RoomTag, SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView,
+    StateChangeView, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
+    UploadProgressView, UrlPreviewView, UtdCauseView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -778,6 +778,7 @@ pub fn aggregation_item(
         per_message_profile: None,
         bundled_link_previews: Vec::new(),
         mention: MentionView::None,
+        forwarded: None,
     }
 }
 
@@ -814,6 +815,7 @@ pub fn timeline_item(
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
             let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
+            let forwarded = forwarded(event, &raw);
 
             TimelineItemView {
                 id,
@@ -836,6 +838,7 @@ pub fn timeline_item(
                 per_message_profile: message_profile,
                 bundled_link_previews,
                 mention,
+                forwarded,
             }
         }
 
@@ -870,6 +873,7 @@ pub fn timeline_item(
                 per_message_profile: None,
                 bundled_link_previews: Vec::new(),
                 mention: MentionView::None,
+                forwarded: None,
             }
         }
     }
@@ -1443,6 +1447,56 @@ pub(crate) fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<Stri
     )
 }
 
+#[derive(serde::Deserialize)]
+struct OriginalContent {
+    content: Option<serde_json::Value>,
+}
+
+fn forwarded(event: &EventTimelineItem, raw: &RawFields) -> Option<ForwardedView> {
+    if event.latest_edit_json().is_none() {
+        return forward_meta(raw.content.as_ref()?);
+    }
+    let original = event
+        .original_json()?
+        .deserialize_as_unchecked::<OriginalContent>()
+        .ok()?;
+    forward_meta(original.content.as_ref()?)
+}
+
+fn forward_meta(content: &serde_json::Value) -> Option<ForwardedView> {
+    let id = |meta: &serde_json::Value, key: &str| meta.get(key)?.as_str().map(str::to_owned);
+    if let Some(meta) = content
+        .get("moe.sable.message.forward")
+        .filter(|meta| meta.is_object())
+    {
+        let private = meta
+            .get("original_event_private")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        return Some(ForwardedView {
+            timestamp: meta
+                .get("original_timestamp")
+                .and_then(serde_json::Value::as_u64),
+            room_id: (!private)
+                .then(|| id(meta, "original_room_id")?.try_into().ok())
+                .flatten(),
+            event_id: (!private)
+                .then(|| id(meta, "original_event_id")?.try_into().ok())
+                .flatten(),
+        });
+    }
+    let meta = content
+        .get("com.famedly.app.forwarded")
+        .filter(|meta| meta.is_object())?;
+    Some(ForwardedView {
+        timestamp: meta
+            .get("origin_server_ts")
+            .and_then(serde_json::Value::as_u64),
+        room_id: id(meta, "room_id").and_then(|room| room.try_into().ok()),
+        event_id: id(meta, "event_id").and_then(|event| event.try_into().ok()),
+    })
+}
+
 fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
     const KEY: &str = "com.beeper.linkpreviews";
 
@@ -2004,12 +2058,59 @@ mod tests {
 
     use super::{
         LocalContent, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
-        call_participants, caption_view, clamp_power_level, geo_coordinates, in_call,
+        call_participants, caption_view, clamp_power_level, forward_meta, geo_coordinates, in_call,
         per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{OwnedEventId, OwnedTransactionId};
+
+    #[test]
+    fn forward_meta_prefers_the_sable_key_and_hides_private_origins() {
+        let sable = forward_meta(&json!({
+            "moe.sable.message.forward": {
+                "original_timestamp": 5,
+                "original_room_id": "!secret:example.org",
+                "original_event_id": "$secret",
+                "original_event_private": true
+            },
+            "com.famedly.app.forwarded": {
+                "origin_server_ts": 9,
+                "room_id": "!other:example.org",
+                "event_id": "$other"
+            }
+        }))
+        .unwrap();
+        assert_eq!(sable.timestamp, Some(5));
+        assert_eq!(sable.room_id, None);
+        assert_eq!(sable.event_id, None);
+
+        let famedly = forward_meta(&json!({
+            "com.famedly.app.forwarded": {
+                "origin_server_ts": 9,
+                "room_id": "!room:example.org",
+                "event_id": "$event"
+            }
+        }))
+        .unwrap();
+        assert_eq!(famedly.timestamp, Some(9));
+        assert_eq!(
+            famedly
+                .room_id
+                .as_deref()
+                .map(matrix_sdk::ruma::RoomId::as_str),
+            Some("!room:example.org")
+        );
+        assert_eq!(
+            famedly
+                .event_id
+                .as_deref()
+                .map(matrix_sdk::ruma::EventId::as_str),
+            Some("$event")
+        );
+
+        assert!(forward_meta(&json!({ "body": "hello" })).is_none());
+    }
 
     #[test]
     fn call_invites_have_a_dedicated_view() {

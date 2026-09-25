@@ -30,6 +30,7 @@ function item(overrides: Partial<TimelineItemView> & { id: string }): TimelineIt
     per_message_profile: null,
     bundled_link_previews: [],
     mention: 'none',
+    forwarded: null,
     ...overrides,
   };
 }

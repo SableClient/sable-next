@@ -326,6 +326,17 @@ impl Core {
                 "room_id": (!private).then(|| room_id.to_string()),
             }),
         );
+        object.insert(
+            SABLE_FORWARD_META.to_owned(),
+            serde_json::json!({
+                "v": 1,
+                "is_forwarded": true,
+                "original_timestamp": u64::from(origin_server_ts),
+                "original_room_id": (!private).then(|| room_id.to_string()),
+                "original_event_id": (!private).then(|| event_id.to_string()),
+                "original_event_private": private,
+            }),
+        );
 
         self.room(to_room_id)
             .await?
@@ -417,6 +428,7 @@ fn edit_version(event: &TimelineEvent, replacement: bool) -> Option<EditVersionV
 }
 
 const FORWARD_META: &str = "com.famedly.app.forwarded";
+const SABLE_FORWARD_META: &str = "moe.sable.message.forward";
 
 #[cfg(test)]
 #[allow(clippy::large_futures)]

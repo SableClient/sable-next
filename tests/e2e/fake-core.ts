@@ -372,6 +372,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         per_message_profile: null,
         bundled_link_previews: [],
         mention: 'none',
+        forwarded: null,
       }));
 
     const searchHits = (payload: CommandFor<'search_messages'>) => {

@@ -2281,6 +2281,18 @@ pub struct TimelineItemView {
     pub per_message_profile: Option<PerMessageProfileView>,
     pub bundled_link_previews: Vec<UrlPreviewView>,
     pub mention: MentionView,
+    pub forwarded: Option<ForwardedView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ForwardedView {
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub timestamp: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub room_id: Option<OwnedRoomId>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub event_id: Option<OwnedEventId>,
 }
 
 /// `Loud` covers `@room` and anything the push rules chose to highlight.

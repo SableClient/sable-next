@@ -31,6 +31,7 @@ function membership(change: 'left' | 'joined', userId: string, name: string): Ti
     timestamp: 0,
     is_own: false,
     mention: 'none',
+    forwarded: null,
     read_by: [],
     reactions: [],
     thread_root: null,

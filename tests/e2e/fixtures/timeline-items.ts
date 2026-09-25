@@ -22,6 +22,7 @@ export function timelineItem(id: string, body: string): TimelineItemView {
     per_message_profile: null,
     bundled_link_previews: [],
     mention: 'none',
+    forwarded: null,
   };
 }
 
