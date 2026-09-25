@@ -1873,6 +1873,16 @@
     white-space: nowrap;
   }
 
+  .reply-compact {
+    gap: var(--space-100);
+    padding: 0;
+  }
+
+  .reply-compact :global(.reply-icon) {
+    height: var(--size-x50);
+    width: var(--size-x50);
+  }
+
   .reply-compact .reply-body,
   .reply-connected .reply-body {
     filter: brightness(var(--opacity-p300));
