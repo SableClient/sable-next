@@ -67,15 +67,14 @@ fn searched(kind: RoomAttachmentKind) -> Vec<SearchAttachment> {
 fn link_view(hit: Hit) -> Option<RoomAttachmentView> {
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Url]);
-    let urls: Vec<String> = finder
-        .links(&hit.body)
-        .map(|link| link.as_str())
-        .filter(|url| {
-            let lower = url.to_ascii_lowercase();
-            lower.starts_with("https://") || lower.starts_with("http://")
-        })
-        .map(ToOwned::to_owned)
-        .collect();
+    let mut urls: Vec<String> = Vec::new();
+    for url in finder.links(&hit.body).map(|link| link.as_str()) {
+        let lower = url.to_ascii_lowercase();
+        let http = lower.starts_with("https://") || lower.starts_with("http://");
+        if http && !urls.iter().any(|seen| seen == url) {
+            urls.push(url.to_owned());
+        }
+    }
     if urls.is_empty() {
         return None;
     }
@@ -210,5 +209,33 @@ fn audio_view(audio: &AudioMessageEventContent) -> RoomAttachmentContentView {
         source: media_source(&audio.source),
         mime: audio.info.as_ref().and_then(|info| info.mimetype.clone()),
         size: dimension(audio.info.as_ref().and_then(|info| info.size)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::ruma::{owned_event_id, owned_room_id, owned_user_id};
+
+    use super::link_view;
+    use crate::protocol::RoomAttachmentContentView;
+    use crate::search::Hit;
+
+    #[test]
+    fn link_view_lists_each_url_once() {
+        let hit = Hit {
+            room_id: owned_room_id!("!room:example.org"),
+            event_id: owned_event_id!("$event"),
+            body: "https://a.example https://b.example https://a.example".to_owned(),
+            sender: owned_user_id!("@alice:example.org"),
+            origin_server_ts: 0,
+            score: 0.0,
+        };
+        let Some(view) = link_view(hit) else {
+            panic!("expected a link view");
+        };
+        let RoomAttachmentContentView::Link { urls, .. } = view.content else {
+            panic!("expected link content");
+        };
+        assert_eq!(urls, ["https://a.example", "https://b.example"]);
     }
 }
