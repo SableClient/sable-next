@@ -135,7 +135,7 @@ async function present(payload: PushPayload | undefined): Promise<void> {
     icon: favicon,
     badge: favicon,
     timestamp: Date.now(),
-    data: { roomId: showing.roomId, lines },
+    data: { roomId: showing.roomId, userId: payload.notification?.user_id, lines },
   };
 
   await worker.registration.showNotification(showing.title, options);
@@ -154,11 +154,11 @@ async function conversation(tag: string): Promise<ReturnType<typeof readLines>> 
 
 worker.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const data = event.notification.data as { roomId?: string } | undefined;
-  event.waitUntil(open(data?.roomId));
+  const data = event.notification.data as { roomId?: string; userId?: string } | undefined;
+  event.waitUntil(open(data?.roomId, data?.userId));
 });
 
-async function open(roomId: string | undefined): Promise<void> {
+async function open(roomId: string | undefined, userId: string | undefined): Promise<void> {
   const clients = await worker.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
@@ -166,7 +166,7 @@ async function open(roomId: string | undefined): Promise<void> {
 
   const client = clients.at(0);
   if (client) {
-    client.postMessage({ type: 'sable:open-room', roomId });
+    client.postMessage({ type: 'sable:open-room', roomId, userId });
     await client.focus();
     return;
   }

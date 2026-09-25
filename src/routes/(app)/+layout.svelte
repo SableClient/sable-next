@@ -35,6 +35,7 @@
     watchNativeNotificationClicks,
   } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
+  import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
   import { watchWindowFocus } from '#lib/platform/window-decorations.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
@@ -438,7 +439,7 @@
 
     return on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
-        | { type?: string; roomId?: string; appId?: string; ackToken?: string }
+        | { type?: string; appId?: string; ackToken?: string }
         | undefined;
 
       if (message?.type === 'sable:push-resubscribe') resync();
@@ -447,9 +448,35 @@
           void core.commands.ackWebPusher(message.appId, message.ackToken).catch(() => undefined);
         }
       }
+    });
+  });
+
+  let pushedRoom = $state<{ roomId: string; userId: string | null } | null>(null);
+
+  $effect(() => {
+    if (!hostsServiceWorker()) return;
+
+    return on(navigator.serviceWorker, 'message', (event) => {
+      const message = (event as MessageEvent).data as
+        | { type?: string; roomId?: string; userId?: string }
+        | undefined;
       if (message?.type === 'sable:open-room' && message.roomId !== undefined) {
-        void goto(roomSectionPath(roomList.rooms, message.roomId));
+        pushedRoom = { roomId: message.roomId, userId: message.userId ?? null };
       }
+    });
+  });
+
+  $effect(() => {
+    if (core.status !== 'ready' || pushedRoom === null) return;
+
+    const { roomId, userId } = pushedRoom;
+    pushedRoom = null;
+    const opened =
+      userId === null
+        ? openNotification(roomId)
+        : openNativeNotification(core, { userId, roomId, eventId: null }, openNotification);
+    void opened.catch((error: unknown) => {
+      console.debug('[sable notifications] notification not opened', error);
     });
   });
 
