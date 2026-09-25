@@ -111,6 +111,7 @@
           src={avatarUrl}
           name={displayName}
           {color}
+          original
           decorative
         />
       </button>
@@ -121,6 +122,7 @@
         src={avatarUrl}
         name={displayName}
         {color}
+        original
         alt={displayName}
       />
     {/if}

@@ -164,6 +164,24 @@ test('opens a profile avatar through viewer callback', async () => {
   await unmount(instance);
 });
 
+test('loads a member card avatar from the original media', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([0x47, 0x49, 0x46, 0x38]));
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: { ...emptyProfile, display_name: 'Alice', avatar_url: 'mxc://example.org/animated' },
+    },
+  });
+
+  await vi.waitFor(() => {
+    expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/animated', 0, 0);
+  });
+  await unmount(instance);
+});
+
 test('sends a direct message from the composer', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   core.sendMessage.mockResolvedValue(undefined);

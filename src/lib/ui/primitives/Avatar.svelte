@@ -19,6 +19,7 @@
     color?: string;
     decorative?: boolean;
     uniform?: boolean;
+    original?: boolean;
     class?: ClassValue;
     children?: Snippet;
   };
@@ -33,6 +34,7 @@
     color,
     decorative = alt === undefined,
     uniform = false,
+    original = false,
     class: className = '',
     children,
   }: Props = $props();
@@ -66,6 +68,7 @@
       width={96}
       height={96}
       {uniform}
+      {original}
       onloaded={() => {
         paintedSrc = src;
         failedSrc = null;
