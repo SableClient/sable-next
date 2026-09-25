@@ -103,8 +103,8 @@
       variant={microphoneEnabled ? 'secondary' : 'danger'}
       {size}
       label={micLabel}
-      disabled={!ready}
-      onclick={onToggleMicrophone}
+      aria-disabled={ready ? undefined : 'true'}
+      onclick={ready ? onToggleMicrophone : undefined}
     >
       {#if microphoneEnabled}
         <MicrophoneIcon />
@@ -168,8 +168,8 @@
       variant={cameraEnabled ? 'primary' : 'secondary'}
       {size}
       label={cameraLabel}
-      disabled={!ready}
-      onclick={onToggleCamera}
+      aria-disabled={ready ? undefined : 'true'}
+      onclick={ready ? onToggleCamera : undefined}
     >
       {#if cameraEnabled}
         <VideoCameraIcon weight="fill" />
@@ -202,8 +202,9 @@
         variant="secondary"
         {size}
         label={$i18n.t('call.switchCamera')}
-        disabled={!ready || !cameraEnabled}
-        onclick={onSwitchCamera}
+        disabled={!cameraEnabled}
+        aria-disabled={ready ? undefined : 'true'}
+        onclick={ready ? onSwitchCamera : undefined}
       >
         <CameraRotateIcon />
       </IconButton>
@@ -218,8 +219,8 @@
         variant={screenShareEnabled ? 'primary' : 'secondary'}
         {size}
         label={screenLabel}
-        disabled={!ready}
-        onclick={onToggleScreenShare}
+        aria-disabled={ready ? undefined : 'true'}
+        onclick={ready ? onToggleScreenShare : undefined}
       >
         <MonitorArrowUpIcon weight={screenShareEnabled ? 'fill' : 'regular'} />
       </IconButton>
@@ -282,6 +283,12 @@
     align-items: center;
     display: flex;
     gap: var(--space-050);
+  }
+
+  .controls :global(.btn[aria-disabled='true']) {
+    cursor: progress;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .controls:not(.compact) :global(.icon-button:not(.device-caret)) {

@@ -49,7 +49,7 @@
   <ActionMenu bind:open {label} side="top" align="center">
     {#snippet trigger({ props })}
       {#if speaker}
-        <Button {...props} variant="secondary" aria-label={label}>
+        <Button {...props} variant="ghost" class="device-speaker" aria-label={label}>
           <SpeakerHighIcon aria-hidden="true" />
           <CaretUpIcon aria-hidden="true" weight="bold" />
         </Button>
@@ -78,6 +78,16 @@
 {/if}
 
 <style>
+  :global(.btn-ghost.device-speaker) {
+    --button-container: transparent;
+    --button-container-hover: var(--ghost-hover, var(--bg-container-hover));
+    --button-container-active: var(--ghost-active, var(--bg-container-active));
+    --button-line: transparent;
+    --button-on-container: inherit;
+    --button-gap: var(--space-100);
+    --button-padding-inline: var(--space-200);
+  }
+
   .heading {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);

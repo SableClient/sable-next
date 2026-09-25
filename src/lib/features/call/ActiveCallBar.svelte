@@ -40,6 +40,7 @@
       <span class="room">{roomName}</span>
     {/if}
   </button>
+  <span class="screen-reader-only" role="status">{statusLabel}</span>
   <CallControls
     compact
     microphoneEnabled={session.transport.microphoneEnabled}
@@ -65,8 +66,8 @@
     border-top: var(--border-width) solid var(--bg-container-line);
     box-sizing: border-box;
     display: grid;
-    gap: var(--space-100);
-    padding: var(--space-150) var(--space-200);
+    gap: var(--space-050);
+    padding: var(--space-100);
   }
 
   .call-room {
@@ -79,7 +80,7 @@
     display: grid;
     font: inherit;
     grid-template-columns: auto minmax(0, 1fr);
-    padding: var(--space-100) var(--space-200);
+    padding: var(--space-100);
     text-align: left;
   }
 

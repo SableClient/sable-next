@@ -39,3 +39,33 @@ test('uses the shared button variants for the call toggles', async () => {
 
   await unmount(instance);
 });
+
+test('keeps a muted mic legible and focusable while media is not ready', async () => {
+  const onToggleMicrophone = vi.fn();
+  const instance = mount(CallControlsHarness, {
+    target: document.body,
+    props: {
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      screenShareEnabled: false,
+      deafened: false,
+      ready: false,
+      canScreenShare: false,
+      onToggleMicrophone,
+      onToggleCamera: vi.fn(),
+      onToggleScreenShare: vi.fn(),
+      onToggleDeafen: vi.fn(),
+      onHangUp: vi.fn(),
+    },
+  });
+  await tick();
+
+  const mic = button('Unmute microphone') as HTMLButtonElement;
+  expect(mic.classList).toContain('btn-danger');
+  expect(mic.disabled).toBe(false);
+  expect(mic.getAttribute('aria-disabled')).toBe('true');
+  mic.click();
+  expect(onToggleMicrophone).not.toHaveBeenCalled();
+
+  await unmount(instance);
+});
