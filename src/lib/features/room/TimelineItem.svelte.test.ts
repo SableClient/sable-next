@@ -141,6 +141,23 @@ test('places a connected reply preview above the sender header', async () => {
 });
 
 test.each(['connected', 'compact', 'expanded'] as const)(
+  'separates reply names from bodies in %s previews',
+  async (replyPreviewStyle) => {
+    setPreference('replyPreviewStyle', replyPreviewStyle);
+    const instance = mount(TimelineItemHarness, {
+      target: document.body,
+      props: { core, item: { item: replyItem(), collapsed: false } },
+    });
+    await tick();
+
+    const copy = document.querySelector('.reply-preview .reply-copy');
+    expect(copy?.querySelector('.reply-name + .reply-body')).toBeInstanceOf(HTMLElement);
+
+    await unmount(instance);
+  }
+);
+
+test.each(['connected', 'compact', 'expanded'] as const)(
   'marks a pinged reply target with an at sign in %s previews',
   async (replyPreviewStyle) => {
     setPreference('replyPreviewStyle', replyPreviewStyle);

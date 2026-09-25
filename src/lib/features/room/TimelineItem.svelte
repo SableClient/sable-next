@@ -907,7 +907,8 @@
           }}
         >
           <span class="reply-copy"
-            ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+            ><span class="reply-name">{replyName}</span>
+            <span class="reply-body">{replyBody}</span></span
           >
         </button>
       {/if}
@@ -954,7 +955,8 @@
           >
             <ReplyIcon class="reply-icon" />
             <span class="reply-copy"
-              ><span class="reply-name">{replyName}</span> <span>{replyBody}</span></span
+              ><span class="reply-name">{replyName}</span>
+              <span class="reply-body">{replyBody}</span></span
             >
           </button>
         {/if}
@@ -1780,8 +1782,8 @@
     white-space: nowrap;
   }
 
-  .reply-compact .reply-copy,
-  .reply-connected .reply-copy {
+  .reply-compact .reply-body,
+  .reply-connected .reply-body {
     filter: brightness(var(--opacity-p300));
   }
 
@@ -1865,7 +1867,7 @@
     color: var(--pmp-ink);
   }
 
-  .reply-preview:is(:hover, :focus-visible) .reply-copy {
+  .reply-preview:is(:hover, :focus-visible) .reply-body {
     filter: brightness(var(--opacity-p500));
   }
 
