@@ -602,7 +602,11 @@
       activeExtra = null;
     }}
     block
-    style="background: transparent; border: 0;"
+    style="background: transparent; 
+          border: 0;
+          border-bottom: var(--border-width) solid var(--profile-line, var(--surface-container-line));
+          border-radius: 0;
+          "
   >
     {#if miscOpen}
       <CaretDownIcon />
@@ -617,38 +621,46 @@
     {/if}
   </Button>
   {#if miscOpen}
-    {#if activeExtra === null}
-      <div class="profile-keys">
-        {#each extra as field (field.key)}
-          <Button
-            size="small"
-            class="choice"
-            block
-            style="background: transparent; border: 0;"
-            onclick={() => {
-              activeExtra = field;
-            }}
-          >
-            {field.key}
-          </Button>
-          <div class="profile-menu-key"></div>
-        {/each}
-      </div>
-    {:else}
-      {@const map = profileFieldMap(activeExtra.value)}
-      {#if map}
-        <tbody>
-          {#each map as [key, value] (key)}
-            <tr>
-              <th scope="row">{key}</th>
-              <td>{value}</td>
-            </tr>
+    <div class="profile-extra-open">
+      {#if activeExtra === null}
+        <div class="profile-keys">
+          {#each extra as field (field.key)}
+            <Button
+              size="small"
+              class="choice"
+              block
+              style="background: transparent; 
+            border: 0;
+            border-bottom: var(--border-width) solid var(--profile-line, var(--surface-container-line));
+            border-radius: 0;
+            "
+              onclick={() => {
+                activeExtra = field;
+              }}
+            >
+              {field.key}
+            </Button>
+            <div class="profile-menu-key"></div>
           {/each}
-        </tbody>
+        </div>
       {:else}
-        {activeExtra.value}
+        {@const map = profileFieldMap(activeExtra.value)}
+        {#if map}
+          <table class="profile-key-table">
+            <tbody>
+              {#each map as [key, value] (key)}
+                <tr>
+                  <th scope="row">{key}</th>
+                  <td>{value}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {:else}
+          {activeExtra.value}
+        {/if}
       {/if}
-    {/if}
+    </div>
   {/if}
 {/snippet}
 
@@ -843,6 +855,21 @@
   .profile-extra {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
+  }
+
+  .profile-extra-open {
+    max-height: 12rem;
+    overflow: auto;
+  }
+
+  .profile-key-table th,
+  .profile-key-table td {
+    border: var(--border-width) solid var(--profile-line, var(--surface-container-line));
+    padding: var(--space-100);
+  }
+
+  .profile-key-table {
+    border-collapse: collapse;
   }
 
   .moderation {

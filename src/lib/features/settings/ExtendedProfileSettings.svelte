@@ -418,7 +418,7 @@
             <TextArea
               bind:value={editKey.value}
               rows={5}
-              maxlength={5000}
+              maxlength={50000}
               placeholder={$i18n.t('settings.otherProfileFieldsValuePlaceholder')}
             />
             <div class="extra-buttons">
