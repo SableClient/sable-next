@@ -47,7 +47,7 @@ test('a created key cannot be left before it is kept somewhere', async () => {
   await unmount(instance);
 });
 
-test('copying the key unlocks Continue', async () => {
+test('copying the key is not enough without ticking the box', async () => {
   const { instance, onComplete } = render('given key');
 
   button(/^Copy$/)?.click();
@@ -55,19 +55,23 @@ test('copying the key unlocks Continue', async () => {
     expect(button(/^Copied$/)).toBeDefined();
   });
   expect(writeText).toHaveBeenCalledWith('given key');
+  expect(button(/^Continue$/)?.disabled).toBe(true);
+  document.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
+  flushSync();
   button(/^Continue$/)?.click();
   expect(onComplete).toHaveBeenCalledOnce();
 
   await unmount(instance);
 });
 
-test('downloading the key saves it as a text file and unlocks Continue', async () => {
+test('downloading the key saves it as a text file but still needs the box', async () => {
   const { instance } = render('given key');
 
   button(/^Download$/)?.click();
   await vi.waitFor(() => {
-    expect(button(/^Continue$/)?.disabled).toBe(false);
+    expect(button(/^Downloaded$/)).toBeDefined();
   });
+  expect(button(/^Continue$/)?.disabled).toBe(true);
   expect(files.saveBytes).toHaveBeenCalledWith(
     new TextEncoder().encode('given key\n'),
     'sable-recovery-key.txt',

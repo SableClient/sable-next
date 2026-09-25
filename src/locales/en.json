@@ -1277,7 +1277,7 @@
     "recoveryDownload": "Download",
     "recoveryDownloaded": "Downloaded",
     "recoveryWrittenDown": "I've written it down",
-    "recoverySaveFirst": "Copy, download or write down the key to continue.",
+    "recoverySaveFirst": "Keep the key somewhere safe, then tick the box to continue.",
     "recoveryCopyFailed": "The key couldn't be copied. Download it or write it down instead.",
     "recoveryDownloadFailed": "The key couldn't be saved. Copy it or write it down instead.",
     "stageNotificationsLabel": "Choose your notifications",

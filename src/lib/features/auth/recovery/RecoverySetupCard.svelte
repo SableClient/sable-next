@@ -27,7 +27,7 @@
   let kept = $state<'copied' | 'downloaded' | null>(null);
   let writtenDown = $state(false);
   const recoveryKey = $derived(createdKey || givenKey || '');
-  const saved = $derived(kept !== null || writtenDown);
+  const saved = $derived(writtenDown);
 
   async function createRecoveryKey(): Promise<void> {
     creating = true;
