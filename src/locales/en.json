@@ -2294,17 +2294,21 @@
         "description": "Set your font in this room",
         "usage": "/font <name|reset>"
       },
+      "scolor": {
+        "description": "Set your name colour across this space",
+        "usage": "/scolor [light|dark] <#rrggbb|reset>"
+      },
       "sfont": {
-        "description": "Set someone else's font in this room",
-        "usage": "/sfont <@user:server> <name|reset>"
+        "description": "Set your font across this space",
+        "usage": "/sfont <name|reset>"
       },
       "pronoun": {
         "description": "Set your pronouns in this room",
         "usage": "/pronoun <pronouns|reset>"
       },
       "spronoun": {
-        "description": "Set someone else's pronouns in this room",
-        "usage": "/spronoun <@user:server> <pronouns|reset>"
+        "description": "Set your pronouns across this space",
+        "usage": "/spronoun <pronouns|reset>"
       },
       "roomname": {
         "description": "Change this room's name",

@@ -36,6 +36,9 @@ function fakeCommands() {
     sendLocation: vi.fn(() => Promise.resolve()),
     sendRawEvent: vi.fn(() => Promise.resolve()),
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
+    roomStateEvents: vi.fn(() =>
+      Promise.resolve([{ state_key: '!space:example.org', content: {} }])
+    ),
     sendStateEvent: vi.fn(() => Promise.resolve()),
     personas: vi.fn(() =>
       Promise.resolve({
@@ -837,24 +840,53 @@ test.each([
     { pronouns: [{ summary: 'she/her' }] },
   ],
 ] as const)(
-  '/%s sets a cosmetic state event for someone else',
+  '/%s sets your own cosmetic on the parent space',
   async (name, eventType, value, content) => {
     const commands = fakeCommands();
 
-    await runSlash(`/${name} @someone:example.org ${value}`, context(commands));
+    await runSlash(`/${name} ${value}`, context(commands));
 
+    expect(commands.roomStateEvents).toHaveBeenCalledWith('!room:example.org', 'm.space.parent');
     expect(commands.sendStateEvent).toHaveBeenCalledWith(
-      '!room:example.org',
+      '!space:example.org',
       eventType,
-      '@someone:example.org',
+      '@me:example.org',
       content
     );
-
-    await expect(runSlash(`/${name} notauser ${value}`, context(commands))).rejects.toMatchObject({
-      key: `composer.slash.${name}.usage`,
-    });
   }
 );
+
+test('/sfont falls back to the room when it has no parent space', async () => {
+  const commands = fakeCommands();
+  commands.roomStateEvents.mockResolvedValueOnce([]);
+
+  await runSlash('/sfont Georgia', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'moe.sable.room.cosmetics.font',
+    '@me:example.org',
+    { font: 'Georgia' }
+  );
+});
+
+test('/scolor writes the colour into your membership of the parent space', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/scolor #ff00ff', context(commands));
+
+  expect(commands.roomStateEvent).toHaveBeenCalledWith(
+    '!space:example.org',
+    'm.room.member',
+    '@me:example.org'
+  );
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!space:example.org',
+    'm.room.member',
+    '@me:example.org',
+    expect.objectContaining({ membership: 'join' })
+  );
+});
 
 test('/kick expands a server wildcard to matching members, excluding the already-banned', async () => {
   const commands = fakeCommands();

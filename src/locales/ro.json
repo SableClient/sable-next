@@ -1830,16 +1830,16 @@
         "usage": "/font <nume|reset>"
       },
       "sfont": {
-        "description": "Setează font-ul altei persoane în camera asta",
-        "usage": "/sfont <@cineva:server> <nume|reset>"
+        "description": "Setează-ți font-ul în tot spațiul ăsta",
+        "usage": "/sfont <nume|reset>"
       },
       "pronoun": {
         "description": "Setează-ți pronumele în camera asta",
         "usage": "/pronoun <pronume|reset>"
       },
       "spronoun": {
-        "description": "Setează pronumele altei persoane în camera asta",
-        "usage": "/spronoun <@cineva:server> <pronume|reset>"
+        "description": "Setează-ți pronumele în tot spațiul ăsta",
+        "usage": "/spronoun <pronume|reset>"
       },
       "roomname": {
         "description": "Schimbă numele camerei",

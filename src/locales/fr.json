@@ -2048,16 +2048,16 @@
         "usage": "/font <nom|reset>"
       },
       "sfont": {
-        "description": "Définir la police d’une autre personne dans ce salon",
-        "usage": "/sfont <@utilisateur:serveur> <nom|reset>"
+        "description": "Définir votre police dans tout cet espace",
+        "usage": "/sfont <nom|reset>"
       },
       "pronoun": {
         "description": "Définir vos pronoms dans ce salon",
         "usage": "/pronoun <pronoms|reset>"
       },
       "spronoun": {
-        "description": "Définir les pronoms d’une autre personne dans ce salon",
-        "usage": "/spronoun <@utilisateur:serveur> <pronoms|reset>"
+        "description": "Définir vos pronoms dans tout cet espace",
+        "usage": "/spronoun <pronoms|reset>"
       },
       "roomname": {
         "description": "Modifier le nom de ce salon",

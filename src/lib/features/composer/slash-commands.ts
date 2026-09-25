@@ -26,6 +26,7 @@ export type SlashCommandApi = Pick<
   | 'removePersona'
   | 'roomMembers'
   | 'roomStateEvent'
+  | 'roomStateEvents'
   | 'sendRawEvent'
   | 'savePersona'
   | 'setAccountData'
@@ -348,8 +349,22 @@ const COSMETIC_EVENT_TYPES = {
   pronoun: 'moe.sable.room.cosmetics.pronouns',
 } as const;
 
+type CosmeticScope = 'room' | 'space';
+
+async function cosmeticTarget(
+  scope: CosmeticScope,
+  roomId: string,
+  commands: SlashCommandApi
+): Promise<string> {
+  if (scope === 'room') return roomId;
+  const parents = await commands.roomStateEvents(roomId, 'm.space.parent');
+  return parents.at(0)?.state_key ?? roomId;
+}
+
 function ownCosmetic(
-  name: keyof typeof COSMETIC_EVENT_TYPES,
+  name: string,
+  eventType: string,
+  scope: CosmeticScope,
   build: (text: string) => Record<string, unknown> | null
 ): SlashCommand {
   return {
@@ -360,42 +375,24 @@ function ownCosmetic(
       const content = build(args.trim());
       if (content === null) return usageError(name);
 
-      await commands.sendStateEvent(roomId, COSMETIC_EVENT_TYPES[name], userId, content);
-      return { kind: 'done' };
-    },
-  };
-}
-
-function otherCosmetic(
-  name: string,
-  eventType: string,
-  build: (text: string) => Record<string, unknown> | null
-): SlashCommand {
-  return {
-    name,
-    run: async (args, { roomId, commands }) => {
-      const [first, ...rest] = args.trim().split(/\s+/);
-      if (!USER_ID.test(first)) return usageError(name);
-
-      const content = build(rest.join(' ').trim());
-      if (content === null) return usageError(name);
-
-      await commands.sendStateEvent(roomId, eventType, first, content);
+      const target = await cosmeticTarget(scope, roomId, commands);
+      await commands.sendStateEvent(target, eventType, userId, content);
       return { kind: 'done' };
     },
   };
 }
 
 // The legacy vendor event write clears deprecated colours for other clients.
-function ownColor(name: string): SlashCommand {
+function ownColor(name: string, scope: CosmeticScope): SlashCommand {
   return {
     name,
-    run: async (args, { roomId, userId, commands }) => {
+    run: async (args, { roomId: currentRoomId, userId, commands }) => {
       if (userId === null) return usageError(name);
 
       const update = colorUpdate(args.trim());
       if (update === null) return usageError(name);
 
+      const roomId = await cosmeticTarget(scope, currentRoomId, commands);
       const existing = objectValue(await commands.roomStateEvent(roomId, 'm.room.member', userId));
       // Omitting the colour field replaces it; spreading it back would keep the old value.
       const source: Record<string, unknown> = { ...existing, membership: 'join' };
@@ -620,11 +617,12 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   setter('nick', (text, { commands }) =>
     commands.setDisplayName(text, preferences.profileChangePropagation)
   ),
-  ownColor('color'),
-  ownCosmetic('font', fontContent),
-  otherCosmetic('sfont', COSMETIC_EVENT_TYPES.font, fontContent),
-  ownCosmetic('pronoun', pronounContent),
-  otherCosmetic('spronoun', COSMETIC_EVENT_TYPES.pronoun, pronounContent),
+  ownColor('color', 'room'),
+  ownColor('scolor', 'space'),
+  ownCosmetic('font', COSMETIC_EVENT_TYPES.font, 'room', fontContent),
+  ownCosmetic('sfont', COSMETIC_EVENT_TYPES.font, 'space', fontContent),
+  ownCosmetic('pronoun', COSMETIC_EVENT_TYPES.pronoun, 'room', pronounContent),
+  ownCosmetic('spronoun', COSMETIC_EVENT_TYPES.pronoun, 'space', pronounContent),
   setter('roomname', (text, { roomId, commands }) => commands.setRoomName(roomId, text)),
   setter('topic', (text, { roomId, commands }) => commands.setRoomTopic(roomId, text)),
   eachUser('disinvite', (userId, { roomId, commands }) => commands.kickUser(roomId, userId)),
