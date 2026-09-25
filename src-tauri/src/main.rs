@@ -124,7 +124,7 @@ fn cef_proxy_from_args(
             continue;
         };
         let value = match argument.strip_prefix("--proxy=") {
-            Some(value) => value,
+            Some(value) => value.to_owned(),
             None if argument == "--proxy" => args
                 .next()
                 .and_then(|value| value.into_string().ok())
@@ -135,7 +135,7 @@ fn cef_proxy_from_args(
         if proxy.is_some() {
             return Err("--proxy may only be specified once".to_owned());
         }
-        proxy = Some(normalize_cef_proxy(value)?);
+        proxy = Some(normalize_cef_proxy(&value)?);
     }
 
     Ok(proxy)
@@ -406,6 +406,16 @@ mod tests {
         assert_eq!(
             cef_proxy_from_args(args),
             Ok(Some("socks5://[::1]:9050".into()))
+        );
+    }
+
+    #[test]
+    fn cef_accepts_an_equals_proxy() {
+        let args = ["--proxy=socks5://127.0.0.1:9050"].map(OsString::from);
+
+        assert_eq!(
+            cef_proxy_from_args(args),
+            Ok(Some("socks5://127.0.0.1:9050".into()))
         );
     }
 
