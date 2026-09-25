@@ -2,7 +2,7 @@
   import type { TimelineItemView } from '#src/generated/protocol';
   import { Dialog } from 'bits-ui';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-  import { tick, untrack } from 'svelte';
+  import { flushSync, tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
@@ -117,7 +117,6 @@
   let fitsWindow = $state(true);
   let dragging = $state(false);
   let instant = $state(false);
-  let instantTimer: ReturnType<typeof setTimeout> | null = null;
   let imageReady = $state(false);
   let editingZoom = $state(false);
   let zoomInput = $state('100');
@@ -191,7 +190,6 @@
     observer.observe(stage);
     return () => {
       observer.disconnect();
-      if (instantTimer !== null) clearTimeout(instantTimer);
     };
   });
 
@@ -300,22 +298,16 @@
 
   function fitToStage(): void {
     fitRatio = fitZoom();
-    withoutTransition();
+    instant = true;
     applyZoom(fitRatio);
+    flushSync();
+    if (imageEl) void getComputedStyle(imageEl).transform;
+    instant = false;
   }
 
   function onImageLoad(): void {
     fitToStage();
     imageReady = true;
-  }
-
-  function withoutTransition(): void {
-    instant = true;
-    if (instantTimer !== null) clearTimeout(instantTimer);
-    instantTimer = setTimeout(() => {
-      instant = false;
-      instantTimer = null;
-    }, 15);
   }
 
   function rotateBy(degrees: number): void {
