@@ -25,6 +25,8 @@
   }
 
   :global(.role-tag-icon.media-image) {
+    block-size: 1em;
     display: inline-flex;
+    inline-size: 1em;
   }
 </style>
