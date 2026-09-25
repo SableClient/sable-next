@@ -822,6 +822,25 @@ test('a collapsed live voice room keeps participant avatars labelled', async () 
   await unmount(instance);
 });
 
+test('a user in a voice room on two devices is listed once per device', async () => {
+  observeImmediately();
+  core.userProfile.mockResolvedValue({ display_name: 'Alice', avatar_url: null });
+  roomsFixture.rooms = [
+    makeRoom({
+      room_id: '!voice:example.org',
+      name: 'Voice',
+      is_voice: true,
+      call_participants: ['@alice:example.org', '@alice:example.org'],
+    }),
+  ];
+
+  const instance = await mountNav();
+  await vi.waitFor(() => {
+    expect(document.querySelectorAll('.call-participant-list li')).toHaveLength(2);
+  });
+  await unmount(instance);
+});
+
 function observeImmediately(): void {
   globalThis.IntersectionObserver = class {
     #callback: IntersectionObserverCallback;

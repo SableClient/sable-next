@@ -17,6 +17,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import CallDevicePreview from './CallDevicePreview.svelte';
+  import { participantKeys } from './participant-keys.js';
   import type { CallMedia } from './call-session.svelte.js';
 
   interface Props {
@@ -50,17 +51,16 @@
   const SHOWN = 6;
 
   let inVoice = $derived(participants.map((userId) => memberIdentity(members, userId)));
+  let inVoiceKeys = $derived(participantKeys(inVoice.map((entry) => entry.userId)));
   let self = $derived(selfId ? memberIdentity(members, selfId) : null);
+  let people = $derived([...new Set(inVoice.map((person) => person.name))]);
   let names = $derived(
-    inVoice.length > 3
+    people.length > 3
       ? $i18n.t('call.lobbyNamesMore', {
-          names: inVoice
-            .slice(0, 2)
-            .map((person) => person.name)
-            .join(', '),
-          count: inVoice.length - 2,
+          names: people.slice(0, 2).join(', '),
+          count: people.length - 2,
         })
-      : inVoice.map((person) => person.name).join(', ')
+      : people.join(', ')
   );
 
   let devicesOpen = $state(false);
@@ -87,7 +87,7 @@
 
     {#if inVoice.length > 0}
       <ul class="faces" aria-label={$i18n.t('call.lobbyInCall', { count: inVoice.length })}>
-        {#each inVoice.slice(0, SHOWN) as person (person.userId)}
+        {#each inVoice.slice(0, SHOWN) as person, index (inVoiceKeys[index])}
           <li>
             <Avatar src={person.avatar} name={person.name} id={person.userId} size="large" />
             <span class="face-name">{person.name}</span>

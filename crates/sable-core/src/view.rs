@@ -132,7 +132,7 @@ pub fn room_summary<S: BuildHasher>(
         is_tombstoned: info.is_some_and(|i| i.is_tombstoned),
         room_type: item.room_type().map(|kind| kind.to_string()),
         is_voice: item.is_call(),
-        call_participants: call_participants(item.active_room_call_participants()),
+        call_participants: item.active_room_call_participants(),
         supports_knock: info.is_some_and(|i| i.supports_knock),
         supports_restricted: info.is_some_and(|i| i.supports_restricted),
         supports_knock_restricted: info.is_some_and(|i| i.supports_knock_restricted),
@@ -142,17 +142,6 @@ pub fn room_summary<S: BuildHasher>(
         marked_unread: item.is_marked_unread(),
         latest_event,
     }
-}
-
-/// The SDK lists one entry per joined device, so a user on two appears twice.
-fn call_participants(joined: Vec<OwnedUserId>) -> Vec<OwnedUserId> {
-    let mut participants: Vec<OwnedUserId> = Vec::with_capacity(joined.len());
-    for user_id in joined {
-        if !participants.contains(&user_id) {
-            participants.push(user_id);
-        }
-    }
-    participants
 }
 
 pub(crate) fn unread_counts(
@@ -2053,12 +2042,12 @@ pub fn room_power_levels(power_levels: &RoomPowerLevels) -> RoomPowerLevelsView 
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::{OwnedUserId, events::room::message::FormattedBody};
+    use matrix_sdk::ruma::events::room::message::FormattedBody;
     use serde_json::json;
 
     use super::{
         LocalContent, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
-        call_participants, caption_view, clamp_power_level, forward_meta, geo_coordinates, in_call,
+        caption_view, clamp_power_level, forward_meta, geo_coordinates, in_call,
         per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
@@ -2566,20 +2555,5 @@ mod tests {
         assert!(!in_call(Some(&json!({ "memberships": [] }))));
         assert!(!in_call(Some(&json!({}))));
         assert!(!in_call(None));
-    }
-
-    #[test]
-    fn one_participant_per_user_however_many_devices_joined() {
-        let user = |id: &str| OwnedUserId::try_from(id).unwrap();
-
-        assert_eq!(
-            call_participants(vec![
-                user("@a:example.org"),
-                user("@b:example.org"),
-                user("@a:example.org"),
-            ]),
-            vec![user("@a:example.org"), user("@b:example.org")]
-        );
-        assert!(call_participants(Vec::new()).is_empty());
     }
 }

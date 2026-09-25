@@ -13,6 +13,8 @@
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
 
+  import { participantKeys } from '#lib/features/call/participant-keys.js';
+
   import { memberIdentity } from './members.js';
 
   const MAX_FACES = 3;
@@ -62,9 +64,12 @@
   }: Props = $props();
 
   let inVoice = $derived(callParticipants.map((userId) => memberIdentity(members, userId)));
+  let inVoiceKeys = $derived(participantKeys(inVoice.map((entry) => entry.userId)));
   let voiceLabel = $derived(
     inVoice.length > 0
-      ? $i18n.t('timeline.inVoiceNames', { names: inVoice.map((entry) => entry.name).join(', ') })
+      ? $i18n.t('timeline.inVoiceNames', {
+          names: [...new Set(inVoice.map((entry) => entry.name))].join(', '),
+        })
       : $i18n.t('nav.voiceRoom')
   );
   let topicShown = $derived(topic !== null && topic.trim() !== '' && onTopic !== null);
@@ -97,7 +102,7 @@
         <SpeakerHighIcon />
         {#if inVoice.length > 0}
           <span class="voice-faces">
-            {#each inVoice.slice(0, MAX_FACES) as participant (participant.userId)}
+            {#each inVoice.slice(0, MAX_FACES) as participant, index (inVoiceKeys[index])}
               <Avatar
                 class="voice-face"
                 src={participant.avatar}

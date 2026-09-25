@@ -73,6 +73,7 @@
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/MentionProfile.svelte';
+  import { participantKeys } from '#lib/features/call/participant-keys.js';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -770,6 +771,7 @@
             </span>
             {#if room && live > 0}
               {@const faces = room.call_participants.slice(0, MAX_VOICE_FACES)}
+              {@const faceKeys = participantKeys(faces)}
               <span
                 class="voice-live"
                 role="img"
@@ -779,7 +781,7 @@
                 })}
               >
                 <span class="voice-faces">
-                  {#each faces as userId (userId)}
+                  {#each faces as userId, index (faceKeys[index])}
                     {@const profile = peerProfiles.get(userId)}
                     <Avatar
                       class="voice-face"
@@ -834,12 +836,13 @@
       {/if}
     </div>
     {#if room?.is_voice && live > 0}
+      {@const rowKeys = participantKeys(room.call_participants)}
       <ul
         class:collapsed
         class="call-participant-list"
         aria-label={$i18n.t('nav.voiceLive', { count: live })}
       >
-        {#each room.call_participants as userId (userId)}
+        {#each room.call_participants as userId, index (rowKeys[index])}
           {@const profile = peerProfiles.get(userId)}
           {@const voice = room.room_id === callRoomId ? callVoiceStates.get(userId) : undefined}
           {@const displayName = profile?.display_name ?? userId}
