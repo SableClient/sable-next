@@ -11,6 +11,7 @@ import type {
   DefaultNotificationModesView,
   DeviceView,
   EncryptionStatusView,
+  IdentityResetStep,
   SyncStatus,
   HomeserverSoftwareView,
   ImagePackView,
@@ -1451,6 +1452,20 @@ export function createCommands(transport: () => Transport) {
         passphrase: null,
       });
       return response.recovery_key;
+    },
+
+    async resetIdentity(): Promise<IdentityResetStep> {
+      const response = await transport().send({ type: 'reset_identity' });
+      return response.step;
+    },
+
+    async continueIdentityReset(password: string | null): Promise<string> {
+      const response = await transport().send({ type: 'continue_identity_reset', password });
+      return response.recovery_key;
+    },
+
+    async cancelIdentityReset(): Promise<void> {
+      await transport().send({ type: 'cancel_identity_reset' });
     },
 
     async renameDevice(deviceId: string, displayName: string): Promise<void> {

@@ -18,6 +18,7 @@
     inputId?: string;
     onRequested?: () => void | Promise<void>;
     onRecovered?: () => void | Promise<void>;
+    onReset: () => void;
   }
 
   let {
@@ -26,6 +27,7 @@
     inputId = 'device-recovery-key',
     onRequested,
     onRecovered,
+    onReset,
   }: Props = $props();
   const verification = new DeviceVerification(useCoreClient());
   let selectedMethod = $state<'recovery' | null>(null);
@@ -105,6 +107,9 @@
         </Button>
       </div>
     </form>
+    <Button class="method-reset" variant="ghost" size="small" onclick={onReset}>
+      {$i18n.t('settings.resetIdentityLost')}
+    </Button>
   {/if}
 </div>
 
@@ -130,7 +135,8 @@
     width: var(--icon-size-medium);
   }
 
-  :global(.method-back) {
+  :global(.method-back),
+  :global(.method-reset) {
     justify-self: start;
   }
 

@@ -1569,6 +1569,19 @@ impl Core {
                 Ok(CommandOk::ResetRecoveryKey { recovery_key })
             }
 
+            Command::ResetIdentity => Ok(CommandOk::ResetIdentity {
+                step: self.reset_identity().await?,
+            }),
+
+            Command::ContinueIdentityReset { password } => Ok(CommandOk::ContinueIdentityReset {
+                recovery_key: self.continue_identity_reset(password).await?,
+            }),
+
+            Command::CancelIdentityReset => {
+                self.cancel_identity_reset().await;
+                Ok(CommandOk::CancelIdentityReset)
+            }
+
             Command::DeleteDevice {
                 device_id,
                 password,

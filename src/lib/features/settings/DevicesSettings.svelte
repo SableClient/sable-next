@@ -31,6 +31,7 @@
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import ResetIdentityDialog from './ResetIdentityDialog.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
 
@@ -48,6 +49,7 @@
   let confirmingReset = $state(false);
   let deleting = $state<string | null>(null);
   let verificationOpen = $state(false);
+  let resettingIdentity = $state(false);
   let verifying = $state<string | null>(null);
   let linkCopied = $state(false);
   let currentDevice = $derived(devices.find((device) => device.is_own));
@@ -387,6 +389,17 @@
             </Button>
           </div>
         {/if}
+
+        <div class="setting-row">
+          <span class="row-icon" aria-hidden="true"><WarningCircleIcon /></span>
+          <div class="row-copy">
+            <strong>{$i18n.t('settings.resetIdentity')}</strong>
+            <p>{$i18n.t('settings.resetIdentityDescription')}</p>
+          </div>
+          <Button variant="danger" onclick={() => (resettingIdentity = true)}>
+            {$i18n.t('settings.resetIdentity')}
+          </Button>
+        </div>
       {:else if loading}
         <div class="settings-form loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingEncryption')}</span>
@@ -597,8 +610,11 @@
     recovery={status.recovery}
     recoveryPassphrase={status.recovery_passphrase}
     onVerified={refresh}
+    onReset={() => (resettingIdentity = true)}
   />
 {/if}
+
+<ResetIdentityDialog bind:open={resettingIdentity} onReset={refresh} />
 
 <style>
   .device-seen {

@@ -1,13 +1,17 @@
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 use std::time::Duration;
 
 use futures_util::StreamExt;
 use matrix_sdk::EncryptionState;
+use matrix_sdk::encryption::recovery::{IdentityResetHandle, RecoveryError};
 use matrix_sdk::encryption::verification::{
     SasState, SasVerification, VerificationRequest, VerificationRequestState,
 };
-use matrix_sdk::encryption::{VerificationState, recovery::RecoveryState};
+use matrix_sdk::encryption::{
+    CrossSigningResetAuthType, VerificationState, recovery::RecoveryState,
+};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
@@ -15,15 +19,130 @@ use matrix_sdk::ruma::events::secret_storage::default_key::SecretStorageDefaultK
 use matrix_sdk::ruma::{OwnedUserId, UserId};
 
 use crate::protocol::{
-    CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, RecoveryStateView,
-    SignOutSafetyView, VerificationStateView, VerificationView,
+    CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
+    RecoveryStateView, SignOutSafetyView, VerificationStateView, VerificationView,
 };
 
 use crate::Core;
 
 const BACKUP_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
 
+pub(crate) struct PendingIdentityReset {
+    generation: u64,
+    handle: Arc<IdentityResetHandle>,
+}
+
 impl Core {
+    pub(crate) async fn reset_identity(&self) -> Result<IdentityResetStep, CommandErr> {
+        let client = self.client().await?;
+        let generation = self.session_generation.load(Ordering::SeqCst);
+        self.cancel_identity_reset().await;
+
+        let Some(handle) = client
+            .encryption()
+            .recovery()
+            .reset_identity()
+            .await
+            .map_err(|error| self.failed("reset_identity", error))?
+        else {
+            return Ok(IdentityResetStep::Done {
+                recovery_key: self.enable_reset_recovery(&client).await?,
+            });
+        };
+
+        let step = match handle.auth_type() {
+            CrossSigningResetAuthType::OAuth(info) => IdentityResetStep::Approve {
+                url: info.approval_url.to_string(),
+            },
+            CrossSigningResetAuthType::Uiaa(uiaa) => {
+                if !uiaa
+                    .flows
+                    .iter()
+                    .any(|flow| flow.stages == [AuthType::Password])
+                {
+                    let stages = uiaa
+                        .flows
+                        .iter()
+                        .flat_map(|flow| &flow.stages)
+                        .map(|stage| stage.as_str().to_owned())
+                        .collect();
+                    return Err(CommandErr::InteractiveAuthRequired { stages });
+                }
+                IdentityResetStep::Password
+            }
+        };
+
+        #[allow(clippy::arc_with_non_send_sync)]
+        let handle = Arc::new(handle);
+        *self.pending_identity_reset.lock().await =
+            Some(PendingIdentityReset { generation, handle });
+        Ok(step)
+    }
+
+    pub(crate) async fn continue_identity_reset(
+        &self,
+        password: Option<String>,
+    ) -> Result<String, CommandErr> {
+        let client = self.client().await?;
+        let generation = self.session_generation.load(Ordering::SeqCst);
+        let handle = match &*self.pending_identity_reset.lock().await {
+            Some(pending) if pending.generation == generation => pending.handle.clone(),
+            _ => return Err(CommandErr::Unavailable),
+        };
+
+        let auth = match (handle.auth_type(), password) {
+            (CrossSigningResetAuthType::OAuth(_), _) => None,
+            (CrossSigningResetAuthType::Uiaa(uiaa), Some(password)) => {
+                let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
+                let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);
+                auth.session.clone_from(&uiaa.session);
+                Some(AuthData::Password(auth))
+            }
+            (CrossSigningResetAuthType::Uiaa(_), None) => {
+                return Err(CommandErr::InteractiveAuthRequired {
+                    stages: vec![AuthType::Password.as_str().to_owned()],
+                });
+            }
+        };
+
+        handle.reset(auth).await.map_err(|error| match &error {
+            RecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => CommandErr::Denied,
+            _ => self.failed("reset_identity: auth", error),
+        })?;
+
+        {
+            let mut pending = self.pending_identity_reset.lock().await;
+            if !pending
+                .as_ref()
+                .is_some_and(|pending| Arc::ptr_eq(&pending.handle, &handle))
+            {
+                return Err(CommandErr::Unavailable);
+            }
+            pending.take();
+        }
+
+        self.enable_reset_recovery(&client).await
+    }
+
+    pub(crate) async fn cancel_identity_reset(&self) {
+        let pending = self.pending_identity_reset.lock().await.take();
+        if let Some(pending) = pending {
+            pending.handle.cancel().await;
+        }
+    }
+
+    async fn enable_reset_recovery(
+        &self,
+        client: &matrix_sdk::Client,
+    ) -> Result<String, CommandErr> {
+        client
+            .encryption()
+            .recovery()
+            .enable()
+            .await
+            .map_err(|error| self.failed("reset_identity: enable_recovery", error))
+    }
+
     /// Self-verification travels to-device, verifying someone else as a DM
     /// message, so both need a handler or one direction never prompts.
     pub(crate) fn watch_incoming_verifications(self: &Arc<Self>, client: &matrix_sdk::Client) {

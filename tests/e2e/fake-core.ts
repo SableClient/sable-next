@@ -1109,6 +1109,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       enable_recovery: () => ({ type: 'enable_recovery', recovery_key: 'e2e-recovery-key' }),
       reset_recovery_key: () => ({ type: 'reset_recovery_key', recovery_key: 'e2e-recovery-key' }),
+      reset_identity: () => ({
+        type: 'reset_identity',
+        step: { step: 'done', recovery_key: 'e2e-recovery-key' },
+      }),
+      continue_identity_reset: () => ({
+        type: 'continue_identity_reset',
+        recovery_key: 'e2e-recovery-key',
+      }),
       delete_device: () => ({ type: 'delete_device', management_url: null }),
       request_verification: () => ({ type: 'request_verification', flow_id: 'e2e-flow' }),
       add_notification_keyword: (command) => {

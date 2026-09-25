@@ -716,6 +716,14 @@ pub enum Command {
     ResetRecoveryKey {
         passphrase: Option<String>,
     },
+    /// Destructive from the first call: the key backup and secret storage are
+    /// gone before the server is asked for authentication.
+    ResetIdentity,
+    /// OAuth polls for the approval for up to two minutes.
+    ContinueIdentityReset {
+        password: Option<String>,
+    },
+    CancelIdentityReset,
     /// Call without a password first: the server states its terms in an
     /// `interactive_auth_required` error, and only then is there a prompt.
     DeleteDevice {
@@ -1340,6 +1348,13 @@ pub enum CommandOk {
     ResetRecoveryKey {
         recovery_key: String,
     },
+    ResetIdentity {
+        step: IdentityResetStep,
+    },
+    ContinueIdentityReset {
+        recovery_key: String,
+    },
+    CancelIdentityReset,
     DeleteDevice {
         management_url: Option<String>,
     },
@@ -1963,6 +1978,15 @@ pub enum VerificationStateView {
     Unknown,
     Verified,
     Unverified,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "step", rename_all = "snake_case")]
+pub enum IdentityResetStep {
+    Done { recovery_key: String },
+    Password,
+    Approve { url: String },
 }
 
 /// `incomplete` means secret storage exists but this device lacks secrets from

@@ -5,6 +5,7 @@
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ResetIdentityDialog from '#lib/features/settings/ResetIdentityDialog.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import AuthField from '../shared/AuthField.svelte';
@@ -23,6 +24,7 @@
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
   let recovered = $state(false);
+  let resettingIdentity = $state(false);
   const verification = new DeviceVerification(core);
   let verified = $derived(status?.verification === 'verified' || recovered);
   let passphrase = $derived(status?.recovery_passphrase ?? false);
@@ -125,7 +127,19 @@
 
 {#if !verified}
   <AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} />
+  <AuthSecondaryAction
+    label={$i18n.t('settings.resetIdentityLost')}
+    onclick={() => (resettingIdentity = true)}
+    disabled={loading || !status}
+  />
 {/if}
+
+<ResetIdentityDialog
+  bind:open={resettingIdentity}
+  onReset={() => {
+    recovered = true;
+  }}
+/>
 
 <style>
   .device-verification-card {

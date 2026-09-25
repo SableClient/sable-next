@@ -781,3 +781,161 @@ async fn recover_identity_accepts_the_passphrase_as_well_as_the_key() {
         Err(CommandErr::Failed { .. })
     ));
 }
+
+async fn mount_identity_reset_endpoints(server: &MatrixMockServer) {
+    use wiremock::matchers::path_regex;
+
+    let not_found = || {
+        ResponseTemplate::new(404)
+            .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "absent"}))
+    };
+    Mock::given(method("GET"))
+        .and(path_regex(r"/room_keys/version$"))
+        .respond_with(not_found())
+        .mount(server.server())
+        .await;
+    Mock::given(method("POST"))
+        .and(path_regex(r"/room_keys/version$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"version": "1"})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/room_keys/keys$"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"etag": "1", "count": 0})))
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/account_data/"))
+        .respond_with(not_found())
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/account_data/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    server.mock_upload_keys().ok().mount().await;
+    server.mock_query_keys().ok().mount().await;
+    server
+        .mock_upload_cross_signing_signatures()
+        .ok()
+        .mount()
+        .await;
+}
+
+#[tokio::test]
+async fn an_identity_reset_without_authentication_returns_the_new_key() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    mount_identity_reset_endpoints(&server).await;
+    server.mock_upload_cross_signing_keys().ok().mount().await;
+    let core = core(&server, client).await;
+
+    let Ok(CommandOk::ResetIdentity {
+        step: crate::protocol::IdentityResetStep::Done { recovery_key },
+    }) = core.dispatch(Command::ResetIdentity).await
+    else {
+        panic!("the reset needed no authentication")
+    };
+    assert!(!recovery_key.is_empty());
+}
+
+#[tokio::test]
+async fn an_identity_reset_retries_a_wrong_password_and_returns_the_new_key() {
+    use matrix_sdk::ruma::api::client::uiaa::{AuthData, Password, UserIdentifier};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    mount_identity_reset_endpoints(&server).await;
+    let user_id = client.user_id().unwrap().to_owned();
+    let password = |secret: &str| {
+        let mut auth = Password::new(
+            UserIdentifier::Matrix(user_id.clone().into()),
+            secret.into(),
+        );
+        auth.session = Some("oFIJVvtEOCKmRUTYKTYIIPHL".into());
+        AuthData::Password(auth)
+    };
+    server
+        .mock_upload_cross_signing_keys()
+        .expect_uiaa_auth_data(&password("hunter2"))
+        .ok()
+        .with_priority(1)
+        .expect(1)
+        .mount()
+        .await;
+    server
+        .mock_upload_cross_signing_keys()
+        .expect_uiaa_auth_data(&password("wrong"))
+        .uiaa_invalid_password()
+        .with_priority(2)
+        .expect(1)
+        .mount()
+        .await;
+    server
+        .mock_upload_cross_signing_keys()
+        .uiaa()
+        .with_priority(3)
+        .expect(1)
+        .mount()
+        .await;
+    let core = core(&server, client).await;
+
+    assert!(matches!(
+        core.dispatch(Command::ResetIdentity).await,
+        Ok(CommandOk::ResetIdentity {
+            step: crate::protocol::IdentityResetStep::Password
+        })
+    ));
+    assert!(matches!(
+        core.dispatch(Command::ContinueIdentityReset {
+            password: Some("wrong".into())
+        })
+        .await,
+        Err(CommandErr::Denied)
+    ));
+    let Ok(CommandOk::ContinueIdentityReset { recovery_key }) = core
+        .dispatch(Command::ContinueIdentityReset {
+            password: Some("hunter2".into()),
+        })
+        .await
+    else {
+        panic!("the right password completes the reset")
+    };
+    assert!(!recovery_key.is_empty());
+    assert!(matches!(
+        core.dispatch(Command::ContinueIdentityReset { password: None })
+            .await,
+        Err(CommandErr::Unavailable)
+    ));
+}
+
+#[tokio::test]
+async fn a_cancelled_oauth_identity_reset_hands_back_no_key() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    mount_identity_reset_endpoints(&server).await;
+    server
+        .mock_upload_cross_signing_keys()
+        .uiaa_unstable_oauth()
+        .mount()
+        .await;
+    let core = core(&server, client).await;
+
+    let Ok(CommandOk::ResetIdentity {
+        step: crate::protocol::IdentityResetStep::Approve { url },
+    }) = core.dispatch(Command::ResetIdentity).await
+    else {
+        panic!("an OAuth account is sent to approve the reset")
+    };
+    assert!(url.contains("org.matrix.cross_signing_reset"));
+
+    let (waiting, ()) = tokio::join!(
+        core.dispatch(Command::ContinueIdentityReset { password: None }),
+        async {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            core.dispatch(Command::CancelIdentityReset).await.unwrap();
+        }
+    );
+    assert!(matches!(waiting, Err(CommandErr::Unavailable)));
+}

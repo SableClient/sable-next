@@ -13,6 +13,7 @@
     recovery: RecoveryStateView;
     recoveryPassphrase?: boolean;
     onVerified?: () => void | Promise<void>;
+    onReset: () => void;
   }
 
   let {
@@ -20,6 +21,7 @@
     recovery,
     recoveryPassphrase = false,
     onVerified,
+    onReset,
   }: Props = $props();
 
   function close(): void {
@@ -29,6 +31,11 @@
   async function completeRecovery(): Promise<void> {
     close();
     await onVerified?.();
+  }
+
+  function resetIdentity(): void {
+    close();
+    onReset();
   }
 </script>
 
@@ -51,6 +58,7 @@
     inputId="settings-recovery-key"
     onRequested={close}
     onRecovered={completeRecovery}
+    onReset={resetIdentity}
   />
 </DialogFrame>
 
