@@ -1,18 +1,24 @@
 <script lang="ts">
+  import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
+  import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import IconContext from 'phosphor-svelte/lib/IconContext';
   import PaperPlaneTiltIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
 
   import type { ScheduledMessageView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
-  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
+  import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
+  import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import type { ScheduledTarget } from './composer-context';
+  import { scheduledTimeLabel } from './schedule-time.js';
   import { dequeue, enqueue, queueFor, type QueuedMessage } from './scheduled-queue.svelte.js';
 
   interface Props {
@@ -55,11 +61,17 @@
     };
   });
 
+  const PREVIEW_LABEL_LENGTH = 40;
+
   function when(ts: number | null): string {
     if (ts === null) return $i18n.t('composer.scheduledPending');
-    return $i18n.t('composer.scheduledFor', {
-      when: `${formatDate(ts)} ${formatTime(ts)}`,
-    });
+    return $i18n.t('composer.scheduledFor', { when: scheduledTimeLabel(ts, Date.now()) });
+  }
+
+  function actionsLabel(body: string): string {
+    const preview =
+      body.length > PREVIEW_LABEL_LENGTH ? `${body.slice(0, PREVIEW_LABEL_LENGTH)}…` : body;
+    return $i18n.t('composer.scheduledActions', { preview });
   }
 
   function settle(delayId: string): void {
@@ -109,6 +121,20 @@
     }
   }
 
+  async function sendLocal(message: QueuedMessage): Promise<void> {
+    failure = null;
+    dequeue(message.id);
+    try {
+      await core.commands.sendMessage(message.roomId, message.body, {
+        formatted: message.formatted,
+      });
+    } catch (error) {
+      console.warn('[sable composer] sending a queued message failed', error);
+      enqueue(message);
+      failure = $i18n.t('composer.scheduledSendFailed');
+    }
+  }
+
   function deleteLocal(message: QueuedMessage): void {
     failure = null;
     dequeue(message.id);
@@ -121,18 +147,61 @@
   }
 </script>
 
+{#snippet row(
+  body: string,
+  sends: string,
+  onEditMessage: (() => void) | null,
+  onSendNow: () => void,
+  onDelete: () => void
+)}
+  <li>
+    <div class="text">
+      <span class="preview">{body}</span>
+      <span class="when">{sends}</span>
+    </div>
+    <ActionMenu label={actionsLabel(body)}>
+      {#snippet trigger({ props })}
+        <IconButton {...props} variant="ghost" size="small" label={actionsLabel(body)}>
+          <DotsThreeVerticalIcon />
+        </IconButton>
+      {/snippet}
+      <IconContext values={{ 'aria-hidden': 'true' }}>
+        {#if onEditMessage}
+          <ActionMenuItem onSelect={onEditMessage}>
+            <PencilSimpleIcon />
+            {$i18n.t('composer.scheduledEdit')}
+          </ActionMenuItem>
+        {/if}
+        <ActionMenuItem onSelect={onSendNow}>
+          <PaperPlaneTiltIcon />
+          {$i18n.t('composer.scheduledSendNow')}
+        </ActionMenuItem>
+        <ActionMenuItem destructive onSelect={onDelete}>
+          <TrashIcon />
+          {$i18n.t('composer.scheduledDelete')}
+        </ActionMenuItem>
+      </IconContext>
+    </ActionMenu>
+  </li>
+{/snippet}
+
 {#if total > 0}
   <section class="scheduled" aria-label={$i18n.t('composer.scheduledCount', { count: total })}>
     <button
       type="button"
-      class="summary"
+      class="pill"
       aria-expanded={expanded}
       onclick={() => {
         expanded = !expanded;
       }}
     >
-      <ClockIcon size={16} aria-hidden="true" />
-      {$i18n.t('composer.scheduledCount', { count: total })}
+      <ClockIcon aria-hidden="true" />
+      {$i18n.t('composer.scheduledPill', { count: total })}
+      {#if expanded}
+        <CaretUpIcon aria-hidden="true" />
+      {:else}
+        <CaretDownIcon aria-hidden="true" />
+      {/if}
     </button>
 
     {#if failure !== null}
@@ -142,76 +211,40 @@
     {#if expanded}
       <ul>
         {#each remote as message (message.delay_id)}
-          <li>
-            <span class="body">{message.body}</span>
-            <span class="when">{when(message.delivery_ts)}</span>
-            {#if onEdit}
-              <IconButton
-                variant="ghost"
-                size="small"
-                label={$i18n.t('composer.scheduledEdit')}
-                onclick={() => {
+          {@render row(
+            message.body,
+            when(message.delivery_ts),
+            onEdit
+              ? () => {
                   onEdit(message.delay_id, message.body, message.formatted, {
                     source: 'server',
                     dueTs: message.delivery_ts,
                   });
-                }}
-              >
-                <PencilSimpleIcon />
-              </IconButton>
-            {/if}
-            <IconButton
-              variant="ghost"
-              size="small"
-              label={$i18n.t('composer.scheduledSendNow')}
-              onclick={() => {
-                void sendRemote(message.delay_id);
-              }}
-            >
-              <PaperPlaneTiltIcon />
-            </IconButton>
-            <IconButton
-              variant="ghost"
-              size="small"
-              label={$i18n.t('composer.scheduledDelete')}
-              onclick={() => {
-                deleteRemote(message.delay_id);
-              }}
-            >
-              <TrashIcon />
-            </IconButton>
-          </li>
+                }
+              : null,
+            () => void sendRemote(message.delay_id),
+            () => {
+              deleteRemote(message.delay_id);
+            }
+          )}
         {/each}
         {#each local as message (message.id)}
-          <li>
-            <span class="body">{message.body}</span>
-            <span class="when">{when(message.dueTs)}</span>
-            {#if onEdit}
-              <IconButton
-                variant="ghost"
-                size="small"
-                label={$i18n.t('composer.scheduledEdit')}
-                onclick={() => {
+          {@render row(
+            message.body,
+            when(message.dueTs),
+            onEdit
+              ? () => {
                   onEdit(message.id, message.body, message.formatted, {
                     source: 'queue',
                     dueTs: message.dueTs,
                   });
-                }}
-              >
-                <PencilSimpleIcon />
-              </IconButton>
-            {/if}
-            <IconButton
-              variant="ghost"
-              size="small"
-              label={$i18n.t('composer.scheduledDelete')}
-              onclick={() => {
-                deleteLocal(message);
-              }}
-            >
-              <TrashIcon />
-            </IconButton>
-          </li>
+                }
+              : null,
+            () => void sendLocal(message),
+            () => {
+              deleteLocal(message);
+            }
+          )}
         {/each}
       </ul>
     {/if}
@@ -220,37 +253,40 @@
 
 <style>
   .scheduled {
-    border-top: var(--border-width) solid var(--surface-container-line);
     display: grid;
-    gap: var(--space-100);
-    padding: var(--space-200) var(--space-300) 0;
+    gap: var(--space-150);
+    margin-inline: var(--space-150);
+    padding-block: var(--space-150);
   }
 
-  .summary {
+  .pill {
     align-items: center;
-    background: none;
-    border: none;
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
+    border-radius: var(--radius-pill);
     color: var(--surface-var-on-container);
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     font: inherit;
     font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
     gap: var(--space-100);
     justify-self: start;
-    padding: 0;
+    padding: var(--space-050) var(--space-200);
   }
 
-  .summary:hover {
-    text-decoration: underline;
+  .pill:hover {
+    background: var(--surface-var-container-hover);
   }
 
   ul {
     display: grid;
     gap: var(--space-100);
+    grid-template-columns: minmax(0, 1fr);
     list-style: none;
     margin: 0;
-    max-height: 9rem;
-    overflow: auto;
+    max-height: 12rem;
+    overflow: hidden auto;
     padding: 0;
   }
 
@@ -259,17 +295,28 @@
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-200);
+    min-width: 0;
   }
 
-  .body {
+  .text {
+    display: grid;
     flex: 1;
+    gap: var(--space-050);
+    min-width: 0;
+  }
+
+  .preview {
+    -webkit-box-orient: vertical;
+    color: var(--surface-on-container);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: var(--line-height-small);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .when {
     color: var(--surface-var-on-container);
-    flex: none;
   }
 </style>

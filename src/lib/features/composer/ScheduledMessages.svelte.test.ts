@@ -34,19 +34,35 @@ function serverMessage(delayId: string, body: string) {
 async function render() {
   const instance = mount(ScheduledMessages, { target: document.body, props: { roomId: ROOM } });
   await vi.waitFor(() => {
-    expect(document.querySelector('.summary')).not.toBeNull();
+    expect(document.querySelector('.pill')).not.toBeNull();
   });
-  document.querySelector<HTMLButtonElement>('.summary')?.click();
+  document.querySelector<HTMLButtonElement>('.pill')?.click();
   flushSync();
   return instance;
 }
 
 function bodies(): string[] {
-  return [...document.querySelectorAll('li .body')].map((node) => node.textContent);
+  return [...document.querySelectorAll('li .preview')].map((node) => node.textContent);
 }
 
-function press(label: string): void {
-  document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.click();
+async function choose(body: string, action: string): Promise<void> {
+  document
+    .querySelector<HTMLButtonElement>(
+      `button[aria-label="Actions for the scheduled message “${body}”"]`
+    )
+    ?.click();
+  flushSync();
+  const item = await vi.waitFor(() => {
+    const found = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (node) => node.textContent.trim() === action
+    );
+    if (!found) throw new Error(`no ${action} item`);
+    return found;
+  });
+  item.click();
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="menuitem"]')).toBeNull();
+  });
   flushSync();
 }
 
@@ -55,7 +71,7 @@ test('deleting waits for the toast to close before cancelling on the server', as
   cancelScheduledMessage.mockResolvedValue(undefined);
   const instance = await render();
 
-  press('Delete');
+  await choose('hello later', 'Delete');
   expect(bodies()).toEqual([]);
   expect(cancelScheduledMessage).not.toHaveBeenCalled();
   expect(toasts.items.at(-1)?.message).toBe('Scheduled message deleted');
@@ -72,7 +88,7 @@ test('undoing a delete keeps the message and never cancels it', async () => {
   scheduledMessages.mockResolvedValue([serverMessage('d1', 'hello later')]);
   const instance = await render();
 
-  press('Delete');
+  await choose('hello later', 'Delete');
   toasts.items.at(-1)?.action?.run();
   flushSync();
 
@@ -86,7 +102,7 @@ test('a failed cancel puts the message back and says so', async () => {
   cancelScheduledMessage.mockRejectedValue(new Error('offline'));
   const instance = await render();
 
-  press('Delete');
+  await choose('hello later', 'Delete');
   const toast = toasts.items.at(-1);
   if (toast) toasts.dismiss(toast.id);
 
@@ -102,12 +118,37 @@ test('a failed send-now puts the message back and says so', async () => {
   sendScheduledMessage.mockRejectedValue(new Error('offline'));
   const instance = await render();
 
-  press('Send now');
+  await choose('hello later', 'Send now');
 
   await vi.waitFor(() => {
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('could not be sent');
   });
   expect(bodies()).toEqual(['hello later']);
+  await unmount(instance);
+});
+
+test('sending a queued message now takes it off the queue, and a failure puts it back', async () => {
+  scheduledMessages.mockResolvedValue([]);
+  const sendMessage = vi.fn().mockRejectedValue(new Error('offline'));
+  Object.assign(core, { sendMessage });
+  const queued = {
+    id: 'q1',
+    roomId: ROOM,
+    body: 'queued',
+    formatted: null,
+    dueTs: Date.now() + 60_000,
+    owner: 'DEV',
+  };
+  adoptQueue([queued]);
+  const instance = await render();
+
+  await choose('queued', 'Send now');
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  });
+  expect(sendMessage).toHaveBeenCalledWith(ROOM, 'queued', { formatted: null });
+  expect(scheduledQueue()).toEqual([queued]);
   await unmount(instance);
 });
 
@@ -124,7 +165,7 @@ test('deleting a queued message can be undone', async () => {
   adoptQueue([queued]);
   const instance = await render();
 
-  press('Delete');
+  await choose('queued', 'Delete');
   expect(scheduledQueue()).toEqual([]);
 
   toasts.items.at(-1)?.action?.run();

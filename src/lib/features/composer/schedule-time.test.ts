@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest';
 
-import { presetOffsets, scheduleAt, scheduleInputs, tomorrowMorning } from './schedule-time.js';
+import {
+  presetOffsets,
+  scheduleAt,
+  scheduledTimeLabel,
+  scheduleInputs,
+  tomorrowMorning,
+} from './schedule-time.js';
 
 const NOON = new Date('2026-08-30T12:00:00').getTime();
 
@@ -45,4 +51,14 @@ test('a scheduled time fills the inputs it would be read back from', () => {
 
 test('an unknown time leaves the inputs empty', () => {
   expect(scheduleInputs(null)).toEqual({ date: '', time: '' });
+});
+
+test('a scheduled time reads as a clock today, a weekday this week and a date after that', () => {
+  const later = new Date('2026-08-30T15:00:00').getTime();
+  const tuesday = new Date('2026-09-01T09:00:00').getTime();
+  const october = new Date('2026-10-12T09:00:00').getTime();
+
+  expect(scheduledTimeLabel(later, NOON)).not.toMatch(/[A-Za-z]{3}/);
+  expect(scheduledTimeLabel(tuesday, NOON)).toMatch(/^Tue /);
+  expect(scheduledTimeLabel(october, NOON)).toMatch(/^Oct 12 |^12 Oct /);
 });
