@@ -41,6 +41,14 @@ export function resolveUnreadBadge(
   return { mode: 'count', count: mention ? count : (counts.notifying ?? count), highlight };
 }
 
+export function hideQuietDot(
+  badge: UnreadBadgeView | null,
+  showUnreadDots: boolean
+): UnreadBadgeView | null {
+  if (showUnreadDots || badge === null) return badge;
+  return badge.mode === 'dot' && !badge.highlight && badge.count > 0 ? null : badge;
+}
+
 export function formatUnreadCount(count: number): string {
   if (count <= 999) return String(count);
 

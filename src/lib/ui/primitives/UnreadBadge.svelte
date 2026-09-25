@@ -3,7 +3,12 @@
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { formatUnreadCount, resolveUnreadBadge, type UnreadBadgeCounts } from './unread-badge.js';
+  import {
+    formatUnreadCount,
+    hideQuietDot,
+    resolveUnreadBadge,
+    type UnreadBadgeCounts,
+  } from './unread-badge.js';
 
   type Props = Omit<HTMLAttributes<HTMLSpanElement>, 'class' | 'children'> & {
     counts: UnreadBadgeCounts | undefined;
@@ -13,7 +18,9 @@
 
   let { counts, dm = false, class: className = '', ...rest }: Props = $props();
 
-  let badge = $derived(resolveUnreadBadge(counts, preferences, dm));
+  let badge = $derived(
+    hideQuietDot(resolveUnreadBadge(counts, preferences, dm), preferences.showUnreadDots)
+  );
 </script>
 
 {#if badge}

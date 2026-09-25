@@ -16,6 +16,7 @@ import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
 import CloudArrowUpIcon from 'phosphor-svelte/lib/CloudArrowUpIcon';
 import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import DesktopIcon from 'phosphor-svelte/lib/DesktopIcon';
+import DotIcon from 'phosphor-svelte/lib/DotIcon';
 import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
 import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
 import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
@@ -516,6 +517,14 @@ export const settingsCategories: SettingsCategory[] = [
         icon: MegaphoneIcon,
         name: 'settings.showPingCounts',
         description: 'settings.showPingCountsHint',
+        type: 'boolean',
+      },
+      {
+        key: 'showUnreadDots',
+        section: 'unread-badges',
+        icon: DotIcon,
+        name: 'settings.showUnreadDots',
+        description: 'settings.showUnreadDotsHint',
         type: 'boolean',
       },
       {

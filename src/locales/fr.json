@@ -1472,6 +1472,8 @@
     "badgeCountDMsOnlyHint": "Affiche sur les conversations privées un nombre plutôt qu’un point.",
     "showPingCounts": "Compteurs de mentions",
     "showPingCountsHint": "Affiche sur les mentions et mots-clés un nombre plutôt qu’un point.",
+    "showUnreadDots": "Points de messages non lus",
+    "showUnreadDotsHint": "Affiche un point sur les salons avec des messages non lus. Désactivé, seuls les mentions, les compteurs et les salons marqués comme non lus restent signalés.",
     "uniformIcons": "Style d’icônes cohérent",
     "uniformIconsHint": "Donne aux icônes transparentes de salons et d’espaces un arrière-plan adapté à leurs couleurs.",
     "twitterEmoji": "Émojis Twitter",

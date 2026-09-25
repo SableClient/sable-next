@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { formatUnreadCount, resolveUnreadBadge } from './unread-badge.js';
+import { formatUnreadCount, hideQuietDot, resolveUnreadBadge } from './unread-badge.js';
 
 const off = { showUnreadCounts: false, badgeCountDMsOnly: false, showPingCounts: false };
 
@@ -95,4 +95,17 @@ test('an aggregate counts what notified, not every unread message under it', () 
     count: 2,
     highlight: true,
   });
+});
+
+test('hiding unread dots keeps mentions, counts and hand-marked rooms', () => {
+  const quiet = resolveUnreadBadge({ unread: 4, highlight: 0, notifying: 0 }, off);
+  const mention = resolveUnreadBadge({ unread: 4, highlight: 1 }, off);
+  const counted = resolveUnreadBadge({ unread: 4, highlight: 0, notifying: 2 }, off);
+  const marked = resolveUnreadBadge({ unread: 0, highlight: 0, marked: true }, off);
+
+  expect(hideQuietDot(quiet, true)).toEqual(quiet);
+  expect(hideQuietDot(quiet, false)).toBeNull();
+  expect(hideQuietDot(mention, false)).toEqual(mention);
+  expect(hideQuietDot(counted, false)).toEqual(counted);
+  expect(hideQuietDot(marked, false)).toEqual(marked);
 });

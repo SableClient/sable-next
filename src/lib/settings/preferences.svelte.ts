@@ -67,6 +67,7 @@ export interface Preferences {
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
   showPingCounts: boolean;
+  showUnreadDots: boolean;
   uniformIcons: boolean;
 
   hour24Clock: boolean;
@@ -276,6 +277,7 @@ const DEFAULTS: Preferences = {
   showUnreadCounts: false,
   badgeCountDMsOnly: true,
   showPingCounts: true,
+  showUnreadDots: true,
   uniformIcons: false,
 
   hour24Clock: false,

@@ -1758,6 +1758,8 @@
     "badgeCountDMsOnlyHint": "Badge direct messages with a number instead of a dot.",
     "showPingCounts": "Mention counts",
     "showPingCountsHint": "Badge mentions and keywords with a number instead of a dot.",
+    "showUnreadDots": "Unread dots",
+    "showUnreadDotsHint": "Dot rooms with unread messages. Off keeps only mentions, counts and rooms you marked unread.",
     "uniformIcons": "Consistent icon style",
     "uniformIconsHint": "Give a transparent room or space icon a background matched to its own colours.",
     "twitterEmoji": "Twitter emoji",
