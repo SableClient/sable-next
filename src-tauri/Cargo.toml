@@ -43,7 +43,7 @@ tauri-plugin-os = "2.3.2"
 # the mobile builds, not the desktop one.
 # The published crate hands back a bare token; the fork takes a VAPID key and
 # returns the keys a UnifiedPush distributor produces.
-tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "eeee0bd95fee507fc14c99c7391b866fd8fa4d8a", default-features = false }
+tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "ccab82b7bb4ffc345f1a0ff93644e055c13446da", default-features = false }
 sable-core = { path = "../crates/sable-core", version = "0.1.0" }
 tokio = { workspace = true }
 # default-features drags in reqwest and native-tls; ureq is a sync rustls
@@ -63,7 +63,7 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-window-state = "2.4.1"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
-tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "eeee0bd95fee507fc14c99c7391b866fd8fa4d8a", default-features = false, features = [
+tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "ccab82b7bb4ffc345f1a0ff93644e055c13446da", default-features = false, features = [
   "notify-rust",
 ] }
 
@@ -76,7 +76,7 @@ tauri-plugin-android-fs = "=29.0.0"
 [target."cfg(any(target_os = \"android\", target_os = \"ios\"))".dependencies]
 tauri-plugin-app-icon = { version = "0.1.0", git = "https://github.com/SableClient/tauri-plugin-app-icon", rev = "bab80ae17f6d018702e472c539d0f02eba480c21" }
 tauri-plugin-geolocation = "2.3.3"
-tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "eeee0bd95fee507fc14c99c7391b866fd8fa4d8a", default-features = false, features = [
+tauri-plugin-notifications = { version = "0.5.0", git = "https://github.com/SableClient/tauri-plugin-notifications.git", rev = "ccab82b7bb4ffc345f1a0ff93644e055c13446da", default-features = false, features = [
   "push-notifications",
 ] }
 tauri-plugin-livekit-mobile = { version = "0.2.0", git = "https://github.com/SableClient/tauri-plugin-livekit-mobile.git", rev = "282d2dd52da4112e1fc241eb88504292161ed8df" }
