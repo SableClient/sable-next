@@ -977,6 +977,7 @@
     "stageCreateAccountLabel": "Create your Matrix account",
     "stageRecoveryLabel": "Set up account recovery",
     "stageProfileLabel": "Choose your profile details",
+    "stageConsentLabel": "Choose whether to send bug reports",
     "signingIn": "Signing in…",
     "moreWaysToSignIn": "More ways to sign in",
     "hideOtherWaysToSignIn": "Hide other ways to sign in",

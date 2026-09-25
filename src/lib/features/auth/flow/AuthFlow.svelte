@@ -27,6 +27,8 @@
   import AccountSummaryCard from '../profile/AccountSummaryCard.svelte';
   import { ProfileController, profileOnboardingMarker } from '../profile/profile-controller.svelte';
   import ProfileCard from '../profile/ProfileCard.svelte';
+  import TelemetryConsentCard from '../consent/TelemetryConsentCard.svelte';
+  import { telemetryConsentPending } from '#lib/platform/telemetry.js';
   import { RedirectController } from './redirect-controller.svelte';
   import { homeserverFromAuthUrl, registrationTokenFromAuthUrl } from './auth-url';
   import { homeservers } from '../shared/homeservers.svelte.js';
@@ -55,6 +57,11 @@
       completed: false,
       accessibilityLabel: 'auth.stageProfileLabel',
     },
+    {
+      route: resolve('register/consent'),
+      completed: false,
+      accessibilityLabel: 'auth.stageConsentLabel',
+    },
   ];
 
   function reauthAccountId(): string | undefined {
@@ -82,6 +89,7 @@
   let restoredMarkerFor: string | null = null;
   let lastUrlPrefill = '';
   let recoveryOnboardingComplete = $state(false);
+  let profileOnboardingComplete = $state(false);
 
   function markLoggedIn(): void {
     localStorage.setItem(LOGGED_IN_MARKER, 'true');
@@ -129,7 +137,7 @@
   const profile = new ProfileController({
     core,
     getUserId: () => core.session?.user_id ?? '',
-    onNavigateHome: () => goto(resolve('/(app)/rooms')),
+    onNavigateHome: finishProfileOnboarding,
   });
 
   const login = new LoginController({
@@ -159,7 +167,10 @@
     stageRegistry.map((stage, index) => ({
       ...stage,
       completed:
-        index === 0 || (index === 1 && signedIn) || (index === 2 && recoveryOnboardingComplete),
+        index === 0 ||
+        (index === 1 && signedIn) ||
+        (index === 2 && recoveryOnboardingComplete) ||
+        (index === 3 && profileOnboardingComplete),
     }))
   );
 
@@ -186,19 +197,29 @@
   let isLaunchingLogin = $derived(redirect.pendingIntent === 'login' && redirect.isLaunching);
   let loginVerificationPending = $state(false);
   let isDeviceVerificationStage = $derived(page.url.pathname === resolve('login/verify'));
-  let loginVerificationActive = $state(page.url.pathname === resolve('login/verify'));
-  let verificationDisplayedStage = $derived(isDeviceVerificationStage ? 1 : 0);
+  let isLoginConsentStage = $derived(page.url.pathname === resolve('login/consent'));
+  let loginConsentReached = $state(page.url.pathname === resolve('login/consent'));
+  let loginVerificationActive = $state(
+    page.url.pathname === resolve('login/verify') || page.url.pathname === resolve('login/consent')
+  );
+  let verificationDisplayedStage = $derived(
+    isLoginConsentStage ? 2 : isDeviceVerificationStage ? 1 : 0
+  );
   let carouselDisplayedStage = $derived(
     loginVerificationActive ? verificationDisplayedStage : displayedStage
   );
-  let carouselTotal = $derived(loginVerificationActive ? 2 : visibleFurthestStage + 1);
+  let carouselTotal = $derived(
+    loginVerificationActive ? (loginConsentReached ? 3 : 2) : visibleFurthestStage + 1
+  );
   let carouselCanForward = $derived(
     loginVerificationActive
-      ? verificationDisplayedStage === 0
+      ? verificationDisplayedStage === 0 ||
+          (verificationDisplayedStage === 1 && loginConsentReached)
       : displayedStage < furthestReached ||
           (displayedStage === 0 && hasSecondaryStage) ||
           (displayedStage === 1 && signedIn) ||
-          (displayedStage === 2 && recoveryOnboardingComplete)
+          (displayedStage === 2 && recoveryOnboardingComplete) ||
+          (displayedStage === 3 && profileOnboardingComplete)
   );
 
   $effect(() => {
@@ -252,7 +273,7 @@
   });
 
   $effect(() => {
-    if (isDeviceVerificationStage && core.status === 'signed-out') {
+    if ((isDeviceVerificationStage || isLoginConsentStage) && core.status === 'signed-out') {
       loginVerificationActive = false;
       void goto(resolve('login'));
     }
@@ -261,7 +282,7 @@
   $effect(() => {
     if (core.status !== 'ready' || !userId || pendingOnboardingTransition || isAddingAccount)
       return;
-    if (loginVerificationActive || loginVerificationPending) return;
+    if (loginVerificationActive || loginVerificationPending || displayedStage === 4) return;
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
     if (!rawMarker) {
@@ -304,9 +325,33 @@
   }
 
   function finishLoginVerification(): void {
+    if (telemetryConsentPending()) {
+      loginConsentReached = true;
+      void goto(resolve('login/consent'), { reset: false });
+      return;
+    }
     loginVerificationActive = false;
     loginVerificationPending = false;
     void goto(resolve('/(app)/rooms'));
+  }
+
+  function finishTelemetryConsent(enabled: boolean): void {
+    if (enabled) {
+      location.assign(resolve('/(app)/rooms'));
+      return;
+    }
+    loginVerificationActive = false;
+    loginVerificationPending = false;
+    void goto(resolve('/(app)/rooms'));
+  }
+
+  async function finishProfileOnboarding(): Promise<void> {
+    if (!telemetryConsentPending()) {
+      await goto(resolve('/(app)/rooms'));
+      return;
+    }
+    profileOnboardingComplete = true;
+    activateStage(4);
   }
 
   function finishRecoveryOnboarding(): void {
@@ -320,13 +365,19 @@
   }
 
   function carouselBack(): void {
-    if (loginVerificationActive) showLoginStage();
-    else back();
+    if (!loginVerificationActive) back();
+    else if (verificationDisplayedStage === 2) void navigateToLoginVerification();
+    else showLoginStage();
   }
 
   function carouselForward(): void {
-    if (loginVerificationActive) void navigateToLoginVerification();
-    else forward();
+    if (!loginVerificationActive) forward();
+    else if (verificationDisplayedStage === 1) showLoginConsentStage();
+    else void navigateToLoginVerification();
+  }
+
+  function showLoginConsentStage(): void {
+    void goto(resolve('login/consent'), { reset: false });
   }
 
   function activateCarouselStage(index: number): void {
@@ -335,6 +386,7 @@
       return;
     }
     if (index === 0) showLoginStage();
+    else if (index === 2) showLoginConsentStage();
     else void navigateToLoginVerification();
   }
 
@@ -358,6 +410,7 @@
     else if (displayedStage === 0 && hasSecondaryStage) activateStage(1);
     else if (displayedStage === 1 && signedIn) activateStage(2);
     else if (displayedStage === 2 && recoveryOnboardingComplete) activateStage(3);
+    else if (displayedStage === 3 && profileOnboardingComplete) activateStage(4);
   }
 
   function activateStage(index: number): void {
@@ -413,13 +466,15 @@
     {$i18n.t(
       isDeviceVerificationStage
         ? 'auth.verifyDevice'
-        : displayedStage === 0
-          ? 'auth.signInTitle'
-          : displayedStage === 2
-            ? 'auth.setUpRecovery'
-            : displayedStage === 3
-              ? 'auth.makeItYours'
-              : 'auth.createAccount'
+        : isLoginConsentStage || displayedStage === 4
+          ? 'settings.telemetryBannerTitle'
+          : displayedStage === 0
+            ? 'auth.signInTitle'
+            : displayedStage === 2
+              ? 'auth.setUpRecovery'
+              : displayedStage === 3
+                ? 'auth.makeItYours'
+                : 'auth.createAccount'
     )} - Sable
   </title>
 </svelte:head>
@@ -638,6 +693,37 @@
                 onContinue={() => void profile.save()}
                 onSkip={() => void profile.skip()}
               />
+            </AuthStageCard>
+          {/if}
+
+          {#if loginVerificationActive && loginConsentReached}
+            <AuthStageCard
+              active={carouselDisplayedStage === 2}
+              after={carouselDisplayedStage < 2}
+              accessibilityLabel={$i18n.t('auth.stageConsentLabel')}
+              onActivate={() => {
+                activateCarouselStage(2);
+              }}
+            >
+              <TelemetryConsentCard onAnswer={finishTelemetryConsent} />
+            </AuthStageCard>
+          {/if}
+
+          {#if !loginVerificationActive && furthestReached >= 4}
+            <AuthStageCard
+              active={displayedStage === 4}
+              after={displayedStage < 4}
+              entering={enteringStage === 4}
+              removing={retiringAfter !== null && retiringAfter < 4}
+              accessibilityLabel={$i18n.t(stages[4].accessibilityLabel)}
+              onActivate={() => {
+                activateStage(4);
+              }}
+              onMotionComplete={() => {
+                completeStageMotion(retiringAfter ?? 4);
+              }}
+            >
+              <TelemetryConsentCard onAnswer={finishTelemetryConsent} />
             </AuthStageCard>
           {/if}
         </AuthRail>

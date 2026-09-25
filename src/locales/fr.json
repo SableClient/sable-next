@@ -975,6 +975,7 @@
     "stageCreateAccountLabel": "Créer votre compte Matrix",
     "stageRecoveryLabel": "Configurer la récupération du compte",
     "stageProfileLabel": "Choisir les informations de votre profil",
+    "stageConsentLabel": "Choisir d’envoyer ou non des rapports de bogue",
     "signingIn": "Connexion…",
     "moreWaysToSignIn": "Plus de méthodes de connexion",
     "hideOtherWaysToSignIn": "Masquer les autres méthodes de connexion",

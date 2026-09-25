@@ -883,6 +883,7 @@
     "stageCreateAccountLabel": "Crează-ți un cont de Matrix",
     "stageRecoveryLabel": "Setează o metodă de recuperare",
     "stageProfileLabel": "Alege detaliile profilului",
+    "stageConsentLabel": "Alege dacă trimiți rapoarte de erori",
     "signingIn": "Se conectează…",
     "moreWaysToSignIn": "Mai multe metode de conectare",
     "hideOtherWaysToSignIn": "Ascunde metodele suplimentare de conectare",
