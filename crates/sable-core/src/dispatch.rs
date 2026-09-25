@@ -1573,6 +1573,16 @@ impl Core {
                 Ok(CommandOk::RenameDevice)
             }
 
+            Command::DiscardRoomKey { room_id } => {
+                self.room(&room_id)
+                    .await?
+                    .discard_room_key()
+                    .await
+                    .map_err(|error| self.failed("discard_room_key", error))?;
+
+                Ok(CommandOk::DiscardRoomKey)
+            }
+
             Command::SetDisplayName { name } => {
                 let client = self.client().await?;
                 if client

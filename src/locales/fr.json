@@ -2048,6 +2048,10 @@
         "description": "Marquer cette conversation privée comme salon ordinaire",
         "usage": "/converttoroom"
       },
+      "discardsession": {
+        "description": "Abandonner la session de chiffrement sortante de ce salon pour que le prochain message utilise une nouvelle clé",
+        "usage": "/discardsession"
+      },
       "acl": {
         "description": "Gérer la liste d’accès des serveurs de ce salon",
         "usage": "/acl [-a serveur] [-d serveur] [-ra serveur] [-rd serveur]"

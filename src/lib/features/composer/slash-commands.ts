@@ -14,6 +14,7 @@ export type SlashCommandApi = Pick<
   | 'bulkRedact'
   | 'createDm'
   | 'disableRoomPersonas'
+  | 'discardRoomKey'
   | 'ignoreUser'
   | 'inviteUser'
   | 'joinRoom'
@@ -642,6 +643,15 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       if (args.trim() !== '') return usageError('converttoroom');
 
       await commands.setDirect(roomId, false);
+      return { kind: 'done' };
+    },
+  },
+  {
+    name: 'discardsession',
+    run: async (args, { roomId, commands }) => {
+      if (args.trim() !== '') return usageError('discardsession');
+
+      await commands.discardRoomKey(roomId);
       return { kind: 'done' };
     },
   },

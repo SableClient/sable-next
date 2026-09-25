@@ -32,6 +32,7 @@ function fakeCommands() {
     ignoreUser: vi.fn(() => Promise.resolve()),
     unignoreUser: vi.fn(() => Promise.resolve()),
     setDirect: vi.fn(() => Promise.resolve()),
+    discardRoomKey: vi.fn(() => Promise.resolve()),
     sendLocation: vi.fn(() => Promise.resolve()),
     sendRawEvent: vi.fn(() => Promise.resolve()),
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
@@ -420,6 +421,17 @@ test('/converttodm and /converttoroom flip the direct flag', async () => {
 
   await runSlash('/converttoroom', context(commands));
   expect(commands.setDirect).toHaveBeenLastCalledWith('!room:example.org', false);
+});
+
+test('/discardsession discards the room key', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/discardsession', context(commands));
+  expect(commands.discardRoomKey).toHaveBeenCalledWith('!room:example.org');
+
+  await expect(runSlash('/discardsession now', context(commands))).rejects.toMatchObject({
+    key: 'composer.slash.discardsession.usage',
+  });
 });
 
 test('/acl merges and removes server rules', async () => {

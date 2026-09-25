@@ -2139,6 +2139,10 @@
         "description": "Mark this direct message as an ordinary room",
         "usage": "/converttoroom"
       },
+      "discardsession": {
+        "description": "Discard this room's outbound encryption session so the next message uses a new key",
+        "usage": "/discardsession"
+      },
       "acl": {
         "description": "Manage this room's server access list",
         "usage": "/acl [-a server] [-d server] [-ra server] [-rd server]"

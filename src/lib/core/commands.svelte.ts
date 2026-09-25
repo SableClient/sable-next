@@ -1455,6 +1455,10 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async discardRoomKey(roomId: string): Promise<void> {
+      await transport().send({ type: 'discard_room_key', room_id: roomId });
+    },
+
     async deleteDevice(deviceId: string, password: string | null): Promise<string | null> {
       const response = await transport().send({
         type: 'delete_device',

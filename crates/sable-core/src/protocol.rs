@@ -714,6 +714,10 @@ pub enum Command {
         device_id: OwnedDeviceId,
         display_name: String,
     },
+    DiscardRoomKey {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
 
     /// `null` clears it.
     SetDisplayName {
@@ -1318,6 +1322,7 @@ pub enum CommandOk {
         management_url: Option<String>,
     },
     RenameDevice,
+    DiscardRoomKey,
 
     SetDisplayName,
     SetAvatarUrl,
