@@ -3,6 +3,8 @@
   import { on } from 'svelte/events';
   import type { Snippet } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { type as osType } from '@tauri-apps/plugin-os';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import '../styles.css';
@@ -21,7 +23,8 @@
   import { trackInspectorShortcut } from '#lib/platform/devtools.js';
   import { suppressNativeContextMenu } from '#lib/platform/context-menu.js';
   import { blockEdgeNavigation } from '#lib/platform/edge-navigation.js';
-  import { registerServiceWorker } from '#lib/platform/service-worker.js';
+  import { hostsServiceWorker, registerServiceWorker } from '#lib/platform/service-worker.js';
+  import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
   import { guardTouchClicks } from '#lib/ui/trailing-click.js';
   import {
     applyDesktopWindowSettings,
@@ -84,6 +87,19 @@
       stopBlockingEdgeNavigation();
       core.stop();
     };
+  });
+
+  $effect(() => {
+    if (!hostsServiceWorker()) return;
+
+    return on(navigator.serviceWorker, 'message', (event) => {
+      if (page.route.id?.startsWith('/(app)')) return;
+      const message = (event as MessageEvent).data as
+        | { type?: string; roomId?: string; userId?: string; eventId?: string }
+        | undefined;
+      if (message?.type !== 'sable:open-room' || message.roomId === undefined) return;
+      void goto(notificationPermalink(message.roomId, message.eventId, message.userId));
+    });
   });
 
   $effect(() => {

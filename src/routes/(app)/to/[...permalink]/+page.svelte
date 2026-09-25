@@ -3,12 +3,15 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { selectNotificationAccount } from '#lib/features/notifications/native-actions.js';
   import UserLinkCard from '#lib/features/profile/UserLinkCard.svelte';
   import { permalinkTarget, type PermalinkTarget } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
+  const core = useCoreClient();
   const roomList = useRoomList();
 
   let unresolved = $state(false);
@@ -24,7 +27,12 @@
     unresolved = false;
     user = null;
 
+    const notifiedUser = page.url.searchParams.get('user');
+
     const open = async (): Promise<void> => {
+      if (notifiedUser !== null) await selectNotificationAccount(core, notifiedUser);
+      if (!active) return;
+
       // A permalink opened from a notification can beat the room list, without
       // which the room's section cannot be decided.
       await roomList.start();

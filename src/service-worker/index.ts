@@ -13,6 +13,7 @@ import {
   readLines,
   summarise,
 } from '#lib/features/notifications/conversation.js';
+import { notificationPermalink } from '#lib/features/notifications/notification-link.js';
 import {
   alert,
   parsePushPayload,
@@ -182,14 +183,9 @@ async function open(
     return;
   }
 
-  await worker.clients.openWindow(roomId === undefined ? resolve('/') : permalink(roomId, eventId));
-}
-
-function permalink(roomId: string, eventId: string | undefined): string {
-  const path = resolve('/(app)/to/[...permalink]', {
-    permalink: encodeURIComponent(roomId),
-  });
-  return eventId === undefined ? path : `${path}?${new URLSearchParams({ notified: eventId })}`;
+  await worker.clients.openWindow(
+    roomId === undefined ? resolve('/') : notificationPermalink(roomId, eventId, userId)
+  );
 }
 
 /** Only the app can re-register a replaced subscription, so it is told to. */

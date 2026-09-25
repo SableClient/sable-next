@@ -20,7 +20,10 @@ export function callNotificationAction(
 type AccountSwitcher = Pick<CoreClient, 'session' | 'accounts' | 'switchAccount'>;
 type Replier = AccountSwitcher & Pick<CoreClient, 'commands'>;
 
-async function selectNotificationAccount(core: AccountSwitcher, userId: string): Promise<boolean> {
+export async function selectNotificationAccount(
+  core: AccountSwitcher,
+  userId: string
+): Promise<boolean> {
   const account = core.accounts.find((entry) => entry.user_id === userId);
   if (account === undefined) return false;
 
