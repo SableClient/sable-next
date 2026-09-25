@@ -1496,7 +1496,10 @@ test('follows sent links after scrolling back to the bottom in Firefox', async (
   test.skip(browserName !== 'firefox', 'Firefox fractional scroll regression');
   await page.setViewportSize({ width: 901, height: 421 });
   await page.addInitScript(() => {
-    localStorage.setItem('sable-preferences', JSON.stringify({ urlPreviews: true }));
+    localStorage.setItem(
+      'sable-preferences',
+      JSON.stringify({ urlPreviews: true, encryptedUrlPreviews: true })
+    );
   });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
