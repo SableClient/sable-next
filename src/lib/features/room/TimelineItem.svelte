@@ -65,6 +65,7 @@
   import PersonaProfile from './PersonaProfile.svelte';
   import ReactionsDialog from './ReactionsDialog.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
+  import { trailingReceipt } from './receipt-fit';
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import SenderName from './SenderName.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
@@ -609,6 +610,11 @@
       stalled === null
   );
 
+  let trailingReceiptBadge = $derived(
+    actionable && showReceiptBadge && !receiptsInline && layout !== 'bubble'
+  );
+  let receiptBeside = $state(false);
+
   const rowPress = new LongPress({
     enabled: () => actionable,
     onPress: () => (sheetOpen = true),
@@ -937,7 +943,14 @@
         />
       {/if}
     {/if}
-    <div class="message-content">
+    <div
+      class={['message-content', { 'receipt-beside': trailingReceiptBadge && receiptBeside }]}
+      {@attach trailingReceiptBadge
+        ? trailingReceipt((fits) => {
+            receiptBeside = fits;
+          })
+        : undefined}
+    >
       {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
         {@const tint = personaWithColor(replyPersona)}
         {@const target = item.in_reply_to.event_id}
@@ -1596,7 +1609,14 @@
 
   .message-content > .receipt-slot {
     grid-column: 1;
+    margin-inline-start: var(--space-200);
     place-self: end;
+  }
+
+  .receipt-beside > .receipt-slot {
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    position: absolute;
   }
 
   .has-receipts :global(.formatted-body) {

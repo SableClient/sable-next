@@ -1,5 +1,5 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
-import { timelineItem } from './fixtures/timeline-items';
+import { timelineImage, timelineItem } from './fixtures/timeline-items';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -41,4 +41,55 @@ test('own bubble receipts reach the same edge as everyone else’s on mobile', a
     )
   );
   expect(edges.own).toBe(edges.other);
+});
+
+test('receipts beside text, reactions, an embed or an image add no row of their own', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  const subscription = await core.subscription();
+  const text = timelineItem('general-18', 'see https://example.test/page');
+  const trailing = {
+    text,
+    reactions: { ...text, reactions: [{ key: '👍', senders: ['@bob:example.test'] }] },
+    embed: {
+      ...text,
+      bundled_link_previews: [
+        {
+          url: 'https://example.test/page',
+          title: 'Example page',
+          description: 'A description of the page',
+          site_name: 'Example',
+          image: null,
+          image_mime: null,
+          image_width: null,
+          image_height: null,
+        },
+      ],
+    },
+    image: timelineImage('general-18'),
+  };
+  const row = page.locator('[data-item-id="general-18"] .message');
+
+  for (const [name, item] of Object.entries(trailing)) {
+    const measure = async (readBy: string[]) => {
+      await core.setTimelineItemById(subscription, 'general-18', { ...item, read_by: readBy });
+      await expect(row.locator('.receipt-slot')).toHaveCount(readBy.length);
+      return row.evaluate((node) => ({
+        height: Math.round(node.getBoundingClientRect().height),
+        beside: node.querySelector('.message-content')?.classList.contains('receipt-beside'),
+      }));
+    };
+    const plain = await measure([]);
+    const receipted = await measure(['@bob:example.test']);
+    expect(Math.abs(receipted.height - plain.height), name).toBeLessThanOrEqual(1);
+    if (item !== text) expect(receipted.beside, name).toBe(true);
+  }
 });
