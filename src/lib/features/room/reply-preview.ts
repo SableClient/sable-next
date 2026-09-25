@@ -2,6 +2,8 @@ import type { TimelineItemContentView } from '#src/generated/protocol';
 
 const SPOILER = 'data-mx-spoiler';
 
+export type ReplyVersion = { of: string; body: string };
+
 function spoilerSafe(body: string, html: string | null): string {
   if (html === null || !html.includes(SPOILER)) return body;
   const parsed = new DOMParser().parseFromString(html, 'text/html').body;

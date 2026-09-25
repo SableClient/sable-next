@@ -1225,6 +1225,10 @@ impl Core {
                 source: self.event_source(&room_id, &event_id).await?,
             }),
 
+            Command::EditHistory { room_id, event_id } => Ok(CommandOk::EditHistory {
+                versions: self.edit_history(&room_id, &event_id).await?,
+            }),
+
             Command::ForwardMessage {
                 room_id,
                 event_id,

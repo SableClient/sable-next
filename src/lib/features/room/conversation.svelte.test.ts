@@ -92,6 +92,29 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
+test('a reply to an earlier version targets the edit and quotes its text', async () => {
+  const { conversation, sendMessage } = setup(
+    [item('$one:example.org', '@ana:example.org')],
+    '@kris:example.org'
+  );
+
+  conversation.reply('$edit:example.org', { of: '$one:example.org', body: 'Helo' });
+  expect(conversation.context).toMatchObject({
+    kind: 'reply',
+    eventId: '$edit:example.org',
+    sender: 'Ana',
+    body: 'Helo',
+    silentReply: false,
+  });
+
+  await conversation.sendMessage(ROOM, 'typo');
+  expect(sendMessage).toHaveBeenCalledWith(
+    ROOM,
+    'typo',
+    expect.objectContaining({ inReplyTo: '$edit:example.org' })
+  );
+});
+
 test('editing a pending message uses its transaction ID', async () => {
   const pending = {
     ...item('local-id', '@kris:example.org'),

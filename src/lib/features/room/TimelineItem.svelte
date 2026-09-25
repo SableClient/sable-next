@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
 
   import type {
+    EditVersionView,
     MemberView,
     MessageKind,
     PerMessageProfileView,
@@ -54,6 +55,7 @@
   import MessageForwardDialog from './MessageForwardDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
   import MessageSourceDialog from './MessageSourceDialog.svelte';
+  import EditHistoryDialog from './EditHistoryDialog.svelte';
   import ReactionSheet from './ReactionSheet.svelte';
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from './bookmarks.svelte.js';
@@ -67,6 +69,7 @@
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
   import MessageReproxyDialog from './MessageReproxyDialog.svelte';
   import type { MatrixLink } from './matrix-link';
+  import { replyPreviewBody, type ReplyVersion } from './reply-preview';
   import './sender-identity.css';
   import {
     formatMessageTimestamp,
@@ -100,7 +103,7 @@
       key: string,
       sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
     ) => void;
-    onReply?: (eventId: string) => void;
+    onReply?: (eventId: string, version?: ReplyVersion) => void;
     onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null, mediaCaption?: boolean) => void;
     onDelete?: (eventId: string, reason: string | null) => void;
@@ -407,6 +410,10 @@
               void downloadEmotes();
             }
           : undefined,
+      onEditHistory:
+        roomId && eventId && item.content.kind === 'message' && item.content.edited
+          ? () => void openEditHistory(eventId)
+          : undefined,
       onViewSource: roomId && eventId ? () => void openSource(eventId) : undefined,
       onReport:
         roomId && eventId && !item.is_own
@@ -485,6 +492,30 @@
     }
   }
 
+  async function openEditHistory(eventId: string): Promise<void> {
+    try {
+      editHistory = await core.commands.editHistory(roomId, eventId);
+      editHistoryOpen = true;
+    } catch (error) {
+      console.warn('[sable timeline] edit history unavailable', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+    }
+  }
+
+  function replyToVersion(version: EditVersionView): void {
+    const eventId = item.event_id;
+    if (!eventId || !onReply) return;
+    const body = replyPreviewBody({
+      kind: 'message',
+      body: version.body,
+      html: version.html,
+      emote: false,
+      notice: false,
+      edited: false,
+    });
+    onReply(version.event_id, { of: eventId, body });
+  }
+
   function report(reason: string | null): void {
     const eventId = item.event_id;
     if (!eventId) return;
@@ -537,6 +568,8 @@
   let stealable = $derived(emoteCandidates(item.content));
   let reproxyOpen = $state(false);
   let source = $state('');
+  let editHistoryOpen = $state(false);
+  let editHistory = $state.raw<EditVersionView[]>([]);
   let threadTarget = $derived(item.thread_root ?? item.event_id);
   let threadSummary = $derived(item.thread_summary);
   const pinnedEvents = usePinnedEvents();
@@ -671,6 +704,15 @@
   {#if actionable}
     {#if sourceOpen}
       <MessageSourceDialog bind:open={sourceOpen} {source} />
+    {/if}
+    {#if editHistoryOpen}
+      <EditHistoryDialog
+        bind:open={editHistoryOpen}
+        versions={editHistory}
+        {senderTimezone}
+        {onMatrixLink}
+        onReply={onReply ? replyToVersion : undefined}
+      />
     {/if}
     {#if reportOpen}
       <MessageReportDialog bind:open={reportOpen} onReport={report} />

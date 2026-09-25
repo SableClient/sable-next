@@ -934,6 +934,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               })
             : '{}',
       }),
+      edit_history: () => ({ type: 'edit_history', versions: [] }),
       personas: () => ({
         type: 'personas',
         catalog: { personas: [], account: null, rooms: {}, disabled_rooms: [] },

@@ -24,7 +24,7 @@ import {
 import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyFallbackFromSource } from '#lib/features/room/reply-fallback.js';
-import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
+import { replyPreviewBody, type ReplyVersion } from '#lib/features/room/reply-preview.js';
 import { previewableLinks } from '#lib/features/room/link-preview.js';
 import { loadUrlPreview } from '#lib/features/room/link-preview-cache.js';
 import {
@@ -374,8 +374,9 @@ export class Conversation {
     void this.#core.commands.redact(this.#roomId(), eventId, reason, this.#threadRoot);
   };
 
-  readonly reply = (eventId: string): void => {
-    const item = this.#timeline.items.find((entry) => entry.event_id === eventId);
+  readonly reply = (eventId: string, version?: ReplyVersion): void => {
+    const target = version?.of ?? eventId;
+    const item = this.#timeline.items.find((entry) => entry.event_id === target);
     if (!item) return;
 
     this.context = {
@@ -383,7 +384,7 @@ export class Conversation {
       eventId,
       sender: item.sender_name ?? item.sender,
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
-      body: replyPreviewBody(item.content),
+      body: version?.body ?? replyPreviewBody(item.content),
     };
   };
 

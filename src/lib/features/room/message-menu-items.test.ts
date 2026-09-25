@@ -18,6 +18,17 @@ test('bookmark reads back the state it was given', () => {
   expect(plain.find((row) => row.key === 'bookmark')?.label).toBe('timeline.bookmarkMessage');
 });
 
+test('version history sits with the other inspection rows', () => {
+  const rows = messageMenuRows({
+    onReadReceipts: () => {},
+    onEditHistory: () => {},
+    onViewSource: () => {},
+  });
+
+  expect(rows.map((row) => row.key)).toEqual(['receipts', 'edit-history', 'source']);
+  expect(rows[1].label).toBe('timeline.editHistory');
+});
+
 test('an action with no handler contributes no row', () => {
   expect(messageMenuRows({})).toEqual([]);
 });

@@ -10,6 +10,7 @@ import type {
   PersonaView,
   DefaultNotificationModesView,
   DeviceView,
+  EditVersionView,
   EncryptionStatusView,
   IdentityResetStep,
   SyncStatus,
@@ -882,6 +883,15 @@ export function createCommands(transport: () => Transport) {
         event_id: eventId,
       });
       return response.source;
+    },
+
+    async editHistory(roomId: string, eventId: string): Promise<EditVersionView[]> {
+      const response = await transport().send({
+        type: 'edit_history',
+        room_id: roomId,
+        event_id: eventId,
+      });
+      return response.versions;
     },
 
     async personas(): Promise<PersonaCatalogView> {

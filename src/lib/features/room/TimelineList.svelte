@@ -29,6 +29,7 @@
   import TimelineSkeleton from './TimelineSkeleton.svelte';
   import TypingIndicator from './TypingIndicator.svelte';
   import type { MatrixLink } from './matrix-link';
+  import type { ReplyVersion } from './reply-preview';
   import {
     cumulativeReadBy,
     isCollapsed,
@@ -75,7 +76,7 @@
       key: string,
       sourcePack?: import('#src/generated/protocol').ImageSourcePackView | null
     ) => void;
-    onReply?: (eventId: string) => void;
+    onReply?: (eventId: string, version?: ReplyVersion) => void;
     onOpenThread?: (rootEventId: string) => void;
     onEdit?: (eventId: string, body: string, html: string | null) => void;
     onDelete?: (eventId: string, reason: string | null) => void;

@@ -406,6 +406,12 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         event_id: OwnedEventId,
     },
+    EditHistory {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     ForwardMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1224,6 +1230,9 @@ pub enum CommandOk {
     ReportMessage,
     EventSource {
         source: String,
+    },
+    EditHistory {
+        versions: Vec<EditVersionView>,
     },
     ForwardMessage,
     Personas {
@@ -2569,6 +2578,16 @@ pub struct ReplyView {
     pub sender_mentioned: bool,
     pub sender_name: Option<String>,
     pub body: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct EditVersionView {
+    pub event_id: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub timestamp: u64,
+    pub body: String,
+    pub html: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

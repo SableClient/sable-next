@@ -6,6 +6,7 @@ import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
 import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
 import DownloadIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
 import ForwardIcon from 'phosphor-svelte/lib/ShareFatIcon';
+import HistoryIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
 import PinIcon from 'phosphor-svelte/lib/PushPinIcon';
 import ReportIcon from 'phosphor-svelte/lib/FlagIcon';
 import UnpinIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
@@ -27,6 +28,7 @@ export type MessageActions = {
   onAddReaction?: () => void;
   onViewReactions?: () => void;
   onReadReceipts?: () => void;
+  onEditHistory?: () => void;
   onMarkUnread?: () => void;
   onReply?: () => void;
   onOpenThread?: () => void;
@@ -177,6 +179,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.readReceipts',
       icon: ReceiptIcon,
       run: actions.onReadReceipts,
+    });
+  }
+  if (actions.onEditHistory) {
+    rows.push({
+      key: 'edit-history',
+      label: 'timeline.editHistory',
+      icon: HistoryIcon,
+      run: actions.onEditHistory,
     });
   }
   if (actions.onViewSource) {

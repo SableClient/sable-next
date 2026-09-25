@@ -1,3 +1,4 @@
+use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::room::MessagesOptions;
 use matrix_sdk::ruma::api::client::room::report_content;
 use matrix_sdk::ruma::events::relation::RelationType;
@@ -7,8 +8,13 @@ use matrix_sdk::ruma::room::JoinRule;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
 
 use crate::Core;
+use crate::matrix_html::{
+    display_html, has_profile_fallback_html, strip_profile_fallback_body,
+    strip_profile_fallback_html,
+};
 use crate::personas::PER_MESSAGE_PROFILE;
-use crate::protocol::CommandErr;
+use crate::protocol::{CommandErr, EditVersionView};
+use crate::view::per_message_profile;
 
 pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Mentions {
     let mut mentions = Mentions::with_user_ids(user_ids);
@@ -216,17 +222,7 @@ impl Core {
             return Err(CommandErr::Unsupported);
         };
 
-        let latest = replacements
-            .iter()
-            .filter(|replacement| {
-                matrix_sdk::check_validity_of_replacement_events(
-                    event.raw(),
-                    event.encryption_info().map(|info| &**info),
-                    replacement.raw(),
-                    replacement.encryption_info().map(|info| &**info),
-                )
-                .is_ok()
-            })
+        let latest = valid_replacements(&event, &replacements)
             .filter_map(|replacement| {
                 let AnySyncTimelineEvent::MessageLike(message) =
                     replacement.raw().deserialize().ok()?
@@ -274,6 +270,85 @@ impl Core {
 
         Ok(())
     }
+
+    pub(crate) async fn edit_history(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+    ) -> Result<Vec<EditVersionView>, CommandErr> {
+        let (event, replacements) = self
+            .room(room_id)
+            .await?
+            .load_or_fetch_event_with_relations(
+                event_id,
+                Some(vec![RelationType::Replacement]),
+                None,
+            )
+            .await
+            .map_err(|error| self.failed("edit_history", error))?;
+
+        let mut edits: Vec<EditVersionView> = valid_replacements(&event, &replacements)
+            .filter_map(|replacement| edit_version(replacement, true))
+            .collect();
+        edits.sort_by_key(|version| version.timestamp);
+
+        Ok(edit_version(&event, false)
+            .into_iter()
+            .chain(edits)
+            .collect())
+    }
+}
+
+fn valid_replacements<'a>(
+    event: &'a TimelineEvent,
+    replacements: &'a [TimelineEvent],
+) -> impl Iterator<Item = &'a TimelineEvent> {
+    replacements.iter().filter(|replacement| {
+        matrix_sdk::check_validity_of_replacement_events(
+            event.raw(),
+            event.encryption_info().map(|info| &**info),
+            replacement.raw(),
+            replacement.encryption_info().map(|info| &**info),
+        )
+        .is_ok()
+    })
+}
+
+fn edit_version(event: &TimelineEvent, replacement: bool) -> Option<EditVersionView> {
+    let raw = serde_json::from_str::<serde_json::Value>(event.raw().json().get()).ok()?;
+    let content = raw.get("content")?;
+    let content = if replacement {
+        content.get("m.new_content")?
+    } else {
+        content
+    };
+    let formatted = content
+        .get("format")
+        .and_then(serde_json::Value::as_str)
+        .filter(|format| *format == "org.matrix.custom.html")
+        .and_then(|_| content.get("formatted_body")?.as_str());
+    let profile = per_message_profile(Some(content));
+    let name = profile
+        .as_ref()
+        .and_then(|profile| profile.display_name.as_deref());
+    let known = formatted.is_some_and(has_profile_fallback_html)
+        || profile.as_ref().is_some_and(|profile| profile.has_fallback);
+    let body = strip_profile_fallback_body(
+        content
+            .get("body")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default(),
+        name,
+        known,
+    );
+    let formatted = formatted.map(|formatted| strip_profile_fallback_html(formatted, name, known));
+
+    Some(EditVersionView {
+        event_id: event.event_id()?.to_string(),
+        timestamp: event.timestamp().map_or(0, |ts| u64::from(ts.0)),
+        html: display_html(&body, formatted.as_deref()),
+        body,
+    })
 }
 
 const FORWARD_META: &str = "com.famedly.app.forwarded";
@@ -406,6 +481,70 @@ mod tests {
         )
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn edit_history_lists_the_original_then_valid_edits_by_time() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let room = room_id!("!history:example.org");
+        server.sync_joined_room(&client, room).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        let edit = |id: &str, sender: &str, ts: u64, body: &str| {
+            json!({
+            "type": "m.room.message", "event_id": id, "sender": sender, "origin_server_ts": ts,
+            "room_id": room, "content": {"msgtype": "m.text", "body": "* fallback",
+            "m.relates_to": {"rel_type": "m.replace", "event_id": "$original"},
+            "m.new_content": {"msgtype": "m.text", "body": body,
+                "format": "org.matrix.custom.html", "formatted_body": format!("<b>{body}</b>")}}})
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room}/event/$original"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "type": "m.room.message", "event_id": "$original", "sender": "@alice:example.org",
+                "origin_server_ts": 1, "room_id": room,
+                "content": {"msgtype": "m.text", "body": "first"}
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/rooms/{room}/relations/$original/m.replace"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": [
+                edit("$third", "@alice:example.org", 3, "third"),
+                edit("$second", "@alice:example.org", 2, "second"),
+                edit("$forged", "@mallory:example.org", 4, "forged")
+            ]})))
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+        let versions = core
+            .edit_history(&room.to_owned(), &event_id!("$original").to_owned())
+            .await
+            .unwrap();
+        let summary: Vec<_> = versions
+            .iter()
+            .map(|version| {
+                (
+                    version.event_id.as_str(),
+                    version.timestamp,
+                    version.body.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                ("$original", 1, "first"),
+                ("$second", 2, "second"),
+                ("$third", 3, "third")
+            ]
+        );
+        assert_eq!(versions[2].html, "<b>third</b>");
     }
 
     #[tokio::test]
