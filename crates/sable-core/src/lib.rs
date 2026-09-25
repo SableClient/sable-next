@@ -797,7 +797,9 @@ mod live_tests {
         let error = core
             .dispatch(Command::Login {
                 homeserver: "https://matrix.org".into(),
-                username: "sable-next-does-not-exist".into(),
+                identifier: crate::protocol::LoginIdentifier::User {
+                    user: "sable-next-does-not-exist".into(),
+                },
                 password: "definitely-wrong".into(),
                 reauth_account_id: None,
             })

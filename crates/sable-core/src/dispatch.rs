@@ -198,10 +198,10 @@ impl Core {
             Command::Login {
                 reauth_account_id,
                 homeserver,
-                username,
+                identifier,
                 password,
             } => {
-                self.login(homeserver, username, password, reauth_account_id)
+                self.login(homeserver, identifier, password, reauth_account_id)
                     .await
             }
 

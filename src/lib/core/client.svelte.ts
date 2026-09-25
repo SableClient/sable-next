@@ -5,6 +5,7 @@ import type {
   SearchCoverageView,
   AuthIntent,
   LoginFlowsView,
+  LoginIdentifier,
   RegistrationFlowsView,
   SessionInfo,
   SyncStatus,
@@ -165,7 +166,7 @@ export class CoreClient {
 
   async login(
     homeserver: string,
-    username: string,
+    identifier: LoginIdentifier,
     password: string,
     reauthAccountId?: string
   ): Promise<void> {
@@ -190,7 +191,7 @@ export class CoreClient {
         type: 'login',
         reauth_account_id: reauthAccountId ?? null,
         homeserver: resolvedHomeserver,
-        username,
+        identifier,
         password,
       });
 

@@ -11,7 +11,7 @@ pub enum Command {
     Login {
         reauth_account_id: Option<String>,
         homeserver: String,
-        username: String,
+        identifier: LoginIdentifier,
         password: String,
     },
     LoginFlows {
@@ -1505,6 +1505,14 @@ pub enum CommandErr {
     Failed {
         log_id: String,
     },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LoginIdentifier {
+    User { user: String },
+    Email { address: String },
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

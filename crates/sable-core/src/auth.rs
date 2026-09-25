@@ -2,10 +2,13 @@ use std::sync::Arc;
 
 use matrix_sdk::authentication::oauth::error::OAuthDiscoveryError;
 use matrix_sdk::ruma::api::client::session::get_login_types::v3::LoginType;
+use matrix_sdk::ruma::api::client::uiaa::{
+    EmailUserIdentifier, MatrixUserIdentifier, UserIdentifier,
+};
 use matrix_sdk::utils::UrlOrQuery;
 use url::Url;
 
-use crate::protocol::{AuthIntent, CommandErr, CommandOk};
+use crate::protocol::{AuthIntent, CommandErr, CommandOk, LoginIdentifier};
 
 use crate::session::{Credentials, PersistedSession};
 
@@ -77,7 +80,7 @@ impl Core {
     pub(crate) async fn login(
         self: &Arc<Self>,
         homeserver: String,
-        username: String,
+        identifier: LoginIdentifier,
         password: String,
         reauth_account_id: Option<String>,
     ) -> Result<CommandOk, CommandErr> {
@@ -105,12 +108,14 @@ impl Core {
             homeserver,
             "requesting an authenticated session"
         );
-        let username = reauth
+        let identifier = reauth
             .as_ref()
-            .map_or(username, |account| account.session.credentials.user_id());
+            .map_or(identifier, |account| LoginIdentifier::User {
+                user: account.session.credentials.user_id(),
+            });
         let mut login = client
             .matrix_auth()
-            .login_username(&username, &password)
+            .login_identifier(user_identifier(identifier), &password)
             .initial_device_display_name("Sable");
         if let Some(account) = &reauth {
             login = login.device_id(&account.session.credentials.device_id());
@@ -598,6 +603,15 @@ fn unexpected_callback(operation: &str, expected: &Url, callback: &Url) {
     );
 }
 
+fn user_identifier(identifier: LoginIdentifier) -> UserIdentifier {
+    match identifier {
+        LoginIdentifier::User { user } => UserIdentifier::Matrix(MatrixUserIdentifier::new(user)),
+        LoginIdentifier::Email { address } => {
+            UserIdentifier::Email(EmailUserIdentifier::new(address))
+        }
+    }
+}
+
 fn has_single_nonempty_query_parameter(url: &Url, name: &str) -> bool {
     let mut values = url
         .query_pairs()
@@ -654,7 +668,9 @@ mod tests {
         );
         core.login(
             "ignored.invalid".to_owned(),
-            "different-user".to_owned(),
+            LoginIdentifier::User {
+                user: "different-user".to_owned(),
+            },
             "bad".to_owned(),
             Some("a1".to_owned()),
         )
@@ -669,6 +685,62 @@ mod tests {
         );
         drop(core);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn a_login_sends_the_identifier_kind_it_was_given() {
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{body_partial_json, method, path},
+        };
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        for identifier in [
+            serde_json::json!({"type": "m.id.user", "user": "@alice:example.org"}),
+            serde_json::json!({"type": "m.id.thirdparty", "medium": "email", "address": "alice@example.org"}),
+        ] {
+            Mock::given(method("POST"))
+                .and(path("/_matrix/client/v3/login"))
+                .and(body_partial_json(
+                    serde_json::json!({ "identifier": identifier }),
+                ))
+                .respond_with(ResponseTemplate::new(403).set_body_json(
+                    serde_json::json!({"errcode": "M_FORBIDDEN", "error": "bad password"}),
+                ))
+                .expect(1)
+                .mount(server.server())
+                .await;
+        }
+        let directory = std::env::temp_dir().join(format!(
+            "sable-identifier-{}",
+            matrix_sdk::ruma::TransactionId::new()
+        ));
+        let store_id = directory.to_str().unwrap();
+        let (core, _events) = Core::new(
+            store_id,
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        for identifier in [
+            LoginIdentifier::User {
+                user: "@alice:example.org".to_owned(),
+            },
+            LoginIdentifier::Email {
+                address: "alice@example.org".to_owned(),
+            },
+        ] {
+            let error = core
+                .login(server.server().uri(), identifier, "pw".to_owned(), None)
+                .await
+                .expect_err("the mock refuses every login");
+            assert!(matches!(error, CommandErr::Denied), "got {error:?}");
+        }
+
+        server.server().verify().await;
+        drop(core);
+        let _ = std::fs::remove_dir_all(directory);
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -701,7 +773,9 @@ mod tests {
 
         core.login(
             server.server().uri(),
-            "alice".to_owned(),
+            LoginIdentifier::User {
+                user: "alice".to_owned(),
+            },
             "pw".to_owned(),
             None,
         )
