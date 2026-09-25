@@ -4,6 +4,7 @@ import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import VoiceLobby from './VoiceLobby.svelte';
+import VoiceLobbyHarness from './VoiceLobbyHarness.test.svelte';
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -75,6 +76,37 @@ test('says the homeserver cannot host calls when it has no call server', async (
     "This homeserver can't host calls."
   );
   expect(document.body.textContent).not.toContain("You don't have permission to join.");
+
+  await unmount(instance);
+});
+
+test('offers a single join button with the device preview underneath', async () => {
+  const instance = mount(VoiceLobbyHarness, {
+    target: document.body,
+    props: {
+      participants: [],
+      members: [],
+      media: { microphone: true, camera: false },
+      joining: false,
+      canJoin: true,
+      hasPermission: true,
+      onChange: vi.fn(),
+      onJoin: vi.fn(),
+    },
+  });
+  await tick();
+
+  const join = Array.from(document.querySelectorAll('button')).filter((node) =>
+    node.textContent.includes('Join voice')
+  );
+  expect(join).toHaveLength(1);
+  expect(document.body.textContent).not.toContain('Check devices');
+  const preview = document.querySelector('.prescreen');
+  expect(preview).not.toBeNull();
+  expect(
+    join[0].compareDocumentPosition(preview as Node) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(document.querySelectorAll('button[aria-label="Mute microphone"]')).toHaveLength(1);
 
   await unmount(instance);
 });
