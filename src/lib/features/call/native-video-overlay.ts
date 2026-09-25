@@ -38,22 +38,34 @@ export function nativeVideoSlot(overlay: CallVideoOverlay): (slot: HTMLElement) 
         .catch(ignoreError);
     };
 
+    let frame = 0;
+    const schedule = (): void => {
+      if (frame !== 0) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        report();
+      });
+    };
+
     report();
-    const resize = new ResizeObserver(report);
+    const resize = new ResizeObserver(schedule);
     resize.observe(slot);
-    const intersection = new IntersectionObserver(report, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+    const intersection = new IntersectionObserver(schedule, {
+      threshold: [0, 0.25, 0.5, 0.75, 1],
+    });
     intersection.observe(slot);
-    const mutation = new MutationObserver(report);
+    const mutation = new MutationObserver(schedule);
     mutation.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
       attributeFilter: ['class', 'style'],
     });
-    const offResize = on(window, 'resize', report);
-    const offScroll = on(document, 'scroll', report, { capture: true, passive: true });
+    const offResize = on(window, 'resize', schedule);
+    const offScroll = on(document, 'scroll', schedule, { capture: true, passive: true });
 
     return () => {
+      cancelAnimationFrame(frame);
       resize.disconnect();
       intersection.disconnect();
       mutation.disconnect();
