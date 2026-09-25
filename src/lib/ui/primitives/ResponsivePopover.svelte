@@ -14,6 +14,7 @@
     class?: string;
     side?: 'top' | 'bottom' | 'left' | 'right';
     align?: 'start' | 'center' | 'end';
+    sideOffset?: number;
     collisionPadding?: number;
     sticky?: 'partial' | 'always';
     closeOnAnchorHidden?: boolean;
@@ -34,6 +35,7 @@
     class: popoverClass,
     side = 'top',
     align = 'start',
+    sideOffset,
     collisionPadding,
     sticky,
     closeOnAnchorHidden = false,
@@ -91,6 +93,7 @@
         customAnchor={trigger ? null : anchor}
         {side}
         {align}
+        {sideOffset}
         {collisionPadding}
         {sticky}
         {onCloseAutoFocus}
