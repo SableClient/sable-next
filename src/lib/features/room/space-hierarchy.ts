@@ -30,6 +30,12 @@ export type HierarchySection = {
   pending: number;
 };
 
+export type LobbyDragItem = { parentId: string; roomId: string | null };
+
+export function sameLobbyItem(left: LobbyDragItem, right: LobbyDragItem): boolean {
+  return left.parentId === right.parentId && left.roomId === right.roomId;
+}
+
 export function lobbyAction(joinRule: RoomJoinRuleView, invited: boolean): 'join' | 'knock' | null {
   if (invited || ['public', 'restricted', 'knock_restricted'].includes(joinRule)) return 'join';
   if (joinRule === 'knock') return 'knock';
@@ -107,7 +113,8 @@ export function mergeHierarchyRooms(
 export function buildHierarchySections(
   rooms: readonly HierarchyRoomView[],
   rootId: string,
-  levels: { loaded?: ReadonlySet<string>; failed?: ReadonlySet<string> } = {}
+  levels: { loaded?: ReadonlySet<string>; failed?: ReadonlySet<string> } = {},
+  keepEmpty = false
 ): HierarchySection[] {
   const byId = new Map(rooms.map((room) => [room.room_id, room]));
   const sections: HierarchySection[] = [];
@@ -148,7 +155,12 @@ export function buildHierarchySections(
       });
     }
 
-    if (ownRooms.length > 0 || !described(spaceId) || refused(spaceId)) {
+    if (
+      ownRooms.length > 0 ||
+      !described(spaceId) ||
+      refused(spaceId) ||
+      (keepEmpty && space !== null)
+    ) {
       sections.push({
         space,
         suggested,

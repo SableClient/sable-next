@@ -14,7 +14,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import type { DropEdge } from '#lib/ui/drag-list.js';
+  import { createDragList, type DropEdge, type DropInstruction } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
   import { copyRoomLink, viaFor } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -40,10 +40,12 @@
     lobbyPhase,
     localHierarchyRooms,
     mergeHierarchyRooms,
+    sameLobbyItem,
     type ChildOrderOverride,
     type HierarchyRoom,
     type HierarchyRoomView,
     type HierarchySection,
+    type LobbyDragItem,
   } from './space-hierarchy';
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
@@ -105,15 +107,26 @@
   let merged = $derived(applyChildOverrides(base, overrides));
   let sections = $derived.by<HierarchySection[]>(() => {
     if (spaceId === null) return [];
-    return buildHierarchySections(merged, spaceId, {
-      loaded: loadedLevels,
-      failed: failedLevels,
-    })
+    return buildHierarchySections(
+      merged,
+      spaceId,
+      {
+        loaded: loadedLevels,
+        failed: failedLevels,
+      },
+      canManage
+    )
       .map((section) => ({
         ...section,
         rooms: section.rooms.filter((entry) => !removed.has(entry.key)),
       }))
-      .filter((section) => section.rooms.length > 0 || !section.loaded || section.failed);
+      .filter(
+        (section) =>
+          section.rooms.length > 0 ||
+          !section.loaded ||
+          section.failed ||
+          (canManage && section.space !== null)
+      );
   });
   let moveTargets = $derived(
     merged
@@ -320,12 +333,7 @@
     }
   }
 
-  async function moveTo(
-    section: HierarchySection,
-    entry: HierarchyRoom,
-    target: string
-  ): Promise<void> {
-    const roomId = entry.room.room_id;
+  async function moveRoom(from: string, roomId: string, target: string): Promise<void> {
     try {
       await core.commands.addToSpace(target, roomId);
     } catch (error) {
@@ -334,12 +342,34 @@
       return;
     }
     try {
-      await core.commands.removeFromSpace(section.parentId, roomId);
-      removed.add(entry.key);
+      await core.commands.removeFromSpace(from, roomId);
+      for (const section of sections) {
+        if (section.parentId !== from) continue;
+        for (const entry of section.rooms) {
+          if (entry.room.room_id === roomId) removed.add(entry.key);
+        }
+      }
     } catch (error) {
       console.warn('[sable lobby] move left the room in both spaces', error);
       failed = true;
     }
+  }
+
+  const dragList = createDragList<LobbyDragItem>(sameLobbyItem);
+
+  function dropRoom(
+    source: LobbyDragItem,
+    target: LobbyDragItem,
+    instruction: DropInstruction
+  ): void {
+    if (source.roomId === null) return;
+    if (source.parentId !== target.parentId) {
+      void moveRoom(source.parentId, source.roomId, target.parentId);
+      return;
+    }
+    if (target.roomId === null || instruction === 'into') return;
+    const section = sections.find((candidate) => candidate.parentId === source.parentId);
+    if (section) reorder(section, source.roomId, target.roomId, instruction);
   }
 
   async function applyReorder(
@@ -566,7 +596,8 @@
         onRemove={(section: HierarchySection, entry: HierarchyRoom) => {
           void remove(section, entry);
         }}
-        onReorder={reorder}
+        {dragList}
+        onDropRoom={dropRoom}
         onMove={move}
         {moveTargets}
         pinned={section.space !== null && pinnedIds.has(section.space.room_id)}
@@ -579,7 +610,7 @@
           void removeSubspace(section);
         }}
         onMoveTo={(section: HierarchySection, entry: HierarchyRoom, target: string) => {
-          void moveTo(section, entry, target);
+          void moveRoom(section.parentId, entry.room.room_id, target);
         }}
       />
     {/each}

@@ -26,11 +26,15 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import { createDragList, type DropState } from '#lib/ui/drag-list.js';
-  import type { HierarchyRoom, HierarchyRoomView, HierarchySection } from './space-hierarchy';
+  import type { DragList, DropInstruction, DropState } from '#lib/ui/drag-list.js';
+  import type {
+    HierarchyRoom,
+    HierarchyRoomView,
+    HierarchySection,
+    LobbyDragItem,
+  } from './space-hierarchy';
   import { lobbyAction, placeholderRows } from './space-hierarchy';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
-  import type { DropEdge } from '#lib/ui/drag-list.js';
 
   interface Props {
     section: HierarchySection;
@@ -48,11 +52,11 @@
     onJoin: (child: HierarchyRoomView, via: readonly string[], parentId: string) => void;
     onCopyLink: (child: HierarchyRoomView) => void;
     onRemove: (section: HierarchySection, entry: HierarchyRoom) => void;
-    onReorder: (
-      section: HierarchySection,
-      source: string,
-      target: string,
-      position: DropEdge
+    dragList: DragList<LobbyDragItem>;
+    onDropRoom: (
+      source: LobbyDragItem,
+      target: LobbyDragItem,
+      instruction: DropInstruction
     ) => void;
     onMove: (section: HierarchySection, roomId: string, delta: number) => void;
     moveTargets: readonly { id: string; name: string }[];
@@ -82,7 +86,8 @@
     onJoin,
     onCopyLink,
     onRemove,
-    onReorder,
+    dragList,
+    onDropRoom,
     onMove,
     moveTargets,
     pinned,
@@ -98,19 +103,20 @@
   let pendingSubspaceRemoval = $state(false);
 
   let dragging = $state<string | null>(null);
-  let dropState = $state<DropState<string> | null>(null);
-  const dragList = createDragList<string>((left, right) => left === right);
+  let dropState = $state<DropState<LobbyDragItem> | null>(null);
+  let headerDrop = $state(false);
 
-  function dropTarget(roomId: string) {
-    return dragList.dropTarget(roomId, {
-      onState: (next) => {
-        dropState = next;
-      },
-      onDrop: (source, target, instruction) => {
-        if (instruction === 'into') return;
-        onReorder(section, source, target, instruction);
-      },
-    });
+  function dropTarget(roomId: string | null) {
+    return dragList.dropTarget(
+      { parentId: section.parentId, roomId },
+      {
+        onState: (next) => {
+          if (roomId === null) headerDrop = next !== null;
+          else dropState = next;
+        },
+        onDrop: onDropRoom,
+      }
+    );
   }
 
   let pendingRemoval = $state<{ room: HierarchyRoom; label: string } | null>(null);
@@ -134,7 +140,11 @@
       })
     : undefined}
 >
-  <div class="section-header">
+  <div
+    class="section-header"
+    class:drop-into={headerDrop}
+    {@attach canManage ? dropTarget(null) : undefined}
+  >
     <Button
       variant="ghost"
       class="section-toggle"
@@ -254,14 +264,17 @@
           <li
             class="room"
             class:dragging={dragging === child.room_id}
-            class:drop-above={dropState?.item === child.room_id &&
+            class:drop-above={dropState?.item.roomId === child.room_id &&
               dropState.instruction === 'above'}
-            class:drop-below={dropState?.item === child.room_id &&
+            class:drop-below={dropState?.item.roomId === child.room_id &&
               dropState.instruction === 'below'}
             {@attach canManage
-              ? dragList.draggable(child.room_id, (next) => {
-                  dragging = next;
-                })
+              ? dragList.draggable(
+                  { parentId: section.parentId, roomId: child.room_id },
+                  (next) => {
+                    dragging = next?.roomId ?? null;
+                  }
+                )
               : undefined}
             {@attach canManage ? dropTarget(child.room_id) : undefined}
           >
@@ -508,6 +521,11 @@
 
   .room + .room {
     border-top: var(--border-width) solid var(--bg-container-line);
+  }
+
+  .section-header.drop-into {
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 0 2px var(--primary-main);
   }
 
   .room.dragging {

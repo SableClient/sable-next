@@ -105,6 +105,17 @@ test('a subspace holding no rooms never becomes a lone heading', () => {
   expect(sections.map((section) => section.space?.room_id ?? null)).toEqual([null]);
 });
 
+test('a manager still gets a heading for a subspace holding no rooms', () => {
+  const rooms = [
+    room('!space', { is_space: true, children: [edge('!a'), edge('!empty')] }),
+    room('!a'),
+    room('!empty', { is_space: true }),
+  ];
+
+  const sections = buildHierarchySections(rooms, '!space', {}, true);
+  expect(sections.map((section) => section.space?.room_id ?? null)).toEqual([null, '!empty']);
+});
+
 test('suggested comes from the edge, so it can differ per parent', () => {
   const rooms = [
     room('!space', { is_space: true, children: [edge('!a', { suggested: true }), edge('!sub')] }),
