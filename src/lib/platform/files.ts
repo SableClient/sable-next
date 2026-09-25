@@ -110,24 +110,33 @@ export async function shareFile(
   try {
     const name = filename.split(/[\\/]/).pop() || 'attachment';
     const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
-    const [{ type }, { appCacheDir, join }, { mkdir, writeFile }, { shareFile: shareNative }] =
-      await Promise.all([
-        import('@tauri-apps/plugin-os'),
-        import('@tauri-apps/api/path'),
-        import('@tauri-apps/plugin-fs'),
-        import('@choochmeque/tauri-plugin-sharekit-api'),
-      ]);
+    const [
+      { type },
+      { appCacheDir, join },
+      { mkdir, remove, writeFile },
+      { shareFile: shareNative },
+    ] = await Promise.all([
+      import('@tauri-apps/plugin-os'),
+      import('@tauri-apps/api/path'),
+      import('@tauri-apps/plugin-fs'),
+      import('@choochmeque/tauri-plugin-sharekit-api'),
+    ]);
 
     const directory = await join(await appCacheDir(), 'outgoing-share');
     await mkdir(directory, { recursive: true });
     const path = await join(directory, cacheName(name));
     await writeFile(path, bytes);
 
-    await shareNative(path, {
-      mimeType: mime,
-      title: name,
-      position: anchor && sharePosition(anchor, type() === 'macos'),
-    });
+    const os = type();
+    try {
+      await shareNative(path, {
+        mimeType: mime,
+        title: name,
+        position: anchor && sharePosition(anchor, os === 'macos'),
+      });
+    } finally {
+      if (os === 'android' || os === 'ios') await remove(path).catch(() => {});
+    }
     return 'saved';
   } catch (error) {
     console.debug('[sable files] share failed', error);

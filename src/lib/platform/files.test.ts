@@ -65,6 +65,7 @@ beforeEach(() => {
   mocks.fsMkdir.mockResolvedValue(undefined);
   mocks.fsReadFile.mockReset();
   mocks.fsRemove.mockReset();
+  mocks.fsRemove.mockResolvedValue(undefined);
   mocks.invoke.mockReset();
   mocks.androidFs.createNewPublicFile.mockReset();
   mocks.androidFs.createNewPublicImageFile.mockReset();
@@ -369,6 +370,46 @@ test('the staged file never sits where the Android plugin copies it, which would
   await shareFile('blob:media', 'holiday.png');
   expect(mocks.fsMkdir).toHaveBeenCalledWith('/cache/outgoing-share', { recursive: true });
   expect(mocks.shareNative).not.toHaveBeenCalledWith('/cache/holiday.png', expect.anything());
+});
+
+test('the staged copy is removed once Android or iOS has taken its own', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response(new Uint8Array([1]))))
+  );
+
+  for (const os of ['android', 'ios']) {
+    mocks.osType.mockReturnValue(os);
+    mocks.fsRemove.mockClear();
+    await shareFile('blob:media', 'holiday.png');
+    expect(mocks.fsRemove).toHaveBeenCalledWith('/cache/outgoing-share/holiday.png');
+  }
+
+  mocks.shareNative.mockRejectedValueOnce(new Error('Share cancelled'));
+  mocks.fsRemove.mockClear();
+  expect(await shareFile('blob:media', 'holiday.png')).toBe('failed');
+  expect(mocks.fsRemove).toHaveBeenCalledWith('/cache/outgoing-share/holiday.png');
+});
+
+test('the staged file stays on macOS and Windows, where the sheet reads it in place', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response(new Uint8Array([1]))))
+  );
+
+  for (const os of ['macos', 'windows']) {
+    mocks.osType.mockReturnValue(os);
+    await shareFile('blob:media', 'holiday.png');
+  }
+  expect(mocks.fsRemove).not.toHaveBeenCalled();
+});
+
+test('a failed cleanup does not turn a share into a failure', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1]))));
+  mocks.osType.mockReturnValue('android');
+  mocks.fsRemove.mockRejectedValue(new Error('not found'));
+
+  expect(await shareFile('blob:media', 'holiday.png')).toBe('saved');
 });
 
 test('a refused share reports the failure rather than throwing', async () => {

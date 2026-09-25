@@ -13,6 +13,10 @@
     {
       "identifier": "fs:allow-write-file",
       "allow": [{ "path": "$APPCACHE/outgoing-share/*" }]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": [{ "path": "$APPCACHE/outgoing-share/*" }]
     }
   ]
 }
