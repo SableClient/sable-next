@@ -682,6 +682,98 @@ async fn forgotten_media_is_fetched_again() {
     core.media_thumbnail(source, 0, 0).await.unwrap();
 }
 
+#[allow(clippy::unwrap_used)]
+async fn space_child_writes(
+    child: Option<serde_json::Value>,
+    command: Command,
+) -> Vec<serde_json::Value> {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let space_id = room_id!("!space:example.org");
+    let mut space = JoinedRoomBuilder::new(space_id);
+    if let Some(content) = child {
+        space = space.add_state_event(
+            Raw::new(&json!({
+                "type": "m.space.child", "state_key": "!child:example.org", "sender": "@alice:example.org",
+                "event_id": "$child", "origin_server_ts": 1, "content": content
+            }))
+            .unwrap()
+            .cast_unchecked(),
+        );
+    }
+    server.sync_room(&client, space).await;
+    Mock::given(method("PUT"))
+        .and(wiremock::matchers::path_regex(
+            r"^/_matrix/client/v3/rooms/[^/]+/state/m\.space\.child/",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$written"})))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.dispatch(command).await.unwrap();
+
+    server
+        .server()
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .filter(|request| request.method.as_str() == "PUT")
+        .map(|request| serde_json::from_slice(&request.body).unwrap())
+        .collect()
+}
+
+fn add_child() -> Command {
+    Command::AddToSpace {
+        space_id: room_id!("!space:example.org").to_owned(),
+        room_id: room_id!("!child:example.org").to_owned(),
+    }
+}
+
+#[tokio::test]
+async fn adding_a_listed_child_keeps_its_edge() {
+    let writes = space_child_writes(
+        Some(json!({"via": ["other.org"], "order": "b", "suggested": true})),
+        add_child(),
+    )
+    .await;
+
+    assert!(writes.is_empty(), "rewrote the edge: {writes:?}");
+}
+
+#[tokio::test]
+async fn adding_a_new_child_routes_through_our_server() {
+    let writes = space_child_writes(None, add_child()).await;
+
+    assert_eq!(writes, [json!({"via": ["localhost"]})]);
+}
+
+#[tokio::test]
+async fn adding_a_delisted_child_lists_it_again() {
+    let writes = space_child_writes(Some(json!({})), add_child()).await;
+
+    assert_eq!(writes, [json!({"via": ["localhost"]})]);
+}
+
+#[tokio::test]
+async fn reordering_a_child_keeps_its_via_and_suggestion() {
+    let writes = space_child_writes(
+        Some(json!({"via": ["other.org"], "order": "b", "suggested": true})),
+        Command::SetSpaceChildOrder {
+            space_id: room_id!("!space:example.org").to_owned(),
+            room_id: room_id!("!child:example.org").to_owned(),
+            order: Some("a".to_owned()),
+        },
+    )
+    .await;
+
+    assert_eq!(
+        writes,
+        [json!({"via": ["other.org"], "order": "a", "suggested": true})]
+    );
+}
+
 #[tokio::test]
 async fn forgetting_an_invalid_uri_is_refused() {
     let (core, _events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));

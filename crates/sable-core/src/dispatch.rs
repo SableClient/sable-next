@@ -2548,23 +2548,9 @@ impl Core {
 
             Command::RoomViaServers { room_id } => {
                 let room = self.room(&room_id).await?;
-                let members = room
-                    .members(RoomMemberships::JOIN)
-                    .await
-                    .map_err(|error| self.failed("room_via_servers", error))?;
-
-                let ranked: Vec<(String, i32)> = members
-                    .iter()
-                    .map(|member| {
-                        (
-                            member.user_id().to_string(),
-                            view::clamp_power_level(member.power_level()),
-                        )
-                    })
-                    .collect();
 
                 Ok(CommandOk::RoomViaServers {
-                    servers: view::via_servers(&ranked),
+                    servers: self.room_via_servers(&room).await?,
                 })
             }
 

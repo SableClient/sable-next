@@ -9,7 +9,7 @@ use matrix_sdk::ruma::directory::Filter;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
-use matrix_sdk::{Client, RoomState};
+use matrix_sdk::{Client, RoomMemberships, RoomState};
 use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
 
 use crate::protocol::{CommandErr, CommandOk};
@@ -129,28 +129,99 @@ impl Core {
         }
     }
 
-    /// Without a `via` server the edge is ignored.
+    /// Without a `via` server the edge is ignored, so a child that is already
+    /// listed keeps its own `via`, `order` and `suggested`.
     pub(crate) async fn add_to_space(
         &self,
         space_id: &OwnedRoomId,
         room_id: &RoomId,
     ) -> Result<(), CommandErr> {
-        let client = self.client().await?;
-        let via = vec![
-            client
-                .user_id()
-                .ok_or(CommandErr::NotLoggedIn)?
-                .server_name()
-                .to_owned(),
-        ];
-
-        self.room(space_id)
+        let space = self.room(space_id).await?;
+        if self
+            .space_child_content(&space, room_id, "add_to_space")
             .await?
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        let via = self
+            .child_via(room_id)
+            .await?
+            .iter()
+            .filter_map(|server| ServerName::parse(server).ok())
+            .collect();
+
+        space
             .send_state_event_for_key(room_id, SpaceChildEventContent::new(via))
             .await
             .map_err(|error| self.failed("add_to_space", error))?;
 
         Ok(())
+    }
+
+    async fn child_via(&self, room_id: &RoomId) -> Result<Vec<String>, CommandErr> {
+        let client = self.client().await?;
+        let own = client
+            .user_id()
+            .ok_or(CommandErr::NotLoggedIn)?
+            .server_name()
+            .to_string();
+
+        let via = match client.get_room(room_id) {
+            Some(room) => self.room_via_servers(&room).await.unwrap_or_else(|error| {
+                tracing::warn!("add_to_space: no via for {room_id}: {error:?}");
+                Vec::new()
+            }),
+            None => Vec::new(),
+        };
+
+        Ok(if via.is_empty() { vec![own] } else { via })
+    }
+
+    pub(crate) async fn room_via_servers(&self, room: &Room) -> Result<Vec<String>, CommandErr> {
+        let members = room
+            .members(RoomMemberships::JOIN)
+            .await
+            .map_err(|error| self.failed("room_via_servers", error))?;
+
+        let ranked: Vec<(String, i32)> = members
+            .iter()
+            .map(|member| {
+                (
+                    member.user_id().to_string(),
+                    view::clamp_power_level(member.power_level()),
+                )
+            })
+            .collect();
+
+        Ok(view::via_servers(&ranked))
+    }
+
+    /// `None` for a child that is not listed, including one delisted by an
+    /// empty content.
+    async fn space_child_content(
+        &self,
+        space: &Room,
+        room_id: &RoomId,
+        context: &str,
+    ) -> Result<Option<SpaceChildEventContent>, CommandErr> {
+        let Some(raw) = space
+            .get_state_event_static_for_key::<SpaceChildEventContent, _>(room_id)
+            .await
+            .map_err(|error| self.failed(context, error))?
+        else {
+            return Ok(None);
+        };
+
+        let Ok(SyncOrStrippedState::Sync(event)) = raw.deserialize() else {
+            return Ok(None);
+        };
+
+        Ok(event
+            .as_original()
+            .map(|event| event.content.clone())
+            .filter(|content| !content.via.is_empty()))
     }
 
     pub(crate) async fn set_space_child_order(
@@ -161,22 +232,10 @@ impl Core {
     ) -> Result<CommandOk, CommandErr> {
         let space = self.room(space_id).await?;
 
-        let existing = space
-            .get_state_event_static_for_key::<SpaceChildEventContent, _>(room_id)
-            .await
-            .map_err(|error| self.failed("set_space_child_order: read", error))?
-            .ok_or(CommandErr::UnknownRoom)?
-            .deserialize()
-            .map_err(|error| self.failed("set_space_child_order: parse", error))?;
-
-        let SyncOrStrippedState::Sync(event) = existing else {
-            return Err(CommandErr::UnknownRoom);
-        };
-        let mut content = event
-            .as_original()
-            .ok_or(CommandErr::UnknownRoom)?
-            .content
-            .clone();
+        let mut content = self
+            .space_child_content(&space, room_id, "set_space_child_order: read")
+            .await?
+            .ok_or(CommandErr::UnknownRoom)?;
 
         content.order = match order {
             Some(order) => Some(
