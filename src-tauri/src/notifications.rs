@@ -728,17 +728,7 @@ pub async fn register_push<R: Runtime>(
         config.user_id.clone().ok_or(CommandErr::Unavailable)?,
         config.device_id.clone().ok_or(CommandErr::Unavailable)?,
     );
-    let accounts = config
-        .accounts
-        .iter()
-        .map(|account| (account.user_id.clone(), account.device_id.clone()))
-        .chain(std::iter::once(identity.clone()))
-        .collect::<std::collections::BTreeSet<_>>()
-        .into_iter()
-        .collect();
-    if let Err(error) = app.notifications().set_push_accounts(accounts).await {
-        log::warn!("could not declare the signed-in accounts: {error}");
-    }
+    declare_push_accounts(app, &config, &identity).await;
 
     // MSC4174 makes the homeserver the push gateway. Query before creating the
     // subscription because the distributor must bind it to the server's VAPID key.
@@ -772,28 +762,18 @@ pub async fn register_push<R: Runtime>(
         p256dh: registered.p256dh,
         auth: registered.auth,
     };
-    if server_vapid.is_some() {
-        if let Some(pusher) =
+    if server_vapid.is_some()
+        && let Some(pusher) =
             server_web_pusher(&registration, &config.web_app_id, config.event_id_only)
-        {
-            let pushkey = pusher.pushkey.clone();
-            let app_id = pusher.app_id.clone();
-            if let Err(error) = Box::pin(core.dispatch(Command::SetWebPusher { pusher })).await {
-                log::warn!("homeserver rejected the MSC4174 pusher: {error:?}");
-                return Err(error);
-            }
-            log::debug!("registered an MSC4174 pusher through the homeserver");
-            remember_pusher(
-                &root,
-                &identity,
-                pushkey,
-                app_id,
-                None,
-                config.event_id_only,
-            )?;
-            retire_old_pushers(&root, &identity).await;
-            return Ok(());
-        }
+    {
+        return Box::pin(register_server_pusher(
+            core,
+            &root,
+            &identity,
+            pusher,
+            config.event_id_only,
+        ))
+        .await;
     }
 
     let gateway_url = registration_gateway(&registration, &config)
@@ -837,6 +817,47 @@ pub async fn register_push<R: Runtime>(
         config.event_id_only,
     )?;
     retire_old_pushers(&root, &identity).await;
+    Ok(())
+}
+
+#[cfg(mobile)]
+async fn declare_push_accounts<R: Runtime>(
+    app: &AppHandle<R>,
+    config: &PushConfig,
+    identity: &(String, String),
+) {
+    let accounts = config
+        .accounts
+        .iter()
+        .map(|account| (account.user_id.clone(), account.device_id.clone()))
+        .chain(std::iter::once(identity.clone()))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if let Err(error) = app.notifications().set_push_accounts(accounts).await {
+        log::warn!("could not declare the signed-in accounts: {error}");
+    }
+}
+
+#[cfg(mobile)]
+async fn register_server_pusher(
+    core: &Arc<sable_core::Core>,
+    root: &std::path::Path,
+    identity: &(String, String),
+    pusher: WebPusherView,
+    event_id_only: bool,
+) -> Result<(), CommandErr> {
+    let pushkey = pusher.pushkey.clone();
+    let app_id = pusher.app_id.clone();
+    if let Err(error) =
+        Box::pin(core.dispatch(sable_core::protocol::Command::SetWebPusher { pusher })).await
+    {
+        log::warn!("homeserver rejected the MSC4174 pusher: {error:?}");
+        return Err(error);
+    }
+    log::debug!("registered an MSC4174 pusher through the homeserver");
+    remember_pusher(root, identity, pushkey, app_id, None, event_id_only)?;
+    retire_old_pushers(root, identity).await;
     Ok(())
 }
 
