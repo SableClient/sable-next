@@ -26,6 +26,7 @@
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
   import { resetUrlPreviews } from '#lib/features/room/link-preview-cache.js';
+  import { rememberAfterLogin } from '#lib/auth/after-login.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import {
     alertsNatively,
@@ -204,14 +205,18 @@
   }
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
+  let wasSignedIn = false;
+
   $effect(() => {
     const login = resolve('login');
+    if (core.status === 'ready') wasSignedIn = true;
     if (core.status === 'signed-out' && !page.url.pathname.startsWith(login)) {
       untrack(clearDrafts);
       resetUrlPreviews();
       const account = core.accounts.find(
         (account) => account.account_id === core.reauthenticationAccountId
       );
+      if (account || !wasSignedIn) rememberAfterLogin(page.url);
       const target = account
         ? resolve(
             `login?reauth=${encodeURIComponent(account.account_id)}&server=${encodeURIComponent(account.homeserver)}`

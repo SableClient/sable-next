@@ -33,6 +33,7 @@
   import { homeserverFromAuthUrl, registrationTokenFromAuthUrl } from './auth-url';
   import { homeservers } from '../shared/homeservers.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { takeAfterLogin } from '#lib/auth/after-login.js';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
@@ -286,7 +287,7 @@
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
     const rawMarker = localStorage.getItem(profileOnboardingMarker(userId));
     if (!rawMarker) {
-      void goto(resolve('/(app)/rooms'));
+      void goto(takeAfterLogin(resolve('/(app)/rooms')));
       return;
     }
     if (restoredMarkerFor === userId) return;
@@ -332,22 +333,22 @@
     }
     loginVerificationActive = false;
     loginVerificationPending = false;
-    void goto(resolve('/(app)/rooms'));
+    void goto(takeAfterLogin(resolve('/(app)/rooms')));
   }
 
   function finishTelemetryConsent(enabled: boolean): void {
     if (enabled) {
-      location.assign(resolve('/(app)/rooms'));
+      location.assign(takeAfterLogin(resolve('/(app)/rooms')));
       return;
     }
     loginVerificationActive = false;
     loginVerificationPending = false;
-    void goto(resolve('/(app)/rooms'));
+    void goto(takeAfterLogin(resolve('/(app)/rooms')));
   }
 
   async function finishProfileOnboarding(): Promise<void> {
     if (!telemetryConsentPending()) {
-      await goto(resolve('/(app)/rooms'));
+      await goto(takeAfterLogin(resolve('/(app)/rooms')));
       return;
     }
     profileOnboardingComplete = true;
@@ -504,6 +505,7 @@
     }}
     onLogin={signInWithPassword}
     onCreateAccount={showCreateAccount ? showRegistrationStage : undefined}
+    followUserServer={!reauthAccountId()}
   />
 {/snippet}
 

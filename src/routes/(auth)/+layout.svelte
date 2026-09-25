@@ -6,6 +6,7 @@
   import { runtimeConfig } from '#lib/config/runtime-config.js';
   import { useCoreClient } from '#lib/core/context.js';
   import AuthFlow from '#lib/features/auth/flow/AuthFlow.svelte';
+  import { takeAfterLogin } from '#lib/auth/after-login.js';
 
   let { children }: { children: Snippet } = $props();
   const core = useCoreClient();
@@ -29,7 +30,7 @@
   $effect(() => {
     if (core.status !== 'ready' || addingAccount) return;
     if (!authEntry || page.url.searchParams.has('addAccount')) {
-      void goto(resolve('/(app)/rooms'), { replace: true });
+      void goto(takeAfterLogin(resolve('/(app)/rooms')), { replace: true });
     }
   });
 </script>

@@ -2,6 +2,7 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
+  import { takeAfterLogin } from '#lib/auth/after-login.js';
 
   const core = useCoreClient();
 
@@ -9,8 +10,11 @@
      decision has to wait for the status to settle rather than sample it once. */
   $effect(() => {
     if (core.status === 'idle' || core.status === 'starting') return;
-    void goto(core.status === 'ready' ? resolve('/(app)/rooms') : resolve('login'), {
-      replace: true,
-    });
+    void goto(
+      core.status === 'ready' ? takeAfterLogin(resolve('/(app)/rooms')) : resolve('login'),
+      {
+        replace: true,
+      }
+    );
   });
 </script>
