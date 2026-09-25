@@ -56,8 +56,8 @@ use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
     HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView,
     MembershipView, MessageKind, MutualRoomView, PackImageInfoView, PaginationDirection,
-    RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, ThreadRootView,
-    UrlPreviewView,
+    ProfilePropagationView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
+    RoomVersionsView, ThreadRootView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -1683,7 +1683,7 @@ impl Core {
                 Ok(CommandOk::DiscardRoomKey)
             }
 
-            Command::SetDisplayName { name } => {
+            Command::SetDisplayName { name, propagate_to } => {
                 let client = self.client().await?;
                 if client
                     .unstable_features()
@@ -1702,7 +1702,7 @@ impl Core {
                         client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
                         value,
                     );
-                    request.propagate_to = PropagateTo::Unchanged;
+                    request.propagate_to = profile_propagation(propagate_to);
                     client
                         .send(request)
                         .await
@@ -1718,7 +1718,7 @@ impl Core {
                 Ok(CommandOk::SetDisplayName)
             }
 
-            Command::SetAvatarUrl { url } => {
+            Command::SetAvatarUrl { url, propagate_to } => {
                 let url = match url {
                     Some(url) => Some(mxc_uri(&url)?),
                     None => None,
@@ -1744,7 +1744,7 @@ impl Core {
                         client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
                         value,
                     );
-                    request.propagate_to = PropagateTo::Unchanged;
+                    request.propagate_to = profile_propagation(propagate_to);
                     client
                         .send(request)
                         .await
@@ -2897,6 +2897,14 @@ fn sticker_info(declared: Option<PackImageInfoView>) -> ImageInfo {
     info.mimetype = declared.mimetype;
     info.size = declared.size.map(Into::into);
     info
+}
+
+const fn profile_propagation(view: ProfilePropagationView) -> PropagateTo {
+    match view {
+        ProfilePropagationView::All => PropagateTo::All,
+        ProfilePropagationView::Unchanged => PropagateTo::Unchanged,
+        ProfilePropagationView::None => PropagateTo::None,
+    }
 }
 
 fn membership_filter(memberships: &[MembershipView]) -> RoomMemberships {

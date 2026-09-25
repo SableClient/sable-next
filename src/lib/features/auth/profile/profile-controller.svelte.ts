@@ -1,5 +1,6 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
 export function revokeAvatarPreview(preview: string | null): void {
@@ -54,13 +55,14 @@ export class ProfileController {
     this.error = null;
     try {
       const name = this.displayName.trim();
-      if (name) await this.options.core.commands.setDisplayName(name);
+      const propagateTo = preferences.profileChangePropagation;
+      if (name) await this.options.core.commands.setDisplayName(name, propagateTo);
       if (this.avatarFile) {
         const upright = await uprightJpeg(this.avatarFile);
         const bytes = new Uint8Array(await upright.arrayBuffer());
-        await this.options.core.uploadAvatar(upright.type || 'image/*', bytes);
+        await this.options.core.uploadAvatar(upright.type || 'image/*', bytes, propagateTo);
       } else if (this.avatarCleared) {
-        await this.options.core.commands.setAvatarUrl(null);
+        await this.options.core.commands.setAvatarUrl(null, propagateTo);
       }
       await this.finish();
     } catch {

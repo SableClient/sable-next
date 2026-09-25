@@ -363,7 +363,7 @@ test('/invite refuses a reason it cannot deliver', async () => {
 });
 
 test.each([
-  ['nick', 'setDisplayName', ['Marie']],
+  ['nick', 'setDisplayName', ['Marie', 'unchanged']],
   ['roomname', 'setRoomName', ['!room:example.org', 'The Lounge']],
   ['topic', 'setRoomTopic', ['!room:example.org', 'The Lounge']],
 ] as const)('/%s writes the text it was given', async (name, method, expected) => {

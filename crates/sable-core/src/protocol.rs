@@ -751,10 +751,12 @@ pub enum Command {
     /// `null` clears it.
     SetDisplayName {
         name: Option<String>,
+        propagate_to: ProfilePropagationView,
     },
     /// An `mxc:` URI from the carrier's `uploadMedia`. `null` clears it.
     SetAvatarUrl {
         url: Option<String>,
+        propagate_to: ProfilePropagationView,
     },
     SetProfileField {
         field: String,
@@ -1678,6 +1680,15 @@ pub enum CoreEvent {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
         last_active_ago: Option<u64>,
     },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum ProfilePropagationView {
+    All,
+    Unchanged,
+    None,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

@@ -15,6 +15,7 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
   import '#lib/ui/primitives/settings-row.css';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
@@ -84,13 +85,13 @@
   }
 
   async function writeName(name: string | null): Promise<void> {
-    await core.commands.setDisplayName(name);
+    await core.commands.setDisplayName(name, preferences.profileChangePropagation);
     displayName = name ?? '';
     if (profile) profile = { ...profile, display_name: name };
   }
 
   async function writeAvatar(url: string | null): Promise<void> {
-    await core.commands.setAvatarUrl(url);
+    await core.commands.setAvatarUrl(url, preferences.profileChangePropagation);
     if (profile) profile = { ...profile, avatar_url: url };
   }
 
@@ -118,7 +119,8 @@
       const upright = await uprightJpeg(file);
       const url = await core.uploadAvatar(
         upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
+        new Uint8Array(await upright.arrayBuffer()),
+        preferences.profileChangePropagation
       );
       if (profile) profile = { ...profile, avatar_url: url };
       offerUndo('settings.avatar', () => writeAvatar(previous));

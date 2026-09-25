@@ -3,6 +3,7 @@ import type { MemberView, MessageKind } from '#src/generated/protocol';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import { parseJoinAddress } from '#lib/features/room/join-address.js';
 import { currentFix } from '#lib/platform/geolocation.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { coordinate, geoUriFor } from './composer-location.js';
 import { escapeHtml, rainbowHtml } from './rainbow.js';
@@ -616,7 +617,9 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   moderationTargets('kick', 'kickUser', true),
   moderationTargets('ban', 'banUser', false),
   moderation('unban', 'unbanUser'),
-  setter('nick', (text, { commands }) => commands.setDisplayName(text)),
+  setter('nick', (text, { commands }) =>
+    commands.setDisplayName(text, preferences.profileChangePropagation)
+  ),
   ownColor('color'),
   ownCosmetic('font', fontContent),
   otherCosmetic('sfont', COSMETIC_EVENT_TYPES.font, fontContent),

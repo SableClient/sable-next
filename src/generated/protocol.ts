@@ -149,9 +149,9 @@ passphrase: string | null } | { type: "reset_recovery_key"; passphrase: string |
  */
 { type: "delete_device"; device_id: string; password: string | null } | { type: "rename_device"; device_id: string; display_name: string } | { type: "discard_room_key"; room_id: string } |
 /**  `null` clears it. */
-{ type: "set_display_name"; name: string | null } |
+{ type: "set_display_name"; name: string | null; propagate_to: ProfilePropagationView } |
 /**  An `mxc:` URI from the carrier's `uploadMedia`. `null` clears it. */
-{ type: "set_avatar_url"; url: string | null } | { type: "set_profile_field"; field: string; value: unknown | null } | { type: "account_contacts" } | { type: "ignored_users" } |
+{ type: "set_avatar_url"; url: string | null; propagate_to: ProfilePropagationView } | { type: "set_profile_field"; field: string; value: unknown | null } | { type: "account_contacts" } | { type: "ignored_users" } |
 /**  `m.direct` is client-owned account data. Nothing else will correct it. */
 { type: "set_direct"; room_id: string; direct: boolean } |
 /**  Server-side, so it survives a reinstall. */
@@ -587,6 +587,8 @@ export type ProfileFieldView = {
 	key: string,
 	value: string,
 };
+
+export type ProfilePropagationView = "all" | "unchanged" | "none";
 
 export type ProfileView = {
 	user_id: string,

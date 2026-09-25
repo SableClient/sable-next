@@ -9,6 +9,7 @@ import type {
   SessionInfo,
   SyncStatus,
   MutualRoomView,
+  ProfilePropagationView,
   ProfileView,
   RegistrationResultView,
   VerificationView,
@@ -638,9 +639,13 @@ export class CoreClient {
     return uri;
   }
 
-  async uploadAvatar(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+  async uploadAvatar(
+    mime: string,
+    bytes: Uint8Array<ArrayBuffer>,
+    propagateTo: ProfilePropagationView
+  ): Promise<string> {
     const uri = await this.ensureTransport().uploadMedia(mime, bytes);
-    await this.commands.setAvatarUrl(uri);
+    await this.commands.setAvatarUrl(uri, propagateTo);
     return uri;
   }
 

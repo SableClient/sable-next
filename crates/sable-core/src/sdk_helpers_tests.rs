@@ -939,3 +939,63 @@ async fn a_cancelled_oauth_identity_reset_hands_back_no_key() {
     );
     assert!(matches!(waiting, Err(CommandErr::Unavailable)));
 }
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn profile_updates_send_the_chosen_msc4466_propagation() {
+    use crate::protocol::ProfilePropagationView;
+    use wiremock::matchers::{path_regex, query_param, query_param_is_missing};
+
+    const PROPAGATE_TO: &str = "computer.gingershaped.msc4466.propagate_to";
+    async fn expect_put(
+        server: &MatrixMockServer,
+        field: &str,
+        query: impl wiremock::Match + 'static,
+    ) {
+        Mock::given(method("PUT"))
+            .and(path_regex(format!("/profile/[^/]+/{field}$")))
+            .and(query)
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+    }
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().no_server_versions().build().await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/versions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "versions": ["v1.13"],
+            "unstable_features": {"computer.gingershaped.msc4466": true}
+        })))
+        .mount(server.server())
+        .await;
+    expect_put(&server, "displayname", query_param(PROPAGATE_TO, "none")).await;
+    expect_put(
+        &server,
+        "avatar_url",
+        query_param(PROPAGATE_TO, "unchanged"),
+    )
+    .await;
+    expect_put(&server, "displayname", query_param_is_missing(PROPAGATE_TO)).await;
+    let core = core(&server, client).await;
+
+    core.dispatch(Command::SetDisplayName {
+        name: Some("Quiet".to_owned()),
+        propagate_to: ProfilePropagationView::None,
+    })
+    .await
+    .unwrap();
+    core.dispatch(Command::SetAvatarUrl {
+        url: Some("mxc://example.org/avatar".to_owned()),
+        propagate_to: ProfilePropagationView::Unchanged,
+    })
+    .await
+    .unwrap();
+    core.dispatch(Command::SetDisplayName {
+        name: Some("Loud".to_owned()),
+        propagate_to: ProfilePropagationView::All,
+    })
+    .await
+    .unwrap();
+}

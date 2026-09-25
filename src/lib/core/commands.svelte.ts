@@ -26,6 +26,7 @@ import type {
   NotificationSettingsView,
   RoomNotificationModeView,
   PresenceView,
+  ProfilePropagationView,
   PublicRoomView,
   PusherView,
   RegisteredPusherView,
@@ -1539,12 +1540,12 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async setDisplayName(name: string | null): Promise<void> {
-      await transport().send({ type: 'set_display_name', name });
+    async setDisplayName(name: string | null, propagateTo: ProfilePropagationView): Promise<void> {
+      await transport().send({ type: 'set_display_name', name, propagate_to: propagateTo });
     },
 
-    async setAvatarUrl(url: string | null): Promise<void> {
-      await transport().send({ type: 'set_avatar_url', url });
+    async setAvatarUrl(url: string | null, propagateTo: ProfilePropagationView): Promise<void> {
+      await transport().send({ type: 'set_avatar_url', url, propagate_to: propagateTo });
     },
 
     async accountContacts(): Promise<string[]> {

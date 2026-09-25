@@ -1,4 +1,4 @@
-import type { PresenceView } from '#src/generated/protocol';
+import type { PresenceView, ProfilePropagationView } from '#src/generated/protocol';
 import type { GifProviderSetting } from '#lib/features/gif/providers.js';
 import type { MemberSort } from '#lib/features/room/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
@@ -149,6 +149,7 @@ export interface Preferences {
 
   settingsSync: boolean;
   syncDrafts: boolean;
+  profileChangePropagation: ProfilePropagationView;
 
   developerTools: boolean;
   showHiddenEvents: boolean;
@@ -200,6 +201,7 @@ const ENUMS = {
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
   presence: ['online', 'unavailable', 'offline'],
+  profileChangePropagation: ['all', 'unchanged', 'none'],
 } as const satisfies { [K in EnumPreference]?: readonly Preferences[K][] };
 
 /** Strings with no fixed set of values, which `load` would otherwise drop and
@@ -346,6 +348,7 @@ const DEFAULTS: Preferences = {
 
   settingsSync: false,
   syncDrafts: true,
+  profileChangePropagation: 'unchanged',
 
   developerTools: false,
   showHiddenEvents: false,

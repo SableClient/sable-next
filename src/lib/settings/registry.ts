@@ -280,8 +280,24 @@ export const settingsCategories: SettingsCategory[] = [
     id: SETTINGS_ACCOUNT_SECTION,
     name: 'settings.account',
     icon: CloudArrowUpIcon,
-    sections: [{ id: 'sync', name: 'settings.syncTitle' }],
+    sections: [
+      { id: 'profile-changes', name: 'settings.profileChangesTitle' },
+      { id: 'sync', name: 'settings.syncTitle' },
+    ],
     items: [
+      {
+        key: 'profileChangePropagation',
+        section: 'profile-changes',
+        icon: UsersIcon,
+        name: 'settings.profileChangePropagation',
+        description: 'settings.profileChangePropagationHint',
+        type: 'select',
+        options: [
+          { value: 'all', label: 'settings.profileChangePropagationAll' },
+          { value: 'unchanged', label: 'settings.profileChangePropagationUnchanged' },
+          { value: 'none', label: 'settings.profileChangePropagationNone' },
+        ],
+      },
       {
         key: 'settingsSync',
         section: 'sync',
