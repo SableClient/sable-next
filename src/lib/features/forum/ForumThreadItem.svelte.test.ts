@@ -3,9 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import MessageContextMenu from '#lib/features/room/MessageContextMenu.svelte';
-
-import ForumThreadItem from './ForumThreadItem.svelte';
+import ForumThreadItemHarness from './ForumThreadItemHarness.test.svelte';
 import type { ForumThread } from './forum-threads';
 
 const thread: ForumThread = {
@@ -35,7 +33,7 @@ test('uses the timeline context menu for a forum thread', async () => {
   const onOpen = vi.fn();
   const onEdit = vi.fn();
   const onDelete = vi.fn();
-  const item = mount(ForumThreadItem, {
+  const item = mount(ForumThreadItemHarness, {
     target: document.body,
     props: {
       thread,
@@ -49,7 +47,6 @@ test('uses the timeline context menu for a forum thread', async () => {
       onCopyLink: vi.fn(),
     },
   });
-  const menu = mount(MessageContextMenu, { target: document.body });
   await tick();
 
   const card = document.querySelector('.forum-thread-card');
@@ -79,6 +76,5 @@ test('uses the timeline context menu for a forum thread', async () => {
   await tick();
   expect(document.body.textContent).toContain('Delete thread?');
 
-  await unmount(menu);
   await unmount(item);
 });

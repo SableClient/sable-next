@@ -1,8 +1,9 @@
 import { expect, test } from 'vitest';
 
-import { openMessageMenu } from './message-menu-open.svelte.js';
+import { OpenMessageMenu } from './message-menu-open.svelte.js';
 
 test('opening a row menu closes whichever row held it', () => {
+  const openMessageMenu = new OpenMessageMenu();
   openMessageMenu.set('first', true);
   expect(openMessageMenu.isOpen('first')).toBe(true);
 
@@ -13,6 +14,7 @@ test('opening a row menu closes whichever row held it', () => {
 });
 
 test('a row closing its own menu does not close the row that now holds it', () => {
+  const openMessageMenu = new OpenMessageMenu();
   openMessageMenu.set('first', true);
   openMessageMenu.set('second', true);
 

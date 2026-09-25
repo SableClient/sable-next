@@ -50,7 +50,7 @@
 
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from './bookmarks.svelte.js';
-  import { openMessageMenu } from './message-menu-open.svelte.js';
+  import { useMessageMenu } from './message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from './PersonaProfile.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
@@ -163,6 +163,7 @@
   const personaStore = usePersonaStore();
   const roomCosmetics = useRoomCosmetics();
   const dialogs = useMessageDialogs();
+  const openMessageMenu = useMessageMenu();
   let profile = $state<ProfileView | null>(null);
   let senderCosmetics = $derived(roomCosmetics?.for(item.sender) ?? null);
   let senderTimezone = $derived(profile?.timezone ?? null);

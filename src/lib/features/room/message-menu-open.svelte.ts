@@ -1,3 +1,5 @@
+import { createContext } from 'svelte';
+
 import type { MessageActions } from './message-menu-items';
 
 export interface MenuPoint {
@@ -5,7 +7,7 @@ export interface MenuPoint {
   readonly y: number;
 }
 
-class OpenMessageMenu {
+export class OpenMessageMenu {
   id = $state<string | null>(null);
   point = $state.raw<MenuPoint>({ x: 0, y: 0 });
   actions = $state.raw<(() => MessageActions) | null>(null);
@@ -30,4 +32,4 @@ class OpenMessageMenu {
   }
 }
 
-export const openMessageMenu = new OpenMessageMenu();
+export const [useMessageMenu, provideMessageMenu] = createContext<OpenMessageMenu>();

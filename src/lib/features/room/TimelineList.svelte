@@ -25,6 +25,7 @@
   import MessageContextMenu from './MessageContextMenu.svelte';
   import MessageDialogHost from './MessageDialogHost.svelte';
   import { MessageDialogs, provideMessageDialogs } from './message-dialogs.svelte.js';
+  import { OpenMessageMenu, provideMessageMenu } from './message-menu-open.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
   import TimelineMemberGroup from './TimelineMemberGroup.svelte';
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
@@ -151,6 +152,7 @@
   }: Props = $props();
 
   const dialogs = provideMessageDialogs(new MessageDialogs());
+  const messageMenu = provideMessageMenu(new OpenMessageMenu());
 
   interface RowValue {
     item: TimelineItemView;
@@ -660,7 +662,7 @@
 
 <TimelineReadReceipt {timeline} visibleEventId={readEventId} onRead={markRead} />
 <TimelineAnnouncements {timeline} {visibleItems} />
-<MessageContextMenu />
+<MessageContextMenu menu={messageMenu} />
 <MessageDialogHost
   {dialogs}
   {events}

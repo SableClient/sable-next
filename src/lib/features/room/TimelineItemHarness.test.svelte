@@ -10,6 +10,7 @@
     type PinnedEventCommands,
   } from './pinned-events.svelte.js';
   import MessageContextMenu from './MessageContextMenu.svelte';
+  import { OpenMessageMenu, provideMessageMenu } from './message-menu-open.svelte.js';
   import MessageDialogHost from './MessageDialogHost.svelte';
   import { MessageDialogs, provideMessageDialogs } from './message-dialogs.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
@@ -26,6 +27,7 @@
   providePinnedEvents(new PinnedEvents(untrack(() => core)));
   provideBookmarks(new Bookmarks(untrack(() => core)));
   const dialogs = provideMessageDialogs(new MessageDialogs());
+  const messageMenu = provideMessageMenu(new OpenMessageMenu());
   let events = $derived({
     get: (eventId: string) => (item.item.event_id === eventId ? item.item : null),
   });
@@ -35,7 +37,7 @@
   {#if showItem}
     <TimelineItem {...item} />
   {/if}
-  <MessageContextMenu />
+  <MessageContextMenu menu={messageMenu} />
   <MessageDialogHost
     {dialogs}
     {events}

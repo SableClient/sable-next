@@ -7,12 +7,14 @@
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import { messageMenuRows } from './message-menu-items';
-  import { openMessageMenu } from './message-menu-open.svelte.js';
+  import type { OpenMessageMenu } from './message-menu-open.svelte.js';
   import MessageQuickReactions from './MessageQuickReactions.svelte';
 
-  let open = $derived(openMessageMenu.id !== null && openMessageMenu.actions !== null);
+  let { menu }: { menu: OpenMessageMenu } = $props();
+
+  let open = $derived(menu.id !== null && menu.actions !== null);
   let anchor = $derived.by(() => {
-    const { x, y } = openMessageMenu.point;
+    const { x, y } = menu.point;
     return { getBoundingClientRect: () => DOMRect.fromRect({ x, y, width: 0, height: 0 }) };
   });
 </script>
@@ -21,12 +23,12 @@
   bind:open={
     () => open,
     (next: boolean) => {
-      if (!next) openMessageMenu.close();
+      if (!next) menu.close();
     }
   }
 >
-  {#if open && openMessageMenu.actions}
-    {@const actions = openMessageMenu.actions()}
+  {#if open && menu.actions}
+    {@const actions = menu.actions()}
     <ContextMenu.Portal>
       <ContextMenu.Content
         class="menu-surface message-menu"

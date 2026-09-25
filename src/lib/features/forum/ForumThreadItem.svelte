@@ -4,7 +4,7 @@
   import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
   import MessageActions from '#lib/features/room/MessageActions.svelte';
   import MessageActionSheet from '#lib/features/room/MessageActionSheet.svelte';
-  import { openMessageMenu } from '#lib/features/room/message-menu-open.svelte.js';
+  import { useMessageMenu } from '#lib/features/room/message-menu-open.svelte.js';
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
@@ -60,6 +60,7 @@
     onCopyLink: () => onCopyLink(thread.eventId),
     onDelete: canDelete ? () => (deleteOpen = true) : undefined,
   });
+  const openMessageMenu = useMessageMenu();
   const rowPress = new LongPress({
     enabled: () => true,
     onPress: () => {

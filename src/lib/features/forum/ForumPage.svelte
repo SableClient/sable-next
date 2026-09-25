@@ -9,6 +9,10 @@
   import { leaveRoomView, searchInRoom } from '#lib/features/room/room-navigation.js';
   import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
   import MessageContextMenu from '#lib/features/room/MessageContextMenu.svelte';
+  import {
+    OpenMessageMenu,
+    provideMessageMenu,
+  } from '#lib/features/room/message-menu-open.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -34,6 +38,7 @@
   const core = useCoreClient();
   const personas = usePersonaStore();
   const roomList = useRoomList();
+  const messageMenu = provideMessageMenu(new OpenMessageMenu());
   const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   const forumThreads = new ForumThreads(core);
   const memberLoader = new RoomMemberLoader();
@@ -197,7 +202,7 @@
   visibleEventId={latestEventId}
   onRead={markRead}
 />
-<MessageContextMenu />
+<MessageContextMenu menu={messageMenu} />
 
 <main class="forum-page" aria-label={$i18n.t('forum.label')}>
   <div class="forum-main">

@@ -100,3 +100,40 @@ test.describe('on mobile', () => {
     await expect(panel).toBeHidden();
   });
 });
+
+test.describe('beside the room', () => {
+  test.use({ viewport: { width: 1400, height: 800 } });
+
+  test('a right-click opens one message menu while a thread is open', async ({
+    app,
+    page,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    const subscription = await core.subscription();
+    await core.emitTimelineDiff(subscription, [
+      {
+        op: 'reset',
+        values: [
+          {
+            ...timelineItem('thread-root', 'Root message'),
+            thread_summary: {
+              num_replies: 3,
+              latest_body: 'a reply',
+              latest_sender: '@bob:example.test',
+            },
+          },
+        ],
+      },
+    ]);
+
+    await page.locator('.thread-summary').first().click();
+    await expect(page.locator('.thread-panel')).toBeVisible();
+
+    await page.locator('.message', { hasText: 'Root message' }).first().click({ button: 'right' });
+    await expect(page.locator('.message-menu').first()).toBeVisible();
+    await expect(page.locator('.message-menu')).toHaveCount(1);
+  });
+});
