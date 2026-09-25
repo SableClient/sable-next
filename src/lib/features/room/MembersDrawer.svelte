@@ -18,6 +18,7 @@
   import { whenVisible } from '#lib/ui/when-visible.js';
 
   import MemberIdentityRow from './MemberIdentityRow.svelte';
+  import RoleTagIcon from './RoleTagIcon.svelte';
   import {
     INITIAL_MEMBER_ROWS,
     MEMBERSHIP_FILTERS,
@@ -42,7 +43,7 @@
     compact?: boolean;
     searchable?: boolean;
     title?: string;
-    powerTags?: PowerLevelTagMap;
+    powerTags?: PowerLevelTagMap | null;
     loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
     onClose: () => void;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
@@ -87,7 +88,7 @@
   let groups = $derived(groupMembers(searched, sort, connected));
   let shown = $derived(limitGroups(groups, limit));
   let hidden = $derived(Math.max(0, searched.length - limit));
-  let busy = $derived(filter === 'join' ? loading : fetching);
+  let busy = $derived(powerTags === null || (filter === 'join' ? loading : fetching));
   let width = $state<number | null>(null);
 
   const WIDTH_STORAGE_KEY = 'sable-members-drawer-width';
@@ -246,9 +247,11 @@
         {#each shown as group (group.key)}
           {@const tag =
             group.level === null
-              ? { name: $i18n.t('timeline.memberGroupOffline'), color: null }
-              : powerTag(group.level, $i18n.t, powerTags)}
-          <h3 class="group-label" style:color={tag.color ?? undefined}>{tag.name}</h3>
+              ? { name: $i18n.t('timeline.memberGroupOffline'), color: null, icon: null }
+              : powerTag(group.level, $i18n.t, powerTags ?? {})}
+          <h3 class="group-label" style:color={tag.color ?? undefined}>
+            {#if tag.icon}<RoleTagIcon icon={tag.icon} class="group-icon" />{/if}{tag.name}
+          </h3>
           <ul>
             {#each group.members as member (member.user_id)}
               <li>
@@ -256,6 +259,7 @@
                   class="member"
                   userId={member.user_id}
                   {members}
+                  powerTag={tag}
                   onProfile={onMemberProfile}
                   showStatus
                 />
@@ -402,6 +406,10 @@
     line-height: var(--line-height-small);
     margin: 0;
     padding: var(--space-200) var(--space-200) var(--space-100);
+  }
+
+  :global(.group-icon) {
+    margin-right: var(--space-100);
   }
 
   ul {

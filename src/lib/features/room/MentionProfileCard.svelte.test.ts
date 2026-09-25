@@ -93,6 +93,34 @@ test('keeps the clicked room member identity when the global profile loads', asy
   await unmount(instance);
 });
 
+test('uses the room role name, emoji and colour when the profile has no name colour', async () => {
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Room Alice',
+        avatar_url: null,
+        power_level: 50,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+      powerTags: { 50: { name: 'Sentinel', color: '#ff0000', icon: '🛡️' } },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.profile-card-meta')?.textContent).toContain('🛡️');
+  expect(document.querySelector('.profile-card-meta')?.textContent).toContain('Sentinel');
+  expect(document.querySelector('.profile-card')?.getAttribute('style')).toContain('#ff0000');
+  await unmount(instance);
+});
+
 test('leaves out the bio and metadata panels when the profile has neither', async () => {
   const instance = mount(MentionProfileCard, {
     target: document.body,

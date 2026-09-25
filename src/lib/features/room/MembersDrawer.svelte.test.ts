@@ -95,6 +95,65 @@ test('sorts members by power then name and opens their profile', async () => {
   await unmount(instance);
 });
 
+test('uses a role tag for its group, member colour and emoji', async () => {
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: {
+      loading: false,
+      members: [
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 50,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+      ],
+      powerTags: { 50: { name: 'Sentinel', color: '#ff0000', icon: '🛡️' } },
+      onClose: vi.fn(),
+      onMemberProfile: vi.fn(),
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.group-label')?.textContent).toBe('🛡️Sentinel');
+  expect(document.querySelector('.member-identity-role-icon')?.textContent).toBe('🛡️');
+  expect(document.querySelector('.member-name')?.getAttribute('style')).toContain('#ff0000');
+  await unmount(instance);
+});
+
+test('waits for room role tags instead of briefly rendering default labels', async () => {
+  const instance = mount(MembersDrawer, {
+    target: document.body,
+    props: {
+      loading: false,
+      members: [
+        {
+          user_id: '@amy:example.org',
+          display_name: 'Amy',
+          avatar_url: null,
+          power_level: 50,
+          membership: 'join' as const,
+          member_ts: null,
+          kicked: false,
+          service: false,
+        },
+      ],
+      powerTags: null,
+      onClose: vi.fn(),
+      onMemberProfile: vi.fn(),
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('.status')?.textContent).toContain('Loading members');
+  expect(document.querySelector('.group-label')).toBeNull();
+  await unmount(instance);
+});
+
 test('resizes the desktop drawer with the keyboard', async () => {
   const instance = mount(MembersDrawer, {
     target: document.body,

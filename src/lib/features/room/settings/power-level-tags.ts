@@ -8,6 +8,8 @@ const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 export interface PowerLevelTag {
   readonly name: string;
   readonly color: string | null;
+  /** A Unicode emoji or Matrix media URI stored in the legacy tag contract. */
+  readonly icon: string | null;
 }
 
 export type PowerLevelTagMap = Readonly<Record<number, PowerLevelTag>>;
@@ -21,7 +23,17 @@ function parseTag(value: unknown): PowerLevelTag | null {
   const name = (value as Record<string, unknown>).name;
   if (typeof name !== 'string' || name.trim() === '') return null;
   const color = (value as Record<string, unknown>).color;
-  return { name, color: typeof color === 'string' && HEX_COLOR.test(color) ? color : null };
+  const rawIcon = (value as Record<string, unknown>).icon;
+  const iconKey =
+    typeof rawIcon === 'object' && rawIcon !== null
+      ? (rawIcon as Record<string, unknown>).key
+      : null;
+  const icon = typeof iconKey === 'string' ? iconKey.trim() || null : null;
+  return {
+    name,
+    color: typeof color === 'string' && HEX_COLOR.test(color) ? color : null,
+    icon,
+  };
 }
 
 export function parsePowerLevelTags(content: unknown): PowerLevelTagMap {
@@ -45,7 +57,7 @@ export function tagForLevel(tags: PowerLevelTagMap, level: number): PowerLevelTa
 export function withPowerLevelTag(
   rawContent: unknown,
   level: number,
-  tag: { name: string; color: string | null } | null
+  tag: PowerLevelTag | null
 ): Record<string, unknown> {
   const base = typeof rawContent === 'object' && rawContent !== null ? rawContent : {};
   const next: Record<string, unknown> = { ...(base as Record<string, unknown>) };
@@ -58,9 +70,12 @@ export function withPowerLevelTag(
 
   const existing = next[key];
   const existingFields = typeof existing === 'object' && existing !== null ? existing : {};
-  next[key] = tag.color
-    ? { ...existingFields, name: tag.name, color: tag.color }
-    : { ...existingFields, name: tag.name, color: undefined };
+  next[key] = {
+    ...existingFields,
+    name: tag.name,
+    color: tag.color ?? undefined,
+    icon: tag.icon ? { key: tag.icon } : undefined,
+  };
   return next;
 }
 

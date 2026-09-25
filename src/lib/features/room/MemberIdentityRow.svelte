@@ -11,7 +11,9 @@
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
 
   import { findMember, senderDisplayColors } from './members.js';
+  import RoleTagIcon from './RoleTagIcon.svelte';
   import SenderName from './SenderName.svelte';
+  import type { PowerLevelTag } from './settings/power-level-tags.js';
 
   interface Props {
     userId: string;
@@ -19,6 +21,7 @@
     class?: ClassValue;
     onProfile?: (userId: string, anchor: HTMLElement) => void;
     showStatus?: boolean;
+    powerTag?: PowerLevelTag | null;
     trailing?: Snippet;
   }
 
@@ -28,6 +31,7 @@
     class: className = '',
     onProfile,
     showStatus = false,
+    powerTag = null,
     trailing,
   }: Props = $props();
   const core = useCoreClient();
@@ -36,7 +40,16 @@
   let member = $derived(findMember(members, userId));
   let displayName = $derived(member?.display_name ?? profile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? profile?.avatar_url ?? null);
-  let colors = $derived(senderDisplayColors(userId, profile));
+  let colors = $derived.by(() => {
+    const profileColors = senderDisplayColors(userId, profile);
+    if (profileColors.tinted || !powerTag?.color) return profileColors;
+    return {
+      ...profileColors,
+      nameColorLight: powerTag.color,
+      nameColorDark: powerTag.color,
+      tinted: true,
+    };
+  });
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.get(userId));
   let userStatus = $derived(showStatus ? resolveUserStatus(profile, presence) : null);
@@ -75,6 +88,9 @@
   <div class="member-identity-main">
     <span class="member-identity-text">
       <SenderName {displayName} {colors} nameClass="member-name" compact />
+      {#if powerTag?.icon}
+        <RoleTagIcon icon={powerTag.icon} class="member-identity-role-icon" />
+      {/if}
       {#if userStatus}
         <span class="member-identity-status">
           {#if userStatus.emoji}<span class="member-identity-status-emoji">{userStatus.emoji}</span
@@ -166,6 +182,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  :global(.member-identity-role-icon) {
+    flex: 0 0 auto;
+    font-size: var(--font-size-small);
+    line-height: 1;
   }
 
   .member-identity-status-emoji {

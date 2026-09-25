@@ -52,7 +52,9 @@
 
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
-  // import { profileFieldMap } from './profile-field-map';
+  import { powerTag } from './power-tags.js';
+  import RoleTagIcon from './RoleTagIcon.svelte';
+  import type { PowerLevelTagMap } from './settings/power-level-tags.js';
   import { senderColor } from './timeline-format';
 
   import '#lib/ui/primitives/menu.css';
@@ -65,6 +67,7 @@
     roomId: string;
     ownPowerLevel?: number;
     permissions?: RoomPermissionsView | null;
+    powerTags?: PowerLevelTagMap | null;
     profile: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -79,6 +82,7 @@
     roomId,
     ownPowerLevel = 0,
     permissions = null,
+    powerTags = null,
     profile,
     onAvatarClick,
     onMatrixLink,
@@ -173,12 +177,9 @@
   let sending = $state(false);
   let sendFailed = $state(false);
   let homeserver = $derived(userId.slice(userId.indexOf(':') + 1));
-  let roleLabel = $derived.by(() => {
-    if (!member) return null;
-    if (member.power_level >= 100) return $i18n.t('timeline.powerLevelAdmin');
-    if (member.power_level >= 50) return $i18n.t('timeline.powerLevelModerator');
-    return $i18n.t('timeline.powerLevelMember');
-  });
+  let roleTag = $derived(
+    member && powerTags !== null ? powerTag(member.power_level, $i18n.t, powerTags) : null
+  );
   let elevated = $derived(member !== null && member.power_level >= 50);
   let outranks = $derived(!isSelf && ownPowerLevel > (member?.power_level ?? 0));
   let canKick = $derived(outranks && (permissions?.can_kick ?? false));
@@ -193,10 +194,10 @@
   // The spec caps what you may grant at your own level.
   let powerRoles = $derived(
     [
-      { level: 100, label: $i18n.t('timeline.powerLevelAdmin') },
-      { level: 50, label: $i18n.t('timeline.powerLevelModerator') },
-      { level: 0, label: $i18n.t('timeline.powerLevelMember') },
-      { level: -1, label: $i18n.t('timeline.powerLevelMuted') },
+      { level: 100, label: powerTag(100, $i18n.t, powerTags ?? {}).name },
+      { level: 50, label: powerTag(50, $i18n.t, powerTags ?? {}).name },
+      { level: 0, label: powerTag(0, $i18n.t, powerTags ?? {}).name },
+      { level: -1, label: powerTag(-1, $i18n.t, powerTags ?? {}).name },
     ].filter((role) => role.level <= ownPowerLevel && role.level !== (member?.power_level ?? 0))
   );
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
@@ -212,9 +213,7 @@
   let sharedGroups = $derived(
     sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct !== true)
   );
-  let hasMeta = $derived(
-    Boolean(pronouns || localTime || animalText || roleLabel || presenceLabel)
-  );
+  let hasMeta = $derived(Boolean(pronouns || localTime || animalText || roleTag || presenceLabel));
   let activeExtra = $state<ProfileFieldView | null>(null);
 
   $effect(() => {
@@ -373,6 +372,13 @@
   {#if pronouns}
     <span class="profile-meta-item"><UserIcon />{pronouns}</span>
   {/if}
+  {#if roleTag}
+    <span class="profile-meta-item" class:profile-meta-elevated={elevated}>
+      <ShieldIcon />
+      {#if roleTag.icon}<RoleTagIcon icon={roleTag.icon} class="profile-role-icon" />{/if}
+      {roleTag.name}
+    </span>
+  {/if}
   {#if localTime}
     <span class="profile-meta-item">
       <ClockIcon />
@@ -382,12 +388,6 @@
   {/if}
   {#if animalText}
     <span class="profile-meta-item"><HeartIcon />{animalText}</span>
-  {/if}
-  {#if roleLabel}
-    <span class="profile-meta-item" class:profile-meta-elevated={elevated}>
-      <ShieldIcon />
-      {roleLabel}
-    </span>
   {/if}
 {/snippet}
 
@@ -676,8 +676,8 @@
   bannerUrl={currentProfile?.banner_url}
   status={userStatus?.text}
   statusEmoji={userStatus?.emoji}
-  nameColorLight={currentProfile?.name_color_light}
-  nameColorDark={currentProfile?.name_color_dark}
+  nameColorLight={currentProfile?.name_color_light ?? roleTag?.color}
+  nameColorDark={currentProfile?.name_color_dark ?? roleTag?.color}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
   children={showFailure || currentProfile?.bio ? bioPanel : undefined}

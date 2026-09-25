@@ -132,3 +132,93 @@ test('syncing copies the parent space levels and roles into the room', async () 
 
   await unmount(instance);
 });
+
+test('saves a role emoji with its name and colour', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.roomStateEvent.mockResolvedValue({
+    '50': { name: 'Sentinel', color: '#ff0000' },
+  });
+  core.sendStateEvent.mockResolvedValue(undefined);
+
+  const instance = mount(RoomPermissionsSettings, {
+    target: document.body,
+    props: { room, permissions },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('.role-chip')?.textContent).toContain('Sentinel');
+  });
+
+  const row = document.querySelector('.role-chip')?.closest('li');
+  row?.querySelector<HTMLButtonElement>('button[aria-label="Edit role"]')?.click();
+  await tick();
+
+  const icon = document.querySelector<HTMLInputElement>('#room-perm-role-icon');
+  if (!icon) throw new Error('role emoji input missing');
+  icon.value = '🛡️';
+  icon.dispatchEvent(new Event('input', { bubbles: true }));
+  document
+    .querySelector<HTMLFormElement>('.settings-form')
+    ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+  await vi.waitFor(() => {
+    expect(core.sendStateEvent).toHaveBeenCalledWith(
+      '!room:example.org',
+      'in.cinny.room.power_level_tags',
+      '',
+      {
+        '50': { name: 'Sentinel', color: '#ff0000', icon: { key: '🛡️' } },
+      }
+    );
+  });
+  await unmount(instance);
+});
+
+test('uses tagged default roles in permission controls and opens their editor', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.roomStateEvent.mockResolvedValue({ '0': { name: 'Test' } });
+
+  const instance = mount(RoomPermissionsSettings, {
+    target: document.body,
+    props: { room, permissions },
+  });
+  await vi.waitFor(() => {
+    expect(document.querySelector('button[aria-label="Invite"]')?.textContent).toContain('Test');
+  });
+
+  const row = [...document.querySelectorAll('li')].find((item) =>
+    item.textContent.includes('Test')
+  );
+  if (!row) throw new Error('tagged permission row missing');
+  const edit = row.querySelector<HTMLButtonElement>('button[aria-label="Edit role"]');
+  if (!edit) throw new Error('role edit button missing');
+  edit.click();
+  await tick();
+
+  expect(document.querySelector<HTMLInputElement>('#room-perm-role-name')?.value).toBe('Test');
+  await unmount(instance);
+});
+
+test('opens a role editor for a power level that no permission currently uses', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.roomStateEvent.mockResolvedValue({});
+
+  const instance = mount(RoomPermissionsSettings, {
+    target: document.body,
+    props: { room, permissions },
+  });
+  await vi.waitFor(() => {
+    expect(document.body.textContent).toContain('Add role');
+  });
+  [...document.querySelectorAll<HTMLButtonElement>('button')]
+    .find((button) => button.textContent.trim() === 'Add role')
+    ?.click();
+  await tick();
+
+  expect(document.querySelector('#room-perm-role-level')).not.toBeNull();
+  expect(document.querySelector('#room-perm-role-name')).not.toBeNull();
+  expect(document.querySelector('#room-perm-role-icon')).not.toBeNull();
+  await unmount(instance);
+});

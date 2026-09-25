@@ -2,6 +2,7 @@
   import type { MemberView, ProfileView, RoomPermissionsView } from '#src/generated/protocol';
 
   import type { MatrixLink } from './matrix-link.js';
+  import type { PowerLevelTagMap } from './settings/power-level-tags.js';
 
   import { i18n } from '#lib/i18n.js';
   import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
@@ -15,6 +16,7 @@
     roomId: string;
     ownPowerLevel?: number;
     permissions?: RoomPermissionsView | null;
+    powerTags?: PowerLevelTagMap | null;
     profile?: ProfileView | null;
     onAvatarClick?: (source: string, displayName: string) => void;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
@@ -31,6 +33,7 @@
     roomId,
     ownPowerLevel = 0,
     permissions = null,
+    powerTags = null,
     profile = null,
     onAvatarClick,
     onMatrixLink,
@@ -76,6 +79,7 @@
         {roomId}
         {ownPowerLevel}
         {permissions}
+        {powerTags}
         {profile}
         {onAvatarClick}
         {onMatrixLink}

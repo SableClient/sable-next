@@ -23,6 +23,7 @@
   import '#lib/ui/primitives/settings-row.css';
 
   import { ancestorSpaceIds } from '../abbreviations.js';
+  import RoleTagIcon from '../RoleTagIcon.svelte';
   import {
     canSendState,
     levelAt,
@@ -70,11 +71,16 @@
   let numberErrors = $state.raw<Record<string, string>>({});
 
   let editingLevel = $state<number | null>(null);
+  let editingNewRole = $state(false);
+  let editingRole = $derived(editingNewRole || editingLevel !== null);
   let editingHasTag = $derived(
     editingLevel !== null && tagForLevel(roleTags, editingLevel) !== null
   );
+  let roleLevelDraft = $state('');
+  let roleLevelError = $state<string | null>(null);
   let roleNameDraft = $state('');
   let roleColorDraft = $state('');
+  let roleIconDraft = $state('');
   let roleSaving = $state(false);
   let roleFailed = $state(false);
   let roleRemoveConfirm = $state(false);
@@ -180,6 +186,8 @@
   }
 
   function levelLabel(level: number): string {
+    const tag = tagForLevel(roleTags, level);
+    if (tag) return tag.name;
     const known = namedLevels.find((entry) => entry.level === level);
     return known ? $i18n.t(known.label) : String(level);
   }
@@ -187,7 +195,7 @@
   function options(current: number): { value: string; label: string; disabled?: boolean }[] {
     const named = namedLevels.map((entry) => ({
       value: String(entry.level),
-      label: $i18n.t(entry.label),
+      label: levelLabel(entry.level),
       disabled: entry.level > ownLevel,
     }));
     const custom = Object.entries(roleTags)
@@ -236,19 +244,52 @@
   function startEditRole(level: number): void {
     const tag = tagForLevel(roleTags, level);
     editingLevel = level;
+    editingNewRole = false;
+    roleLevelDraft = String(level);
     roleNameDraft = tag?.name ?? levelLabel(level);
     roleColorDraft = tag?.color ?? '';
+    roleIconDraft = tag?.icon ?? '';
+    roleLevelError = null;
+    roleFailed = false;
+  }
+
+  function startAddRole(): void {
+    editingLevel = null;
+    editingNewRole = true;
+    roleLevelDraft = '';
+    roleNameDraft = '';
+    roleColorDraft = '';
+    roleIconDraft = '';
+    roleLevelError = null;
     roleFailed = false;
   }
 
   function cancelEditRole(): void {
     editingLevel = null;
+    editingNewRole = false;
   }
 
   async function saveRole(): Promise<void> {
     const target = roomId;
-    const level = editingLevel;
-    if (!target || level === null || roleSaving) return;
+    if (!target || !editingRole || roleSaving) return;
+
+    let level: number;
+    if (editingNewRole) {
+      const levelInput = parsePowerLevelInput(roleLevelDraft, ownLevel);
+      if (!levelInput.valid) {
+        const messages = {
+          'not-a-number': $i18n.t('room.permLevelNumberInvalid'),
+          'out-of-range': $i18n.t('room.permLevelNumberOutOfRange'),
+          'exceeds-own': $i18n.t('room.permLevelNumberExceedsOwn'),
+        } as const;
+        roleLevelError = messages[levelInput.reason];
+        return;
+      }
+      level = levelInput.level;
+    } else {
+      if (editingLevel === null) return;
+      level = editingLevel;
+    }
 
     const name = roleNameDraft.trim();
     if (name === '') return;
@@ -258,10 +299,15 @@
     roleSaving = true;
     roleFailed = false;
     try {
-      const nextContent = withPowerLevelTag(rawRoleTags, level, { name, color });
+      const nextContent = withPowerLevelTag(rawRoleTags, level, {
+        name,
+        color,
+        icon: roleIconDraft.trim() || null,
+      });
       await core.commands.sendStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE, '', nextContent);
       rawRoleTags = nextContent;
       editingLevel = null;
+      editingNewRole = false;
     } catch (error) {
       console.warn('[sable room] role tag save failed', error);
       roleFailed = true;
@@ -304,6 +350,34 @@
   {#if loading && levels === null}
     <p class="settings-status" role="status"><Spinner small /></p>
   {:else if levels}
+    {#if canEdit}
+      <SettingsSection headingId="room-perm-roles" title={$i18n.t('room.permRoles')}>
+        <ul class="settings-rows">
+          {#each Object.entries(roleTags).sort(([left], [right]) => Number(right) - Number(left)) as [key, tag] (key)}
+            {@const level = Number(key)}
+            <SettingsRow title={`${tag.name} (${level})`}>
+              {#if tag.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
+              <span class="role-swatch" style:background-color={tag.color ?? undefined}></span>
+              <IconButton
+                variant="subtle"
+                size="small"
+                label={$i18n.t('room.permRoleEdit')}
+                disabled={saving}
+                onclick={() => startEditRole(level)}
+              >
+                <PencilIcon />
+              </IconButton>
+            </SettingsRow>
+          {/each}
+          <li class="settings-row role-add-row">
+            <Button variant="secondary" onclick={startAddRole} disabled={saving}>
+              {$i18n.t('room.permRoleAdd')}
+            </Button>
+          </li>
+        </ul>
+      </SettingsSection>
+    {/if}
+
     {#if canEdit && syncSpaceId}
       <SettingsSection headingId="room-perm-sync" title={$i18n.t('room.permSyncTitle')}>
         <ul class="settings-rows">
@@ -356,6 +430,7 @@
                     style:background-color={tag.color ?? undefined}
                     aria-hidden="true"
                   ></span>
+                  {#if tag.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
                   <span class="role-name">{tag.name} ({level})</span>
                 </span>
               {:else}
@@ -416,7 +491,7 @@
       </SettingsSection>
     {/each}
 
-    {#if editingLevel !== null}
+    {#if editingRole}
       <SettingsSection headingId="room-perm-role-editor" title={$i18n.t('room.permRoleEdit')}>
         <form
           class="settings-form"
@@ -428,6 +503,18 @@
           {#if roleFailed}
             <Alert variant="critical" role="alert">{$i18n.t('room.permFailed')}</Alert>
           {/if}
+          {#if editingNewRole}
+            <FormField fieldId="room-perm-role-level" label={$i18n.t('room.permRoleLevel')}>
+              <TextInput
+                id="room-perm-role-level"
+                inputmode="numeric"
+                aria-invalid={roleLevelError ? 'true' : undefined}
+                bind:value={roleLevelDraft}
+                required
+              />
+              {#if roleLevelError}<p class="number-error" role="alert">{roleLevelError}</p>{/if}
+            </FormField>
+          {/if}
           <FormField fieldId="room-perm-role-name" label={$i18n.t('room.permRoleName')}>
             <TextInput id="room-perm-role-name" bind:value={roleNameDraft} required />
           </FormField>
@@ -437,6 +524,9 @@
               bind:value={roleColorDraft}
               placeholder={$i18n.t('room.permRoleColorHint')}
             />
+          </FormField>
+          <FormField fieldId="room-perm-role-icon" label={$i18n.t('emoji.unicode')}>
+            <TextInput id="room-perm-role-icon" bind:value={roleIconDraft} placeholder="✨" />
           </FormField>
           <div class="actions">
             {#if editingHasTag}
@@ -512,9 +602,17 @@
     width: 0.6rem;
   }
 
+  .role-add-row {
+    justify-content: flex-end;
+  }
+
   .role-name {
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
+  }
+
+  :global(.role-icon) {
+    font-size: var(--font-size-small);
   }
 
   .number-field {

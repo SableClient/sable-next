@@ -18,9 +18,10 @@ describe('powerTag', () => {
   });
 
   it('prefers the room tag and carries its colour', () => {
-    expect(powerTag(100, t, { 100: { name: 'Overlord', color: '#ff0000' } })).toEqual({
+    expect(powerTag(100, t, { 100: { name: 'Overlord', color: '#ff0000', icon: '⚡' } })).toEqual({
       name: 'Overlord',
       color: '#ff0000',
+      icon: '⚡',
     });
   });
 
@@ -28,7 +29,7 @@ describe('powerTag', () => {
     expect(powerTag(75, t).name).toBe(
       'timeline.powerTagDerived({"tag":"timeline.powerLevelModerator","level":75})'
     );
-    expect(powerTag(75, t, { 60: { name: 'Helper', color: null } }).name).toBe(
+    expect(powerTag(75, t, { 60: { name: 'Helper', color: null, icon: null } }).name).toBe(
       'timeline.powerTagDerived({"tag":"Helper","level":75})'
     );
   });

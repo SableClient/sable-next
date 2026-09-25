@@ -125,7 +125,7 @@
   let profileRequestId = 0;
   let permissions = $state<RoomPermissionsView | null>(null);
   let powerLevels = $state<RoomPowerLevelsView | null>(null);
-  let powerTags = $state.raw<PowerLevelTagMap>({});
+  let powerTags = $state.raw<PowerLevelTagMap | null>(null);
   let settingsOpen = $state(false);
   let topicOpen = $state(false);
   let inviteOpen = $state(false);
@@ -401,7 +401,7 @@
     const activeRoomId = resolvedRoomId;
     permissions = null;
     powerLevels = null;
-    powerTags = {};
+    powerTags = null;
     widgets = [];
     predecessor = null;
     let current = true;
@@ -417,6 +417,7 @@
       })
       .catch((error: unknown) => {
         console.debug('[sable room] room details unavailable', error);
+        if (current) powerTags = {};
       });
     void core.commands
       .roomPowerLevels(activeRoomId)
@@ -1230,6 +1231,7 @@
     ownPowerLevel={memberLoader.members.find((member) => member.user_id === core.session?.user_id)
       ?.power_level ?? 0}
     {permissions}
+    {powerTags}
     {profile}
     failed={profileFailed}
     onAvatarClick={openProfileAvatar}

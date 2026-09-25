@@ -11,14 +11,14 @@ import {
   withPowerLevelTagsFrom,
 } from './power-level-tags';
 
-test('a valid tag map is read with its name and colour', () => {
+test('a valid tag map is read with its name, colour and icon', () => {
   const tags = parsePowerLevelTags({
-    '100': { name: 'Admin', color: '#0088ff' },
+    '100': { name: 'Admin', color: '#0088ff', icon: { key: '✨' } },
     '50': { name: 'Moderator' },
   });
 
-  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: '#0088ff' });
-  expect(tagForLevel(tags, 50)).toEqual({ name: 'Moderator', color: null });
+  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: '#0088ff', icon: '✨' });
+  expect(tagForLevel(tags, 50)).toEqual({ name: 'Moderator', color: null, icon: null });
   expect(tagForLevel(tags, 0)).toBeNull();
 });
 
@@ -35,7 +35,7 @@ test('hostile content does not crash and yields no tags', () => {
 
 test('an invalid colour falls back to no colour rather than an unvalidated string', () => {
   const tags = parsePowerLevelTags({ '100': { name: 'Admin', color: 'javascript:alert(1)' } });
-  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: null });
+  expect(tagForLevel(tags, 100)).toEqual({ name: 'Admin', color: null, icon: null });
 });
 
 test('writing a tag preserves other entries and unknown fields on the same entry', () => {
@@ -44,19 +44,23 @@ test('writing a tag preserves other entries and unknown fields on the same entry
     '50': { name: 'Moderator' },
   };
 
-  const next = withPowerLevelTag(content, 100, { name: 'Owner', color: '#ff0000' });
+  const next = withPowerLevelTag(content, 100, {
+    name: 'Owner',
+    color: '#ff0000',
+    icon: '✨',
+  });
 
   expect(next['100']).toEqual({
     name: 'Owner',
     color: '#ff0000',
-    icon: { key: 'mxc://server/abc' },
+    icon: { key: '✨' },
   });
   expect(next['50']).toEqual({ name: 'Moderator' });
 });
 
 test('writing a tag with no colour clears a previously set colour', () => {
   const content = { '100': { name: 'Admin', color: '#0088ff' } };
-  const next = withPowerLevelTag(content, 100, { name: 'Admin', color: null });
+  const next = withPowerLevelTag(content, 100, { name: 'Admin', color: null, icon: null });
 
   expect(next['100']).toEqual({ name: 'Admin', color: undefined });
 });
@@ -69,10 +73,10 @@ test('writing null removes the entry', () => {
 });
 
 test('writing against hostile raw content starts fresh rather than throwing', () => {
-  expect(withPowerLevelTag(null, 100, { name: 'Admin', color: null })).toEqual({
+  expect(withPowerLevelTag(null, 100, { name: 'Admin', color: null, icon: null })).toEqual({
     '100': { name: 'Admin', color: undefined },
   });
-  expect(withPowerLevelTag('nonsense', 100, { name: 'Admin', color: null })).toEqual({
+  expect(withPowerLevelTag('nonsense', 100, { name: 'Admin', color: null, icon: null })).toEqual({
     '100': { name: 'Admin', color: undefined },
   });
 });
@@ -102,9 +106,9 @@ test('syncing tags takes the source role at each level and keeps the rest', () =
   );
 
   expect(parsePowerLevelTags(next)).toEqual({
-    100: { name: 'Admin', color: '#0088ff' },
-    50: { name: 'Moderator', color: null },
-    20: { name: 'Helper', color: '#00ff00' },
+    100: { name: 'Admin', color: '#0088ff', icon: null },
+    50: { name: 'Moderator', color: null, icon: null },
+    20: { name: 'Helper', color: '#00ff00', icon: null },
   });
   expect(withPowerLevelTagsFrom(null, undefined)).toEqual({});
 });

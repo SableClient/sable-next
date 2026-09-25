@@ -23,7 +23,7 @@ function named(level: number, t: Translate, tags: PowerLevelTagMap): PowerLevelT
   if (room) return room;
 
   const fallback = DEFAULT_TAGS.find((tag) => tag.level === level);
-  return fallback ? { name: t(fallback.key), color: null } : null;
+  return fallback ? { name: t(fallback.key), color: null, icon: null } : null;
 }
 
 export function powerTag(level: number, t: Translate, tags: PowerLevelTagMap = {}): PowerLevelTag {
@@ -42,5 +42,6 @@ export function powerTag(level: number, t: Translate, tags: PowerLevelTagMap = {
       ? t('timeline.powerTagDerived', { tag: tag.name, level })
       : t('timeline.powerTagTeam', { level }),
     color: tag?.color ?? null,
+    icon: null,
   };
 }
