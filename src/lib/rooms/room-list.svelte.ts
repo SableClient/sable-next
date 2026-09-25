@@ -1,4 +1,5 @@
 import { createContext, untrack } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 
 import type {
   CoreEvent,
@@ -64,6 +65,7 @@ export class RoomList {
   private generation = 0;
   /* eslint-disable svelte/prefer-svelte-reactivity -- rows read the published snapshot, not these */
   private readonly notificationModes = new Map<string, RoomNotificationModes>();
+  private readonly notificationModeVersions = new Map<string, number>();
   private readonly loadingNotificationModes = new Set<string>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
@@ -153,6 +155,7 @@ export class RoomList {
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     this.typingUsers = new Map();
     this.notificationModes.clear();
+    this.notificationModeVersions.clear();
     this.loadingNotificationModes.clear();
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
     this.publishedModes = new Map();
@@ -265,6 +268,9 @@ export class RoomList {
   private async loadNotificationModes(rooms: readonly RoomSummary[]): Promise<void> {
     const generation = this.generation;
     const pending = rooms.filter((room) => !this.loadingNotificationModes.has(room.room_id));
+    const requestedVersions = new SvelteMap(
+      pending.map((room) => [room.room_id, this.notificationModeVersions.get(room.room_id) ?? 0])
+    );
     for (const room of pending) this.loadingNotificationModes.add(room.room_id);
     this.publishLoadingModes();
     const modes: { roomId: string; mode: RoomNotificationModes }[] = [];
@@ -289,6 +295,9 @@ export class RoomList {
 
     let changed = false;
     for (const { roomId, mode } of modes) {
+      if ((this.notificationModeVersions.get(roomId) ?? 0) !== requestedVersions.get(roomId))
+        continue;
+
       const previous = this.notificationModes.get(roomId);
       if (previous?.room === mode.room && previous.fallback === mode.fallback) continue;
 
@@ -304,6 +313,7 @@ export class RoomList {
   setNotificationOverride(roomId: string, room: NotificationModeView | null): void {
     const previous = this.notificationModes.get(roomId);
     if (!previous || previous.room === room) return;
+    this.notificationModeVersions.set(roomId, (this.notificationModeVersions.get(roomId) ?? 0) + 1);
     this.notificationModes.set(roomId, { ...previous, room });
     // eslint-disable-next-line svelte/prefer-svelte-reactivity -- replaced wholesale, never mutated
     this.publishedModes = new Map(this.notificationModes);

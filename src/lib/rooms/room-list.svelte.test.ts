@@ -95,6 +95,54 @@ test('a room override set here shows before the push rules echo back', async () 
   roomList.stop();
 });
 
+test('a stale notification-mode refresh cannot overwrite a room override', async () => {
+  const room = { room_id: '!room:example.org' } as RoomSummary;
+  const eventListeners: ((event: unknown) => void)[] = [];
+  let resolveRefresh:
+    | ((value: { room_id: string; room: 'mentions'; default: 'all' }[]) => void)
+    | null = null;
+  let loads = 0;
+  const roomNotificationModes = vi.fn((roomIds: readonly string[]) => {
+    loads += 1;
+    if (loads === 1)
+      return Promise.resolve(
+        roomIds.map((room_id) => ({ room_id, room: 'mentions' as const, default: 'all' as const }))
+      );
+
+    return new Promise((resolve) => {
+      resolveRefresh = resolve;
+    });
+  });
+  const core = {
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [room] })),
+      roomNotificationModes,
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationOverride(room.room_id)).toBe('mentions');
+  });
+
+  eventListeners[1]?.({ type: 'notification_settings_changed' });
+  await vi.waitFor(() => {
+    expect(roomNotificationModes).toHaveBeenCalledTimes(2);
+  });
+
+  roomList.setNotificationOverride(room.room_id, 'all');
+  resolveRefresh?.([{ room_id: room.room_id, room: 'mentions', default: 'all' }]);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(roomList.notificationOverride(room.room_id)).toBe('all');
+  roomList.stop();
+});
+
 test('inbox counts follow room overrides and default changes', async () => {
   const rooms = [
     { room_id: '!inherited', state: 'joined', unread: 2, highlight: 0 },
