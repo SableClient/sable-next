@@ -9,7 +9,7 @@ use matrix_sdk::ruma::{
 };
 
 pub(crate) const NOTIFICATION_EVENT_TYPE: &str = "org.matrix.msc4075.rtc.notification";
-const DECLINE_EVENT_TYPE: &str = "org.matrix.msc4310.rtc.decline";
+pub(crate) const DECLINE_EVENT_TYPE: &str = "org.matrix.msc4310.rtc.decline";
 pub(crate) const NOTIFICATION_LIFETIME_MS: u64 = 30_000;
 pub(crate) const MAX_RING_TARGETS: usize = 8;
 const MAX_NOTIFICATION_LIFETIME_MS: u64 = 120_000;

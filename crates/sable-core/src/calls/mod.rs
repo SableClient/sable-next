@@ -453,8 +453,21 @@ impl Core {
         let content = notify::make_decline_event(&room, &event_id)
             .await
             .map_err(|error| self.failed("decline_call", error))?;
+        let mut content =
+            serde_json::to_value(content).map_err(|error| self.failed("decline_call", error))?;
+        if let Some(object) = content.as_object_mut() {
+            object
+                .entry("m.mentions")
+                .or_insert_with(|| serde_json::json!({}));
+        }
+        let content =
+            Raw::<matrix_sdk::ruma::events::AnyMessageLikeEventContent>::from_json_string(
+                content.to_string(),
+            )
+            .map_err(|error| self.failed("decline_call", error))?
+            .cast_unchecked();
         room.send_queue()
-            .send(content.into())
+            .send_raw(content, notify::DECLINE_EVENT_TYPE.to_owned())
             .await
             .map_err(|error| self.failed("decline_call", error))?;
 

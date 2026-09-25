@@ -454,8 +454,9 @@ impl Core {
             Command::SendRawEvent {
                 room_id,
                 event_type,
-                content,
+                mut content,
             } => {
+                ensure_empty_mentions(&mut content);
                 self.room(&room_id)
                     .await?
                     .send_raw(&event_type, content)
@@ -535,7 +536,10 @@ impl Core {
                             persona,
                         ))
                     }),
-                    [(IMAGE_SOURCE_PACKS, source)],
+                    [
+                        (IMAGE_SOURCE_PACKS, source),
+                        ("m.mentions", Some(serde_json::json!({}))),
+                    ],
                 );
                 timeline
                     .send_with_extra_content(content.into(), extra)
@@ -569,9 +573,7 @@ impl Core {
                 info.size = size.map(Into::into);
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
-                let content = RoomMessageEventContent::new(MessageType::Image(
-                    ImageMessageEventContent::plain(body, url).info(Box::new(info)),
-                ));
+                let content = gif_content(body, url, info);
 
                 let content = match thread_reply(in_reply_to, thread_root.clone(), false) {
                     Some(reply) => {
@@ -1310,13 +1312,23 @@ impl Core {
                     timeline
                         .send_with_extra_content(
                             ReactionEventContent::new(Annotation::new(event_id, key)).into(),
-                            extra_content(None, [(IMAGE_SOURCE_PACKS, Some(source))]),
+                            extra_content(
+                                None,
+                                [
+                                    (IMAGE_SOURCE_PACKS, Some(source)),
+                                    ("m.mentions", Some(serde_json::json!({}))),
+                                ],
+                            ),
                         )
                         .await
                         .map_err(|error| self.failed("react", error))?;
                 } else {
                     timeline
-                        .toggle_reaction(&TimelineEventItemId::EventId(event_id), &key)
+                        .toggle_reaction_with_extra_content(
+                            &TimelineEventItemId::EventId(event_id),
+                            &key,
+                            empty_mentions_extra(),
+                        )
                         .await
                         .map_err(|error| self.failed("react", error))?;
                 }
@@ -1394,41 +1406,32 @@ impl Core {
                 }
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
-                match timeline
-                    .send_location(
-                        body.clone(),
-                        geo_uri.clone(),
-                        None,
-                        None,
-                        None,
-                        in_reply_to.clone(),
-                    )
-                    .await
-                {
-                    Ok(_) => {}
-                    Err(matrix_sdk_ui::timeline::Error::ReplyError(
-                        matrix_sdk::room::reply::ReplyError::StateEvent,
-                    )) => {
-                        let mut location = LocationMessageEventContent::new(body, geo_uri.clone());
-                        location.location = Some(LocationContent::new(geo_uri));
-                        let Some(event_id) = in_reply_to else {
-                            return Err(self.failed(
-                                "send_location",
-                                "state-event reply error without an event id",
-                            ));
-                        };
-                        let content = reply_relation_fallback(
-                            RoomMessageEventContent::new(MessageType::Location(location)),
-                            event_id,
-                            thread_root,
-                        );
-                        timeline
-                            .send(content.into())
+                let content = location_content(body, geo_uri);
+                let content = match in_reply_to {
+                    Some(event_id) => {
+                        let fallback = content.clone();
+                        match self
+                            .room(&room_id)
+                            .await?
+                            .make_reply_event(
+                                content.into(),
+                                reply_to(event_id.clone(), thread_root.is_some(), false),
+                            )
                             .await
-                            .map_err(|error| self.failed("send_location", error))?;
+                        {
+                            Ok(content) => content,
+                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
+                                reply_relation_fallback(fallback, event_id, thread_root)
+                            }
+                            Err(error) => return Err(self.failed("send_location", error)),
+                        }
                     }
-                    Err(error) => return Err(self.failed("send_location", error)),
-                }
+                    None => content,
+                };
+                timeline
+                    .send(content.into())
+                    .await
+                    .map_err(|error| self.failed("send_location", error))?;
 
                 Ok(CommandOk::SendLocation)
             }
@@ -1447,7 +1450,7 @@ impl Core {
 
                 self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
-                    .send(content.into())
+                    .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
                     .map_err(|error| self.failed("create poll", error))?;
 
@@ -1466,7 +1469,7 @@ impl Core {
 
                 self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
-                    .send(content.into())
+                    .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
                     .map_err(|error| self.failed("vote poll", error))?;
 
@@ -1486,7 +1489,7 @@ impl Core {
 
                 self.timeline_for(&room_id, thread_root.as_ref())
                     .await?
-                    .send(content.into())
+                    .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
                     .map_err(|error| self.failed("end poll", error))?;
 
@@ -2706,22 +2709,34 @@ fn thread_reply(
     thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
     silent: bool,
 ) -> Option<SdkReply> {
-    let (event_id, enforce_thread) = match (in_reply_to, thread_root) {
-        (Some(event_id), Some(_)) => (event_id, EnforceThread::Threaded(ReplyWithinThread::Yes)),
-        (Some(event_id), None) => (event_id, EnforceThread::MaybeThreaded),
-        (None, Some(root)) => (root, EnforceThread::Threaded(ReplyWithinThread::No)),
-        (None, None) => return None,
-    };
+    match (in_reply_to, thread_root) {
+        (Some(event_id), thread_root) => Some(reply_to(event_id, thread_root.is_some(), silent)),
+        (None, Some(root)) => Some(SdkReply {
+            enforce_thread: EnforceThread::Threaded(ReplyWithinThread::No),
+            ..reply_to(root, false, silent)
+        }),
+        (None, None) => None,
+    }
+}
 
-    Some(SdkReply {
+const fn reply_to(
+    event_id: matrix_sdk::ruma::OwnedEventId,
+    in_thread: bool,
+    silent: bool,
+) -> SdkReply {
+    SdkReply {
         event_id,
-        enforce_thread,
+        enforce_thread: if in_thread {
+            EnforceThread::Threaded(ReplyWithinThread::Yes)
+        } else {
+            EnforceThread::MaybeThreaded
+        },
         add_mentions: if silent {
             AddMentions::No
         } else {
             AddMentions::Yes
         },
-    })
+    }
 }
 
 fn reply_relation_fallback(
@@ -2755,6 +2770,20 @@ fn message_content(
     content.add_mentions(outgoing_mentions(mentions, room))
 }
 
+fn gif_content(body: String, url: OwnedMxcUri, info: ImageInfo) -> RoomMessageEventContent {
+    RoomMessageEventContent::new(MessageType::Image(
+        ImageMessageEventContent::plain(body, url).info(Box::new(info)),
+    ))
+    .add_mentions(outgoing_mentions(Vec::new(), false))
+}
+
+fn location_content(body: String, geo_uri: String) -> RoomMessageEventContent {
+    let mut location = LocationMessageEventContent::new(body, geo_uri.clone());
+    location.location = Some(LocationContent::new(geo_uri));
+    RoomMessageEventContent::new(MessageType::Location(location))
+        .add_mentions(outgoing_mentions(Vec::new(), false))
+}
+
 const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
 const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
 
@@ -2769,6 +2798,18 @@ fn extra_content<const N: usize>(
         }
     }
     extra
+}
+
+fn empty_mentions_extra() -> Option<serde_json::Map<String, serde_json::Value>> {
+    extra_content(None, [("m.mentions", Some(serde_json::json!({})))])
+}
+
+fn ensure_empty_mentions(content: &mut serde_json::Value) {
+    if let Some(object) = content.as_object_mut() {
+        object
+            .entry("m.mentions")
+            .or_insert_with(|| serde_json::json!({}));
+    }
 }
 
 fn image_source_pack_extra(
@@ -3016,7 +3057,10 @@ async fn room_state_events_from_server(
 
 #[cfg(test)]
 mod tests {
-    use super::{edit_content, message_content, state_event_content};
+    use super::{
+        edit_content, empty_mentions_extra, ensure_empty_mentions, gif_content, location_content,
+        message_content, state_event_content,
+    };
     use matrix_sdk::ruma::RoomId;
 
     use crate::protocol::{CreateJoinRuleView, MessageKind};
@@ -3141,6 +3185,39 @@ mod tests {
             serde_json::to_value(&content).unwrap()["m.mentions"],
             serde_json::json!({})
         );
+    }
+
+    #[test]
+    fn gifs_and_locations_without_mentions_send_an_empty_m_mentions() {
+        let gif = gif_content(
+            "dancing".to_owned(),
+            matrix_sdk::ruma::OwnedMxcUri::from("mxc://example.org/gif"),
+            super::ImageInfo::new(),
+        );
+        let location = location_content("here".to_owned(), "geo:48.8584,2.2945".to_owned());
+
+        for content in [gif, location] {
+            assert_eq!(
+                serde_json::to_value(content).unwrap()["m.mentions"],
+                serde_json::json!({})
+            );
+        }
+    }
+
+    #[test]
+    fn polls_receive_an_empty_m_mentions_extra_field() {
+        assert_eq!(
+            empty_mentions_extra().unwrap()["m.mentions"],
+            serde_json::json!({})
+        );
+    }
+
+    #[test]
+    fn raw_events_without_mentions_receive_an_empty_m_mentions() {
+        let mut content = serde_json::json!({"body": "hello"});
+        ensure_empty_mentions(&mut content);
+
+        assert_eq!(content["m.mentions"], serde_json::json!({}));
     }
 
     #[test]

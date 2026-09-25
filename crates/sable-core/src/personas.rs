@@ -506,6 +506,7 @@ impl Core {
             object.insert("m.relates_to".to_owned(), relation.clone());
         }
         stamp_profile(&mut value, profile);
+        ensure_empty_mentions(&mut value);
 
         let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
             .map_err(|error| self.failed("edit_local_with_persona", error))?;
@@ -533,6 +534,7 @@ impl Core {
                 object.remove(PER_MESSAGE_PROFILE);
                 object.remove("m.per_message_profile");
             }
+            ensure_empty_mentions(content);
         };
         update(&mut value);
         if let Some(content) = value.get_mut("m.new_content") {
@@ -805,11 +807,19 @@ impl Core {
     }
 }
 
+fn ensure_empty_mentions(content: &mut Value) {
+    if let Some(object) = content.as_object_mut() {
+        object
+            .entry("m.mentions")
+            .or_insert_with(|| serde_json::json!({}));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        RoomAssociation, fallback_body, outgoing_with_fallback, persona_from_json,
-        personas_from_catalog, profile_to_json, room_associations_from_json,
+        RoomAssociation, ensure_empty_mentions, fallback_body, outgoing_with_fallback,
+        persona_from_json, personas_from_catalog, profile_to_json, room_associations_from_json,
         room_associations_to_json, stamp_profile,
     };
     use crate::protocol::{PerMessageProfileView, PronounView};
@@ -825,6 +835,17 @@ mod tests {
             color_on_dark: None,
             has_fallback,
         }
+    }
+
+    #[test]
+    fn persona_edits_add_an_empty_m_mentions_without_overwriting_mentions() {
+        let mut without_mentions = json!({ "msgtype": "m.text", "body": "hello" });
+        ensure_empty_mentions(&mut without_mentions);
+        assert_eq!(without_mentions["m.mentions"], json!({}));
+
+        let mut with_mentions = json!({ "m.mentions": { "room": true } });
+        ensure_empty_mentions(&mut with_mentions);
+        assert_eq!(with_mentions["m.mentions"], json!({ "room": true }));
     }
 
     #[test]

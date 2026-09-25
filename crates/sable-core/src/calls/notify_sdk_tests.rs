@@ -56,9 +56,10 @@ async fn core_declines_legacy_notifications_but_rejects_invalid_and_own_events()
         .and(path_regex(
             r"/rooms/.*/send/org\.matrix\.msc4310\.rtc\.decline/.*",
         ))
-        .and(body_json(
-            json!({"m.relates_to": {"rel_type": "m.reference", "event_id": "$legacy"}}),
-        ))
+        .and(body_json(json!({
+            "m.mentions": {},
+            "m.relates_to": {"rel_type": "m.reference", "event_id": "$legacy"},
+        })))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$declined"})))
         .expect(1)
         .mount(server.server())
