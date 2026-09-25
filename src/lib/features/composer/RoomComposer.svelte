@@ -58,7 +58,7 @@
   import ScheduleComposer from './ScheduleComposer.svelte';
   import type { AutocompleteQuery, Suggestion } from './autocomplete';
   import { formattedForEditing, type ComposerContext } from './composer-context';
-  import { clearDraft, readDraft, writeDraft } from './composer-drafts.svelte';
+  import { clearDraft, readDraft, remoteRevision, writeDraft } from './composer-drafts.svelte';
   import {
     filesFrom,
     restoreFile,
@@ -165,6 +165,7 @@
   const listboxId = `composer-suggestions-${uid}`;
   const optionId = (index: number): string => `${listboxId}-${String(index)}`;
 
+  const DRAFT_PERSIST_MS = 500;
   const draftKey = (): string => (threadRoot === null ? roomId : `${roomId}/${threadRoot}`);
 
   let prefilledFor: string | null = null;
@@ -174,6 +175,8 @@
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
+  let draftTimeout: ReturnType<typeof setTimeout> | undefined;
+  let seenRemoteDraft = 0;
   let boardOpen = $state(false);
   let boardTab = $state<BoardTab>('emoticon');
   let boardQuery = $state('');
@@ -290,6 +293,7 @@
       if (change.docChanged) {
         updateTyping();
         scheduleLayout();
+        schedulePersistDraft();
       }
     },
     onQuery: (next) => {
@@ -362,14 +366,25 @@
     else writeDraft(key, { doc: doc?.toJSON() ?? null, staged, nextStagedId });
   }
 
+  function schedulePersistDraft(): void {
+    clearTimeout(draftTimeout);
+    draftTimeout = setTimeout(() => {
+      draftTimeout = undefined;
+      if (activeDraftKey !== null) persistDraft(activeDraftKey);
+    }, DRAFT_PERSIST_MS);
+  }
+
   $effect(() => {
     const key = draftKey();
     if (activeDraftKey === key) return;
     const previous = activeDraftKey;
+    clearTimeout(draftTimeout);
+    draftTimeout = undefined;
     if (previous !== null) untrack(() => persistDraft(previous));
     activeDraftKey = key;
 
     untrack(() => {
+      seenRemoteDraft = remoteRevision(key);
       const draft = readDraft(key);
       if (draft) {
         staged = draft.staged;
@@ -388,9 +403,24 @@
     sendPress.cancel();
     if (layoutFrame !== undefined) cancelAnimationFrame(layoutFrame);
     if (typingTimeout) clearTimeout(typingTimeout);
+    clearTimeout(draftTimeout);
     stopTyping();
     queue.dispose();
     if (activeDraftKey !== null) persistDraft(activeDraftKey);
+  });
+
+  $effect(() => {
+    const key = draftKey();
+    const revision = remoteRevision(key);
+    untrack(() => {
+      if (activeDraftKey !== key || revision === seenRemoteDraft) return;
+      seenRemoteDraft = revision;
+      if (draftTimeout !== undefined || preEdit !== undefined) return;
+
+      const draft = readDraft(key);
+      editor.clear();
+      if (draft?.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
+    });
   });
 
   $effect(() => {

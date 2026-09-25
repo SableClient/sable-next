@@ -126,6 +126,28 @@ describe('the drafts document', () => {
     expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'local' });
     expect(readDraft('!other:example.org')?.doc).toEqual({ type: 'remote' });
   });
+
+  it('follows later remote edits to a draft it adopted', () => {
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'first' } } });
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'second' } } });
+
+    expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'second' });
+  });
+
+  it('drops an adopted draft once another device sends it', () => {
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'first' } } });
+    draftsDocument.adopt({ v: 1, drafts: {} });
+
+    expect(readDraft('!room:example.org')).toBeUndefined();
+  });
+
+  it('keeps an adopted draft this device has since edited', () => {
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'first' } } });
+    writeDraft('!room:example.org', { doc: { type: 'local' }, staged: [], nextStagedId: 0 });
+    draftsDocument.adopt({ v: 1, drafts: {} });
+
+    expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'local' });
+  });
 });
 
 describe('the recent emoji document', () => {

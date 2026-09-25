@@ -10,7 +10,13 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
-import { clearDraft, clearDrafts, writeDraft } from './composer-drafts.svelte';
+import {
+  adoptDraftDocuments,
+  clearDraft,
+  clearDrafts,
+  readDraft,
+  writeDraft,
+} from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
 import { composerSchema } from './editor/schema';
 import Harness from './RoomComposerHarness.test.svelte';
@@ -746,6 +752,37 @@ test('an unmount keeps the typed draft for the next mount', async () => {
 
   expect(editorText()).toBe('half a thought');
   void unmount(reopened);
+});
+
+test('typing saves the draft without leaving the room', async () => {
+  vi.useFakeTimers();
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+
+  clearEditor();
+  await vi.advanceTimersByTimeAsync(1000);
+
+  expect(readDraft('!room:example.org')).toBeUndefined();
+  vi.useRealTimers();
+  void unmount(instance);
+});
+
+test('a draft from another device appears in the open composer', async () => {
+  const instance = render({ roomId: '!room:example.org' });
+  await tick();
+
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('from the desktop')]),
+  ]);
+  adoptDraftDocuments({ '!room:example.org': draft.toJSON() as unknown });
+  await tick();
+
+  expect(editorText()).toBe('from the desktop');
+  void unmount(instance);
 });
 
 test('a thread keeps its draft out of the room it hangs off', async () => {
