@@ -1117,6 +1117,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'continue_identity_reset',
         recovery_key: 'e2e-recovery-key',
       }),
+      export_room_keys: () => {
+        throw new FakeCoreError('unsupported');
+      },
+      import_room_keys: () => {
+        throw new FakeCoreError('unsupported');
+      },
       delete_device: () => ({ type: 'delete_device', management_url: null }),
       request_verification: () => ({ type: 'request_verification', flow_id: 'e2e-flow' }),
       add_notification_keyword: (command) => {

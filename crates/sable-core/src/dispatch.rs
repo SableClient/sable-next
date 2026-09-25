@@ -1582,6 +1582,17 @@ impl Core {
                 Ok(CommandOk::CancelIdentityReset)
             }
 
+            #[cfg(not(target_family = "wasm"))]
+            Command::ExportRoomKeys { passphrase } => self.export_room_keys(&passphrase).await,
+            #[cfg(not(target_family = "wasm"))]
+            Command::ImportRoomKeys { export, passphrase } => {
+                self.import_room_keys(&export, &passphrase).await
+            }
+            #[cfg(target_family = "wasm")]
+            Command::ExportRoomKeys { .. } | Command::ImportRoomKeys { .. } => {
+                Err(CommandErr::Unsupported)
+            }
+
             Command::DeleteDevice {
                 device_id,
                 password,

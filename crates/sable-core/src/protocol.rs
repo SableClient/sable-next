@@ -724,6 +724,13 @@ pub enum Command {
         password: Option<String>,
     },
     CancelIdentityReset,
+    ExportRoomKeys {
+        passphrase: String,
+    },
+    ImportRoomKeys {
+        export: String,
+        passphrase: String,
+    },
     /// Call without a password first: the server states its terms in an
     /// `interactive_auth_required` error, and only then is there a prompt.
     DeleteDevice {
@@ -1355,6 +1362,15 @@ pub enum CommandOk {
         recovery_key: String,
     },
     CancelIdentityReset,
+    ExportRoomKeys {
+        export: String,
+    },
+    ImportRoomKeys {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        imported: u64,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        total: u64,
+    },
     DeleteDevice {
         management_url: Option<String>,
     },
@@ -1428,6 +1444,7 @@ pub enum CommandErr {
     /// A poll needs a question and between 1 and 20 answers.
     InvalidPoll,
     InvalidLocation,
+    InvalidKeyExport,
     EncryptedScheduleUnsupported,
     DelayedEventsUnsupported,
     /// Static: safe to hide UI.

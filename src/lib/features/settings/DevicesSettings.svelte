@@ -34,6 +34,7 @@
   import ResetIdentityDialog from './ResetIdentityDialog.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
+  import RoomKeyFile from './RoomKeyFile.svelte';
 
   const core = useCoreClient();
   let devices = $state.raw<DeviceView[]>([]);
@@ -592,6 +593,8 @@
         </ul>
       {/if}
     </SettingsSection>
+
+    <RoomKeyFile />
   </div>
 </AppPageShell>
 

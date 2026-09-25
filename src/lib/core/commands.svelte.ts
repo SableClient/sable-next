@@ -1468,6 +1468,23 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'cancel_identity_reset' });
     },
 
+    async exportRoomKeys(passphrase: string): Promise<string> {
+      const response = await transport().send({ type: 'export_room_keys', passphrase });
+      return response.export;
+    },
+
+    async importRoomKeys(
+      exported: string,
+      passphrase: string
+    ): Promise<{ imported: number; total: number }> {
+      const { imported, total } = await transport().send({
+        type: 'import_room_keys',
+        export: exported,
+        passphrase,
+      });
+      return { imported, total };
+    },
+
     async renameDevice(deviceId: string, displayName: string): Promise<void> {
       await transport().send({
         type: 'rename_device',

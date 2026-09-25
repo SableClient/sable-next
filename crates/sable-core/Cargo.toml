@@ -54,6 +54,7 @@ matrix-sdk = { workspace = true, features = [
   "automatic-room-key-forwarding",
   "qrcode",
 ] }
+tempfile = "3"
 tokio = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
