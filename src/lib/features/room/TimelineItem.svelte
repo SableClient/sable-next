@@ -612,9 +612,7 @@
       stalled === null
   );
 
-  let trailingReceiptBadge = $derived(
-    actionable && showReceiptBadge && !receiptsInline && layout !== 'bubble'
-  );
+  let trailingReceiptBadge = $derived(actionable && showReceiptBadge && !receiptsInline);
   let receiptBeside = $state(false);
 
   const rowPress = new LongPress({
@@ -1641,7 +1639,7 @@
 
   .receipt-space {
     display: inline-block;
-    inline-size: calc(var(--receipt-reserve) + var(--space-200));
+    inline-size: var(--receipt-reserve);
   }
 
   .message header {

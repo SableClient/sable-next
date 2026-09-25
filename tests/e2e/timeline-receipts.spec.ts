@@ -93,3 +93,40 @@ test('receipts beside text, reactions, an embed or an image add no row of their 
     if (item !== text) expect(receipted.beside, name).toBe(true);
   }
 });
+
+test('bubble receipts sit beside trailing reactions on either side', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ layout: 'bubble' }));
+  });
+  await installRoomCore('ready');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  const subscription = await core.subscription();
+  const row = page.locator('[data-item-id="general-18"] .message');
+  const reacted = {
+    ...timelineItem('general-18', 'hello there'),
+    reactions: [{ key: '👍', senders: ['@bob:example.test'] }],
+  };
+
+  for (const own of [false, true]) {
+    const measure = async (readBy: string[]) => {
+      await core.setTimelineItemById(subscription, 'general-18', {
+        ...reacted,
+        is_own: own,
+        read_by: readBy,
+      });
+      await expect(row.locator('.receipt-slot')).toHaveCount(readBy.length);
+      return row.evaluate((node) => Math.round(node.getBoundingClientRect().height));
+    };
+    const plain = await measure([]);
+    expect(await measure(['@bob:example.test']), String(own)).toBe(plain);
+    await expect(row.locator('.message-content')).toHaveClass(/receipt-beside/);
+  }
+});

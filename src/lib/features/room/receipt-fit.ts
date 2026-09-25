@@ -7,29 +7,21 @@ export interface Box {
   bottom: number;
 }
 
-export interface Corner {
-  width: number;
-  height: number;
-  gap: number;
-  rtl: boolean;
-}
-
 export function fitsBesideContent(
   rects: readonly Box[],
-  frame: Box,
-  bottom: number,
-  corner: Corner
+  column: Box,
+  badge: Box,
+  gap: number,
+  rtl: boolean
 ): boolean {
-  const full = frame.right - frame.left - 1;
-  const top = bottom - corner.height;
-  const edge = corner.rtl
-    ? frame.left + corner.width + corner.gap
-    : frame.right - corner.width - corner.gap;
+  const full = column.right - column.left - 1;
+  const top = column.bottom - (badge.bottom - badge.top);
+  const edge = rtl ? badge.right + gap : badge.left - gap;
   return rects.every((rect) => {
     if (rect.right - rect.left <= 0 || rect.bottom - rect.top <= 0) return true;
     if (rect.right - rect.left >= full) return true;
     if (rect.bottom <= top) return true;
-    return corner.rtl ? rect.left >= edge : rect.right <= edge;
+    return rtl ? rect.left >= edge : rect.right <= edge;
   });
 }
 
@@ -42,17 +34,15 @@ export function trailingReceipt(onFit: (fits: boolean) => void): Attachment<HTML
       const range = document.createRange();
       range.selectNodeContents(main);
       const rects = [...range.getClientRects()];
-      const frame = node.getBoundingClientRect();
-      const bottom = main.getBoundingClientRect().bottom;
-      const size = badge.getBoundingClientRect();
       const style = getComputedStyle(badge);
       onFit(
-        fitsBesideContent(rects, frame, bottom, {
-          width: size.width,
-          height: size.height,
-          gap: Number.parseFloat(style.marginInlineStart) || 0,
-          rtl: style.direction === 'rtl',
-        })
+        fitsBesideContent(
+          rects,
+          main.getBoundingClientRect(),
+          badge.getBoundingClientRect(),
+          Number.parseFloat(style.marginInlineStart) || 0,
+          style.direction === 'rtl'
+        )
       );
     };
     const observer = new ResizeObserver(measure);
