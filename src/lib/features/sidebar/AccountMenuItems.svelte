@@ -11,6 +11,7 @@
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
   import PencilIcon from 'phosphor-svelte/lib/PencilIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -141,7 +142,10 @@
     </ActionMenuItem>
   </ActionMenuSub>
 {/if}
-<ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>
+<ActionMenuItem destructive onSelect={onLogout}>
+  <SignOutIcon aria-hidden="true" />
+  <span>{$i18n.t('settings.logout')}</span>
+</ActionMenuItem>
 
 <style>
   :global(.account-popover .menu-item .presence-dot) {
