@@ -88,6 +88,18 @@ runs:
       working-directory: ${{ github.workspace }}
       run: pnpm wasm:build
 
+    - name: Verify Sentry source map configuration
+      if: ${{ inputs.build == 'true' }}
+      shell: bash
+      run: |
+        if [ -z "${VITE_SENTRY_DSN:-}" ]; then
+          exit 0
+        fi
+        : "${SENTRY_AUTH_TOKEN:?SENTRY_AUTH_TOKEN is required when VITE_SENTRY_DSN is set}"
+        : "${SENTRY_ORG:?SENTRY_ORG is required when VITE_SENTRY_DSN is set}"
+        : "${SENTRY_PROJECT:?SENTRY_PROJECT is required when VITE_SENTRY_DSN is set}"
+        : "${VITE_APP_VERSION:?VITE_APP_VERSION is required when VITE_SENTRY_DSN is set}"
+
     # `vite build` rather than `pnpm build`, whose prebuild hook would recompile
     # the bindings the cache just restored.
     - name: Build app

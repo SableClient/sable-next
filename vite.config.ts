@@ -43,15 +43,13 @@ export default defineConfig({
       // project does not have, and does not know `adapter-static` either.
       adapter: 'other',
       autoUploadSourceMaps: Boolean(process.env.SENTRY_AUTH_TOKEN),
+      authToken: process.env.SENTRY_AUTH_TOKEN,
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
       release: { name: process.env.VITE_APP_VERSION },
       sourcemaps: {
-        // `adapter: 'other'` would look in `.svelte-kit/output`, not the copy
-        // `adapter-static` writes and the browser loads.
-        assets: ['./dist/**/*.js', './dist/**/*.js.map'],
-        // Otherwise the maps ship to Cloudflare with the bundle.
-        filesToDeleteAfterUpload: ['./dist/**/*.js.map'],
+        // Upload discovery uses SvelteKit's output; neither copy may ship maps.
+        filesToDeleteAfterUpload: ['./.svelte-kit/output/**/*.map', './dist/**/*.map'],
       },
     }),
     sveltekit({
