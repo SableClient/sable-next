@@ -198,8 +198,6 @@ fn profile_animal(response: &ProfileResponse) -> Option<AnimalIdentityView> {
 }
 
 fn profile_extra(response: &ProfileResponse) -> Vec<ProfileFieldView> {
-    const MAX_VALUE_CHARS: usize = 256;
-
     let mut extra = response
         .iter()
         .filter(|(field, _)| !RENDERED_PROFILE_FIELDS.contains(&field.as_str()))
@@ -207,10 +205,7 @@ fn profile_extra(response: &ProfileResponse) -> Vec<ProfileFieldView> {
             key: field.as_str().to_owned(),
             value: value
                 .as_str()
-                .map_or_else(|| value.to_string(), ToOwned::to_owned)
-                .chars()
-                .take(MAX_VALUE_CHARS)
-                .collect(),
+                .map_or_else(|| value.to_string(), ToOwned::to_owned),
         })
         .collect::<Vec<_>>();
     extra.sort_by(|left, right| left.key.cmp(&right.key));

@@ -60,7 +60,7 @@
 
   import '#lib/ui/primitives/menu.css';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
-  import { profileFieldMap } from './profile-field-map.js';
+  import { profileFieldJson, profileFieldMap, profileFieldPreview } from './profile-field-map.js';
 
   interface Props {
     userId: string;
@@ -646,8 +646,11 @@
             <div class="profile-menu-key"></div>
           {/each}
         </div>
+      {:else if preferences.developerTools}
+        <pre class="profile-extra-json">{profileFieldJson(activeExtra.value)}</pre>
       {:else}
-        {@const map = profileFieldMap(activeExtra.value)}
+        {@const value = profileFieldPreview(activeExtra.value)}
+        {@const map = profileFieldMap(value)}
         {#if map}
           <table class="profile-key-table">
             <tbody>
@@ -660,7 +663,7 @@
             </tbody>
           </table>
         {:else}
-          {activeExtra.value}
+          {value}
         {/if}
       {/if}
     </div>
@@ -878,6 +881,13 @@
 
   .profile-key-table {
     border-collapse: collapse;
+  }
+
+  .profile-extra-json {
+    font-family: var(--font-family-mono);
+    margin: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
   }
 
   .moderation {

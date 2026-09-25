@@ -38,6 +38,8 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
   return { ...actual, usePresenceStore: () => ({ get: () => null }) };
 });
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import MentionProfileCard from './MentionProfileCard.svelte';
 
 const emptyProfile: ProfileView = {
@@ -608,5 +610,41 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
   );
   expect(names).toEqual(['General', 'Alice']);
   expect(document.querySelector('.profile-card-bio')).toBeNull();
+  await unmount(instance);
+});
+
+test('shows a misc field in full as JSON with developer tools on, and a preview without', async () => {
+  const value = JSON.stringify({ site: 'x'.repeat(300) });
+  const open = async () => {
+    const instance = mount(MentionProfileCard, {
+      target: document.body,
+      props: {
+        userId: '@alice:example.org',
+        roomId: '!room:example.org',
+        member: null,
+        profile: { ...emptyProfile, extra: [{ key: 'net.example.links', value }] },
+      },
+    });
+    await tick();
+    document.querySelector<HTMLButtonElement>('button.profile-extra')?.click();
+    await tick();
+    document.querySelector<HTMLButtonElement>('.profile-keys button')?.click();
+    await tick();
+    return instance;
+  };
+
+  preferences.developerTools = true;
+  let instance = await open();
+  expect(document.querySelector('.profile-extra-json')?.textContent).toBe(
+    JSON.stringify(JSON.parse(value), null, 2)
+  );
+  await unmount(instance);
+
+  preferences.developerTools = false;
+  instance = await open();
+  expect(document.querySelector('.profile-extra-json')).toBeNull();
+  expect(document.querySelector('.profile-extra-open')?.textContent.trim()).toBe(
+    value.slice(0, 256)
+  );
   await unmount(instance);
 });
