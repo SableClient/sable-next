@@ -728,6 +728,7 @@ fn add_child() -> Command {
     Command::AddToSpace {
         space_id: room_id!("!space:example.org").to_owned(),
         room_id: room_id!("!child:example.org").to_owned(),
+        suggested: None,
     }
 }
 
@@ -754,6 +755,39 @@ async fn adding_a_delisted_child_lists_it_again() {
     let writes = space_child_writes(Some(json!({})), add_child()).await;
 
     assert_eq!(writes, [json!({"via": ["localhost"]})]);
+}
+
+#[tokio::test]
+async fn adding_a_suggested_child_marks_it() {
+    let writes = space_child_writes(
+        None,
+        Command::AddToSpace {
+            space_id: room_id!("!space:example.org").to_owned(),
+            room_id: room_id!("!child:example.org").to_owned(),
+            suggested: Some(true),
+        },
+    )
+    .await;
+
+    assert_eq!(writes, [json!({"via": ["localhost"], "suggested": true})]);
+}
+
+#[tokio::test]
+async fn suggesting_a_child_keeps_its_via_and_order() {
+    let writes = space_child_writes(
+        Some(json!({"via": ["other.org"], "order": "b"})),
+        Command::SetSpaceChildSuggested {
+            space_id: room_id!("!space:example.org").to_owned(),
+            room_id: room_id!("!child:example.org").to_owned(),
+            suggested: true,
+        },
+    )
+    .await;
+
+    assert_eq!(
+        writes,
+        [json!({"via": ["other.org"], "order": "b", "suggested": true})]
+    );
 }
 
 #[tokio::test]

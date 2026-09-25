@@ -645,6 +645,7 @@ pub enum Command {
         space_id: OwnedRoomId,
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
+        suggested: Option<bool>,
     },
     SetSpaceChildOrder {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -652,6 +653,13 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
         order: Option<String>,
+    },
+    SetSpaceChildSuggested {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        space_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        suggested: bool,
     },
     SpaceHierarchy {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1328,6 +1336,7 @@ pub enum CommandOk {
     },
     RemoveFromSpace,
     SetSpaceChildOrder,
+    SetSpaceChildSuggested,
     SpaceSidebar {
         items: Vec<SidebarItemView>,
     },

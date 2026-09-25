@@ -135,13 +135,21 @@ impl Core {
         &self,
         space_id: &OwnedRoomId,
         room_id: &RoomId,
+        suggested: Option<bool>,
     ) -> Result<(), CommandErr> {
         let space = self.room(space_id).await?;
-        if self
+        if let Some(mut content) = self
             .space_child_content(&space, room_id, "add_to_space")
             .await?
-            .is_some()
         {
+            let Some(suggested) = suggested.filter(|&next| next != content.suggested) else {
+                return Ok(());
+            };
+            content.suggested = suggested;
+            space
+                .send_state_event_for_key(room_id, content)
+                .await
+                .map_err(|error| self.room_error("add_to_space", error))?;
             return Ok(());
         }
 
@@ -152,8 +160,11 @@ impl Core {
             .filter_map(|server| ServerName::parse(server).ok())
             .collect();
 
+        let mut content = SpaceChildEventContent::new(via);
+        content.suggested = suggested.unwrap_or(false);
+
         space
-            .send_state_event_for_key(room_id, SpaceChildEventContent::new(via))
+            .send_state_event_for_key(room_id, content)
             .await
             .map_err(|error| self.failed("add_to_space", error))?;
 
@@ -198,8 +209,6 @@ impl Core {
         Ok(view::via_servers(&ranked))
     }
 
-    /// `None` for a child that is not listed, including one delisted by an
-    /// empty content.
     async fn space_child_content(
         &self,
         space: &Room,
@@ -251,6 +260,28 @@ impl Core {
             .map_err(|error| self.room_error("set_space_child_order", error))?;
 
         Ok(CommandOk::SetSpaceChildOrder)
+    }
+
+    pub(crate) async fn set_space_child_suggested(
+        &self,
+        space_id: &OwnedRoomId,
+        room_id: &RoomId,
+        suggested: bool,
+    ) -> Result<CommandOk, CommandErr> {
+        let space = self.room(space_id).await?;
+
+        let mut content = self
+            .space_child_content(&space, room_id, "set_space_child_suggested: read")
+            .await?
+            .ok_or(CommandErr::UnknownRoom)?;
+        content.suggested = suggested;
+
+        space
+            .send_state_event_for_key(room_id, content)
+            .await
+            .map_err(|error| self.room_error("set_space_child_suggested", error))?;
+
+        Ok(CommandOk::SetSpaceChildSuggested)
     }
 
     pub(crate) async fn knock_room(

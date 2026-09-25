@@ -13,6 +13,7 @@
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
+  import StarFourIcon from 'phosphor-svelte/lib/StarFourIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
@@ -65,6 +66,7 @@
     onOpenLobby: (roomId: string) => void;
     onCreateIn: (roomId: string, kind: 'create-room' | 'create-space') => void;
     onTogglePin: (roomId: string) => void;
+    onSetSuggested: (parentId: string, roomId: string, suggested: boolean) => void;
     onMoveSubspace: (section: HierarchySection, delta: number) => void;
     onRemoveSubspace: (section: HierarchySection) => void;
     onMoveTo: (section: HierarchySection, entry: HierarchyRoom, target: string) => void;
@@ -95,6 +97,7 @@
     onOpenLobby,
     onCreateIn,
     onTogglePin,
+    onSetSuggested,
     onMoveSubspace,
     onRemoveSubspace,
     onMoveTo,
@@ -226,6 +229,18 @@
                 <UsersThreeIcon size={16} />{$i18n.t('nav.createSubspace')}
               </ActionMenuItem>
             {/if}
+            {#if section.ownerId !== null}
+              {@const ownerId = section.ownerId}
+              <ActionMenuItem
+                onSelect={() => {
+                  onSetSuggested(ownerId, sectionSpace.room_id, !section.suggested);
+                }}
+              >
+                <StarFourIcon size={16} />{$i18n.t(
+                  section.suggested ? 'room.lobbyUnmarkSuggested' : 'room.lobbyMarkSuggested'
+                )}
+              </ActionMenuItem>
+            {/if}
             <ActionMenuItem
               onSelect={() => {
                 onMoveSubspace(section, -1);
@@ -355,6 +370,15 @@
                     <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
                   </ActionMenuItem>
                   {#if canManage}
+                    <ActionMenuItem
+                      onSelect={() => {
+                        onSetSuggested(section.parentId, child.room_id, !entry.suggested);
+                      }}
+                    >
+                      <StarFourIcon size={16} />{$i18n.t(
+                        entry.suggested ? 'room.lobbyUnmarkSuggested' : 'room.lobbyMarkSuggested'
+                      )}
+                    </ActionMenuItem>
                     <ActionMenuItem
                       onSelect={() => {
                         onMove(section, child.room_id, -1);

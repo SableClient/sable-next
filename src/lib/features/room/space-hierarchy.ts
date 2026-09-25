@@ -235,6 +235,43 @@ export function applyChildOverrides(
   });
 }
 
+export type SuggestedOverride = {
+  parentId: string;
+  roomId: string;
+  suggested: boolean;
+};
+
+export function applySuggestedOverrides(
+  rooms: readonly HierarchyRoomView[],
+  overrides: readonly SuggestedOverride[]
+): HierarchyRoomView[] {
+  if (overrides.length === 0) return [...rooms];
+
+  return rooms.map((room) => {
+    const own = overrides.filter((override) => override.parentId === room.room_id);
+    if (own.length === 0) return room;
+
+    return {
+      ...room,
+      children: room.children.map((edge) => {
+        const override = own.find((candidate) => candidate.roomId === edge.room_id);
+        return override === undefined ? edge : { ...edge, suggested: override.suggested };
+      }),
+    };
+  });
+}
+
+export function pendingSuggestedOverrides(
+  rooms: readonly HierarchyRoomView[],
+  overrides: readonly SuggestedOverride[]
+): SuggestedOverride[] {
+  return overrides.filter(
+    (override) =>
+      childEdges(rooms, override.parentId).find((edge) => edge.room_id === override.roomId)
+        ?.suggested !== override.suggested
+  );
+}
+
 export function levelTargets(
   sections: readonly HierarchySection[],
   rootId: string,

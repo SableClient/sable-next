@@ -4,6 +4,7 @@ import type { RoomSummary, SpaceChildEdge, SpaceHierarchyRoomView } from '#src/g
 
 import {
   applyChildOverrides,
+  applySuggestedOverrides,
   buildHierarchySections,
   childEdges,
   edgeSignature,
@@ -12,6 +13,7 @@ import {
   lobbyPhase,
   localHierarchyRooms,
   mergeHierarchyRooms,
+  pendingSuggestedOverrides,
   placeholderRows,
 } from './space-hierarchy';
 
@@ -379,4 +381,28 @@ test('a subspace the server refuses stays as a heading', () => {
   expect(section.space?.room_id).toBe('!sub');
   expect(section.failed).toBe(true);
   expect(placeholderRows(section)).toBe(0);
+});
+
+test('a suggestion override shows on the edge until the parent agrees', () => {
+  const rooms = [
+    room('!root', { is_space: true, children: [edge('!a'), edge('!sub')] }),
+    room('!a'),
+    room('!sub', { is_space: true, children: [edge('!b')] }),
+    room('!b'),
+  ];
+  const overrides = [
+    { parentId: '!root', roomId: '!a', suggested: true },
+    { parentId: '!root', roomId: '!sub', suggested: true },
+  ];
+
+  const sections = buildHierarchySections(applySuggestedOverrides(rooms, overrides), '!root');
+
+  expect(sections[0].rooms[0].suggested).toBe(true);
+  expect(sections[1]).toMatchObject({ ownerId: '!root', suggested: true });
+  expect(pendingSuggestedOverrides(rooms, overrides)).toEqual(overrides);
+
+  const synced = [
+    room('!root', { is_space: true, children: [edge('!a', { suggested: true }), edge('!sub')] }),
+  ];
+  expect(pendingSuggestedOverrides(synced, overrides)).toEqual([overrides[1]]);
 });

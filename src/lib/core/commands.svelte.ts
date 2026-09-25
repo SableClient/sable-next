@@ -627,11 +627,16 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'leave_room', room_id: roomId });
     },
 
-    async addToSpace(spaceId: string, roomId: string): Promise<void> {
+    async addToSpace(
+      spaceId: string,
+      roomId: string,
+      suggested: boolean | null = null
+    ): Promise<void> {
       await transport().send({
         type: 'add_to_space',
         space_id: spaceId,
         room_id: roomId,
+        suggested,
       });
     },
 
@@ -661,6 +666,19 @@ export function createCommands(transport: () => Transport) {
         space_id: spaceId,
         room_id: roomId,
         order,
+      });
+    },
+
+    async setSpaceChildSuggested(
+      spaceId: string,
+      roomId: string,
+      suggested: boolean
+    ): Promise<void> {
+      await transport().send({
+        type: 'set_space_child_suggested',
+        space_id: spaceId,
+        room_id: roomId,
+        suggested,
       });
     },
 

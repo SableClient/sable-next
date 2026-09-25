@@ -29,9 +29,11 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import {
     applyChildOverrides,
+    applySuggestedOverrides,
     buildHierarchySections,
     childEdges,
     edgeSignature,
@@ -40,12 +42,14 @@
     lobbyPhase,
     localHierarchyRooms,
     mergeHierarchyRooms,
+    pendingSuggestedOverrides,
     sameLobbyItem,
     type ChildOrderOverride,
     type HierarchyRoom,
     type HierarchyRoomView,
     type HierarchySection,
     type LobbyDragItem,
+    type SuggestedOverride,
   } from './space-hierarchy';
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
@@ -80,6 +84,7 @@
 
   let fetched = $state.raw<SpaceHierarchyRoomView[]>([]);
   let overrides = $state.raw<ChildOrderOverride[]>([]);
+  let suggestedOverrides = $state.raw<SuggestedOverride[]>([]);
   let failed = $state(false);
   let topicOpen = $state(false);
   let permissions = $state<RoomPermissionsView | null>(null);
@@ -104,7 +109,8 @@
     if (spaceId === null) return [];
     return mergeHierarchyRooms(localHierarchyRooms(roomList.rooms, spaceId), fetched);
   });
-  let merged = $derived(applyChildOverrides(base, overrides));
+  let ordered = $derived(applyChildOverrides(base, overrides));
+  let merged = $derived(applySuggestedOverrides(ordered, suggestedOverrides));
   let sections = $derived.by<HierarchySection[]>(() => {
     if (spaceId === null) return [];
     return buildHierarchySections(
@@ -149,6 +155,7 @@
     drainingFor = null;
     fetched = [];
     overrides = [];
+    suggestedOverrides = [];
     failed = false;
     loadedLevels.clear();
     pendingLevels.clear();
@@ -272,6 +279,28 @@
         ? resolve('/(app)/space/[spaceId]/create-room', { spaceId })
         : resolve('/(app)/space/[spaceId]/create-space', { spaceId })
     );
+  }
+
+  $effect(() => {
+    if (suggestedOverrides.length === 0) return;
+
+    const kept = pendingSuggestedOverrides(ordered, suggestedOverrides);
+    if (kept.length !== suggestedOverrides.length) suggestedOverrides = kept;
+  });
+
+  async function setSuggested(parentId: string, roomId: string, suggested: boolean): Promise<void> {
+    const override = { parentId, roomId, suggested };
+    const others = (candidate: SuggestedOverride) =>
+      candidate.parentId !== parentId || candidate.roomId !== roomId;
+    suggestedOverrides = [...suggestedOverrides.filter(others), override];
+
+    try {
+      await core.commands.setSpaceChildSuggested(parentId, roomId, suggested);
+    } catch (error) {
+      console.warn('[sable lobby] suggestion not saved', error);
+      suggestedOverrides = suggestedOverrides.filter((candidate) => candidate !== override);
+      toasts.error($i18n.t('room.lobbySuggestedFailed'));
+    }
   }
 
   function togglePin(roomId: string): void {
@@ -605,6 +634,9 @@
         onOpenLobby={openLobby}
         onCreateIn={createIn}
         onTogglePin={togglePin}
+        onSetSuggested={(parentId: string, roomId: string, suggested: boolean) => {
+          void setSuggested(parentId, roomId, suggested);
+        }}
         onMoveSubspace={moveSubspace}
         onRemoveSubspace={(section: HierarchySection) => {
           void removeSubspace(section);
