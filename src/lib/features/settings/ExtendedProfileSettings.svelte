@@ -16,6 +16,7 @@
   import ColorSetting from './ColorSetting.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
+  import { pronounSets } from '#lib/profile/pronouns.js';
   import { bioMarkdown, bioTexts } from './bio-markdown.js';
 
   interface Props {
@@ -90,7 +91,7 @@
         timezone = snapshot.timezone ?? '';
       },
       fields: () => [
-        ['io.fsky.nyx.pronouns', pronounSets()],
+        ['io.fsky.nyx.pronouns', pronounSets(pronouns)],
         ['m.tz', timezone || null],
         ['us.cloke.msc4175.tz', timezone || null],
       ],
@@ -275,20 +276,6 @@
     } finally {
       saving = null;
     }
-  }
-
-  function pronounSets(): Array<{ summary: string; language?: string }> {
-    return pronouns
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry) => {
-        const match = /^(.*?)(?:\s*\(([^)]+)\))?$/.exec(entry);
-        return {
-          summary: match?.[1]?.trim() || entry,
-          ...(match?.[2] ? { language: match[2] } : {}),
-        };
-      });
   }
 </script>
 

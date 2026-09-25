@@ -295,11 +295,15 @@
           <ProfileCard
             {userId}
             displayName={profile.displayName}
+            pronouns={profile.pronouns}
             avatarPreview={profile.avatarPreview}
             isSaving={profile.isSaving}
             error={index === activeIndex ? profile.error : null}
             onDisplayName={(value: string) => {
               profile.setDisplayName(value);
+            }}
+            onPronouns={(value: string) => {
+              profile.setPronouns(value);
             }}
             onAvatar={(file: File | null) => {
               profile.setAvatar(file);

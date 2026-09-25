@@ -11,10 +11,12 @@
   interface Props {
     userId: string;
     displayName: string;
+    pronouns: string;
     avatarPreview: string | null;
     isSaving: boolean;
     error: string | null;
     onDisplayName: (value: string) => void;
+    onPronouns: (value: string) => void;
     onAvatar: (file: File | null) => void;
     onContinue: () => void;
     onSkip: () => void;
@@ -23,10 +25,12 @@
   let {
     userId,
     displayName,
+    pronouns,
     avatarPreview,
     isSaving,
     error,
     onDisplayName,
+    onPronouns,
     onAvatar,
     onContinue,
     onSkip,
@@ -85,6 +89,17 @@
       maxlength={255}
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onDisplayName(event.currentTarget.value);
+      }}
+    />
+  </FormField>
+
+  <FormField dense fieldId="profile-pronouns" label={$i18n.t('settings.pronouns')}>
+    <TextInput
+      id="profile-pronouns"
+      value={pronouns}
+      placeholder={$i18n.t('settings.pronounsPlaceholder')}
+      oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
+        onPronouns(event.currentTarget.value);
       }}
     />
   </FormField>

@@ -1,4 +1,5 @@
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { pronounSets } from '#lib/profile/pronouns.js';
 import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
@@ -31,6 +32,7 @@ interface ProfileControllerOptions {
 
 export class ProfileController {
   displayName = $state('');
+  pronouns = $state('');
   avatarPreview = $state<string | null>(null);
   avatarFile = $state<File | null>(null);
   avatarCleared = $state(false);
@@ -41,6 +43,10 @@ export class ProfileController {
 
   setDisplayName(value: string): void {
     this.displayName = value;
+  }
+
+  setPronouns(value: string): void {
+    this.pronouns = value;
   }
 
   setAvatar(file: File | null): void {
@@ -57,6 +63,10 @@ export class ProfileController {
       const name = this.displayName.trim();
       const propagateTo = preferences.profileChangePropagation;
       if (name) await this.options.core.commands.setDisplayName(name, propagateTo);
+      const pronouns = pronounSets(this.pronouns);
+      if (pronouns.length > 0) {
+        await this.options.core.setProfileField('io.fsky.nyx.pronouns', pronouns);
+      }
       if (this.avatarFile) {
         const upright = await uprightJpeg(this.avatarFile);
         const bytes = new Uint8Array(await upright.arrayBuffer());
