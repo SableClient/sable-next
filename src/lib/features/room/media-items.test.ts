@@ -24,6 +24,7 @@ function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }
     per_message_profile: null,
     bundled_link_previews: [],
     mention: 'none',
+    forwarded: null,
   } satisfies TimelineItemView;
 }
 

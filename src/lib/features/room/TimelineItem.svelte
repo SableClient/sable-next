@@ -69,6 +69,7 @@
   import ReceiptsDialog from './ReceiptsDialog.svelte';
   import SenderName from './SenderName.svelte';
   import DeleteMessageDialog from './DeleteMessageDialog.svelte';
+  import ForwardedLine from './ForwardedLine.svelte';
   import MessageReproxyDialog from './MessageReproxyDialog.svelte';
   import type { MatrixLink } from './matrix-link';
   import { replyPreviewBody, type ReplyVersion } from './reply-preview';
@@ -1025,6 +1026,9 @@
               <span class="reply-body">{replyBody}</span></span
             >
           </button>
+        {/if}
+        {#if item.forwarded}
+          <ForwardedLine forwarded={item.forwarded} {roomId} {onJumpToEvent} />
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
           {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
