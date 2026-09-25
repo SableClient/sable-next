@@ -60,6 +60,7 @@
   }: Props = $props();
 
   let size = $derived<'small' | 'medium'>(compact ? 'small' : 'medium');
+  let neutral = $derived<'ghost' | 'secondary'>(compact ? 'ghost' : 'secondary');
   let devices = $derived(compact ? undefined : onSwitchDevice);
   let pending = $derived(ready ? '' : ` · ${$i18n.t('call.waitingForMedia')}`);
   let micMenu = $state(false);
@@ -100,7 +101,7 @@
   {#snippet micButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={microphoneEnabled ? 'secondary' : 'danger'}
+      variant={microphoneEnabled ? neutral : 'danger'}
       {size}
       label={micLabel}
       aria-disabled={ready ? undefined : 'true'}
@@ -133,7 +134,7 @@
   {#snippet deafenButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={deafened ? 'danger' : 'secondary'}
+      variant={deafened ? 'danger' : neutral}
       {size}
       label={deafenLabel}
       onclick={onToggleDeafen}
@@ -165,7 +166,7 @@
   {#snippet cameraButton(props: Record<string, unknown>)}
     <IconButton
       {...props}
-      variant={cameraEnabled ? 'primary' : 'secondary'}
+      variant={cameraEnabled ? 'primary' : neutral}
       {size}
       label={cameraLabel}
       aria-disabled={ready ? undefined : 'true'}
@@ -199,7 +200,7 @@
     {#snippet switchCameraButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant="secondary"
+        variant={neutral}
         {size}
         label={$i18n.t('call.switchCamera')}
         disabled={!cameraEnabled}
@@ -216,7 +217,7 @@
     {#snippet screenButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant={screenShareEnabled ? 'primary' : 'secondary'}
+        variant={screenShareEnabled ? 'primary' : neutral}
         {size}
         label={screenLabel}
         aria-disabled={ready ? undefined : 'true'}
@@ -232,7 +233,7 @@
     {#snippet settingsButton(props: Record<string, unknown>)}
       <IconButton
         {...props}
-        variant="secondary"
+        variant={neutral}
         {size}
         label={$i18n.t('call.settings')}
         onclick={onOpenSettings}
@@ -325,11 +326,11 @@
   }
 
   .controls.compact {
-    gap: var(--space-150);
-    justify-content: space-between;
+    gap: var(--space-100);
+    justify-content: flex-start;
   }
 
-  .controls.compact :global(.hang-up) {
-    margin-inline-start: var(--space-300);
+  .controls.compact .control:last-child {
+    margin-inline-start: auto;
   }
 </style>

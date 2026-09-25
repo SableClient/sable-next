@@ -69,3 +69,30 @@ test('keeps a muted mic legible and focusable while media is not ready', async (
 
   await unmount(instance);
 });
+
+test('uses borderless neutral toggles in the compact sidebar bar', async () => {
+  const instance = mount(CallControlsHarness, {
+    target: document.body,
+    props: {
+      compact: true,
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      screenShareEnabled: false,
+      deafened: false,
+      ready: true,
+      canScreenShare: false,
+      onToggleMicrophone: vi.fn(),
+      onToggleCamera: vi.fn(),
+      onToggleScreenShare: vi.fn(),
+      onToggleDeafen: vi.fn(),
+      onHangUp: vi.fn(),
+    },
+  });
+  await tick();
+
+  expect(button('Unmute microphone')?.classList).toContain('btn-danger');
+  expect(button('Deafen')?.classList).toContain('btn-ghost');
+  expect(button('Turn camera on')?.classList).toContain('btn-ghost');
+
+  await unmount(instance);
+});

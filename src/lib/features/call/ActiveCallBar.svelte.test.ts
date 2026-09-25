@@ -33,6 +33,7 @@ test('announces the call status', async () => {
   await tick();
 
   expect(document.querySelector('[role="status"]')?.textContent).toContain('Joining call');
+  expect(document.querySelector('.call-bar')?.classList).not.toContain('live');
   await unmount(joining);
 
   const active = mount(ActiveCallBar, {
@@ -42,5 +43,6 @@ test('announces the call status', async () => {
   await tick();
 
   expect(document.querySelector('[role="status"]')?.textContent).toContain('Connected');
+  expect(document.querySelector('.call-bar')?.classList).toContain('live');
   await unmount(active);
 });

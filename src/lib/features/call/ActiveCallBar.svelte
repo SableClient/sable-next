@@ -15,6 +15,12 @@
 
   let { session, roomName, collapsed = false, onReturn }: Props = $props();
 
+  let live = $derived(
+    session.lifecycle === 'active' &&
+      session.mediaReady &&
+      session.transport.connection === 'connected'
+  );
+  let reconnecting = $derived(session.transport.connection === 'reconnecting');
   let statusLabel = $derived(
     $i18n.t(
       callStatusKey({
@@ -26,7 +32,13 @@
   );
 </script>
 
-<section class="call-bar" class:collapsed aria-label={$i18n.t('call.title')}>
+<section
+  class="call-bar"
+  class:collapsed
+  class:live
+  class:reconnecting
+  aria-label={$i18n.t('call.title')}
+>
   <button
     class="call-room"
     type="button"
@@ -61,9 +73,13 @@
 
 <style>
   .call-bar {
-    background: var(--bg-container);
-    border-right: var(--border-width) solid var(--bg-container-line);
-    border-top: var(--border-width) solid var(--bg-container-line);
+    --call-bar-tone: var(--surface-on-container);
+    --ghost-hover: var(--surface-container-hover);
+    --ghost-active: var(--surface-container-active);
+
+    background: var(--surface-container);
+    border-right: var(--border-width) solid var(--surface-container-line);
+    border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
     display: grid;
     gap: var(--space-050);
@@ -84,20 +100,37 @@
     text-align: left;
   }
 
+  .call-bar.live {
+    --call-bar-tone: var(--success-main);
+  }
+
+  .call-bar.reconnecting {
+    --call-bar-tone: var(--warn-main);
+  }
+
+  .call-bar.collapsed {
+    --ghost-hover: var(--bg-container-hover);
+    --ghost-active: var(--bg-container-active);
+
+    background: var(--bg-container);
+    border-right-color: var(--bg-container-line);
+    border-top-color: var(--bg-container-line);
+  }
+
   .call-room:hover,
   .call-room:focus-visible {
-    background: var(--bg-container-hover);
+    background: var(--ghost-hover);
   }
 
   .call-room :global(svg) {
-    color: var(--success-main);
+    color: var(--call-bar-tone);
     grid-row: span 2;
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
   }
 
   .status {
-    color: var(--success-main);
+    color: var(--call-bar-tone);
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-bold);
   }
@@ -120,7 +153,7 @@
     justify-content: center;
   }
 
-  .collapsed :global(.hang-up) {
+  .collapsed :global(.control:last-child) {
     margin-inline-start: 0;
   }
 </style>
