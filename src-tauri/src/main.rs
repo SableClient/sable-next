@@ -258,7 +258,7 @@ fn main() {
 
     // Before everything else: CEF re-execs this binary for its subprocesses.
     #[cfg(all(feature = "cef", target_os = "linux"))]
-    {
+    let _deep_link_socket = {
         tauri_runtime_cef::configure(tauri_runtime_cef::CefConfig {
             identifier: "moe.sable.next".into(),
             custom_schemes: vec![
@@ -283,17 +283,26 @@ fn main() {
         }
 
         if matches!(
-            app_lib::deep_link_ipc::try_forward_deep_links(),
+            app_lib::deep_link_ipc::try_forward_to_primary(),
             app_lib::deep_link_ipc::ForwardResult::Forwarded
         ) {
             return;
         }
 
-        install_permission_policy();
-    }
+        let socket = app_lib::deep_link_ipc::bind_and_listen();
+        if socket.is_none()
+            && matches!(
+                app_lib::deep_link_ipc::try_forward_to_primary(),
+                app_lib::deep_link_ipc::ForwardResult::Forwarded
+            )
+        {
+            return;
+        }
+        socket
+    };
 
     #[cfg(all(feature = "cef", target_os = "linux"))]
-    let _deep_link_socket = app_lib::deep_link_ipc::bind_and_listen();
+    install_permission_policy();
 
     app_lib::run();
 }

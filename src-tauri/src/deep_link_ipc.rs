@@ -21,6 +21,7 @@ use crate::deep_link_delivery::Delivery;
 const SCHEMES: &[&str] = &["moe.sable.next:", "sable:"];
 const SOCKET_NAME: &str = "moe.sable.next-deeplink.sock";
 const NEW_URL_EVENT: &str = "deep-link://new-url";
+const ACTIVATE: &str = "activate";
 const WRITE_TIMEOUT: Duration = Duration::from_secs(2);
 const READ_TIMEOUT: Duration = Duration::from_secs(3);
 const SOCKET_MODE: u32 = 0o600;
@@ -50,21 +51,16 @@ where
 }
 
 pub enum ForwardResult {
-    /// The URLs reached the primary; the caller must exit.
+    /// The launch reached the primary; the caller must exit.
     Forwarded,
-    /// A deep link was in argv but nothing is listening: become the primary.
+    /// Nothing is listening: become the primary.
     NoPrimary,
-    NoUrls,
 }
 
-/// Call before CEF is initialized, or this process fights for the cache lock.
+/// Call before CEF is initialized.
 #[must_use]
-pub fn try_forward_deep_links() -> ForwardResult {
+pub fn try_forward_to_primary() -> ForwardResult {
     let urls = deep_link_urls_in_args(std::env::args());
-    if urls.is_empty() {
-        return ForwardResult::NoUrls;
-    }
-
     let Some(path) = socket_path() else {
         return ForwardResult::NoPrimary;
     };
@@ -72,6 +68,7 @@ pub fn try_forward_deep_links() -> ForwardResult {
         return ForwardResult::NoPrimary;
     };
     let _ = stream.set_write_timeout(Some(WRITE_TIMEOUT));
+    let _ = writeln!(stream, "{ACTIVATE}");
     for url in &urls {
         let _ = writeln!(stream, "{url}");
     }
@@ -79,9 +76,40 @@ pub fn try_forward_deep_links() -> ForwardResult {
 }
 
 static DELIVERY: OnceLock<Mutex<Delivery>> = OnceLock::new();
+type ActivationHandler = Arc<dyn Fn() + Send + Sync>;
+
+#[derive(Default)]
+struct ActivationDelivery {
+    pending: bool,
+    handler: Option<ActivationHandler>,
+}
+
+impl ActivationDelivery {
+    fn push(&mut self) -> Option<ActivationHandler> {
+        match &self.handler {
+            Some(handler) => Some(handler.clone()),
+            None => {
+                self.pending = true;
+                None
+            }
+        }
+    }
+
+    fn install(&mut self, handler: ActivationHandler) -> Option<ActivationHandler> {
+        let pending = std::mem::take(&mut self.pending);
+        self.handler = Some(handler.clone());
+        pending.then_some(handler)
+    }
+}
+
+static ACTIVATION: OnceLock<Mutex<ActivationDelivery>> = OnceLock::new();
 
 fn delivery() -> &'static Mutex<Delivery> {
     DELIVERY.get_or_init(|| Mutex::new(Delivery::default()))
+}
+
+fn activation() -> &'static Mutex<ActivationDelivery> {
+    ACTIVATION.get_or_init(|| Mutex::new(ActivationDelivery::default()))
 }
 
 /// The query and fragment carry OIDC tokens.
@@ -96,6 +124,16 @@ fn dispatch_url(url: String) {
         .push(url);
     if let Some((handler, url)) = live {
         handler(url);
+    }
+}
+
+fn dispatch_activation() {
+    if let Some(handler) = activation()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .push()
+    {
+        handler();
     }
 }
 
@@ -161,7 +199,9 @@ fn handle_connection(stream: UnixStream) {
     let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
     for line in BufReader::new(stream).lines() {
         let Ok(url) = line else { break };
-        if is_deep_link(&url) {
+        if url == ACTIVATE {
+            dispatch_activation();
+        } else if is_deep_link(&url) {
             log::info!("received deep link {}", redact_for_log(&url));
             dispatch_url(url);
         }
@@ -169,7 +209,22 @@ fn handle_connection(stream: UnixStream) {
 }
 
 pub fn install_handler<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
-    use tauri::Emitter;
+    use tauri::{Emitter, Manager};
+
+    let window_app = app.clone();
+    let activate = Arc::new(move || {
+        if let Some(window) = window_app.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    });
+    if let Some(handler) = activation()
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .install(activate)
+    {
+        handler();
+    }
 
     let emitter = app.clone();
     delivery()
@@ -192,7 +247,8 @@ pub fn take_pending_urls() -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{deep_link_urls_in_args, redact_for_log};
+    use super::{ActivationDelivery, deep_link_urls_in_args, redact_for_log};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn keeps_only_the_deep_links_after_argv_zero() {
@@ -222,5 +278,20 @@ mod tests {
             redact_for_log("moe.sable.next:/login?code=secret#state=secret"),
             "moe.sable.next:/login"
         );
+    }
+
+    #[test]
+    fn activation_before_setup_is_delivered_when_the_handler_is_installed() {
+        let mut delivery = ActivationDelivery::default();
+        assert!(delivery.push().is_none());
+
+        let activated = Arc::new(Mutex::new(false));
+        let received = activated.clone();
+        let handler = delivery
+            .install(Arc::new(move || *received.lock().unwrap() = true))
+            .expect("queued activation");
+        handler();
+
+        assert!(*activated.lock().unwrap());
     }
 }
