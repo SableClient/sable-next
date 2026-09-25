@@ -1,4 +1,6 @@
 <script lang="ts">
+  import CameraIcon from 'phosphor-svelte/lib/CameraIcon';
+
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -6,7 +8,6 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import AuthSecondaryAction from '../shared/AuthSecondaryAction.svelte';
-  import FormActions from '#lib/ui/primitives/FormActions.svelte';
 
   interface Props {
     userId: string;
@@ -51,34 +52,47 @@
   <p class="user-id">{userId}</p>
 
   <div class="avatar-picker">
-    <Avatar class="avatar-preview" src={avatarPreview} alt="" name={displayName} size="large" />
-    <FormField
-      dense
-      fieldId="profile-avatar"
-      label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'auth.avatar')}
-    >
-      <input
-        id="profile-avatar"
-        type="file"
-        accept="image/*"
-        onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
-          onAvatar(event.currentTarget.files?.[0] ?? null);
-        }}
+    <label class="avatar-hit" for="profile-avatar">
+      <Avatar
+        class="avatar-preview"
+        id={userId}
+        src={avatarPreview}
+        alt=""
+        name={displayName || userId}
+        size="large"
       />
-      {#if avatarPreview}
-        <button
-          class="auth-link-button remove-avatar"
-          type="button"
-          onclick={() => {
-            onAvatar(null);
-            const input = document.getElementById('profile-avatar');
-            if (input instanceof HTMLInputElement) input.value = '';
-          }}
-        >
-          {$i18n.t('auth.removeAvatar')}
-        </button>
-      {/if}
-    </FormField>
+      <span class="avatar-badge" aria-hidden="true"><CameraIcon weight="fill" /></span>
+    </label>
+    <div class="avatar-actions">
+      <span class="avatar-label">{$i18n.t('auth.avatar')}</span>
+      <div class="avatar-buttons">
+        <label class="file-button btn btn-secondary btn-small">
+          <input
+            id="profile-avatar"
+            type="file"
+            accept="image/*"
+            aria-label={$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'settings.uploadAvatar')}
+            onchange={(event: Event & { currentTarget: HTMLInputElement }) => {
+              onAvatar(event.currentTarget.files?.[0] ?? null);
+            }}
+          />
+          {$i18n.t(avatarPreview ? 'auth.replaceAvatar' : 'settings.uploadAvatar')}
+        </label>
+        {#if avatarPreview}
+          <Button
+            variant="ghost"
+            size="small"
+            onclick={() => {
+              onAvatar(null);
+              const input = document.getElementById('profile-avatar');
+              if (input instanceof HTMLInputElement) input.value = '';
+            }}
+          >
+            {$i18n.t('auth.removeAvatar')}
+          </Button>
+        {/if}
+      </div>
+    </div>
   </div>
 
   <FormField dense fieldId="profile-display-name" label={$i18n.t('auth.displayName')}>
@@ -115,13 +129,12 @@
 
   {#if error}<Alert variant="critical" aria-live="polite">{error}</Alert>{/if}
 
-  <FormActions>
-    <Button onclick={onContinue} loading={isSaving}>
-      {$i18n.t('auth.continue')}
-    </Button>
-    <AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} disabled={isSaving} />
-  </FormActions>
+  <Button variant="primary" block onclick={onContinue} loading={isSaving}>
+    {$i18n.t('auth.continue')}
+  </Button>
 </section>
+
+<AuthSecondaryAction label={$i18n.t('auth.skipForNow')} onclick={onSkip} disabled={isSaving} />
 
 <style>
   .profile-card {
@@ -145,8 +158,64 @@
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .avatar-picker input[type='file'] {
-    max-width: 100%;
+  .avatar-hit {
+    border-radius: var(--radius);
+    cursor: pointer;
+    display: block;
+    position: relative;
+  }
+
+  .avatar-badge {
+    align-items: center;
+    background: var(--primary-main);
+    border: calc(var(--border-width) * 2) solid var(--surface-container);
+    border-radius: 50%;
+    bottom: calc(var(--space-100) * -1);
+    color: var(--primary-on-main);
+    display: flex;
+    height: 1.75rem;
+    justify-content: center;
+    position: absolute;
+    right: calc(var(--space-100) * -1);
+    width: 1.75rem;
+  }
+
+  .avatar-badge :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
+  }
+
+  .avatar-actions {
+    display: grid;
+    gap: var(--space-150);
+    min-width: 0;
+  }
+
+  .avatar-label {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .avatar-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+  }
+
+  .file-button {
+    cursor: pointer;
+    position: relative;
+  }
+
+  .file-button input {
+    height: 1px;
+    opacity: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  .file-button:focus-within {
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
   :global(.avatar-root.avatar-preview) {
