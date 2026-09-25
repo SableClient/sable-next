@@ -1244,6 +1244,7 @@
   "setup": {
     "title": "Set up this device",
     "profileTitle": "Your profile",
+    "profileAddress": "People can also find you by your Matrix address, {{address}}.",
     "checking": "Checking this device…",
     "stageDeviceLabel": "Confirm it's you",
     "confirmTitle": "Confirm it's you",

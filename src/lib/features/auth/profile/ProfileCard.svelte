@@ -62,7 +62,6 @@
   <AuthField labelId="profile-title" label={$i18n.t('setup.profileTitle')}>
     <AuthInfoBox>{$i18n.t('auth.profileIntro')}</AuthInfoBox>
   </AuthField>
-  <p class="user-id">{userId}</p>
 
   <div class="avatar-picker">
     <label class="avatar-hit" for="profile-avatar">
@@ -114,10 +113,14 @@
       value={displayName}
       autocomplete="nickname"
       maxlength={255}
+      aria-describedby="profile-address"
       oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
         onDisplayName(event.currentTarget.value);
       }}
     />
+    <p id="profile-address" class="field-hint">
+      {$i18n.t('setup.profileAddress', { address: userId })}
+    </p>
   </FormField>
 
   <FormField dense fieldId="profile-pronouns" label={$i18n.t('settings.pronouns')}>
@@ -204,9 +207,11 @@
     min-width: 0;
   }
 
-  .user-id {
+  .field-hint {
     color: var(--sec-main);
     font-size: var(--font-size-small);
+    margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .avatar-picker {
@@ -293,21 +298,25 @@
     animation: avatar-in var(--motion-normal) ease both;
   }
 
-  .more-options {
-    border-top: var(--border-width) solid var(--surface-container-line);
-    padding-top: var(--space-300);
-  }
-
   .more-options summary {
-    color: var(--sec-main);
     cursor: pointer;
     font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    padding-block: var(--space-200);
   }
 
   .more-list {
     display: grid;
     gap: var(--space-300);
     padding-top: var(--space-300);
+  }
+
+  .more-list :global(.color-setting) {
+    gap: var(--space-100);
+  }
+
+  .more-list :global(.color-setting > span) {
+    font-size: var(--font-size-small);
   }
 
   .banner-setting {
