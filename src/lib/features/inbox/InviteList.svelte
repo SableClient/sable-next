@@ -122,63 +122,72 @@
       {@const groupId = `${headingId}-${group}`}
       {@const collapsed = group === 'spam' && !spamOpen}
       {@const busy = members.some((invite) => answers.isAnswering(invite.room.room_id))}
-      <section class="group" aria-labelledby={groupId}>
-        <InboxSectionHeader
-          id={groupId}
-          level={3}
-          title={$i18n.t(GROUP_TITLES[group])}
-          count={members.length}
-        >
-          <div class="group-actions">
-            {#if group === 'known' && members.length > 1}
-              <Button
-                variant="ghost"
-                size="small"
-                disabled={busy}
-                onclick={() => {
-                  void answers.acceptAll(members.map((invite) => invite.room));
-                }}
-              >
-                {$i18n.t('inbox.acceptAll')}
-              </Button>
-            {/if}
-            {#if group === 'spam'}
-              <Button
-                variant="ghost"
-                size="small"
-                aria-expanded={spamOpen}
-                aria-controls={`${groupId}-list`}
-                onclick={() => (spamOpen = !spamOpen)}
-              >
-                {spamOpen ? $i18n.t('inbox.invitesSpamCollapse') : $i18n.t('inbox.invitesSpamShow')}
-              </Button>
-            {/if}
-            {#if group !== 'known' && (group === 'spam' || members.length > 1)}
-              <Button
-                variant="ghost"
-                size="small"
-                disabled={busy}
-                onclick={() => {
-                  answers.declineAll(members.map((invite) => invite.room));
-                }}
-              >
-                {$i18n.t('inbox.declineAll')}
-              </Button>
-            {/if}
-            {#if group === 'spam' && members.some((invite) => invite.inviter)}
-              <Button
-                variant="ghost"
-                size="small"
-                disabled={busy}
-                onclick={() => {
-                  askToBlock(members);
-                }}
-              >
-                {$i18n.t('inbox.blockSenders')}
-              </Button>
-            {/if}
-          </div>
-        </InboxSectionHeader>
+      {@const titled = groups.length > 1 || group === 'spam' || members.length > 1}
+      <section
+        class="group"
+        aria-labelledby={titled ? groupId : undefined}
+        aria-label={titled ? undefined : $i18n.t(GROUP_TITLES[group])}
+      >
+        {#if titled}
+          <InboxSectionHeader
+            id={groupId}
+            level={3}
+            title={$i18n.t(GROUP_TITLES[group])}
+            count={members.length}
+          >
+            <div class="group-actions">
+              {#if group === 'known' && members.length > 1}
+                <Button
+                  variant="ghost"
+                  size="small"
+                  disabled={busy}
+                  onclick={() => {
+                    void answers.acceptAll(members.map((invite) => invite.room));
+                  }}
+                >
+                  {$i18n.t('inbox.acceptAll')}
+                </Button>
+              {/if}
+              {#if group === 'spam'}
+                <Button
+                  variant="ghost"
+                  size="small"
+                  aria-expanded={spamOpen}
+                  aria-controls={`${groupId}-list`}
+                  onclick={() => (spamOpen = !spamOpen)}
+                >
+                  {spamOpen
+                    ? $i18n.t('inbox.invitesSpamCollapse')
+                    : $i18n.t('inbox.invitesSpamShow')}
+                </Button>
+              {/if}
+              {#if group !== 'known' && (group === 'spam' || members.length > 1)}
+                <Button
+                  variant="ghost"
+                  size="small"
+                  disabled={busy}
+                  onclick={() => {
+                    answers.declineAll(members.map((invite) => invite.room));
+                  }}
+                >
+                  {$i18n.t('inbox.declineAll')}
+                </Button>
+              {/if}
+              {#if group === 'spam' && members.some((invite) => invite.inviter)}
+                <Button
+                  variant="ghost"
+                  size="small"
+                  disabled={busy}
+                  onclick={() => {
+                    askToBlock(members);
+                  }}
+                >
+                  {$i18n.t('inbox.blockSenders')}
+                </Button>
+              {/if}
+            </div>
+          </InboxSectionHeader>
+        {/if}
 
         {#if group === 'spam'}
           <Alert variant="warning">
