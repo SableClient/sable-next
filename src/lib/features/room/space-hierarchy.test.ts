@@ -91,6 +91,7 @@ test('each subspace becomes its own section after the root section', () => {
     [null, 0, ['!direct']],
     ['!sub', 1, ['!nested']],
   ]);
+  expect(sections.map((section) => section.ownerId)).toEqual([null, '!space']);
 });
 
 test('a subspace holding no rooms never becomes a lone heading', () => {

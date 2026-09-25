@@ -3,18 +3,25 @@
 
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ArrowRightIcon from 'phosphor-svelte/lib/ArrowRightIcon';
+  import ArrowsLeftRightIcon from 'phosphor-svelte/lib/ArrowsLeftRightIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import DotsSixVerticalIcon from 'phosphor-svelte/lib/DotsSixVerticalIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
+  import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
+  import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -48,6 +55,15 @@
       position: DropEdge
     ) => void;
     onMove: (section: HierarchySection, roomId: string, delta: number) => void;
+    moveTargets: readonly { id: string; name: string }[];
+    pinned: boolean;
+    joinedSpace: boolean;
+    onOpenLobby: (roomId: string) => void;
+    onCreateIn: (roomId: string, kind: 'create-room' | 'create-space') => void;
+    onTogglePin: (roomId: string) => void;
+    onMoveSubspace: (section: HierarchySection, delta: number) => void;
+    onRemoveSubspace: (section: HierarchySection) => void;
+    onMoveTo: (section: HierarchySection, entry: HierarchyRoom, target: string) => void;
   }
 
   let {
@@ -68,7 +84,18 @@
     onRemove,
     onReorder,
     onMove,
+    moveTargets,
+    pinned,
+    joinedSpace,
+    onOpenLobby,
+    onCreateIn,
+    onTogglePin,
+    onMoveSubspace,
+    onRemoveSubspace,
+    onMoveTo,
   }: Props = $props();
+  let otherTargets = $derived(moveTargets.filter((target) => target.id !== section.parentId));
+  let pendingSubspaceRemoval = $state(false);
 
   let dragging = $state<string | null>(null);
   let dropState = $state<DropState<string> | null>(null);
@@ -146,11 +173,72 @@
         <IconContext values={{ 'aria-hidden': 'true' }}>
           <ActionMenuItem
             onSelect={() => {
+              onOpenLobby(sectionSpace.room_id);
+            }}
+          >
+            <HouseIcon size={16} />{$i18n.t('room.lobbyOpenSubspace')}
+          </ActionMenuItem>
+          <ActionMenuItem
+            onSelect={() => {
               onCopyLink(sectionSpace);
             }}
           >
             <LinkIcon size={16} />{$i18n.t('room.menuCopyLink')}
           </ActionMenuItem>
+          {#if joinedSpace}
+            <ActionMenuItem
+              onSelect={() => {
+                onTogglePin(sectionSpace.room_id);
+              }}
+            >
+              {#if pinned}
+                <PushPinSlashIcon size={16} />{$i18n.t('nav.unpinFromSidebar')}
+              {:else}
+                <PushPinIcon size={16} />{$i18n.t('nav.pinToSidebar')}
+              {/if}
+            </ActionMenuItem>
+          {/if}
+          {#if canManage}
+            <ActionMenuSeparator />
+            {#if joinedSpace}
+              <ActionMenuItem
+                onSelect={() => {
+                  onCreateIn(sectionSpace.room_id, 'create-room');
+                }}
+              >
+                <PlusIcon size={16} />{$i18n.t('nav.createRoomInSpace')}
+              </ActionMenuItem>
+              <ActionMenuItem
+                onSelect={() => {
+                  onCreateIn(sectionSpace.room_id, 'create-space');
+                }}
+              >
+                <UsersThreeIcon size={16} />{$i18n.t('nav.createSubspace')}
+              </ActionMenuItem>
+            {/if}
+            <ActionMenuItem
+              onSelect={() => {
+                onMoveSubspace(section, -1);
+              }}
+            >
+              <ArrowUpIcon size={16} />{$i18n.t('room.lobbyMoveUp')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              onSelect={() => {
+                onMoveSubspace(section, 1);
+              }}
+            >
+              <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
+            </ActionMenuItem>
+            <ActionMenuItem
+              destructive
+              onSelect={() => {
+                pendingSubspaceRemoval = true;
+              }}
+            >
+              <TrashIcon size={16} />{$i18n.t('room.lobbyRemove')}
+            </ActionMenuItem>
+          {/if}
         </IconContext>
       </ActionMenu>
     {/if}
@@ -268,6 +356,22 @@
                     >
                       <ArrowDownIcon size={16} />{$i18n.t('room.lobbyMoveDown')}
                     </ActionMenuItem>
+                    {#if otherTargets.length > 0}
+                      <ActionMenuSub label={$i18n.t('room.lobbyMoveTo')}>
+                        {#snippet trigger()}
+                          <ArrowsLeftRightIcon size={16} />{$i18n.t('room.lobbyMoveTo')}
+                        {/snippet}
+                        {#each otherTargets as target (target.id)}
+                          <ActionMenuItem
+                            onSelect={() => {
+                              onMoveTo(section, entry, target.id);
+                            }}
+                          >
+                            {target.name}
+                          </ActionMenuItem>
+                        {/each}
+                      </ActionMenuSub>
+                    {/if}
                     <ActionMenuItem
                       destructive
                       onSelect={() => {
@@ -292,6 +396,21 @@
     </div>
   {/if}
 </div>
+
+<ConfirmDialog
+  open={pendingSubspaceRemoval}
+  onOpenChange={(next: boolean) => {
+    pendingSubspaceRemoval = next;
+  }}
+  title={$i18n.t('room.lobbyRemoveConfirm', {
+    room: section.space ? label(section.space) : '',
+  })}
+  confirmLabel={$i18n.t('room.lobbyRemove')}
+  onConfirm={() => {
+    pendingSubspaceRemoval = false;
+    onRemoveSubspace(section);
+  }}
+/>
 
 <ConfirmDialog
   open={pendingRemoval !== null}

@@ -278,6 +278,8 @@
     "remove": "Remove",
     "lobbyMoveUp": "Move up",
     "lobbyMoveDown": "Move down",
+    "lobbyMoveTo": "Move to",
+    "lobbyOpenSubspace": "Open lobby",
     "lobbySuggested": "Suggested",
     "lobbyEmpty": "This space has no rooms yet.",
     "lobbyFailed": "The space directory could not be loaded.",

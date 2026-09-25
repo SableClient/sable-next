@@ -23,6 +23,7 @@ export type HierarchySection = {
   key: string;
   rooms: HierarchyRoom[];
   parentId: string;
+  ownerId: string | null;
   siblings: SpaceChildEdge[];
   loaded: boolean;
   failed: boolean;
@@ -155,6 +156,7 @@ export function buildHierarchySections(
         key: ancestry.join('/'),
         rooms: ownRooms,
         parentId: spaceId,
+        ownerId: ancestry.at(-2) ?? null,
         siblings: current.children,
         loaded: described(spaceId),
         failed: refused(spaceId),

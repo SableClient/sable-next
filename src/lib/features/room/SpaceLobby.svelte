@@ -2,6 +2,7 @@
   import type {
     RoomPermissionsView,
     RoomSummary,
+    SpaceChildEdge,
     SpaceHierarchyRoomView,
   } from '#src/generated/protocol';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
@@ -17,6 +18,8 @@
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
   import { copyRoomLink, viaFor } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { layoutSpaceIds, withoutSpace, withSpace } from '#lib/spaces/sidebar-layout.js';
+  import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -62,6 +65,7 @@
   let leaveOpen = $state(false);
   const core = useCoreClient();
   const roomList = useRoomList();
+  const spaceSidebar = useSpaceSidebar();
   const joining = new SvelteSet<string>();
   const knocked = new SvelteSet<string>();
   const joinErrors = new SvelteMap<string, string>();
@@ -111,6 +115,15 @@
       }))
       .filter((section) => section.rooms.length > 0 || !section.loaded || section.failed);
   });
+  let moveTargets = $derived(
+    merged
+      .filter((room) => room.is_space)
+      .map((room) => ({
+        id: room.room_id,
+        name: room.room_id === spaceId ? (space?.name ?? label(room)) : label(room),
+      }))
+  );
+  let pinnedIds = $derived(new Set(layoutSpaceIds(spaceSidebar.items)));
   let phase = $derived(lobbyPhase(sections.length, spaceId === null || !loadedLevels.has(spaceId)));
 
   $effect(() => {
@@ -223,7 +236,7 @@
   function open(child: HierarchyRoomView): void {
     const target = roomPathParamFromId(child.room_id);
     if (child.is_space) {
-      void goto(resolve('/(app)/space/[spaceId]', { spaceId: target }));
+      openLobby(child.room_id);
       return;
     }
     if (!space) return;
@@ -232,6 +245,26 @@
         spaceId: roomPathParam(space),
         roomId: target,
       })
+    );
+  }
+
+  function openLobby(roomId: string): void {
+    void goto(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParamFromId(roomId) }));
+  }
+
+  function createIn(roomId: string, kind: 'create-room' | 'create-space'): void {
+    const spaceId = roomPathParamFromId(roomId);
+    void goto(
+      kind === 'create-room'
+        ? resolve('/(app)/space/[spaceId]/create-room', { spaceId })
+        : resolve('/(app)/space/[spaceId]/create-space', { spaceId })
+    );
+  }
+
+  function togglePin(roomId: string): void {
+    const items = spaceSidebar.items;
+    spaceSidebar.write(
+      pinnedIds.has(roomId) ? withoutSpace(items, roomId) : withSpace(items, roomId)
     );
   }
 
@@ -276,13 +309,49 @@
     }
   }
 
-  async function applyReorder(section: HierarchySection, changes: Reorder[]): Promise<void> {
+  async function removeSubspace(section: HierarchySection): Promise<void> {
+    if (section.ownerId === null) return;
+
+    try {
+      await core.commands.removeFromSpace(section.ownerId, section.parentId);
+    } catch (error) {
+      console.warn('[sable lobby] remove failed', error);
+      failed = true;
+    }
+  }
+
+  async function moveTo(
+    section: HierarchySection,
+    entry: HierarchyRoom,
+    target: string
+  ): Promise<void> {
+    const roomId = entry.room.room_id;
+    try {
+      await core.commands.addToSpace(target, roomId);
+    } catch (error) {
+      console.warn('[sable lobby] move failed', error);
+      failed = true;
+      return;
+    }
+    try {
+      await core.commands.removeFromSpace(section.parentId, roomId);
+      removed.add(entry.key);
+    } catch (error) {
+      console.warn('[sable lobby] move left the room in both spaces', error);
+      failed = true;
+    }
+  }
+
+  async function applyReorder(
+    parentId: string,
+    siblings: readonly SpaceChildEdge[],
+    changes: Reorder[]
+  ): Promise<void> {
     if (changes.length === 0) return;
 
-    const parentId = section.parentId;
     const orders = new Map(changes.map((change) => [change.roomId, change.order]));
     const children = sortEdges(
-      section.siblings.map((edge) =>
+      siblings.map((edge) =>
         orders.has(edge.room_id) ? { ...edge, order: orders.get(edge.room_id) ?? null } : edge
       )
     );
@@ -302,13 +371,14 @@
     }
   }
 
-  function reorder(
-    section: HierarchySection,
+  function reorderIn(
+    parentId: string,
+    edges: readonly SpaceChildEdge[],
     source: string,
     target: string,
     position: DropEdge
   ): void {
-    const siblings = section.siblings.map((edge) => ({
+    const siblings = edges.map((edge) => ({
       roomId: edge.room_id,
       order: edge.order,
     }));
@@ -316,7 +386,40 @@
     const to = siblings.findIndex((sibling) => sibling.roomId === target);
     if (from === -1 || to === -1) return;
 
-    void applyReorder(section, reorderChildren(siblings, source, dropIndex(from, to, position)));
+    void applyReorder(
+      parentId,
+      edges,
+      reorderChildren(siblings, source, dropIndex(from, to, position))
+    );
+  }
+
+  function reorder(
+    section: HierarchySection,
+    source: string,
+    target: string,
+    position: DropEdge
+  ): void {
+    reorderIn(section.parentId, section.siblings, source, target, position);
+  }
+
+  function moveSubspace(section: HierarchySection, delta: number): void {
+    if (section.ownerId === null) return;
+
+    const edges = childEdges(merged, section.ownerId);
+    const spaces = edges.filter(
+      (edge) => merged.find((room) => room.room_id === edge.room_id)?.is_space
+    );
+    const index = spaces.findIndex((edge) => edge.room_id === section.parentId);
+    const to = index + delta;
+    if (index === -1 || to < 0 || to >= spaces.length) return;
+
+    reorderIn(
+      section.ownerId,
+      edges,
+      section.parentId,
+      spaces[to].room_id,
+      delta < 0 ? 'above' : 'below'
+    );
   }
 
   function move(section: HierarchySection, roomId: string, delta: number): void {
@@ -465,6 +568,19 @@
         }}
         onReorder={reorder}
         onMove={move}
+        {moveTargets}
+        pinned={section.space !== null && pinnedIds.has(section.space.room_id)}
+        joinedSpace={section.space !== null && joinedIds.has(section.space.room_id)}
+        onOpenLobby={openLobby}
+        onCreateIn={createIn}
+        onTogglePin={togglePin}
+        onMoveSubspace={moveSubspace}
+        onRemoveSubspace={(section: HierarchySection) => {
+          void removeSubspace(section);
+        }}
+        onMoveTo={(section: HierarchySection, entry: HierarchyRoom, target: string) => {
+          void moveTo(section, entry, target);
+        }}
       />
     {/each}
 
