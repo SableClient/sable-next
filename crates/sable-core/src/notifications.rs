@@ -19,19 +19,17 @@ use matrix_sdk::ruma::push::{
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedRoomId, OwnedUserId, RoomId};
 use matrix_sdk::{Client, NotificationSettingsError};
-#[cfg(not(target_family = "wasm"))]
-use matrix_sdk_ui::notification_client::RawNotificationEvent;
 use matrix_sdk_ui::notification_client::{
     NotificationClient, NotificationEvent, NotificationItem, NotificationProcessSetup,
-    NotificationStatus,
+    NotificationStatus, RawNotificationEvent,
 };
 
 use url::Url;
 
 use crate::protocol::{
     DefaultNotificationModesView, MentionNotificationModeView, MentionNotificationsView,
-    MentionRuleView, NotificationModeView, NotificationSettingsView, NotificationView, PusherView,
-    RoomNotificationModeView,
+    MentionRuleView, NotificationModeView, NotificationSettingsView, NotificationView,
+    PushEventView, PushFetchView, PusherView, RoomNotificationModeView,
 };
 #[cfg(not(target_family = "wasm"))]
 use crate::session::{AccountRegistry, PersistedAccount};
@@ -264,6 +262,87 @@ async fn decrypt_push_event(
         }
         Ok(NotificationStatus::EventNotFound) | Err(_) => undecryptable,
     }
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn fetch_cold_push_event(
+    core: Option<&crate::Core>,
+    data_dir: &std::path::Path,
+    user_id: &str,
+    device_id: &str,
+    room_id: &str,
+    event_id: &str,
+) -> PushFetchView {
+    let (Ok(room_id), Ok(event_id)) = (RoomId::parse(room_id), EventId::parse(event_id)) else {
+        return PushFetchView::Unavailable;
+    };
+    let live = match core {
+        Some(core) => core
+            .session
+            .read()
+            .await
+            .as_ref()
+            .filter(|session| {
+                session.client.user_id().is_some_and(|id| id == user_id)
+                    && session.client.device_id().is_some_and(|id| id == device_id)
+            })
+            .map(|session| (session.client.clone(), session.sync_service.clone())),
+        None => None,
+    };
+    let (client, sync_service) = if let Some(live) = live {
+        live
+    } else {
+        let store_dir = cold_push_store_dir(data_dir);
+        let Some(client) = push_client(&store_dir, user_id, device_id).await else {
+            return PushFetchView::Unavailable;
+        };
+        let Ok(sync_service) = crate::session::build_sync(client.clone()).await else {
+            return PushFetchView::Unavailable;
+        };
+        (client, sync_service)
+    };
+    Box::pin(fetch_push_event(&client, sync_service, &room_id, &event_id)).await
+}
+
+pub async fn fetch_push_event(
+    client: &Client,
+    sync_service: std::sync::Arc<matrix_sdk_ui::sync_service::SyncService>,
+    room_id: &RoomId,
+    event_id: &EventId,
+) -> PushFetchView {
+    let setup = NotificationProcessSetup::SingleProcess { sync_service };
+    let Ok(notifications) = NotificationClient::new(client.clone(), setup).await else {
+        return PushFetchView::Unavailable;
+    };
+    match notifications.get_notification(room_id, event_id).await {
+        Ok(NotificationStatus::Event(item)) => push_event_view(*item)
+            .map_or(PushFetchView::Unavailable, |event| PushFetchView::Event {
+                event,
+            }),
+        Ok(NotificationStatus::EventFilteredOut | NotificationStatus::EventRedacted) => {
+            PushFetchView::Discard
+        }
+        Ok(NotificationStatus::EventNotFound) | Err(_) => PushFetchView::Unavailable,
+    }
+}
+
+fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
+    let raw = match &item.raw_event {
+        RawNotificationEvent::Timeline(raw) => raw.json().get(),
+        RawNotificationEvent::Invite(raw) => raw.json().get(),
+    };
+    let mut event: serde_json::Value = serde_json::from_str(raw).ok()?;
+    Some(PushEventView {
+        event_type: event.get("type")?.as_str()?.to_owned(),
+        content: event
+            .get_mut("content")
+            .map(serde_json::Value::take)
+            .unwrap_or_default(),
+        sender: item.event.sender().to_string(),
+        sender_display_name: item.sender_display_name,
+        room_name: item.room_computed_display_name,
+        room_avatar_url: item.room_avatar_url,
+    })
 }
 
 impl From<NotificationModeView> for RoomNotificationMode {
@@ -974,11 +1053,13 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        ColdPush, cold_push_store_dir, decrypt_cold_push, gateway, is_backfill, keyword_rule_ids,
-        mention_actions, mention_rule, push_account, pushes_every_encrypted_event,
-        read_mention_mode, split_defaults, timeline_body,
+        ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
+        is_backfill, keyword_rule_ids, mention_actions, mention_rule, push_account,
+        pushes_every_encrypted_event, read_mention_mode, split_defaults, timeline_body,
     };
-    use crate::protocol::{MentionNotificationModeView, MentionRuleView, NotificationModeView};
+    use crate::protocol::{
+        MentionNotificationModeView, MentionRuleView, NotificationModeView, PushFetchView,
+    };
     use crate::session::{PersistedSession, restore_authenticated_client};
     use crate::store::{FileSessionStore, SessionStore};
 
@@ -1032,7 +1113,7 @@ mod tests {
         data_dir: std::path::PathBuf,
         client: Option<matrix_sdk::Client>,
         outbound: OutboundGroupSession,
-        _server: MatrixMockServer,
+        server: MatrixMockServer,
     }
 
     impl ColdFixture {
@@ -1101,7 +1182,7 @@ mod tests {
                 data_dir,
                 client: Some(client),
                 outbound,
-                _server: server,
+                server,
             }
         }
 
@@ -1322,6 +1403,62 @@ mod tests {
             fixture.decrypt_locally(&unknown).await,
             ColdPush::NeedsKey { quietly: true }
         );
+        tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    async fn fetch(fixture: &ColdFixture, device: &str, event: serde_json::Value) -> PushFetchView {
+        use matrix_sdk::ruma::api::client::sync::sync_events::v5;
+
+        let mut room = v5::response::Room::new();
+        room.initial = Some(true);
+        room.timeline = vec![Raw::from_json_string(event.to_string()).unwrap()];
+        let mut response = v5::Response::new("1".to_owned());
+        response.rooms =
+            std::collections::BTreeMap::from([(room_id!("!cold:example.org").to_owned(), room)]);
+        let _sync = fixture
+            .server
+            .mock_sliding_sync()
+            .ok(response)
+            .mount_as_scoped()
+            .await;
+        let _encryption = fixture
+            .server
+            .mock_room_state_encryption()
+            .plain()
+            .mount_as_scoped()
+            .await;
+        fetch_cold_push_event(
+            None,
+            &fixture.data_dir,
+            "@alice:example.org",
+            device,
+            COLD_ROOM,
+            event["event_id"].as_str().unwrap(),
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn an_event_id_only_push_is_fetched_in_the_shape_of_a_rich_payload() {
+        let fixture = ColdFixture::new("fetch", cold_room_with_members(), None).await;
+        let message = json!({"type": "m.room.message", "event_id": "$fetched",
+            "sender": "@sender:example.org", "origin_server_ts": 1,
+            "content": {"msgtype": "m.text", "body": "fetched by id"}});
+
+        let PushFetchView::Event { event } = fetch(&fixture, "A", message.clone()).await else {
+            panic!("a push that names only its event must be fetched");
+        };
+        let payload = serde_json::to_value(&event).unwrap();
+        assert_eq!(payload["type"], "m.room.message");
+        assert_eq!(payload["content"]["body"], "fetched by id");
+        assert_eq!(payload["sender"], "@sender:example.org");
+        assert!(!event.room_name.is_empty());
+
+        assert!(matches!(
+            fetch(&fixture, "OTHER", message).await,
+            PushFetchView::Unavailable
+        ));
+
         tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
     }
 

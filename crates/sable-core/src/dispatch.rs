@@ -2025,6 +2025,21 @@ impl Core {
                 })
             }
 
+            Command::PushEvent { room_id, event_id } => {
+                let client = self.client().await?;
+                let sync_service = self.sync_service().await?;
+
+                Ok(CommandOk::PushEvent {
+                    fetched: Box::pin(notifications::fetch_push_event(
+                        &client,
+                        sync_service,
+                        &room_id,
+                        &event_id,
+                    ))
+                    .await,
+                })
+            }
+
             Command::SetRoomTag { room_id, tag, set } => {
                 let room = self.room(&room_id).await?;
                 let name = match tag {

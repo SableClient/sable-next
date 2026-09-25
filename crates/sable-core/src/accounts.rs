@@ -755,6 +755,9 @@ impl Core {
         generation: u64,
     ) -> bool {
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
+            if self.session_generation.load(Ordering::SeqCst) == generation {
+                self.emit(CoreEvent::SessionTokensRefreshed);
+            }
             return false;
         };
         let soft_logout = data.soft_logout;

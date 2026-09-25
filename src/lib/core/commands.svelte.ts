@@ -9,6 +9,7 @@ import type {
   PerMessageProfileView,
   PersonaCatalogView,
   PersonaView,
+  PushFetchView,
   DefaultNotificationModesView,
   DeviceView,
   EditVersionView,
@@ -428,6 +429,15 @@ export function createCommands(transport: () => Transport) {
     async accountDataTypes(): Promise<string[]> {
       const response = await transport().send({ type: 'account_data_types' });
       return response.event_types;
+    },
+
+    async pushEvent(roomId: string, eventId: string): Promise<PushFetchView> {
+      const response = await transport().send({
+        type: 'push_event',
+        room_id: roomId,
+        event_id: eventId,
+      });
+      return response.fetched;
     },
 
     async accessToken(): Promise<string | null> {

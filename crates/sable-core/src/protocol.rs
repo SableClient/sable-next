@@ -125,6 +125,12 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         event_id: OwnedEventId,
     },
+    PushEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     ImagePacks {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1128,6 +1134,9 @@ pub enum CommandOk {
     Notification {
         notification: Option<NotificationView>,
     },
+    PushEvent {
+        fetched: PushFetchView,
+    },
     ImagePacks {
         packs: Vec<ImagePackView>,
         complete: bool,
@@ -1589,6 +1598,7 @@ pub enum CoreEvent {
     SessionEnded {
         reason: String,
     },
+    SessionTokensRefreshed,
 
     /// One batch is one render, so it stays batched all the way to the UI.
     RoomListDiff {
@@ -3187,6 +3197,28 @@ pub struct NotificationView {
     pub body: String,
     pub mention: bool,
     pub noisy: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct PushEventView {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+    pub content: serde_json::Value,
+    pub sender: String,
+    pub sender_display_name: Option<String>,
+    pub room_name: String,
+    pub room_avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PushFetchView {
+    Event { event: PushEventView },
+    Discard,
+    Unavailable,
 }
 
 /// Structured, so arranging and localising the preview stays with the UI.

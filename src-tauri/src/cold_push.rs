@@ -4,6 +4,7 @@ use jni::objects::{JClass, JString};
 use jni::{Env, EnvUnowned};
 use sable_core::Core;
 use sable_core::notifications::ColdPush;
+use sable_core::protocol::PushFetchView;
 
 pub static CORE: OnceLock<Arc<Core>> = OnceLock::new();
 
@@ -91,19 +92,72 @@ fn decrypt_push<'frame>(
             .await
             .unwrap_or(ColdPush::Undecryptable)
         };
-        let result = if core.is_some() {
-            tauri::async_runtime::block_on(decrypt)
-        } else {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_or(ColdPush::Undecryptable, |runtime| runtime.block_on(decrypt))
-        };
+        let result = block_on(core.is_some(), decrypt).unwrap_or(ColdPush::Undecryptable);
 
         JString::from_str(env, encode(result))
     });
 
     result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
+}
+
+fn block_on<T>(live: bool, future: impl Future<Output = T>) -> Option<T> {
+    if live {
+        return Some(tauri::async_runtime::block_on(future));
+    }
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()
+        .map(|runtime| runtime.block_on(future))
+}
+
+#[unsafe(no_mangle)]
+#[expect(unsafe_code, reason = "JNI entry point")]
+pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeFetchPush<'frame>(
+    mut unowned_env: EnvUnowned<'frame>,
+    _class: JClass<'frame>,
+    store_dir: JString<'frame>,
+    user_id: JString<'frame>,
+    device_id: JString<'frame>,
+    room_id: JString<'frame>,
+    event_id: JString<'frame>,
+) -> JString<'frame> {
+    let result = unowned_env.with_env(|env: &mut Env<'frame>| -> Result<_, jni::errors::Error> {
+        let data_dir = store_dir.to_string();
+        let user_id = user_id.to_string();
+        let device_id = device_id.to_string();
+        let room_id = room_id.to_string();
+        let event_id = event_id.to_string();
+        let core = CORE.get();
+        let fetch = async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(20),
+                sable_core::notifications::fetch_cold_push_event(
+                    core.map(Arc::as_ref),
+                    std::path::Path::new(&data_dir),
+                    &user_id,
+                    &device_id,
+                    &room_id,
+                    &event_id,
+                ),
+            )
+            .await
+            .unwrap_or(PushFetchView::Unavailable)
+        };
+        let result = block_on(core.is_some(), fetch).unwrap_or(PushFetchView::Unavailable);
+
+        JString::from_str(env, encode_fetch(&result))
+    });
+
+    result.resolve::<jni::errors::ThrowRuntimeExAndDefault>()
+}
+
+fn encode_fetch(result: &PushFetchView) -> String {
+    match result {
+        PushFetchView::Event { event } => serde_json::to_string(event).unwrap_or_default(),
+        PushFetchView::Discard => DISCARD.to_owned(),
+        PushFetchView::Unavailable => String::new(),
+    }
 }
 
 fn encode(result: ColdPush) -> String {

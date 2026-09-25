@@ -543,6 +543,10 @@ mod tests {
 
         assert!(!core.handle_session_change(&matrix_sdk::SessionChange::TokensRefreshed, 1));
         assert_eq!(*bytes.lock().await, Some(b"session".to_vec()));
+        assert!(matches!(
+            events.recv().await,
+            Some(CoreEvent::SessionTokensRefreshed)
+        ));
 
         assert!(core.handle_session_change(
             &matrix_sdk::SessionChange::UnknownToken(
