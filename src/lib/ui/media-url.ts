@@ -3,7 +3,7 @@ import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
 /* Not `SvelteMap`: callers read the cache from inside an effect, so a reactive
    miss re-runs every waiting media element each time any other one resolves. */
-type CachedMediaUrl = { url: string; bytes: number };
+type CachedMediaUrl = { url: string; bytes: number; ratio: number | undefined };
 
 const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
@@ -89,7 +89,8 @@ export function mediaAspectRatio(
   width: number,
   height: number
 ): number | null {
-  return aspectRatios.get(cacheKey(core.session?.account_id, source, width, height)) ?? null;
+  const key = cacheKey(core.session?.account_id, source, width, height);
+  return objectUrls.get(key)?.ratio ?? aspectRatios.get(key) ?? null;
 }
 
 function evict(published: string): void {
@@ -228,7 +229,7 @@ export function loadMediaUrl(
             objectUrlBytes -= previous.bytes;
             if (!holds.has(key)) URL.revokeObjectURL(previous.url);
           }
-          objectUrls.set(key, { url: objectUrl, bytes: blob.size });
+          objectUrls.set(key, { url: objectUrl, bytes: blob.size, ratio: aspectRatios.get(key) });
           objectUrlBytes += blob.size;
           evict(key);
           return objectUrl;

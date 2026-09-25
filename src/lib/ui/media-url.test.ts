@@ -2,11 +2,18 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
 
-import { cachedMediaUrl, discardMediaUrl, holdMediaUrl, loadMediaUrl } from './media-url.js';
+import {
+  cachedMediaUrl,
+  discardMediaUrl,
+  holdMediaUrl,
+  loadMediaUrl,
+  mediaAspectRatio,
+} from './media-url.js';
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function session(accountId: string, userId: string, deviceId: string) {
@@ -112,6 +119,31 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   await loadMediaUrl(core, 'mxc://example.org/later', 800, 600);
 
   expect(revoke).toHaveBeenCalledWith(held);
+});
+
+test('keeps the shape of a held URL however much media is measured after it', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:shaped');
+  vi.stubGlobal('createImageBitmap', (blob: Blob) =>
+    Promise.resolve({ width: blob.size, height: 1, close: () => {} })
+  );
+  const core = {
+    session: session('account-shaped', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: {
+      fetchMedia: vi.fn((source: string) =>
+        Promise.resolve(new Uint8Array(source.endsWith('wide') ? 4 : 1))
+      ),
+    },
+  };
+
+  const release = holdMediaUrl(core, 'mxc://example.org/wide', 0, 0);
+  await loadMediaUrl(core, 'mxc://example.org/wide', 0, 0);
+  for (let index = 0; index < 600; index += 1) {
+    await loadMediaUrl(core, `mxc://example.org/other-${String(index)}`, 0, 0);
+  }
+
+  expect(mediaAspectRatio(core, 'mxc://example.org/wide', 0, 0)).toBe(4);
+  release();
 });
 
 test('a cached URL that is held again is evicted after older ones', async () => {
