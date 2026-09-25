@@ -22,3 +22,10 @@ test('mobile settings row controls can shrink around long values', () => {
   expect(rowControl).toContain('max-width: 100%;');
   expect(rowControl).toContain('min-width: 0;');
 });
+
+test('About offers update checks on every platform', () => {
+  expect(aboutSource).toContain('aboutCheckForUpdates');
+  expect(aboutSource).toContain('checkForUpdates');
+  expect(aboutSource).toContain('checkForMobileUpdate');
+  expect(aboutSource).toContain('checkForWebUpdate');
+});

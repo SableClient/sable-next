@@ -1,42 +1,17 @@
 <script lang="ts">
-  import { version } from '$app/env';
   import { onMount } from 'svelte';
   import { on } from 'svelte/events';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { checkForWebUpdate, webUpdateState } from '#lib/platform/web-updates.svelte.js';
   import Banner from '#lib/ui/primitives/Banner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
 
-  let registration = $state<ServiceWorkerRegistration | null>(null);
+  const registration = $derived(webUpdateState.registration);
   let dismissed = $state(false);
-  let live = true;
 
-  const VERSION_REPLY_MS = 1_500;
   const POLL_INTERVAL_MS = 300_000;
-
-  function workerVersion(worker: ServiceWorker): Promise<string | null> {
-    return new Promise((settle) => {
-      const channel = new MessageChannel();
-      const timer = setTimeout(() => settle(null), VERSION_REPLY_MS);
-      channel.port1.onmessage = (event: MessageEvent<unknown>) => {
-        clearTimeout(timer);
-        settle(typeof event.data === 'string' ? event.data : null);
-      };
-      worker.postMessage({ type: 'sable:version' }, [channel.port2]);
-    });
-  }
-
-  async function consider(next: ServiceWorkerRegistration, worker: ServiceWorker): Promise<void> {
-    const reported = await workerVersion(worker);
-    if (!live) return;
-    if (reported === version) {
-      worker.postMessage({ type: 'sable:skip-waiting' });
-      return;
-    }
-    registration = next;
-    dismissed = false;
-  }
 
   function refresh(): void {
     const waiting = registration?.waiting;
@@ -54,47 +29,21 @@
   onMount(() => {
     if (!('serviceWorker' in navigator)) return;
 
-    let stopInstalling: (() => void) | undefined;
-    let stopUpdates: (() => void) | undefined;
-    let timer: ReturnType<typeof setInterval> | undefined;
-    void navigator.serviceWorker.ready
-      .then((ready) => {
-        if (!live) return;
-        if (ready.waiting) void consider(ready, ready.waiting);
-
-        const onUpdate = (): void => {
-          if (!live) return;
-          const installing = ready.installing;
-          if (installing === null) return;
-
-          const onStateChange = (): void => {
-            if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-              void consider(ready, installing);
-            }
-          };
-          stopInstalling?.();
-          stopInstalling = on(installing, 'statechange', onStateChange);
-        };
-        stopUpdates = on(ready, 'updatefound', onUpdate);
-
-        const check = (): void => {
-          ready.update().catch((error: unknown) => {
-            console.debug('[sable updates] web update check failed', error);
-          });
-        };
-        check();
-        timer = setInterval(check, POLL_INTERVAL_MS);
-      })
-      .catch((error: unknown) => {
+    const check = (): void => {
+      checkForWebUpdate().catch((error: unknown) => {
         console.debug('[sable updates] web update check failed', error);
       });
+    };
+    check();
+    const timer = setInterval(check, POLL_INTERVAL_MS);
 
     return () => {
-      live = false;
-      stopInstalling?.();
-      stopUpdates?.();
       clearInterval(timer);
     };
+  });
+
+  $effect(() => {
+    if (webUpdateState.generation > 0) dismissed = false;
   });
 </script>
 

@@ -5,6 +5,8 @@
   import { SABLE_DONATE_URL, SABLE_SOURCE_URL } from '#lib/config/links.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { checkForMobileUpdate, checkForUpdate, updatePlatform } from '#lib/platform/updates.js';
+  import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
@@ -19,6 +21,10 @@
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
   let resetting = $state(false);
   let resetFailed = $state(false);
+  let checkingForUpdate = $state(false);
+  let updateCheckResult = $state<'available' | 'current' | 'mobile-available' | 'failed' | null>(
+    null
+  );
 
   $effect(() => {
     let cancelled = false;
@@ -43,6 +49,30 @@
     } catch {
       resetting = false;
       resetFailed = true;
+    }
+  }
+
+  async function checkForUpdates(): Promise<void> {
+    if (checkingForUpdate) return;
+    checkingForUpdate = true;
+    updateCheckResult = null;
+    try {
+      const platform = updatePlatform();
+      const available =
+        platform === 'desktop'
+          ? Boolean(await checkForUpdate())
+          : platform === 'web'
+            ? await checkForWebUpdate()
+            : await checkForMobileUpdate();
+      updateCheckResult = available
+        ? platform === 'mobile'
+          ? 'mobile-available'
+          : 'available'
+        : 'current';
+    } catch {
+      updateCheckResult = 'failed';
+    } finally {
+      checkingForUpdate = false;
     }
   }
 </script>
@@ -110,6 +140,32 @@
           {$i18n.t('settings.aboutReport')}
         </LinkButton>
       </SettingsRow>
+      <SettingsRow
+        id="check-for-updates"
+        title={$i18n.t('settings.aboutCheckForUpdates')}
+        description={$i18n.t('settings.aboutCheckForUpdatesHint')}
+      >
+        <Button size="small" loading={checkingForUpdate} onclick={() => void checkForUpdates()}>
+          {$i18n.t('settings.aboutCheckForUpdates')}
+        </Button>
+      </SettingsRow>
+      {#if updateCheckResult === 'current'}
+        <li class="settings-form status" aria-live="polite">
+          {$i18n.t('settings.aboutUpToDate')}
+        </li>
+      {:else if updateCheckResult === 'available'}
+        <li class="settings-form status" aria-live="polite">
+          {$i18n.t('settings.aboutUpdateAvailable')}
+        </li>
+      {:else if updateCheckResult === 'mobile-available'}
+        <li class="settings-form status" aria-live="polite">
+          {$i18n.t('settings.aboutMobileUpdateAvailable')}
+        </li>
+      {:else if updateCheckResult === 'failed'}
+        <li class="settings-form error" role="alert">
+          {$i18n.t('settings.aboutUpdateCheckFailed')}
+        </li>
+      {/if}
       <SettingsRow
         id="reset-cache"
         title={$i18n.t('settings.aboutResetCache')}
@@ -190,6 +246,11 @@
 
   .error {
     color: var(--crit-main);
+    margin: 0;
+  }
+
+  .status {
+    color: var(--surface-var-on-container);
     margin: 0;
   }
 

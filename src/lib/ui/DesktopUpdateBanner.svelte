@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import ArrowCircleUpIcon from 'phosphor-svelte/lib/ArrowCircleUpIcon';
 
   import { i18n } from '#lib/i18n.js';
@@ -7,6 +7,7 @@
     checkForUpdate,
     relaunchApp,
     supportsAutoUpdate,
+    subscribeToUpdates,
     type AvailableUpdate,
   } from '#lib/platform/updates.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -35,19 +36,29 @@
         : $i18n.t('settings.updateBannerTitle')
   );
 
+  function showUpdate(found: AvailableUpdate): void {
+    if (found.version !== update?.version) {
+      stage = { name: 'available' };
+      dismissed = false;
+    }
+    update = found;
+  }
+
   async function poll(): Promise<void> {
     if (stage.name === 'downloading' || stage.name === 'staged') return;
     try {
       const found = await checkForUpdate();
-      if (found && found.version !== update?.version) {
-        stage = { name: 'available' };
-        dismissed = false;
-      }
-      update = found;
+      if (found) showUpdate(found);
     } catch (error) {
       console.debug('[sable updates] check failed', error);
     }
   }
+
+  onMount(() =>
+    subscribeToUpdates((found) => {
+      showUpdate(found);
+    })
+  );
 
   $effect(() => {
     if (!supportsAutoUpdate() || !preferences.autoUpdateCheck) return undefined;
