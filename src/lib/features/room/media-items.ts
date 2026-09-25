@@ -30,7 +30,7 @@ export function timelineMediaItems(entries: readonly TimelineItemView[]): MediaI
               size: item.size,
               blurhash: item.blurhash,
               thumbnail: item.thumbnail,
-              spoiler: null,
+              spoiler: item.spoiler,
             },
           ];
         }

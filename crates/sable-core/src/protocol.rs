@@ -2823,6 +2823,7 @@ pub enum GalleryItemView {
         size: Option<u64>,
         blurhash: Option<String>,
         thumbnail: Option<String>,
+        spoiler: Option<String>,
     },
     Video {
         filename: String,
@@ -2835,6 +2836,7 @@ pub enum GalleryItemView {
         height: Option<u64>,
         blurhash: Option<String>,
         thumbnail: Option<String>,
+        spoiler: Option<String>,
     },
     Audio {
         filename: String,

@@ -125,6 +125,7 @@ test('opens the selected gallery image', async () => {
             size: null,
             blurhash: null,
             thumbnail: null,
+            spoiler: null,
           },
           {
             kind: 'image',
@@ -137,6 +138,7 @@ test('opens the selected gallery image', async () => {
             size: null,
             blurhash: null,
             thumbnail: null,
+            spoiler: null,
           },
         ],
       }),
@@ -176,6 +178,7 @@ test('opens a gallery pdf in the viewer', async () => {
             size: null,
             blurhash: null,
             thumbnail: null,
+            spoiler: null,
           },
           {
             kind: 'file',
@@ -223,6 +226,7 @@ test('renders gallery items with their captions, sizes and waveforms', async () 
             size: 2048,
             blurhash: null,
             thumbnail: null,
+            spoiler: null,
           },
           {
             kind: 'audio',
@@ -258,6 +262,44 @@ test('renders gallery items with their captions, sizes and waveforms', async () 
   expect(document.querySelector('.gallery .item-caption')?.textContent).toBe('the beach');
   expect(document.querySelector('.gallery .voice-message-player')).not.toBeNull();
   expect(document.querySelector('.gallery .media-file-size')?.textContent).toBe('1.5 MB');
+  await unmount(instance);
+});
+
+test('hides a spoilered gallery item until it is revealed', async () => {
+  const instance = mount(MessageBody, {
+    target: document.body,
+    props: {
+      item: item({
+        kind: 'gallery',
+        body: '',
+        html: '',
+        items: ['one', 'two'].map((name) => ({
+          kind: 'image' as const,
+          filename: `${name}.png`,
+          caption: null,
+          source: `mxc://example.org/${name}`,
+          mime: 'image/png',
+          width: 100,
+          height: 100,
+          size: null,
+          blurhash: null,
+          thumbnail: null,
+          spoiler: name === 'two' ? 'sunburn' : null,
+        })),
+      }),
+      canRedactOthers: false,
+    },
+  });
+  await tick();
+
+  expect(document.querySelectorAll('.gallery .media-image')).toHaveLength(1);
+  const reveal = document.querySelector<HTMLButtonElement>('.gallery .spoiler-reveal');
+  expect(reveal?.textContent).toContain('sunburn');
+
+  reveal?.click();
+  await tick();
+
+  expect(document.querySelectorAll('.gallery .media-image')).toHaveLength(2);
   await unmount(instance);
 });
 

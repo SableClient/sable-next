@@ -41,6 +41,7 @@ test('lists a gallery pdf as a file the viewer can open, and skips other files',
         size: null,
         blurhash: null,
         thumbnail: null,
+        spoiler: 'sunburn',
       },
       {
         kind: 'file',
@@ -63,7 +64,7 @@ test('lists a gallery pdf as a file the viewer can open, and skips other files',
 
   expect(items).toHaveLength(2);
   expect(items).toMatchObject([
-    { kind: 'image', eventId: '$gallery:gallery:0' },
+    { kind: 'image', eventId: '$gallery:gallery:0', spoiler: 'sunburn' },
     {
       kind: 'file',
       eventId: '$gallery:gallery:2',

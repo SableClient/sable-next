@@ -1332,7 +1332,9 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
                                 "body": "the beach",
                                 "filename": "beach.jpg",
                                 "url": "mxc://example.org/beach",
-                                "info": { "mimetype": "image/jpeg", "size": 2048 }
+                                "info": { "mimetype": "image/jpeg", "size": 2048 },
+                                "page.codeberg.everypizza.msc4193.spoiler": true,
+                                "page.codeberg.everypizza.msc4193.spoiler.reason": "sunburn"
                             },
                             {
                                 "itemtype": "m.audio",
@@ -1371,6 +1373,7 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
     assert_eq!(json[0]["filename"], "beach.jpg");
     assert_eq!(json[0]["caption"], "the beach");
     assert_eq!(json[0]["size"], 2048);
+    assert_eq!(json[0]["spoiler"], "sunburn");
     assert_eq!(json[1]["filename"], "memo.ogg");
     assert_eq!(json[1]["caption"], serde_json::Value::Null);
     assert_eq!(json[1]["duration_ms"], 4000);

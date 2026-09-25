@@ -1,8 +1,11 @@
 <script lang="ts">
   import type { GalleryItemView } from '#src/generated/protocol';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import FormattedBody from './FormattedBody.svelte';
@@ -19,12 +22,18 @@
 
   let { items, body, html, senderTimezone = null, onMatrixLink, onOpen }: Props = $props();
   let columns = $derived(items.length > 1 ? 2 : 1);
+  const revealed = new SvelteSet<string>();
 </script>
 
 <div class="gallery" style:--gallery-columns={columns}>
   {#each items as item, index (index)}
+    {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
     <div class="cell">
-      {#if item.kind === 'image'}
+      {#if spoiler !== null && !revealed.has(item.source)}
+        <Button class="spoiler-reveal" onclick={() => revealed.add(item.source)}>
+          {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
+        </Button>
+      {:else if item.kind === 'image'}
         <MediaImage
           class="tile privacy-media"
           source={item.source}

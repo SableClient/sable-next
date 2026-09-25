@@ -1222,7 +1222,10 @@ pub(crate) fn video_thumbnail(info: &VideoInfo) -> Option<String> {
     info.thumbnail_source.as_ref().map(media_source)
 }
 
-fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
+fn gallery_item(
+    item: &GalleryItemType,
+    raw: Option<&serde_json::Value>,
+) -> Option<GalleryItemView> {
     let dimension = |value: Option<UInt>| value.map(u64::from);
     let caption = |caption: Option<&str>| caption.map(ToOwned::to_owned);
 
@@ -1237,6 +1240,7 @@ fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
             size: dimension(image.info.as_ref().and_then(|info| info.size)),
             blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
             thumbnail: image.info.as_deref().and_then(image_thumbnail),
+            spoiler: spoiler_reason(raw),
         },
         GalleryItemType::Video(video) => GalleryItemView::Video {
             filename: video.filename().to_owned(),
@@ -1247,6 +1251,7 @@ fn gallery_item(item: &GalleryItemType) -> Option<GalleryItemView> {
             height: dimension(video.info.as_ref().and_then(|info| info.height)),
             blurhash: video.info.as_ref().and_then(|info| info.blurhash.clone()),
             thumbnail: video.info.as_deref().and_then(video_thumbnail),
+            spoiler: spoiler_reason(raw),
         },
         GalleryItemType::Audio(audio) => GalleryItemView::Audio {
             filename: audio.filename().to_owned(),
@@ -1562,7 +1567,19 @@ fn message_content(
                     .map(|formatted| formatted.body.as_str()),
             ),
             body: gallery.body.clone(),
-            items: gallery.itemtypes.iter().filter_map(gallery_item).collect(),
+            items: gallery
+                .itemtypes
+                .iter()
+                .enumerate()
+                .filter_map(|(index, item)| {
+                    let raw = raw
+                        .content
+                        .as_ref()
+                        .and_then(|content| content.get("itemtypes"))
+                        .and_then(|items| items.get(index));
+                    gallery_item(item, raw)
+                })
+                .collect(),
         },
         _ => text_message(message, profile, raw),
     }
