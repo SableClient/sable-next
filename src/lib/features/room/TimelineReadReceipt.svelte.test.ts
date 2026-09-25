@@ -108,6 +108,23 @@ test('a queued receipt is discarded when switching to focused history', async ()
   vi.useRealTimers();
 });
 
+test('a focused timeline read to the live end sends a receipt', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.mode = { kind: 'focused', eventId: '$latest' };
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const instance = mount(TimelineReadReceipt, {
+    target: document.body,
+    props: { timeline, visibleEventId: '$latest', atLatest: true, onRead: read },
+  });
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenCalledWith('$latest');
+  await unmount(instance);
+  vi.useRealTimers();
+});
+
 function itemWithId(id: string): TimelineItemView {
   return { ...item(), id, event_id: `$${id}` };
 }

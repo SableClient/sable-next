@@ -660,7 +660,12 @@
   }
 </script>
 
-<TimelineReadReceipt {timeline} visibleEventId={readEventId} onRead={markRead} />
+<TimelineReadReceipt
+  {timeline}
+  visibleEventId={readEventId}
+  atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
+  onRead={markRead}
+/>
 <TimelineAnnouncements {timeline} {visibleItems} />
 <MessageContextMenu menu={messageMenu} />
 <MessageDialogHost
