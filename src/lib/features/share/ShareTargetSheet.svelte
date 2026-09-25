@@ -5,6 +5,7 @@
   import { readDraft, writeDraft } from '#lib/features/composer/composer-drafts.svelte.js';
   import { stageFiles } from '#lib/features/composer/composer-files.js';
   import { i18n } from '#lib/i18n.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
@@ -44,6 +45,7 @@
 
       const path = roomSectionPath(roomList.rooms, roomId);
       await inbox.clear();
+      await afterOverlayPops();
       await goto(path, { replaceState: true });
     } catch (error) {
       console.warn('[sable share-target] staging failed', error);
