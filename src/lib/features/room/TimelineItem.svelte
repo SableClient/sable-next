@@ -21,7 +21,7 @@
     senderDisplayColors,
     stripReplyFallback,
   } from './members.js';
-  import { firstPreviewableLink } from './link-preview.js';
+  import { previewableLinks } from './link-preview.js';
   import LinkEmbed from './embeds/LinkEmbed.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
@@ -558,8 +558,8 @@
       receiptReaders.length > 0
   );
   let nonTextContent = $derived(item.content.kind !== 'message');
-  let previewUrl = $derived(
-    item.content.kind === 'message' ? firstPreviewableLink(item.content.html) : null
+  let previewUrls = $derived(
+    item.content.kind === 'message' ? previewableLinks(item.content.html) : []
   );
   let receiptWidth = $state(0);
   let receiptsInline = $derived(
@@ -568,7 +568,7 @@
       !threadSummary &&
       !item.thread_root &&
       item.bundled_link_previews.length === 0 &&
-      previewUrl === null &&
+      previewUrls.length === 0 &&
       upload === null &&
       stalled === null
   );
@@ -1000,8 +1000,10 @@
             {#each item.bundled_link_previews as preview (preview.url)}
               <LinkEmbed url={preview.url} bundled={preview} {encrypted} />
             {/each}
-          {:else if previewUrl}
-            <LinkEmbed url={previewUrl} {encrypted} />
+          {:else}
+            {#each previewUrls as url (url)}
+              <LinkEmbed {url} {encrypted} />
+            {/each}
           {/if}
         {:else if item.content.kind === 'redacted'}
           {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}

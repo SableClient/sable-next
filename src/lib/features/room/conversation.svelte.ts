@@ -25,7 +25,7 @@ import { runSlash } from '#lib/features/composer/slash-commands.js';
 import { gifFilename, proxiedGif, type GifResult } from '#lib/features/gif/providers.js';
 import { replyFallbackFromSource } from '#lib/features/room/reply-fallback.js';
 import { replyPreviewBody } from '#lib/features/room/reply-preview.js';
-import { firstPreviewableLink } from '#lib/features/room/link-preview.js';
+import { previewableLinks } from '#lib/features/room/link-preview.js';
 import { loadUrlPreview } from '#lib/features/room/link-preview-cache.js';
 import {
   projectPersona,
@@ -87,10 +87,11 @@ export class Conversation {
     const enabled =
       this.#encrypted() === false ? preferences.urlPreviews : preferences.encryptedUrlPreviews;
     if (!enabled) return [];
-    const url = html ? firstPreviewableLink(html) : null;
-    if (!url) return [];
-    const preview = await loadUrlPreview(this.#core.commands, url);
-    return preview ? [preview] : [];
+    if (!html) return [];
+    const previews = await Promise.all(
+      previewableLinks(html).map((url) => loadUrlPreview(this.#core.commands, url))
+    );
+    return previews.filter((preview) => preview !== null);
   }
 
   readonly sendMessage = async (

@@ -11,7 +11,7 @@
 
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
-  import { firstPreviewableLink } from './link-preview.js';
+  import { previewableLinks } from './link-preview.js';
   import FormattedBody from './FormattedBody.svelte';
   import LinkEmbed from './embeds/LinkEmbed.svelte';
   import TimelineGallery from './TimelineGallery.svelte';
@@ -45,8 +45,8 @@
     onEndPoll,
     onSenderProfile,
   }: Props = $props();
-  let previewLink = $derived(
-    item.content.kind === 'gallery' ? firstPreviewableLink(item.content.html) : null
+  let previewLinks = $derived(
+    item.content.kind === 'gallery' ? previewableLinks(item.content.html) : []
   );
   let spoiler = $derived(
     item.content.kind === 'image' || item.content.kind === 'video' ? item.content.spoiler : null
@@ -169,9 +169,9 @@
     {/if}
   </div>
 {/if}
-{#if previewLink}
-  <LinkEmbed url={previewLink} {encrypted} />
-{/if}
+{#each previewLinks as url (url)}
+  <LinkEmbed {url} {encrypted} />
+{/each}
 
 <style>
   .body {

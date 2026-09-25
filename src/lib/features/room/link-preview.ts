@@ -51,7 +51,8 @@ export function imageMimeFromUrl(href: string): string | null {
   return IMAGE_MIMES[extension] ?? null;
 }
 
-export function firstPreviewableLink(html: string): string | null {
+export function previewableLinks(html: string): string[] {
+  const links = new Set<string>();
   let skipped: { name: string; depth: number } | null = null;
 
   for (const [, closing, rawName, attributes = '', slash] of html.matchAll(TAG_REGEX)) {
@@ -74,8 +75,8 @@ export function firstPreviewableLink(html: string): string | null {
     const href = HREF_REGEX.exec(attributes)?.[1];
     if (href === undefined) continue;
     const decoded = decodeEntities(href);
-    if (isPreviewable(decoded)) return decoded;
+    if (isPreviewable(decoded)) links.add(decoded);
   }
 
-  return null;
+  return [...links];
 }

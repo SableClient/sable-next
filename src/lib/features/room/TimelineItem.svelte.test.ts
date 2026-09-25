@@ -3,7 +3,7 @@
 import { mount, tick, unmount } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { CoreEvent, TimelineItemView } from '#src/generated/protocol';
+import type { CoreEvent, TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -15,6 +15,18 @@ const core = Object.assign(baseCore, {
   setPinned: vi.fn(() => Promise.resolve<string[]>([])),
   bookmarks: vi.fn(() => Promise.resolve([])),
   setBookmark: vi.fn(() => Promise.resolve(false)),
+  urlPreview: vi.fn((url: string): Promise<UrlPreviewView> =>
+    Promise.resolve({
+      url,
+      title: url,
+      description: null,
+      site_name: null,
+      image: null,
+      image_mime: null,
+      image_width: null,
+      image_height: null,
+    })
+  ),
 });
 
 const { saveBytes } = vi.hoisted(() => ({
@@ -1335,4 +1347,30 @@ test('fills one bar across a gallery and names the item uploading', async () => 
   expect(document.querySelector<HTMLProgressElement>('progress.upload')?.value).toBeCloseTo(0.375);
   expect(document.querySelector('.transfer-count')?.textContent.trim()).toBe('2 of 4');
   await unmount(instance);
+});
+
+test('renders a link preview for every link in a message', async () => {
+  setPreference('urlPreviews', true);
+  const message: TimelineItemView = {
+    ...item(false),
+    content: {
+      kind: 'message',
+      body: 'https://example.org/one https://example.org/two',
+      html: '<a href="https://example.org/one">one</a> <a href="https://example.org/two">two</a>',
+      emote: false,
+      notice: false,
+      edited: false,
+    },
+  };
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: { core, item: { item: message, collapsed: false, encrypted: false } },
+  });
+  await vi.waitFor(() => {
+    expect(
+      [...document.querySelectorAll<HTMLAnchorElement>('a.link-preview')].map((link) => link.href)
+    ).toEqual(['https://example.org/one', 'https://example.org/two']);
+  });
+  await unmount(instance);
+  setPreference('urlPreviews', false);
 });
