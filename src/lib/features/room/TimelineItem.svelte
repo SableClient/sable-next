@@ -1650,7 +1650,6 @@
   .via {
     background: none;
     border: none;
-    border-radius: var(--radius-pill);
     cursor: pointer;
     letter-spacing: 0.01em;
     min-width: 0;
@@ -1671,7 +1670,7 @@
   }
 
   .via:hover {
-    background: var(--surface-var-container-hover);
+    text-decoration: underline;
   }
 
   .emote {
