@@ -219,7 +219,7 @@
 <style>
   .drawer-viewport {
     height: 100%;
-    overflow: hidden;
+    overflow: clip;
     touch-action: pan-y;
   }
 
