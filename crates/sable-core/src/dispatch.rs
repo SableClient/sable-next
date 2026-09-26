@@ -449,6 +449,19 @@ impl Core {
                 Ok(CommandOk::SendRawEvent)
             }
 
+            Command::CalendarEntries { room_id } => Ok(CommandOk::CalendarEntries(
+                self.calendar_entries(&room_id).await?,
+            )),
+
+            Command::SaveCalendarEvent {
+                room_id,
+                event,
+                replaces,
+            } => {
+                self.save_calendar_event(&room_id, event, replaces).await?;
+                Ok(CommandOk::SaveCalendarEvent)
+            }
+
             Command::Personas => Ok(CommandOk::Personas {
                 catalog: self.personas().await?,
             }),
@@ -2496,6 +2509,9 @@ impl Core {
                     CreateRoomKind::Space => Some(RoomType::Space),
                     CreateRoomKind::Voice => Some(RoomType::Call),
                     CreateRoomKind::Forum => Some(RoomType::from(view::FORUM_ROOM_TYPE)),
+                    CreateRoomKind::Calendar => {
+                        Some(RoomType::from(crate::calendar::CALENDAR_ROOM_TYPE))
+                    }
                 };
                 if room_type.is_some() || !federate {
                     let mut creation = RoomCreateEventContent::new_v11();
@@ -3142,7 +3158,7 @@ impl Core {
         Ok(events)
     }
 
-    async fn room_state_event_content(
+    pub(crate) async fn room_state_event_content(
         &self,
         room_id: OwnedRoomId,
         event_type: String,

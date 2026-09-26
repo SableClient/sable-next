@@ -183,6 +183,18 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
     },
+    CalendarEntries {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    SaveCalendarEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        event: serde_json::Value,
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        replaces: Option<OwnedEventId>,
+    },
     SendSticker {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1229,6 +1241,8 @@ pub enum CommandOk {
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
     SendRawEvent,
+    CalendarEntries(CalendarView),
+    SaveCalendarEvent,
     SendSticker,
     SendGif,
     SendLocation,
@@ -1628,6 +1642,7 @@ pub enum CreateRoomKind {
     Space,
     Voice,
     Forum,
+    Calendar,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -3562,6 +3577,36 @@ pub struct InviteTriageView {
 pub struct StatusView {
     pub text: String,
     pub emoji: Option<String>,
+}
+
+/// One `JSCalendar` event from a `chat.commet.calendar_events` room event.
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct CalendarEntryView {
+    pub event_id: String,
+    pub sender: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub timestamp: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+    pub event: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct CalendarRsvpView {
+    pub sender: String,
+    pub calendar_event_id: String,
+    pub uid: String,
+    pub status: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct CalendarView {
+    pub entries: Vec<CalendarEntryView>,
+    pub rsvps: Vec<CalendarRsvpView>,
 }
 
 /// MSC4549 track details from an `m.audio` event's `info`.

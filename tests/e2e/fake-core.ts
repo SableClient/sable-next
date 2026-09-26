@@ -869,6 +869,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       bulk_redact: () => ({ type: 'bulk_redact', redacted: 0 }),
       delete_thread: () => ({ type: 'delete_thread' }),
       pinned_events: () => ({ type: 'pinned_events', event_ids: [] }),
+      calendar_entries: () => ({ type: 'calendar_entries', entries: [], rsvps: [] }),
       room_has_space_parent: () => ({ type: 'room_has_space_parent', has_space_parent: false }),
       room_open: (command, port) => {
         const permissions = handlers.room_permissions(

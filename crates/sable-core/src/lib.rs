@@ -4,6 +4,7 @@ mod accounts;
 mod attachments;
 mod auth;
 mod bookmarks;
+mod calendar;
 mod calls;
 mod cosmetics;
 mod dispatch;
