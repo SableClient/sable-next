@@ -1574,7 +1574,7 @@
 
   .thread-line,
   .thread-elbow {
-    border-color: var(--bg-container-line);
+    border-color: var(--surface-container-line);
     border-style: solid;
     border-width: 0 0 0 var(--border-width-500);
     left: calc(
