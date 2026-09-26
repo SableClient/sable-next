@@ -851,3 +851,28 @@ describe('clipboard slices', () => {
     });
   });
 });
+
+describe('MSC references', () => {
+  const pull = 'https://github.com/matrix-org/matrix-spec-proposals/pull';
+
+  test('link in the formatted body and stay as typed in the body', () => {
+    const message = serializeComposer(docOf(para(composerSchema.text('see MSC4144, not xMSC1'))));
+
+    expect(message.body).toBe('see MSC4144, not xMSC1');
+    expect(message.formatted).toBe(`see <a href="${pull}/4144">MSC4144</a>, not xMSC1`);
+  });
+
+  test('link in plain mode, but not inside code', () => {
+    const message = serializePlain(textDoc('msc2545 and `MSC3391`'));
+
+    expect(message.body).toBe('msc2545 and `MSC3391`');
+    expect(message.formatted).toBe(`<a href="${pull}/2545">msc2545</a> and <code>MSC3391</code>`);
+  });
+
+  test('an edit of a linked message keeps its plain source', () => {
+    const sent = serializePlain(textDoc('MSC4144 lands')).formatted ?? '';
+
+    expect(plainEditSource('MSC4144 lands', sent)).toBe('MSC4144 lands');
+    expect(serializeComposer(parseMatrixHtml(sent)).body).toBe('MSC4144 lands');
+  });
+});

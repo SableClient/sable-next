@@ -19,6 +19,7 @@ import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
 import { mfmPlugin } from './mfm';
+import { isMscLink, linkMscs } from './msc-links';
 import { composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
 import { docToMarkdown } from './to-markdown';
 
@@ -39,7 +40,12 @@ function isBareUrl(mark: Mark, parent: ProseMirrorNode, index: number): boolean 
 
   const href = mark.attrs.href as string;
   const text = child.text ?? '';
-  return text === href || `https://${text}` === href || `mailto:${text}` === href;
+  return (
+    text === href ||
+    `https://${text}` === href ||
+    `mailto:${text}` === href ||
+    isMscLink(text, href)
+  );
 }
 
 function cellLine(row: ProseMirrorNode): string {
@@ -341,8 +347,9 @@ export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const source = withoutTrailingParagraph(flattenRoomPings(doc));
   const sourceWasPlain = isPlain(source);
   const flat = expandMfm(source);
+  const linked = linkMscs(flat);
   const imageSourcePacks = imageSourcePacksOf(flat);
-  if (isPlain(flat)) {
+  if (isPlain(linked)) {
     return {
       body: plainTextOf(source).trim(),
       formatted: null,
@@ -364,7 +371,7 @@ export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
 
   return {
     body,
-    formatted: html(flat),
+    formatted: html(linked),
     mentions,
     ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
   };
@@ -618,8 +625,10 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
     };
 
   const { source, atoms } = markdownSourceOf(doc);
-  const parsed = withoutTrailingParagraph(
-    flattenRoomPings(spliceAtoms(markdownParser.parse(source.trim()), atoms))
+  const parsed = linkMscs(
+    withoutTrailingParagraph(
+      flattenRoomPings(spliceAtoms(markdownParser.parse(source.trim()), atoms))
+    )
   );
   return {
     body,
