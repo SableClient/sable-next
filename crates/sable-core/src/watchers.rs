@@ -179,8 +179,12 @@ impl Core {
                 let mut alerted_events = std::collections::HashSet::new();
                 while let Some((notification, room)) = pending.recv().await {
                     let Notification { event, actions } = notification;
-                    let every_encrypted =
-                        notifications::every_encrypted_event_pushed(&client).await;
+                    let every_encrypted = match core.push_rules().await {
+                        Ok(rules) => {
+                            crate::push_rules::pushes_every_encrypted_event(&rules.snapshot().await)
+                        }
+                        Err(_) => notifications::every_encrypted_event_pushed(&client).await,
+                    };
                     if let RawAnySyncOrStrippedTimelineEvent::Sync(raw) = &event
                         && !(every_encrypted && notifications::raw_is_encrypted(raw))
                     {
@@ -248,16 +252,14 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_notification_settings(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        generation: u64,
-    ) {
+    pub(crate) fn watch_notification_settings(self: &Arc<Self>, generation: u64) {
         let core = self.clone();
-        let watched = client.clone();
         self.track_session_task(
             spawn(async move {
-                let mut changes = watched.notification_settings().await.subscribe_to_changes();
+                let Ok(rules) = core.push_rules().await else {
+                    return;
+                };
+                let mut changes = rules.subscribe();
                 while let Ok(()) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) =
                     changes.recv().await
                 {

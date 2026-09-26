@@ -100,10 +100,14 @@ impl Core {
     }
 
     pub(crate) async fn align_encrypted_defaults(&self) {
-        let Ok(client) = self.client().await else {
+        let Ok(rules) = self.push_rules().await else {
             return;
         };
-        if let Err(error) = crate::notifications::align_encrypted_defaults(&client).await {
+        let writes = crate::push_rules::plan_alignment(&rules.snapshot().await);
+        if writes.is_empty() {
+            return;
+        }
+        if let Err(error) = rules.apply(writes).await {
             tracing::warn!("could not align the encrypted notification defaults: {error}");
         }
     }

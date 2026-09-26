@@ -22,6 +22,7 @@ import type {
   MemberView,
   MembershipView,
   MessageKind,
+  KeywordNotificationView,
   MentionNotificationModeView,
   MentionNotificationsView,
   MentionRuleView,
@@ -1456,7 +1457,7 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_read_room', room_id: roomId });
     },
 
-    async notificationKeywords(): Promise<string[]> {
+    async notificationKeywords(): Promise<KeywordNotificationView[]> {
       const response = await transport().send({
         type: 'notification_keywords',
       });
@@ -1475,6 +1476,13 @@ export function createCommands(transport: () => Transport) {
         type: 'remove_notification_keyword',
         keyword,
       });
+    },
+
+    async setNotificationKeywordMode(
+      keyword: string,
+      mode: MentionNotificationModeView
+    ): Promise<void> {
+      await transport().send({ type: 'set_notification_keyword_mode', keyword, mode });
     },
 
     async setPresence(presence: PresenceView, statusMessage: string | null): Promise<void> {

@@ -391,6 +391,10 @@ pub enum Command {
     RemoveNotificationKeyword {
         keyword: String,
     },
+    SetNotificationKeywordMode {
+        keyword: String,
+        mode: MentionNotificationModeView,
+    },
     TimestampToEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1270,18 +1274,19 @@ pub enum CommandOk {
         roots: Vec<TimelineItemView>,
         next_batch: Option<String>,
     },
+    EventItems {
+        items: Vec<TimelineItemView>,
+    },
     RoomAttachments {
         items: Vec<RoomAttachmentView>,
         next_batch: Option<String>,
     },
-    EventItems {
-        items: Vec<TimelineItemView>,
-    },
     NotificationKeywords {
-        keywords: Vec<String>,
+        keywords: Vec<KeywordNotificationView>,
     },
     AddNotificationKeyword,
     RemoveNotificationKeyword,
+    SetNotificationKeywordMode,
     TimestampToEvent {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         event_id: Option<OwnedEventId>,
@@ -3266,10 +3271,17 @@ pub enum MentionRuleView {
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct MentionNotificationsView {
-    pub room: MentionNotificationModeView,
-    pub user: MentionNotificationModeView,
+    pub room: Option<MentionNotificationModeView>,
+    pub user: Option<MentionNotificationModeView>,
     pub display_name: Option<MentionNotificationModeView>,
     pub username: Option<MentionNotificationModeView>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct KeywordNotificationView {
+    pub keyword: String,
+    pub mode: MentionNotificationModeView,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

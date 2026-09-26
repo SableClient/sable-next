@@ -5,6 +5,7 @@ import type {
   CommandOk,
   CoreEvent,
   EncryptionStatusView,
+  KeywordNotificationView,
   MentionNotificationsView,
   ProfileView,
   RoomSummary,
@@ -456,7 +457,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       recovery_passphrase: false,
     });
     const subscriptions = new Map<number, { roomId: string; page: number }>();
-    const notificationKeywords: string[] = [];
+    const notificationKeywords: KeywordNotificationView[] = [];
     let defaultGroupMode: 'all' | 'mentions' = 'mentions';
     let membershipNotifications: boolean | null = false;
     const mentionNotificationModes: MentionNotificationsView = {
@@ -965,7 +966,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       room_attachments: () => ({ type: 'room_attachments', items: [], next_batch: null }),
       notification_keywords: () => ({
         type: 'notification_keywords',
-        keywords: [...notificationKeywords],
+        keywords: notificationKeywords.map((entry) => ({ ...entry })),
       }),
       timestamp_to_event: () => ({ type: 'timestamp_to_event', event_id: null }),
       room_account_data: () => ({ type: 'room_account_data', content: null }),
@@ -1225,15 +1226,21 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       request_verification: () => ({ type: 'request_verification', flow_id: 'e2e-flow' }),
       add_notification_keyword: (command) => {
         if (command.keyword === 'network-fail') throw new FakeCoreError('failed');
-        if (!notificationKeywords.includes(command.keyword))
-          notificationKeywords.push(command.keyword);
+        const existing = notificationKeywords.find((entry) => entry.keyword === command.keyword);
+        if (existing) existing.mode = 'notify';
+        else notificationKeywords.push({ keyword: command.keyword, mode: 'notify' });
         return { type: 'add_notification_keyword' };
       },
       remove_notification_keyword: (command) => {
         if (command.keyword === 'stuck-keyword') throw new FakeCoreError('failed');
-        const index = notificationKeywords.indexOf(command.keyword);
+        const index = notificationKeywords.findIndex((entry) => entry.keyword === command.keyword);
         if (index !== -1) notificationKeywords.splice(index, 1);
         return { type: 'remove_notification_keyword' };
+      },
+      set_notification_keyword_mode: (command) => {
+        const existing = notificationKeywords.find((entry) => entry.keyword === command.keyword);
+        if (existing) existing.mode = command.mode;
+        return { type: 'set_notification_keyword_mode' };
       },
       set_mention_notifications: (command) => {
         mentionNotificationModes[command.rule] = command.mode;

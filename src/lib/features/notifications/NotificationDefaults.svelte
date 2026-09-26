@@ -11,11 +11,10 @@
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
-  const modes: NotificationModeView[] = ['all', 'mentions', 'mute'];
-  const modeLabels: Record<NotificationModeView, string> = {
+  const modes: Exclude<NotificationModeView, 'mute'>[] = ['all', 'mentions'];
+  const modeLabels: Record<Exclude<NotificationModeView, 'mute'>, string> = {
     all: 'room.notifyAll',
     mentions: 'room.notifyMentions',
-    mute: 'room.notifyMute',
   };
 
   const rows: {
@@ -70,6 +69,7 @@
 
     void core.commands.setDefaultNotificationMode(isDirect, mode).catch(() => {
       failed = true;
+      settingsChanges.version += 1;
     });
   }
 
@@ -78,6 +78,7 @@
 
     void core.commands.setMembershipNotifications(enabled).catch(() => {
       failed = true;
+      settingsChanges.version += 1;
     });
   }
 </script>

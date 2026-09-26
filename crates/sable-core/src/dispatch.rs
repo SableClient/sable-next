@@ -69,7 +69,7 @@ use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::{encryption_status, sign_out_safety};
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, session, spaces, view, webpush};
+use crate::{notifications, push_rules, session, spaces, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 const MAX_SEARCH_CONTEXT: usize = 3;
@@ -952,16 +952,16 @@ impl Core {
                 Ok(CommandOk::SetRoomDirectoryVisibility)
             }
 
-            Command::NotificationKeywords => {
-                let keywords = notifications::keywords(&self.client().await?)
-                    .await
-                    .map_err(|error| self.failed("notification_keywords", error))?;
-
-                Ok(CommandOk::NotificationKeywords { keywords })
-            }
+            Command::NotificationKeywords => Ok(CommandOk::NotificationKeywords {
+                keywords: push_rules::keywords(&self.push_rules().await?.snapshot().await),
+            }),
 
             Command::AddNotificationKeyword { keyword } => {
-                notifications::add_keyword(&self.client().await?, keyword)
+                let rules = self.push_rules().await?;
+                let writes = push_rules::plan_add_keyword(&rules.snapshot().await, &keyword)
+                    .map_err(|error| self.failed("add_notification_keyword", error))?;
+                rules
+                    .apply(writes)
                     .await
                     .map_err(|error| self.failed("add_notification_keyword", error))?;
 
@@ -969,11 +969,30 @@ impl Core {
             }
 
             Command::RemoveNotificationKeyword { keyword } => {
-                notifications::remove_keyword(&self.client().await?, keyword)
+                let rules = self.push_rules().await?;
+                rules
+                    .apply(push_rules::plan_remove_keyword(
+                        &rules.snapshot().await,
+                        &keyword,
+                    ))
                     .await
                     .map_err(|error| self.failed("remove_notification_keyword", error))?;
 
                 Ok(CommandOk::RemoveNotificationKeyword)
+            }
+
+            Command::SetNotificationKeywordMode { keyword, mode } => {
+                let rules = self.push_rules().await?;
+                rules
+                    .apply(push_rules::plan_keyword_mode(
+                        &rules.snapshot().await,
+                        &keyword,
+                        mode,
+                    ))
+                    .await
+                    .map_err(|error| self.failed("set_notification_keyword_mode", error))?;
+
+                Ok(CommandOk::SetNotificationKeywordMode)
             }
 
             Command::ListThreads { room_id, from } => {
@@ -1887,35 +1906,43 @@ impl Core {
 
             Command::NotificationSettings { room_id } => {
                 let room = self.room(&room_id).await?;
+                let rules = self.push_rules().await?.snapshot().await;
 
-                Ok(CommandOk::NotificationSettings(
-                    notifications::settings(&room).await,
-                ))
+                Ok(CommandOk::NotificationSettings(push_rules::room_settings(
+                    &rules,
+                    &room_id,
+                    notifications::is_one_to_one(&room),
+                )))
             }
 
-            Command::RoomNotificationModes { room_ids } => Ok(CommandOk::RoomNotificationModes {
-                modes: notifications::room_modes(&self.client().await?, room_ids).await,
-            }),
+            Command::RoomNotificationModes { room_ids } => {
+                let client = self.client().await?;
+                let rules = self.push_rules().await?.snapshot().await;
+                let rooms = room_ids.into_iter().filter_map(|room_id| {
+                    let direct = notifications::is_one_to_one(&client.get_room(&room_id)?);
+                    Some((room_id, direct))
+                });
+
+                Ok(CommandOk::RoomNotificationModes {
+                    modes: push_rules::room_modes(&rules, rooms),
+                })
+            }
 
             Command::DefaultNotificationModes => Ok(CommandOk::DefaultNotificationModes {
-                modes: notifications::default_modes(&self.client().await?).await,
+                modes: push_rules::default_modes(&self.push_rules().await?.snapshot().await),
             }),
 
-            Command::MentionNotifications => {
-                let modes = notifications::mention_notifications(&self.client().await?)
-                    .await
-                    .map_err(|error| self.failed("mention_notifications", error))?;
+            Command::MentionNotifications => Ok(CommandOk::MentionNotifications {
+                modes: push_rules::mention_notifications(
+                    &self.push_rules().await?.snapshot().await,
+                ),
+            }),
 
-                Ok(CommandOk::MentionNotifications { modes })
-            }
-
-            Command::MembershipNotifications => {
-                let enabled = notifications::membership_notifications(&self.client().await?)
-                    .await
-                    .map_err(|error| self.failed("membership_notifications", error))?;
-
-                Ok(CommandOk::MembershipNotifications { enabled })
-            }
+            Command::MembershipNotifications => Ok(CommandOk::MembershipNotifications {
+                enabled: push_rules::membership_notifications(
+                    &self.push_rules().await?.snapshot().await,
+                ),
+            }),
 
             Command::SetPusher { pusher } => {
                 notifications::set_pusher(&self.client().await?, pusher)
@@ -2016,38 +2043,53 @@ impl Core {
 
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
-                notifications::set_room_mode(&room, mode)
+                let rules = self.push_rules().await?;
+                let writes = push_rules::plan_room_mode(
+                    &rules.snapshot().await,
+                    &room_id,
+                    notifications::is_one_to_one(&room),
+                    mode,
+                );
+                rules
+                    .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_room_notification_mode", error))?;
 
-                self.emit(CoreEvent::NotificationSettingsChanged);
                 Ok(CommandOk::SetRoomNotificationMode)
             }
 
             Command::SetDefaultNotificationMode { direct, mode } => {
-                notifications::set_default_mode(&self.client().await?, direct, mode)
+                let rules = self.push_rules().await?;
+                let writes =
+                    push_rules::plan_default_mode(&rules.snapshot().await, direct, mode)
+                        .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                rules
+                    .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_default_notification_mode", error))?;
 
-                self.emit(CoreEvent::NotificationSettingsChanged);
                 Ok(CommandOk::SetDefaultNotificationMode)
             }
 
             Command::SetMentionNotifications { rule, mode } => {
-                notifications::set_mention_notifications(&self.client().await?, rule, mode)
+                let rules = self.push_rules().await?;
+                let writes = push_rules::plan_mention(&rules.snapshot().await, rule, mode)
+                    .map_err(|error| self.failed("set_mention_notifications", error))?;
+                rules
+                    .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_mention_notifications", error))?;
 
-                self.emit(CoreEvent::NotificationSettingsChanged);
                 Ok(CommandOk::SetMentionNotifications)
             }
 
             Command::SetMembershipNotifications { enabled } => {
-                notifications::set_membership_notifications(&self.client().await?, enabled)
+                self.push_rules()
+                    .await?
+                    .apply(push_rules::plan_membership(enabled))
                     .await
                     .map_err(|error| self.failed("set_membership_notifications", error))?;
 
-                self.emit(CoreEvent::NotificationSettingsChanged);
                 Ok(CommandOk::SetMembershipNotifications)
             }
 

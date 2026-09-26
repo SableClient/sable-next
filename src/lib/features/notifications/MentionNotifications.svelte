@@ -10,6 +10,8 @@
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+
+  import { settingsChanges } from './notifications.svelte';
   import '#lib/ui/primitives/settings-row.css';
 
   const core = useCoreClient();
@@ -66,6 +68,8 @@
   });
 
   $effect(() => {
+    void settingsChanges.version;
+
     let alive = true;
     void core.commands
       .mentionNotifications()
@@ -92,6 +96,7 @@
 
     void core.commands.setMentionNotifications(rule, mode).catch(() => {
       failed = true;
+      settingsChanges.version += 1;
     });
   }
 </script>

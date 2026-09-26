@@ -5,13 +5,20 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
+import type { KeywordNotificationView, MentionNotificationModeView } from '#src/generated/protocol';
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
-  notificationKeywords: vi.fn<() => Promise<string[]>>(),
+  notificationKeywords: vi.fn<() => Promise<KeywordNotificationView[]>>(),
   addNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
   removeNotificationKeyword: vi.fn<(keyword: string) => Promise<void>>(),
+  setNotificationKeywordMode:
+    vi.fn<(keyword: string, mode: MentionNotificationModeView) => Promise<void>>(),
 });
+
+function listed(...keywords: string[]): KeywordNotificationView[] {
+  return keywords.map((keyword) => ({ keyword, mode: 'notify' }));
+}
 
 import NotificationKeywords from './NotificationKeywords.svelte';
 
@@ -32,8 +39,8 @@ function setInput(input: HTMLInputElement, value: string): void {
 }
 
 test('lists the account keywords and lets one be removed', async () => {
-  core.notificationKeywords.mockResolvedValueOnce(['erwan', 'sable']);
-  core.notificationKeywords.mockResolvedValueOnce(['sable']);
+  core.notificationKeywords.mockResolvedValueOnce(listed('erwan', 'sable'));
+  core.notificationKeywords.mockResolvedValueOnce(listed('sable'));
   core.removeNotificationKeyword.mockResolvedValue(undefined);
 
   const instance = mount(NotificationKeywords, { target: document.body });
@@ -86,7 +93,7 @@ test('refuses a blank or whitespace-only keyword', async () => {
 });
 
 test('does not add a keyword already in the list', async () => {
-  core.notificationKeywords.mockResolvedValue(['sable']);
+  core.notificationKeywords.mockResolvedValue(listed('sable'));
 
   const instance = mount(NotificationKeywords, { target: document.body });
   await vi.waitFor(() => {
@@ -107,7 +114,7 @@ test('does not add a keyword already in the list', async () => {
 });
 
 test('does not leave the list showing an add the server rejected', async () => {
-  core.notificationKeywords.mockResolvedValue(['sable']);
+  core.notificationKeywords.mockResolvedValue(listed('sable'));
   core.addNotificationKeyword.mockRejectedValue(new Error('denied'));
 
   const instance = mount(NotificationKeywords, { target: document.body });
@@ -144,7 +151,7 @@ test('reports a load failure instead of showing an empty list', async () => {
 
 test('a slow initial load cannot overwrite the list a fresh add produced', async () => {
   let releaseInitial = (): void => {};
-  const initial = new Promise<string[]>((resolve) => {
+  const initial = new Promise<KeywordNotificationView[]>((resolve) => {
     releaseInitial = () => {
       resolve([]);
     };
@@ -179,9 +186,9 @@ test('a slow initial load cannot overwrite the list a fresh add produced', async
 
 test('a removal survives a load that was already in flight', async () => {
   let releaseInitial = (): void => {};
-  const initial = new Promise<string[]>((resolve) => {
+  const initial = new Promise<KeywordNotificationView[]>((resolve) => {
     releaseInitial = () => {
-      resolve(['sable']);
+      resolve(listed('sable'));
     };
   });
   core.notificationKeywords.mockReturnValueOnce(initial);
@@ -211,6 +218,26 @@ test('a removal survives a load that was already in flight', async () => {
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.keyword-list li').length).toBe(0);
   });
+
+  await unmount(instance);
+});
+
+test('shows each keyword at its own level, including one disabled elsewhere', async () => {
+  core.notificationKeywords.mockResolvedValue([
+    { keyword: 'quiet', mode: 'off' },
+    { keyword: 'urgent', mode: 'loud' },
+  ]);
+
+  const instance = mount(NotificationKeywords, { target: document.body });
+
+  await vi.waitFor(() => {
+    expect(
+      required('[aria-label="Notification level for urgent"]', HTMLElement).textContent
+    ).toContain('Loud');
+  });
+  expect(
+    required('[aria-label="Notification level for quiet"]', HTMLElement).textContent
+  ).toContain('Off');
 
   await unmount(instance);
 });

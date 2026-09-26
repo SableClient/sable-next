@@ -58,6 +58,7 @@
       },
       (error: unknown) => {
         console.warn('[sable room] notification mode failed', error);
+        void read();
       }
     );
   }

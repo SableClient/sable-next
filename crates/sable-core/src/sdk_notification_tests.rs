@@ -444,8 +444,13 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
     let room = client.get_room(room_id).unwrap();
     assert!(room.encryption_state().is_encrypted());
 
-    let result = notifications::settings(&room).await;
-    let modes = notifications::room_modes(&client, vec![room_id.to_owned()]).await;
+    let rules = crate::push_rules::PushRules::load(&client)
+        .await
+        .snapshot()
+        .await;
+    let direct = notifications::is_one_to_one(&room);
+    let result = crate::push_rules::room_settings(&rules, room_id, direct);
+    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), direct)]);
 
     assert!(result.room.is_none());
     assert_eq!(
@@ -456,4 +461,88 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
         serde_json::to_value(modes[0].default).unwrap(),
         json!("mentions")
     );
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
+    use crate::protocol::NotificationModeView;
+    use crate::push_rules::{PushRules, plan_room_mode, room_mode};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!rapid:example.org");
+    for verb in ["PUT", "DELETE"] {
+        Mock::given(method(verb))
+            .and(path_regex(r"/_matrix/client/v3/pushrules/global/.*"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+    }
+    let rules = PushRules::load(&client).await;
+
+    rules
+        .apply(plan_room_mode(
+            &rules.snapshot().await,
+            room_id,
+            false,
+            Some(NotificationModeView::Mute),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        room_mode(&rules.snapshot().await, room_id),
+        Some(NotificationModeView::Mute)
+    );
+
+    rules
+        .apply(plan_room_mode(
+            &rules.snapshot().await,
+            room_id,
+            false,
+            None,
+        ))
+        .await
+        .unwrap();
+
+    assert_eq!(room_mode(&rules.snapshot().await, room_id), None);
+    let deleted_override = server
+        .server()
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .any(|request| {
+            request.method.as_str() == "DELETE"
+                && request.url.path().contains("/override/")
+                && request.url.path().contains("rapid")
+        });
+    assert!(deleted_override, "the mute must be removed on the server");
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_missing_rule_on_delete_is_not_a_failure() {
+    use crate::push_rules::{PushRules, plan_room_mode};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("DELETE"))
+        .and(path_regex(r"/_matrix/client/v3/pushrules/global/.*"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND", "error": "Unknown rule"
+        })))
+        .mount(server.server())
+        .await;
+    let rules = PushRules::load(&client).await;
+
+    rules
+        .apply(plan_room_mode(
+            &rules.snapshot().await,
+            room_id!("!gone:example.org"),
+            false,
+            None,
+        ))
+        .await
+        .unwrap();
 }

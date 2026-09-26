@@ -22,6 +22,7 @@ pub mod polls;
 mod presence;
 pub mod profiles;
 pub mod protocol;
+pub mod push_rules;
 mod registration;
 mod room_keys;
 mod rooms;
@@ -102,6 +103,7 @@ pub struct Core {
     inbox_lock: Mutex<()>,
     account_data_types: Mutex<std::collections::BTreeSet<String>>,
     pack_cache: Mutex<image_packs::PackCache>,
+    push_rules: Mutex<Option<Arc<push_rules::PushRules>>>,
     timelines: Mutex<HashMap<OwnedRoomId, CachedTimeline>>,
     thread_timelines: Mutex<HashMap<ThreadKey, CachedTimeline>>,
     notification_content: AtomicBool,
@@ -227,6 +229,7 @@ impl Core {
             inbox_lock: Mutex::new(()),
             account_data_types: Mutex::new(std::collections::BTreeSet::new()),
             pack_cache: Mutex::new(image_packs::PackCache::default()),
+            push_rules: Mutex::new(None),
             timelines: Mutex::new(HashMap::new()),
             thread_timelines: Mutex::new(HashMap::new()),
             search_index: Mutex::new(search::MessageIndex::new()),
@@ -451,6 +454,17 @@ impl Core {
             .map_err(|error| self.failed(label, error))?;
 
         Ok(())
+    }
+
+    pub(crate) async fn push_rules(&self) -> Result<Arc<push_rules::PushRules>, CommandErr> {
+        let client = self.client().await?;
+        let mut cached = self.push_rules.lock().await;
+        if let Some(rules) = cached.as_ref() {
+            return Ok(rules.clone());
+        }
+        let rules = push_rules::PushRules::load(&client).await;
+        *cached = Some(rules.clone());
+        Ok(rules)
     }
 
     pub(crate) async fn sync_service(

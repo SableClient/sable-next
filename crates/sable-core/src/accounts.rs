@@ -549,6 +549,7 @@ impl Core {
         self.thread_timelines.lock().await.clear();
         self.account_data_types.lock().await.clear();
         *self.pack_cache.lock().await = image_packs::PackCache::default();
+        *self.push_rules.lock().await = None;
         self.set_read_room(None);
         self.probed_pinned_rooms
             .lock()
@@ -620,7 +621,7 @@ impl Core {
         self.watch_encryption(&client, generation);
         self.watch_devices(&client, generation);
         self.watch_notifications(&client, generation).await;
-        self.watch_notification_settings(&client, generation);
+        self.watch_notification_settings(generation);
         self.watch_space_sidebar(&client, generation);
         self.watch_cosmetics(&client, generation);
         self.watch_joined_invites(&client);
