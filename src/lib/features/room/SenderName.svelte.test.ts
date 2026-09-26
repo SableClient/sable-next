@@ -17,10 +17,7 @@ test('SenderName mentions and shows pronoun pills', async () => {
     props: {
       displayName: 'Alice',
       colors: senderDisplayColors('@alice:example.org', null),
-      pronouns: {
-        visible: [{ summary: 'they/them', language: null }],
-        overflow: [],
-      },
+      pronouns: [{ summary: 'they/them', language: null }],
       onMention,
     },
   });

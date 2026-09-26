@@ -1,4 +1,5 @@
 <script lang="ts">
+  import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import type {
     MemberView,
     ProfileView,
@@ -24,7 +25,6 @@
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
-  import UserIcon from 'phosphor-svelte/lib/UserIcon';
 
   import { goto } from '$app/navigation';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
@@ -372,15 +372,17 @@
   }
 </script>
 
+{#snippet pronounRow()}
+  {#if pronounSets}
+    <PronounPill class="profile-pronoun-pill" pronouns={pronounSets} />
+  {/if}
+{/snippet}
 {#snippet metaRow()}
   {#if presenceLabel}
     <span class="profile-meta-item">
       <PresenceDot presence={presence?.presence ?? 'offline'} label={presenceLabel} />
       {lastSeenText || presenceLabel}
     </span>
-  {/if}
-  {#if pronouns}
-    <span class="profile-meta-item"><UserIcon />{pronouns}</span>
   {/if}
   {#if roleTag}
     <span class="profile-meta-item" class:profile-meta-elevated={elevated}>
@@ -709,6 +711,7 @@
   nameFont={cosmetics?.font}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
+  pronouns={pronounRow}
   children={showFailure || currentProfile?.bio ? bioPanel : undefined}
   footer={extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
@@ -772,6 +775,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  :global(.profile-pronoun-pill) {
+    background: var(--profile-panel-ground);
+    color: var(--profile-text-muted);
   }
 
   .profile-meta-item {

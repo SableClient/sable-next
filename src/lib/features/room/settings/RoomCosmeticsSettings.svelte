@@ -256,7 +256,7 @@
         displayName={previewName}
         colors={previewColors}
         {font}
-        pronouns={{ visible: previewPronouns, overflow: [] }}
+        pronouns={previewPronouns}
       />
     </div>
     <ul class="settings-rows">

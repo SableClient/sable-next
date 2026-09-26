@@ -3,8 +3,6 @@
   import type { PerMessageProfileView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
-  import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
 
@@ -29,18 +27,13 @@
   }: Props = $props();
   let displayName = $derived(profile.display_name ?? accountName);
   let accountLabel = $derived(displayName === accountName ? accountId : accountName);
-  let pronouns = $derived(
-    !preferences.showPronouns
-      ? ''
-      : (preferences.filterPronounsByLanguage
-          ? preferredPronouns(profile.pronouns, $i18n.resolvedLanguage ?? $i18n.language)
-          : profile.pronouns
-        )
-          .map((pronoun) =>
-            clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
-          )
-          .join(' · ')
-  );
+  // let pronouns = $derived(
+  //   !preferences.showPronouns
+  //     ? []
+  //     : preferences.filterPronounsByLanguage
+  //       ? preferredPronouns(profile.pronouns, $i18n.resolvedLanguage ?? $i18n.language)
+  //       : profile.pronouns
+  // );
 </script>
 
 <ProfileCard
@@ -54,14 +47,9 @@
   nameColorLight={profile.color_on_light}
   nameColorDark={profile.color_on_dark}
 >
-  {#snippet meta()}
-    {#if pronouns}
-      <PronounPill
-        class={profile.color_on_light || profile.color_on_dark ? 'profile-card-tinted' : undefined}
-        style={profile.color_on_light || profile.color_on_dark
-          ? undefined
-          : `color: ${senderColor(profile.id ?? displayName)};`}>{pronouns}</PronounPill
-      >
+  {#snippet pronouns()}
+    {#if profile.pronouns}
+      <PronounPill pronouns={profile.pronouns} class="persona-profile-pronoun-pill" />
     {/if}
   {/snippet}
   {#snippet actions()}
@@ -70,3 +58,13 @@
     </Button>
   {/snippet}
 </ProfileCard>
+
+<style>
+  :global(.persona-profile-pronoun-pill) {
+    background: var(--surface-var-container);
+
+    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
+
+    color: var(--profile-text-muted);
+  }
+</style>

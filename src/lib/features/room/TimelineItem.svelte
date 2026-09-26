@@ -26,13 +26,7 @@
   import LinkEmbed from './embeds/LinkEmbed.svelte';
   import { MessageSwipe } from './message-swipe.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import {
-    pronounPillLength,
-    pronounPillLimit,
-    splitDisplayNamePronouns,
-    visiblePronouns,
-    withDisplayNamePronouns,
-  } from '#lib/personas/pronouns.js';
+  import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -211,24 +205,16 @@
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
-    visiblePronouns(
-      preferences.showPronouns
-        ? withDisplayNamePronouns(
-            persona?.pronouns?.length
-              ? persona.pronouns
-              : senderCosmetics?.pronouns.length
-                ? senderCosmetics.pronouns
-                : (profile?.pronouns ?? []),
-            senderIdentity.pronouns
-          )
-        : [],
-      {
-        language: $i18n.resolvedLanguage ?? $i18n.language,
-        filterByLanguage: preferences.filterPronounsByLanguage,
-        limit: pronounPillLimit(preferences.pronounPillLimit),
-        maxLength: pronounPillLength(preferences.pronounPillLength),
-      }
-    )
+    preferences.showPronouns
+      ? withDisplayNamePronouns(
+          persona?.pronouns?.length
+            ? persona.pronouns
+            : senderCosmetics?.pronouns.length
+              ? senderCosmetics.pronouns
+              : (profile?.pronouns ?? []),
+          senderIdentity.pronouns
+        )
+      : []
   );
   let replyNameBase = $derived(
     replyPersona?.display_name ??

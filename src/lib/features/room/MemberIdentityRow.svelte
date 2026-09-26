@@ -5,7 +5,6 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { pronounPillLength, pronounPillLimit, visiblePronouns } from '#lib/personas/pronouns.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -55,19 +54,11 @@
     };
   });
   let pronouns = $derived(
-    visiblePronouns(
-      preferences.showPronouns
-        ? cosmetics?.pronouns.length
-          ? cosmetics.pronouns
-          : (profile?.pronouns ?? [])
-        : [],
-      {
-        language: $i18n.resolvedLanguage ?? $i18n.language,
-        filterByLanguage: preferences.filterPronounsByLanguage,
-        limit: pronounPillLimit(preferences.pronounPillLimit),
-        maxLength: pronounPillLength(preferences.pronounPillLength),
-      }
-    )
+    preferences.showPronouns
+      ? cosmetics?.pronouns.length
+        ? cosmetics.pronouns
+        : (profile?.pronouns ?? [])
+      : []
   );
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
   let presence = $derived(presenceStore.get(userId));
@@ -112,7 +103,7 @@
         {pronouns}
         font={cosmetics?.font}
         nameClass="member-name"
-        compact={pronouns.visible.length === 0}
+        compact={pronouns.length === 0}
       />
       {#if userStatus}
         <span class="member-identity-status">

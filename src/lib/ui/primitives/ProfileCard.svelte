@@ -30,6 +30,7 @@
     class?: ClassValue;
     meta?: Snippet;
     actions?: Snippet;
+    pronouns?: Snippet;
     children?: Snippet;
     footer?: Snippet;
     composer?: Snippet;
@@ -42,6 +43,7 @@
     avatarLabel,
     onAvatarClick,
     color,
+    pronouns,
     heroColor = null,
     heroBrightness = null,
     bannerUrl = null,
@@ -135,13 +137,18 @@
     {/if}
   </div>
   <div class="profile-card-identity">
-    <h2
-      class="profile-card-name"
-      class:tinted={nameColor}
-      style:font-family={nameFont ?? undefined}
+    <span
+      style=" align-items: baseline;display: flex; flex-flow: row nowrap; gap: var(--space-200)"
     >
-      {displayName}
-    </h2>
+      <h2
+        class="profile-card-name"
+        class:tinted={nameColor}
+        style:font-family={nameFont ?? undefined}
+      >
+        {displayName}
+      </h2>
+      {#if pronouns}{@render pronouns()}{/if}
+    </span>
     <button
       class="profile-card-user-id"
       type="button"
@@ -292,8 +299,8 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
-    font-size: var(--font-size-body);
-    line-height: var(--line-height-body);
+    font-size: var(--font-size-label);
+    line-height: var(--line-height-small);
     margin: 0 0 var(--space-200);
     max-height: calc(
       var(--line-height-body) * 3em + 2 * var(--space-200) + 2 * var(--border-width)

@@ -1,10 +1,8 @@
 <script lang="ts">
+  import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
   import type { ClassValue } from 'svelte/elements';
   import type { PronounView } from '#src/generated/protocol';
-
   import { i18n } from '#lib/i18n.js';
-  import { formatPronouns } from '#lib/personas/pronouns.js';
-
   import type { SenderDisplayColors } from './members.js';
 
   import './sender-identity.css';
@@ -14,7 +12,7 @@
     accountName?: string;
     colors: SenderDisplayColors;
     font?: string | null;
-    pronouns?: { visible: readonly PronounView[]; overflow: readonly PronounView[] };
+    pronouns?: readonly PronounView[];
     nameClass?: ClassValue;
     mentionLabel?: string;
     profileLabel?: string;
@@ -29,7 +27,7 @@
     accountName,
     colors,
     font = null,
-    pronouns = { visible: [], overflow: [] },
+    pronouns = [],
     nameClass = 'sender',
     mentionLabel,
     profileLabel,
@@ -91,7 +89,18 @@
   >
     {@render name()}
 
-    {#if pronouns.visible.length > 0}<span
+    {#if pronouns.length > 0}
+      <PronounPill
+        class="sender-identity-pronoun"
+        style=" color={colors.tinted
+          ? undefined
+          : colors.nameColor} --name-color-on-light={colors.nameColorLight ??
+          undefined} --name-color-on-dark={colors.nameColorDark ?? undefined} "
+        {pronouns}
+      />
+    {/if}
+
+    <!--<span
         class="sender-identity-pronouns"
         class:tinted={colors.tinted}
         style:color={colors.tinted ? undefined : colors.nameColor}
@@ -109,8 +118,7 @@
             })}
           </span>
         {/if}</span
-      >
-    {/if}
+      >-->
     {#if accountName}
       <span class="sender-identity-via"
         >|

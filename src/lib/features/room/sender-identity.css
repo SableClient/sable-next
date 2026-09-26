@@ -54,41 +54,6 @@
 
 .sender-identity-pronoun {
   background: var(--surface-var-container);
-  border-radius: var(--radii-0);
-  display: block;
-  padding: 0 var(--space-050);
-  position: relative;
-  z-index: 0;
-
-  &:not(:last-child)::before {
-    background: var(--surface-var-container);
-    border-radius: var(--radii-0);
-    border-bottom-right-radius: var(--radii-pill);
-    border-top-right-radius: var(--radii-pill);
-
-    /* Hides visual element from screen readers */
-    content: '...' / '';
-    display: block;
-    height: 1rem;
-    line-height: 1rem;
-    padding: 0 var(--space-050);
-    padding-right: var(--space-150);
-    position: absolute;
-    right: -1.5em;
-    z-index: -1;
-  }
-}
-
-.sender-identity-pronoun:first-child {
-  border-bottom-left-radius: var(--radii-pill);
-  border-top-left-radius: var(--radii-pill);
-  padding-left: var(--space-150);
-}
-
-.sender-identity-pronoun:last-child {
-  border-bottom-right-radius: var(--radii-pill);
-  border-top-right-radius: var(--radii-pill);
-  padding-right: var(--space-150);
 }
 
 .sender-identity-via {
