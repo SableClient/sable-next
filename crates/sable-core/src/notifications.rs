@@ -156,9 +156,50 @@ async fn push_client(
     let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
     accounts.reanchor_stores(base_store);
     let account = push_account(&accounts, user_id, device_id)?;
-    crate::session::restore_authenticated_client(&account.store_id, &account.session)
+    let client = crate::session::restore_authenticated_client(&account.store_id, &account.session)
         .await
-        .ok()
+        .ok()?;
+    let store = FileSessionStore::new(store_dir);
+    let base_store = base_store.to_owned();
+    let account_id = account.account_id.clone();
+    let save = move |client: Client| {
+        persist_push_session(&store, &base_store, &account_id, &client).map_err(Into::into)
+    };
+    let reload = |client: Client| {
+        client
+            .session_tokens()
+            .ok_or_else(|| "no session tokens to reload".into())
+    };
+    if let Err(error) = client.set_session_callbacks(Box::new(reload), Box::new(save)) {
+        tracing::error!("could not install push session callbacks: {error}");
+    }
+    Some(client)
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn persist_push_session(
+    store: &FileSessionStore,
+    base_store: &str,
+    account_id: &str,
+    client: &Client,
+) -> Result<(), String> {
+    let stored = store.load_blocking()?;
+    let (mut accounts, _) =
+        AccountRegistry::from_bytes(&stored, base_store).map_err(|error| error.to_string())?;
+    let Some(account) = accounts
+        .accounts
+        .iter_mut()
+        .find(|account| account.account_id == account_id && !account.needs_reauth)
+    else {
+        return Ok(());
+    };
+    let Some(current) = crate::session::current_session(client, account.session.homeserver.clone())
+    else {
+        return Ok(());
+    };
+    account.session = current.keeping_endpoint_of(&account.session);
+    let bytes = serde_json::to_vec(&accounts).map_err(|error| error.to_string())?;
+    store.save_blocking(&bytes)
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -602,7 +643,7 @@ mod tests {
 
     use super::{
         ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
-        is_backfill, push_account, timeline_body,
+        is_backfill, push_account, push_client, timeline_body,
     };
     use crate::protocol::PushFetchView;
     use crate::session::{PersistedSession, restore_authenticated_client};
@@ -1005,6 +1046,53 @@ mod tests {
         ));
 
         tokio::fs::remove_dir_all(&fixture.data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_saves_the_tokens_it_refreshes() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+
+        let data_dir =
+            std::env::temp_dir().join(format!("sable-cold-push-refresh-{}", std::process::id()));
+        let store_dir = cold_push_store_dir(&data_dir);
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let persisted: PersistedSession = serde_json::from_value(json!({
+            "homeserver": server.uri(), "resolved_homeserver": server.uri(),
+            "credentials": {"kind": "password", "user_id": "@alice:example.org",
+                "device_id": "A", "access_token": "old-access", "refresh_token": "old-refresh"}
+        }))
+        .unwrap();
+        let store = FileSessionStore::new(&store_dir);
+        store
+            .save(serde_json::to_vec(&persisted).unwrap())
+            .await
+            .unwrap();
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/refresh"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"access_token": "new-access", "refresh_token": "new-refresh"}),
+            ))
+            .expect(1)
+            .mount(server.server())
+            .await;
+
+        let client = push_client(&store_dir, "@alice:example.org", "A")
+            .await
+            .unwrap();
+        client.matrix_auth().refresh_access_token().await.unwrap();
+
+        let saved = store.load().await.unwrap().unwrap();
+        let (accounts, _) =
+            crate::session::AccountRegistry::from_bytes(&saved, store_dir.to_str().unwrap())
+                .unwrap();
+        let session = serde_json::to_value(&accounts.accounts[0].session).unwrap();
+        assert_eq!(session["credentials"]["refresh_token"], "new-refresh");
+
+        tokio::fs::remove_dir_all(&data_dir).await.unwrap();
     }
 
     fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {

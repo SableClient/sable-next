@@ -23,6 +23,16 @@ impl FileSessionStore {
             path: data_dir.into().join("session.json"),
         }
     }
+
+    pub(crate) fn load_blocking(&self) -> Result<Vec<u8>, String> {
+        std::fs::read(&self.path).map_err(|e| e.to_string())
+    }
+
+    pub(crate) fn save_blocking(&self, bytes: &[u8]) -> Result<(), String> {
+        let temporary = self.path.with_extension("tmp");
+        std::fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&temporary, &self.path).map_err(|e| e.to_string())
+    }
 }
 
 #[cfg(not(target_family = "wasm"))]
