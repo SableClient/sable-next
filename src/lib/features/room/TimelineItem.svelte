@@ -54,7 +54,7 @@
   import { trailingReceipt } from './receipt-fit';
   import SenderName from './SenderName.svelte';
   import RoleTagIcon from './RoleTagIcon.svelte';
-  import { hasSenderRoleIcons, useSenderRoleIcons } from './sender-role-icons.js';
+  import { hasSenderRoles, useSenderRoles } from './sender-roles.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import ForwardedLine from './ForwardedLine.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -165,7 +165,7 @@
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   const roomCosmetics = useRoomCosmetics();
-  const senderRoleIcons = hasSenderRoleIcons() ? useSenderRoleIcons() : null;
+  const senderRoles = hasSenderRoles() ? useSenderRoles() : null;
   const dialogs = useMessageDialogs();
   const openMessageMenu = useMessageMenu();
   let profile = $state<ProfileView | null>(null);
@@ -253,7 +253,8 @@
           replyProfile,
           replyPersona,
           currentUserId !== null && replySender === currentUserId,
-          replyCosmetics
+          replyCosmetics,
+          senderRoles?.(replySender)?.color ?? null
         )
   );
   let replyNameColor = $derived(replyColors?.nameColor ?? senderColor(null));
@@ -320,11 +321,19 @@
     onReply: () => actions.onReply?.(),
     onEdit: () => actions.onEdit?.(),
   });
+  let senderRole = $derived(item.sender ? (senderRoles?.(item.sender) ?? null) : null);
   let senderColors = $derived(
-    senderDisplayColors(item.sender ?? '', profile, persona, item.is_own, senderCosmetics)
+    senderDisplayColors(
+      item.sender ?? '',
+      profile,
+      persona,
+      item.is_own,
+      senderCosmetics,
+      senderRole?.color ?? null
+    )
   );
   let senderFont = $derived(persona ? null : (senderCosmetics?.font ?? null));
-  let senderRoleIcon = $derived(item.sender ? (senderRoleIcons?.(item.sender) ?? null) : null);
+  let senderRoleIcon = $derived(senderRole?.icon ?? null);
 
   let senderId = $derived(item.sender);
   $effect(() => {

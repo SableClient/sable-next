@@ -265,7 +265,7 @@ test("shows the sender's role icon after their name", async () => {
     props: {
       core,
       item: { item: item(false), collapsed: false },
-      roleIcons: { '@alice:example.org': '🛡️' },
+      roles: { '@alice:example.org': { icon: '🛡️', color: null } },
     },
   });
   await tick();
@@ -683,6 +683,25 @@ test('uses the sender profile name color in every message layout', async () => {
   expect(
     document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-dark')
   ).toBe('#9fd07c');
+  await unmount(instance);
+});
+
+test('falls back to the role colour when the sender profile has none', async () => {
+  core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: item(false), collapsed: false },
+      roles: { '@alice:example.org': { icon: null, color: '#c04040' } },
+    },
+  });
+  await tick();
+
+  const message = document.querySelector<HTMLElement>('.message');
+  expect(document.querySelector('.sender')?.classList.contains('tinted')).toBe(true);
+  expect(message?.style.getPropertyValue('--name-color-on-light')).toBe('#c04040');
+  expect(message?.style.getPropertyValue('--name-color-on-dark')).toBe('#c04040');
   await unmount(instance);
 });
 

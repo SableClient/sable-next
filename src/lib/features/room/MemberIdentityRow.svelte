@@ -43,16 +43,9 @@
   let displayName = $derived(member?.display_name ?? profile?.display_name ?? userId);
   let avatarUrl = $derived(member?.avatar_url ?? profile?.avatar_url ?? null);
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
-  let colors = $derived.by(() => {
-    const profileColors = senderDisplayColors(userId, profile, null, false, cosmetics);
-    if (profileColors.tinted || !powerTag?.color) return profileColors;
-    return {
-      ...profileColors,
-      nameColorLight: powerTag.color,
-      nameColorDark: powerTag.color,
-      tinted: true,
-    };
-  });
+  let colors = $derived(
+    senderDisplayColors(userId, profile, null, false, cosmetics, powerTag?.color ?? null)
+  );
   let pronouns = $derived(
     preferences.showPronouns
       ? cosmetics?.pronouns.length

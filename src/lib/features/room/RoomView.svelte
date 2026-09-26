@@ -97,7 +97,8 @@
     tagForLevel,
     type PowerLevelTagMap,
   } from './settings/power-level-tags.js';
-  import { provideSenderRoleIcons } from './sender-role-icons.js';
+  import { provideSenderRoles, type SenderRole } from './sender-roles.js';
+  import { powerTag } from './power-tags';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
@@ -366,17 +367,18 @@
   const abbreviations = new RoomAbbreviations(core.commands);
   provideRoomAbbreviations(abbreviations);
   provideRoomMemberNames({ displayName: memberDisplayName });
-  let roleIcons = $derived.by((): Record<string, string> => {
+  let senderRoles = $derived.by((): Record<string, SenderRole> => {
     const tags = powerTags;
-    if (!tags || !Object.values(tags).some((tag) => tag.icon)) return {};
+    if (!tags || !Object.values(tags).some((tag) => tag.icon || tag.color)) return {};
     return Object.fromEntries(
       memberLoader.members.flatMap((member) => {
-        const icon = tagForLevel(tags, member.power_level)?.icon;
-        return icon ? [[member.user_id, icon]] : [];
+        const icon = tagForLevel(tags, member.power_level)?.icon ?? null;
+        const color = powerTag(member.power_level, $i18n.t, tags).color;
+        return icon || color ? [[member.user_id, { icon, color }]] : [];
       })
     );
   });
-  provideSenderRoleIcons((userId) => roleIcons[userId] ?? null);
+  provideSenderRoles((userId) => senderRoles[userId] ?? null);
 
   const cosmetics = new RoomCosmetics(core);
   provideRoomCosmetics(cosmetics);

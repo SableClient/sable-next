@@ -17,7 +17,8 @@ export function senderDisplayColors(
   profile: ProfileView | null,
   persona: PerMessageProfileView | null = null,
   isOwn = false,
-  room: SenderCosmetics | null = null
+  room: SenderCosmetics | null = null,
+  roleColor: string | null = null
 ): SenderDisplayColors {
   const override = profileOverrides.colors(userId);
   if (override === null) {
@@ -32,6 +33,7 @@ export function senderDisplayColors(
     room?.colorOnLight ??
     profile?.name_color_light ??
     profile?.name_color_dark ??
+    roleColor ??
     null;
   const nameColorDark =
     override?.dark ??
@@ -40,6 +42,7 @@ export function senderDisplayColors(
     room?.colorOnDark ??
     profile?.name_color_dark ??
     profile?.name_color_light ??
+    roleColor ??
     null;
   const tinted = nameColorLight !== null || nameColorDark !== null;
   const nameColor = isOwn ? 'var(--primary-on-container)' : senderColor(userId);

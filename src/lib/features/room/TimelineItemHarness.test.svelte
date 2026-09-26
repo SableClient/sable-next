@@ -14,20 +14,20 @@
   import MessageDialogHost from './MessageDialogHost.svelte';
   import { MessageDialogs, provideMessageDialogs } from './message-dialogs.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
-  import { provideSenderRoleIcons } from './sender-role-icons.js';
+  import { provideSenderRoles, type SenderRole } from './sender-roles.js';
 
   interface Props {
     core: PinnedEventCommands & BookmarkCommands;
     item: ComponentProps<typeof TimelineItem>;
     readers?: readonly string[];
     showItem?: boolean;
-    roleIcons?: Record<string, string>;
+    roles?: Record<string, SenderRole>;
   }
 
-  let { core, item, readers, showItem = true, roleIcons }: Props = $props();
+  let { core, item, readers, showItem = true, roles }: Props = $props();
 
-  const icons = untrack(() => roleIcons);
-  if (icons) provideSenderRoleIcons((userId) => icons[userId] ?? null);
+  const senderRoles = untrack(() => roles);
+  if (senderRoles) provideSenderRoles((userId) => senderRoles[userId] ?? null);
 
   providePinnedEvents(new PinnedEvents(untrack(() => core)));
   provideBookmarks(new Bookmarks(untrack(() => core)));
