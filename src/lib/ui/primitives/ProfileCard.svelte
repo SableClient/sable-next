@@ -411,17 +411,6 @@
     padding-inline: var(--space-300);
   }
 
-  @supports not selector(::-webkit-scrollbar) {
-    .profile-card-bio {
-      scrollbar-color: var(--surface-container-line) transparent;
-    }
-  }
-
-  .profile-card-bio::-webkit-scrollbar-thumb {
-    background: var(--surface-container-line);
-    background-clip: padding-box;
-  }
-
   .profile-card-bio :global(.formatted-body) {
     white-space: normal;
   }

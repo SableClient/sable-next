@@ -470,14 +470,8 @@ body {
 
 @supports not selector(::-webkit-scrollbar) {
   * {
-    scrollbar-color: transparent transparent;
-    scrollbar-width: thin;
-  }
-
-  *:hover,
-  *:focus-within,
-  .explicit-scrollbar {
     scrollbar-color: var(--surface-container-line) transparent;
+    scrollbar-width: thin;
   }
 }
 
@@ -491,17 +485,10 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: var(--surface-container-line);
   background-clip: padding-box;
   border: calc(var(--border-width) * 2) solid transparent;
   border-radius: var(--radius-pill);
-}
-
-*:hover::-webkit-scrollbar-thumb,
-*:focus-within::-webkit-scrollbar-thumb,
-.explicit-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--surface-container-line);
-  background-clip: padding-box;
 }
 
 :root[data-underline-links='off'] {

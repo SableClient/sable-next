@@ -955,13 +955,8 @@
 
   @supports not selector(::-webkit-scrollbar) {
     .viewport {
-      scrollbar-color: transparent transparent;
+      scrollbar-color: var(--surface-var-container-line) transparent;
       scrollbar-width: thin;
-    }
-
-    .viewport:hover,
-    .viewport:focus-within {
-      scrollbar-color: var(--surface-var-container-line) var(--surface-var-container-active);
     }
   }
 
@@ -976,22 +971,12 @@
   }
 
   .viewport::-webkit-scrollbar-thumb {
-    background: transparent;
+    background: var(--surface-var-container-line);
     border-radius: var(--radius-pill);
   }
 
   .viewport::-webkit-scrollbar-track {
     background: transparent;
-  }
-
-  .viewport:hover::-webkit-scrollbar-thumb,
-  .viewport:focus-within::-webkit-scrollbar-thumb {
-    background: var(--surface-var-container-line);
-  }
-
-  .viewport:hover::-webkit-scrollbar-track,
-  .viewport:focus-within::-webkit-scrollbar-track {
-    background: var(--surface-var-container-active);
   }
 
   .items {
