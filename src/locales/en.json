@@ -2287,6 +2287,7 @@
     "coreCrashed": "Sable hit an internal error and stopped syncing.",
     "coreUnresponsive": "Sable is not responding.",
     "syncFailed": "Sync failed: {{message}}",
+    "localNetworkBlocked": "Your browser is blocking Sable from reaching {{host}} on your local network. Allow local network access for this site in the browser's site settings. In Firefox, add {{host}} to network.lna.skip-domains in about:config.",
     "actionFailed": "Could not complete that action. Try again.",
     "copyFailed": "Could not copy the link.",
     "dismissToast": "Dismiss"

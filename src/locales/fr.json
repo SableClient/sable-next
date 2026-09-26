@@ -1908,6 +1908,7 @@
     "coreError": "La connexion n’a pas pu être terminée. Réessayez ou signalez le problème s’il persiste.",
     "coreCrashed": "Sable a rencontré une erreur interne et a cessé de se synchroniser.",
     "coreUnresponsive": "Sable ne répond pas.",
+    "localNetworkBlocked": "Votre navigateur empêche Sable de joindre {{host}} sur votre réseau local. Autorisez l’accès au réseau local pour ce site dans les paramètres du site. Dans Firefox, ajoutez {{host}} à network.lna.skip-domains dans about:config.",
     "syncFailed": "Échec de la synchronisation : {{message}}",
     "actionFailed": "Impossible d’effectuer cette action. Réessayez.",
     "copyFailed": "Impossible de copier le lien.",

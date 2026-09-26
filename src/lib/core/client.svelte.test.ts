@@ -1,4 +1,4 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent, SessionInfo } from '#src/generated/protocol';
 import type { Transport } from '#src/transport';
@@ -6,6 +6,13 @@ import type { Transport } from '#src/transport';
 import { recentSearches, rememberSearch } from '#lib/features/search/recent-searches.svelte.js';
 
 import { createCoreClient } from './client.svelte.js';
+
+const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
+
+vi.mock('#lib/platform/local-network.js', () => ({
+  browserGatesCoreNetwork: () => localNetwork.gated,
+  localNetworkDenied: () => Promise.resolve(localNetwork.denied),
+}));
 
 const session: SessionInfo = {
   account_id: 'account-a',
@@ -329,6 +336,68 @@ test('the sync status outlives the reset the session replacement performs', asyn
   await vi.waitFor(() => {
     expect(core.sync?.state).toBe('live');
   });
+});
+
+async function startGated(fetch: () => Promise<unknown>) {
+  localNetwork.gated = true;
+  const fetchMock = vi.fn(fetch);
+  vi.stubGlobal('fetch', fetchMock);
+  vi.stubGlobal('navigator', { onLine: true });
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  return { core, fake, fetchMock };
+}
+
+afterEach(() => {
+  localNetwork.gated = false;
+  localNetwork.denied = false;
+  vi.unstubAllGlobals();
+});
+
+test('a restored session asks for local network access from the page', async () => {
+  const { fetchMock } = await startGated(() => Promise.resolve(new Response('{}')));
+
+  expect(fetchMock).toHaveBeenCalledWith(new URL('https://example.org/_matrix/client/versions'), {
+    mode: 'cors',
+  });
+});
+
+test('an offline core with a homeserver the page reaches reports the browser blocking it', async () => {
+  const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(core.localNetworkBlocked).toBe('example.org');
+  });
+
+  fake.emit({ type: 'sync_status', state: 'live' });
+  expect(core.localNetworkBlocked).toBeNull();
+});
+
+test('an offline core reports the browser blocking it when the permission was denied', async () => {
+  localNetwork.denied = true;
+  const { core, fake } = await startGated(() => Promise.reject(new TypeError('blocked')));
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+
+  await vi.waitFor(() => {
+    expect(core.localNetworkBlocked).toBe('example.org');
+  });
+});
+
+test('an offline core the page cannot reach either is just offline', async () => {
+  const { core, fake, fetchMock } = await startGated(() =>
+    Promise.reject(new TypeError('offline'))
+  );
+
+  fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(core.localNetworkBlocked).toBeNull();
 });
 
 test('a cancellation for an unknown verification flow does not open the verification dialog', async () => {

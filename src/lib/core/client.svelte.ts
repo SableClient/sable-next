@@ -26,6 +26,7 @@ import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/features/search/recent-searches.svelte.js';
+import { browserGatesCoreNetwork, localNetworkDenied } from '#lib/platform/local-network.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -52,13 +53,19 @@ async function discoverBaseUrl(origin: URL): Promise<string | null> {
   }
 }
 
-async function grantLocalNetworkAccess(baseUrl: string): Promise<void> {
+function homeserverUrl(homeserver: string): URL {
+  return new URL(homeserver.includes('://') ? homeserver : `https://${homeserver}`);
+}
+
+async function grantLocalNetworkAccess(baseUrl: string): Promise<boolean> {
   try {
-    await fetch(new URL('_matrix/client/versions', baseUrl), { mode: 'cors' });
+    await fetch(new URL('_matrix/client/versions', homeserverUrl(baseUrl)), { mode: 'cors' });
+    return true;
   } catch (error) {
     console.warn('[sable auth] homeserver unreachable from the page', {
       error: error instanceof Error ? error.name : 'unknown',
     });
+    return false;
   }
 }
 
@@ -71,7 +78,7 @@ async function resolveHomeserverInPage(
 
   let origin: URL;
   try {
-    origin = new URL(homeserver.includes('://') ? homeserver : `https://${homeserver}`);
+    origin = homeserverUrl(homeserver);
   } catch {
     return homeserver;
   }
@@ -110,6 +117,7 @@ export class CoreClient {
   /** Every device on this account, pushed on change. Absolute, not a diff. */
   deviceList = $state.raw<DeviceView[]>([]);
   unresponsive = $state(false);
+  localNetworkBlocked = $state<string | null>(null);
   accountRevision = $state(0);
 
   private transport: Transport | null = null;
@@ -668,6 +676,7 @@ export class CoreClient {
     this.deviceList = [];
     this.searchCoverage = null;
     this.searchCoverageUnavailable = false;
+    this.localNetworkBlocked = null;
   }
 
   /** Both events fire only on a change, so a session that starts unverified
@@ -698,6 +707,7 @@ export class CoreClient {
     if (changed && session) {
       void this.primeEncryptionStatus();
       void this.primeSyncStatus();
+      if (browserGatesCoreNetwork()) void grantLocalNetworkAccess(session.homeserver);
     }
     if (changed && broadcast) this.accountChannel?.postMessage(null);
   }
@@ -800,17 +810,37 @@ export class CoreClient {
     try {
       const status = await this.commands.syncStatus();
       if (generation !== this.generation || this.sync !== null) return;
-      this.sync = status;
+      this.applySyncStatus(status);
     } catch (error) {
       console.debug('[sable core] sync status unavailable', error);
     }
+  }
+
+  private applySyncStatus(status: SyncStatus): void {
+    this.sync = status;
+    if (status.state !== 'offline') {
+      this.localNetworkBlocked = null;
+      return;
+    }
+    if (browserGatesCoreNetwork()) void this.checkLocalNetwork();
+  }
+
+  private async checkLocalNetwork(): Promise<void> {
+    const session = this.session;
+    if (!session) return;
+    const revision = this.accountRevision;
+    const blocked =
+      (await grantLocalNetworkAccess(session.homeserver)) ||
+      (navigator.onLine && (await localNetworkDenied()));
+    if (revision !== this.accountRevision || this.sync?.state !== 'offline') return;
+    this.localNetworkBlocked = blocked ? homeserverUrl(session.homeserver).host : null;
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {
     recordDebugLog('debug', event.type === 'sync_status' ? 'sync' : 'general', 'core', event.type);
     switch (event.type) {
       case 'sync_status':
-        this.sync = event;
+        this.applySyncStatus(event);
         return;
       case 'encryption_status':
         this.encryption = event.status;

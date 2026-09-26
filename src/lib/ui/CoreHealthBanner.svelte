@@ -12,6 +12,12 @@
     if (core.unresponsive) {
       return { kind: 'warn' as const, text: $i18n.t('errors.coreUnresponsive') };
     }
+    if (core.localNetworkBlocked !== null) {
+      return {
+        kind: 'warn' as const,
+        text: $i18n.t('errors.localNetworkBlocked', { host: core.localNetworkBlocked }),
+      };
+    }
     if (core.sync?.state === 'error') {
       return {
         kind: 'warn' as const,
