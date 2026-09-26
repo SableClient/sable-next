@@ -27,6 +27,8 @@
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
+  import { tick } from 'svelte';
+
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
@@ -214,6 +216,15 @@
   let sharedGroups = $derived(
     sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct !== true)
   );
+  let roomsLabel = $derived($i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length }));
+  let spacesLabel = $derived(
+    $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })
+  );
+  let actionRowEl = $state<HTMLElement | null>(null);
+  let actionRowWidth = $state(0);
+  let actionsWidth = $state(0);
+  let measuringActions = $state(false);
+  let mutualInOverflow = $derived(!measuringActions && actionsWidth > actionRowWidth);
   let hasMeta = $derived(Boolean(localTime || animalText || roleTag || presenceLabel));
   let activeExtra = $state<ProfileFieldView | null>(null);
 
@@ -240,6 +251,44 @@
       cancelled = true;
     };
   });
+
+  $effect(() => {
+    const row = actionRowEl;
+    void roomsLabel;
+    void spacesLabel;
+    if (!row) return;
+
+    let cancelled = false;
+    measuringActions = true;
+    void tick().then(() => {
+      if (cancelled) return;
+      const widths = [...row.children]
+        .map((child) => child.getBoundingClientRect().width)
+        .filter((width) => width > 0);
+      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+      actionsWidth =
+        widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, widths.length - 1);
+      measuringActions = false;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  function watchActionRow(node: HTMLElement): (() => void) | undefined {
+    const row = node.parentElement;
+    if (!row) return;
+
+    actionRowEl = row;
+    const observer = new ResizeObserver(() => {
+      actionRowWidth = row.clientWidth;
+    });
+    observer.observe(row);
+    return () => {
+      observer.disconnect();
+      actionRowEl = null;
+    };
+  }
 
   async function copy(text: string): Promise<void> {
     try {
@@ -404,7 +453,12 @@
 {#snippet actionRow()}
   <ActionMenu label={$i18n.t('timeline.profileShare')} align="start">
     {#snippet trigger({ props })}
-      <button {...props} type="button" class="profile-action selection-open">
+      <button
+        {...props}
+        type="button"
+        class="profile-action selection-open"
+        {@attach watchActionRow}
+      >
         <ShareNetworkIcon size={14} />
         {$i18n.t('timeline.profileShare')}
       </button>
@@ -423,29 +477,23 @@
       {/if}
     </IconContext>
   </ActionMenu>
-  {#if sharedRooms.length > 0}
-    {@const label = $i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length })}
-    <ActionMenu {label} class="profile-mutual-menu" align="start">
+  {#if sharedRooms.length > 0 && !mutualInOverflow}
+    <ActionMenu label={roomsLabel} class="profile-mutual-menu" align="start">
       {#snippet trigger({ props })}
         <button {...props} class="profile-action selection-open" type="button">
           <ChatsIcon size={14} />
-          {label}
+          {roomsLabel}
         </button>
       {/snippet}
-      {@render mutualRows(sharedGroups)}
-      {#if sharedGroups.length > 0 && sharedDirect.length > 0}
-        <ActionMenuSeparator />
-      {/if}
-      {@render mutualRows(sharedDirect)}
+      {@render mutualRoomRows()}
     </ActionMenu>
   {/if}
-  {#if sharedSpaces.length > 0}
-    {@const label = $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })}
-    <ActionMenu {label} class="profile-mutual-menu" align="start">
+  {#if sharedSpaces.length > 0 && !mutualInOverflow}
+    <ActionMenu label={spacesLabel} class="profile-mutual-menu" align="start">
       {#snippet trigger({ props })}
         <button {...props} class="profile-action selection-open" type="button">
           <UsersThreeIcon size={14} />
-          {label}
+          {spacesLabel}
         </button>
       {/snippet}
       {@render mutualRows(sharedSpaces)}
@@ -463,6 +511,27 @@
       </button>
     {/snippet}
     <IconContext values={{ 'aria-hidden': 'true' }}>
+      {#if mutualInOverflow && sharedRooms.length > 0}
+        <ActionMenuSub label={roomsLabel} class="profile-mutual-menu">
+          {#snippet trigger()}
+            <ChatsIcon />
+            {roomsLabel}
+          {/snippet}
+          {@render mutualRoomRows()}
+        </ActionMenuSub>
+      {/if}
+      {#if mutualInOverflow && sharedSpaces.length > 0}
+        <ActionMenuSub label={spacesLabel} class="profile-mutual-menu">
+          {#snippet trigger()}
+            <UsersThreeIcon />
+            {spacesLabel}
+          {/snippet}
+          {@render mutualRows(sharedSpaces)}
+        </ActionMenuSub>
+      {/if}
+      {#if mutualInOverflow && mutualRooms.length > 0}
+        <ActionMenuSeparator />
+      {/if}
       <ActionMenuItem onSelect={copyServer}>
         <CopyIcon />
         {$i18n.t('timeline.profileCopyServer')}
@@ -582,6 +651,14 @@
       <span class="profile-mutual-name">{room.name ?? room.room_id}</span>
     </ActionMenuItem>
   {/each}
+{/snippet}
+
+{#snippet mutualRoomRows()}
+  {@render mutualRows(sharedGroups)}
+  {#if sharedGroups.length > 0 && sharedDirect.length > 0}
+    <ActionMenuSeparator />
+  {/if}
+  {@render mutualRows(sharedDirect)}
 {/snippet}
 
 {#snippet composer()}
@@ -827,13 +904,17 @@
     font-weight: var(--font-weight-medium);
     gap: var(--space-100);
     justify-content: center;
-    min-height: 2rem;
+    min-height: var(--profile-action-size);
     padding: 0 var(--space-300);
     white-space: nowrap;
   }
 
-  :global(.profile-card-sheet .profile-action) {
-    min-height: 2.75rem;
+  :global(.profile-card-actions) {
+    --profile-action-size: var(--control-height-300);
+  }
+
+  :global(.profile-card-sheet .profile-card-actions) {
+    --profile-action-size: 2.75rem;
   }
 
   :global(.profile-action svg) {
@@ -854,7 +935,8 @@
 
   :global(.profile-action-overflow) {
     margin-left: auto;
-    padding: var(--space-050) var(--space-200);
+    min-width: var(--profile-action-size);
+    padding: 0;
   }
 
   :global(.profile-power-name) {

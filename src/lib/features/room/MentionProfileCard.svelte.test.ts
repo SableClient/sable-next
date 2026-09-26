@@ -666,6 +666,72 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
   await unmount(instance);
 });
 
+test('moves the mutual rooms and spaces into the overflow menu when the row cannot fit them', async () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(private readonly callback: () => void) {}
+      observe(target: Element): void {
+        if (target.classList.contains('profile-card-actions')) this.callback();
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+  );
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    return this.classList.contains('profile-card-actions') ? 300 : 0;
+  });
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const width = this.classList.contains('profile-action') ? 120 : 0;
+    return DOMRect.fromRect({ width, height: 32 });
+  });
+  core.userRelations.mockResolvedValueOnce({
+    mutualRooms: [
+      { room_id: '!general:example.org', name: 'General', is_space: false },
+      { room_id: '!space:example.org', name: 'Space', is_space: true },
+    ],
+    ignored: false,
+  });
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  await vi.waitFor(() => {
+    expect(core.userRelations).toHaveBeenCalled();
+  });
+  document.querySelector('.profile-action-overflow')?.dispatchEvent(
+    new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'mouse',
+      button: 0,
+      isPrimary: true,
+    })
+  );
+
+  const items = await vi.waitFor(() => {
+    const labels = [...document.querySelectorAll('[role="menuitem"]')].map(
+      (node) => node.textContent
+    );
+    if (labels.length === 0) throw new Error('overflow menu not open');
+    return labels;
+  });
+  expect(items.some((label) => label.includes('1 mutual room'))).toBe(true);
+  expect(items.some((label) => label.includes('1 mutual space'))).toBe(true);
+  const chips = [...document.querySelectorAll('.profile-action')].map((node) => node.textContent);
+  expect(chips.some((label) => label.includes('mutual'))).toBe(false);
+  await unmount(instance);
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
 test('shows a misc field in full as JSON with developer tools on, and a preview without', async () => {
   const value = JSON.stringify({ site: 'x'.repeat(300) });
   const open = async () => {
