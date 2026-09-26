@@ -254,11 +254,38 @@
           }
         : null)
   );
-  let replyNameColor = $derived(
-    currentUserId !== null && item.in_reply_to?.sender === currentUserId
-      ? 'var(--primary-on-container)'
-      : senderColor(item.in_reply_to?.sender ?? null)
+  let replyProfile = $state<ProfileView | null>(null);
+  let replySender = $derived(item.in_reply_to?.sender ?? null);
+  let replyColors = $derived(
+    replySender === null
+      ? null
+      : senderDisplayColors(
+          replySender,
+          replyProfile,
+          replyPersona,
+          currentUserId !== null && replySender === currentUserId,
+          replyCosmetics
+        )
   );
+  let replyNameColor = $derived(replyColors?.nameColor ?? senderColor(null));
+  $effect(() => {
+    const userId = replySender;
+    replyProfile = null;
+    if (!userId || preview) return;
+
+    let current = true;
+    void core.userProfile(userId).then(
+      (next) => {
+        if (current) replyProfile = next;
+      },
+      () => {
+        // A reply preview should remain readable when an optional profile lookup fails.
+      }
+    );
+    return () => {
+      current = false;
+    };
+  });
 
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
@@ -858,8 +885,12 @@
           }}
         >
           <span class="reply-copy"
-            ><span class="reply-name" style:font-family={replyCosmetics?.font ?? undefined}
-              >{replyName}</span
+            ><span
+              class="reply-name"
+              class:tinted={replyColors?.tinted}
+              style:--name-color-on-light={replyColors?.nameColorLight ?? undefined}
+              style:--name-color-on-dark={replyColors?.nameColorDark ?? undefined}
+              style:font-family={replyCosmetics?.font ?? undefined}>{replyName}</span
             >
             <span class="reply-body">{replyBody}</span></span
           >
@@ -910,8 +941,12 @@
           >
             <ReplyIcon class="reply-icon" />
             <span class="reply-copy"
-              ><span class="reply-name" style:font-family={replyCosmetics?.font ?? undefined}
-                >{replyName}</span
+              ><span
+                class="reply-name"
+                class:tinted={replyColors?.tinted}
+                style:--name-color-on-light={replyColors?.nameColorLight ?? undefined}
+                style:--name-color-on-dark={replyColors?.nameColorDark ?? undefined}
+                style:font-family={replyCosmetics?.font ?? undefined}>{replyName}</span
               >
               <span class="reply-body">{replyBody}</span></span
             >
@@ -1855,7 +1890,7 @@
     overflow: hidden;
   }
 
-  .reply-preview .reply-name {
+  .reply-preview .reply-name:not(.tinted) {
     color: var(--reply-name-color);
   }
 

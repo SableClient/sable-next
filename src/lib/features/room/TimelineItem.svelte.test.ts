@@ -669,6 +669,32 @@ test('uses the sender profile name color in every message layout', async () => {
   await unmount(instance);
 });
 
+test.each(['connected', 'compact', 'expanded'] as const)(
+  'colours a %s reply name from the replied-to sender profile',
+  async (replyPreviewStyle) => {
+    setPreference('replyPreviewStyle', replyPreviewStyle);
+    core.userProfile.mockImplementation((userId: string) =>
+      Promise.resolve(
+        userId === '@bob:example.org'
+          ? { name_color_light: '#2244aa', name_color_dark: '#88aaff' }
+          : { name_color_light: null, name_color_dark: null }
+      )
+    );
+    const instance = mount(TimelineItemHarness, {
+      target: document.body,
+      props: { core, item: { item: replyItem(), collapsed: false } },
+    });
+    await tick();
+
+    const name = document.querySelector<HTMLElement>('.reply-preview .reply-name');
+    expect(name?.classList.contains('tinted')).toBe(true);
+    expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
+    expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
+    expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
+    await unmount(instance);
+  }
+);
+
 test('does not mount hidden message dialogs', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,
