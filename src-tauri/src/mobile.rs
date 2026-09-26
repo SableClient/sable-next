@@ -11,6 +11,7 @@
 use std::sync::OnceLock;
 
 use jni::objects::{JObject, JValue};
+use jni::signature::MethodSignature;
 use jni::strings::JNIString;
 use jni::{EnvUnowned, JavaVM, jni_sig, jni_str};
 
@@ -48,14 +49,32 @@ pub fn haptic_feedback(strong: bool) -> Result<(), String> {
     call_activity_bool("hapticFeedbackNative", strong)
 }
 
+/// `color` is an opaque ARGB value, as `android.graphics.Color` packs it.
+#[tauri::command]
+pub fn set_window_background(color: i32) -> Result<(), String> {
+    call_activity(
+        "setWindowBackgroundNative",
+        jni_sig!("(I)V"),
+        JValue::Int(color),
+    )
+}
+
 fn call_activity_bool(method: &str, value: bool) -> Result<(), String> {
+    call_activity(method, jni_sig!("(Z)V"), JValue::Bool(value))
+}
+
+fn call_activity(
+    method: &str,
+    signature: MethodSignature<'static, 'static>,
+    value: JValue,
+) -> Result<(), String> {
     let vm = JAVA_VM.get().ok_or("java vm not initialized")?;
     vm.attach_current_thread(|env| {
         let result = env.call_static_method(
             jni_str!("moe/sable/next/MainActivity"),
             JNIString::new(method),
-            jni_sig!("(Z)V"),
-            &[JValue::Bool(value)],
+            signature,
+            &[value],
         );
         if result.is_err() {
             env.exception_clear();

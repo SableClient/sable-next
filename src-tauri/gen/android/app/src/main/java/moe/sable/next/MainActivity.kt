@@ -1,6 +1,7 @@
 package moe.sable.next
 
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -133,6 +134,17 @@ class MainActivity : TauriActivity() {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightStatusBars = light
+      }
+    }
+
+    // The inset host pads the webview's parent to the keyboard's final height as
+    // soon as the IME animation starts, and that band shows the window
+    // background, which follows the system theme rather than the app's.
+    @JvmStatic
+    fun setWindowBackgroundNative(color: Int) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        activity.window.setBackgroundDrawable(ColorDrawable(color))
       }
     }
 

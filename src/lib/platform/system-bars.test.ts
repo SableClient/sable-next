@@ -2,7 +2,7 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { isLightColor, startSystemBarSync } from './system-bars';
+import { isLightColor, opaqueArgb, startSystemBarSync } from './system-bars';
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true, invoke }));
@@ -50,4 +50,28 @@ test('repeated triggers sample on an interval, not once per trigger', async () =
   expect(reads.mock.calls.length).toBeLessThanOrEqual(2);
 
   stop();
+});
+
+test('a surface colour packs into an opaque java argb int', () => {
+  expect(opaqueArgb('rgb(26, 28, 40)')).toBe(0xff1a1c28 | 0);
+  expect(opaqueArgb('rgba(255, 255, 255, 0.5)')).toBe(-1);
+});
+
+test('the surface under the navigation bar becomes the window background', async () => {
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+    cb(0);
+    return 1;
+  });
+  const surface = document.createElement('div');
+  surface.style.backgroundColor = 'rgb(26, 28, 40)';
+  document.body.append(surface);
+  vi.spyOn(document, 'elementFromPoint').mockReturnValue(surface);
+  invoke.mockResolvedValue(undefined);
+
+  const stop = startSystemBarSync();
+  await Promise.resolve();
+
+  expect(invoke).toHaveBeenCalledWith('set_window_background', { color: 0xff1a1c28 | 0 });
+  stop();
+  surface.remove();
 });

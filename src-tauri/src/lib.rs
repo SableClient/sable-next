@@ -741,7 +741,9 @@ pub fn run() {
             #[cfg(target_os = "android")]
             mobile::set_status_bar_light,
             #[cfg(target_os = "android")]
-            mobile::set_navigation_bar_light
+            mobile::set_navigation_bar_light,
+            #[cfg(target_os = "android")]
+            mobile::set_window_background
         ])
         .run(tauri::generate_context!())
     {

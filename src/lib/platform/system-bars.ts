@@ -30,6 +30,38 @@ function readSurfaceColor(x: number, y: number): string | undefined {
   return undefined;
 }
 
+let swatch: CanvasRenderingContext2D | null | undefined;
+
+function srgbChannels(color: string): [number, number, number] | undefined {
+  const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(color);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  swatch ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  if (!swatch) return undefined;
+  swatch.clearRect(0, 0, 1, 1);
+  swatch.fillStyle = color;
+  swatch.fillRect(0, 0, 1, 1);
+  const [red, green, blue] = swatch.getImageData(0, 0, 1, 1).data;
+  return [red, green, blue];
+}
+
+/** `android.graphics.Color`'s packing, alpha forced opaque, as a signed Java int. */
+export function opaqueArgb(color: string): number | undefined {
+  const channels = srgbChannels(color);
+  if (!channels) return undefined;
+  const [red, green, blue] = channels.map((value) => Math.round(value) & 0xff);
+  return 0xff000000 | (red << 16) | (green << 8) | blue | 0;
+}
+
+function syncWindowBackground(color: string | undefined, last: string): string {
+  if (color === undefined || color === last) return last;
+  const argb = opaqueArgb(color);
+  if (argb === undefined) return last;
+  void invoke('set_window_background', { color: argb }).catch(() => {
+    // A missing command means an older shell; the keyboard band stays themed by Android.
+  });
+  return color;
+}
+
 const SAMPLE_INTERVAL_MS = 200;
 
 type BarCommand = 'set_status_bar_light' | 'set_navigation_bar_light';
@@ -63,17 +95,16 @@ export function startSystemBarSync(): () => void {
   let sampledAt = 0;
   let lastTop = '';
   let lastBottom = '';
+  let lastBackground = '';
 
   const sample = (): void => {
     frame = 0;
     sampledAt = performance.now();
     const x = Math.round(window.innerWidth / 2);
     lastTop = syncEdge('set_status_bar_light', readSurfaceColor(x, 1), lastTop);
-    lastBottom = syncEdge(
-      'set_navigation_bar_light',
-      readSurfaceColor(x, window.innerHeight - 1),
-      lastBottom
-    );
+    const bottom = readSurfaceColor(x, window.innerHeight - 1);
+    lastBottom = syncEdge('set_navigation_bar_light', bottom, lastBottom);
+    lastBackground = syncWindowBackground(bottom, lastBackground);
   };
 
   const runSample = (): void => {
