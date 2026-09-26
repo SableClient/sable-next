@@ -41,7 +41,12 @@
   import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
-  import { leaveRoomView, searchInRoom, trackRoomEntry } from './room-navigation.js';
+  import {
+    leaveRoomView,
+    scopedSearchQuery,
+    searchInRoom,
+    trackRoomEntry,
+  } from './room-navigation.js';
   import {
     findRoomByPathId,
     roomPathParamFromId,
@@ -67,6 +72,7 @@
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import ThreadList from './ThreadList.svelte';
   import RoomAttachments from './RoomAttachments.svelte';
+  import RoomSearchPanel from './RoomSearchPanel.svelte';
   import ThreadPanel from './ThreadPanel.svelte';
   import MentionProfile from './MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
@@ -211,11 +217,13 @@
   let threadRootId = $state<string | null>(null);
   let threadsOpen = $state(false);
   let attachmentsOpen = $state(false);
+  let searchOpen = $state(false);
 
   function openThread(rootEventId: string): void {
     threadRootId = rootEventId;
     threadsOpen = false;
     attachmentsOpen = false;
+    searchOpen = false;
     desktopMembersOpen = false;
   }
 
@@ -411,6 +419,7 @@
     threadRootId = null;
     threadsOpen = false;
     attachmentsOpen = false;
+    searchOpen = false;
     closeProfile();
   });
 
@@ -735,6 +744,18 @@
   function toggleAttachments(): void {
     attachmentsOpen = !attachmentsOpen;
     threadsOpen = false;
+    searchOpen = false;
+  }
+
+  function openSearch(): void {
+    if (!desktop) {
+      searchInRoom(resolvedRoom, resolvedRoomId);
+      return;
+    }
+    searchOpen = !searchOpen;
+    threadsOpen = false;
+    attachmentsOpen = false;
+    if (searchOpen) desktopMembersOpen = false;
   }
 
   function openProfileAvatar(source: string, displayName: string): void {
@@ -935,6 +956,7 @@
           onclick={() => {
             threadsOpen = !threadsOpen;
             attachmentsOpen = false;
+            searchOpen = false;
           }}
         >
           <ChatsIcon weight={threadsOpen ? 'fill' : 'regular'} />
@@ -970,7 +992,7 @@
       chatBeside={desktop}
       onBack={leaveRoomView}
       onMembers={toggleMembers}
-      onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
+      onSearch={openSearch}
       onTopic={() => (topicOpen = true)}
       actions={headerActions}
     >
@@ -1087,6 +1109,15 @@
       onOpenThread={openThread}
       onClose={() => (threadsOpen = false)}
     />
+  {/if}
+
+  {#if searchOpen}
+    {#key resolvedRoomId}
+      <RoomSearchPanel
+        query={scopedSearchQuery('in', resolvedRoom, resolvedRoomId)}
+        onClose={() => (searchOpen = false)}
+      />
+    {/key}
   {/if}
 
   {#if attachmentsOpen}

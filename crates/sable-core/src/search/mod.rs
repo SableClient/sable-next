@@ -32,7 +32,7 @@ use matrix_sdk::ruma::events::{
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
 use probly_search::{Index, score::bm25};
-use regex::{Regex, RegexBuilder};
+use regex_lite::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -309,7 +309,9 @@ impl BodyPattern {
 
     fn matches(&self, document: &Document) -> bool {
         match self {
-            Self::Regex(pattern) => pattern.is_match(&document.body),
+            Self::Regex(pattern) => {
+                pattern.is_match(&document.body) || pattern.is_match(&document.folded)
+            }
             Self::Literal(text) => document.folded.contains(text.as_str()),
         }
     }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { SearchContextView, SearchHitView, SearchOrder } from '#src/generated/protocol';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -40,6 +40,12 @@
   import { chipText, composeQuery, splitTokenField } from './token-field';
   import { SenderDirectory, type SenderIdentity } from './sender-directory.svelte.js';
 
+  interface Props {
+    panel?: boolean;
+    initialQuery?: string;
+  }
+
+  let { panel = false, initialQuery = '' }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
   const senders = new SenderDirectory(core);
@@ -61,8 +67,8 @@
   let lookupTimer: ReturnType<typeof setTimeout> | undefined;
   let destroyed = false;
 
-  search.query = page.url.searchParams.get('q') ?? '';
-  search.order = orderFrom(page.url.searchParams.get('order'));
+  search.query = untrack(() => (panel ? initialQuery : (page.url.searchParams.get('q') ?? '')));
+  search.order = untrack(() => (panel ? 'rank' : orderFrom(page.url.searchParams.get('order'))));
   if (search.query !== '') {
     search.schedule();
     scheduleLookup();
@@ -317,6 +323,7 @@
   }
 
   function syncUrl(): void {
+    if (panel) return;
     const parts: string[] = [];
     if (search.query !== '') parts.push(`q=${encodeURIComponent(search.query)}`);
     if (search.order !== 'rank') parts.push(`order=${search.order}`);
@@ -356,7 +363,15 @@
   </span>
 {/snippet}
 
-<AppPageShell title={$i18n.t('search.title')} density="compact">
+{#if panel}
+  {@render content()}
+{:else}
+  <AppPageShell title={$i18n.t('search.title')} density="compact">
+    {@render content()}
+  </AppPageShell>
+{/if}
+
+{#snippet content()}
   <div class="search-view">
     <div class="search-bar">
       <div class="field">
@@ -590,7 +605,7 @@
       {/if}
     </div>
   </div>
-</AppPageShell>
+{/snippet}
 
 <style>
   .search-view {

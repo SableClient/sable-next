@@ -37,14 +37,22 @@ export function leaveRoomView(): void {
   void goto(target);
 }
 
-export function scopedSearchPath(
+export function scopedSearchQuery(
   operator: 'in' | 'space',
   room: RoomSummary | undefined,
   roomId: string
 ): string {
   const label = room?.canonical_alias ?? room?.name ?? roomId;
   const scope = label.includes(' ') ? `"${label}"` : label;
-  return `${resolve('/(app)/search')}?q=${encodeURIComponent(`${operator}:${scope} `)}`;
+  return `${operator}:${scope} `;
+}
+
+export function scopedSearchPath(
+  operator: 'in' | 'space',
+  room: RoomSummary | undefined,
+  roomId: string
+): string {
+  return `${resolve('/(app)/search')}?q=${encodeURIComponent(scopedSearchQuery(operator, room, roomId))}`;
 }
 
 export function contextSearchPath(

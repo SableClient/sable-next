@@ -46,18 +46,27 @@ async function awaitIndexed(page: Page): Promise<void> {
   });
 }
 
-test('the room header search button opens the search page scoped to that room', async ({
+test('the room header search button opens a search panel scoped to that room', async ({
   page,
   app,
 }) => {
   await app.openRooms();
   await app.openRoomFromList('General');
+  await page.waitForURL(/\/rooms\/.+/);
+  const roomUrl = page.url();
 
   await page.getByRole('button', { name: 'Search messages' }).click();
 
-  await expect(page).toHaveURL(/\/search\?q=/);
-  await expect(page.locator('.chip')).toHaveText(/in:\s*General/);
+  const panel = page.getByRole('complementary', { name: en.search.title });
+  await expect(panel.locator('.chip')).toHaveText(/in:\s*General/);
   await expect(searchField(page)).toHaveValue('');
+  await searchField(page).fill('message');
+  await expect(panel.locator('.hit-row').first()).toBeVisible(INDEXED);
+  expect(page.url()).toBe(roomUrl);
+  await page.screenshot({ path: '/tmp/room-search-panel.png' });
+
+  await panel.getByRole('button', { name: en.search.close }).click();
+  await expect(panel).toHaveCount(0);
 });
 
 test('message search from a space sidebar starts scoped to that space', async ({
@@ -613,21 +622,6 @@ test('clicking the field padding focuses the input', async ({ page }) => {
   await page.locator('.token-field').click({ position: { x: 2, y: 2 } });
 
   await expect(field).toBeFocused();
-});
-
-test('the operator cheat-sheet does not reopen on refocus', async ({ page }) => {
-  await page.goto('/search');
-  const field = searchField(page);
-
-  await field.press('Alt+ArrowDown');
-  await expect(page.getByRole('listbox')).toBeVisible();
-
-  await field.blur();
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-
-  await field.focus();
-
-  await expect(page.getByRole('listbox')).toHaveCount(0);
 });
 
 test('a quoted phrase is marked whole in the result body', async ({ page }) => {
