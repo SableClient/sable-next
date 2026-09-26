@@ -114,6 +114,111 @@ test('a decodable video never reaches the re-encoder', async () => {
   expect(playButton()).not.toBeInTheDocument();
 });
 
+function streamOnce(): void {
+  streamVideo.mockImplementationOnce(((
+    _source: string,
+    _id: number,
+    onChunk: (chunk: Uint8Array) => void
+  ) => {
+    onChunk(new Uint8Array([1]));
+    return Promise.resolve();
+  }) as never);
+}
+
+function trackObjectUrls() {
+  let next = 0;
+  const revoked: string[] = [];
+  vi.stubGlobal(
+    'URL',
+    Object.assign(globalThis.URL, {
+      createObjectURL: () => `blob:stream-${String(next++)}`,
+      revokeObjectURL: (url: string) => revoked.push(url),
+    })
+  );
+  return revoked;
+}
+
+test('the re-encoded stream is revoked when the tile unmounts', async () => {
+  const revoked = trackObjectUrls();
+  streamOnce();
+  const { instance } = mountVideo();
+  await settle();
+
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
+  await settle();
+  expect(revoked).toEqual([]);
+
+  instance.unmount();
+
+  expect(revoked).toEqual(['blob:stream-0']);
+});
+
+test('the re-encoded stream is revoked when the tile is recycled for another video', async () => {
+  const revoked = trackObjectUrls();
+  streamOnce();
+  const { props } = mountVideo();
+  await settle();
+
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
+  await settle();
+
+  props.source = 'mxc://example.org/other';
+  await settle();
+
+  expect(revoked).toEqual(['blob:stream-0']);
+});
+
+test('a re-encode that lands after the tile moved on is revoked at once', async () => {
+  const revoked = trackObjectUrls();
+  let finish = (): void => {};
+  streamVideo.mockImplementationOnce(((
+    _source: string,
+    _id: number,
+    onChunk: (chunk: Uint8Array) => void
+  ) => {
+    onChunk(new Uint8Array([1]));
+    return new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+  }) as never);
+  const { props } = mountVideo();
+  await settle();
+
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
+  await settle();
+  props.source = 'mxc://example.org/other';
+  await settle();
+  finish();
+  await settle();
+
+  expect(revoked).toEqual(['blob:stream-0']);
+});
+
+test('a re-encode that lands after the tile unmounted is revoked at once', async () => {
+  const revoked = trackObjectUrls();
+  let finish = (): void => {};
+  streamVideo.mockImplementationOnce(((
+    _source: string,
+    _id: number,
+    onChunk: (chunk: Uint8Array) => void
+  ) => {
+    onChunk(new Uint8Array([1]));
+    return new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+  }) as never);
+  const { instance } = mountVideo();
+  await settle();
+
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
+  await settle();
+  instance.unmount();
+  finish();
+  await settle();
+
+  expect(revoked).toEqual(['blob:stream-0']);
+});
+
 test('a build without the native re-encoder leaves the video alone', async () => {
   videoStreamMime.mockRejectedValueOnce(new Error('unknown command'));
 

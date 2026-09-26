@@ -140,6 +140,8 @@
   let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
   let streamUnavailable = $state(false);
   let streamedSource: string | null = null;
+  let streamUrl: string | null = null;
+  let streamEpoch = 0;
   let transcode = $derived(
     item?.kind === 'video' &&
       !canPlayVideo(mime) &&
@@ -197,6 +199,20 @@
     if (item === undefined) onClose();
   });
 
+  function adoptStream(next: string | null): void {
+    if (streamUrl !== null && streamUrl !== next) URL.revokeObjectURL(streamUrl);
+    streamUrl = next;
+  }
+
+  $effect(() => {
+    void source;
+    return () => {
+      streamEpoch += 1;
+      streamedSource = null;
+      adoptStream(null);
+    };
+  });
+
   $effect(() => {
     if (source === null) {
       url = null;
@@ -217,6 +233,7 @@
       streamedSource = source;
       url = null;
       const wanted = source;
+      const epoch = streamEpoch;
       void videoStreamUrl(
         core,
         wanted,
@@ -225,8 +242,13 @@
           if (streamedSource === wanted) url = next;
         }
       )
-        .then((streamUrl) => {
-          if (streamedSource === wanted) url = streamUrl;
+        .then((next) => {
+          if (epoch !== streamEpoch || streamedSource !== wanted) {
+            URL.revokeObjectURL(next);
+            return;
+          }
+          adoptStream(next);
+          url = next;
         })
         .catch(() => {
           streamUnavailable = true;

@@ -96,6 +96,8 @@
   );
   /* Keyed by source: a recycled tile must not inherit another's start. */
   let startedSource = $state<string | null>(null);
+  let streamUrl: string | null = null;
+  let streamEpoch = 0;
   let started = $derived(startedSource === source);
   let awaitingPlay = $derived(kind === 'video' && !started && url === null);
   let posterFailed = $state<string | null>(null);
@@ -239,11 +241,25 @@
     };
   });
 
+  function adoptStream(next: string | null): void {
+    if (streamUrl !== null && streamUrl !== next) URL.revokeObjectURL(streamUrl);
+    streamUrl = next;
+  }
+
+  $effect(() => {
+    void source;
+    return () => {
+      streamEpoch += 1;
+      adoptStream(null);
+    };
+  });
+
   function play(): void {
     startedSource = source;
     if (!transcode) return;
     url = null;
     const wanted = source;
+    const epoch = streamEpoch;
     void videoStreamUrl(
       core,
       wanted,
@@ -252,8 +268,13 @@
         if (startedSource === wanted) url = next;
       }
     )
-      .then((streamUrl) => {
-        if (startedSource === wanted) url = streamUrl;
+      .then((next) => {
+        if (epoch !== streamEpoch || startedSource !== wanted) {
+          URL.revokeObjectURL(next);
+          return;
+        }
+        adoptStream(next);
+        url = next;
       })
       .catch(() => {
         streamUnavailable = true;

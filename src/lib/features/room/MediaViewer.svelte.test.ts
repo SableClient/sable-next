@@ -20,6 +20,8 @@ vi.mock('#lib/i18n.js', () => ({
 }));
 
 import MediaViewer from './MediaViewer.svelte';
+import { resetVideoStreaming } from '#lib/ui/video-stream.svelte.js';
+import { resetVideoSupport } from '#lib/ui/video-support.js';
 
 const imageItem: MediaItem = {
   kind: 'image',
@@ -266,4 +268,48 @@ test('closes instead of throwing when the selected media is no longer in the tim
   expect(onClose).toHaveBeenCalled();
   expect(core.fetchMedia).not.toHaveBeenCalled();
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('revokes the re-encoded stream when the viewer closes', async () => {
+  resetVideoSupport();
+  resetVideoStreaming();
+  vi.spyOn(window.HTMLVideoElement.prototype, 'canPlayType').mockReturnValue('');
+  let next = 0;
+  const revoked: string[] = [];
+  vi.stubGlobal(
+    'URL',
+    Object.assign(globalThis.URL, {
+      createObjectURL: () => `blob:stream-${String(next++)}`,
+      revokeObjectURL: (url: string) => revoked.push(url),
+    })
+  );
+  Object.assign(core, {
+    streamVideo: vi.fn((_source: string, _id: number, onChunk: (chunk: Uint8Array) => void) => {
+      onChunk(new Uint8Array([1]));
+      return Promise.resolve();
+    }),
+    videoStreamMime: vi.fn(() => Promise.resolve('video/webm; codecs="vp9,opus"')),
+  });
+
+  try {
+    const { unmount } = render(MediaViewer, {
+      items: [videoItem],
+      selectedEventId: '$video',
+      onClose: () => {},
+    });
+    await vi.waitFor(() => {
+      expect(document.querySelector('video')?.getAttribute('src')).toBe('blob:stream-0');
+    });
+    expect(revoked).toEqual([]);
+
+    unmount();
+
+    expect(revoked).toEqual(['blob:stream-0']);
+  } finally {
+    vi.unstubAllGlobals();
+    delete (core as Record<string, unknown>).streamVideo;
+    delete (core as Record<string, unknown>).videoStreamMime;
+    resetVideoSupport();
+    resetVideoStreaming();
+  }
 });

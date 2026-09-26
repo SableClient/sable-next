@@ -10,6 +10,7 @@ type CachedMediaUrl = { url: string; bytes: number; ratio: number | undefined };
 const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
 const holds = new Map<string, number>();
+const displaced = new Map<string, string[]>();
 /* An object URL pins its blob until revoked. Held entries are exempt. */
 const MAX_OBJECT_URLS = 64;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
@@ -112,8 +113,13 @@ export function holdMediaUrl(
   }
   return () => {
     const remaining = (holds.get(key) ?? 1) - 1;
-    if (remaining > 0) holds.set(key, remaining);
-    else holds.delete(key);
+    if (remaining > 0) {
+      holds.set(key, remaining);
+      return;
+    }
+    holds.delete(key);
+    for (const url of displaced.get(key) ?? []) URL.revokeObjectURL(url);
+    displaced.delete(key);
   };
 }
 
@@ -216,7 +222,8 @@ export function loadMediaUrl(
           const previous = objectUrls.get(key);
           if (previous !== undefined) {
             objectUrlBytes -= previous.bytes;
-            if (!holds.has(key)) URL.revokeObjectURL(previous.url);
+            if (holds.has(key)) displaced.set(key, [...(displaced.get(key) ?? []), previous.url]);
+            else URL.revokeObjectURL(previous.url);
           }
           objectUrls.set(key, { url: objectUrl, bytes: blob.size, ratio: aspectRatios.get(key) });
           objectUrlBytes += blob.size;

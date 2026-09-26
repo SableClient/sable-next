@@ -189,6 +189,29 @@ test('revokes the URL it replaces when a key is fetched twice', async () => {
   expect(revoke).toHaveBeenCalledWith(first);
 });
 
+test('revokes a replaced URL once the last caller holding it lets go', async () => {
+  let nextUrl = 0;
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:displaced-${String(nextUrl++)}`);
+  const core = {
+    session: session('account-displaced', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+  const source = 'mxc://example.org/refetched';
+
+  const release = holdMediaUrl(core, source, 0, 0);
+  const first = await loadMediaUrl(core, source, 0, 0);
+  const second = await loadMediaUrl(core, source, 0, 0);
+
+  expect(revoke).not.toHaveBeenCalledWith(first);
+
+  release();
+
+  expect(revoke).toHaveBeenCalledWith(first);
+  expect(revoke).not.toHaveBeenCalledWith(second);
+});
+
 test('holds media requests at six in flight', async () => {
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:gated');
   const settlers: (() => void)[] = [];
