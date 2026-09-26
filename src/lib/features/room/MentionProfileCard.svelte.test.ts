@@ -57,6 +57,7 @@ const emptyProfile: ProfileView = {
   name_color_dark: null,
   animal: null,
   extra: [],
+  legacy_fields: [],
 };
 
 core.userRelations.mockResolvedValue({ mutualRooms: [], ignored: false });

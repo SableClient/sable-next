@@ -25,6 +25,7 @@ function controller(existing: Partial<ProfileView> = {}) {
         pronouns: [],
         name_color_light: null,
         name_color_dark: null,
+        legacy_fields: [],
         ...existing,
       } as ProfileView)
     ),
@@ -136,4 +137,20 @@ test('a field typed before the profile arrives is kept', async () => {
   await profile.load();
 
   expect(profile.displayName).toBe('Typed');
+});
+
+test('a status save deletes the legacy status keys the profile still carries', async () => {
+  const { profile, core } = controller({
+    status: { text: 'around', emoji: null },
+    legacy_fields: ['chat.commet.profile_status', 'moe.sable.app.bio'],
+  });
+  await profile.load();
+
+  profile.setStatus('away');
+  await profile.save();
+
+  expect(core.setProfileField).toHaveBeenCalledWith('m.status', { text: 'away' });
+  expect(core.setProfileField).toHaveBeenCalledWith('chat.commet.profile_status', null);
+  expect(core.setProfileField).not.toHaveBeenCalledWith('org.matrix.msc4426.status', null);
+  expect(core.setProfileField).not.toHaveBeenCalledWith('moe.sable.app.bio', null);
 });

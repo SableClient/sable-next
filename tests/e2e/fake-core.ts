@@ -109,6 +109,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       name_color_dark: null,
       animal: null,
       extra: [],
+      legacy_fields: [],
     };
     const room: RoomSummary = {
       room_id: '!room:example.test',

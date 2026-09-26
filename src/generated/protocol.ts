@@ -694,6 +694,7 @@ export type ProfileView = {
 	 *  another client wrote is still readable here.
 	 */
 	extra: ProfileFieldView[],
+	legacy_fields: string[],
 };
 
 export type PronounView = {

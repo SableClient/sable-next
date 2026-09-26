@@ -18,9 +18,13 @@
   import '#lib/ui/primitives/settings-row.css';
   import {
     BANNER_FIELD,
+    BIO_FIELD,
+    LEGACY_BIO_FIELDS,
+    LEGACY_STATUS_FIELDS,
     NAME_COLOR_FIELD,
     PRONOUNS_FIELD,
     STATUS_FIELD,
+    legacyDeletes,
   } from '#lib/profile/fields.js';
   import { pronounSets, pronounText } from '#lib/profile/pronouns.js';
   import { bioMarkdown, bioTexts } from './bio-markdown.js';
@@ -67,7 +71,10 @@
       write: (snapshot) => {
         status = snapshot.status ?? '';
       },
-      fields: () => [[STATUS_FIELD, status ? { text: status } : null]],
+      fields: () => [
+        [STATUS_FIELD, status ? { text: status } : null],
+        ...legacyDeletes(profile.legacy_fields, LEGACY_STATUS_FIELDS),
+      ],
     },
     colors: {
       name: 'settings.profileColors',
@@ -107,7 +114,10 @@
       write: (snapshot) => {
         bio = snapshot.bio ?? '';
       },
-      fields: () => [['gay.fomx.biography', bio ? { 'm.text': bioTexts(bio) } : null]],
+      fields: () => [
+        [BIO_FIELD, bio ? { 'm.text': bioTexts(bio) } : null],
+        ...legacyDeletes(profile.legacy_fields, LEGACY_BIO_FIELDS),
+      ],
     },
     animal: {
       name: 'settings.animalIdentity',
@@ -120,7 +130,7 @@
       fields: () => [
         ['pet.plz.me', isAnimal || null],
         ['pet.plz.my', hasAnimal || null],
-        ['pet.plz.gib', animalNeed || null],
+        ['pet.plz.gib', isAnimal || hasAnimal ? animalNeed : null],
       ],
     },
   } satisfies Record<string, Group>;

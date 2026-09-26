@@ -3539,6 +3539,7 @@ pub struct ProfileView {
     /// Extended fields this client has no rendering for, kept so a profile that
     /// another client wrote is still readable here.
     pub extra: Vec<ProfileFieldView>,
+    pub legacy_fields: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

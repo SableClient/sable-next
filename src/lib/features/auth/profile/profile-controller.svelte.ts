@@ -2,9 +2,11 @@ import type { ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import {
   BANNER_FIELD,
+  LEGACY_STATUS_FIELDS,
   NAME_COLOR_FIELD,
   PRONOUNS_FIELD,
   STATUS_FIELD,
+  legacyDeletes,
 } from '#lib/profile/fields.js';
 import { pronounSets, pronounText } from '#lib/profile/pronouns.js';
 import { t } from '#lib/i18n.js';
@@ -36,6 +38,7 @@ interface LoadedProfile {
   pronouns: string;
   nameColor: string;
   status: string;
+  legacyFields: string[];
 }
 
 function loadedFields(profile: ProfileView): LoadedProfile {
@@ -44,6 +47,7 @@ function loadedFields(profile: ProfileView): LoadedProfile {
     pronouns: pronounText(profile.pronouns),
     nameColor: profile.name_color_dark ?? profile.name_color_light ?? '',
     status: profile.status?.text ?? '',
+    legacyFields: profile.legacy_fields,
   };
 }
 
@@ -68,7 +72,13 @@ export class ProfileController {
   avatarCleared = $state(false);
   error = $state<string | null>(null);
   isSaving = $state(false);
-  #loaded: LoadedProfile = { displayName: '', pronouns: '', nameColor: '', status: '' };
+  #loaded: LoadedProfile = {
+    displayName: '',
+    pronouns: '',
+    nameColor: '',
+    status: '',
+    legacyFields: [],
+  };
 
   constructor(private readonly options: ProfileControllerOptions) {}
 
@@ -155,6 +165,9 @@ export class ProfileController {
       const status = this.status.trim();
       if (status !== loaded.status) {
         await core.setProfileField(STATUS_FIELD, status ? { text: status } : null);
+        for (const [field] of legacyDeletes(loaded.legacyFields, LEGACY_STATUS_FIELDS)) {
+          await core.setProfileField(field, null);
+        }
       }
       if (this.bannerFile) {
         const url = await core.commands.uploadMedia(

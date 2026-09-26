@@ -7,11 +7,20 @@ use crate::protocol::{
 
 type ProfileResponse = matrix_sdk::ruma::api::client::profile::get_profile::v3::Response;
 
-const RENDERED_PROFILE_FIELDS: [&str; 21] = [
+const LEGACY_PROFILE_FIELDS: [&str; 4] = [
+    "moe.sable.app.bio",
+    "chat.commet.profile_bio",
+    "chat.commet.profile_status",
+    "org.matrix.msc4426.status",
+];
+
+const RENDERED_PROFILE_FIELDS: [&str; 23] = [
     "displayname",
     "avatar_url",
     "m.biography",
     "gay.fomx.biography",
+    "moe.sable.app.bio",
+    "chat.commet.profile_bio",
     "chat.commet.profile_color_scheme",
     "chat.commet.profile_banner",
     "chat.commet.profile_status",
@@ -74,7 +83,16 @@ fn profile_bio(response: &ProfileResponse) -> Option<String> {
     };
 
     let plain = representation(None).or_else(|| representation(Some("text/plain")));
-    let html = representation(Some("text/html"));
+    let html = representation(Some("text/html")).or_else(|| {
+        plain.is_none().then(|| {
+            profile_text(profile_field(response, "moe.sable.app.bio")).or_else(|| {
+                profile_text(
+                    profile_field(response, "chat.commet.profile_bio")
+                        .and_then(|bio| bio.get("formatted_body")),
+                )
+            })
+        })?
+    });
 
     (plain.is_some() || html.is_some())
         .then(|| display_html(plain.as_deref().unwrap_or_default(), html.as_deref()))
@@ -190,7 +208,10 @@ fn profile_animal(response: &ProfileResponse) -> Option<AnimalIdentityView> {
             .or_else(|| legacy_cat("kitty.meow.is_cat", "cat")),
         has_animal: profile_text(profile_field(response, "pet.plz.my"))
             .or_else(|| legacy_cat("kitty.meow.has_cats", "cats")),
-        animal_need: profile_text(profile_field(response, "pet.plz.gib")),
+        animal_need: profile_field(response, "pet.plz.gib").map_or_else(
+            || Some("headpats".to_owned()),
+            |need| profile_text(Some(need)),
+        ),
     };
 
     // The need alone says nothing without an animal to attach it to.
@@ -234,5 +255,81 @@ pub(crate) fn profile_view(user_id: OwnedUserId, response: &ProfileResponse) -> 
         name_color_dark,
         animal: profile_animal(response),
         extra: profile_extra(response),
+        legacy_fields: LEGACY_PROFILE_FIELDS
+            .into_iter()
+            .filter(|name| profile_field(response, name).is_some())
+            .map(ToOwned::to_owned)
+            .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn view(fields: &serde_json::Value) -> ProfileView {
+        let response = fields
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect::<ProfileResponse>();
+        profile_view("@me:example.org".try_into().unwrap(), &response)
+    }
+
+    #[test]
+    fn a_legacy_bio_is_read_and_reported() {
+        let sable = view(&json!({ "moe.sable.app.bio": "<b>sable</b>" }));
+        assert!(sable.bio.unwrap().contains("sable"));
+        assert_eq!(sable.legacy_fields, ["moe.sable.app.bio"]);
+        assert!(sable.extra.is_empty());
+
+        let commet = view(&json!({
+            "chat.commet.profile_bio": {
+                "format": "org.matrix.custom.html",
+                "formatted_body": "commet",
+            },
+        }));
+        assert!(commet.bio.unwrap().contains("commet"));
+        assert_eq!(commet.legacy_fields, ["chat.commet.profile_bio"]);
+    }
+
+    #[test]
+    fn the_msc_bio_wins_over_a_legacy_one() {
+        let profile = view(&json!({
+            "gay.fomx.biography": { "m.text": [{ "body": "msc" }] },
+            "moe.sable.app.bio": "legacy",
+        }));
+        let bio = profile.bio.unwrap();
+        assert!(bio.contains("msc") && !bio.contains("legacy"));
+        assert_eq!(profile.legacy_fields, ["moe.sable.app.bio"]);
+    }
+
+    #[test]
+    fn legacy_status_fields_are_reported() {
+        let profile = view(&json!({
+            "m.status": { "text": "here" },
+            "chat.commet.profile_status": "old",
+            "org.matrix.msc4426.status": { "text": "older" },
+        }));
+        assert_eq!(profile.status.unwrap().text, "here");
+        assert_eq!(
+            profile.legacy_fields,
+            ["chat.commet.profile_status", "org.matrix.msc4426.status"]
+        );
+    }
+
+    #[test]
+    fn an_absent_animal_need_defaults_to_headpats() {
+        let unset = view(&json!({ "kitty.meow.is_cat": true })).animal.unwrap();
+        assert_eq!(unset.is_animal.as_deref(), Some("cat"));
+        assert_eq!(unset.animal_need.as_deref(), Some("headpats"));
+
+        let cleared = view(&json!({ "pet.plz.me": "cat", "pet.plz.gib": "" }))
+            .animal
+            .unwrap();
+        assert_eq!(cleared.animal_need, None);
     }
 }
