@@ -632,8 +632,14 @@
   }
 
   .board.sheet {
-    height: min(24rem, 60dvh);
+    height: min(24rem, calc(100dvh - 7rem));
     width: 100%;
+  }
+
+  @media (hover: none) {
+    .board.sheet .preview:has(.preview-hint) {
+      display: none;
+    }
   }
 
   .board-head {

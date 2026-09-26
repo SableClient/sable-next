@@ -35,7 +35,6 @@
     bind:open
     label={$i18n.t('timeline.addReaction')}
     closeLabel={$i18n.t('timeline.closeMenu')}
-    contentInset={false}
   >
     <EmoteBoard
       {roomId}
