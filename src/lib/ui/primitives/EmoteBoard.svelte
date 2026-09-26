@@ -809,6 +809,7 @@
   .grids .unicode button {
     font-size: calc(var(--emote-cell) * 0.667);
     line-height: 1;
+    padding-inline: 0;
     width: 100%;
   }
 

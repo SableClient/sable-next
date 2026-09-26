@@ -29,4 +29,11 @@ test('frequently used keeps custom emotes and text reactions inside their cells'
     (cells) => cells.filter((cell) => cell.scrollWidth > cell.clientWidth + 1).length
   );
   expect(overflowing).toBe(0);
+
+  const clippedGlyphs = await page
+    .locator('#emoji-people .unicode-text')
+    .evaluateAll(
+      (glyphs) => glyphs.filter((glyph) => glyph.scrollWidth > glyph.clientWidth + 1).length
+    );
+  expect(clippedGlyphs).toBe(0);
 });
