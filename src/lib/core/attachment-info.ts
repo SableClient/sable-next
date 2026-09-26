@@ -1,5 +1,5 @@
 import { encodeBlurhash } from '#lib/ui/blurhash.js';
-import type { AttachmentInfoView } from '#src/generated/protocol';
+import type { AttachmentInfoView, AudioMetadataView } from '#src/generated/protocol';
 
 const MEASURE_TIMEOUT_MS = 5_000;
 
@@ -18,6 +18,7 @@ export async function measureAttachment(file: Blob): Promise<AttachmentInfoView 
           animated: animated(file.type),
           waveform: null,
           voice: false,
+          audio_metadata: null,
         };
   }
 
@@ -26,10 +27,52 @@ export async function measureAttachment(file: Blob): Promise<AttachmentInfoView 
     if (metadata === null) return null;
     const recorded = file instanceof File ? voiceWaveforms.get(file) : undefined;
     const waveform = recorded === undefined ? null : [...recorded];
-    return { ...metadata, animated: null, blurhash: null, waveform, voice: waveform !== null };
+    const tags = kind === 'audio' && waveform === null ? await readAudioTags(file) : null;
+    return {
+      ...metadata,
+      animated: null,
+      blurhash: null,
+      waveform,
+      voice: waveform !== null,
+      audio_metadata: tags,
+    };
   }
 
   return null;
+}
+
+export async function readAudioTags(file: Blob): Promise<AudioMetadataView | null> {
+  try {
+    const { parseBlob } = await import('music-metadata');
+    const { common } = await parseBlob(file);
+    const picture = common.picture?.[0];
+    const cover_art = picture ? await coverBlurhash(picture.data, picture.format) : null;
+    const text = (value: string | undefined) => value?.trim() || null;
+    const tags = {
+      title: text(common.title),
+      artist: text(common.artist),
+      album: text(common.album),
+      cover_art,
+    };
+    return Object.values(tags).some((value) => value !== null) ? tags : null;
+  } catch (error) {
+    console.debug('[sable media] the audio tags could not be read', error);
+    return null;
+  }
+}
+
+async function coverBlurhash(data: Uint8Array, format: string): Promise<string | null> {
+  if (typeof createImageBitmap !== 'function') return null;
+  try {
+    const bitmap = await createImageBitmap(new Blob([data.slice()], { type: format }));
+    try {
+      return encodeBlurhash(bitmap);
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return null;
+  }
 }
 
 const voiceWaveforms = new WeakMap<File, readonly number[]>();

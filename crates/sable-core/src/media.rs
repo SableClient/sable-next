@@ -9,7 +9,9 @@ use matrix_sdk::attachment::{
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::ruma::api::Metadata;
 use matrix_sdk::ruma::api::client::authenticated_media;
+use matrix_sdk::ruma::events::Mentions;
 use matrix_sdk::ruma::events::room::MediaSource;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, UInt,
     events::room::message::TextMessageEventContent,
@@ -20,7 +22,9 @@ use mime::Mime;
 
 use crate::messages::outgoing_mentions;
 use crate::personas::profile_extra_content;
-use crate::protocol::{AttachmentInfoView, CommandErr, CoreEvent, PerMessageProfileView};
+use crate::protocol::{
+    AttachmentInfoView, AudioMetadataView, CommandErr, CoreEvent, PerMessageProfileView,
+};
 use crate::view::SPOILER_PROPERTY;
 
 use crate::{Core, MatrixClient};
@@ -309,15 +313,33 @@ impl Core {
             None => (caption, formatted_caption, None),
         };
 
+        let info = info.unwrap_or_default();
+        if mime.type_() == mime::AUDIO
+            && let Some(metadata) = info.audio_metadata.clone()
+        {
+            return self
+                .send_tagged_audio(TaggedAudio {
+                    room_id,
+                    filename,
+                    mime,
+                    bytes,
+                    caption,
+                    formatted_caption,
+                    in_reply_to,
+                    thread_root,
+                    mentions: outgoing_mentions(mentions, mentions_room),
+                    extra: attachment_extra_content(persona.as_ref(), spoiler),
+                    duration_ms: info.duration_ms,
+                    metadata,
+                })
+                .await;
+        }
+
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
             mentions: Some(outgoing_mentions(mentions, mentions_room)),
             in_reply_to,
-            info: Some(attachment_info(
-                &mime,
-                &info.unwrap_or_default(),
-                bytes.len(),
-            )),
+            info: Some(attachment_info(&mime, &info, bytes.len())),
             extra_content: attachment_extra_content(persona.as_ref(), spoiler),
             ..AttachmentConfig::default()
         };
@@ -448,6 +470,127 @@ fn attachment_profile(
     profile: &PerMessageProfileView,
 ) -> serde_json::Map<String, serde_json::Value> {
     profile_extra_content(profile)
+}
+
+const AUDIO_METADATA_KEY: &str = "org.matrix.msc4549.audio_metadata";
+
+struct TaggedAudio {
+    room_id: OwnedRoomId,
+    filename: String,
+    mime: Mime,
+    bytes: Vec<u8>,
+    caption: Option<String>,
+    formatted_caption: Option<String>,
+    in_reply_to: Option<OwnedEventId>,
+    thread_root: Option<OwnedEventId>,
+    mentions: Mentions,
+    extra: Option<serde_json::Map<String, serde_json::Value>>,
+    duration_ms: Option<u32>,
+    metadata: AudioMetadataView,
+}
+
+impl Core {
+    /// The SDK only merges extra fields at the top level, and MSC4549 lives
+    /// inside `info`, so a tagged track is uploaded here and sent raw.
+    async fn send_tagged_audio(&self, mut audio: TaggedAudio) -> Result<(), CommandErr> {
+        let room = self.room(&audio.room_id).await?;
+        let bytes = std::mem::take(&mut audio.bytes);
+        let size = bytes.len();
+        let source = if self.room_is_encrypted(&room).await? {
+            let mut reader = std::io::Cursor::new(bytes);
+            let file = room
+                .client()
+                .upload_encrypted_file(&mut reader)
+                .await
+                .map_err(|error| self.failed("send_attachment", error))?;
+            serde_json::Map::from_iter([(
+                "file".to_owned(),
+                serde_json::to_value(file)
+                    .map_err(|error| self.failed("send_attachment", error))?,
+            )])
+        } else {
+            let response = room
+                .client()
+                .media()
+                .upload(&audio.mime, bytes, None)
+                .await
+                .map_err(|error| self.failed("send_attachment", error))?;
+            serde_json::Map::from_iter([(
+                "url".to_owned(),
+                serde_json::Value::String(response.content_uri.to_string()),
+            )])
+        };
+        let content = tagged_audio_content(&audio, source, size);
+        let raw = serde_json::value::to_raw_value(&content)
+            .map(Raw::from_json)
+            .map_err(|error| self.failed("send_attachment", error))?;
+        room.send_queue()
+            .send_raw(raw, "m.room.message".to_owned())
+            .await
+            .map_err(|error| self.failed("send_attachment", error))?;
+        Ok(())
+    }
+}
+
+fn tagged_audio_content(
+    audio: &TaggedAudio,
+    source: serde_json::Map<String, serde_json::Value>,
+    size: usize,
+) -> serde_json::Value {
+    use serde_json::{Map, Value, json};
+
+    let metadata: Map<String, Value> = [
+        ("title", &audio.metadata.title),
+        ("artist", &audio.metadata.artist),
+        ("album", &audio.metadata.album),
+        ("cover_art", &audio.metadata.cover_art),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| {
+        value
+            .clone()
+            .map(|value| (key.to_owned(), Value::String(value)))
+    })
+    .collect();
+    let mut info = Map::new();
+    info.insert("mimetype".to_owned(), json!(audio.mime.essence_str()));
+    info.insert("size".to_owned(), json!(size));
+    if let Some(duration) = audio.duration_ms {
+        info.insert("duration".to_owned(), json!(duration));
+    }
+    info.insert(AUDIO_METADATA_KEY.to_owned(), Value::Object(metadata));
+
+    let mut content = Map::new();
+    content.insert("msgtype".to_owned(), json!("m.audio"));
+    content.insert(
+        "body".to_owned(),
+        json!(audio.caption.as_deref().unwrap_or(&audio.filename)),
+    );
+    content.insert("filename".to_owned(), json!(audio.filename));
+    content.insert("info".to_owned(), Value::Object(info));
+    content.insert("m.mentions".to_owned(), json!(audio.mentions));
+    if let (Some(_), Some(html)) = (&audio.caption, &audio.formatted_caption) {
+        content.insert("format".to_owned(), json!("org.matrix.custom.html"));
+        content.insert("formatted_body".to_owned(), json!(html));
+    }
+    content.extend(source);
+    let relation = match (&audio.thread_root, &audio.in_reply_to) {
+        (Some(root), reply) => Some(json!({
+            "rel_type": "m.thread",
+            "event_id": root,
+            "is_falling_back": reply.is_none(),
+            "m.in_reply_to": { "event_id": reply.as_ref().unwrap_or(root) },
+        })),
+        (None, Some(reply)) => Some(json!({ "m.in_reply_to": { "event_id": reply } })),
+        (None, None) => None,
+    };
+    if let Some(relation) = relation {
+        content.insert("m.relates_to".to_owned(), relation);
+    }
+    for (key, value) in audio.extra.iter().flatten() {
+        content.entry(key.clone()).or_insert_with(|| value.clone());
+    }
+    Value::Object(content)
 }
 
 fn attachment_extra_content(
@@ -607,10 +750,83 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
 #[cfg(test)]
 mod tests {
     use super::{
-        AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedUserId,
-        PerMessageProfileView, SPOILER_PROPERTY, attachment_caption, attachment_extra_content,
-        attachment_info, attachment_profile, outgoing_mentions,
+        AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedEventId, OwnedRoomId,
+        OwnedUserId, PerMessageProfileView, SPOILER_PROPERTY, TaggedAudio, attachment_caption,
+        attachment_extra_content, attachment_info, attachment_profile, outgoing_mentions,
+        tagged_audio_content,
     };
+
+    fn tagged(caption: Option<&str>, thread: Option<&str>, reply: Option<&str>) -> TaggedAudio {
+        TaggedAudio {
+            room_id: OwnedRoomId::try_from("!room:example.org").expect("a room ID"),
+            filename: "Moonwalker.flac".to_owned(),
+            mime: mime("audio/flac"),
+            bytes: Vec::new(),
+            caption: caption.map(str::to_owned),
+            formatted_caption: caption.map(|text| format!("<b>{text}</b>")),
+            in_reply_to: reply.map(|id| OwnedEventId::try_from(id).expect("an event ID")),
+            thread_root: thread.map(|id| OwnedEventId::try_from(id).expect("an event ID")),
+            mentions: outgoing_mentions(Vec::new(), false),
+            extra: Some(serde_json::Map::from_iter([
+                ("body".to_owned(), serde_json::json!("shadowed")),
+                (
+                    "page.codeberg.everypizza.msc4193.spoiler".to_owned(),
+                    serde_json::json!(true),
+                ),
+            ])),
+            duration_ms: Some(180_000),
+            metadata: crate::protocol::AudioMetadataView {
+                title: Some("Moonwalker".to_owned()),
+                artist: Some("Jake Chudnow".to_owned()),
+                album: None,
+                cover_art: Some("LBEpAr~VM{x[004:oyM|9GM|xtIU".to_owned()),
+            },
+        }
+    }
+
+    #[test]
+    fn tagged_audio_carries_msc4549_inside_info_and_reads_back() {
+        let source = serde_json::Map::from_iter([(
+            "url".to_owned(),
+            serde_json::json!("mxc://example.org/abc"),
+        )]);
+        let content = tagged_audio_content(&tagged(None, None, None), source.clone(), 42);
+
+        assert_eq!(content["msgtype"], "m.audio");
+        assert_eq!(content["body"], "Moonwalker.flac");
+        assert_eq!(content["url"], "mxc://example.org/abc");
+        assert_eq!(content["info"]["size"], 42);
+        assert_eq!(content["info"]["duration"], 180_000);
+        assert!(
+            content["info"]["org.matrix.msc4549.audio_metadata"]
+                .get("album")
+                .is_none()
+        );
+        assert_eq!(content["page.codeberg.everypizza.msc4193.spoiler"], true);
+        assert!(content.get("m.relates_to").is_none());
+        let read = crate::view::audio_metadata(Some(&content)).expect("metadata reads back");
+        assert_eq!(read.artist.as_deref(), Some("Jake Chudnow"));
+
+        let captioned = tagged_audio_content(
+            &tagged(Some("new single"), Some("$root"), None),
+            source.clone(),
+            42,
+        );
+        assert_eq!(captioned["body"], "new single");
+        assert_eq!(captioned["formatted_body"], "<b>new single</b>");
+        assert_eq!(captioned["m.relates_to"]["rel_type"], "m.thread");
+        assert_eq!(captioned["m.relates_to"]["is_falling_back"], true);
+        assert_eq!(
+            captioned["m.relates_to"]["m.in_reply_to"]["event_id"],
+            "$root"
+        );
+
+        let reply = tagged_audio_content(&tagged(None, None, Some("$parent")), source, 42);
+        assert_eq!(
+            reply["m.relates_to"]["m.in_reply_to"]["event_id"],
+            "$parent"
+        );
+    }
 
     fn view(
         width: Option<u32>,
@@ -625,6 +841,7 @@ mod tests {
             blurhash: None,
             waveform: None,
             voice: false,
+            audio_metadata: None,
         }
     }
 

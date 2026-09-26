@@ -2684,6 +2684,7 @@ pub struct AttachmentInfoView {
     pub waveform: Option<Vec<f32>>,
     #[serde(default)]
     pub voice: bool,
+    pub audio_metadata: Option<AudioMetadataView>,
 }
 
 /// MSC4144 per-message profile, letting one account send under several
@@ -3564,7 +3565,7 @@ pub struct StatusView {
 }
 
 /// MSC4549 track details from an `m.audio` event's `info`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct AudioMetadataView {
     pub title: Option<String>,

@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { markVoiceRecording, measureAttachment } from './attachment-info.js';
+import { markVoiceRecording, measureAttachment, readAudioTags } from './attachment-info.js';
 
 function file(mime: string): Blob {
   return new Blob([new Uint8Array([1, 2, 3])], { type: mime });
@@ -58,6 +58,7 @@ test('an image reports the decoded dimensions', async () => {
     blurhash: null,
     waveform: null,
     voice: false,
+    audio_metadata: null,
   });
 });
 
@@ -110,6 +111,7 @@ test('a video reports dimensions and a duration in milliseconds', async () => {
     blurhash: null,
     waveform: null,
     voice: false,
+    audio_metadata: null,
   });
 });
 
@@ -130,6 +132,7 @@ test('audio reports a duration and no dimensions', async () => {
     blurhash: null,
     waveform: null,
     voice: false,
+    audio_metadata: null,
   });
 });
 
@@ -153,6 +156,7 @@ test('a file marked as a voice recording carries its waveform', async () => {
     blurhash: null,
     waveform: [0, 0.5, 1],
     voice: true,
+    audio_metadata: null,
   });
 });
 
@@ -161,4 +165,54 @@ test('a document is not measured at all', async () => {
 
   await expect(measureAttachment(file('application/pdf'))).resolves.toBeNull();
   expect(createElement).not.toHaveBeenCalled();
+});
+
+function id3(frames: Record<string, string>): Uint8Array<ArrayBuffer> {
+  const encoder = new TextEncoder();
+  const body = Object.entries(frames).flatMap(([id, text]) => {
+    const value = [0, ...encoder.encode(text)];
+    const size = value.length;
+    return [
+      ...encoder.encode(id),
+      (size >>> 24) & 0xff,
+      (size >>> 16) & 0xff,
+      (size >>> 8) & 0xff,
+      size & 0xff,
+      0,
+      0,
+      ...value,
+    ];
+  });
+  const size = body.length;
+  const header = [
+    ...encoder.encode('ID3'),
+    3,
+    0,
+    0,
+    (size >>> 21) & 0x7f,
+    (size >>> 14) & 0x7f,
+    (size >>> 7) & 0x7f,
+    size & 0x7f,
+  ];
+  return new Uint8Array([...header, ...body]);
+}
+
+test('reads the title, artist and album tags of a music file', async () => {
+  const file = new File(
+    [id3({ TIT2: 'Moonwalker', TPE1: 'Jake Chudnow', TALB: 'The Moon' })],
+    'moon.mp3',
+    {
+      type: 'audio/mpeg',
+    }
+  );
+
+  expect(await readAudioTags(file)).toEqual({
+    title: 'Moonwalker',
+    artist: 'Jake Chudnow',
+    album: 'The Moon',
+    cover_art: null,
+  });
+  expect(
+    await readAudioTags(new File([new Uint8Array(8)], 'x.mp3', { type: 'audio/mpeg' }))
+  ).toBeNull();
 });

@@ -13,6 +13,7 @@ export type AttachmentInfoView = {
 	blurhash: string | null,
 	waveform: number[] | null,
 	voice: boolean,
+	audio_metadata: AudioMetadataView | null,
 };
 
 /**  MSC4549 track details from an `m.audio` event's `info`. */
