@@ -108,6 +108,7 @@
     transition: background-color 0s;
     user-select: none;
     width: 0.5rem;
+    will-change: transform;
   }
 
   .resize-handle.vertical {
