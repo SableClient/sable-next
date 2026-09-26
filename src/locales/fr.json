@@ -1591,7 +1591,6 @@
     "telemetryBannerBody": "Ils n’incluent jamais les messages, noms de salons ou personnes avec qui vous échangez.",
     "telemetryBannerSent": "Ils sont envoyés aux mainteneurs via un service tiers.",
     "telemetryBannerSablePolicy": "Politique de confidentialité de Sable",
-    "telemetryBannerSentryPolicy": "Politique de confidentialité de Sentry",
     "telemetryBannerAccept": "Activer",
     "telemetryBannerDecline": "Non merci",
     "telemetryReloadNotice": "Rechargez pour appliquer la modification du signalement des erreurs.",

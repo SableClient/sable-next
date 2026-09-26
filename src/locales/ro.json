@@ -1293,7 +1293,6 @@
     "telemetryBannerBody": "Ele nu includ mesaje, camere sau persoane cu care vorbești.",
     "telemetryBannerSent": "Ele sunt trimise folosind un serviciu 3rd party.",
     "telemetryBannerSablePolicy": "Confidențialitate Sable",
-    "telemetryBannerSentryPolicy": "Confidențialitate Sentry",
     "telemetryBannerAccept": "Activează",
     "telemetryBannerDecline": "Nu mulțumesc",
     "telemetryReloadNotice": "Reîncarcă pagina ca raportarea sa funcționeze.",

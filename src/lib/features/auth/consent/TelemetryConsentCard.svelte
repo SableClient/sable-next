@@ -33,9 +33,6 @@
     <a href="https://sable.moe/privacy" rel="noopener noreferrer" target="_blank">
       {$i18n.t('settings.telemetryBannerSablePolicy')}
     </a>
-    <a href="https://sentry.io/privacy/" rel="noopener noreferrer" target="_blank">
-      {$i18n.t('settings.telemetryBannerSentryPolicy')}
-    </a>
   </div>
 
   <div class="telemetry-consent-actions">
