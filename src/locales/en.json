@@ -859,7 +859,6 @@
     "forwardedFromRoom": "Forwarded from {{room}}",
     "forwardedFromAnotherRoom": "Forwarded from another room",
     "forwardedFromEarlier": "Forwarded from earlier",
-    "playVideo": "Play {{title}}",
     "morePronouns": "+{{count, number}}",
     "sending": "Sending…",
     "uploading": "Uploading attachment",

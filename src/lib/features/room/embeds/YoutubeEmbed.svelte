@@ -51,7 +51,7 @@
         <button
           type="button"
           class="youtube-poster"
-          aria-label={$i18n.t('timeline.playVideo', { title: details.title })}
+          aria-label={$i18n.t('timeline.playVideo', { name: details.title })}
           onclick={() => (playing = true)}
         >
           <img src={youtubeThumbnailUrl(video)} alt="" loading="lazy" />

@@ -774,7 +774,6 @@
     "predecessorOpen": "Voir les messages plus anciens",
     "readMarker": "Messages lus jusqu’ici",
     "edited": "(modifié)",
-    "playVideo": "Lire {{title}}",
     "morePronouns": "+{{count, number}}",
     "sending": "Envoi…",
     "uploading": "Envoi de la pièce jointe…",
@@ -1025,7 +1024,7 @@
     "utdRecoverAction": "Configurer la récupération",
     "utdWaiting": "En attente de la clé de ce message…",
     "videoConverting": "Conversion de la video…",
-    "playVideo": "Jouer {{name}}"
+    "playVideo": "Lire {{name}}"
   },
   "viewer": {
     "title": "Visionneuse de médias",
