@@ -212,6 +212,19 @@ test('sends a direct message from the composer', async () => {
   await unmount(instance);
 });
 
+function extraKeys(): string[] {
+  return [...document.querySelectorAll('.profile-keys button')].map((key) =>
+    key.textContent.trim()
+  );
+}
+
+async function openExtra(key: string): Promise<void> {
+  [...document.querySelectorAll<HTMLButtonElement>('.profile-keys button')]
+    .find((button) => button.textContent.trim() === key)
+    ?.click();
+  await tick();
+}
+
 test('renders the extended profile fields', async () => {
   const instance = mount(MentionProfileCard, {
     target: document.body,
@@ -241,10 +254,13 @@ test('renders the extended profile fields', async () => {
   expect(document.querySelector('.profile-card-status')?.textContent.trim()).toBe(
     '🌙beyond the shore'
   );
-  expect(document.querySelector('.profile-extra summary')?.textContent.trim()).toBe(
-    'Show misc. data (1 value)'
-  );
-  expect(document.querySelector('.profile-extra dt')?.textContent).toBe('net.example.mood');
+  const toggle = document.querySelector<HTMLButtonElement>('button.profile-extra');
+  expect(toggle?.textContent.trim()).toBe('Show misc. data (1 value)');
+  expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+  toggle?.click();
+  await tick();
+  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+  expect(extraKeys()).toEqual(['net.example.mood']);
   await unmount(instance);
 });
 
@@ -266,13 +282,17 @@ test('renders a flat map field as a collapsed key/value table and anything else 
   });
   await tick();
 
-  const toggle = document.querySelector<HTMLButtonElement>('.profile-extra-toggle');
-  expect(toggle?.textContent.trim()).toBe('net.example.links');
-  expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-  const panel = document.getElementById(toggle?.getAttribute('aria-controls') ?? '');
-  expect(panel?.hidden).toBe(true);
+  const toggle = document.querySelector<HTMLButtonElement>('button.profile-extra');
+  expect(toggle?.textContent.trim()).toBe('Show misc. data (2 values)');
+  expect(document.querySelector('.profile-extra-open')).toBeNull();
 
-  const rows = [...(panel?.querySelectorAll('tr') ?? [])].map((row) => [
+  toggle?.click();
+  await tick();
+  expect(extraKeys()).toEqual(['net.example.links', 'net.example.nested']);
+
+  await openExtra('net.example.links');
+  expect(toggle?.textContent.trim()).toBe('net.example.links');
+  const rows = [...document.querySelectorAll('.profile-extra-open tr')].map((row) => [
     row.querySelector('th')?.textContent,
     row.querySelector('td')?.textContent,
   ]);
@@ -281,18 +301,15 @@ test('renders a flat map field as a collapsed key/value table and anything else 
     ['age', '3'],
     ['cat', 'true'],
   ]);
-  expect(panel?.querySelector('b')).toBeNull();
+  expect(document.querySelector('.profile-extra-open b')).toBeNull();
 
   toggle?.click();
   await tick();
-  expect(toggle?.getAttribute('aria-expanded')).toBe('true');
-  expect(panel?.hidden).toBe(false);
-
-  expect(document.querySelectorAll('.profile-extra table')).toHaveLength(1);
-  const nested = [...document.querySelectorAll('.profile-extra dt')].find(
-    (term) => term.textContent === 'net.example.nested'
-  );
-  expect(nested?.nextElementSibling?.textContent).toBe('{"a":{"b":"c"}}');
+  toggle?.click();
+  await tick();
+  await openExtra('net.example.nested');
+  expect(document.querySelector('.profile-extra-open table')).toBeNull();
+  expect(document.querySelector('.profile-extra-open')?.textContent.trim()).toBe('{"a":{"b":"c"}}');
   await unmount(instance);
 });
 

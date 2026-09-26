@@ -600,6 +600,7 @@
 {#snippet miscData()}
   <Button
     class="profile-extra"
+    aria-expanded={miscOpen}
     onclick={() => {
       miscOpen = !miscOpen;
       activeExtra = null;
