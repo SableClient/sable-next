@@ -1,3 +1,4 @@
+import type { ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import {
   BANNER_FIELD,
@@ -5,7 +6,7 @@ import {
   PRONOUNS_FIELD,
   STATUS_FIELD,
 } from '#lib/profile/fields.js';
-import { pronounSets } from '#lib/profile/pronouns.js';
+import { pronounSets, pronounText } from '#lib/profile/pronouns.js';
 import { t } from '#lib/i18n.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
@@ -30,6 +31,22 @@ export function profileOnboardingMarker(matrixId: string): string {
   return `sable-registration-onboarding:${matrixId}`;
 }
 
+interface LoadedProfile {
+  displayName: string;
+  pronouns: string;
+  nameColor: string;
+  status: string;
+}
+
+function loadedFields(profile: ProfileView): LoadedProfile {
+  return {
+    displayName: profile.display_name ?? '',
+    pronouns: pronounText(profile.pronouns),
+    nameColor: profile.name_color_dark ?? profile.name_color_light ?? '',
+    status: profile.status?.text ?? '',
+  };
+}
+
 interface ProfileControllerOptions {
   core: CoreClient;
   getUserId: () => string;
@@ -43,13 +60,46 @@ export class ProfileController {
   status = $state('');
   bannerFile = $state<File | null>(null);
   bannerPreview = $state<string | null>(null);
+  bannerUrl = $state<string | null>(null);
+  bannerCleared = $state(false);
   avatarPreview = $state<string | null>(null);
+  avatarUrl = $state<string | null>(null);
   avatarFile = $state<File | null>(null);
   avatarCleared = $state(false);
   error = $state<string | null>(null);
   isSaving = $state(false);
+  #loaded: LoadedProfile = { displayName: '', pronouns: '', nameColor: '', status: '' };
 
   constructor(private readonly options: ProfileControllerOptions) {}
+
+  get shownAvatar(): string | null {
+    return this.avatarPreview ?? (this.avatarCleared ? null : this.avatarUrl);
+  }
+
+  get shownBanner(): string | null {
+    return this.bannerPreview ?? (this.bannerCleared ? null : this.bannerUrl);
+  }
+
+  async load(): Promise<void> {
+    const userId = this.options.getUserId();
+    if (!userId) return;
+    let profile: ProfileView;
+    try {
+      profile = await this.options.core.userProfile(userId);
+    } catch (error) {
+      console.debug('[sable setup] profile unavailable', error);
+      return;
+    }
+    const loaded = loadedFields(profile);
+    const previous = this.#loaded;
+    if (this.displayName === previous.displayName) this.displayName = loaded.displayName;
+    if (this.pronouns === previous.pronouns) this.pronouns = loaded.pronouns;
+    if (this.nameColor === previous.nameColor) this.nameColor = loaded.nameColor;
+    if (this.status === previous.status) this.status = loaded.status;
+    this.#loaded = loaded;
+    this.avatarUrl = profile.avatar_url?.startsWith('mxc://') ? profile.avatar_url : null;
+    this.bannerUrl = profile.banner_url?.startsWith('mxc://') ? profile.banner_url : null;
+  }
 
   setDisplayName(value: string): void {
     this.displayName = value;
@@ -69,13 +119,14 @@ export class ProfileController {
 
   setBanner(file: File | null): void {
     revokeAvatarPreview(this.bannerPreview);
+    this.bannerCleared = file === null && this.bannerUrl !== null;
     this.bannerFile = file;
     this.bannerPreview = file ? URL.createObjectURL(file) : null;
   }
 
   setAvatar(file: File | null): void {
     const next = nextAvatarPreview(file, this.avatarPreview);
-    this.avatarCleared = next.cleared;
+    this.avatarCleared = next.cleared || (file === null && this.avatarUrl !== null);
     this.avatarFile = file;
     this.avatarPreview = next.preview;
   }
@@ -84,22 +135,35 @@ export class ProfileController {
     this.isSaving = true;
     this.error = null;
     try {
+      const loaded = this.#loaded;
       const name = this.displayName.trim();
       const propagateTo = preferences.profileChangePropagation;
-      if (name) await this.options.core.commands.setDisplayName(name, propagateTo);
-      const pronouns = pronounSets(this.pronouns);
+      if (name && name !== loaded.displayName) {
+        await this.options.core.commands.setDisplayName(name, propagateTo);
+      }
       const core = this.options.core;
-      if (pronouns.length > 0) await core.setProfileField(PRONOUNS_FIELD, pronouns);
+      if (this.pronouns.trim() !== loaded.pronouns) {
+        await core.setProfileField(PRONOUNS_FIELD, pronounSets(this.pronouns));
+      }
       const color = this.nameColor.trim();
-      if (color) await core.setProfileField(NAME_COLOR_FIELD, { on_light: color, on_dark: color });
+      if (color !== loaded.nameColor) {
+        await core.setProfileField(
+          NAME_COLOR_FIELD,
+          color ? { on_light: color, on_dark: color } : null
+        );
+      }
       const status = this.status.trim();
-      if (status) await core.setProfileField(STATUS_FIELD, { text: status });
+      if (status !== loaded.status) {
+        await core.setProfileField(STATUS_FIELD, status ? { text: status } : null);
+      }
       if (this.bannerFile) {
         const url = await core.commands.uploadMedia(
           this.bannerFile.type || 'image/*',
           new Uint8Array(await this.bannerFile.arrayBuffer())
         );
         await core.setProfileField(BANNER_FIELD, url);
+      } else if (this.bannerCleared) {
+        await core.setProfileField(BANNER_FIELD, null);
       }
       if (this.avatarFile) {
         const upright = await uprightJpeg(this.avatarFile);

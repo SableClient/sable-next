@@ -22,7 +22,7 @@
     PRONOUNS_FIELD,
     STATUS_FIELD,
   } from '#lib/profile/fields.js';
-  import { pronounSets } from '#lib/profile/pronouns.js';
+  import { pronounSets, pronounText } from '#lib/profile/pronouns.js';
   import { bioMarkdown, bioTexts } from './bio-markdown.js';
 
   interface Props {
@@ -174,9 +174,7 @@
     untrack(() => {
       status = profile.status?.text ?? '';
       bio = bioMarkdown(profile.bio ?? '');
-      pronouns = profile.pronouns
-        .map(({ summary, language }) => `${summary}${language ? ` (${language})` : ''}`)
-        .join(', ');
+      pronouns = pronounText(profile.pronouns);
       timezone = profile.timezone ?? '';
       lightColor = profile.name_color_light ?? '';
       darkColor = profile.name_color_dark ?? '';

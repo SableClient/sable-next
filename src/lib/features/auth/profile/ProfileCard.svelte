@@ -1,10 +1,10 @@
 <script lang="ts">
   import CameraIcon from 'phosphor-svelte/lib/CameraIcon';
-  import { untrack } from 'svelte';
 
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
 
   import { i18n } from '#lib/i18n.js';
+  import MediaImage from '#lib/ui/MediaImage.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -55,7 +55,7 @@
   }: Props = $props();
 
   let moreOpen = $state(false);
-  let color = $state(untrack(() => nameColor));
+  let color = $derived(nameColor);
 </script>
 
 <form
@@ -164,7 +164,17 @@
       </FormField>
       <div class="banner-setting">
         <span class="avatar-label">{$i18n.t('auth.banner')}</span>
-        {#if bannerPreview}<img class="banner-preview" src={bannerPreview} alt="" />{/if}
+        {#if bannerPreview?.startsWith('mxc://')}
+          <MediaImage
+            class="banner-preview"
+            source={bannerPreview}
+            alt=""
+            width={1000}
+            height={375}
+          />
+        {:else if bannerPreview}
+          <img class="banner-preview" src={bannerPreview} alt="" />
+        {/if}
         <div class="avatar-buttons">
           <label class="file-button btn btn-secondary btn-small">
             <input
@@ -326,7 +336,7 @@
     gap: var(--space-150);
   }
 
-  .banner-preview {
+  .banner-setting :global(.banner-preview) {
     aspect-ratio: 8 / 3;
     border-radius: var(--radius);
     display: block;

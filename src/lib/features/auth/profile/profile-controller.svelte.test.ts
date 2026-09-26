@@ -2,17 +2,32 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { ProfileController } from './profile-controller.svelte';
 
-function controller() {
+function controller(existing: Partial<ProfileView> = {}) {
   const core = {
     commands: {
       setDisplayName: vi.fn(() => Promise.resolve()),
+      setAvatarUrl: vi.fn(() => Promise.resolve()),
       uploadMedia: vi.fn(() => Promise.resolve('mxc://example.org/banner')),
     },
     setProfileField: vi.fn(() => Promise.resolve()),
+    userProfile: vi.fn(() =>
+      Promise.resolve({
+        user_id: '@new:example.org',
+        display_name: null,
+        avatar_url: null,
+        banner_url: null,
+        status: null,
+        pronouns: [],
+        name_color_light: null,
+        name_color_dark: null,
+        ...existing,
+      } as ProfileView)
+    ),
   };
   const onNavigateHome = vi.fn(() => Promise.resolve());
   const profile = new ProfileController({
@@ -67,4 +82,58 @@ test('the extra options go to the fields Settings edits', async () => {
     'chat.commet.profile_banner',
     'mxc://example.org/banner'
   );
+});
+
+test('an existing profile fills the form and saving it untouched writes nothing', async () => {
+  const { profile, core } = controller({
+    display_name: 'Existing',
+    avatar_url: 'mxc://example.org/avatar',
+    banner_url: 'mxc://example.org/old-banner',
+    status: { text: 'around', emoji: null },
+    pronouns: [{ summary: 'she/her', language: null }],
+    name_color_light: '#112233',
+    name_color_dark: '#112233',
+  });
+
+  await profile.load();
+
+  expect(profile.displayName).toBe('Existing');
+  expect(profile.pronouns).toBe('she/her');
+  expect(profile.nameColor).toBe('#112233');
+  expect(profile.status).toBe('around');
+  expect(profile.shownAvatar).toBe('mxc://example.org/avatar');
+  expect(profile.shownBanner).toBe('mxc://example.org/old-banner');
+
+  await profile.save();
+
+  expect(core.commands.setDisplayName).not.toHaveBeenCalled();
+  expect(core.commands.setAvatarUrl).not.toHaveBeenCalled();
+  expect(core.setProfileField).not.toHaveBeenCalled();
+});
+
+test('clearing loaded fields removes them from the profile', async () => {
+  const { profile, core } = controller({
+    avatar_url: 'mxc://example.org/avatar',
+    banner_url: 'mxc://example.org/old-banner',
+    status: { text: 'around', emoji: null },
+  });
+  await profile.load();
+
+  profile.setStatus('');
+  profile.setAvatar(null);
+  profile.setBanner(null);
+  await profile.save();
+
+  expect(core.setProfileField).toHaveBeenCalledWith('m.status', null);
+  expect(core.setProfileField).toHaveBeenCalledWith('chat.commet.profile_banner', null);
+  expect(core.commands.setAvatarUrl).toHaveBeenCalledWith(null, expect.anything());
+});
+
+test('a field typed before the profile arrives is kept', async () => {
+  const { profile } = controller({ display_name: 'Existing' });
+  profile.setDisplayName('Typed');
+
+  await profile.load();
+
+  expect(profile.displayName).toBe('Typed');
 });

@@ -16,3 +16,11 @@ export function pronounSets(text: string): PronounSet[] {
       };
     });
 }
+
+export function pronounText(
+  sets: readonly { summary: string; language?: string | null }[]
+): string {
+  return sets
+    .map(({ summary, language }) => `${summary}${language ? ` (${language})` : ''}`)
+    .join(', ');
+}

@@ -92,6 +92,10 @@
     profile.cleanup();
   });
 
+  $effect(() => {
+    if (userId) void untrack(() => profile.load());
+  });
+
   function stepRoute(step: SetupStep): string {
     return resolve('/(auth)/setup/[step]', { step });
   }
@@ -311,8 +315,8 @@
             pronouns={profile.pronouns}
             nameColor={profile.nameColor}
             status={profile.status}
-            bannerPreview={profile.bannerPreview}
-            avatarPreview={profile.avatarPreview}
+            bannerPreview={profile.shownBanner}
+            avatarPreview={profile.shownAvatar}
             isSaving={profile.isSaving}
             error={index === activeIndex ? profile.error : null}
             onDisplayName={(value: string) => {
