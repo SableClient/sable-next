@@ -1,5 +1,7 @@
 import type { NotificationModeView } from '#src/generated/protocol';
 
+import { appendPushEntry, type PushHistoryEntry, readPushHistory } from './push-history';
+
 /** A service worker has no session to ask for a room's name, so the app leaves
     the names where it can read them. */
 const DATABASE = 'sable-notifications';
@@ -211,4 +213,40 @@ export class RoomNameWriter {
     clearTimeout(this.#timer);
     this.#timer = undefined;
   }
+}
+
+const HISTORY_KEY = '\u0000push-history';
+
+export async function recordPush(entry: PushHistoryEntry): Promise<void> {
+  try {
+    const database = await open();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE, 'readwrite');
+      const store = transaction.objectStore(STORE);
+      const read = store.get(HISTORY_KEY);
+      read.onsuccess = () => {
+        store.put(appendPushEntry(readPushHistory(read.result), entry), HISTORY_KEY);
+      };
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = () => {
+        reject(transaction.error ?? new Error('push history unavailable'));
+      };
+    });
+  } catch {
+    return;
+  }
+}
+
+export async function pushHistory(): Promise<PushHistoryEntry[]> {
+  try {
+    return readPushHistory(await transact<unknown>('readonly', (store) => store.get(HISTORY_KEY)));
+  } catch {
+    return [];
+  }
+}
+
+export async function clearPushHistory(): Promise<void> {
+  await transact('readwrite', (store) => store.delete(HISTORY_KEY));
 }

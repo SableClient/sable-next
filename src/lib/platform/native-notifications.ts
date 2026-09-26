@@ -94,6 +94,38 @@ export async function takeNativePushDiagnostics(): Promise<NativePushDiagnostics
   }
 }
 
+export async function nativePushHistory(): Promise<unknown[] | null> {
+  if (!isTauri()) return null;
+  try {
+    const taken = await invoke<{ entries?: unknown[] }>('plugin:notifications|push_history');
+    return taken.entries ?? [];
+  } catch {
+    return null;
+  }
+}
+
+export async function clearNativePushHistory(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke('plugin:notifications|clear_push_history');
+}
+
+export interface NativePushTransport {
+  provider: string | null;
+  distributor: string | null;
+}
+
+export async function nativePushTransport(): Promise<NativePushTransport | null> {
+  if (!isTauri()) return null;
+  try {
+    const transport = await invoke<{ provider?: string; distributor?: string }>(
+      'plugin:notifications|push_transport'
+    );
+    return { provider: transport.provider ?? null, distributor: transport.distributor ?? null };
+  } catch {
+    return null;
+  }
+}
+
 export async function watchNativeNotificationActions(
   handler: (action: NativeNotificationAction) => void
 ): Promise<() => void> {

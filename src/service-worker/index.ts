@@ -28,8 +28,14 @@ import {
   readPushFetch,
 } from '#lib/features/notifications/push-fetch.js';
 import {
+  isDiagnosticPush,
+  pushTrace,
+  type PushHistoryEntry,
+} from '#lib/features/notifications/push-history.js';
+import {
   pushContentPolicy,
   pushSession,
+  recordPush,
   roomMode,
   roomName,
 } from '#lib/features/notifications/room-names.js';
@@ -43,7 +49,10 @@ worker.addEventListener('push', (event) => {
   const validation = webPushValidation(raw);
   if (validation) {
     event.waitUntil(
-      worker.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      Promise.all([
+        record('WEBPUSH_VALIDATION'),
+        worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
+      ]).then(([, clients]) => {
         for (const client of clients) {
           client.postMessage({
             type: 'sable:webpush-ack',
@@ -120,25 +129,51 @@ async function handShares(): Promise<void> {
   }
 }
 
+function record(outcome: string, trace: Omit<PushHistoryEntry, 'at' | 'outcome'> = {}) {
+  return recordPush({ at: Date.now(), outcome, ...trace });
+}
+
 async function present(pushed: PushPayload | undefined): Promise<void> {
-  if (!pushed) return;
+  if (!pushed) {
+    await record('INVALID_PAYLOAD');
+    return;
+  }
+  const trace = pushTrace(pushed);
+  if (isDiagnosticPush(pushed)) {
+    await record('DIAGNOSTIC_RECEIVED', trace);
+    return;
+  }
 
   const count = unreadCount(pushed);
   if (count !== null && 'setAppBadge' in navigator) {
     await navigator.setAppBadge(count).catch(() => undefined);
   }
 
-  if (await focused()) return;
-  const payload = namesOnlyItsEvent(pushed) ? await fetchEvent(pushed) : pushed;
-  if (!payload) return;
-  if (silencedByRoomMode(payload, await roomMode(payload.notification?.room_id ?? ''))) return;
+  if (await focused()) {
+    await record('APP_FOCUSED', trace);
+    return;
+  }
+  const fetched = namesOnlyItsEvent(pushed);
+  const payload = fetched ? await fetchEvent(pushed) : pushed;
+  if (!payload) {
+    await record('DISCARDED', trace);
+    return;
+  }
+  if (fetched) await record(payload.notification?.type ? 'FETCHED' : 'FETCH_FAILED', trace);
+  if (silencedByRoomMode(payload, await roomMode(payload.notification?.room_id ?? ''))) {
+    await record('ROOM_MODE_SILENCED', trace);
+    return;
+  }
 
   const policy = await pushContentPolicy();
   const encrypted =
     payload.notification?.type === 'm.room.encrypted' || payload.notification?.decrypted === true;
   const showContent = policy.content && (!encrypted || policy.encryptedContent);
   const showing = alert(payload, await roomName(payload.notification?.room_id ?? ''), showContent);
-  if (!showing) return;
+  if (!showing) {
+    await record('BADGE_ONLY', trace);
+    return;
+  }
 
   const held = await conversation(showing.tag);
   const lines = appendLine(showContent ? held : hideLines(held), showing.line);
@@ -170,6 +205,7 @@ async function present(pushed: PushPayload | undefined): Promise<void> {
   }
 
   await worker.registration.showNotification(showing.title, options);
+  await record('POSTED', trace);
 }
 
 async function fetchEvent(payload: PushPayload): Promise<PushPayload | null> {

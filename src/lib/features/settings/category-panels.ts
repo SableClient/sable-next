@@ -22,6 +22,7 @@ import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.sv
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
 import DeveloperDebugLogs from '#lib/features/settings/DeveloperDebugLogs.svelte';
 import DeveloperNotifications from '#lib/features/settings/DeveloperNotifications.svelte';
+import DeveloperPushHistory from '#lib/features/settings/DeveloperPushHistory.svelte';
 import DeveloperSearchMetrics from '#lib/features/settings/DeveloperSearchMetrics.svelte';
 import DeveloperSentry from '#lib/features/settings/DeveloperSentry.svelte';
 import DeveloperSyncDiagnostics from '#lib/features/settings/DeveloperSyncDiagnostics.svelte';
@@ -76,6 +77,11 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     },
     {
       component: DeveloperNotifications,
+      section: 'developer-notifications',
+      when: () => preferences.developerTools,
+    },
+    {
+      component: DeveloperPushHistory,
       section: 'developer-notifications',
       when: () => preferences.developerTools,
     },
