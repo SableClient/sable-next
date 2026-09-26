@@ -13,6 +13,8 @@ const COPIED_PROPERTIES = [
   'textTransform',
 ] as const;
 
+const lineHeights = new WeakMap<HTMLElement, { key: string; height: number }>();
+
 export interface MultilineMeasure {
   text: string;
   row: HTMLElement;
@@ -65,14 +67,21 @@ export function isMultiline({
   if (width <= 0) return false;
 
   const style = getComputedStyle(editable);
-  for (const property of COPIED_PROPERTIES) measurer.style[property] = style[property];
-
-  measurer.style.width = 'max-content';
-  measurer.textContent = 'M';
-  const line = measurer.scrollHeight;
+  const copied = COPIED_PROPERTIES.map((property) => style[property]);
+  const key = [...copied, (document.fonts as FontFaceSet | undefined)?.status].join('\n');
+  let line = lineHeights.get(measurer);
+  if (line?.key !== key) {
+    COPIED_PROPERTIES.forEach((property, index) => {
+      measurer.style[property] = copied[index];
+    });
+    measurer.style.width = 'max-content';
+    measurer.textContent = 'M';
+    line = { key, height: measurer.scrollHeight };
+    lineHeights.set(measurer, line);
+  }
 
   measurer.style.width = `${String(width)}px`;
   measurer.textContent = /[ \t]$/.test(text) ? `${text}${TRAILING_SPACE_SENTINEL}` : text;
 
-  return measurer.scrollHeight > line + HEIGHT_EPSILON;
+  return measurer.scrollHeight > line.height + HEIGHT_EPSILON;
 }

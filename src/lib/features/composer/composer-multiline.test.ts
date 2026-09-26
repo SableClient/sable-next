@@ -32,6 +32,7 @@ function harness(rowWidth = 300, buttonWidth = 40): Harness {
   }
 
   Object.defineProperty(measurer, 'scrollHeight', {
+    configurable: true,
     get(this: HTMLElement) {
       const width = Number.parseFloat(this.style.width);
       const length = this.textContent.length;
@@ -69,4 +70,39 @@ test('a trailing space counts towards the width', () => {
 
 test('a row with no width yet stays inline', () => {
   expect(measure('a'.repeat(100), harness(0))).toBe(false);
+});
+
+function countLineMeasures(measurer: HTMLElement): () => number {
+  let count = 0;
+  const descriptor = Object.getOwnPropertyDescriptor(measurer, 'scrollHeight');
+  Object.defineProperty(measurer, 'scrollHeight', {
+    get(this: HTMLElement) {
+      if (this.textContent === 'M') count += 1;
+      return descriptor?.get?.call(this) as number;
+    },
+  });
+  return () => count;
+}
+
+test('the single-line height is measured once while the style is unchanged', () => {
+  const elements = harness();
+  const lineMeasures = countLineMeasures(elements.measurer);
+
+  isMultiline({ text: 'a'.repeat(20), ...elements });
+  isMultiline({ text: 'a'.repeat(21), ...elements });
+  isMultiline({ text: 'a'.repeat(30), ...elements });
+
+  expect(lineMeasures()).toBe(1);
+});
+
+test('the single-line height is measured again after the style changes', () => {
+  const elements = harness();
+  const lineMeasures = countLineMeasures(elements.measurer);
+
+  isMultiline({ text: 'a'.repeat(20), ...elements });
+  elements.editable.style.lineHeight = '40px';
+  isMultiline({ text: 'a'.repeat(21), ...elements });
+
+  expect(lineMeasures()).toBe(2);
+  expect(elements.measurer.style.lineHeight).toBe('40px');
 });
