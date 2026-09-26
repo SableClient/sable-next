@@ -3,7 +3,12 @@ import { createContext } from 'svelte';
 import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
 import type { CallGrant, CoreClient } from '#lib/core/client.svelte.js';
 
-import type { CallEncryptionKey, CallTransport, CallTransportState } from './call-transport';
+import type {
+  CallEncryptionKey,
+  CallParticipant,
+  CallTransport,
+  CallTransportState,
+} from './call-transport';
 import { decodeCallKey, idleTransportState, ignoreError } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
 import type { LivekitTransport } from './livekit-transport';
@@ -12,6 +17,7 @@ import { hasNativeCalls } from '#lib/platform/calls.js';
 import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
 import { cameraVisible, screenShareVisible } from './call-layout';
+import { participantKeys } from './participant-keys';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
 import type { CallBackendGrant, CallVideoOverlay } from './call-transport';
@@ -44,6 +50,37 @@ const isCallEvent = (event: CoreEvent): event is PendingEvent =>
   event.type === 'call_members' ||
   event.type === 'call_backends' ||
   event.type === 'call_signaling_error';
+
+export function voiceStates(
+  members: readonly CallMemberView[],
+  participants: readonly CallParticipant[],
+  deafened: boolean
+): Map<string, CallVoiceState> {
+  /* eslint-disable svelte/prefer-svelte-reactivity -- rebuilt whole on every change, never mutated after */
+  const byIdentity = new Map(members.map((member) => [member.identity, member]));
+  const devices = new Map<string, { member: CallMemberView; state: CallVoiceState }>();
+  for (const participant of participants) {
+    const member = byIdentity.get(participant.identity);
+    if (!member) continue;
+    const previous = devices.get(participant.identity)?.state;
+    devices.set(participant.identity, {
+      member,
+      state: {
+        speaking: (previous?.speaking ?? false) || participant.speaking === true,
+        muted: (previous?.muted ?? true) && (participant.microphone?.muted ?? true),
+        camera: (previous?.camera ?? false) || cameraVisible(participant),
+        screen: (previous?.screen ?? false) || screenShareVisible(participant),
+        deafened: (previous?.deafened ?? false) || (participant.local === true && deafened),
+      },
+    });
+  }
+  const ordered = [...devices.values()].sort((left, right) =>
+    left.member.device_id.localeCompare(right.member.device_id)
+  );
+  const keys = participantKeys(ordered.map(({ member }) => member.user_id));
+  return new Map(ordered.map(({ state }, index) => [keys[index] ?? '', state]));
+  /* eslint-enable svelte/prefer-svelte-reactivity */
+}
 
 const isLivekit = (transport: CallTransport): transport is LivekitTransport =>
   'keyProvider' in transport;
@@ -132,24 +169,8 @@ export class CallSession {
   }
 
   readonly voiceStates = $derived.by(() => {
-    /* eslint-disable svelte/prefer-svelte-reactivity -- rebuilt whole on every change, never mutated after */
-    const userIds = new Map(this.members.map((member) => [member.identity, member.user_id]));
-    const states = new Map<string, CallVoiceState>();
     const { self, participants } = this.transport;
-    for (const participant of self ? [self, ...participants] : participants) {
-      const userId = userIds.get(participant.identity);
-      if (!userId) continue;
-      const previous = states.get(userId);
-      states.set(userId, {
-        speaking: (previous?.speaking ?? false) || participant.speaking === true,
-        muted: (previous?.muted ?? true) && (participant.microphone?.muted ?? true),
-        camera: (previous?.camera ?? false) || cameraVisible(participant),
-        screen: (previous?.screen ?? false) || screenShareVisible(participant),
-        deafened: (previous?.deafened ?? false) || (participant.local === true && this.deafened),
-      });
-    }
-    /* eslint-enable svelte/prefer-svelte-reactivity */
-    return states;
+    return voiceStates(this.members, self ? [self, ...participants] : participants, this.deafened);
   });
 
   get active(): boolean {

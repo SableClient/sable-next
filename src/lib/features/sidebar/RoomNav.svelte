@@ -847,7 +847,8 @@
       >
         {#each room.call_participants as userId, index (rowKeys[index])}
           {@const profile = peerProfiles.get(userId)}
-          {@const voice = room.room_id === callRoomId ? callVoiceStates.get(userId) : undefined}
+          {@const voice =
+            room.room_id === callRoomId ? callVoiceStates.get(rowKeys[index] ?? userId) : undefined}
           {@const displayName = profile?.display_name ?? userId}
           <li
             class:speaking={voice?.speaking && !voice.muted}

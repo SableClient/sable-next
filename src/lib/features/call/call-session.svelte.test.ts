@@ -3,7 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import { CallSession } from './call-session.svelte.js';
+import { CallSession, voiceStates } from './call-session.svelte.js';
 import { MatrixKeyProvider } from './key-provider';
 import type { CallTransportConnectOptions } from './call-transport';
 import { resetCallOwner } from './call-owner';
@@ -762,4 +762,24 @@ test('a transport with a camera switch flips the camera through it', async () =>
   flip.mockRejectedValueOnce(new Error('media_failed'));
   await session.switchCamera();
   expect(session.deviceError).toBe('camera');
+});
+
+test('two devices of one account keep their own voice state', () => {
+  const member = (device: string) => ({
+    user_id: '@me:x',
+    device_id: device,
+    identity: `@me:x:${device}`,
+    backend_id: null,
+  });
+  const states = voiceStates(
+    [member('BBBB'), member('AAAA')],
+    [
+      { identity: '@me:x:BBBB', speaking: true, microphone: { muted: false } },
+      { identity: '@me:x:AAAA', speaking: false, microphone: { muted: false } },
+    ] as never,
+    false
+  );
+
+  expect(states.get('@me:x')?.speaking).toBe(false);
+  expect(states.get('@me:x#1')?.speaking).toBe(true);
 });
