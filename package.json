@@ -122,7 +122,7 @@
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "testcontainers": "^12.1.0",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.0",
     "typescript-eslint": "^8.70.1",
     "vite": "^8.3.1",
     "vitest": "^5.0.0",
