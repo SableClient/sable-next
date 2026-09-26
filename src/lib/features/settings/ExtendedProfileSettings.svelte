@@ -260,7 +260,7 @@
     error = null;
     try {
       await core.setUserIgnored(userId, true);
-      ignored = [...ignored, userId].sort();
+      if (!ignored.includes(userId)) ignored = [...ignored, userId].sort();
       userToBlock = '';
     } catch {
       error = 'Could not update blocked users.';

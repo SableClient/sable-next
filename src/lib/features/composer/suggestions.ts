@@ -100,6 +100,7 @@ function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Sug
 }
 
 function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggestion[] {
+  const seen = new Set<string>();
   return rooms
     .map((room) => ({ room, name: room.name ?? room.canonical_alias ?? room.room_id }))
     .filter(({ room, name }) => {
@@ -113,14 +114,19 @@ function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggest
       );
       return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
     })
-    .slice(0, limit)
     .map(({ room, name }) => ({
       id: room.canonical_alias ?? room.room_id,
       insert: name.startsWith('#') ? name : `#${name}`,
       label: name.startsWith('#') ? name : `#${name}`,
       detail: room.canonical_alias,
       avatarUrl: room.avatar_url,
-    }));
+    }))
+    .filter(({ id }) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    })
+    .slice(0, limit);
 }
 
 function commandSuggestions(needle: string, translate: Translate): Suggestion[] {

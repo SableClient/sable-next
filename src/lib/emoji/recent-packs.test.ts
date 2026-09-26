@@ -34,3 +34,8 @@ test('a store holding something else does not break the picker', async () => {
   expect((await loadStore('not json at all')).readRecent()).toEqual([]);
   expect((await loadStore('["ok", 3, null]')).readRecent()).toEqual(['ok']);
 });
+
+test('a synced list that repeats a shortcode keeps its first place', async () => {
+  const { parseShortcodes } = await loadStore();
+  expect(parseShortcodes(['party', 'blobwave', 'party', 7])).toEqual(['party', 'blobwave']);
+});

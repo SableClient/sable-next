@@ -72,7 +72,11 @@
       const content = canonicalContent as { alias?: unknown; alt_aliases?: unknown } | null;
       canonical = typeof content?.alias === 'string' ? content.alias : null;
       alternatives = Array.isArray(content?.alt_aliases)
-        ? content.alt_aliases.filter((entry): entry is string => typeof entry === 'string')
+        ? [
+            ...new Set(
+              content.alt_aliases.filter((entry): entry is string => typeof entry === 'string')
+            ),
+          ]
         : [];
     } catch (error) {
       console.debug('[sable room] addresses unavailable', error);

@@ -685,7 +685,7 @@
 <div class="rail" role="presentation" oncontextmenu={mouseContextMenu(openDisplayMenu)}>
   <div class="rail-scroll" {@attach mobile ? noAttachment : monitor}>
     <ul class="rail-stack">
-      {#each [...items, ...directItems] as item (item.href)}
+      {#each [...items, ...directItems] as item (item.roomId ?? item.href)}
         <li>
           {#if item.section !== undefined}
             {@render sectionItem(item, item.section)}

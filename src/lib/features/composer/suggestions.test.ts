@@ -198,3 +198,14 @@ test('a translator passed in is what renders the command descriptions', () => {
 
   expect(suggestion.detail).toBe('translated:composer.slash.me.description');
 });
+
+test('two rooms claiming one alias are suggested once', () => {
+  const rooms = [
+    room('!joined:example.org', 'General', '#general:example.org'),
+    room('!invite:example.org', 'General', '#general:example.org'),
+  ];
+
+  expect(suggestionsFor(roomQuery('gen'), [], [], rooms).map((item) => item.id)).toEqual([
+    '#general:example.org',
+  ]);
+});

@@ -63,7 +63,11 @@ export class GifSearch {
       if (!response.ok) throw new Error(`HTTP ${String(response.status)}`);
       const parsed = provider.parse(await response.json());
       if (generation !== this.#generation) return;
-      this.results = parsed.filter((gif) => gif.mediaUrl !== '');
+      this.results = parsed.filter(
+        (gif, index) =>
+          gif.mediaUrl !== '' &&
+          parsed.findIndex(({ mediaUrl }) => mediaUrl === gif.mediaUrl) === index
+      );
       this.failed = false;
     } catch {
       if (generation !== this.#generation) return;

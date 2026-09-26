@@ -20,7 +20,7 @@ function load(): RecentReaction[] {
 export function parseRecentReactions(value: unknown): RecentReaction[] {
   if (!Array.isArray(value)) return [];
 
-  return value.flatMap((entry) => {
+  const entries = value.flatMap((entry): RecentReaction[] => {
     if (typeof entry === 'string') return [{ emoji: entry, total: 1 }];
     if (Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'number') {
       return [{ emoji: entry[0], total: entry[1] }];
@@ -31,6 +31,9 @@ export function parseRecentReactions(value: unknown): RecentReaction[] {
       ? [{ emoji: record.emoji, total: record.total }]
       : [];
   });
+  return entries.filter(
+    (entry, index) => entries.findIndex(({ emoji }) => emoji === entry.emoji) === index
+  );
 }
 
 export function recentReactionEntries(): RecentReaction[] {
