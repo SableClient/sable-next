@@ -29,6 +29,7 @@ pub struct PushRules {
 }
 
 impl PushRules {
+    #[allow(clippy::arc_with_non_send_sync)]
     pub async fn load(client: &Client) -> Arc<Self> {
         let initial = client
             .account()
