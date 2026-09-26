@@ -514,6 +514,25 @@ test('a late room subscription cannot replace the current room', async () => {
   expect(core.unsubscribed).toEqual([1]);
 });
 
+test('a second start of a failing subscription resolves and reports the error', async () => {
+  const core = new FakeCore();
+  let fail: (error: Error) => void = () => {};
+  core.subscribeTimeline = () =>
+    new Promise((_, reject) => {
+      fail = reject;
+    });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  const first = timeline.start('!room:example.org');
+  await Promise.resolve();
+  const second = timeline.start('!room:example.org');
+  fail(new Error('failed'));
+
+  await expect(first).resolves.toBeUndefined();
+  await expect(second).resolves.toBeUndefined();
+  expect(timeline.error).toBe('load_failed');
+});
+
 test('a stale failed start cannot stop the active room subscription', async () => {
   const core = new SwitchingCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);

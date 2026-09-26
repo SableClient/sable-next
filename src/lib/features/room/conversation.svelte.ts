@@ -50,6 +50,12 @@ export type ConversationDeps = {
   threadRoot?: string | null;
 };
 
+function failed(action: string): (error: unknown) => void {
+  return (error) => {
+    console.warn(`[sable room] ${action} failed`, error);
+  };
+}
+
 export class Conversation {
   context = $state<ComposerContext | null>(null);
   scheduledRevision = $state(0);
@@ -335,11 +341,15 @@ export class Conversation {
   };
 
   readonly retrySend = (transactionId: string): void => {
-    void this.#core.commands.retrySend(this.#roomId(), transactionId, this.#threadRoot);
+    void this.#core.commands
+      .retrySend(this.#roomId(), transactionId, this.#threadRoot)
+      .catch(failed('retry'));
   };
 
   readonly cancelSend = (transactionId: string): void => {
-    void this.#core.commands.cancelSend(this.#roomId(), transactionId, this.#threadRoot);
+    void this.#core.commands
+      .cancelSend(this.#roomId(), transactionId, this.#threadRoot)
+      .catch(failed('cancel'));
   };
 
   readonly toggleReaction = (
@@ -355,21 +365,25 @@ export class Conversation {
       );
     void this.#core.commands
       .toggleReaction(this.#roomId(), eventId, key, this.#threadRoot, mine ? null : sourcePack)
-      .catch((error: unknown) => {
-        console.warn('[sable room] reaction failed', error);
-      });
+      .catch(failed('reaction'));
   };
 
   readonly votePoll = (eventId: string, answers: string[]): void => {
-    void this.#core.commands.votePoll(this.#roomId(), eventId, answers, this.#threadRoot);
+    void this.#core.commands
+      .votePoll(this.#roomId(), eventId, answers, this.#threadRoot)
+      .catch(failed('vote'));
   };
 
   readonly endPoll = (eventId: string): void => {
-    void this.#core.commands.endPoll(this.#roomId(), eventId, this.#threadRoot);
+    void this.#core.commands
+      .endPoll(this.#roomId(), eventId, this.#threadRoot)
+      .catch(failed('end poll'));
   };
 
   readonly redact = (eventId: string, reason: string | null): void => {
-    void this.#core.commands.redact(this.#roomId(), eventId, reason, this.#threadRoot);
+    void this.#core.commands
+      .redact(this.#roomId(), eventId, reason, this.#threadRoot)
+      .catch(failed('redaction'));
   };
 
   readonly reply = (eventId: string, version?: ReplyVersion): void => {

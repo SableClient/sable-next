@@ -153,7 +153,7 @@ export class RoomTimeline {
       this.target.hiddenEvents === hiddenEvents
     ) {
       if (this.subscription !== null) return;
-      if (this.startPromise) return this.startPromise;
+      if (this.startPromise) return this.startPromise.catch(() => {});
     }
 
     const request = ++this.startRequest;

@@ -136,7 +136,9 @@
   }
 
   function deleteThread(eventId: string, reason: string | null): void {
-    void core.commands.deleteThread(resolvedRoomId, eventId, reason);
+    void core.commands.deleteThread(resolvedRoomId, eventId, reason).catch((error: unknown) => {
+      console.warn('[sable forum] deleting a thread failed', error);
+    });
   }
 
   function copyEventLink(eventId: string): void {
