@@ -28,6 +28,14 @@ pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Menti
     mentions
 }
 
+fn unique_pins(events: Vec<OwnedEventId>) -> Vec<OwnedEventId> {
+    let mut seen = std::collections::BTreeSet::new();
+    events
+        .into_iter()
+        .filter(|event| seen.insert(event.clone()))
+        .collect()
+}
+
 impl Core {
     pub(crate) async fn delete_thread(
         &self,
@@ -172,7 +180,7 @@ impl Core {
     ) -> Result<Vec<OwnedEventId>, CommandErr> {
         let room = self.room(room_id).await?;
         if let Some(events) = room.pinned_event_ids() {
-            return Ok(events);
+            return Ok(unique_pins(events));
         }
         if let Some(events) = self
             .probed_pinned_rooms
@@ -182,11 +190,12 @@ impl Core {
         {
             return Ok(events.clone());
         }
-        let events = room
-            .load_pinned_events()
-            .await
-            .map_err(|error| self.failed("pinned_events", error))?
-            .unwrap_or_default();
+        let events = unique_pins(
+            room.load_pinned_events()
+                .await
+                .map_err(|error| self.failed("pinned_events", error))?
+                .unwrap_or_default(),
+        );
         self.remember_pinned(room_id, &events);
         Ok(events)
     }
@@ -213,11 +222,12 @@ impl Core {
         }
         .map_err(|error| self.failed("set_pinned", error))?;
 
-        let events = room
-            .load_pinned_events()
-            .await
-            .map_err(|error| self.failed("set_pinned", error))?
-            .unwrap_or_default();
+        let events = unique_pins(
+            room.load_pinned_events()
+                .await
+                .map_err(|error| self.failed("set_pinned", error))?
+                .unwrap_or_default(),
+        );
         self.remember_pinned(room_id, &events);
         Ok(events)
     }
@@ -483,6 +493,16 @@ mod tests {
     };
 
     use crate::{Core, session::Session, store::MemorySessionStore};
+
+    #[test]
+    fn a_pin_listed_twice_is_kept_once_in_order() {
+        let pins = super::unique_pins(vec![
+            event_id!("$b").to_owned(),
+            event_id!("$a").to_owned(),
+            event_id!("$b").to_owned(),
+        ]);
+        assert_eq!(pins, [event_id!("$b"), event_id!("$a")]);
+    }
 
     async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());

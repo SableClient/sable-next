@@ -43,8 +43,10 @@ impl Core {
             .await
             .and_then(|index| {
                 index.get("bookmark_ids")?.as_array().map(|ids| {
+                    let mut seen = std::collections::BTreeSet::new();
                     ids.iter()
                         .filter_map(|id| id.as_str())
+                        .filter(|id| seen.insert(*id))
                         .map(str::to_owned)
                         .collect()
                 })

@@ -1118,6 +1118,50 @@ async fn a_poll_carries_its_tally_and_the_answer_this_account_picked() {
 }
 
 #[tokio::test]
+async fn a_poll_that_repeats_an_answer_id_lists_it_once() {
+    use matrix_sdk::ruma::events::poll::unstable_start::{
+        NewUnstablePollStartEventContent, UnstablePollAnswer, UnstablePollAnswers,
+        UnstablePollStartContentBlock, UnstablePollStartEventContent,
+    };
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!poll-repeat:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+    let answers = UnstablePollAnswers::try_from(vec![
+        UnstablePollAnswer::new("0", "ramen"),
+        UnstablePollAnswer::new("0", "curry"),
+        UnstablePollAnswer::new("1", "soup"),
+    ])
+    .expect("three answers are within the limits");
+    let content: UnstablePollStartEventContent = NewUnstablePollStartEventContent::new(
+        UnstablePollStartContentBlock::new("lunch?", answers),
+    )
+    .into();
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.event(content).event_id(event_id!("$repeat"))),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let poll = only_poll(&views).expect("a poll on the timeline");
+    let ids: Vec<_> = poll
+        .answers
+        .iter()
+        .map(|answer| answer.id.as_str())
+        .collect();
+    assert_eq!(ids, ["0", "1"]);
+}
+
+#[tokio::test]
 async fn an_undisclosed_poll_withholds_its_tally_until_it_closes() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

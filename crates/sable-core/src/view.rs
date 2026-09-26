@@ -501,8 +501,10 @@ pub fn hierarchy_child_edges(
         .filter_map(|raw| raw.deserialize().ok())
         .collect();
     events.sort_by(SpaceChildOrd::cmp_space_child);
+    let mut seen = BTreeSet::new();
     events
         .into_iter()
+        .filter(|event| seen.insert(event.state_key.clone()))
         .map(|event| SpaceChildEdge {
             room_id: event.state_key,
             via: event.content.via.iter().map(ToString::to_string).collect(),
@@ -1282,12 +1284,14 @@ fn poll(state: &PollState, own_user_id: Option<&UserId>) -> PollView {
     let undisclosed = !matches!(results.kind, PollKind::Disclosed);
     let reveal = results.end_time.is_some() || !undisclosed;
     let tally = results.votes;
+    let mut seen = BTreeSet::new();
 
     PollView {
         question: results.question,
         answers: results
             .answers
             .into_iter()
+            .filter(|answer| seen.insert(answer.id.clone()))
             .map(|answer| {
                 let voters = tally.get(&answer.id);
                 PollAnswerView {
@@ -1471,16 +1475,18 @@ fn state_change(
                     .as_ref()
                     .and_then(|prev| prev.pinned.clone())
                     .unwrap_or_default();
+                let mut added = BTreeSet::new();
+                let mut removed = BTreeSet::new();
                 Some(StateChangeView::PinnedEvents {
                     added: content
                         .pinned
                         .iter()
-                        .filter(|pin| !previous.contains(pin))
+                        .filter(|pin| !previous.contains(pin) && added.insert(*pin))
                         .cloned()
                         .collect(),
                     removed: previous
                         .iter()
-                        .filter(|pin| !content.pinned.contains(pin))
+                        .filter(|pin| !content.pinned.contains(pin) && removed.insert(*pin))
                         .cloned()
                         .collect(),
                     total: u32::try_from(content.pinned.len()).unwrap_or(u32::MAX),
@@ -1606,6 +1612,7 @@ fn forward_meta(content: &serde_json::Value) -> Option<ForwardedView> {
 fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
     const KEY: &str = "com.beeper.linkpreviews";
 
+    let mut seen = BTreeSet::new();
     content
         .and_then(|content| content.get(KEY))
         .and_then(serde_json::Value::as_array)
@@ -1633,6 +1640,7 @@ fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewV
                         image_height: dimension("og:image:height"),
                     })
                 })
+                .filter(|preview| seen.insert(preview.url.clone()))
                 .collect()
         })
 }
@@ -2266,6 +2274,19 @@ mod tests {
             Some("mxc://example.org/image")
         );
         assert_eq!(previews[1].image_width, Some(640));
+    }
+
+    #[test]
+    fn a_link_bundled_twice_is_previewed_once() {
+        let previews = bundled_link_previews(Some(&json!({
+            "com.beeper.linkpreviews": [
+                { "matched_url": "https://example.org/post", "og:title": "First" },
+                { "og:url": "https://example.org/post", "og:title": "Second" },
+            ],
+        })));
+
+        assert_eq!(previews.len(), 1);
+        assert_eq!(previews[0].title.as_deref(), Some("First"));
     }
 
     #[test]
