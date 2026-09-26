@@ -7,16 +7,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { VerificationView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
-const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
-vi.mock('$app/navigation', () => ({
-  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
-    Object.assign(history.state, options?.state);
-    return Promise.resolve();
-  },
-}));
-vi.mock('$app/state', () => ({
-  page: { state: history.state, url: new URL('http://localhost/rooms') },
-}));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('./VerificationQrScanner.svelte', async () => ({
   default: (await import('./ScannerStub.test.svelte')).default,
 }));
@@ -45,7 +37,6 @@ const button = (name: RegExp) => screen.queryByRole('button', { name });
 const qr = () => screen.queryByRole('img', { name: 'Verification code' });
 
 afterEach(() => {
-  history.state.overlay = undefined;
   vi.clearAllMocks();
 });
 

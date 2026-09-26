@@ -9,13 +9,14 @@ import type { RoomSummary } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 const mocks = vi.hoisted(() => ({
-  goto: vi.fn(() => Promise.resolve()),
   afterOverlayPops: vi.fn(() => Promise.resolve()),
   rooms: [] as RoomSummary[],
 }));
 
-vi.mock('$app/navigation', () => ({ goto: mocks.goto }));
-vi.mock('$app/state', () => ({ page: { state: {}, url: new URL('http://localhost/rooms') } }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { goto } from '#lib/test-support/app-navigation.js';
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
   afterOverlayPops: mocks.afterOverlayPops,
   holdOverlayBack: () => {},
@@ -30,7 +31,6 @@ import ShareTargetSheet from './ShareTargetSheet.svelte';
 
 afterEach(() => {
   mocks.rooms.length = 0;
-  mocks.goto.mockClear();
   mocks.afterOverlayPops.mockReset();
 });
 
@@ -64,11 +64,11 @@ test('picking a room navigates there only once the sheet has popped its history 
     expect(mocks.afterOverlayPops).toHaveBeenCalled();
   });
   expect(clear).toHaveBeenCalled();
-  expect(mocks.goto).not.toHaveBeenCalled();
+  expect(goto).not.toHaveBeenCalled();
 
   popped();
   await vi.waitFor(() => {
-    expect(mocks.goto).toHaveBeenCalledWith(expect.stringContaining('/rooms/'), {
+    expect(goto).toHaveBeenCalledWith(expect.stringContaining('/rooms/'), {
       replace: true,
     });
   });

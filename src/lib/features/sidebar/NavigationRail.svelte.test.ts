@@ -2,24 +2,16 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { tick, type ComponentProps } from 'svelte';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-const pageState = vi.hoisted(() => ({
-  url: { pathname: '/home', search: '', hash: '' },
-  state: {},
-}));
-const navigation = vi.hoisted(() => ({ afterNavigate: null as (() => void) | null }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
-vi.mock('$app/state', () => ({ page: pageState }));
-vi.mock('$app/navigation', () => ({
-  goto: () => Promise.resolve(),
-  afterNavigate: (callback: () => void) => {
-    navigation.afterNavigate = callback;
-  },
-}));
+import { visit } from '#lib/test-support/app-state.js';
+import { navigated } from '#lib/test-support/app-navigation.js';
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string> = {}) => {
     const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
@@ -29,19 +21,7 @@ vi.mock('$app/paths', () => ({
     return resolved.startsWith('/(app)') ? resolved.slice('/(app)'.length) : resolved;
   },
 }));
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(
-      run: (value: { t: (key: string, params?: Record<string, string>) => string }) => void
-    ) {
-      run({
-        t: (key: string, params?: Record<string, string>) =>
-          params === undefined ? key : `${key}:${Object.values(params).join(',')}`,
-      });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.room_id),
   useRoomList: () => ({ rooms: [] }),
@@ -51,18 +31,28 @@ vi.mock('#lib/core/context.js');
 import { core } from '#lib/core/__mocks__/context.js';
 
 core.roomPermissions.mockResolvedValue({ can_manage_children: false });
-vi.mock('#lib/ui/primitives/Tooltip.svelte', () => import('./TooltipStub.test.svelte'));
+
+import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
 import NavigationRail from './NavigationRail.svelte';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
+beforeEach(() => {
+  visit('/home');
+});
+
 afterEach(() => {
   localStorage.clear();
   setPreference('showSearch', true);
 });
 
+function renderRail(
+  options: ComponentProps<typeof NavigationRail> | { props: ComponentProps<typeof NavigationRail> }
+) {
+  return render(NavigationRail, options, { wrapper: TooltipProvider });
+}
 const user = userEvent.setup();
 const tab = (name: string) => screen.getByRole('link', { name });
 const linkTo = (href: string) =>
@@ -111,7 +101,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
 }
 
 test('badges unread direct chats', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [],
       directUnread: { unread: 3, highlight: 3 },
@@ -127,7 +117,7 @@ test('badges unread direct chats', async () => {
 });
 
 test('badges the unspaced section', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [],
       unspacedUnread: { unread: 4, highlight: 2 },
@@ -142,7 +132,7 @@ test('badges the unspaced section', async () => {
 });
 
 test('search leaves the rail when the preference is off', async () => {
-  render(NavigationRail, { spaces: [], mobile: true });
+  renderRail({ spaces: [], mobile: true });
   await tick();
 
   expect(tab('search.title')).toHaveAttribute('href', '/search');
@@ -154,7 +144,7 @@ test('search leaves the rail when the preference is off', async () => {
 });
 
 test('uses a dot for ordinary unread messages outside spaces', async () => {
-  render(NavigationRail, { spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true });
+  renderRail({ spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true });
   await tick();
 
   expect(tab('nav.unspaced').querySelector('.unread-badge-dot')).toBeInTheDocument();
@@ -190,7 +180,7 @@ test('shows unread direct rooms as individual avatars', async () => {
     marked_unread: false,
     latest_event: null,
   } satisfies RoomSummary;
-  render(NavigationRail, { spaces: [], directRooms: [directRoom], mobile: true });
+  renderRail({ spaces: [], directRooms: [directRoom], mobile: true });
   await tick();
 
   const directLink = tab('Alice');
@@ -203,7 +193,7 @@ test('shows unread direct rooms as individual avatars', async () => {
 });
 
 test('badges a space with its mentions and dots one with only unread messages', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       spaceUnread: new Map([
@@ -225,7 +215,7 @@ test('badges a space with its mentions and dots one with only unread messages', 
 });
 
 test('outlines every tab but a space avatar', async () => {
-  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')], mobile: true });
   await tick();
 
   expect(tab('nav.unspaced')).toHaveClass('nav-tab-outlined');
@@ -252,19 +242,19 @@ test('opens a space on its lobby when there is nothing to restore', () => {
 });
 
 test('separates the spaces from the tabs above them, only when there are any', async () => {
-  const empty = render(NavigationRail, { spaces: [], mobile: true });
+  const empty = renderRail({ spaces: [], mobile: true });
   await tick();
   expect(document.querySelector('.rail-separator')).toBeNull();
   empty.unmount();
 
-  render(NavigationRail, { spaces: [space()], mobile: true });
+  renderRail({ spaces: [space()], mobile: true });
   await tick();
   expect(document.querySelector('.rail-separator')).not.toBeNull();
 });
 
 test('marks a whole section read from the tab that badges it', async () => {
   const marked: string[] = [];
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [],
       directUnread: { unread: 2, highlight: 0 },
@@ -282,7 +272,7 @@ test('marks a whole section read from the tab that badges it', async () => {
 
 test('marks the rooms outside spaces read from their tab', async () => {
   const marked: string[] = [];
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [],
       unspacedUnread: { unread: 2, highlight: 0 },
@@ -318,15 +308,11 @@ test('restores a space to its last desktop route', () => {
 });
 
 test('records the active desktop space route without its event anchor', async () => {
-  render(NavigationRail, { spaces: [space()] });
+  renderRail({ spaces: [space()] });
   await tick();
 
-  pageState.url = {
-    pathname: '/space/!space%3Aexample.org/!room%3Aexample.org',
-    search: '?event=%24event&via=example.org',
-    hash: '#reply',
-  };
-  navigation.afterNavigate?.();
+  visit('/space/!space%3Aexample.org/!room%3Aexample.org?event=%24event&via=example.org#reply');
+  navigated();
 
   expect(savedSpacePaths()).toEqual({
     '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org?via=example.org#reply',
@@ -338,14 +324,14 @@ test('opens a space root on mobile even when it has a saved route', async () => 
     'sable-space-paths',
     JSON.stringify({ '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org' })
   );
-  render(NavigationRail, { spaces: [space()], mobile: true });
+  renderRail({ spaces: [space()], mobile: true });
   await tick();
 
   expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org');
 });
 
 test('orders spaces by the stored layout and appends unplaced ones', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [{ kind: 'space', room_id: '!b:example.org' }],
@@ -359,7 +345,7 @@ test('orders spaces by the stored layout and appends unplaced ones', async () =>
 
 test('shows a collapsed folder as one tab, with the names of the spaces inside', async () => {
   const toggled: string[] = [];
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
@@ -386,7 +372,7 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
 
 test('shows the spaces of an open folder, and a way to shut it', async () => {
   const toggled: string[] = [];
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
@@ -410,7 +396,7 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
 });
 
 test('a space that left the room list drops out of its folder', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
@@ -427,7 +413,7 @@ test('a space that left the room list drops out of its folder', async () => {
 
 test('offers a way out of a folder holding a single space', async () => {
   const removed: [string, string][] = [];
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [{ kind: 'folder', id: 'f', name: null, content: ['!a:example.org'] }],
@@ -445,14 +431,14 @@ test('offers a way out of a folder holding a single space', async () => {
 });
 
 test('the mobile rail does not arm dragging', async () => {
-  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')], mobile: true });
   await tick();
 
   expect(tab('Alpha').closest('.rail-slot')).not.toHaveAttribute('draggable');
 });
 
 test('a folder whose spaces are all unresolved renders nothing', async () => {
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
@@ -469,7 +455,7 @@ test('a folder whose spaces are all unresolved renders nothing', async () => {
 });
 
 test('right-clicking a top-level space opens its options menu', async () => {
-  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')] });
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')] });
   await tick();
 
   const items = labels(await openMenu(tab('Alpha')));
@@ -482,7 +468,7 @@ test.each([
   ['a top-level space', false],
 ])('%s offers unpinning from its options menu only when pinned', async (_, pinned) => {
   const onUnpin = vi.fn();
-  render(NavigationRail, {
+  renderRail({
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       pinnedSpaceIds: new Set(pinned ? ['!a:example.org'] : []),
@@ -504,7 +490,7 @@ test.each([
 test('long-pressing a top-level space opens its options menu', async () => {
   vi.useFakeTimers();
   const touch = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
-  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
+  renderRail({ spaces: [space('!a:example.org', 'Alpha')], mobile: true });
 
   const target = tab('Alpha');
   await touch.pointer({ keys: '[TouchA>]', target, coords: { clientX: 8, clientY: 8 } });
@@ -532,7 +518,7 @@ test('opens the direct root on mobile even when it has a saved chat', async () =
     'sable-space-paths',
     JSON.stringify({ direct: '/direct/!dm%3Aexample.org' })
   );
-  render(NavigationRail, { spaces: [], mobile: true });
+  renderRail({ spaces: [], mobile: true });
   await tick();
 
   expect(tab('nav.direct')).toHaveAttribute('href', '/direct');
@@ -540,18 +526,18 @@ test('opens the direct root on mobile even when it has a saved chat', async () =
 });
 
 test('records the active desktop direct chat', async () => {
-  render(NavigationRail, { spaces: [] });
+  renderRail({ spaces: [] });
   await tick();
 
-  pageState.url = { pathname: '/direct/!dm%3Aexample.org', search: '?event=%24event', hash: '' };
-  navigation.afterNavigate?.();
+  visit('/direct/!dm%3Aexample.org?event=%24event');
+  navigated();
 
   expect(savedSpacePaths()).toEqual({ direct: '/direct/!dm%3Aexample.org' });
 });
 
 test('offers join by address from the add button', async () => {
   const visited: string[] = [];
-  render(NavigationRail, {
+  renderRail({
     spaces: [],
     mobile: true,
     onNavigate: (href: string) => visited.push(href),

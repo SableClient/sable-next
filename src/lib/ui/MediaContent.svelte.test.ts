@@ -10,8 +10,8 @@ import type { CoreEvent } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-vi.mock('$app/state', () => ({ page: { url: { pathname: '/home' }, params: {}, state: {} } }));
-vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('pdfjs-dist', () => ({
   GlobalWorkerOptions: {},
   getDocument: () => ({ promise: new Promise(() => {}), destroy: () => Promise.resolve() }),

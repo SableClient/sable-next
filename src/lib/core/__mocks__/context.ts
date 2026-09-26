@@ -7,6 +7,7 @@ export type CoreStub = ReturnType<typeof createCoreStub>;
 export function createCoreStub<T extends Record<string, unknown>>(overrides = {} as T) {
   const stub = {
     session: null as unknown,
+    accounts: [] as unknown[],
     fetchMedia: vi.fn<(...args: never[]) => Promise<Uint8Array<ArrayBuffer>>>(pending),
     forgetMedia: vi.fn<(...args: never[]) => Promise<void>>(() => Promise.resolve()),
     userProfile: vi.fn<(...args: never[]) => Promise<unknown>>(() =>

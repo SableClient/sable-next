@@ -2,17 +2,15 @@
 
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-const pageState = vi.hoisted(() => ({
-  params: { roomId: '!old:example.org' } as Record<string, string>,
-  url: new URL('https://app.test/rooms/!old:example.org?via=example.org'),
-}));
 const rendered = vi.hoisted(() => [] as { kind: string; roomId: string; extra: unknown }[]);
 
-vi.mock('$app/state', () => ({ page: pageState }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+
+import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -32,6 +30,10 @@ vi.mock('./JoinBeforeNavigate.svelte', () => ({
 import { core } from '#lib/core/__mocks__/context.js';
 
 import RoomPage from './RoomPage.svelte';
+
+beforeEach(() => {
+  visit('/rooms/!old:example.org?via=example.org', { roomId: '!old:example.org' });
+});
 
 afterEach(() => {
   rendered.length = 0;

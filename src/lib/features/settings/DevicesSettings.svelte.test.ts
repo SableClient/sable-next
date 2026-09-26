@@ -2,21 +2,12 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
 
-const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
-
-vi.mock('$app/state', () => ({
-  page: { url: { pathname: '/settings' }, params: {}, state: history.state },
-}));
-vi.mock('$app/navigation', () => ({
-  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
-    Object.assign(history.state, options?.state);
-    return Promise.resolve();
-  },
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -67,10 +58,6 @@ const other2: DeviceView = {
   last_seen_ts: null,
   last_seen_ip: null,
 };
-
-afterEach(() => {
-  history.state.overlay = undefined;
-});
 
 async function renderDevices(devices: DeviceView[]) {
   core.encryptionStatus.mockResolvedValue(status);

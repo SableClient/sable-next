@@ -10,14 +10,7 @@ const geolocation = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/platform/geolocation.js', () => geolocation);
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import LocationComposer from './LocationComposer.svelte';
 

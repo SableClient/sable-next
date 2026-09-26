@@ -6,9 +6,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { SearchMetricsView } from '#src/generated/protocol';
 
-vi.mock('$app/state', () => ({
-  page: { url: { pathname: '/settings' }, params: {}, state: {} },
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';

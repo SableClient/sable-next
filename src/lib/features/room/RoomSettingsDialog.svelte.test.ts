@@ -18,14 +18,7 @@ const core = Object.assign(baseCore, {
   roomDirectoryVisibility: vi.fn(),
   roomHasSpaceParent: vi.fn(),
 });
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import RoomSettingsDialog from './RoomSettingsDialog.svelte';
 

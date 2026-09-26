@@ -78,6 +78,7 @@ export default mergeConfig(
           'src/**/*.d.ts',
           'src/**/*.test.ts',
           'src/**/__mocks__/**',
+          'src/lib/test-support/**',
           'src/app.d.ts',
           'src/generated/**',
         ],

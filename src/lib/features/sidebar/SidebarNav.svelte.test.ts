@@ -2,45 +2,15 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type { CoreEvent, RoomSummary } from '#src/generated/protocol';
 
-const pageState = vi.hoisted(() => ({
-  url: { pathname: '/home', search: '', hash: '' },
-  state: {},
-}));
-const navigation = vi.hoisted(() => ({ afterNavigate: null as (() => void) | null }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
-vi.mock('$app/state', () => ({ page: pageState }));
-vi.mock('$app/navigation', () => ({
-  goto: () => Promise.resolve(),
-  afterNavigate: (callback: () => void) => {
-    navigation.afterNavigate = callback;
-  },
-}));
-vi.mock('$app/paths', () => ({
-  resolve: (path: string, params: Record<string, string> = {}) => {
-    const resolved = (path.startsWith('/') ? path : `/${path}`).replace(
-      /\[([^\]]+)\]/g,
-      (_, key: string) => params[key] ?? key
-    );
-    return resolved.startsWith('/(app)') ? resolved.slice('/(app)'.length) : resolved;
-  },
-}));
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(
-      run: (value: { t: (key: string, params?: Record<string, string>) => string }) => void
-    ) {
-      run({
-        t: (key: string, params?: Record<string, string>) =>
-          params === undefined ? key : `${key}:${Object.values(params).join(',')}`,
-      });
-      return () => {};
-    },
-  },
-}));
+import { visit } from '#lib/test-support/app-state.js';
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 const fixture = vi.hoisted(() => ({ roomList: null as RoomList | null }));
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -55,19 +25,23 @@ vi.mock('#lib/spaces/sidebar-layout.svelte.js', () => ({
 vi.mock('#lib/features/call/call-session.svelte.js', () => ({
   useCallSession: () => ({ active: false, roomId: null }),
 }));
-vi.mock('./RoomNav.svelte', () => ({ default: () => null }));
-vi.mock('./UserQuickTools.svelte', () => ({ default: () => null }));
-vi.mock('./FolderRenameDialog.svelte', () => ({ default: () => null }));
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  usePresenceStore: () => ({ get: () => null, peek: () => null }),
+}));
 
 import { core } from '#lib/core/__mocks__/context.js';
 
 core.roomPermissions.mockResolvedValue({ can_manage_children: false });
-vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
 
-import SidebarNav from './SidebarNav.svelte';
+import SidebarNav from './SidebarNavHarness.test.svelte';
 import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+
+beforeEach(() => {
+  visit('/home');
+});
 
 afterEach(() => {
   localStorage.clear();

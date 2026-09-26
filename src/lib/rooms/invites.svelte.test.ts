@@ -2,7 +2,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { goto } from '#lib/test-support/app-navigation.js';
 vi.mock('$app/paths', () => ({ resolve: (path: string) => path }));
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -78,14 +80,13 @@ test('an accepted invitation raises nothing', async () => {
 });
 
 test('accepting all joins every invite without leaving the page and reports failures once', async () => {
-  const { goto } = await import('$app/navigation');
   const other = { ...room, room_id: '!other:example.org' };
   const third = { ...room, room_id: '!third:example.org' };
   const joinRoom = vi.fn((roomId: string) =>
     roomId === room.room_id ? Promise.resolve(roomId) : Promise.reject(new Error('no via'))
   );
   const answers = actions({ joinRoom });
-  vi.mocked(goto).mockClear();
+  goto.mockClear();
 
   await answers.acceptAll([room, other, third]);
 

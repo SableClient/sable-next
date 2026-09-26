@@ -7,14 +7,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { RoomPowerLevelsView, RoomSummary } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 

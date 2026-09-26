@@ -8,10 +8,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
-vi.mock('$app/state', () => ({
-  page: { state: {}, url: new URL('http://localhost/setup/device') },
-}));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
   holdOverlayBack: vi.fn(),
   afterOverlayPops: () => Promise.resolve(),

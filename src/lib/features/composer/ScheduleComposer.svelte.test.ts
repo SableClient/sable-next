@@ -4,15 +4,7 @@ import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-  currentLocale: () => 'en',
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 

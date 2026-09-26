@@ -8,12 +8,12 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SignOutSafetyView } from '#src/generated/protocol';
 
-const mocks = vi.hoisted(() => ({
-  goto: vi.fn(() => Promise.resolve()),
-}));
+vi.hoisted(() => ({}));
 
-vi.mock('$app/navigation', () => ({ goto: mocks.goto }));
-vi.mock('$app/state', () => ({ page: { state: {}, url: new URL('http://localhost/profile') } }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { goto } from '#lib/test-support/app-navigation.js';
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('#lib/platform/overlay-back.svelte.js', () => ({
   afterOverlayPops: () => Promise.resolve(),
   holdOverlayBack: () => {},
@@ -34,9 +34,7 @@ const safe: SignOutSafetyView = {
   has_encrypted_rooms: true,
 };
 
-afterEach(() => {
-  mocks.goto.mockClear();
-});
+afterEach(() => {});
 
 async function openWarning(safety: SignOutSafetyView) {
   const guard = new SignOutGuard({
@@ -81,7 +79,7 @@ test('routes an unverified session to the security settings instead', async () =
 
   await user.click(await screen.findByRole('button', { name: 'Verify this session' }));
   await vi.waitFor(() => {
-    expect(mocks.goto).toHaveBeenCalledWith('/settings/devices');
+    expect(goto).toHaveBeenCalledWith('/settings/devices');
   });
   expect(guard.risk).toBeNull();
   expect(proceed).not.toHaveBeenCalled();

@@ -8,8 +8,8 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-vi.mock('$app/state', () => ({ page: { url: { pathname: '/home' }, params: {}, state: {} } }));
-vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import MediaContent from './MediaContent.svelte';
 import { resetVideoStreaming } from './video-stream.svelte.js';

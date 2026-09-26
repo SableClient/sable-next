@@ -1,39 +1,36 @@
 // @vitest-environment happy-dom
 
 import { fireEvent, render, screen } from '@testing-library/svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-const pageState = vi.hoisted(() => ({
-  url: { pathname: '/rooms', search: '', hash: '' },
-  state: {},
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
-vi.mock('$app/state', () => ({ page: pageState }));
-vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key: string) => key });
-      return () => {};
-    },
-  },
-}));
+import { visit } from '#lib/test-support/app-state.js';
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [], notificationMode: () => 'all_messages' }),
 }));
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/ui/primitives/Tooltip.svelte', () => import('./TooltipStub.test.svelte'));
-vi.mock('./AccountSwitcher.svelte', () => ({ default: () => null }));
+vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  usePresenceStore: () => ({ get: () => null, peek: () => null }),
+}));
 
 import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
+import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 import UserQuickTools from './UserQuickTools.svelte';
+
+beforeEach(() => {
+  visit('/rooms');
+});
 
 afterEach(() => {
   paletteState.open = false;
 });
 
 function setup(props: { mobile?: boolean; compact?: boolean } = { mobile: true }): void {
-  render(UserQuickTools, props);
+  render(UserQuickTools, props, { wrapper: TooltipProvider });
 }
 
 test('the mobile bar links navigation and inbox as pages, not overlays', async () => {

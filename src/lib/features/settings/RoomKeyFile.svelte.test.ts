@@ -2,11 +2,10 @@
 
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
 import { CoreError } from '#src/transport';
 
-const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
 const files = vi.hoisted(() => ({
   pickFiles: vi.fn<(accept: string) => Promise<File[] | null>>(),
   saveBytes:
@@ -19,15 +18,8 @@ const files = vi.hoisted(() => ({
     >(),
 }));
 
-vi.mock('$app/state', () => ({
-  page: { url: { pathname: '/settings' }, params: {}, state: history.state },
-}));
-vi.mock('$app/navigation', () => ({
-  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
-    Object.assign(history.state, options?.state);
-    return Promise.resolve();
-  },
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/platform/files.js', () => files);
 
@@ -48,10 +40,6 @@ beforeEach(() => {
   core.importRoomKeys.mockReset();
   files.pickFiles.mockReset();
   files.saveBytes.mockReset();
-});
-
-afterEach(() => {
-  history.state.overlay = undefined;
 });
 
 function form(): HTMLElement {

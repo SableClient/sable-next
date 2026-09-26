@@ -4,26 +4,19 @@ import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-const navigation = vi.hoisted(() => ({ goto: vi.fn<() => Promise<void>>() }));
-
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, { createDm: vi.fn<() => Promise<string>>() });
-vi.mock('$app/navigation', () => ({ goto: navigation.goto }));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { goto } from '#lib/test-support/app-navigation.js';
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Record<string, string>) =>
     path.replace('[roomId]', params.roomId),
 }));
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParamFromId: (roomId: string) => encodeURIComponent(roomId),
 }));
@@ -39,9 +32,7 @@ async function submit(value: string): Promise<void> {
 }
 
 beforeEach(() => {
-  navigation.goto.mockClear();
   core.createDm.mockReset();
-  navigation.goto.mockResolvedValue(undefined);
 });
 
 test('creates the chat and navigates to it under the direct section', async () => {
@@ -53,7 +44,7 @@ test('creates the chat and navigates to it under the direct section', async () =
     expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
   });
 
-  expect(navigation.goto).toHaveBeenCalledWith('/(app)/direct/!dm%3Aexample.org');
+  expect(goto).toHaveBeenCalledWith('/(app)/direct/!dm%3Aexample.org');
 });
 
 test('rejects an input that is not a user id without calling the core', async () => {
@@ -74,6 +65,6 @@ test('reports a failed creation and stays on the page', async () => {
   await submit('@alice:example.org');
   expect(await screen.findByRole('alert')).toHaveTextContent('direct.failed');
 
-  expect(navigation.goto).not.toHaveBeenCalled();
+  expect(goto).not.toHaveBeenCalled();
   warn.mockRestore();
 });

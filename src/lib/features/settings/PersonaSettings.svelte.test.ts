@@ -16,17 +16,8 @@ const mocks = vi.hoisted(() => ({
   setAccountData: vi.fn<(eventType: string, content: unknown) => Promise<void>>(),
 }));
 
-const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
-
-vi.mock('$app/state', () => ({
-  page: { url: { pathname: '/settings' }, params: {}, state: history.state },
-}));
-vi.mock('$app/navigation', () => ({
-  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
-    Object.assign(history.state, options?.state);
-    return Promise.resolve();
-  },
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: mocks.isTauri, invoke: mocks.invoke }));
 

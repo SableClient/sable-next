@@ -10,14 +10,7 @@ import type { MediaItem } from './MediaViewer.svelte';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import MediaViewer from './MediaViewer.svelte';
 import { resetVideoStreaming } from '#lib/ui/video-stream.svelte.js';

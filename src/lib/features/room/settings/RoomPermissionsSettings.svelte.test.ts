@@ -10,9 +10,8 @@ import type {
   RoomSummary,
 } from '#src/generated/protocol';
 
-const { pageState, space, extraRooms } = vi.hoisted(() => ({
+const { space, extraRooms } = vi.hoisted(() => ({
   extraRooms: [] as { room_id: string; state: string; space_children: [] }[],
-  pageState: {} as Record<string, unknown>,
   space: {
     room_id: '!space:example.org',
     name: 'Guild',
@@ -23,15 +22,8 @@ const { pageState, space, extraRooms } = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/core/context.js');
-vi.mock('$app/state', () => ({
-  page: { url: { pathname: '/rooms' }, params: {}, state: pageState },
-}));
-vi.mock('$app/navigation', () => ({
-  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
-    Object.assign(pageState, options?.state);
-    return Promise.resolve();
-  },
-}));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({

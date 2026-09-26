@@ -14,12 +14,6 @@ import type {
 import { roomNotifications, roomUnread } from '#lib/rooms/unread.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
-const pageState = vi.hoisted(() => ({
-  url: { pathname: '/rooms' },
-  params: {},
-  state: {},
-}));
-
 const roomsFixture = vi.hoisted(() => {
   const muteAware = {
     notificationMode: (roomId: string): NotificationModeView =>
@@ -43,8 +37,10 @@ const roomsFixture = vi.hoisted(() => {
   return fixture;
 });
 
-vi.mock('$app/state', () => ({ page: pageState }));
-vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
@@ -59,14 +55,7 @@ vi.mock('$app/paths', () => ({
     return resolved.startsWith('/(app)') ? resolved.slice('/(app)'.length) : resolved;
   },
 }));
-vi.mock('#lib/i18n.js', () => ({
-  i18n: {
-    subscribe(run: (value: { t: (key: string) => string }) => void) {
-      run({ t: (key) => key });
-      return () => {};
-    },
-  },
-}));
+vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => roomsFixture,
   findRoomByPathId: (rooms: readonly RoomSummary[], pathId: string | undefined) =>
@@ -143,8 +132,7 @@ async function openMenu(name: string): Promise<void> {
 }
 
 beforeEach(() => {
-  pageState.url.pathname = '/rooms';
-  pageState.params = {};
+  visit('/rooms', {});
   roomsFixture.rooms = [];
   roomsFixture.reset();
   presenceFixture.entry = null;
@@ -199,8 +187,7 @@ test.each([
       ]
     : [target];
   if (isSpace) {
-    pageState.url.pathname = '/space/!root%3Aexample.org';
-    pageState.params = { spaceId: '!root:example.org' };
+    visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   }
   core.roomPermissions.mockResolvedValue({ can_invite: true, can_manage_children: false });
   await mountNav();
@@ -217,8 +204,7 @@ test.each([
 });
 
 test('a subspace context menu opens its lobby', async () => {
-  pageState.url.pathname = '/space/!root%3Aexample.org';
-  pageState.params = { spaceId: '!root:example.org' };
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [
     makeRoom({
       room_id: '!root:example.org',
@@ -260,8 +246,7 @@ test('a subspace context menu opens its lobby', async () => {
 });
 
 test('nests subspaces with thread lines and links past the depth limit to the lobby', async () => {
-  pageState.url.pathname = '/space/!root%3Aexample.org';
-  pageState.params = { spaceId: '!root:example.org' };
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   const edge = (roomId: string) => ({
     room_id: roomId,
     via: [],
@@ -311,7 +296,7 @@ test('nests subspaces with thread lines and links past the depth limit to the lo
 });
 
 test('a route outside every list shows the rooms outside spaces', async () => {
-  pageState.url.pathname = '/inbox';
+  visit('/inbox');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
     makeRoom({ room_id: '!direct:example.org', name: 'Direct', is_direct: true }),
@@ -373,8 +358,7 @@ test('favourites sit in their own section above the rest of the list', async () 
 });
 
 test('a space lifts a favourite out of its subspace', async () => {
-  pageState.url.pathname = '/space/!root%3Aexample.org';
-  pageState.params = { spaceId: '!root:example.org' };
+  visit('/space/!root%3Aexample.org', { spaceId: '!root:example.org' });
   const edge = (roomId: string) => ({
     room_id: roomId,
     via: [],
@@ -405,7 +389,7 @@ test('a space lifts a favourite out of its subspace', async () => {
 });
 
 test('a route outside every list links rooms to the rooms section', async () => {
-  pageState.url.pathname = '/inbox';
+  visit('/inbox');
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
 
   await mountNav();
@@ -413,8 +397,7 @@ test('a route outside every list links rooms to the rooms section', async () => 
 });
 
 test('expanded room disclosures do not use the active-route surface', async () => {
-  pageState.url.pathname = '/space/!root%3Aexample.org/!room%3Aexample.org';
-  pageState.params = { spaceId: '!root:example.org' };
+  visit('/space/!root%3Aexample.org/!room%3Aexample.org', { spaceId: '!root:example.org' });
   roomsFixture.rooms = [
     makeRoom({
       room_id: '!root:example.org',
@@ -471,7 +454,7 @@ test('home leaves out invited and knocked rooms', async () => {
 });
 
 test('the unspaced section leaves out rooms a joined space claims', async () => {
-  pageState.url.pathname = '/rooms';
+  visit('/rooms');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!loose:example.org', name: 'Loose' }),
     makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
@@ -497,7 +480,7 @@ test('the unspaced section leaves out rooms a joined space claims', async () => 
 });
 
 test('a claim from a space that is not joined keeps the room in the unspaced section', async () => {
-  pageState.url.pathname = '/rooms';
+  visit('/rooms');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!claimed:example.org', name: 'Claimed' }),
     makeRoom({
@@ -522,7 +505,7 @@ test('a claim from a space that is not joined keeps the room in the unspaced sec
 });
 
 test('direct page lists joined direct rooms only', async () => {
-  pageState.url.pathname = '/direct';
+  visit('/direct');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!dm:example.org', name: 'DM', is_direct: true }),
     makeRoom({
@@ -540,7 +523,7 @@ test('direct page lists joined direct rooms only', async () => {
 });
 
 test('direct page offers starting a chat and searching instead of creating or browsing rooms', async () => {
-  pageState.url.pathname = '/direct';
+  visit('/direct');
 
   await mountNav();
   expect(
@@ -594,8 +577,7 @@ test('message search from a space is scoped to that space', async () => {
       is_space: true,
     }),
   ];
-  pageState.url.pathname = '/space/!space:example.org';
-  pageState.params = { spaceId: '!space:example.org' };
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
 
   await mountNav();
   const search = screen
@@ -610,8 +592,7 @@ test('a space list header shows the space banner above it', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
   ];
-  pageState.url.pathname = '/space/!space:example.org';
-  pageState.params = { spaceId: '!space:example.org' };
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
   core.roomStateEvent.mockResolvedValue({
     type: 'page.codeberg.everypizza.room.banner',
     content: { url: 'mxc://example.org/banner' },
@@ -640,8 +621,7 @@ test('a space list header wears the space avatar when collapsed', async () => {
       join_rule: 'invite',
     }),
   ];
-  pageState.url.pathname = '/space/!space:example.org';
-  pageState.params = { spaceId: '!space:example.org' };
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
 
   await mountNav({ collapsed: true });
   const badge = document.querySelector('.room-nav-badge');
@@ -815,7 +795,7 @@ function roomTopics(): (string | null)[] {
 }
 
 test('a DM row shows the peer status once its profile arrives', async () => {
-  pageState.url.pathname = '/direct';
+  visit('/direct');
   observeImmediately();
   core.userProfile.mockResolvedValue({ status: { text: 'Shipping', emoji: '\u{1F680}' } });
   roomsFixture.rooms = [
@@ -835,7 +815,7 @@ test('a DM row shows the peer status once its profile arrives', async () => {
 });
 
 test('a DM row falls back to the peer presence message, and a topic still wins', async () => {
-  pageState.url.pathname = '/direct';
+  visit('/direct');
   presenceFixture.entry = { statusMessage: 'In a meeting' };
   roomsFixture.rooms = [
     makeRoom({

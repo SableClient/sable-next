@@ -22,10 +22,10 @@ const core = Object.assign(baseCore, {
   setUserPowerLevel: vi.fn<(roomId: string, userId: string, level: number) => Promise<void>>(),
 });
 
-const goto = vi.hoisted(() =>
-  vi.fn<(href: string) => Promise<void>>(() => Promise.reject(new Error('no router')))
-);
-vi.mock('$app/navigation', () => ({ goto }));
+vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+
+import { goto } from '#lib/test-support/app-navigation.js';
 
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock('#lib/ui/toasts.svelte.js', () => ({ toasts: { error: toastError } }));
