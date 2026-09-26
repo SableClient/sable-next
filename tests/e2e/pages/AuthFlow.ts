@@ -45,12 +45,12 @@ export class AuthFlow {
       await expect(this.page).toHaveURL(/\/(setup\/[a-z]+|rooms)$/, { timeout: 30_000 });
       if (rooms.test(new URL(this.page.url()).pathname)) return;
       const before = this.page.url();
-      await this.setupCard
-        .getByRole('button', {
-          name: /^(Skip anyway|Skip for now|Not now|Continue|Go to your chats)$/,
-        })
-        .first()
-        .click();
+      const skip = this.setupCard
+        .getByRole('button', { name: /^(Skip anyway|Skip for now|Not now|Go to your chats)$/ })
+        .first();
+      const onward = this.setupCard.getByRole('button', { name: 'Continue', exact: true }).first();
+      await expect(skip.or(onward).first()).toBeVisible();
+      await ((await skip.count()) > 0 ? skip : onward).click();
       await this.page
         .waitForURL((url) => url.href !== before, { timeout: 5_000 })
         .catch(() => undefined);

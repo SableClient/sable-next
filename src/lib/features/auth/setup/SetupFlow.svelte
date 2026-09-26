@@ -76,8 +76,7 @@
     requestedIndex >= 0 && requestedIndex <= pendingIndex ? requestedIndex : pendingIndex
   );
   const canSkipAhead = $derived(
-    pending !== null &&
-      ['profile', 'notifications', 'appearance', 'layout', 'sync'].includes(pending)
+    pending !== null && ['appearance', 'layout', 'sync'].includes(pending)
   );
 
   const profile = new ProfileController({
