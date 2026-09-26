@@ -24,7 +24,6 @@
 
   let position = $state<number | undefined>();
   let dragging = $state(false);
-  let routeChanging = $state(false);
   let gesture: Gesture | undefined;
   let settleFrame: number | undefined;
   let routeFrame: number | undefined;
@@ -35,6 +34,8 @@
   const LIST_INDEX_PATHS = new Set(['/rooms', '/direct']);
   const BLANK_INDEX_PATHS = new Set(['/rooms']);
   let pathname = $derived(page.url.pathname);
+  let settledPath = $state(page.url.pathname);
+  let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
   let showMobileQuickTools = $derived(page.params.roomId === undefined);
   let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
@@ -47,13 +48,14 @@
   // Navigating out from under a drag would otherwise leave the track pinned at
   // the gesture's last offset.
   $effect(() => {
-    void pathname;
+    const next = pathname;
     cancelSettling();
     if (routeFrame !== undefined) cancelAnimationFrame(routeFrame);
-    routeChanging = true;
     routeFrame = requestAnimationFrame(() => {
-      routeChanging = false;
-      routeFrame = undefined;
+      routeFrame = requestAnimationFrame(() => {
+        settledPath = next;
+        routeFrame = undefined;
+      });
     });
     position = undefined;
     dragging = false;

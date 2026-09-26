@@ -18,6 +18,7 @@ export default defineConfig({
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
+    'mobile-drawer.spec.ts',
     'thread-panel.spec.ts',
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',

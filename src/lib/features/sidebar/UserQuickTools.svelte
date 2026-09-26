@@ -51,6 +51,7 @@
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
   const mobileSlotCount = mobileTools.length + 1;
+  const ROOM_LIST_PATHS = ['/rooms', '/direct', '/space/'];
   const desktopTools = [
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
     { href: '/settings', icon: GearIcon, label: 'nav.settings' },
@@ -104,6 +105,8 @@
     if (href === '/inbox') {
       return (!mobile && page.state.inbox === true) || page.url.pathname === href;
     }
+    if (href === '/rooms')
+      return ROOM_LIST_PATHS.some((path) => page.url.pathname.startsWith(path));
     return page.url.pathname.startsWith(href);
   }
 
