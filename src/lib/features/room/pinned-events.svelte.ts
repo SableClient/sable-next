@@ -1,9 +1,17 @@
 import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
+import { CoreError } from '#src/transport';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
+import { t } from '#lib/i18n.js';
 
 export type PinnedEventCommands = Pick<CoreCommands, 'pinnedEvents' | 'setPinned'>;
+
+export function pinErrorMessage(cause: unknown): string {
+  return cause instanceof CoreError && cause.detail.code === 'denied'
+    ? t('room.pinDenied')
+    : t('errors.actionFailed');
+}
 
 export class PinnedEvents {
   readonly #ids = new SvelteSet<string>();

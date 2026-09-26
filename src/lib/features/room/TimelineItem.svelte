@@ -40,7 +40,7 @@
   import FormattedBody from './FormattedBody.svelte';
   import MessageBody from './MessageBody.svelte';
   import MessageReactions from './MessageReactions.svelte';
-  import { usePinnedEvents } from './pinned-events.svelte.js';
+  import { pinErrorMessage, usePinnedEvents } from './pinned-events.svelte.js';
   import TimelineNotice from './TimelineNotice.svelte';
   import type { TimelineEventIndex } from './timeline-event-index';
   import MessageActions from './MessageActions.svelte';
@@ -484,7 +484,7 @@
       await pinnedEvents.toggle(roomId, eventId);
     } catch (error) {
       console.warn('[sable timeline] pin failed', error);
-      toasts.error($i18n.t('errors.actionFailed'));
+      toasts.error(pinErrorMessage(error));
     }
   }
 

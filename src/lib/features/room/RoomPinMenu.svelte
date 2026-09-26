@@ -12,6 +12,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import {
     isNewPin,
@@ -21,6 +22,7 @@
     type PinReadMarker,
   } from './pin-marker';
   import { useEventItems } from './event-items.svelte.js';
+  import { pinErrorMessage } from './pinned-events.svelte.js';
   import MessagePreview from './MessagePreview.svelte';
   import { opensFrom } from './message-preview';
 
@@ -135,6 +137,7 @@
       shownIds = shownIds.filter((id) => id !== eventId);
     } catch (error) {
       console.warn('[sable room] unpin failed', error);
+      toasts.error(pinErrorMessage(error));
     }
   }
 

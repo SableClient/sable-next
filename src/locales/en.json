@@ -341,6 +341,7 @@
     "pinsEmpty": "No pinned messages",
     "pinsEmptyHint": "Anyone with the power to pin can pin a message from its menu.",
     "pinsUnreadable": "This message could not be loaded.",
+    "pinDenied": "You don't have permission to pin messages in this room.",
     "pinsJump": "Jump to message",
     "menuMoreOptions": "More options",
     "menuMarkRead": "Mark as read",

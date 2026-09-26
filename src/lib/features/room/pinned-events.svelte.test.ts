@@ -1,6 +1,8 @@
 import { expect, test, vi } from 'vitest';
 
-import { PinnedEvents, type PinnedEventCommands } from './pinned-events.svelte.js';
+import { CoreError } from '#src/transport';
+
+import { pinErrorMessage, PinnedEvents, type PinnedEventCommands } from './pinned-events.svelte.js';
 
 function fakeCore(pinnedEvents = vi.fn(() => Promise.resolve<string[]>([])), setPinned = vi.fn()) {
   return { pinnedEvents, setPinned } as unknown as PinnedEventCommands;
@@ -95,4 +97,13 @@ test('a failed load leaves the set intact rather than clearing it', async () => 
   await pins.load('!room:example.org');
 
   expect(pins.has('$a')).toBe(true);
+});
+
+test('a refused pin says so instead of asking to retry', () => {
+  expect(pinErrorMessage(new CoreError({ code: 'denied' }))).toBe(
+    "You don't have permission to pin messages in this room."
+  );
+  expect(pinErrorMessage(new CoreError({ code: 'failed', log_id: 'e1' }))).toBe(
+    'Could not complete that action. Try again.'
+  );
 });

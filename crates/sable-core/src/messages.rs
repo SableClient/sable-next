@@ -220,7 +220,7 @@ impl Core {
         } else {
             room.unpin_event(&event_id).await
         }
-        .map_err(|error| self.failed("set_pinned", error))?;
+        .map_err(|error| self.room_error("set_pinned", error))?;
 
         let events = unique_pins(
             room.load_pinned_events()
