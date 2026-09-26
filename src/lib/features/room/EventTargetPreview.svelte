@@ -6,6 +6,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { readEventSource } from './event-source-cache';
   import { memberName } from './members.js';
@@ -13,12 +14,15 @@
   import { replyPreviewBody } from './reply-preview';
   import { reactionKey, stateEventText, type Translate } from './state-event-text';
   import type { TimelineEventIndex } from './timeline-event-index';
+  import { senderColor } from './timeline-format';
 
   interface Props {
     eventId: string;
     roomId?: string;
     events?: TimelineEventIndex;
     members?: readonly MemberView[];
+    currentUserId?: string | null;
+    reply?: boolean;
     icon?: Component;
     onJump?: (eventId: string) => void;
     body?: Snippet;
@@ -29,6 +33,8 @@
     roomId = '',
     events,
     members = [],
+    currentUserId = null,
+    reply = false,
     icon: Icon = ArrowBendUpLeftIcon,
     onJump,
     body,
@@ -47,6 +53,13 @@
     preview?.sender
       ? (loaded?.sender_name ?? null) || memberName(members, preview.sender)
       : $i18n.t('timeline.unknownSender')
+  );
+
+  let replyStyle = $derived(reply ? preferences.replyPreviewStyle : null);
+  let nameColor = $derived(
+    currentUserId !== null && preview?.sender === currentUserId
+      ? 'var(--primary-on-container)'
+      : senderColor(preview?.sender ?? null)
   );
 
   function previewOf(item: TimelineItemView, t: Translate): Preview {
@@ -79,14 +92,15 @@
 </script>
 
 <button
-  class="target-preview"
+  class={['target-preview', replyStyle && `target-${replyStyle}`]}
   type="button"
+  style:--target-name-color={nameColor}
   disabled={!onJump}
   onclick={() => {
     onJump?.(eventId);
   }}
 >
-  <Icon class="target-icon" />
+  {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
     <span class="target-name">{name}</span>
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
@@ -124,7 +138,6 @@
   }
 
   .target-copy {
-    filter: brightness(var(--opacity-p300));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -134,11 +147,85 @@
     white-space: normal;
   }
 
-  .target-preview:not(:disabled):is(:hover, :focus-visible) .target-copy {
+  .target-copy > :not(.target-name) {
+    filter: brightness(var(--opacity-p300));
+  }
+
+  .target-preview:not(:disabled):is(:hover, :focus-visible) .target-copy > :not(.target-name) {
     filter: brightness(var(--opacity-p500));
   }
 
   .target-name {
+    color: var(--target-name-color);
     font-weight: var(--font-weight-medium);
+  }
+
+  .target-compact {
+    gap: var(--space-100);
+    padding: 0;
+  }
+
+  .target-compact :global(.target-icon) {
+    height: var(--size-x50);
+    width: var(--size-x50);
+  }
+
+  .target-connected {
+    --target-connector-width: var(--border-width-500);
+
+    grid-template-columns: minmax(0, 1fr);
+    min-height: var(--space-500);
+    overflow: visible;
+    padding-inline: 0;
+    position: relative;
+  }
+
+  .target-connected::before {
+    border-left: var(--target-connector-width) solid var(--surface-on-container);
+    border-radius: var(--radius) 0 0;
+    border-top: var(--target-connector-width) solid var(--surface-on-container);
+    content: '';
+    height: calc(50% + var(--space-100));
+    left: calc(-1 * (var(--timeline-row-gap) + var(--avatar-size-small) / 2));
+    opacity: var(--opacity-placeholder);
+    pointer-events: none;
+    position: absolute;
+    top: calc(50% - var(--border-width-300));
+    width: calc(var(--timeline-row-gap) / 2 + var(--avatar-size-small) / 2);
+  }
+
+  .target-connected:not(:disabled):is(:hover, :focus-visible)::before {
+    opacity: var(--opacity-p300);
+  }
+
+  .target-expanded {
+    --target-accent-width: var(--border-width-600);
+
+    align-items: start;
+    background: var(--surface-var-container);
+    padding: var(--space-200) var(--space-300) var(--space-200)
+      calc(var(--space-300) + var(--target-accent-width));
+    position: relative;
+  }
+
+  .target-expanded::before {
+    background: var(--primary-main);
+    bottom: 0;
+    content: '';
+    left: 0;
+    pointer-events: none;
+    position: absolute;
+    top: 0;
+    width: var(--target-accent-width);
+  }
+
+  .target-expanded .target-copy {
+    display: grid;
+    gap: var(--space-050);
+    white-space: normal;
+  }
+
+  .target-expanded .target-copy > :not(.target-name) {
+    filter: none;
   }
 </style>

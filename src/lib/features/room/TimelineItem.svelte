@@ -1078,6 +1078,7 @@
     {roomId}
     {events}
     {members}
+    {currentUserId}
     {onSenderProfile}
     {onJumpToEvent}
   />
@@ -1117,6 +1118,7 @@
       {roomId}
       {events}
       {members}
+      {currentUserId}
       {onSenderProfile}
       {onJumpToEvent}
     />

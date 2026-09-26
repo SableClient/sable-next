@@ -6,6 +6,7 @@
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import EditDiff from './EditDiff.svelte';
@@ -32,6 +33,7 @@
     roomId?: string;
     events?: TimelineEventIndex;
     members?: readonly MemberView[];
+    currentUserId?: string | null;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onJumpToEvent?: (eventId: string) => void;
   }
@@ -42,6 +44,7 @@
     roomId = '',
     events,
     members = [],
+    currentUserId = null,
     onSenderProfile,
     onJumpToEvent,
   }: Props = $props();
@@ -62,6 +65,7 @@
     const key = reactionKey(content.content);
     return key !== null && isCustomReaction(key) ? key : null;
   });
+  let targetAbove = $derived(preferences.replyPreviewStyle !== 'expanded');
   let pins = $derived.by(() => {
     const content = item.content;
     if (content.kind !== 'state_event' || content.change?.kind !== 'pinned_events') return [];
@@ -71,6 +75,34 @@
     ].slice(0, MAX_PIN_PREVIEWS);
   });
 </script>
+
+{#snippet targetDetail(target: string)}
+  <div class="state-detail">
+    {#if isEditEvent(item)}
+      <EventTargetPreview
+        eventId={target}
+        {roomId}
+        {events}
+        {members}
+        {currentUserId}
+        reply
+        onJump={onJumpToEvent}
+      >
+        {#snippet body()}<EditDiff {item} {roomId} {events} />{/snippet}
+      </EventTargetPreview>
+    {:else}
+      <EventTargetPreview
+        eventId={target}
+        {roomId}
+        {events}
+        {members}
+        {currentUserId}
+        reply
+        onJump={onJumpToEvent}
+      />
+    {/if}
+  </div>
+{/snippet}
 
 {#snippet stateGutter()}
   <span class="state-icon" aria-hidden="true"><StateIcon /></span>
@@ -89,6 +121,7 @@
           {roomId}
           {events}
           {members}
+          {currentUserId}
           icon={pin.pinned ? PushPinIcon : PushPinSlashIcon}
           onJump={onJumpToEvent}
         />
@@ -106,6 +139,7 @@
     </div>
   {/if}
 {:else if hiddenTarget !== null}
+  {#if targetAbove}{@render targetDetail(hiddenTarget)}{/if}
   <p class="state">
     {@render stateGutter()}
     <span
@@ -120,21 +154,7 @@
         />{/if}</span
     >
   </p>
-  <div class="state-detail">
-    {#if isEditEvent(item)}
-      <EventTargetPreview eventId={hiddenTarget} {roomId} {events} {members} onJump={onJumpToEvent}>
-        {#snippet body()}<EditDiff {item} {roomId} {events} />{/snippet}
-      </EventTargetPreview>
-    {:else}
-      <EventTargetPreview
-        eventId={hiddenTarget}
-        {roomId}
-        {events}
-        {members}
-        onJump={onJumpToEvent}
-      />
-    {/if}
-  </div>
+  {#if !targetAbove}{@render targetDetail(hiddenTarget)}{/if}
 {:else if item.content.kind === 'hidden_event'}
   {@const raw = item.content.content}
   <div class="debug-event">
