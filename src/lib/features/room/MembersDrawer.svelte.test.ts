@@ -121,7 +121,7 @@ test('uses a role tag for its group, member colour and emoji', async () => {
 
   expect(document.querySelector('.group-label')?.textContent).toBe('🛡️Sentinel');
   expect(document.querySelector('.member-identity-row .role-tag-icon')).toBeNull();
-  expect(document.querySelector('.member-name')?.getAttribute('style')).toContain('#ff0000');
+  expect(document.querySelector('.member-name')?.getAttribute('style')).toContain('#cf0000');
   await unmount(instance);
 });
 

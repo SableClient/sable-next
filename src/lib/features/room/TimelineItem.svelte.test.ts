@@ -666,7 +666,7 @@ test('wraps non-text messages in a bubble in bubble layout', async () => {
 
 test('uses the sender profile name color in every message layout', async () => {
   core.userProfile.mockResolvedValue({
-    name_color_light: '#4f7a3a',
+    name_color_light: '#2f5a1f',
     name_color_dark: '#9fd07c',
   });
   const instance = mount(TimelineItemHarness, {
@@ -679,7 +679,7 @@ test('uses the sender profile name color in every message layout', async () => {
   expect(name?.classList.contains('tinted')).toBe(true);
   expect(
     document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-light')
-  ).toBe('#4f7a3a');
+  ).toBe('#2f5a1f');
   expect(
     document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-dark')
   ).toBe('#9fd07c');
@@ -700,8 +700,8 @@ test('falls back to the role colour when the sender profile has none', async () 
 
   const message = document.querySelector<HTMLElement>('.message');
   expect(document.querySelector('.sender')?.classList.contains('tinted')).toBe(true);
-  expect(message?.style.getPropertyValue('--name-color-on-light')).toBe('#c04040');
-  expect(message?.style.getPropertyValue('--name-color-on-dark')).toBe('#c04040');
+  expect(message?.style.getPropertyValue('--name-color-on-light')).toBe('#b8383a');
+  expect(message?.style.getPropertyValue('--name-color-on-dark')).toBe('#ee6a65');
   await unmount(instance);
 });
 

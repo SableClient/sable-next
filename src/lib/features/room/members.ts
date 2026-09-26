@@ -2,6 +2,7 @@ import type { MemberView, PerMessageProfileView, ProfileView } from '#src/genera
 
 import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import type { SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
+import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
 import { senderColor } from './timeline-format';
 
@@ -47,7 +48,12 @@ export function senderDisplayColors(
   const tinted = nameColorLight !== null || nameColorDark !== null;
   const nameColor = isOwn ? 'var(--primary-on-container)' : senderColor(userId);
 
-  return { nameColor, nameColorLight, nameColorDark, tinted };
+  return {
+    nameColor,
+    nameColorLight: nameColorOnLight(nameColorLight),
+    nameColorDark: nameColorOnDark(nameColorDark),
+    tinted,
+  };
 }
 
 export function findMember(

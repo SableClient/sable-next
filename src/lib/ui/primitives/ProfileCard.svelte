@@ -8,6 +8,15 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import Avatar from './Avatar.svelte';
+  import {
+    BLACK,
+    WHITE,
+    inkFor,
+    nameColorOn,
+    nameColorOnDark,
+    nameColorOnLight,
+    profilePalette,
+  } from './readable-color.js';
 
   interface Props {
     displayName: string;
@@ -62,9 +71,24 @@
   }: Props = $props();
   let banner = $derived(bannerUrl?.startsWith('mxc://') ? bannerUrl : null);
   let cover = $derived(banner ?? (avatarUrl?.startsWith('mxc://') ? avatarUrl : null));
-  let tinted = $derived(heroColor !== null && heroColor !== '');
-  let nameColor = $derived(nameColorLight ?? nameColorDark);
-  let nameColorForDark = $derived(nameColorDark ?? nameColorLight);
+  let ink = $derived(
+    !heroColor
+      ? null
+      : heroBrightness === 'light'
+        ? BLACK
+        : heroBrightness === 'dark'
+          ? WHITE
+          : inkFor(heroColor)
+  );
+  let palette = $derived(heroColor && ink ? profilePalette(heroColor, ink) : null);
+  let tinted = $derived(palette !== null);
+  let nameColor = $derived(nameColorOnLight(nameColorLight ?? nameColorDark));
+  let nameColorForDark = $derived(nameColorOnDark(nameColorDark ?? nameColorLight));
+  let nameOnHero = $derived.by(() => {
+    const own =
+      ink === BLACK ? (nameColorLight ?? nameColorDark) : (nameColorDark ?? nameColorLight);
+    return palette && own ? nameColorOn(own, palette.ground) : null;
+  });
   let canOpenAvatar = $derived(Boolean(avatarUrl && onAvatarClick));
   function openAvatar(): void {
     if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
@@ -83,11 +107,14 @@
 <section
   class={['profile-card', `profile-card-${variant}`, className]}
   class:tinted
-  class:tint-light={heroBrightness === 'light'}
-  class:tint-dark={heroBrightness === 'dark'}
-  style:--profile-hero={heroColor}
+  class:tint-light={ink === BLACK}
+  class:tint-dark={ink === WHITE}
+  style:--profile-hero={palette?.ground}
+  style:--profile-hero-panel={palette?.panel}
+  style:--profile-hero-muted={palette?.muted}
   style:--profile-name-color={nameColor}
   style:--profile-name-color-dark={nameColorForDark}
+  style:--profile-name-on-hero={nameOnHero}
   data-inset-owner={variant === 'sheet' ? 'bottom' : undefined}
 >
   <div class="profile-card-cover" class:has-banner={banner} style:background={color}>
@@ -205,18 +232,12 @@
   .profile-card.tinted {
     --profile-ink: var(--bg-on-container);
     --profile-card-ground: var(--profile-hero);
-    --profile-panel-ground: color-mix(in oklab, var(--profile-hero) 88%, var(--profile-ink));
-    --profile-text-muted: color-mix(in oklab, var(--profile-ink) 75%, var(--profile-hero));
+    --profile-panel-ground: var(--profile-hero-panel);
+    --profile-text-muted: var(--profile-hero-muted);
     --profile-icon: var(--profile-text-muted);
     --profile-line: color-mix(in oklab, var(--profile-ink) 20%, var(--profile-hero));
 
     color: var(--profile-ink);
-  }
-
-  @supports (color: oklch(from red l c h)) {
-    .profile-card.tinted {
-      --profile-ink: oklch(from var(--profile-hero) clamp(0, (0.62 - l) * 1000, 1) 0 0deg);
-    }
   }
 
   .profile-card.tinted.tint-dark {
@@ -460,48 +481,13 @@
     }
   }
 
-  @supports (color: oklch(from red l c h)) {
-    .profile-card-name.tinted,
-    :global(.profile-card-tinted) {
-      color: oklch(from var(--profile-name-color) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not(.light) .profile-card-name.tinted,
-      :root:not(.light) :global(.profile-card-tinted),
-      :root.dark .profile-card-name.tinted,
-      :root.dark :global(.profile-card-tinted) {
-        color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
-      }
-    }
-  }
-
   :root.dark .profile-card-name.tinted,
   :root.dark :global(.profile-card-tinted) {
     color: var(--profile-name-color-dark);
   }
 
-  @supports (color: oklch(from red l c h)) {
-    :root.dark .profile-card-name.tinted,
-    :root.dark :global(.profile-card-tinted) {
-      color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
-    }
-  }
-
   .profile-card.tinted .profile-card-name.tinted,
   .profile-card.tinted :global(.profile-card-tinted) {
-    color: var(--profile-ink);
-  }
-
-  @supports (color: oklch(from red l c h)) {
-    .profile-card.tinted.tint-light .profile-card-name.tinted,
-    .profile-card.tinted.tint-light :global(.profile-card-tinted) {
-      color: oklch(from var(--profile-name-color) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
-    }
-
-    .profile-card.tinted.tint-dark .profile-card-name.tinted,
-    .profile-card.tinted.tint-dark :global(.profile-card-tinted) {
-      color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
-    }
+    color: var(--profile-name-on-hero, var(--profile-ink));
   }
 </style>

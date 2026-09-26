@@ -31,6 +31,7 @@
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 
@@ -762,8 +763,8 @@
       },
     ]}
     data-selected={selected ? 'true' : undefined}
-    style:--pmp-on-light={personaTint?.color_on_light ?? undefined}
-    style:--pmp-on-dark={personaTint?.color_on_dark ?? undefined}
+    style:--pmp-on-light={nameColorOnLight(personaTint?.color_on_light) ?? undefined}
+    style:--pmp-on-dark={nameColorOnDark(personaTint?.color_on_dark) ?? undefined}
     style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
     style:--name-color-on-dark={senderColors.nameColorDark ?? undefined}
     style:--timeline-emote-size={timelineEmoteSize}
@@ -876,8 +877,8 @@
         <button
           class={['reply-preview', 'reply-connected', { persona: tint }]}
           type="button"
-          style:--pmp-on-light={tint?.color_on_light ?? undefined}
-          style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+          style:--pmp-on-light={nameColorOnLight(tint?.color_on_light) ?? undefined}
+          style:--pmp-on-dark={nameColorOnDark(tint?.color_on_dark) ?? undefined}
           style:--reply-name-color={replyNameColor}
           onclick={() => {
             onJumpToEvent?.(target);
@@ -934,8 +935,8 @@
           <button
             class={['reply-preview', `reply-${preferences.replyPreviewStyle}`, { persona: tint }]}
             type="button"
-            style:--pmp-on-light={tint?.color_on_light ?? undefined}
-            style:--pmp-on-dark={tint?.color_on_dark ?? undefined}
+            style:--pmp-on-light={nameColorOnLight(tint?.color_on_light) ?? undefined}
+            style:--pmp-on-dark={nameColorOnDark(tint?.color_on_dark) ?? undefined}
             style:--reply-name-color={replyNameColor}
             onclick={() => {
               onJumpToEvent?.(target);
@@ -1606,33 +1607,8 @@
     }
   }
 
-  @supports (color: oklch(from red l c h)) {
-    .persona {
-      --pmp-ink: oklch(
-        from var(--pmp-on-light, var(--sec-on-container)) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h
-      );
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not(.light) .persona,
-      :root.dark .persona {
-        --pmp-ink: oklch(
-          from var(--pmp-on-dark, var(--sec-on-container)) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
-        );
-      }
-    }
-  }
-
   :root.dark .persona {
     --pmp-ink: var(--pmp-on-dark, var(--sec-on-container));
-  }
-
-  @supports (color: oklch(from red l c h)) {
-    :root.dark .persona {
-      --pmp-ink: oklch(
-        from var(--pmp-on-dark, var(--sec-on-container)) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
-      );
-    }
   }
 
   .message.persona :global(.message-avatar) {

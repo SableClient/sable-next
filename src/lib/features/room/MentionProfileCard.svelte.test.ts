@@ -120,7 +120,7 @@ test('uses the room role name, emoji and colour when the profile has no name col
 
   expect(document.querySelector('.profile-card-meta')?.textContent).toContain('🛡️');
   expect(document.querySelector('.profile-card-meta')?.textContent).toContain('Sentinel');
-  expect(document.querySelector('.profile-card')?.getAttribute('style')).toContain('#ff0000');
+  expect(document.querySelector('.profile-card')?.getAttribute('style')).toContain('#cf0000');
   await unmount(instance);
 });
 

@@ -5,10 +5,13 @@ test.use({ storageState: SIGNED_OUT });
 const CASES = [
   { scheme: 'light', hero: '#1b1b3a', brightness: 'dark' },
   { scheme: 'dark', hero: '#f4e7c8', brightness: 'light' },
+  { scheme: 'light', hero: '#ff0000', brightness: 'dark' },
+  { scheme: 'dark', hero: '#ff0000', brightness: 'light' },
+  { scheme: 'light', hero: '#ff0000', brightness: null },
 ] as const;
 
 for (const { scheme, hero, brightness } of CASES) {
-  test(`a ${brightness} profile card keeps its text legible on the ${scheme} theme`, async ({
+  test(`a ${hero} profile card with ${brightness ?? 'automatic'} brightness keeps its text legible on the ${scheme} theme`, async ({
     app,
     page,
     installRoomCore,
@@ -62,7 +65,7 @@ for (const { scheme, hero, brightness } of CASES) {
         const fg = luminance(getComputedStyle(element).color);
         const bg = luminance(background(element));
         const contrast = (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
-        if (contrast < 3) failures.push(`${text} (${contrast.toFixed(2)})`);
+        if (contrast < 4.5) failures.push(`${text} (${contrast.toFixed(2)})`);
       }
       return failures;
     });

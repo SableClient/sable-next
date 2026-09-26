@@ -69,31 +69,6 @@
   }
 }
 
-@supports (color: oklch(from red l c h)) {
-  :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns, .reply-name).tinted {
-    color: oklch(from var(--name-color-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not(.light)
-      :is(
-        .sender-identity-name,
-        .sender-identity-via,
-        .sender-identity-pronouns,
-        .reply-name
-      ).tinted,
-    :root.dark
-      :is(
-        .sender-identity-name,
-        .sender-identity-via,
-        .sender-identity-pronouns,
-        .reply-name
-      ).tinted {
-      color: oklch(from var(--name-color-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
-    }
-  }
-}
-
 @media (width <= 25rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     max-width: 6rem;

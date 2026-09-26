@@ -16,6 +16,7 @@
   import { reactionKey, stateEventText, type Translate } from './state-event-text';
   import type { TimelineEventIndex } from './timeline-event-index';
   import { senderColor } from './timeline-format';
+  import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
   interface Props {
     eventId: string;
@@ -58,8 +59,8 @@
   );
 
   let cosmetics = $derived(roomCosmetics?.for(preview?.sender) ?? null);
-  let tintOnLight = $derived(cosmetics?.colorOnLight ?? cosmetics?.colorOnDark ?? null);
-  let tintOnDark = $derived(cosmetics?.colorOnDark ?? cosmetics?.colorOnLight ?? null);
+  let tintOnLight = $derived(nameColorOnLight(cosmetics?.colorOnLight ?? cosmetics?.colorOnDark));
+  let tintOnDark = $derived(nameColorOnDark(cosmetics?.colorOnDark ?? cosmetics?.colorOnLight));
   let replyStyle = $derived(reply ? preferences.replyPreviewStyle : null);
   let nameColor = $derived(
     currentUserId !== null && preview?.sender === currentUserId
@@ -179,28 +180,6 @@
 
   :root.dark .tinted {
     --target-name-color: var(--target-on-dark);
-  }
-
-  @supports (color: oklch(from red l c h)) {
-    .tinted {
-      --target-name-color: oklch(
-        from var(--target-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h
-      );
-    }
-
-    @media (prefers-color-scheme: dark) {
-      :root:not(.light) .tinted {
-        --target-name-color: oklch(
-          from var(--target-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
-        );
-      }
-    }
-
-    :root.dark .tinted {
-      --target-name-color: oklch(
-        from var(--target-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
-      );
-    }
   }
 
   .target-compact {
