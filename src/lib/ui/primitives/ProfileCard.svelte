@@ -165,9 +165,7 @@
   {#if children || footer}
     <div class="profile-card-panel" class:framed={children}>
       {#if children}
-        <div class="profile-card-bio-block">
-          <div class="profile-card-bio">{@render children()}</div>
-        </div>
+        <div class="profile-card-bio explicit-scrollbar">{@render children()}</div>
       {/if}
       {#if footer}
         <div class="profile-card-footer" class:divided={children}>{@render footer()}</div>
@@ -392,11 +390,6 @@
     overflow: clip;
   }
 
-  .profile-card-bio-block {
-    display: grid;
-    padding: var(--space-300);
-  }
-
   /* One toolbar of equal targets, which is what separates verbs from the facts
      above rather than the presence of a border. */
   .profile-card-actions {
@@ -410,10 +403,12 @@
   .profile-card-bio {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
+    margin-block: var(--space-300);
     max-height: calc(var(--profile-bio-lines) * var(--line-height-body) * 1em);
     overflow-wrap: break-word;
     overflow-y: auto;
     overscroll-behavior: contain;
+    padding-inline: var(--space-300);
   }
 
   .profile-card-bio :global(.formatted-body) {

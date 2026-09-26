@@ -1,7 +1,7 @@
-@import url("@fontsource-variable/nunito");
-@import url("@sableclient/twemoji-font");
-@import url("./lib/ui/primitives/selection.css");
-@import url("./lib/ui/primitives/settings-nav.css");
+@import url('@fontsource-variable/nunito');
+@import url('@sableclient/twemoji-font');
+@import url('./lib/ui/primitives/selection.css');
+@import url('./lib/ui/primitives/settings-nav.css');
 
 /* Palette lifted verbatim from Sable's src/app/styles/themes.css so the two
    apps read as the same product. These stay plain CSS rather than a generated
@@ -392,30 +392,16 @@ html {
   --code-line-height: 1.25rem;
 
   /* Font families */
-  --font-family-emoji: "Twemoji_DISABLED";
-  --font-family-mono:
-    ui-monospace,
-    "Cascadia Code",
-    "Source Code Pro",
-    menlo,
-    consolas,
-    monospace;
+  --font-family-emoji: 'Twemoji_DISABLED';
+  --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
   --font-family-cosmetic-arial: arial, helvetica, sans-serif;
   --font-family-cosmetic-verdana: verdana, geneva, sans-serif;
-  --font-family-cosmetic-trebuchet: "Trebuchet MS", "Lucida Grande", sans-serif;
-  --font-family-cosmetic-georgia: georgia, "Times New Roman", serif;
-  --font-family-cosmetic-times: "Times New Roman", times, serif;
-  --font-family-cosmetic-courier: "Courier New", courier, monospace;
-  --font-family-cosmetic-comic:
-    "Comic Sans MS",
-    "Comic Neue",
-    "Chalkboard SE",
-    cursive;
-  --font-family-cosmetic-impact:
-    impact,
-    haettenschweiler,
-    "Arial Narrow Bold",
-    sans-serif;
+  --font-family-cosmetic-trebuchet: 'Trebuchet MS', 'Lucida Grande', sans-serif;
+  --font-family-cosmetic-georgia: georgia, 'Times New Roman', serif;
+  --font-family-cosmetic-times: 'Times New Roman', times, serif;
+  --font-family-cosmetic-courier: 'Courier New', courier, monospace;
+  --font-family-cosmetic-comic: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+  --font-family-cosmetic-impact: impact, haettenschweiler, 'Arial Narrow Bold', sans-serif;
 
   /* Typography scale */
   --font-size-x-small: calc(0.75rem * var(--text-scale));
@@ -452,10 +438,7 @@ html {
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
   --safe-top: var(--safe-area-inset-top);
   --safe-right: var(--safe-area-inset-right);
-  --safe-bottom: max(
-    var(--safe-area-inset-bottom),
-    var(--keyboard-height, 0px)
-  );
+  --safe-bottom: max(var(--safe-area-inset-bottom), var(--keyboard-height, 0px));
   --safe-left: var(--safe-area-inset-left);
   --keyboard-overlap: var(--keyboard-height, 0px);
   --edge-inset-top: 0px;
@@ -463,13 +446,13 @@ html {
   --sheet-inset-bottom: 0px;
 }
 
-:root[data-tauri-os="android"] {
+:root[data-tauri-os='android'] {
   --safe-bottom: var(--safe-area-inset-bottom);
   --keyboard-overlap: 0px;
 }
 
-:root[data-client-decorations="desktop"],
-:root[data-client-decorations="mac"] {
+:root[data-client-decorations='desktop'],
+:root[data-client-decorations='mac'] {
   --titlebar-height: 2rem;
   --safe-top: calc(var(--safe-area-inset-top) + var(--titlebar-height));
 }
@@ -487,8 +470,8 @@ body {
 
 @supports not selector(::-webkit-scrollbar) {
   * {
-    scrollbar-width: thin;
     scrollbar-color: transparent transparent;
+    scrollbar-width: thin;
   }
 
   *:hover,
@@ -521,11 +504,11 @@ body {
   background-clip: padding-box;
 }
 
-:root[data-underline-links="off"] {
+:root[data-underline-links='off'] {
   --link-decoration: none;
 }
 
-:root[data-reduced-motion="on"] {
+:root[data-reduced-motion='on'] {
   --motion-fast: 0s;
   --motion-normal: 0s;
   --motion-slow: 0s;
@@ -547,14 +530,14 @@ body {
   }
 }
 
-:root[data-twitter-emoji="on"] {
-  --font-family-emoji: "Twemoji";
+:root[data-twitter-emoji='on'] {
+  --font-family-emoji: 'Twemoji';
 }
 
-:root[data-blur-media="on"] .privacy-media,
-:root[data-blur-avatars="on"] .avatar-root,
-:root[data-blur-emotes="on"] img[data-mx-emoticon],
-:root[data-blur-emotes="on"] .reaction-image {
+:root[data-blur-media='on'] .privacy-media,
+:root[data-blur-avatars='on'] .avatar-root,
+:root[data-blur-emotes='on'] img[data-mx-emoticon],
+:root[data-blur-emotes='on'] .reaction-image {
   filter: blur(1.5rem) grayscale(1);
   opacity: 0.7;
   transition:
@@ -562,16 +545,16 @@ body {
     opacity var(--duration-fast) ease;
 }
 
-:root[data-blur-media="on"] .privacy-media:hover,
-:root[data-blur-media="on"] .privacy-media:focus-within,
-:root[data-blur-avatars="on"] .avatar-root:hover,
-:root[data-blur-emotes="on"] img[data-mx-emoticon]:hover,
-:root[data-blur-emotes="on"] .reaction-image:hover {
+:root[data-blur-media='on'] .privacy-media:hover,
+:root[data-blur-media='on'] .privacy-media:focus-within,
+:root[data-blur-avatars='on'] .avatar-root:hover,
+:root[data-blur-emotes='on'] img[data-mx-emoticon]:hover,
+:root[data-blur-emotes='on'] .reaction-image:hover {
   filter: none;
   opacity: 1;
 }
 
-:root[data-high-contrast="on"] {
+:root[data-high-contrast='on'] {
   --border-width: var(--border-width-500);
   --focus-ring-width: var(--border-width-700);
   --link-decoration: underline;
@@ -590,7 +573,7 @@ body {
 body {
   background: var(--bg-container);
   color: var(--bg-on-container);
-  font-family: "Nunito Variable", var(--font-family-emoji), sans-serif;
+  font-family: 'Nunito Variable', var(--font-family-emoji), sans-serif;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);
@@ -608,7 +591,7 @@ textarea {
 }
 
 :disabled,
-[aria-disabled="true"] {
+[aria-disabled='true'] {
   cursor: not-allowed;
 }
 
@@ -646,13 +629,13 @@ button,
 a,
 input,
 label,
-[role="button"],
-[role="switch"] {
+[role='button'],
+[role='switch'] {
   -webkit-tap-highlight-color: transparent;
 }
 
 label[for],
-[role="switch"] {
+[role='switch'] {
   user-select: none;
 }
 
@@ -664,7 +647,7 @@ label[for],
 .selection-layer::after {
   background: var(--surface-container-active);
   border-radius: inherit;
-  content: "";
+  content: '';
   inset: 0;
   opacity: 0;
   pointer-events: none;
@@ -697,29 +680,29 @@ a:not([class]):hover {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  html:not([data-reduced-motion="on"]) .btn,
-  html:not([data-reduced-motion="on"]) .menu-item,
-  html:not([data-reduced-motion="on"]) .option-card {
+  html:not([data-reduced-motion='on']) .btn,
+  html:not([data-reduced-motion='on']) .menu-item,
+  html:not([data-reduced-motion='on']) .option-card {
     transition:
       background-color var(--motion-normal) var(--motion-easing-standard),
       translate var(--motion-fast) var(--ease-smooth-out),
       scale var(--motion-fast) var(--ease-smooth-out);
   }
 
-  html:not([data-reduced-motion="on"])
-    .btn:hover:not(:disabled, [aria-disabled="true"], [data-no-button-motion]),
-  html:not([data-reduced-motion="on"])
+  html:not([data-reduced-motion='on'])
+    .btn:hover:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  html:not([data-reduced-motion='on'])
     .menu-item:hover:not(:disabled, [data-disabled], [data-no-button-motion]),
-  html:not([data-reduced-motion="on"])
+  html:not([data-reduced-motion='on'])
     .option-card:hover:not([data-disabled], [data-no-button-motion]) {
     translate: 0 -1px;
   }
 
-  html:not([data-reduced-motion="on"])
-    .btn:active:not(:disabled, [aria-disabled="true"], [data-no-button-motion]),
-  html:not([data-reduced-motion="on"])
+  html:not([data-reduced-motion='on'])
+    .btn:active:not(:disabled, [aria-disabled='true'], [data-no-button-motion]),
+  html:not([data-reduced-motion='on'])
     .menu-item:active:not(:disabled, [data-disabled], [data-no-button-motion]),
-  html:not([data-reduced-motion="on"])
+  html:not([data-reduced-motion='on'])
     .option-card:active:not([data-disabled], [data-no-button-motion]) {
     scale: 0.96;
   }
