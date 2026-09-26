@@ -10,6 +10,7 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
@@ -27,9 +28,10 @@
   import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
   import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
-  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -172,8 +174,9 @@
   let canMessage = $derived(core.session !== null && !isSelf);
   let messageLabel = $derived($i18n.t('timeline.messageUser', { name: displayName }));
   let draft = $state('');
+  let hasDraft = $derived(draft.trim() !== '');
   let sending = $state(false);
-  let sendFailed = $state(false);
+  let sendFailed = $state<'send' | 'open' | null>(null);
   let homeserver = $derived(userId.slice(userId.indexOf(':') + 1));
   let roleTag = $derived(
     member && powerTags !== null ? powerTag(member.power_level, $i18n.t, powerTags) : null
@@ -343,17 +346,24 @@
 
   async function sendDirectMessage(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    const body = draft.trim();
-    if (!body || sending) return;
+    if (sending) return;
 
+    const body = draft.trim();
+    let step: 'send' | 'open' = 'open';
     sending = true;
-    sendFailed = false;
+    sendFailed = null;
     try {
-      const roomId = await core.commands.createDm(userId);
-      await core.commands.sendMessage(roomId, body);
-      draft = '';
-    } catch {
-      sendFailed = true;
+      const dmId = await core.commands.createDm(userId);
+      if (body) {
+        step = 'send';
+        await core.commands.sendMessage(dmId, body);
+        draft = '';
+        step = 'open';
+      }
+      await goto(resolve('/(app)/direct/[roomId]', { roomId: roomPathParamFromId(dmId) }));
+    } catch (error) {
+      console.warn('[sable profile] could not open a chat', error);
+      sendFailed = step;
     } finally {
       sending = false;
     }
@@ -584,17 +594,24 @@
       disabled={sending}
     />
     <IconButton
-      label={$i18n.t('timeline.sendMessage')}
-      variant="primary"
+      label={hasDraft ? $i18n.t('timeline.sendMessage') : $i18n.t('timeline.openChat')}
+      title={hasDraft ? undefined : $i18n.t('timeline.openChat')}
+      variant={hasDraft ? 'primary' : 'secondary'}
       size="small"
       type="submit"
-      disabled={sending || draft.trim() === ''}
+      disabled={sending}
     >
-      <PaperPlaneRightIcon />
+      {#if hasDraft}
+        <PaperPlaneRightIcon />
+      {:else}
+        <ChatCircleIcon />
+      {/if}
     </IconButton>
   </form>
   {#if sendFailed}
-    <p class="profile-composer-error" role="status">{$i18n.t('timeline.sendFailed')}</p>
+    <p class="profile-composer-error" role="status">
+      {sendFailed === 'send' ? $i18n.t('timeline.sendFailed') : $i18n.t('timeline.openChatFailed')}
+    </p>
   {/if}
 {/snippet}
 

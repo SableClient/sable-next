@@ -20,6 +20,11 @@ const core = Object.assign(baseCore, {
   setUserPowerLevel: vi.fn<(roomId: string, userId: string, level: number) => Promise<void>>(),
 });
 
+const goto = vi.hoisted(() =>
+  vi.fn<(href: string) => Promise<void>>(() => Promise.reject(new Error('no router')))
+);
+vi.mock('$app/navigation', () => ({ goto }));
+
 const toastError = vi.hoisted(() => vi.fn());
 vi.mock('#lib/ui/toasts.svelte.js', () => ({ toasts: { error: toastError } }));
 
@@ -29,6 +34,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
     byId: (roomId: string) =>
       roomId === '!dm:example.org' ? { room_id: roomId, is_direct: true } : undefined,
   }),
+  roomPathParamFromId: (roomId: string) => roomId,
 }));
 
 vi.mock('#lib/rooms/presence.svelte.js', async () => {
@@ -210,6 +216,35 @@ test('sends a direct message from the composer', async () => {
   });
 
   expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
+  });
+  await unmount(instance);
+});
+
+test('opens the chat without sending when the composer is empty', async () => {
+  core.createDm.mockResolvedValue('!dm:example.org');
+  const instance = mount(MentionProfileCard, {
+    target: document.body,
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  const submit = document.querySelector<HTMLButtonElement>('.profile-composer [type="submit"]');
+  expect(submit?.getAttribute('aria-label')).toBe('Open chat');
+  expect(submit?.disabled).toBe(false);
+  document.querySelector('.profile-composer')?.dispatchEvent(new Event('submit'));
+  await vi.waitFor(() => {
+    expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
+  });
+
+  expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
+  expect(core.sendMessage).not.toHaveBeenCalled();
   await unmount(instance);
 });
 

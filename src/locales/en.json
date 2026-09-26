@@ -1007,6 +1007,8 @@
     "profileBlock": "Block user",
     "profileUnblock": "Unblock user",
     "messageUser": "Message {{name}}",
+    "openChat": "Open chat",
+    "openChatFailed": "Could not open the chat",
     "animalBoth": "{{is}} with {{has}}",
     "animalIs": "Is {{is}}",
     "animalHas": "Has {{has}}",
