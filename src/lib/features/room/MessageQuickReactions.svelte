@@ -109,8 +109,9 @@
   .quick-reaction :global(.quick-reaction-image) {
     display: block;
     height: 1.125rem;
+    max-width: 9.375rem;
     object-fit: contain;
-    width: auto;
+    width: calc(1.125rem * var(--media-ratio));
   }
 
   .quick-reaction:focus-visible {
@@ -125,6 +126,7 @@
 
   .quick-strip.roomy .quick-reaction :global(.quick-reaction-image) {
     height: 1.5rem;
+    width: calc(1.5rem * var(--media-ratio));
   }
 
   .quick-line {
