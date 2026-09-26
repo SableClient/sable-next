@@ -17,6 +17,7 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
   roomPreview: vi.fn<() => Promise<{ name: string | null }>>(),
+  eventItems: vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([])),
 });
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -554,5 +555,26 @@ test('a time inside a link stays part of the link', async () => {
   const click = new MouseEvent('click', { bubbles: true, cancelable: true });
   chip?.dispatchEvent(click);
   expect(click.defaultPrevented).toBe(false);
+  await unmount(instance);
+});
+
+test('a bare event link names the room and quotes the message, with an icon', async () => {
+  roomList.rooms = [{ room_id: '!room:example.org', canonical_alias: null, name: 'Design' }];
+  core.eventItems.mockResolvedValue([
+    { content: { kind: 'message', body: `ship it\n${'x'.repeat(100)}`, html: null } },
+  ]);
+  const url = 'https://matrix.to/#/!room:example.org/$event';
+  const instance = mount(FormattedBody, {
+    target: document.body,
+    props: { html: `<a href="${url}">${url}</a>` },
+  });
+
+  const anchor = document.querySelector<HTMLAnchorElement>('a');
+  await vi.waitFor(() => {
+    expect(anchor?.textContent).toMatch(/^#Design: ship it x+…$/);
+  });
+  expect(anchor?.textContent).toHaveLength('#Design: '.length + 72);
+  expect(anchor?.querySelector('.link-chip-icon svg')).not.toBeNull();
+  expect(core.eventItems).toHaveBeenCalledWith('!room:example.org', ['$event']);
   await unmount(instance);
 });

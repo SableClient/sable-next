@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { mount, unmount, untrack, type Component } from 'svelte';
   import { on } from 'svelte/events';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
+  import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -21,6 +23,7 @@
   import { splitVia } from './join-address';
   import { settingsLinkLabel } from './settings-link-label';
   import { parseSettingsLink } from './settings-link';
+  import { replyPreviewBody } from './reply-preview';
 
   interface Props {
     html: string;
@@ -151,6 +154,17 @@
     return (node: HTMLElement) => {
       void html;
       return untrack(() => {
+        const icons: ReturnType<typeof mount>[] = [];
+        const withIcon = (anchor: HTMLAnchorElement, icon: Component): HTMLSpanElement => {
+          const holder = document.createElement('span');
+          holder.className = 'link-chip-icon';
+          holder.ariaHidden = 'true';
+          const label = document.createElement('span');
+          label.textContent = anchor.textContent;
+          anchor.replaceChildren(holder, label);
+          icons.push(mount(icon, { target: holder }));
+          return label;
+        };
         for (const anchor of node.querySelectorAll('a')) {
           anchor.target = '_blank';
           anchor.rel = 'noopener noreferrer';
@@ -159,10 +173,10 @@
           if (link) {
             anchor.dataset.matrixLink = link.kind;
             if (link.kind === 'user') continue;
-            if (anchor.textContent.trim() === anchor.getAttribute('href')?.trim()) {
-              anchor.textContent = link.roomId;
-              void resolveRoomName(link, anchor);
-            }
+            const bare = anchor.textContent.trim() === anchor.getAttribute('href')?.trim();
+            if (bare) anchor.textContent = link.roomId;
+            const label = link.kind === 'event' ? withIcon(anchor, ChatCircleIcon) : anchor;
+            if (bare) void resolveLinkLabel(link, anchor, label);
             continue;
           }
 
@@ -171,6 +185,7 @@
             anchor.dataset.settingsLink = settings.section;
             if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
             anchor.textContent = settingsLinkLabel(settings);
+            withIcon(anchor, GearSixIcon);
           }
         }
         for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
@@ -221,6 +236,7 @@
           offFocusOut();
           closeDefinition();
           for (const release of releases) release();
+          for (const icon of icons) void unmount(icon);
         };
       });
     };
@@ -265,9 +281,12 @@
       : $i18n.t('timeline.timeMarkupDetail', { local, utc });
   }
 
-  async function resolveRoomName(
+  const EVENT_SNIPPET_LENGTH = 72;
+
+  async function resolveLinkLabel(
     link: Exclude<MatrixLink, { kind: 'user' }>,
-    anchor: HTMLAnchorElement
+    anchor: HTMLAnchorElement,
+    label: HTMLElement
   ) {
     const known = roomList.rooms.find(
       (room) => room.room_id === link.roomId || room.canonical_alias === link.roomId
@@ -278,7 +297,20 @@
         (preview) => preview.name,
         () => null
       ));
-    if (name && anchor.isConnected) anchor.textContent = name.startsWith('#') ? name : `#${name}`;
+    const room = name ? (name.startsWith('#') ? name : `#${name}`) : null;
+    const snippet =
+      link.kind === 'event' && known
+        ? await core.commands.eventItems(known.room_id, [link.eventId]).then(
+            ([item]) => (item ? replyPreviewBody(item.content).replace(/\s+/g, ' ').trim() : ''),
+            () => ''
+          )
+        : '';
+    if (!anchor.isConnected || room === null) return;
+    const short =
+      snippet.length > EVENT_SNIPPET_LENGTH
+        ? `${snippet.slice(0, EVENT_SNIPPET_LENGTH - 1)}…`
+        : snippet;
+    label.textContent = short ? `${room}: ${short}` : room;
   }
 
   /** Past this many lines a block collapses behind a toggle. */
@@ -608,6 +640,12 @@
   .formatted-body :global(a[data-matrix-link]),
   .formatted-body :global(a[data-settings-link]) {
     display: inline-block;
+  }
+
+  .formatted-body :global(.link-chip-icon) {
+    display: inline-flex;
+    margin-inline-end: var(--space-100);
+    vertical-align: -0.125em;
   }
 
   .formatted-body :global(a[data-matrix-link]),
