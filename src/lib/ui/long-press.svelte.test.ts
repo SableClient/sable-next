@@ -1,7 +1,7 @@
 import { hapticFeedback } from '#lib/platform/haptics.js';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import { LONG_PRESS_MS, LongPress, mouseContextMenu } from './long-press.svelte.js';
+import { LONG_PRESS_MS, LongPress, longPress, mouseContextMenu } from './long-press.svelte.js';
 
 vi.mock('#lib/platform/haptics.js', () => ({ hapticFeedback: vi.fn() }));
 
@@ -176,5 +176,84 @@ test('a touch press is held until it lifts or fires', () => {
 
   press.start(pointer({ pointerType: 'mouse' }));
   expect(press.pressing).toBe(false);
+  vi.useRealTimers();
+});
+
+test('a touch contextmenu after the platform cancels the hold fires the press', () => {
+  vi.useFakeTimers();
+  const onPress = vi.fn();
+  const node = document.createElement('a');
+  const detach = longPress({ onPress })(node);
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('contextmenu', { pointerType: 'touch' }));
+
+  expect(onPress).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(1000);
+  expect(onPress).toHaveBeenCalledOnce();
+  detach();
+  vi.useRealTimers();
+});
+
+test('a platform cancel after its own contextmenu fires the press', () => {
+  vi.useFakeTimers();
+  const onPress = vi.fn();
+  const node = document.createElement('a');
+  const detach = longPress({ onPress })(node);
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('contextmenu', { pointerType: 'touch' }));
+  expect(onPress).not.toHaveBeenCalled();
+  node.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }));
+
+  expect(onPress).toHaveBeenCalledOnce();
+  vi.advanceTimersByTime(1000);
+  expect(onPress).toHaveBeenCalledOnce();
+  detach();
+  vi.useRealTimers();
+});
+
+test('a lift after the platform contextmenu opens nothing', () => {
+  vi.useFakeTimers();
+  const onPress = vi.fn();
+  const node = document.createElement('a');
+  const detach = longPress({ onPress })(node);
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('contextmenu', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('pointercancel', { pointerType: 'touch' }));
+  vi.advanceTimersByTime(1000);
+
+  expect(onPress).not.toHaveBeenCalled();
+  detach();
+  vi.useRealTimers();
+});
+
+test('a touch contextmenu opens nothing after a lift, a slide or a fired press', () => {
+  vi.useFakeTimers();
+  const onPress = vi.fn();
+  const node = document.createElement('a');
+  const detach = longPress({ onPress })(node);
+  const menu = () => new PointerEvent('contextmenu', { pointerType: 'touch' });
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch' }));
+  node.dispatchEvent(menu());
+  expect(onPress).not.toHaveBeenCalled();
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(new PointerEvent('pointermove', { pointerType: 'touch', clientY: 40 }));
+  node.dispatchEvent(menu());
+  expect(onPress).not.toHaveBeenCalled();
+
+  node.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
+  node.dispatchEvent(menu());
+  expect(onPress).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(LONG_PRESS_MS);
+  node.dispatchEvent(menu());
+  expect(onPress).toHaveBeenCalledOnce();
+  detach();
   vi.useRealTimers();
 });

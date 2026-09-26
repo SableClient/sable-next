@@ -33,9 +33,10 @@ export function longPress(options: LongPressOptions): (node: Element) => () => v
     const listeners = [
       ['pointerdown', press.start],
       ['pointermove', press.move],
-      ['pointerup', press.end],
-      ['pointercancel', press.end],
+      ['pointerup', press.lift],
+      ['pointercancel', press.cancelled],
       ['pointerleave', press.end],
+      ['contextmenu', press.contextMenu],
     ] as const;
     for (const [type, handler] of listeners) node.addEventListener(type, handler as EventListener);
     return () => {
@@ -54,6 +55,8 @@ export class LongPress {
 
   #timer: ReturnType<typeof setTimeout> | undefined;
   #origin: { x: number; y: number } | null = null;
+  #held = false;
+  #menuSeen = false;
 
   constructor(private readonly options: LongPressOptions) {}
 
@@ -69,6 +72,8 @@ export class LongPress {
 
     this.fired = false;
     this.pressing = true;
+    this.#held = true;
+    this.#menuSeen = false;
     this.#origin = { x: event.clientX, y: event.clientY };
     this.#timer = setTimeout(() => {
       this.#timer = undefined;
@@ -78,6 +83,7 @@ export class LongPress {
   };
 
   fire(event: MouseEvent): void {
+    this.#held = false;
     this.fired = true;
     this.pressing = false;
     hapticFeedback('medium');
@@ -92,7 +98,26 @@ export class LongPress {
     const moved =
       Math.abs(event.clientX - this.#origin.x) > LONG_PRESS_SLOP_PX ||
       Math.abs(event.clientY - this.#origin.y) > LONG_PRESS_SLOP_PX;
-    if (moved) this.end();
+    if (moved) {
+      this.#held = false;
+      this.end();
+    }
+  };
+
+  lift = (event: PointerEvent): void => {
+    this.#held = false;
+    this.end(event);
+  };
+
+  contextMenu = (event: MouseEvent): void => {
+    if (!this.#held || !touchContextMenu(event)) return;
+    if (this.pending) this.#menuSeen = true;
+    else this.fire(event);
+  };
+
+  cancelled = (event: PointerEvent): void => {
+    this.end(event);
+    if (this.#held && this.#menuSeen) this.fire(event);
   };
 
   end = (event?: PointerEvent): void => {
@@ -104,6 +129,7 @@ export class LongPress {
   };
 
   cancel(): void {
+    this.#held = false;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = undefined;
     this.pressing = false;
