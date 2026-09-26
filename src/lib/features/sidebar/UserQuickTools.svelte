@@ -47,7 +47,7 @@
 
   const mobileTools = [
     { href: '/rooms', icon: ChatsIcon, label: 'nav.messages' },
-    { href: null, icon: ListMagnifyingGlassIcon, label: 'shortcuts.openRoomSearch' },
+    { href: '/navigate', icon: ListMagnifyingGlassIcon, label: 'shortcuts.openRoomSearch' },
     { href: '/inbox', icon: BellIcon, label: 'nav.inbox' },
   ] as const;
   const mobileSlotCount = mobileTools.length + 1;
@@ -57,6 +57,11 @@
   ] as const;
 
   function activateTool(event: MouseEvent, href: string): void {
+    if (mobile) {
+      onNavigate?.(href);
+      return;
+    }
+
     if (
       href === '/inbox' &&
       (page.url.pathname === href || page.state.inbox === true) &&
@@ -96,13 +101,13 @@
   }
 
   function isToolActive(href: string): boolean {
-    if (href === '/inbox') return page.state.inbox === true || page.url.pathname === href;
+    if (href === '/inbox') {
+      return (!mobile && page.state.inbox === true) || page.url.pathname === href;
+    }
     return page.url.pathname.startsWith(href);
   }
 
-  let mobileSelectedIndex = $derived(
-    mobileTools.findIndex((item) => item.href !== null && isToolActive(item.href))
-  );
+  let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));
 </script>
 
 {#snippet roomSwitcher(toolClass: string, side: 'top' | 'right')}
@@ -129,36 +134,25 @@
     aria-label={$i18n.t('nav.quickTools')}
   >
     {#each mobileTools as item (item.label)}
-      {@const toolActive = item.href !== null && isToolActive(item.href)}
+      {@const toolActive = isToolActive(item.href)}
+      {@const href = item.href}
       <div class="mobile-tool-slot">
-        {#if item.href === null}
-          <button
-            type="button"
-            class="quick-tool mobile-tool"
-            aria-label={$i18n.t(item.label)}
-            onclick={() => (paletteState.open = true)}
+        <a
+          class="quick-tool mobile-tool"
+          {href}
+          onclick={(event) => {
+            activateTool(event, href);
+          }}
+          aria-label={toolLabel(item)}
+          aria-current={toolActive ? 'page' : undefined}
+        >
+          <span class="mobile-icon" aria-hidden="true"
+            ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
           >
-            <span class="mobile-icon" aria-hidden="true"><item.icon /></span>
-          </button>
-        {:else}
-          {@const href = item.href}
-          <a
-            class="quick-tool mobile-tool"
-            {href}
-            onclick={(event) => {
-              activateTool(event, href);
-            }}
-            aria-label={toolLabel(item)}
-            aria-current={toolActive ? 'page' : undefined}
-          >
-            <span class="mobile-icon" aria-hidden="true"
-              ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
-            >
-            {#if item.href === '/inbox'}
-              <UnreadBadge counts={inboxCounts} aria-hidden="true" />
-            {/if}
-          </a>
-        {/if}
+          {#if item.href === '/inbox'}
+            <UnreadBadge counts={inboxCounts} aria-hidden="true" />
+          {/if}
+        </a>
       </div>
     {/each}
     <div class="mobile-tool-slot">

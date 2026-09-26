@@ -44,16 +44,20 @@ function render(props: { mobile?: boolean; compact?: boolean } = { mobile: true 
   dispose = () => void unmount(component);
 }
 
-test('the mobile bar opens the room switcher', () => {
+test('the mobile bar links navigation and inbox as pages, not overlays', () => {
   render();
 
-  const button = document.querySelector<HTMLButtonElement>(
-    'button[aria-label="shortcuts.openRoomSearch"]'
+  const navigate = document.querySelector<HTMLAnchorElement>(
+    'a[aria-label="shortcuts.openRoomSearch"]'
   );
-  expect(button).not.toBeNull();
+  expect(navigate?.getAttribute('href')).toBe('/navigate');
+  navigate?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  expect(paletteState.open).toBe(false);
 
-  button?.click();
-  expect(paletteState.open).toBe(true);
+  const inbox = document.querySelector<HTMLAnchorElement>('.mobile-tools a[href="/inbox"]');
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  inbox?.dispatchEvent(click);
+  expect(click.defaultPrevented).toBe(false);
 });
 
 test('the mobile bar keeps a slot per tool', () => {
