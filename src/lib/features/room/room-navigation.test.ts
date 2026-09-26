@@ -24,6 +24,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 }));
 
 import {
+  backToRoomList,
   contextSearchPath,
   leaveRoomView,
   scopedSearchPath,
@@ -126,4 +127,17 @@ test('a room reached by going back, or from elsewhere, navigates to its list', (
 
   expect(mocks.back).not.toHaveBeenCalled();
   expect(mocks.goto).toHaveBeenCalledTimes(2);
+});
+
+test('the back arrow on a phone opens the drawer over the room rather than leaving it', () => {
+  mocks.page.url = new URL('https://app.test/rooms/room');
+  enter('/rooms');
+
+  backToRoomList();
+
+  expect(mocks.back).not.toHaveBeenCalled();
+  expect(mocks.goto).toHaveBeenCalledExactlyOnceWith('', {
+    shallow: true,
+    state: { mobileDrawer: 'open' },
+  });
 });

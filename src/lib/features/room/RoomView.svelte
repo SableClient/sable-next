@@ -42,6 +42,7 @@
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
+    backToRoomList,
     leaveRoomView,
     scopedSearchQuery,
     searchInRoom,
@@ -995,7 +996,7 @@
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
       chatBeside={desktop}
-      onBack={leaveRoomView}
+      onBack={backToRoomList}
       onMembers={toggleMembers}
       onSearch={openSearch}
       onTopic={() => (topicOpen = true)}

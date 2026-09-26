@@ -37,6 +37,14 @@ export function leaveRoomView(): void {
   void goto(target);
 }
 
+export function backToRoomList(): void {
+  if (window.matchMedia(BREAKPOINTS.appLayout).matches) {
+    leaveRoomView();
+    return;
+  }
+  void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'open' } });
+}
+
 export function scopedSearchQuery(
   operator: 'in' | 'space',
   room: RoomSummary | undefined,

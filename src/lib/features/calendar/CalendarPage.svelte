@@ -5,7 +5,7 @@
   import type { CalendarView, RoomPermissionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { leaveRoomView, trackRoomEntry } from '#lib/features/room/room-navigation.js';
+  import { backToRoomList, trackRoomEntry } from '#lib/features/room/room-navigation.js';
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -199,7 +199,7 @@
 <main class="calendar-page" aria-label={$i18n.t('calendar.label')}>
   <PanelHeader title={roomName} titleSize="h1">
     {#snippet prefix()}
-      <PanelHeaderButton label={$i18n.t('timeline.back')} onclick={leaveRoomView}>
+      <PanelHeaderButton label={$i18n.t('timeline.back')} onclick={backToRoomList}>
         <BackIcon />
       </PanelHeaderButton>
       <Avatar

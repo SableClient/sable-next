@@ -7,7 +7,7 @@
   import { Conversation } from '#lib/features/room/conversation.svelte.js';
   import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
   import {
-    leaveRoomView,
+    backToRoomList,
     searchInRoom,
     trackRoomEntry,
   } from '#lib/features/room/room-navigation.js';
@@ -222,7 +222,7 @@
       roomId={resolvedRoomId}
       {roomName}
       {roomAvatar}
-      onBack={leaveRoomView}
+      onBack={backToRoomList}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
     />
     <div class="forum-content">
