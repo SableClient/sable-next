@@ -2,6 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(all(feature = "cef", target_os = "linux"))]
 fn prompt_for_permission(message: &str, answer: std::sync::mpsc::Sender<bool>) {
     use gtk::prelude::*;
     use gtk::{
