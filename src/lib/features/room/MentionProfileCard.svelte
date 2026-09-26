@@ -792,12 +792,12 @@
   }
 
   .profile-meta-elevated {
-    color: var(--bg-on-container);
+    color: var(--profile-ink, var(--bg-on-container));
     font-weight: var(--font-weight-medium);
   }
 
   .profile-meta-elevated :global(svg) {
-    color: var(--bg-on-container);
+    color: var(--profile-ink, var(--bg-on-container));
   }
 
   :global(.profile-action) {
@@ -805,7 +805,7 @@
     background: none;
     border: var(--border-width) solid var(--profile-line, var(--surface-container-line));
     border-radius: var(--radius-pill);
-    color: var(--bg-on-container);
+    color: var(--profile-ink, var(--bg-on-container));
     cursor: pointer;
     display: inline-flex;
     font: inherit;
@@ -829,7 +829,7 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.profile-action:hover:not([aria-expanded='true'])) {
-      background: color-mix(in oklab, var(--bg-on-container) 7%, transparent);
+      background: color-mix(in oklab, var(--profile-ink, var(--bg-on-container)) 7%, transparent);
     }
   }
 
@@ -891,6 +891,11 @@
     color: var(--crit-main);
     font-size: var(--font-size-small);
     margin: var(--space-200) 0 0;
+  }
+
+  :global(.btn.profile-extra),
+  .profile-keys :global(.btn) {
+    --button-on-container: var(--profile-ink, var(--sec-on-container));
   }
 
   .profile-extra {

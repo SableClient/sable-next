@@ -860,6 +860,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               command.user_id === profile.user_id
                 ? profile.display_name
                 : `${localpart.charAt(0).toUpperCase()}${localpart.slice(1)}`,
+            ...(window as { __e2eProfilePatch?: Partial<ProfileView> }).__e2eProfilePatch,
           },
         };
       },

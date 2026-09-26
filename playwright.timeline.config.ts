@@ -19,6 +19,8 @@ export default defineConfig({
     'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
     'mobile-drawer.spec.ts',
+    'profile-card-tint.spec.ts',
+    'mobile-drawer.spec.ts',
     'thread-panel.spec.ts',
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',

@@ -420,6 +420,20 @@
     white-space: normal;
   }
 
+  .profile-card.tinted :global(.formatted-body a:not([data-matrix-link], [data-settings-link])) {
+    color: var(--profile-ink);
+    text-decoration: underline;
+  }
+
+  .profile-card.tinted :global(.formatted-body code:not(pre code)) {
+    background: var(--profile-card-ground);
+    border-color: var(--profile-line);
+  }
+
+  .profile-card.tinted :global(.formatted-body .code-block) {
+    color: var(--bg-on-container);
+  }
+
   /* No hairline: the framed panel above already draws one edge, and two reads as
      a double rule. */
   .profile-card-composer {
