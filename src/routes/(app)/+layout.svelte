@@ -38,7 +38,7 @@
   } from '#lib/platform/native-notifications.js';
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
-  import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
+  import { followExternalLink } from '#lib/platform/external-links.js';
   import { watchWindowFocus } from '#lib/platform/window-decorations.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
@@ -331,15 +331,7 @@
         return;
       }
 
-      if (anchor.target !== '_blank' || event.button > 1) return;
-      if (!opensExternalUrls()) return;
-      if (anchor.protocol !== 'http:' && anchor.protocol !== 'https:') return;
-
-      event.preventDefault();
-      const href = anchor.href;
-      void openExternalUrl(href).catch((error: unknown) => {
-        console.warn('[sable links] external link unavailable', href, error);
-      });
+      followExternalLink(event, anchor);
     };
 
     const offClick = on(document, 'click', onClick);

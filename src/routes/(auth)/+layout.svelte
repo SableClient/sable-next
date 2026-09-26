@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, type Snippet } from 'svelte';
+  import { on } from 'svelte/events';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -7,6 +8,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import AuthFlow from '#lib/features/auth/flow/AuthFlow.svelte';
   import { takeAfterLogin } from '#lib/auth/after-login.js';
+  import { followExternalLink } from '#lib/platform/external-links.js';
 
   let { children }: { children: Snippet } = $props();
   const core = useCoreClient();
@@ -28,6 +30,19 @@
     void runtimeConfig().then((config) => {
       accountSwitching = !config.disableAccountSwitcher;
     });
+  });
+
+  onMount(() => {
+    const onClick = (event: MouseEvent): void => {
+      const anchor = event.target instanceof Element ? event.target.closest('a') : null;
+      if (anchor) followExternalLink(event, anchor);
+    };
+    const offClick = on(document, 'click', onClick);
+    const offAuxClick = on(document, 'auxclick', onClick);
+    return () => {
+      offClick();
+      offAuxClick();
+    };
   });
 
   $effect(() => {
