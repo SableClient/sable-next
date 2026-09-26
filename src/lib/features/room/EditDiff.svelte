@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { diffWordsWithSpace } from 'diff';
+
   import type { TimelineItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { isRecord } from '#lib/guards.js';
 
   import { readEventSource } from './event-source-cache';
-  import { diffWords } from './text-diff';
   import { editedBody, relationOf, type TimelineEventIndex } from './timeline-event-index';
 
   interface Props {
@@ -25,7 +26,7 @@
     previous?.content.kind === 'hidden_event' ? editedBody(previous.content.content) : original
   );
   let segments = $derived(
-    before !== null && after !== null && before !== after ? diffWords(before, after) : null
+    before !== null && after !== null && before !== after ? diffWordsWithSpace(before, after) : null
   );
 
   $effect(() => {
@@ -46,10 +47,8 @@
 
 {#if segments}
   <span class="edit-diff"
-    >{#each segments as segment, index (index)}{#if segment.kind === 'added'}<ins
-          >{segment.text}</ins
-        >{:else if segment.kind === 'removed'}<del>{segment.text}</del>{:else}<span
-          >{segment.text}</span
+    >{#each segments as segment, index (index)}{#if segment.added}<ins>{segment.value}</ins
+        >{:else if segment.removed}<del>{segment.value}</del>{:else}<span>{segment.value}</span
         >{/if}{/each}</span
   >
 {:else if after !== null}

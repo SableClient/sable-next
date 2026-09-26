@@ -1,8 +1,12 @@
+import QuickLRU from 'quick-lru';
+
 import { isRecord } from '#lib/guards.js';
 
 const MAX_ENTRIES = 256;
 
-const sources = new Map<string, Promise<Record<string, unknown> | null>>();
+const sources = new QuickLRU<string, Promise<Record<string, unknown> | null>>({
+  maxSize: MAX_ENTRIES,
+});
 
 export function readEventSource(
   read: (roomId: string, eventId: string) => Promise<string>,
@@ -12,7 +16,6 @@ export function readEventSource(
   const key = `${roomId}\u0000${eventId}`;
   const cached = sources.get(key);
   if (cached) return cached;
-  if (sources.size >= MAX_ENTRIES) sources.clear();
   const pending = read(roomId, eventId)
     .then((source) => {
       const event: unknown = JSON.parse(source);

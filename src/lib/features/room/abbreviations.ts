@@ -1,3 +1,5 @@
+import escapeStringRegexp from 'escape-string-regexp';
+
 import type { RoomSummary } from '#src/generated/protocol';
 
 import type { AbbreviationEntry } from './settings/abbreviations';
@@ -39,7 +41,7 @@ export function abbreviationPattern(map: AbbreviationMap): RegExp | null {
 
   const terms = [...map.keys()]
     .sort((left, right) => right.length - left.length)
-    .map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    .map(escapeStringRegexp);
   return new RegExp(`\\b(?:${terms.join('|')})\\b`, 'gi');
 }
 

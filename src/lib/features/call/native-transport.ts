@@ -2,6 +2,7 @@ import type {
   NativeCallSnapshot,
   NativeCallRemoteParticipant,
 } from '@sableclient/tauri-plugin-livekit-mobile';
+import { uint8ArrayToBase64 } from 'uint8array-extras';
 
 import { loadNativeCalls } from '#lib/platform/calls.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -104,7 +105,7 @@ export async function createNativeTransport(
     }
   };
 
-  const encode = (key: CallEncryptionKey): string => btoa(String.fromCharCode(...key.key));
+  const encode = (key: CallEncryptionKey): string => uint8ArrayToBase64(key.key);
 
   const pushKey = async (key: CallEncryptionKey): Promise<void> => {
     adopt(

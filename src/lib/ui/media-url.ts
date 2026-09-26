@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
@@ -7,9 +9,6 @@ type CachedMediaUrl = { url: string; bytes: number; ratio: number | undefined };
 
 const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
-/* A deadline, not a verdict: `Unavailable` covers a blip as well as a 404. */
-const unavailable = new Map<string, number>();
-const aspectRatios = new Map<string, number>();
 const holds = new Map<string, number>();
 /* An object URL pins its blob until revoked. Held entries are exempt. */
 const MAX_OBJECT_URLS = 64;
@@ -18,6 +17,12 @@ const MAX_MEDIA_METADATA = 512;
 const MAX_MEDIA_REQUESTS = 6;
 const MEDIA_STALL_TIMEOUT_MS = 30_000;
 const MEDIA_FAILURE_TTL_MS = 30_000;
+/* A deadline, not a verdict: `Unavailable` covers a blip as well as a 404. */
+const unavailable = new QuickLRU<string, true>({
+  maxSize: MAX_MEDIA_METADATA,
+  maxAge: MEDIA_FAILURE_TTL_MS,
+});
+const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
 let inflight = 0;
 const waiting: (() => void)[] = [];
@@ -26,14 +31,6 @@ function releaseSlot(): void {
   const next = waiting.shift();
   if (next) next();
   else inflight -= 1;
-}
-
-function markUnavailable(key: string): void {
-  unavailable.set(key, Date.now() + MEDIA_FAILURE_TTL_MS);
-  if (unavailable.size > MAX_MEDIA_METADATA) {
-    const oldest = unavailable.keys().next().value;
-    if (oldest !== undefined) unavailable.delete(oldest);
-  }
 }
 
 function cacheKey(
@@ -73,10 +70,6 @@ function measure(key: string, type: string, blob: Blob): Promise<void> | null {
     .then((bitmap) => {
       if (bitmap.width > 0 && bitmap.height > 0) {
         aspectRatios.set(key, bitmap.width / bitmap.height);
-        if (aspectRatios.size > MAX_MEDIA_METADATA) {
-          const oldest = aspectRatios.keys().next().value;
-          if (oldest !== undefined) aspectRatios.delete(oldest);
-        }
       }
       bitmap.close();
     })
@@ -151,7 +144,7 @@ export function discardMediaUrl(
   URL.revokeObjectURL(cached.url);
   objectUrls.delete(key);
   objectUrlBytes -= cached.bytes;
-  markUnavailable(key);
+  unavailable.set(key, true);
 }
 
 /**
@@ -211,11 +204,7 @@ export function loadMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const key = cacheKey(core.session?.account_id, source, width, height);
-  const failedUntil = unavailable.get(key);
-  if (failedUntil !== undefined) {
-    if (Date.now() < failedUntil) return Promise.reject(new Error('Media unavailable'));
-    unavailable.delete(key);
-  }
+  if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
   const request =
     pending.get(key) ??
     fetchThroughGate(core, source, width, height)
@@ -243,7 +232,7 @@ export function loadMediaUrl(
       });
   pending.set(key, request);
   void request.catch(() => {
-    markUnavailable(key);
+    unavailable.set(key, true);
   });
   return request;
 }
@@ -256,7 +245,7 @@ export function retryMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const prefix = `${core.session?.account_id ?? ''}:${source}:`;
-  for (const key of unavailable.keys()) {
+  for (const key of [...unavailable.keys()]) {
     if (key.startsWith(prefix)) unavailable.delete(key);
   }
   return loadMediaUrl(core, source, width, height, mime);

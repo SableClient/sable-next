@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type { ImagePackView } from '#src/generated/protocol';
 
@@ -9,7 +11,7 @@ interface Snapshot {
 }
 
 interface PackCache {
-  snapshots: Map<string, Snapshot>;
+  snapshots: QuickLRU<string, Snapshot>;
   refreshes: Map<string, Refresh>;
   generation: number;
 }
@@ -31,7 +33,11 @@ const packAccountDataEvents = new Set([
 function cacheFor(commands: PackCommands): PackCache {
   let cache = caches.get(commands);
   if (cache === undefined) {
-    cache = { snapshots: new Map(), refreshes: new Map(), generation: 0 };
+    cache = {
+      snapshots: new QuickLRU({ maxSize: MAX_SNAPSHOTS }),
+      refreshes: new Map(),
+      generation: 0,
+    };
     caches.set(commands, cache);
   }
   return cache;
@@ -42,22 +48,6 @@ export function invalidatePacks(commands: PackCommands): void {
   cache.generation += 1;
   cache.snapshots.clear();
   cache.refreshes.clear();
-}
-
-function readSnapshot(cache: PackCache, key: string): Snapshot | undefined {
-  const snapshot = cache.snapshots.get(key);
-  if (snapshot === undefined) return undefined;
-  cache.snapshots.delete(key);
-  cache.snapshots.set(key, snapshot);
-  return snapshot;
-}
-
-function keepSnapshot(cache: PackCache, key: string, packs: ImagePackView[]): void {
-  cache.snapshots.delete(key);
-  cache.snapshots.set(key, { packs, takenAt: Date.now() });
-  if (cache.snapshots.size <= MAX_SNAPSHOTS) return;
-  const oldest = cache.snapshots.keys().next();
-  if (oldest.done !== true) cache.snapshots.delete(oldest.value);
 }
 
 export function isPackAccountDataEvent(eventType: string): boolean {
@@ -72,7 +62,7 @@ export async function loadPacks(
 ): Promise<boolean> {
   const cache = cacheFor(commands);
   const key = `${accountId ?? ''}\u0000${roomId}`;
-  const snapshot = readSnapshot(cache, key);
+  const snapshot = cache.snapshots.get(key);
   if (snapshot !== undefined) {
     apply(snapshot.packs);
     if (Date.now() - snapshot.takenAt < SNAPSHOT_MAX_AGE_MS) return true;
@@ -93,7 +83,7 @@ export async function loadPacks(
       .imagePackListing(roomId)
       .then((listing) => {
         if (listing.complete && cache.generation === generation) {
-          keepSnapshot(cache, key, listing.packs);
+          cache.snapshots.set(key, { packs: listing.packs, takenAt: Date.now() });
         }
         return listing;
       })

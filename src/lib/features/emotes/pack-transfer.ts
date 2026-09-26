@@ -1,3 +1,5 @@
+import { unzipSync, zipSync } from 'fflate';
+
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import { saveBytes, mimeFromName, type SaveOutcome } from '#lib/platform/files.js';
 import { imageMime } from '#lib/ui/media-url.js';
@@ -13,7 +15,6 @@ import {
   type ArchivePack,
 } from './pack-archive.js';
 import { ALL_USAGES, type PackDraft } from './pack-content.js';
-import { readZip, writeZip, type ZipEntry } from './zip.js';
 
 export type PackTransferCore = {
   commands: Pick<CoreCommands, 'fetchMedia' | 'uploadMedia'>;
@@ -30,10 +31,12 @@ async function inBatches<T>(tasks: (() => Promise<T>)[]): Promise<T[]> {
   return results;
 }
 
+type ArchiveFile = { name: string; bytes: Uint8Array };
+
 async function collect(
   core: PackTransferCore,
   drafts: PackDraft[]
-): Promise<Map<string, ZipEntry>> {
+): Promise<Map<string, ArchiveFile>> {
   const wanted = new Map<string, (mime: string | null) => string>();
   for (const [index, draft] of drafts.entries()) {
     for (const image of draft.images) {
@@ -69,17 +72,14 @@ export async function buildArchive(
 ): Promise<Uint8Array<ArrayBuffer>> {
   const files = await collect(core, drafts);
   const manifest = drafts.map((draft) => archivePack(draft, (url) => files.get(url)?.name));
-  const entries = new Map<string, ZipEntry>([
-    [
-      MANIFEST_NAME,
-      { name: MANIFEST_NAME, bytes: new TextEncoder().encode(manifestJson(manifest)) },
-    ],
-  ]);
+  const entries: Record<string, Uint8Array> = {
+    [MANIFEST_NAME]: new TextEncoder().encode(manifestJson(manifest)),
+  };
   for (const file of files.values()) {
-    entries.set(file.name, file);
+    entries[file.name] = file.bytes;
   }
 
-  return writeZip([...entries.values()]);
+  return zipSync(entries, { level: 0 });
 }
 
 export async function exportPacks(
@@ -104,7 +104,7 @@ export async function importArchive(
   core: PackTransferCore,
   bytes: Uint8Array
 ): Promise<PackDraft[]> {
-  const files = readZip(bytes);
+  const files = new Map(Object.entries(unzipSync(bytes)));
   const manifest = files.get(MANIFEST_NAME);
   if (manifest === undefined) throw new Error('The archive has no pack.json');
 

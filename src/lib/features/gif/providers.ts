@@ -1,3 +1,5 @@
+import { stringToBase64 } from 'uint8array-extras';
+
 import { isRecord } from '#lib/guards.js';
 
 export const gifProviderIds = ['klipy', 'tenor', 'giphy'] as const;
@@ -263,13 +265,6 @@ export function gifSearchAvailable(
   return gifProvider(config, override).apiKey(config) !== null && config.proxyUrl !== null;
 }
 
-function toBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCodePoint(byte);
-  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
-}
-
 export type ProxiedGif = { mxcUrl: string; mimetype: string };
 
 export function proxiedGif(gif: GifResult, proxyUrl: string | null): ProxiedGif | undefined {
@@ -290,7 +285,7 @@ export function proxiedGif(gif: GifResult, proxyUrl: string | null): ProxiedGif 
   if (!provider || !payload) return undefined;
 
   return {
-    mxcUrl: `mxc://${server}/${provider.id}_${toBase64Url(payload)}`,
+    mxcUrl: `mxc://${server}/${provider.id}_${stringToBase64(payload, { urlSafe: true })}`,
     mimetype: gif.mimetype,
   };
 }

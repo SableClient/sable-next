@@ -8,7 +8,7 @@
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import '#lib/ui/primitives/menu.css';
 
-  import { fuzzyMatchIndices } from './fuzzy.js';
+  import { fuzzyMatchParts } from './fuzzy.js';
   import {
     filterRoomsByQuery,
     parentSpaceNames,
@@ -38,21 +38,6 @@
 
   function optionId(index: number): string {
     return `${uid}-option-${index}`;
-  }
-
-  function nameParts(name: string): { text: string; match: boolean }[] {
-    const indices = new Set(fuzzyMatchIndices(name, parsed.text));
-    if (indices.size === 0) return [{ text: name, match: false }];
-
-    const parts: { text: string; match: boolean }[] = [];
-    for (const [index, character] of [...name].entries()) {
-      const match = indices.has(index);
-      const last = parts.at(-1);
-      if (last && last.match === match) last.text += character;
-      else parts.push({ text: character, match });
-    }
-
-    return parts;
   }
 
   function keepActiveInView(node: HTMLElement): void {
@@ -127,7 +112,7 @@
             </Avatar>
             <span class="text">
               <span class="name"
-                >{#each nameParts(name) as part, partIndex (partIndex)}{#if part.match}<mark
+                >{#each fuzzyMatchParts(name, parsed.text) as part, partIndex (partIndex)}{#if part.match}<mark
                       >{part.text}</mark
                     >{:else}{part.text}{/if}{/each}</span
               >

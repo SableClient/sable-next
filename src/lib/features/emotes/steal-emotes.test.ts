@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import { unzipSync } from 'fflate';
 import { expect, test, vi } from 'vitest';
 
 import type { TimelineItemContentView } from '#src/generated/protocol';
@@ -14,7 +15,6 @@ import {
   type EmoteCandidate,
 } from './steal-emotes';
 import type { PackTransferCore } from './pack-transfer';
-import { readZip } from './zip';
 
 vi.mock('#lib/platform/files.js', () => ({
   saveBytes: vi.fn(() => Promise.resolve('saved')),
@@ -214,5 +214,5 @@ test('several emotes download as one zip, and a repeated shortcode is suffixed',
   const [bytes, filename, mime] = vi.mocked(saveBytes).mock.calls[0] ?? [];
   expect(filename).toMatch(/^sable-emotes-\d+\.zip$/u);
   expect(mime).toBe('application/zip');
-  expect([...readZip(bytes).keys()]).toEqual(['wave.png', 'wave-1.png']);
+  expect(Object.keys(unzipSync(bytes))).toEqual(['wave.png', 'wave-1.png']);
 });

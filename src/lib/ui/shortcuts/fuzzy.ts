@@ -1,24 +1,20 @@
-export function fuzzyScore(text: string, query: string): number | null {
-  if (query === '') return 0;
+import uFuzzy from '@leeoniya/ufuzzy';
 
-  const haystack = text.toLocaleLowerCase();
-  const needle = query.toLocaleLowerCase();
+const matcher = new uFuzzy({
+  unicode: true,
+  interSplit: "[^\\p{L}\\d']+",
+  intraSplit: '\\p{Ll}\\p{Lu}',
+  intraBound: '\\p{L}\\d|\\d\\p{L}|\\p{Ll}\\p{Lu}',
+  intraChars: "[\\p{L}\\d']",
+  intraContr: "'\\p{L}{1,2}\\b",
+  intraIns: Infinity,
+});
 
-  let score = 0;
-  let needleIndex = 0;
-  let previousMatchIndex = -1;
-
-  for (let index = 0; index < haystack.length && needleIndex < needle.length; index += 1) {
-    if (haystack[index] !== needle[needleIndex]) continue;
-
-    score += index === 0 ? 3 : 1;
-    if (previousMatchIndex === index - 1) score += 2;
-
-    previousMatchIndex = index;
-    needleIndex += 1;
-  }
-
-  return needleIndex === needle.length ? score : null;
+function search(haystack: string[], query: string): { idx: number; ranges: number[] }[] {
+  const result = matcher.search(uFuzzy.latinize(haystack), uFuzzy.latinize(query));
+  if (result[1] === null) return [];
+  const [, info, order] = result;
+  return order.map((rank) => ({ idx: info.idx[rank], ranges: info.ranges[rank] }));
 }
 
 export function fuzzyFilter<T>(
@@ -30,30 +26,24 @@ export function fuzzyFilter<T>(
   const trimmed = query.trim();
   if (trimmed === '') return items.slice(0, limit);
 
-  const scored: { item: T; score: number }[] = [];
-  for (const item of items) {
-    const score = fuzzyScore(text(item), trimmed);
-    if (score !== null) scored.push({ item, score });
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((entry) => entry.item);
+  return search(items.map(text), trimmed)
+    .slice(0, limit)
+    .map(({ idx }) => items[idx]);
 }
 
-export function fuzzyMatchIndices(text: string, query: string): number[] {
-  const trimmed = query.trim();
-  if (trimmed === '') return [];
+export function fuzzyMatchParts(text: string, query: string): { text: string; match: boolean }[] {
+  const hit = query.trim() === '' ? undefined : search([text], query.trim()).at(0);
+  if (hit === undefined) return [{ text, match: false }];
 
-  const haystack = text.toLocaleLowerCase();
-  const needle = trimmed.toLocaleLowerCase();
-
-  const indices: number[] = [];
-  let needleIndex = 0;
-  for (let index = 0; index < haystack.length && needleIndex < needle.length; index += 1) {
-    if (haystack[index] !== needle[needleIndex]) continue;
-    indices.push(index);
-    needleIndex += 1;
+  const parts: { text: string; match: boolean }[] = [];
+  let at = 0;
+  for (let index = 0; index < hit.ranges.length; index += 2) {
+    const start = hit.ranges[index];
+    const end = hit.ranges[index + 1];
+    if (start > at) parts.push({ text: text.slice(at, start), match: false });
+    parts.push({ text: text.slice(start, end), match: true });
+    at = end;
   }
-
-  return needleIndex === needle.length ? indices : [];
+  if (at < text.length) parts.push({ text: text.slice(at), match: false });
+  return parts;
 }

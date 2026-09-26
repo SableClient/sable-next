@@ -1,22 +1,5 @@
 import { parseMatrixLink } from './matrix-link';
 
-const TAG_REGEX = /<(\/?)([a-z0-9-]+)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/gi;
-const HREF_REGEX = /\bhref\s*=\s*"([^"]*)"/i;
-
-const VERBATIM_ELEMENTS = new Set(['pre', 'code']);
-
-const ENTITIES: Record<string, string> = {
-  '&amp;': '&',
-  '&lt;': '<',
-  '&gt;': '>',
-  '&quot;': '"',
-  '&#39;': "'",
-};
-
-function decodeEntities(value: string): string {
-  return value.replace(/&(?:amp|lt|gt|quot|#39);/g, (entity) => ENTITIES[entity] ?? entity);
-}
-
 function isPreviewable(href: string): boolean {
   if (parseMatrixLink(href)) return false;
   try {
@@ -25,12 +8,6 @@ function isPreviewable(href: string): boolean {
   } catch {
     return false;
   }
-}
-
-function hidesItsLinks(name: string, attributes: string): boolean {
-  return (
-    VERBATIM_ELEMENTS.has(name) || (name === 'span' && /\bdata-mx-spoiler\b/i.test(attributes))
-  );
 }
 
 const IMAGE_MIMES: Record<string, string> = {
@@ -52,31 +29,13 @@ export function imageMimeFromUrl(href: string): string | null {
 }
 
 export function previewableLinks(html: string): string[] {
+  if (!html.includes('<a')) return [];
   const links = new Set<string>();
-  let skipped: { name: string; depth: number } | null = null;
-
-  for (const [, closing, rawName, attributes = '', slash] of html.matchAll(TAG_REGEX)) {
-    const name = rawName.toLowerCase();
-    const opens = closing === '' && slash === '';
-
-    if (skipped !== null) {
-      if (name !== skipped.name) continue;
-      if (opens) skipped.depth += 1;
-      else if (closing !== '' && --skipped.depth === 0) skipped = null;
-      continue;
-    }
-
-    if (opens && hidesItsLinks(name, attributes)) {
-      skipped = { name, depth: 1 };
-      continue;
-    }
-    if (!opens || name !== 'a') continue;
-
-    const href = HREF_REGEX.exec(attributes)?.[1];
-    if (href === undefined) continue;
-    const decoded = decodeEntities(href);
-    if (isPreviewable(decoded)) links.add(decoded);
+  const document = new DOMParser().parseFromString(html, 'text/html');
+  for (const anchor of document.querySelectorAll('a[href]')) {
+    if (anchor.closest('pre, code, span[data-mx-spoiler]')) continue;
+    const href = anchor.getAttribute('href') ?? '';
+    if (isPreviewable(href)) links.add(href);
   }
-
   return [...links];
 }

@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 import type { MemberView } from '#src/generated/protocol';
 
 const MAX_CACHED_ROOMS = 8;
@@ -8,8 +10,7 @@ export class RoomMemberLoader {
 
   private attemptedRoomId: string | null = null;
   private generation = 0;
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  private readonly cache = new Map<string, MemberView[]>();
+  private readonly cache = new QuickLRU<string, MemberView[]>({ maxSize: MAX_CACHED_ROOMS / 2 });
 
   reset(): void {
     this.generation += 1;
@@ -33,7 +34,7 @@ export class RoomMemberLoader {
 
     try {
       const members = await fetchMembers(roomId);
-      this.remember(roomId, members);
+      this.cache.set(roomId, members);
       if (generation === this.generation) this.members = members;
     } catch (error) {
       console.debug('[sable room] members unavailable', error);
@@ -48,16 +49,6 @@ export class RoomMemberLoader {
       member.user_id === userId ? { ...member, power_level: level } : member
     );
     this.members = members;
-    if (this.cache.has(roomId)) this.remember(roomId, members);
-  }
-
-  private remember(roomId: string, members: MemberView[]): void {
-    this.cache.delete(roomId);
-    this.cache.set(roomId, members);
-    while (this.cache.size > MAX_CACHED_ROOMS) {
-      const oldest = this.cache.keys().next();
-      if (oldest.done) break;
-      this.cache.delete(oldest.value);
-    }
+    if (this.cache.has(roomId)) this.cache.set(roomId, members);
   }
 }

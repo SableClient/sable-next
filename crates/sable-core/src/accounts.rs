@@ -659,10 +659,7 @@ impl Core {
 
                     if stalled {
                         failures = failures.saturating_add(1);
-                        matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
-                            2u64.saturating_pow(failures.min(5)),
-                        ))
-                        .await;
+                        crate::watchers::retry_backoff(failures).await;
                         restarted.start().await;
                     } else {
                         failures = 0;

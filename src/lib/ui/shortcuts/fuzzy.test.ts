@@ -1,38 +1,39 @@
 import { expect, test } from 'vitest';
 
-import { fuzzyFilter, fuzzyScore } from './fuzzy';
+import { fuzzyFilter, fuzzyMatchParts } from './fuzzy';
 
-test('an empty query matches everything with a zero score', () => {
-  expect(fuzzyScore('anything', '')).toBe(0);
-});
+const match = (text: string, query: string): string[] =>
+  fuzzyFilter([text], query, (item) => item, 1);
 
 test('a subsequence matches regardless of case', () => {
-  expect(fuzzyScore('Engineering Team', 'eng')).not.toBeNull();
-  expect(fuzzyScore('Engineering Team', 'ENG')).not.toBeNull();
+  expect(match('Engineering Team', 'eng')).toHaveLength(1);
+  expect(match('Engineering Team', 'ENG')).toHaveLength(1);
 });
 
 test('out-of-order letters do not match', () => {
-  expect(fuzzyScore('cat', 'tac')).toBeNull();
+  expect(match('cat', 'tac')).toEqual([]);
 });
 
 test('a letter missing from the text does not match', () => {
-  expect(fuzzyScore('Engineering', 'engz')).toBeNull();
+  expect(match('Engineering', 'engz')).toEqual([]);
 });
 
-test('a contiguous match scores higher than a scattered one', () => {
-  const contiguous = fuzzyScore('devteam', 'dev');
-  const scattered = fuzzyScore('duesevlop', 'dev');
-  expect(contiguous).not.toBeNull();
-  expect(scattered).not.toBeNull();
-  expect(contiguous ?? 0).toBeGreaterThan(scattered ?? 0);
+test('an accent in the name does not stop a plain query', () => {
+  expect(match('Café Crème', 'creme')).toHaveLength(1);
 });
 
-test('a match at the very start scores higher than one further in', () => {
-  const atStart = fuzzyScore('room one', 'room');
-  const later = fuzzyScore('the room one', 'room');
-  expect(atStart).not.toBeNull();
-  expect(later).not.toBeNull();
-  expect(atStart ?? 0).toBeGreaterThan(later ?? 0);
+test('a contiguous match ranks above a scattered one', () => {
+  expect(fuzzyFilter(['duesevlop', 'devteam'], 'dev', (item) => item, 10)).toEqual([
+    'devteam',
+    'duesevlop',
+  ]);
+});
+
+test('a match at the very start ranks above one further in', () => {
+  expect(fuzzyFilter(['the room one', 'room one'], 'room', (item) => item, 10)).toEqual([
+    'room one',
+    'the room one',
+  ]);
 });
 
 test('fuzzyFilter returns everything, capped at the limit, for an empty query', () => {
@@ -40,7 +41,7 @@ test('fuzzyFilter returns everything, capped at the limit, for an empty query', 
   expect(fuzzyFilter(items, '', (item) => item, 2)).toEqual(['a', 'b']);
 });
 
-test('fuzzyFilter drops non-matches and ranks the rest by score', () => {
+test('fuzzyFilter drops non-matches and ranks the rest', () => {
   const items = ['xdxexvx', 'no match here', 'xdevx'];
   expect(fuzzyFilter(items, 'dev', (item) => item, 10)).toEqual(['xdevx', 'xdxexvx']);
 });
@@ -48,4 +49,12 @@ test('fuzzyFilter drops non-matches and ranks the rest by score', () => {
 test('fuzzyFilter respects the limit after ranking', () => {
   const items = ['aardvark', 'aardwolf', 'aardappel'];
   expect(fuzzyFilter(items, 'aard', (item) => item, 1)).toHaveLength(1);
+});
+
+test('the matched letters are split out for highlighting', () => {
+  expect(fuzzyMatchParts('Sable Dev', 'dev')).toEqual([
+    { text: 'Sable ', match: false },
+    { text: 'Dev', match: true },
+  ]);
+  expect(fuzzyMatchParts('Sable', 'xyz')).toEqual([{ text: 'Sable', match: false }]);
 });

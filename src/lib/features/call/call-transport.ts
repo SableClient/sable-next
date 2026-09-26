@@ -1,3 +1,5 @@
+import { base64ToUint8Array } from 'uint8array-extras';
+
 export type CallEncryptionKey = {
   backendId?: string;
   identity: string;
@@ -106,9 +108,7 @@ export const idleTransportState = (): CallTransportState => ({
 
 export function decodeCallKey(encoded: string): Uint8Array<ArrayBuffer> | null {
   try {
-    const binary = atob(encoded);
-    const key = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) key[index] = binary.charCodeAt(index);
+    const key = base64ToUint8Array(encoded);
     return key.length > 0 ? key : null;
   } catch {
     return null;

@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { scheduleInputs } from '#lib/features/composer/schedule-time.js';
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -34,10 +35,8 @@
   });
 
   function localInput(timestamp: number): string {
-    const at = new Date(timestamp);
-    const pad = (part: number, width = 2): string => String(part).padStart(width, '0');
-    const date = `${pad(at.getFullYear(), 4)}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
-    return `${date}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+    const { date, time } = scheduleInputs(timestamp);
+    return `${date}T${time}`;
   }
 
   function startOfDay(daysAgo: number): number {

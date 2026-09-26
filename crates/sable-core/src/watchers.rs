@@ -103,10 +103,7 @@ impl Core {
                     while errors.try_recv().is_ok() {}
 
                     failures = failures.saturating_add(1);
-                    matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
-                        2u64.saturating_pow(failures.min(5)),
-                    ))
-                    .await;
+                    retry_backoff(failures).await;
                     queue.set_enabled(true).await;
                 }
             })
@@ -426,4 +423,11 @@ pub(crate) fn sync_status(state: SyncState) -> SyncStatus {
             message: error.to_string(),
         },
     }
+}
+
+pub(crate) async fn retry_backoff(failures: u32) {
+    matrix_sdk::sleep::sleep(std::time::Duration::from_secs(
+        2u64.saturating_pow(failures.min(5)),
+    ))
+    .await;
 }

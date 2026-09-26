@@ -1,3 +1,5 @@
+import { zipSync } from 'fflate';
+
 import type { ImageUsageView, TimelineItemContentView } from '#src/generated/protocol';
 
 import { saveBytes, type SaveOutcome } from '#lib/platform/files.js';
@@ -13,7 +15,6 @@ import {
   usageContent,
   type PackImageDraft,
 } from './pack-content.js';
-import { writeZip } from './zip.js';
 
 export interface EmoteCandidate {
   source: string;
@@ -115,7 +116,11 @@ export async function downloadCandidates(
     return saveBytes(only.bytes, only.name, only.mime ?? 'application/octet-stream');
   }
 
-  return saveBytes(writeZip(files), `sable-emotes-${String(Date.now())}.zip`, 'application/zip');
+  return saveBytes(
+    zipSync(Object.fromEntries(files.map((file) => [file.name, file.bytes])), { level: 0 }),
+    `sable-emotes-${String(Date.now())}.zip`,
+    'application/zip'
+  );
 }
 
 export function mergedPackContent(

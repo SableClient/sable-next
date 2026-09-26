@@ -1,3 +1,4 @@
+import { unzipSync, zipSync } from 'fflate';
 import { expect, test, vi } from 'vitest';
 
 import type { ImagePackView } from '#src/generated/protocol';
@@ -5,7 +6,6 @@ import type { ImagePackView } from '#src/generated/protocol';
 import { MANIFEST_NAME } from './pack-archive';
 import { packDraft } from './pack-content';
 import { buildArchive, importArchive, type PackTransferCore } from './pack-transfer';
-import { readZip } from './zip';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
 const GIF = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 9, 9]);
@@ -72,15 +72,15 @@ const media = {
 
 test('an exported pack carries the bytes, not just the mxc uris', async () => {
   const core = fakeCore(media);
-  const files = readZip(await buildArchive(core, [packDraft(pack())]));
+  const files = unzipSync(await buildArchive(core, [packDraft(pack())]));
 
-  expect([...files.keys()].toSorted()).toEqual([
+  expect(Object.keys(files).toSorted()).toEqual([
     'avatars/0.png',
     'images/0-blob_party.gif',
     'images/0-blob_wave.png',
     MANIFEST_NAME,
   ]);
-  expect(files.get('images/0-blob_party.gif')).toEqual(GIF);
+  expect(files['images/0-blob_party.gif']).toEqual(GIF);
 });
 
 test('the export asks for the original, never a thumbnail', async () => {
@@ -94,9 +94,9 @@ test('the export asks for the original, never a thumbnail', async () => {
 
 test('an image with no declared mimetype is named from its own bytes', async () => {
   const core = fakeCore(media);
-  const files = readZip(await buildArchive(core, [packDraft(pack())]));
+  const files = unzipSync(await buildArchive(core, [packDraft(pack())]));
 
-  expect(files.has('images/0-blob_party.gif')).toBe(true);
+  expect(files).toHaveProperty(['images/0-blob_party.gif']);
 });
 
 test('a pack survives a round trip onto a homeserver that never saw the originals', async () => {
@@ -125,13 +125,20 @@ test('a pack survives a round trip onto a homeserver that never saw the original
   expect(importer.uploads.some((upload) => upload.mime === 'image/gif')).toBe(true);
 });
 
+test('an archive recompressed by another tool still imports', async () => {
+  const archive = unzipSync(await buildArchive(fakeCore(media), [packDraft(pack())]));
+  const [imported] = await importArchive(fakeCore({}), zipSync(archive, { level: 9 }));
+
+  expect(imported.images).toHaveLength(2);
+});
+
 test('two packs export into one archive without colliding', async () => {
   const core = fakeCore(media);
   const second = pack({ id: 'more', name: 'More', images: pack().images.slice(0, 1) });
-  const files = readZip(await buildArchive(core, [packDraft(pack()), packDraft(second)]));
+  const files = unzipSync(await buildArchive(core, [packDraft(pack()), packDraft(second)]));
 
-  expect(files.has('images/0-blob_wave.png')).toBe(true);
-  expect(files.has('images/1-blob_wave.png')).toBe(false);
+  expect(files).toHaveProperty(['images/0-blob_wave.png']);
+  expect(files).not.toHaveProperty(['images/1-blob_wave.png']);
   const [first, last] = await importArchive(
     fakeCore({}),
     await buildArchive(core, [packDraft(pack()), packDraft(second)])
@@ -147,10 +154,10 @@ test('a shared image is fetched and stored once', async () => {
     avatar_url: 'mxc://old/wave',
     images: pack().images.slice(0, 1),
   });
-  const files = readZip(await buildArchive(core, [packDraft(shared)]));
+  const files = unzipSync(await buildArchive(core, [packDraft(shared)]));
 
   expect(vi.mocked(core.commands.fetchMedia).mock.calls).toHaveLength(1);
-  expect([...files.keys()].toSorted()).toEqual(['images/0-blob_wave.png', MANIFEST_NAME]);
+  expect(Object.keys(files).toSorted()).toEqual(['images/0-blob_wave.png', MANIFEST_NAME]);
 });
 
 test('an archive without a manifest is refused', async () => {
@@ -158,5 +165,7 @@ test('an archive without a manifest is refused', async () => {
   const stripped = await buildArchive(core, []);
 
   await expect(importArchive(core, stripped)).resolves.toEqual([]);
-  await expect(importArchive(core, new TextEncoder().encode('nope'))).rejects.toThrow(/Not a zip/u);
+  await expect(importArchive(core, new TextEncoder().encode('nope'))).rejects.toThrow(
+    /invalid zip data/u
+  );
 });

@@ -16,6 +16,7 @@
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity, type MemberIdentity } from '#lib/features/room/members.js';
+  import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
@@ -126,14 +127,6 @@
     return () => clearInterval(timer);
   });
 
-  function elapsed(since: number, until: number): string {
-    const seconds = Math.max(0, Math.floor((until - since) / 1000));
-    const hours = Math.floor(seconds / 3600);
-    const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(hours > 0 ? 2 : 1, '0');
-    const rest = String(seconds % 60).padStart(2, '0');
-    return hours > 0 ? `${hours}:${minutes}:${rest}` : `${minutes}:${rest}`;
-  }
-
   const DEVICE_ERROR_KEY = {
     microphone: 'call.microphoneUnavailable',
     camera: 'call.cameraUnavailable',
@@ -223,7 +216,7 @@
         <span class="meta" title={$i18n.t('call.duration')}>
           <TimerIcon aria-hidden="true" weight="bold" />
           <span class="screen-reader-only">{$i18n.t('call.duration')}</span>
-          {elapsed(session.connectedAt, now)}
+          {formatClockDuration(Math.max(0, Math.floor((now - session.connectedAt) / 1000)))}
         </span>
       {/if}
       {#if ready && others > 0}

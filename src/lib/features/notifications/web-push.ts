@@ -1,3 +1,5 @@
+import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
+
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
@@ -26,17 +28,7 @@ export type PushTarget = {
 
 /** A VAPID key travels as base64url and `applicationServerKey` wants bytes. */
 export function vapidBytes(key: string): Uint8Array<ArrayBuffer> {
-  const padded = key.padEnd(key.length + ((4 - (key.length % 4)) % 4), '=');
-  const binary = atob(padded.replaceAll('-', '+').replaceAll('_', '/'));
-  const bytes = new Uint8Array(new ArrayBuffer(binary.length));
-  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return bytes;
-}
-
-function base64url(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return base64ToUint8Array(key);
 }
 
 /** A subscription is minted under one VAPID key and cannot be re-keyed. */
@@ -51,7 +43,7 @@ export function applicationServerKeyMatches(
     : key instanceof ArrayBuffer
       ? new Uint8Array(key)
       : null;
-  return bytes !== null && base64url(bytes) === vapid;
+  return bytes !== null && uint8ArrayToBase64(bytes, { urlSafe: true }) === vapid;
 }
 
 /** Includes the gateway and app id because retargeting leaves the endpoint

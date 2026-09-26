@@ -1,9 +1,11 @@
+import QuickLRU from 'quick-lru';
+
 import { CoreError } from '#src/transport';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import type { UrlPreviewView } from '#src/generated/protocol';
 
-const previews = new Map<string, Promise<UrlPreviewView | null>>();
+const previews = new QuickLRU<string, Promise<UrlPreviewView | null>>({ maxSize: 256 });
 let homeserverPreviews = true;
 
 export function resetUrlPreviews(): void {

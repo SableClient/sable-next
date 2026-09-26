@@ -1,3 +1,5 @@
+import { uint8ArrayToBase64 } from 'uint8array-extras';
+
 import type { PushFetchView } from '#src/generated/protocol';
 
 import { isRecord } from '#lib/guards.js';
@@ -126,10 +128,7 @@ async function thumbnail(fetcher: PushFetcher, mxc: string): Promise<string | un
     );
     if (!response.ok) return undefined;
     const type = response.headers.get('content-type') ?? 'image/png';
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    let binary = '';
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return `data:${type};base64,${btoa(binary)}`;
+    return `data:${type};base64,${uint8ArrayToBase64(new Uint8Array(await response.arrayBuffer()))}`;
   } catch {
     return undefined;
   }

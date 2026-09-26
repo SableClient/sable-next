@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import { uint8ArrayToBase64 } from 'uint8array-extras';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
@@ -38,7 +39,7 @@
       await core.commands.scanVerificationQr(
         core.session.user_id,
         core.verification.flowId,
-        btoa(String.fromCharCode(...data))
+        uint8ArrayToBase64(data)
       );
     } catch (cause) {
       error = verificationErrorMessage(cause);

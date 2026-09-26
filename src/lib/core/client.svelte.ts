@@ -21,6 +21,7 @@ import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.j
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
+import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
@@ -120,22 +121,22 @@ export class CoreClient {
   /* Nothing renders from these, and a reactive map would make every mounted
      profile card re-run its effect on any other user's cache write. */
   /* eslint-disable svelte/prefer-svelte-reactivity */
-  private readonly profileCache = new Map<
+  private readonly profileCache = new QuickLRU<
     string,
-    { accountId: string | null; fetchedAt: number; profile: ProfileView }
-  >();
+    { accountId: string | null; profile: ProfileView }
+  >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileCacheFreshMs });
   private readonly profileRequests = new Map<
     string,
     { accountId: string | null; request: Promise<ProfileView> }
   >();
-  private readonly profileFailures = new Map<
+  private readonly profileFailures = new QuickLRU<
     string,
-    { accountId: string | null; failedAt: number; error: unknown }
-  >();
-  private readonly relationsCache = new Map<
+    { accountId: string | null; error: unknown }
+  >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
+  private readonly relationsCache = new QuickLRU<
     string,
-    { accountId: string | null; fetchedAt: number; relations: UserRelations }
-  >();
+    { accountId: string | null; relations: UserRelations }
+  >({ maxSize: MAX_RELATIONS_CACHE_ENTRIES, maxAge: relationsCacheFreshMs });
   private readonly resolvedHomeservers = new Map<string, string>();
   /* eslint-enable svelte/prefer-svelte-reactivity */
 
@@ -440,7 +441,7 @@ export class CoreClient {
   async userProfile(userId: string): Promise<ProfileView> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.profileCache.get(userId);
-    if (cached?.accountId === accountId && Date.now() - cached.fetchedAt < profileCacheFreshMs) {
+    if (cached?.accountId === accountId) {
       return cached.profile;
     }
 
@@ -448,7 +449,7 @@ export class CoreClient {
     if (pending?.accountId === accountId) return pending.request;
 
     const failure = this.profileFailures.get(userId);
-    if (failure?.accountId === accountId && Date.now() - failure.failedAt < profileFailureRetryMs) {
+    if (failure?.accountId === accountId) {
       throw failure.error;
     }
 
@@ -456,24 +457,12 @@ export class CoreClient {
       .send({ type: 'user_profile', user_id: userId })
       .then((response) => {
         this.profileFailures.delete(userId);
-        this.profileCache.set(userId, {
-          accountId,
-          fetchedAt: Date.now(),
-          profile: response.profile,
-        });
-        if (this.profileCache.size > MAX_PROFILE_CACHE_ENTRIES) {
-          const oldest = this.profileCache.keys().next().value;
-          if (oldest !== undefined) this.profileCache.delete(oldest);
-        }
+        this.profileCache.set(userId, { accountId, profile: response.profile });
         return response.profile;
       })
       .catch((error: unknown) => {
         if (this.profileRequests.get(userId)?.request === request) {
-          this.profileFailures.set(userId, { accountId, failedAt: Date.now(), error });
-          if (this.profileFailures.size > MAX_PROFILE_CACHE_ENTRIES) {
-            const oldest = this.profileFailures.keys().next().value;
-            if (oldest !== undefined) this.profileFailures.delete(oldest);
-          }
+          this.profileFailures.set(userId, { accountId, error });
         }
         throw error;
       });
@@ -494,7 +483,7 @@ export class CoreClient {
   async userRelations(userId: string): Promise<UserRelations> {
     const accountId = this.session?.account_id ?? null;
     const cached = this.relationsCache.get(userId);
-    if (cached?.accountId === accountId && Date.now() - cached.fetchedAt < relationsCacheFreshMs) {
+    if (cached?.accountId === accountId) {
       return cached.relations;
     }
 
@@ -506,15 +495,7 @@ export class CoreClient {
       mutualRooms: response.mutual_rooms,
       ignored: response.ignored,
     };
-    this.relationsCache.set(userId, {
-      accountId,
-      fetchedAt: Date.now(),
-      relations,
-    });
-    if (this.relationsCache.size > MAX_RELATIONS_CACHE_ENTRIES) {
-      const oldest = this.relationsCache.keys().next().value;
-      if (oldest !== undefined) this.relationsCache.delete(oldest);
-    }
+    this.relationsCache.set(userId, { accountId, relations });
     return relations;
   }
 

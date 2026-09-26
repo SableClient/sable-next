@@ -1,3 +1,5 @@
+import QuickLRU from 'quick-lru';
+
 import type { CallTelemetry } from './call-telemetry';
 import type {
   CallBackendGrant,
@@ -24,7 +26,7 @@ export function createMultiSfuTransport(
   const transports = new Map<string, LivekitTransport>();
   const unsubscribes = new Map<string, () => void>();
   const listeners = new Set<(state: CallTransportState) => void>();
-  const keys = new Map<string, CallEncryptionKey>();
+  const keys = new QuickLRU<string, CallEncryptionKey>({ maxSize: MAX_CACHED_KEYS });
   let publisherId: string | undefined;
   let microphoneEnabled = false;
   let cameraEnabled = false;
@@ -36,13 +38,7 @@ export function createMultiSfuTransport(
   let desiredBackends = new Map<string, CallBackendGrant>();
 
   const cacheKey = (key: CallEncryptionKey): void => {
-    const keyId = `${key.identity}\u0000${key.keyIndex}`;
-    keys.delete(keyId);
-    keys.set(keyId, key);
-    if (keys.size > MAX_CACHED_KEYS) {
-      const oldest = keys.keys().next().value;
-      if (oldest !== undefined) keys.delete(oldest);
-    }
+    keys.set(`${key.identity}\u0000${key.keyIndex}`, key);
   };
 
   const drop = async (backendId: string): Promise<void> => {
