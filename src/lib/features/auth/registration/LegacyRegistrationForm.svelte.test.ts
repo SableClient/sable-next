@@ -34,7 +34,7 @@ function render(serverLabel: string, username: string) {
   return instance;
 }
 
-const hint = () => document.querySelector('.address-hint')?.textContent?.trim();
+const hint = () => document.querySelector('.address-hint')?.textContent.trim();
 
 afterEach(() => {
   document.body.replaceChildren();

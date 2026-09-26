@@ -2,6 +2,7 @@
   import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 
+  import type { NotificationModeView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { permissionState } from '#lib/features/notifications/present.js';
   import { i18n } from '#lib/i18n.js';
@@ -11,18 +12,27 @@
   import AuthStatusSlot from '../shared/AuthStatusSlot.svelte';
 
   interface Props {
+    active: boolean;
     onComplete: () => void;
   }
 
-  let { onComplete }: Props = $props();
+  let { active, onComplete }: Props = $props();
   const core = useCoreClient();
   let notifying = $state(false);
+  let groupMode = $state<NotificationModeView | null>(null);
 
   $effect(() => {
+    if (!active) return;
     let alive = true;
     void permissionState().then((state) => {
       if (alive) notifying = state === 'granted' && preferences.systemNotifications;
     });
+    void core.commands.defaultNotificationModes().then(
+      ({ group }) => {
+        if (alive) groupMode = group;
+      },
+      () => undefined
+    );
     return () => {
       alive = false;
     };
@@ -40,6 +50,15 @@
       no: 'setup.doneNoRecovery',
     },
     { done: notifying, yes: 'setup.doneNotifying', no: 'setup.doneNotNotifying' },
+    ...(groupMode
+      ? [
+          {
+            done: groupMode !== 'mute',
+            yes: groupMode === 'all' ? 'setup.doneGroupAll' : 'setup.doneGroupMentions',
+            no: 'setup.doneGroupMuted',
+          },
+        ]
+      : []),
     { done: preferences.settingsSync, yes: 'setup.doneSyncing', no: 'setup.doneNotSyncing' },
   ]);
 </script>

@@ -106,6 +106,7 @@
     encrypted?: boolean | null;
     selected?: boolean;
     layout?: TimelineLayout;
+    preview?: boolean;
     alignOwn?: boolean;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
@@ -146,6 +147,7 @@
     encrypted = null,
     selected = false,
     layout = 'modern',
+    preview = false,
     alignOwn = true,
     members = [],
     onJumpToEvent,
@@ -298,7 +300,7 @@
   $effect(() => {
     const userId = senderId;
     profile = null;
-    if (!userId) return;
+    if (!userId || preview) return;
 
     let current = true;
     void core.userProfile(userId).then(

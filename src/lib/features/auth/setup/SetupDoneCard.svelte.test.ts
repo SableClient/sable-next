@@ -12,6 +12,10 @@ vi.mock('#lib/features/notifications/present.js', () => present);
 import { core } from '#lib/core/__mocks__/context.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+Object.assign(core, {
+  defaultNotificationModes: vi.fn(() => Promise.resolve({ group: 'all', direct: 'all' })),
+});
+
 import SetupDoneCard from './SetupDoneCard.svelte';
 
 function setEncryption(verification: string, recovery: string) {
@@ -22,7 +26,10 @@ function setEncryption(verification: string, recovery: string) {
 
 async function render() {
   const onComplete = vi.fn();
-  const instance = mount(SetupDoneCard, { target: document.body, props: { onComplete } });
+  const instance = mount(SetupDoneCard, {
+    target: document.body,
+    props: { active: true, onComplete },
+  });
   await vi.waitFor(() => {
     expect(present.permissionState).toHaveBeenCalled();
   });
@@ -52,6 +59,7 @@ test('says where the device ended up, including what was skipped', async () => {
     { text: 'Not confirmed yet', done: false },
     { text: 'No recovery key yet', done: false },
     { text: 'Notifications are off', done: false },
+    { text: 'Group chats: all messages', done: true },
     { text: 'Settings stay on this device', done: false },
   ]);
 

@@ -50,6 +50,10 @@
     ArrowUp: -1,
   };
   const systemDark = new MediaQuery('(prefers-color-scheme: dark)');
+  let {
+    onboarding = false,
+    onThemeChosen,
+  }: { onboarding?: boolean; onThemeChosen?: (kind: ResolvedTheme) => void } = $props();
 
   let catalogOpen = $state(false);
   let installing = $state<string | null>(null);
@@ -117,6 +121,7 @@
     const theme = { ...parsed.theme, source };
     const previous = selectedCustomThemeId(theme.kind);
     installCustomTheme(theme, activate);
+    if (activate && onboarding) onThemeChosen?.(theme.kind);
     offerUndo(
       activate
         ? t('settings.themeSetFor', { name: theme.name, mode: slotLabel(theme.kind).toLowerCase() })
@@ -175,7 +180,7 @@
     try {
       if (themePreview.current?.source === entry.fullUrl) clearThemePreview();
       const css = await fetchCatalogFile(entry.fullUrl);
-      if (!install(css, entry.basename, entry.fullUrl, false)) throw new Error('unreadable');
+      if (!install(css, entry.basename, entry.fullUrl, onboarding)) throw new Error('unreadable');
     } catch {
       error = null;
       failed = entry.fullUrl;
@@ -210,7 +215,21 @@
 
   function themesForSlot(slot: ResolvedTheme): CustomTheme[] {
     const selected = selectedCustomThemeId(slot);
-    return customThemes.themes.filter((theme) => theme.kind === slot || theme.id === selected);
+    return customThemes.themes.filter((theme) => theme.id === selected || theme.kind === slot);
+  }
+
+  function moveMode(event: KeyboardEvent): void {
+    const radios = [
+      ...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]'),
+    ];
+    const from = radios.indexOf(document.activeElement as HTMLElement);
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+    const to = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : (from + step + 2) % 2;
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp', 'Home', 'End'].includes(event.key))
+      return;
+    event.preventDefault();
+    onThemeChosen?.(SLOTS[to]);
+    radios[to]?.focus();
   }
 
   function revealSelected(list: HTMLElement): void {
@@ -276,99 +295,124 @@
   }
 </script>
 
-<div class="custom-themes settings-form">
-  <p class="themes-hint">{$i18n.t('settings.customThemesSlotsHint')}</p>
-
-  {#each SLOTS as slot (slot)}
-    {@const themes = themesForSlot(slot)}
-    {@const selected = selectedCustomThemeId(slot)}
-    {@const slotName =
-      slot === 'light'
-        ? $i18n.t('settings.customThemesLightSlot')
-        : $i18n.t('settings.customThemesDarkSlot')}
-    <div class="slot">
-      <div class="slot-head">
-        <span class="slot-name" id={`theme-slot-${slot}`}>{slotName}</span>
-        {#if showing === slot}
-          <StatusBadge variant="primary" label={$i18n.t('settings.themeShowingNow')} />
-        {/if}
-      </div>
-      <ul
-        class="tiles"
-        role="radiogroup"
-        id={`theme-slot-${slot}-items`}
-        aria-labelledby={`theme-slot-${slot}`}
-        onkeydown={(event) => void moveInSlot(event, slot)}
-        {@attach revealSelected}
-      >
-        <li role="none">
-          <ThemeTile
-            name={$i18n.t('settings.themeSableDefault')}
-            swatches={DEFAULT_THEME_SWATCHES[slot]}
-            selected={selected === null}
-            tabindex={selected === null ? 0 : -1}
-            onselect={() => {
-              selectCustomTheme(slot, null);
-            }}
-          />
-        </li>
-        {#each themes as theme (theme.id)}
+<div class="custom-themes settings-form" class:compact={onboarding}>
+  {#if onboarding}
+    <div
+      class="mode-choices"
+      role="radiogroup"
+      aria-label={$i18n.t('setup.appearanceTitle')}
+      tabindex={-1}
+      onkeydown={moveMode}
+    >
+      {#each SLOTS as slot (slot)}
+        {@const theme = customThemes.themes.find((item) => item.id === selectedCustomThemeId(slot))}
+        <ThemeTile
+          name={$i18n.t(slot === 'light' ? 'settings.themeLight' : 'settings.themeDark')}
+          swatches={theme ? themeSwatches(theme.css) : DEFAULT_THEME_SWATCHES[slot]}
+          radius={theme ? themeRadius(theme.css) : undefined}
+          innerRadius={theme ? themeRadius(theme.css, 'radius-inner') : undefined}
+          selected={showing === slot}
+          tabindex={showing === slot ? 0 : -1}
+          onselect={() => onThemeChosen?.(slot)}
+        />
+      {/each}
+    </div>
+  {:else}
+    <p class="themes-hint">{$i18n.t('settings.customThemesSlotsHint')}</p>
+    {#each SLOTS as slot (slot)}
+      {@const themes = themesForSlot(slot)}
+      {@const selected = selectedCustomThemeId(slot)}
+      {@const slotName =
+        slot === 'light'
+          ? $i18n.t('settings.customThemesLightSlot')
+          : $i18n.t('settings.customThemesDarkSlot')}
+      <div class="slot">
+        <div class="slot-head">
+          <span class="slot-name" id={`theme-slot-${slot}`}>{slotName}</span>
+          {#if showing === slot}
+            <StatusBadge variant="primary" label={$i18n.t('settings.themeShowingNow')} />
+          {/if}
+        </div>
+        <ul
+          class="tiles"
+          role="radiogroup"
+          id={`theme-slot-${slot}-items`}
+          aria-labelledby={`theme-slot-${slot}`}
+          onkeydown={(event) => void moveInSlot(event, slot)}
+          {@attach revealSelected}
+        >
           <li role="none">
             <ThemeTile
-              name={theme.name}
-              swatches={themeSwatches(theme.css)}
-              radius={themeRadius(theme.css)}
-              innerRadius={themeRadius(theme.css, 'radius-inner')}
-              selected={selected === theme.id}
-              tabindex={selected === theme.id ? 0 : -1}
-              keyshortcuts="Delete"
+              name={$i18n.t('settings.themeSableDefault')}
+              swatches={DEFAULT_THEME_SWATCHES[slot]}
+              selected={selected === null}
+              tabindex={selected === null ? 0 : -1}
               onselect={() => {
-                use(theme, slot);
+                selectCustomTheme(slot, null);
               }}
-            >
-              {#snippet trailing()}
-                <IconButton
-                  variant="ghost"
-                  size="small"
-                  tabindex={-1}
-                  label={$i18n.t('settings.customThemesRemove', { name: theme.name })}
-                  onclick={() => {
-                    removeTheme(theme);
-                  }}
-                >
-                  <TrashIcon />
-                </IconButton>
-              {/snippet}
-            </ThemeTile>
+            />
           </li>
-        {/each}
-      </ul>
-    </div>
-  {/each}
+          {#each themes as theme (theme.id)}
+            <li role="none">
+              <ThemeTile
+                name={theme.name}
+                swatches={themeSwatches(theme.css)}
+                radius={themeRadius(theme.css)}
+                innerRadius={themeRadius(theme.css, 'radius-inner')}
+                selected={selected === theme.id}
+                tabindex={selected === theme.id ? 0 : -1}
+                keyshortcuts="Delete"
+                onselect={() => {
+                  use(theme, slot);
+                }}
+              >
+                {#snippet trailing()}
+                  <IconButton
+                    variant="ghost"
+                    size="small"
+                    tabindex={-1}
+                    label={$i18n.t('settings.customThemesRemove', { name: theme.name })}
+                    onclick={() => {
+                      removeTheme(theme);
+                    }}
+                  >
+                    <TrashIcon />
+                  </IconButton>
+                {/snippet}
+              </ThemeTile>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/each}
+  {/if}
 
   <div class="actions">
     <Button
-      variant="primary"
+      variant={onboarding ? 'secondary' : 'primary'}
+      block={onboarding}
       aria-haspopup="dialog"
       aria-expanded={catalogOpen}
       onclick={openCatalog}
     >
-      {$i18n.t('settings.themeCatalogTitle')}
+      {onboarding ? $i18n.t('setup.browseThemes') : $i18n.t('settings.themeCatalogTitle')}
     </Button>
-    <Button variant="secondary" onclick={() => void importTheme()}>
-      {$i18n.t('settings.customThemesImport')}
-    </Button>
-    <input
-      bind:this={picker}
-      class="screen-reader-only"
-      type="file"
-      accept=".sable.css,text/css"
-      onchange={(event) => void importFiles(event.currentTarget.files ?? [])}
-    />
+    {#if !onboarding}
+      <Button variant="secondary" onclick={() => void importTheme()}>
+        {$i18n.t('settings.customThemesImport')}
+      </Button>
+      <input
+        bind:this={picker}
+        class="screen-reader-only"
+        type="file"
+        accept=".sable.css,text/css"
+        onchange={(event) => void importFiles(event.currentTarget.files ?? [])}
+      />
+    {/if}
   </div>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
 
-  {#if customThemes.tweaks.length > 0}
+  {#if !onboarding && customThemes.tweaks.length > 0}
     <div class="tweaks-block">
       <ul class="tweaks">
         {#each customThemes.tweaks as tweak (tweak.id)}
@@ -462,6 +506,12 @@
     overflow-y: auto;
     padding: var(--space-100);
     scrollbar-gutter: stable;
+  }
+
+  .mode-choices {
+    display: grid;
+    gap: var(--space-300);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   @media (width < 36rem) {

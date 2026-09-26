@@ -26,6 +26,7 @@
   const core = useCoreClient();
   let permission = $state<Awaited<ReturnType<typeof permissionState>> | null>(null);
   let groupMode = $state<GroupMode>('mentions');
+  let groupModeChanged = false;
   let saving = $state(false);
   let error = $state<string | null>(null);
 
@@ -34,6 +35,20 @@
     void permissionState().then((state) => {
       if (alive) permission = state;
     });
+    return () => {
+      alive = false;
+    };
+  });
+
+  $effect(() => {
+    if (!askDefault) return;
+    let alive = true;
+    void core.commands.defaultNotificationModes().then(
+      ({ group }) => {
+        if (alive && !groupModeChanged) groupMode = group === 'all' ? 'all' : 'mentions';
+      },
+      () => undefined
+    );
     return () => {
       alive = false;
     };
@@ -115,6 +130,7 @@
           },
         ]}
         onSelect={(mode) => {
+          groupModeChanged = true;
           groupMode = mode;
         }}
       />

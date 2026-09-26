@@ -46,7 +46,9 @@ export class AuthFlow {
       if (rooms.test(new URL(this.page.url()).pathname)) return;
       const before = this.page.url();
       await this.setupCard
-        .getByRole('button', { name: /^(Skip anyway|Skip for now|Not now|Go to your chats)$/ })
+        .getByRole('button', {
+          name: /^(Skip anyway|Skip for now|Not now|Continue|Go to your chats)$/,
+        })
         .first()
         .click();
       await this.page

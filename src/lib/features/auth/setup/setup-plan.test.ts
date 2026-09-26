@@ -48,6 +48,7 @@ describe('planSetup', () => {
       'recovery',
       'profile',
       'appearance',
+      'layout',
       'done',
     ]);
   });
@@ -62,7 +63,7 @@ describe('planSetup', () => {
       }),
       true
     );
-    expect(plan).toEqual(['device', 'appearance', 'done']);
+    expect(plan).toEqual(['device', 'appearance', 'layout', 'done']);
   });
 
   test('a key from an identity reset is shown even when the account finished recovery', () => {

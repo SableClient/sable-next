@@ -1,13 +1,16 @@
 <script lang="ts">
+  import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import type { Snippet } from 'svelte';
 
   interface Props {
     active: boolean;
+    reachable?: boolean;
     before?: boolean;
     after?: boolean;
     entering?: boolean;
     removing?: boolean;
     accessibilityLabel: string;
+    unavailableLabel?: string;
     onActivate: () => void;
     onMotionComplete?: () => void;
     children: Snippet;
@@ -15,11 +18,13 @@
 
   let {
     active,
+    reachable = true,
     before = false,
     after = false,
     entering = false,
     removing = false,
     accessibilityLabel,
+    unavailableLabel,
     onActivate,
     onMotionComplete,
     children,
@@ -30,6 +35,7 @@
   class="auth-card"
   class:active
   class:muted={!active}
+  class:unavailable={!active && !reachable}
   class:before
   class:after
   class:entering
@@ -50,8 +56,14 @@
     onclick={onActivate}
     aria-label={accessibilityLabel}
     aria-hidden={active}
-    tabindex={active ? -1 : 0}
+    disabled={!reachable}
+    tabindex={active || !reachable ? -1 : 0}
   ></button>
+  {#if !active && !reachable && unavailableLabel}
+    <span class="unavailable-cue" role="img" title={unavailableLabel} aria-label={unavailableLabel}>
+      <LockSimpleIcon aria-hidden="true" />
+    </span>
+  {/if}
   <div class="card-content" inert={!active}>
     {@render children()}
   </div>
@@ -81,6 +93,11 @@
     pointer-events: none;
   }
 
+  .stage-activation:disabled,
+  .auth-card.muted.unavailable {
+    cursor: default;
+  }
+
   .stage-activation:focus-visible {
     border-radius: var(--radius);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
@@ -93,5 +110,21 @@
 
   .auth-card.muted .card-content {
     pointer-events: none;
+  }
+
+  .unavailable-cue {
+    background: var(--surface-container);
+    border-radius: var(--radii-round);
+    inset-block-start: var(--space-200);
+    inset-inline-end: var(--space-200);
+    padding: var(--space-100);
+    position: absolute;
+    z-index: 3;
+  }
+
+  .unavailable-cue :global(svg) {
+    display: block;
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 </style>

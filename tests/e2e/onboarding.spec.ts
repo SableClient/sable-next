@@ -1,14 +1,7 @@
-import type { Page } from '@playwright/test';
-
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { FakeCoreDriver } from './pages/FakeCoreDriver';
 
 test.use({ storageState: SIGNED_OUT });
-
-async function shot(page: Page, name: string): Promise<void> {
-  if (!process.env.SABLE_E2E_SHOTS) return;
-  await page.screenshot({ path: test.info().outputPath(`${name}.png`) });
-}
 
 for (const viewport of [
   { name: 'desktop', size: { width: 1280, height: 800 } },
@@ -28,10 +21,8 @@ for (const viewport of [
     const card = auth.setupCard;
     await expect(page).toHaveURL(/\/setup\/device$/, { timeout: 20_000 });
     await expect(card.getByRole('heading', { name: "Confirm it's you" })).toBeVisible();
-    await shot(page, 'device');
     await card.getByRole('button', { name: 'Reset my digital identity' }).click();
     await card.getByRole('checkbox', { name: 'I understand this cannot be undone' }).check();
-    await shot(page, 'device-reset');
     await card.getByRole('button', { name: 'Reset my digital identity' }).click();
 
     await expect(page).toHaveURL(/\/setup\/recovery$/);
@@ -40,7 +31,6 @@ for (const viewport of [
     );
     const keep = card.getByRole('button', { name: 'Continue' });
     await expect(keep).toBeDisabled();
-    await shot(page, 'recovery');
     await card.getByRole('checkbox', { name: "I've written it down" }).check();
     await keep.click();
 
@@ -53,19 +43,17 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/setup\/recovery$/);
     await page.goForward();
     await expect(page).toHaveURL(/\/setup\/notifications$/);
-    await shot(page, 'notifications');
     await card.getByRole('radio', { name: /All messages/ }).click();
     await card.getByRole('button', { name: 'Continue' }).click();
 
     await expect(page).toHaveURL(/\/setup\/sync$/);
-    await expect(card).toContainText("isn't encrypted");
-    await shot(page, 'sync');
+    await expect(card).toContainText('unencrypted data');
     await card.getByRole('button', { name: 'Turn on sync' }).click();
 
     await expect(page).toHaveURL(/\/setup\/done$/);
     await expect(card).toContainText('Confirmed as yours');
     await expect(card).toContainText('Settings sync across devices');
-    await shot(page, 'done');
+    await expect(card).toContainText('Group chats: all messages');
     await card.getByRole('button', { name: 'Go to your chats' }).click();
 
     await expect(page).toHaveURL(/\/rooms$/);
@@ -82,10 +70,59 @@ for (const viewport of [
   });
 }
 
+test('mobile hides neighboring cards and card navigation preserves page scroll', async ({
+  auth,
+  page,
+  installRoomCore,
+}) => {
+  await page.setViewportSize({ width: 390, height: 500 });
+  await installRoomCore('ready');
+  await page.goto('/settings/about');
+  await page.getByRole('button', { name: 'Run setup again' }).click();
+  await expect(page).toHaveURL(/\/setup\/profile$/, { timeout: 20_000 });
+  await auth.setupCard.getByRole('button', { name: 'Skip for now' }).click();
+  await expect(page).toHaveURL(/\/setup\/notifications$/);
+
+  const adjacent = page.locator('.rail > .auth-card.before');
+  await expect(adjacent).toBeVisible();
+  const appearance = page.locator('.rail > .auth-card.after').first();
+  await expect(appearance).toBeVisible();
+  await expect(appearance.locator('.stage-activation')).toBeEnabled();
+  await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2');
+  for (const card of [adjacent, appearance]) {
+    const { opacity, visibleWidth } = await card.evaluate((element) => {
+      const rail = element.parentElement?.getBoundingClientRect();
+      const bounds = element.getBoundingClientRect();
+      return {
+        opacity: Number(getComputedStyle(element).opacity),
+        visibleWidth: rail
+          ? Math.max(0, Math.min(rail.right, bounds.right) - Math.max(rail.left, bounds.left))
+          : 0,
+      };
+    });
+    expect(opacity).toBeGreaterThan(0);
+    expect(opacity).toBeLessThan(1);
+    expect(visibleWidth).toBe(0);
+  }
+
+  const before = await page.evaluate(() => {
+    window.scrollTo(0, 120);
+    return window.scrollY;
+  });
+  expect(before).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Back' }).first().click();
+  await expect(page).toHaveURL(/\/setup\/profile$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Next' }).first().click();
+  await expect(page).toHaveURL(/\/setup\/notifications$/);
+  await page.getByRole('button', { name: 'Next' }).first().click();
+  await expect(page).toHaveURL(/\/setup\/appearance$/);
+});
+
 test.describe('with motion', () => {
   test.use({ contextOptions: { reducedMotion: 'no-preference' } });
 
-  test('moving to the next step shows only the step it leaves and the one it reaches', async ({
+  test('moving to the next step gives full opacity only to the cards in transition', async ({
     auth,
     page,
     installRoomCore,
@@ -104,7 +141,7 @@ test.describe('with motion', () => {
       const started = performance.now();
       const sample = () => {
         document.querySelectorAll<HTMLElement>('.rail > .auth-card').forEach((element, index) => {
-          if (getComputedStyle(element).visibility !== 'hidden') seen.add(String(index));
+          if (Number(getComputedStyle(element).opacity) >= 0.9) seen.add(String(index));
         });
         if (performance.now() - started < 1500) requestAnimationFrame(sample);
       };
@@ -121,43 +158,57 @@ test.describe('with motion', () => {
   });
 });
 
-test('About runs setup again for a device that already finished it', async ({
+for (const viewport of [
+  { name: 'desktop', size: { width: 1280, height: 800 } },
+  { name: 'mobile', size: { width: 390, height: 844 } },
+]) {
+  test(`About runs setup again on ${viewport.name}`, async ({ auth, page, installRoomCore }) => {
+    await page.setViewportSize(viewport.size);
+    await installRoomCore('ready');
+    await page.goto('/settings/about');
+    await page.getByRole('button', { name: 'Run setup again' }).click();
+
+    const card = auth.setupCard;
+    for (const [step, action] of [
+      ['profile', 'Skip for now'],
+      ['notifications', 'Skip for now'],
+      ['appearance', 'Continue'],
+      ['layout', 'Continue'],
+      ['sync', 'Not now'],
+      ['done', 'Go to your chats'],
+    ] as const) {
+      await expect(page).toHaveURL(new RegExp(`/setup/${step}$`), { timeout: 20_000 });
+      if (step === 'appearance') {
+        await card.getByRole('button', { name: 'Browse more themes' }).click();
+        await expect(page.getByRole('dialog', { name: 'Theme catalogue' })).toBeVisible();
+        await page.getByRole('button', { name: 'Close catalogue' }).click();
+        await card.getByRole('radio', { name: 'Dark' }).click();
+      }
+      if (step === 'layout') {
+        await card.getByRole('radio', { name: 'Compact', exact: true }).check();
+        await card.getByRole('radio', { name: 'Expanded card' }).check();
+      }
+      await card.getByRole('button', { name: action }).click();
+    }
+
+    await expect(page).toHaveURL(/\/rooms$/);
+    const pending = await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) => key.startsWith('sable-setup:'))
+    );
+    expect(pending).toEqual([]);
+  });
+}
+
+test('touch: a swipe past device confirmation does not move', async ({
   auth,
   page,
   installRoomCore,
 }) => {
-  await installRoomCore('ready');
-  await page.goto('/settings/about');
-  await page.getByRole('button', { name: 'Run setup again' }).click();
-
-  const card = auth.setupCard;
-  for (const [step, action] of [
-    ['profile', 'Skip for now'],
-    ['notifications', 'Skip for now'],
-    ['appearance', 'Skip for now'],
-    ['sync', 'Not now'],
-    ['done', 'Go to your chats'],
-  ] as const) {
-    await expect(page).toHaveURL(new RegExp(`/setup/${step}$`), { timeout: 20_000 });
-    await card.getByRole('button', { name: action }).click();
-  }
-
-  await expect(page).toHaveURL(/\/rooms$/);
-  const pending = await page.evaluate(() =>
-    Object.keys(localStorage).filter((key) => key.startsWith('sable-setup:'))
-  );
-  expect(pending).toEqual([]);
-});
-
-test('touch: a swipe towards a step that is not reachable yet does not move', async ({
-  page,
-  installRoomCore,
-}) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await installRoomCore('ready');
-  await page.goto('/settings/about');
-  await page.getByRole('button', { name: 'Run setup again' }).click();
-  await expect(page).toHaveURL(/\/setup\/profile$/, { timeout: 20_000 });
+  await installRoomCore('onboarding');
+  await auth.open('https://example.test');
+  await auth.signInWithPassword('e2e', 'password');
+  await expect(page).toHaveURL(/\/setup\/device$/, { timeout: 20_000 });
   await page.waitForTimeout(500);
 
   const moved = await page.evaluate(async () => {
@@ -190,7 +241,7 @@ test('touch: a swipe towards a step that is not reachable yet does not move', as
 
   expect(moved).toBe(0);
   await page.waitForTimeout(400);
-  await expect(page).toHaveURL(/\/setup\/profile$/);
+  await expect(page).toHaveURL(/\/setup\/device$/);
 });
 
 test('a rail knocked off the current step by a relayout settles back onto it', async ({

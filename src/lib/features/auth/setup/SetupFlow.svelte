@@ -22,6 +22,7 @@
   import ConfirmDeviceCard from './ConfirmDeviceCard.svelte';
   import NotificationsSetupCard from './NotificationsSetupCard.svelte';
   import AppearanceSetupCard from './AppearanceSetupCard.svelte';
+  import ChatStyleSetupCard from './ChatStyleSetupCard.svelte';
   import SettingsSyncCard from './SettingsSyncCard.svelte';
   import SetupDoneCard from './SetupDoneCard.svelte';
   import {
@@ -49,6 +50,7 @@
     profile: 'auth.stageProfileLabel',
     notifications: 'setup.stageNotificationsLabel',
     appearance: 'setup.stageAppearanceLabel',
+    layout: 'setup.stageLayoutLabel',
     sync: 'setup.stageSyncLabel',
     done: 'setup.stageDoneLabel',
     consent: 'auth.stageConsentLabel',
@@ -72,6 +74,10 @@
   const requestedIndex = $derived(steps.indexOf(requested as SetupStep));
   const activeIndex = $derived(
     requestedIndex >= 0 && requestedIndex <= pendingIndex ? requestedIndex : pendingIndex
+  );
+  const canSkipAhead = $derived(
+    pending !== null &&
+      ['profile', 'notifications', 'appearance', 'layout', 'sync'].includes(pending)
   );
 
   const profile = new ProfileController({
@@ -151,7 +157,8 @@
     record = next;
     const target = stepRoute(upcoming);
     if (reload) location.assign(target);
-    else if (page.url.pathname !== target) void goto(target, { replaceState: requestedIndex < 0 });
+    else if (page.url.pathname !== target)
+      void goto(target, { replaceState: requestedIndex < 0, reset: false });
   }
 
   function leave(target: string, reload: boolean): void {
@@ -174,7 +181,9 @@
 
   function activate(index: number): void {
     const step = steps.at(index);
-    if (step && index <= pendingIndex) void goto(stepRoute(step));
+    if (!step) return;
+    if (index <= pendingIndex) void goto(stepRoute(step), { reset: false });
+    else if (index === pendingIndex + 1 && canSkipAhead && pending) advance(pending);
   }
 
   function skipChecking(): void {
@@ -198,7 +207,7 @@
   $effect(() => {
     if (!record || !pending || leaving) return;
     if (requestedIndex >= 0 && requestedIndex <= pendingIndex) return;
-    void goto(stepRoute(pending), { replaceState: true });
+    void goto(stepRoute(pending), { replaceState: true, reset: false });
   });
 </script>
 
@@ -213,7 +222,7 @@
     {activeIndex}
     total={steps.length}
     canBack={activeIndex > 0}
-    canForward={activeIndex < pendingIndex}
+    canForward={activeIndex < pendingIndex || (activeIndex === pendingIndex && canSkipAhead)}
     progress={steps.length > 1
       ? $i18n.t('setup.progress', { current: activeIndex + 1, total: steps.length })
       : undefined}
@@ -227,9 +236,11 @@
     {#each steps as step, index (step)}
       <AuthStageCard
         active={index === activeIndex}
+        reachable={index <= pendingIndex || (index === pendingIndex + 1 && canSkipAhead)}
         before={index < activeIndex}
         after={index > activeIndex}
         accessibilityLabel={$i18n.t(STAGE_LABELS[step])}
+        unavailableLabel={$i18n.t('setup.finishCurrentStep')}
         onActivate={() => {
           activate(index);
         }}
@@ -275,10 +286,9 @@
             onComplete={() => {
               advance('appearance');
             }}
-            onSkip={() => {
-              advance('appearance');
-            }}
           />
+        {:else if step === 'layout'}
+          <ChatStyleSetupCard onComplete={() => advance('layout')} />
         {:else if step === 'sync'}
           <SettingsSyncCard
             onComplete={() => {
@@ -290,6 +300,7 @@
           />
         {:else if step === 'done'}
           <SetupDoneCard
+            active={index === activeIndex}
             onComplete={() => {
               advance('done');
             }}

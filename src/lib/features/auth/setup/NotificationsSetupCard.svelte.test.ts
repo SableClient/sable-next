@@ -18,7 +18,8 @@ vi.mock('#lib/settings/preferences.svelte.js', async (importOriginal) => ({
 import { core } from '#lib/core/__mocks__/context.js';
 
 const setDefaultNotificationMode = vi.fn(() => Promise.resolve());
-Object.assign(core, { setDefaultNotificationMode });
+const defaultNotificationModes = vi.fn(() => Promise.resolve({ group: 'mentions', direct: 'all' }));
+Object.assign(core, { setDefaultNotificationMode, defaultNotificationModes });
 
 import NotificationsSetupCard from './NotificationsSetupCard.svelte';
 
@@ -71,6 +72,13 @@ test('choosing all messages writes the spec default instead', async () => {
   await unmount(instance);
 });
 
+test('shows the account’s saved group choice', async () => {
+  defaultNotificationModes.mockResolvedValueOnce({ group: 'all', direct: 'all' });
+  const { instance } = await render();
+  expect(radio(/All messages/)?.getAttribute('aria-checked')).toBe('true');
+  await unmount(instance);
+});
+
 test('an account that already chose only asks this device for its permission', async () => {
   const { instance, onComplete } = await render(false);
 
@@ -91,7 +99,7 @@ test('the OS prompt runs inside the click, and a grant turns the alerts on', asy
     expect(prefs.setPreference).toHaveBeenCalledWith('systemNotifications', true);
   });
   expect(button(/Allow notifications/)).toBeUndefined();
-  expect(document.body.textContent).toContain('Notifications are allowed');
+  expect(document.body.textContent).toContain('Notifications are on');
 
   await unmount(instance);
 });
@@ -101,7 +109,7 @@ test('a permission already denied is not asked for again', async () => {
   const { instance } = await render();
 
   expect(button(/Allow notifications/)).toBeUndefined();
-  expect(document.body.textContent).toContain('blocked for Sable');
+  expect(document.body.textContent).toContain('Notifications are off');
 
   await unmount(instance);
 });

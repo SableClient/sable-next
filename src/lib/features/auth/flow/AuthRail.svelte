@@ -27,6 +27,7 @@
     $props();
   let railElement = $state<HTMLDivElement>();
   let motionReady = $state(false);
+  let activeCardHeight = $state<number | null>(null);
   let isNavigating = $state(false);
   let lastActiveIndex: number | null = null;
   let scrollTimer: number | undefined;
@@ -206,6 +207,11 @@
     const cards = rail.querySelectorAll<HTMLElement>(':scope > .auth-card');
     if (index < 0 || index >= cards.length) return;
     const card = cards.item(index);
+    const sizeObserver = new ResizeObserver(() => {
+      activeCardHeight = card.offsetHeight;
+    });
+    activeCardHeight = card.offsetHeight;
+    sizeObserver.observe(card);
     const shouldFocus = lastActiveIndex !== null && lastActiveIndex !== index;
     leavingCard?.removeAttribute('data-leaving');
     leavingCard =
@@ -232,6 +238,7 @@
     }
 
     return () => {
+      sizeObserver.disconnect();
       window.cancelAnimationFrame(scrollAnimation ?? 0);
       window.cancelAnimationFrame(motionReadyFrame ?? 0);
       window.clearTimeout(scrollTimer);
@@ -240,7 +247,16 @@
 </script>
 
 {#if progress}
-  <p class="rail-progress" aria-live="polite">{progress}</p>
+  <div
+    class="rail-progress"
+    role="progressbar"
+    aria-label={$i18n.t('setup.title')}
+    aria-valuemin="1"
+    aria-valuemax={total}
+    aria-valuenow={activeIndex + 1}
+    aria-valuetext={progress}
+    style:--progress={`${((activeIndex + 1) / total) * 100}%`}
+  ></div>
 {/if}
 <div class="rail-shell">
   {#if total > 1}
@@ -269,6 +285,10 @@
     class:motion-ready={motionReady}
     class:is-navigating={isNavigating}
     class:is-dragging={isDragging}
+    style:height={activeCardHeight === null
+      ? undefined
+      : `calc(${activeCardHeight}px + var(--space-100) + var(--space-400))`}
+    style:--active-card-height={activeCardHeight === null ? undefined : `${activeCardHeight}px`}
     role="group"
     aria-label={$i18n.t('auth.stageNavigation')}
     ontouchstart={handleTouchStart}
@@ -287,10 +307,21 @@
 
 <style>
   .rail-progress {
-    color: var(--sec-main);
-    font-size: var(--font-size-small);
-    margin: 0 0 var(--space-200);
-    text-align: center;
+    background: var(--surface-var-container);
+    border-radius: var(--radii-pill);
+    height: var(--space-100);
+    margin: 0 auto var(--space-400);
+    max-width: 12rem;
+    overflow: hidden;
+  }
+
+  .rail-progress::before {
+    background: var(--primary-main);
+    border-radius: inherit;
+    content: '';
+    display: block;
+    height: 100%;
+    width: var(--progress);
   }
 
   .rail-shell {
@@ -329,7 +360,7 @@
     display: flex;
     gap: var(--space-800);
     margin-inline: auto;
-    overflow-x: auto;
+    overflow: auto hidden;
     overscroll-behavior-inline: contain;
     padding: var(--space-100) max(var(--space-100), calc((100% - var(--auth-card-width)) / 2))
       var(--space-400);
@@ -370,7 +401,10 @@
 
   .rail :global(.auth-card.before),
   .rail :global(.auth-card.after) {
-    opacity: 1;
+    mask-image: linear-gradient(black 75%, transparent);
+    max-height: var(--active-card-height, none);
+    opacity: 0.45;
+    overflow: hidden;
     transform: scale(var(--scale-subtle));
   }
 
@@ -391,13 +425,6 @@
   .rail :global(.auth-card.active) {
     opacity: 1;
     transform: translateX(0) scale(1);
-  }
-
-  .rail:not(.is-navigating, .is-dragging) :global(.auth-card:not(.active)),
-  .rail.is-navigating:not(.is-dragging) :global(.auth-card:not(.active, [data-leaving])) {
-    max-height: 0;
-    overflow: hidden;
-    visibility: hidden;
   }
 
   .rail.motion-ready :global(.auth-card.entering) {

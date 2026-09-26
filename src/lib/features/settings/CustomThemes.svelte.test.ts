@@ -134,6 +134,31 @@ test('offers the built-in theme in both slots, chosen by default', async () => {
   await unmount(instance);
 });
 
+test('onboarding selects one mode and activates a theme chosen from the catalogue', async () => {
+  stubCatalog();
+  const onThemeChosen = vi.fn();
+  const instance = mount(CustomThemes, {
+    target: document.body,
+    props: { onboarding: true, onThemeChosen },
+  });
+
+  const radios = [...document.querySelectorAll('.mode-choices [role="radio"]')];
+  expect(radios.map((radio) => radio.textContent.trim())).toEqual(['Light', 'Dark']);
+  expect(radios.filter((radio) => radio.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+
+  button('Browse more themes')?.click();
+  await vi.waitFor(() => {
+    expect(installButtons()).toHaveLength(2);
+  });
+  installButton('Night')?.click();
+  await vi.waitFor(() => {
+    expect(onThemeChosen).toHaveBeenCalledWith('dark');
+  });
+  expect(customThemes.darkThemeId).toBe(customThemes.themes[0]?.id);
+
+  await unmount(instance);
+});
+
 test('keeps the selected installed theme first in the scrollable list', async () => {
   replaceCustomThemes({
     themes: Array.from({ length: 5 }, (_, index) => ({

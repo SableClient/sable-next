@@ -10,6 +10,7 @@ const STEPS: readonly SetupStep[] = [
   'profile',
   'notifications',
   'appearance',
+  'layout',
   'sync',
   'consent',
   'done',
