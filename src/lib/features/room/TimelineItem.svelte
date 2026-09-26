@@ -1544,6 +1544,7 @@
   }
 
   .message-main {
+    font-size: var(--font-size-editor);
     grid-column: 1;
     min-width: 0;
   }

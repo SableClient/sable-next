@@ -57,15 +57,13 @@ function homeserverUrl(homeserver: string): URL {
   return new URL(homeserver.includes('://') ? homeserver : `https://${homeserver}`);
 }
 
-async function grantLocalNetworkAccess(baseUrl: string): Promise<boolean> {
+async function grantLocalNetworkAccess(baseUrl: string): Promise<void> {
   try {
     await fetch(new URL('_matrix/client/versions', homeserverUrl(baseUrl)), { mode: 'cors' });
-    return true;
   } catch (error) {
     console.warn('[sable auth] homeserver unreachable from the page', {
       error: error instanceof Error ? error.name : 'unknown',
     });
-    return false;
   }
 }
 
@@ -829,9 +827,7 @@ export class CoreClient {
     const session = this.session;
     if (!session) return;
     const revision = this.accountRevision;
-    const blocked =
-      (await grantLocalNetworkAccess(session.homeserver)) ||
-      (navigator.onLine && (await localNetworkDenied()));
+    const blocked = navigator.onLine && (await localNetworkDenied());
     if (revision !== this.accountRevision || this.sync?.state !== 'offline') return;
     this.localNetworkBlocked = blocked ? homeserverUrl(session.homeserver).host : null;
   }

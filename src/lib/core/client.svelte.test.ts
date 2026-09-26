@@ -363,15 +363,12 @@ test('a restored session asks for local network access from the page', async () 
   });
 });
 
-test('an offline core with a homeserver the page reaches reports the browser blocking it', async () => {
+test('an offline core with local network access allowed is just offline', async () => {
   const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
 
   fake.emit({ type: 'sync_status', state: 'offline' });
-  await vi.waitFor(() => {
-    expect(core.localNetworkBlocked).toBe('example.org');
-  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
-  fake.emit({ type: 'sync_status', state: 'live' });
   expect(core.localNetworkBlocked).toBeNull();
 });
 
@@ -384,17 +381,17 @@ test('an offline core reports the browser blocking it when the permission was de
   await vi.waitFor(() => {
     expect(core.localNetworkBlocked).toBe('example.org');
   });
+
+  fake.emit({ type: 'sync_status', state: 'live' });
+  expect(core.localNetworkBlocked).toBeNull();
 });
 
-test('an offline core the page cannot reach either is just offline', async () => {
-  const { core, fake, fetchMock } = await startGated(() =>
-    Promise.reject(new TypeError('offline'))
-  );
+test('an offline core is not blamed on the browser while the device is offline', async () => {
+  localNetwork.denied = true;
+  const { core, fake } = await startGated(() => Promise.reject(new TypeError('offline')));
+  vi.stubGlobal('navigator', { onLine: false });
 
   fake.emit({ type: 'sync_status', state: 'offline' });
-  await vi.waitFor(() => {
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(core.localNetworkBlocked).toBeNull();

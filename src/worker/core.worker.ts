@@ -8,6 +8,7 @@ import init, {
 } from '#src/generated/wasm/sable_wasm.js';
 import { clearSession, loadSession, saveSession } from '#lib/platform/session-storage.js';
 import { createCoreWorkerBoundary } from './core-worker-boundary';
+import { withPageFetchFallback } from './page-fetch';
 
 declare const self: SharedWorkerGlobalScope;
 
@@ -38,6 +39,8 @@ const boundary = createCoreWorkerBoundary(
     self.close();
   }
 );
+
+self.fetch = withPageFetchFallback(self.fetch.bind(self), boundary.pageFetch, self.location.origin);
 
 // A trap unwinds only the call that hit it, so the sync loop and the SDK's
 // timers keep re-entering a module whose allocator and borrows were left

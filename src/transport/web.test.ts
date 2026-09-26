@@ -227,3 +227,26 @@ test('resetCaches terminates the worker and drops the cached stores', async () =
   expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, reset: true });
   expect(deleted).toEqual(['sable-next-account-a1::matrix-sdk-state']);
 });
+
+test('the page answers the requests the worker hands it', async () => {
+  const probe = vi.fn(() => Promise.resolve(new Response(null)));
+  vi.stubGlobal('fetch', probe);
+  const transport = await load();
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
+  const port = FakeSharedWorker.last?.port;
+
+  const channel = new MessageChannel();
+  const reply = new Promise((resolve) => {
+    channel.port1.onmessage = (event) => {
+      resolve(event.data);
+    };
+  });
+  port?.onmessage?.({
+    data: { pageFetch: { probe: 'https://matrix.lan/' } },
+    ports: [channel.port2],
+  } as unknown as MessageEvent);
+
+  expect(await reply).toEqual({ reachable: true });
+  expect(probe).toHaveBeenCalledOnce();
+  channel.port1.close();
+});
