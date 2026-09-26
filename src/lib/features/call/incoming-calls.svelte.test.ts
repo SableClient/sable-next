@@ -4,6 +4,22 @@ import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+const system = vi.hoisted(() => ({
+  handler: null as ((action: { action: string; uuid: string; roomId?: string }) => void) | null,
+  report: vi.fn((_call: { uuid: string }) => Promise.resolve(false)),
+  end: vi.fn((_callId: string) => Promise.resolve(true)),
+}));
+
+vi.mock('#lib/platform/calls.js', () => ({
+  reportIncomingSystemCall: system.report,
+  endSystemCall: system.end,
+  systemCallKey: (callId: string) => callId,
+  listenSystemCallActions: (handler: typeof system.handler) => {
+    system.handler = handler;
+    return Promise.resolve(() => {});
+  },
+}));
+
 import { IncomingCalls } from './incoming-calls.svelte.js';
 
 function harness() {
@@ -49,6 +65,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  system.report.mockClear();
+  system.end.mockClear();
+  system.handler = null;
 });
 
 test('an incoming call is surfaced', () => {
@@ -141,4 +160,65 @@ test('accepting dismisses the prompt without declining', () => {
 
   expect(declineCall).not.toHaveBeenCalled();
   expect(calls.calls).toHaveLength(0);
+});
+
+test('answering in the system call UI joins the room and keeps the system call', async () => {
+  system.report.mockResolvedValueOnce(true);
+  const { client, emit } = harness();
+  const onAnswer = vi.fn();
+  const calls = new IncomingCalls(client, onAnswer);
+  calls.start();
+  await Promise.resolve();
+
+  emit(incoming({ has_video: true }));
+  await vi.waitFor(() => {
+    expect(system.report).toHaveBeenCalled();
+  });
+  const uuid = system.report.mock.calls[0]?.[0].uuid ?? '';
+  await Promise.resolve();
+  system.handler?.({ action: 'answer', uuid });
+
+  expect(onAnswer).toHaveBeenCalledWith({
+    uuid,
+    callId: '$notify',
+    roomId: '!room:example.org',
+    hasVideo: true,
+  });
+  expect(calls.calls).toEqual([]);
+  expect(system.end).not.toHaveBeenCalled();
+});
+
+test('a call answered from a push the app never saw still joins its room', async () => {
+  const { client } = harness();
+  const onAnswer = vi.fn();
+  const calls = new IncomingCalls(client, onAnswer);
+  calls.start();
+  await Promise.resolve();
+
+  system.handler?.({ action: 'answer', uuid: 'push-uuid', roomId: '!cold:example.org' });
+
+  expect(onAnswer).toHaveBeenCalledWith({
+    uuid: 'push-uuid',
+    callId: 'push-uuid',
+    roomId: '!cold:example.org',
+    hasVideo: false,
+  });
+});
+
+test('declining in the system call UI declines the Matrix call', async () => {
+  system.report.mockResolvedValueOnce(true);
+  const { client, emit, declineCall } = harness();
+  const calls = new IncomingCalls(client);
+  calls.start();
+  await Promise.resolve();
+
+  emit(incoming());
+  await vi.waitFor(() => {
+    expect(system.report).toHaveBeenCalled();
+  });
+  await Promise.resolve();
+  system.handler?.({ action: 'end', uuid: system.report.mock.calls.at(-1)?.[0].uuid ?? '' });
+
+  expect(declineCall).toHaveBeenCalledWith('!room:example.org', '$notify');
+  expect(calls.calls).toEqual([]);
 });

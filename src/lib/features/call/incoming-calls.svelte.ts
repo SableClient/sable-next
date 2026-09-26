@@ -1,6 +1,12 @@
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
-import { endSystemCall, reportIncomingSystemCall } from '#lib/platform/calls.js';
+import type { SystemCallAction } from '@sableclient/tauri-plugin-livekit-mobile';
+import {
+  endSystemCall,
+  listenSystemCallActions,
+  reportIncomingSystemCall,
+  systemCallKey,
+} from '#lib/platform/calls.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { ignoreError } from './call-transport';
@@ -17,6 +23,8 @@ export type IncomingCall = {
   expiresAtMs: number;
 };
 
+export type SystemAnswer = { uuid: string; callId: string; roomId: string; hasVideo: boolean };
+
 export class IncomingCalls {
   calls = $state.raw<IncomingCall[]>([]);
 
@@ -25,18 +33,31 @@ export class IncomingCalls {
   readonly #timers = new Map<string, ReturnType<typeof setTimeout>>();
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never rendered from
   readonly #system = new Set<string>();
+  // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never rendered from
+  readonly #uuids = new Map<string, string>();
+  readonly #onSystemAnswer: (answer: SystemAnswer) => void;
   #ringtone: Ringtone | undefined;
   #unsubscribe: (() => void) | undefined;
+  #stopSystemActions: (() => void) | undefined;
 
-  constructor(client: CoreClient) {
+  constructor(client: CoreClient, onSystemAnswer: (answer: SystemAnswer) => void = () => {}) {
     this.#client = client;
+    this.#onSystemAnswer = onSystemAnswer;
   }
 
   start(): () => void {
     this.#unsubscribe = this.#client.subscribeEvents((event) => {
       this.#onEvent(event);
     });
+    let stopped = false;
+    void listenSystemCallActions((action) => {
+      this.#onSystemAction(action);
+    }).then((stop) => {
+      if (stopped) stop();
+      else this.#stopSystemActions = stop;
+    });
     return () => {
+      stopped = true;
       this.stop();
     };
   }
@@ -44,10 +65,13 @@ export class IncomingCalls {
   stop(): void {
     this.#unsubscribe?.();
     this.#unsubscribe = undefined;
+    this.#stopSystemActions?.();
+    this.#stopSystemActions = undefined;
     for (const timer of this.#timers.values()) clearTimeout(timer);
     this.#timers.clear();
-    for (const callId of this.#system) void endSystemCall(callId);
+    for (const callId of this.#system) void endSystemCall(this.#systemKey(callId));
     this.#system.clear();
+    this.#uuids.clear();
     this.calls = [];
     this.#syncRingtone();
   }
@@ -101,17 +125,44 @@ export class IncomingCalls {
     this.#syncRingtone();
   }
 
+  #systemKey(notificationEventId: string): string {
+    return systemCallKey(notificationEventId, this.#uuids.get(notificationEventId) ?? '');
+  }
+
+  #onSystemAction(action: SystemCallAction): void {
+    const call = this.calls.find(
+      (entry) => this.#uuids.get(entry.notificationEventId) === action.uuid
+    );
+    if (call) this.#system.delete(call.notificationEventId);
+    if (action.action === 'answer') {
+      const roomId = call?.roomId ?? action.roomId;
+      if (call) this.#drop(call.notificationEventId);
+      if (roomId) {
+        this.#onSystemAnswer({
+          uuid: action.uuid,
+          callId: call ? this.#systemKey(call.notificationEventId) : action.uuid,
+          roomId,
+          hasVideo: call?.hasVideo ?? false,
+        });
+      }
+    } else if (action.action === 'end' && call) {
+      void this.decline(call);
+    }
+  }
+
   async #raiseSystemCall(call: IncomingCall): Promise<void> {
+    const uuid = crypto.randomUUID();
+    this.#uuids.set(call.notificationEventId, uuid);
     const taken = await reportIncomingSystemCall({
       callId: call.notificationEventId,
-      uuid: crypto.randomUUID(),
+      uuid,
       callerName: call.senderName ?? call.roomName ?? call.sender,
       hasVideo: call.hasVideo,
       roomId: call.roomId,
     });
     if (!taken) return;
     if (!this.calls.some((c) => c.notificationEventId === call.notificationEventId)) {
-      void endSystemCall(call.notificationEventId);
+      void endSystemCall(systemCallKey(call.notificationEventId, uuid));
       return;
     }
     this.#system.add(call.notificationEventId);
@@ -124,7 +175,10 @@ export class IncomingCalls {
       clearTimeout(timer);
       this.#timers.delete(notificationEventId);
     }
-    if (this.#system.delete(notificationEventId)) void endSystemCall(notificationEventId);
+    if (this.#system.delete(notificationEventId)) {
+      void endSystemCall(this.#systemKey(notificationEventId));
+    }
+    this.#uuids.delete(notificationEventId);
     this.calls = this.calls.filter((call) => call.notificationEventId !== notificationEventId);
     this.#syncRingtone();
   }

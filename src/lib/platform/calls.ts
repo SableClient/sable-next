@@ -1,4 +1,10 @@
-import type { NativeCallCapabilities } from '@sableclient/tauri-plugin-livekit-mobile';
+import type {
+  NativeCallCapabilities,
+  SystemCallAction,
+} from '@sableclient/tauri-plugin-livekit-mobile';
+
+import { isTauri } from '@tauri-apps/api/core';
+import { type as osType } from '@tauri-apps/plugin-os';
 
 import { isNativeMobile } from './os';
 
@@ -43,6 +49,10 @@ export async function reportIncomingSystemCall(call: IncomingSystemCall): Promis
   }
 }
 
+export function systemCallKey(callId: string, uuid: string): string {
+  return isTauri() && osType() === 'ios' ? uuid : callId;
+}
+
 export async function endSystemCall(callId: string): Promise<boolean> {
   const plugin = await loadNativeCalls();
   if (!plugin) return false;
@@ -52,4 +62,23 @@ export async function endSystemCall(callId: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function listenSystemCallActions(
+  handler: (action: SystemCallAction) => void
+): Promise<() => void> {
+  const plugin = await loadNativeCalls();
+  if (!plugin) return () => {};
+  try {
+    const listener = await plugin.onSystemCallAction(handler);
+    for (const action of await plugin.drainPendingSystemCallActions()) handler(action);
+    return () => void listener.unregister();
+  } catch {
+    return () => {};
+  }
+}
+
+export async function fulfillSystemAnswer(uuid: string): Promise<void> {
+  const plugin = await loadNativeCalls();
+  await plugin?.fulfillAnswerCall(uuid).catch(() => {});
 }

@@ -20,6 +20,7 @@
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
+  import { endSystemCall, fulfillSystemAnswer } from '#lib/platform/calls.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
@@ -125,9 +126,28 @@
   providePresenceStore(presence);
   const notifications = new NotificationCenter();
   provideNotificationCenter(notifications);
-  const incomingCalls = new IncomingCalls(core);
   const callSession = new CallSession(core);
   provideCallSession(callSession);
+  let systemCall = $state<{ callId: string; roomId: string } | null>(null);
+  const incomingCalls = new IncomingCalls(core, ({ uuid, callId, roomId, hasVideo }) => {
+    void goto(roomSectionPath(roomList.rooms, roomId));
+    void callSession
+      .join(roomId, { microphone: true, camera: hasVideo })
+      .then(() => {
+        systemCall = { callId, roomId };
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable call] system answer not joined', error);
+      })
+      .finally(() => void fulfillSystemAnswer(uuid));
+  });
+
+  $effect(() => {
+    const answered = systemCall;
+    if (answered === null || callSession.roomId === answered.roomId) return;
+    systemCall = null;
+    void endSystemCall(answered.callId);
+  });
 
   let callUserIds = $derived(
     new Map(callSession.members.map((member) => [member.identity, member.user_id]))
