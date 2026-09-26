@@ -9,6 +9,7 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import CaretRightIcon from 'phosphor-svelte/lib/CaretRightIcon';
+  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
@@ -36,6 +37,7 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
@@ -51,6 +53,7 @@
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import ProfileOverrideDialog from './ProfileOverrideDialog.svelte';
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
   import { powerTag } from './power-tags.js';
@@ -117,8 +120,12 @@
     }
   });
 
-  let displayName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
-  let avatarUrl = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
+  let realName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
+  let realAvatar = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
+  let displayName = $derived(profileOverrides.name(userId, realName));
+  let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
+  let overrideColors = $derived(profileOverrides.colors(userId));
+  let overrideOpen = $state(false);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let pronounSets = $derived(
@@ -521,6 +528,10 @@
         </ActionMenuItem>
       {/if}
       {#if !isSelf}
+        <ActionMenuItem onSelect={() => (overrideOpen = true)}>
+          <PencilSimpleIcon />
+          {$i18n.t('timeline.profileOverride')}
+        </ActionMenuItem>
         <ActionMenuItem
           destructive
           class={['profile-menu-destructive', (canKick || canBan) && 'profile-menu-grouped']}
@@ -683,8 +694,18 @@
   bannerUrl={currentProfile?.banner_url}
   status={userStatus?.text}
   statusEmoji={userStatus?.emoji}
-  nameColorLight={cosmetics?.colorOnLight ?? currentProfile?.name_color_light ?? roleTag?.color}
-  nameColorDark={cosmetics?.colorOnDark ?? currentProfile?.name_color_dark ?? roleTag?.color}
+  nameColorLight={overrideColors === null
+    ? null
+    : (overrideColors?.light ??
+      cosmetics?.colorOnLight ??
+      currentProfile?.name_color_light ??
+      roleTag?.color)}
+  nameColorDark={overrideColors === null
+    ? null
+    : (overrideColors?.dark ??
+      cosmetics?.colorOnDark ??
+      currentProfile?.name_color_dark ??
+      roleTag?.color)}
   nameFont={cosmetics?.font}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   actions={actionRow}
@@ -692,6 +713,14 @@
   footer={extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
   {variant}
+/>
+
+<ProfileOverrideDialog
+  open={overrideOpen}
+  {userId}
+  {realName}
+  {realAvatar}
+  onOpenChange={(next) => (overrideOpen = next)}
 />
 
 <DialogFrame

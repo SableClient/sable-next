@@ -1104,7 +1104,17 @@
     "utdWithheldUnverified": "The sender withheld the key because this device is unverified or insecure.",
     "utdWithheldBySender": "The sender chose not to send this device the key.",
     "utdRecoverAction": "Set up recovery",
-    "utdWaiting": "Waiting for this message’s key…"
+    "utdWaiting": "Waiting for this message’s key…",
+    "profileOverride": "Set a nickname",
+    "profileOverrideTitle": "How you see this person",
+    "profileOverrideHint": "Only your devices show these. They are stored in your account data, which your homeserver can read.",
+    "profileOverrideName": "Name",
+    "profileOverrideAvatar": "Choose a picture",
+    "profileOverrideAvatarReset": "Use their picture",
+    "profileOverrideColor": "Name colour",
+    "profileOverrideSave": "Save",
+    "profileOverrideCancel": "Cancel",
+    "profileOverrideRemove": "Show their own profile"
   },
   "viewer": {
     "title": "Media viewer",

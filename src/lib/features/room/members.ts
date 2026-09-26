@@ -1,5 +1,6 @@
 import type { MemberView, PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 
+import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 import type { SenderCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
 import { senderColor } from './timeline-format';
@@ -18,14 +19,23 @@ export function senderDisplayColors(
   isOwn = false,
   room: SenderCosmetics | null = null
 ): SenderDisplayColors {
+  const override = profileOverrides.colors(userId);
+  if (override === null) {
+    const nameColor = isOwn ? 'var(--primary-on-container)' : senderColor(userId);
+    return { nameColor, nameColorLight: null, nameColorDark: null, tinted: false };
+  }
   const personaTint = personaWithColor(persona);
   const nameColorLight =
+    override?.light ??
+    override?.dark ??
     personaTint?.color_on_light ??
     room?.colorOnLight ??
     profile?.name_color_light ??
     profile?.name_color_dark ??
     null;
   const nameColorDark =
+    override?.dark ??
+    override?.light ??
     personaTint?.color_on_dark ??
     room?.colorOnDark ??
     profile?.name_color_dark ??
@@ -47,11 +57,11 @@ export function findMember(
 }
 
 export function memberName(members: readonly MemberView[], userId: string): string {
-  return findMember(members, userId)?.display_name ?? userId;
+  return profileOverrides.name(userId, findMember(members, userId)?.display_name ?? userId);
 }
 
 export function memberAvatar(members: readonly MemberView[], userId: string): string | null {
-  return findMember(members, userId)?.avatar_url ?? null;
+  return profileOverrides.avatar(userId, findMember(members, userId)?.avatar_url ?? null);
 }
 
 export interface MemberIdentity {

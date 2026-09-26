@@ -13,6 +13,7 @@
   import { i18n } from '#lib/i18n.js';
   import {
     findRoomByPathId,
+    roomAvatarUrl,
     roomLabel,
     roomPathParam,
     roomPathParamFromId,
@@ -678,6 +679,7 @@
   {#snippet navRoom(item: RoomNavRow)}
     {@const room = item.room}
     {@const name = room ? roomLabel(room) : item.roomId}
+    {@const avatarUrl = room ? roomAvatarUrl(room) : null}
     {@const href = roomHref(item)}
     {@const active = page.url.pathname === href}
     {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
@@ -723,12 +725,12 @@
               })
             : undefined}
         >
-          {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(room?.avatar_url))}
+          {#if (room?.is_direct ?? false) || showsRoomAvatar(iconMode, collapsed, Boolean(avatarUrl))}
             <span class="room-avatar">
               <Avatar
-                class={['room-avatar-icon', { glyph: !room?.avatar_url, voice: room?.is_voice }]}
-                id={room?.avatar_url ? item.roomId : null}
-                src={room?.avatar_url ?? null}
+                class={['room-avatar-icon', { glyph: !avatarUrl, voice: room?.is_voice }]}
+                id={avatarUrl ? item.roomId : null}
+                src={avatarUrl}
                 size="small"
                 uniform
               >
@@ -931,9 +933,9 @@
         >
           <span class="room-avatar">
             <Avatar
-              class={['room-avatar-icon', { glyph: !room.avatar_url }]}
-              id={room.avatar_url ? room.room_id : null}
-              src={room.avatar_url}
+              class={['room-avatar-icon', { glyph: !roomAvatarUrl(room) }]}
+              id={roomAvatarUrl(room) ? room.room_id : null}
+              src={roomAvatarUrl(room)}
               size="small"
               uniform
             >

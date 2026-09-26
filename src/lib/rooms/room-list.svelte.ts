@@ -11,6 +11,7 @@ import { applyDiffs } from '#src/transport';
 
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 
 import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
 import {
@@ -39,8 +40,19 @@ export function roomPathParam(room: RoomSummary): string {
   return roomPathParamFromId(roomPathId(room));
 }
 
+function directPeer(room: RoomSummary): string | null {
+  return room.is_direct && room.direct_targets.length === 1 ? room.direct_targets[0] : null;
+}
+
 export function roomLabel(room: RoomSummary): string {
-  return room.name ?? room.canonical_alias ?? room.room_id;
+  const label = room.name ?? room.canonical_alias ?? room.room_id;
+  const peer = directPeer(room);
+  return peer === null ? label : profileOverrides.name(peer, label);
+}
+
+export function roomAvatarUrl(room: RoomSummary): string | null {
+  const peer = directPeer(room);
+  return peer === null ? room.avatar_url : profileOverrides.avatar(peer, room.avatar_url);
 }
 
 export function findRoomByPathId(

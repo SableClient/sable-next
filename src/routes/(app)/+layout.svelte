@@ -20,6 +20,7 @@
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -633,12 +634,14 @@
     notifications.start(core, openNotification);
     presence.start(core);
     dismissedInvites.start(core);
+    profileOverrides.start(core);
     return () => {
       roomList.stop();
       spaceSidebar.stop();
       notifications.stop();
       presence.stop();
       dismissedInvites.stop();
+      profileOverrides.stop();
     };
   });
 

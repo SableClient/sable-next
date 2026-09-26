@@ -9,6 +9,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
@@ -178,11 +179,14 @@
       : undefined
   );
   let accountName = $derived(
-    item.sender_name ??
-      senderMember?.display_name ??
-      profile?.display_name ??
-      item.sender ??
-      $i18n.t('timeline.unknownSender')
+    profileOverrides.name(
+      item.sender ?? '',
+      item.sender_name ??
+        senderMember?.display_name ??
+        profile?.display_name ??
+        item.sender ??
+        $i18n.t('timeline.unknownSender')
+    )
   );
   let persona = $derived(item.per_message_profile);
   let senderIdentity = $derived(
@@ -194,7 +198,11 @@
   let senderAvatar = $derived(
     persona?.avatar_url === ''
       ? null
-      : (persona?.avatar_url ?? item.sender_avatar ?? senderMember?.avatar_url ?? null)
+      : (persona?.avatar_url ??
+          profileOverrides.avatar(
+            item.sender ?? '',
+            item.sender_avatar ?? senderMember?.avatar_url ?? null
+          ))
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
@@ -219,10 +227,13 @@
   );
   let replyNameBase = $derived(
     replyPersona?.display_name ??
-      item.in_reply_to?.sender_name ??
-      findMember(members, item.in_reply_to?.sender)?.display_name ??
-      item.in_reply_to?.sender ??
-      $i18n.t('timeline.unknownSender')
+      profileOverrides.name(
+        item.in_reply_to?.sender ?? '',
+        item.in_reply_to?.sender_name ??
+          findMember(members, item.in_reply_to?.sender)?.display_name ??
+          item.in_reply_to?.sender ??
+          $i18n.t('timeline.unknownSender')
+      )
   );
   let replyIsPinged = $derived(item.in_reply_to?.sender_mentioned ?? false);
   let replyName = $derived(
