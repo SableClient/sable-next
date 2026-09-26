@@ -58,13 +58,14 @@ use crate::matrix_html::{
 };
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
-    AvatarChangeView, DisplayNameChangeView, ForwardedView, GalleryItemView, LatestEventView,
-    MemberView, MembershipChangeView, MembershipView, MentionView, PerMessageProfileView,
-    PollAnswerView, PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView,
-    RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView,
-    RoomSummary, RoomTag, SearchContextView, SearchHitView, SendStateView, SpaceChildEdge,
-    SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView, TimelineItemContentView,
-    TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView, VectorDiff,
+    AudioMetadataView, AvatarChangeView, DisplayNameChangeView, ForwardedView, GalleryItemView,
+    LatestEventView, MemberView, MembershipChangeView, MembershipView, MentionView,
+    PerMessageProfileView, PollAnswerView, PollView, PredecessorRoomView, PublicRoomView,
+    ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
+    RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchContextView, SearchHitView,
+    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
+    TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
+    VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -1543,6 +1544,36 @@ pub(crate) const CALL_SLOT_ID: &str = "m.call#ROOM";
 
 pub(crate) const SPOILER_PROPERTY: &str = "page.codeberg.everypizza.msc4193.spoiler";
 
+const AUDIO_METADATA_KEYS: [&str; 2] = ["audio_metadata", "org.matrix.msc4549.audio_metadata"];
+const AUDIO_METADATA_MAX_CHARS: usize = 256;
+const BLURHASH_MAX_CHARS: usize = 128;
+
+pub(crate) fn audio_metadata(content: Option<&serde_json::Value>) -> Option<AudioMetadataView> {
+    let info = content?.get("info")?;
+    let metadata = AUDIO_METADATA_KEYS
+        .iter()
+        .find_map(|key| info.get(*key).filter(|value| value.is_object()))?;
+    let text = |key: &str, limit: usize| {
+        metadata
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && value.chars().count() <= limit)
+            .map(str::to_owned)
+    };
+    let view = AudioMetadataView {
+        title: text("title", AUDIO_METADATA_MAX_CHARS),
+        artist: text("artist", AUDIO_METADATA_MAX_CHARS),
+        album: text("album", AUDIO_METADATA_MAX_CHARS),
+        cover_art: text("cover_art", BLURHASH_MAX_CHARS),
+    };
+    (view.title.is_some()
+        || view.artist.is_some()
+        || view.album.is_some()
+        || view.cover_art.is_some())
+    .then_some(view)
+}
+
 pub(crate) fn spoiler_reason(content: Option<&serde_json::Value>) -> Option<String> {
     const REASON: &str = "page.codeberg.everypizza.msc4193.spoiler.reason";
 
@@ -1722,6 +1753,7 @@ fn message_content(
                 duration_ms: audio_duration_ms(audio),
                 waveform: audio_waveform(audio),
                 voice: audio.voice.is_some(),
+                metadata: audio_metadata(raw.content.as_ref()),
             }
         }
         MessageType::File(file) => {
@@ -2183,13 +2215,41 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        LocalContent, RoomSendQueueUpdate, SerializableEventContent, bundled_link_previews,
-        caption_view, clamp_power_level, forward_meta, geo_coordinates, in_call,
-        per_message_profile, relay_author, relay_profile, via_servers,
+        LocalContent, RoomSendQueueUpdate, SerializableEventContent, audio_metadata,
+        bundled_link_previews, caption_view, clamp_power_level, forward_meta, geo_coordinates,
+        in_call, per_message_profile, relay_author, relay_profile, via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{OwnedEventId, OwnedTransactionId};
+
+    #[test]
+    fn audio_metadata_reads_msc4549_and_prefers_the_stable_key() {
+        let unstable = audio_metadata(Some(&json!({"info": {
+            "org.matrix.msc4549.audio_metadata": {
+                "title": " Moonwalker ", "artist": "Jake Chudnow", "album": "",
+                "cover_art": "LBEpAr~VM{x[004:oyM|9GM|xtIU"
+            }
+        }})))
+        .expect("metadata");
+        assert_eq!(unstable.title.as_deref(), Some("Moonwalker"));
+        assert_eq!(unstable.artist.as_deref(), Some("Jake Chudnow"));
+        assert_eq!(unstable.album, None);
+        assert_eq!(
+            unstable.cover_art.as_deref(),
+            Some("LBEpAr~VM{x[004:oyM|9GM|xtIU")
+        );
+
+        let both = audio_metadata(Some(&json!({"info": {
+            "audio_metadata": {"title": "Stable"},
+            "org.matrix.msc4549.audio_metadata": {"title": "Unstable"}
+        }})))
+        .expect("metadata");
+        assert_eq!(both.title.as_deref(), Some("Stable"));
+
+        assert!(audio_metadata(Some(&json!({"info": {"audio_metadata": {"title": 5}}}))).is_none());
+        assert!(audio_metadata(Some(&json!({"info": {}}))).is_none());
+    }
 
     #[test]
     fn forward_meta_prefers_the_sable_key_and_hides_private_origins() {

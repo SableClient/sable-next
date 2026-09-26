@@ -234,6 +234,7 @@
               duration_ms: null,
               waveform: null,
               voice: false,
+              metadata: null,
             },
           ];
         }

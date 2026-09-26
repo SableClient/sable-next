@@ -15,6 +15,14 @@ export type AttachmentInfoView = {
 	voice: boolean,
 };
 
+/**  MSC4549 track details from an `m.audio` event's `info`. */
+export type AudioMetadataView = {
+	title: string | null,
+	artist: string | null,
+	album: string | null,
+	cover_art: string | null,
+};
+
 export type AuthIntent = "login" | "register";
 
 export type AvatarChangeView = {
@@ -1114,7 +1122,7 @@ html: string | null; source: string; mime: string | null; width: number | null; 
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
-html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean } | { kind: "file"; filename: string; caption: string | null;
+html: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null; voice: boolean; metadata: AudioMetadataView | null } | { kind: "file"; filename: string; caption: string | null;
 /**  Sanitised display HTML for a formatted caption, when present. */
 html: string | null; source: string; mime: string | null; size: number | null } | { kind: "sticker"; body: string; source: string; mime: string | null; width: number | null; height: number | null } |
 /**

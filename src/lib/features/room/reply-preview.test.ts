@@ -30,6 +30,7 @@ test('every renderable message kind yields a preview', () => {
       duration_ms: null,
       waveform: null,
       voice: true,
+      metadata: null,
     })
   ).toBe('voice.ogg');
   expect(

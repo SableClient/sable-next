@@ -2881,6 +2881,7 @@ pub enum TimelineItemContentView {
         #[cfg_attr(feature = "typegen", specta(type = Option<Vec<specta_typescript::Number>>))]
         waveform: Option<Vec<f32>>,
         voice: bool,
+        metadata: Option<AudioMetadataView>,
     },
     File {
         filename: String,
@@ -3560,6 +3561,16 @@ pub struct InviteTriageView {
 pub struct StatusView {
     pub text: String,
     pub emoji: Option<String>,
+}
+
+/// MSC4549 track details from an `m.audio` event's `info`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct AudioMetadataView {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub cover_art: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,9 +2,11 @@
   import DownloadSimpleIcon from 'phosphor-svelte/lib/DownloadSimpleIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
+  import type { AudioMetadataView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { saveFile, savesNatively } from '#lib/platform/files.js';
+  import AudioTrack from '#lib/ui/AudioTrack.svelte';
   import { blurhashDataUrl } from '#lib/ui/blurhash.js';
   import PdfThumbnail from '#lib/ui/PdfThumbnail.svelte';
   import { isPdfAttachment } from '#lib/ui/pdf-attachment.js';
@@ -45,6 +47,7 @@
     thumbnail?: string | null;
     durationMs?: number | null;
     waveform?: number[] | null;
+    audioMetadata?: AudioMetadataView | null;
     onOpen?: () => void;
     class?: string;
   }
@@ -62,6 +65,7 @@
     thumbnail = null,
     durationMs = null,
     waveform = null,
+    audioMetadata = null,
     class: className = '',
   }: Props = $props();
   const core = useCoreClient();
@@ -300,6 +304,7 @@
     {:else if kind === 'audio' && waveform !== null && waveform.length > 0}
       <VoiceMessagePlayer {url} body={filename} {durationMs} {waveform} />
     {:else if kind === 'audio'}
+      {#if audioMetadata}<AudioTrack metadata={audioMetadata} fallbackTitle={mediaLabel} />{/if}
       <audio class="media-content" controls src={url} aria-label={mediaLabel}>
         {filename}
       </audio>

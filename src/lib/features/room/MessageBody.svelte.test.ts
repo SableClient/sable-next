@@ -84,7 +84,7 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
         spoiler: null,
       };
     case 'audio':
-      return { ...base, kind, duration_ms: null, waveform: null, voice: false };
+      return { ...base, kind, duration_ms: null, waveform: null, voice: false, metadata: null };
     case 'file':
       return { ...base, kind, size: null };
   }

@@ -58,6 +58,7 @@ const audioItem: MediaItem = {
   duration_ms: null,
   waveform: null,
   voice: false,
+  metadata: null,
   filename: 'voice.ogg',
   caption: null,
   source: 'mxc://example.org/audio',
