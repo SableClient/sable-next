@@ -1,4 +1,9 @@
-import type { SubscriptionId, TimelineFocusView, TimelineItemView } from '#src/generated/protocol';
+import type {
+  CoreEvent,
+  SubscriptionId,
+  TimelineFocusView,
+  TimelineItemView,
+} from '#src/generated/protocol';
 import { applyDiffs } from '#src/transport';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -301,6 +306,7 @@ export class RoomTimeline {
   ): Promise<void> {
     const session = this.session;
     this.state = 'pending';
+    const pending: Extract<CoreEvent, { type: 'timeline_diff' }>[] = [];
     const stopEvents = this.core.subscribeEvents((event) => {
       if (
         event.type !== 'timeline_diff' &&
@@ -308,6 +314,10 @@ export class RoomTimeline {
         event.type !== 'timeline_aggregations'
       )
         return;
+      if (event.type === 'timeline_diff' && session === this.session && this.state === 'pending') {
+        pending.push(event);
+        return;
+      }
       if (
         session !== this.session ||
         this.state !== 'active' ||
@@ -367,7 +377,14 @@ export class RoomTimeline {
     }
 
     this.subscription = response.subscription;
-    this.items = this.withReplyFallbacks(response.items);
+    this.items = this.withReplyFallbacks(
+      applyDiffs(
+        response.items,
+        pending
+          .filter((event) => event.subscription === response.subscription)
+          .flatMap((event) => event.diffs)
+      )
+    );
     this.aggregations = response.aggregations;
     this.hasSnapshot = true;
     this.state = 'active';

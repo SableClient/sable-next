@@ -42,11 +42,6 @@ class FakeCore {
 
   subscribeTimeline(roomId: string, focus: TimelineFocusView) {
     this.subscribeCalls.push({ roomId, focus });
-    this.emit({
-      type: 'timeline_diff',
-      subscription: 1,
-      diffs: [{ op: 'push_back', value: item('buffered') }],
-    });
     return Promise.resolve({ subscription: 1, items: [item('initial')], aggregations: [] });
   }
 
@@ -600,6 +595,38 @@ test('a delayed stale start cannot paginate the active timeline', async () => {
   await firstStart;
 
   expect(core.paginateSubscriptions).toEqual([]);
+});
+
+test('a diff that lands before the snapshot reply keeps later indices aligned', async () => {
+  const core = new SwitchingCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+
+  const start = timeline.start('!room:example.org');
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'insert', index: 0, value: item('divider') }],
+  });
+  const response = core.responses.get('!room:example.org');
+  if (!response) throw new Error('subscription was not created');
+  response.resolve({ subscription: 1, items: [item('a')], aggregations: [] });
+  await start;
+
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('echo') }],
+  });
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [
+      { op: 'remove', index: 2 },
+      { op: 'insert', index: 2, value: item('remote') },
+    ],
+  });
+
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['divider', 'a', 'remote']);
 });
 
 test('ignores events that precede the subscription snapshot', async () => {
