@@ -25,12 +25,12 @@
   {:else if context.kind === 'schedule'}
     <span class="context-kind">{$i18n.t('composer.editingScheduled')}</span>
   {:else}
-    <span
-      class="context-kind context-reply"
-      aria-label={$i18n.t('composer.replyingTo', { name: context.sender ?? '' })}
-    >
+    <span class="context-kind context-reply">
       <span class="context-reply-icon" aria-hidden="true"><ReplyIcon /></span>
-      <span class="context-sender">{context.sender}</span>
+      <span class="context-sender" aria-hidden="true">{context.sender}</span>
+      <span class="screen-reader-only"
+        >{$i18n.t('composer.replyingTo', { name: context.sender ?? '' })}</span
+      >
     </span>
   {/if}
   <span class="context-body">{context.body}</span>

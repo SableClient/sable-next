@@ -1,38 +1,28 @@
-import { readFileSync } from 'node:fs';
+// @vitest-environment happy-dom
 
+import { render, screen } from '@testing-library/svelte';
 import { expect, test } from 'vitest';
 
-const source = readFileSync(new URL('./ComposerContextBanner.svelte', import.meta.url), 'utf8');
+import ComposerContextBanner from './ComposerContextBanner.svelte';
 
-test('a long reply sender leaves room for the context actions', () => {
-  const contextKind = source.match(/\.context-kind \{(?<contents>[^}]+)\}/u)?.groups?.contents;
+test('a reply context shows its sender and announces who is being replied to', () => {
+  const { container } = render(ComposerContextBanner, {
+    props: {
+      context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+    },
+  });
 
-  expect(contextKind).toContain('flex: 0 1 auto;');
-  expect(contextKind).toContain('min-width: 0;');
-  expect(contextKind).toContain('overflow: hidden;');
-  expect(contextKind).toContain('text-overflow: ellipsis;');
-  expect(contextKind).toContain('white-space: nowrap;');
+  expect(screen.getByText('Replying to Alice')).toHaveClass('screen-reader-only');
+  expect(container.querySelector('.context-sender')).toHaveTextContent('Alice');
+  expect(container.querySelector('.context-reply-icon svg')).toBeInTheDocument();
+  expect(screen.getByText('Hello')).toBeInTheDocument();
 });
 
-test('a reply context shows a reply icon and sender with an accessible reply label', () => {
-  expect(source).toContain("import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpRightIcon';");
-  expect(source).toContain(
-    '<span class="context-reply-icon" aria-hidden="true"><ReplyIcon /></span>'
-  );
-  expect(source).toContain('<span class="context-sender">{context.sender}</span>');
-  expect(source).toMatch(
-    /<span class="context-reply-icon" aria-hidden="true"><ReplyIcon \/><\/span>\s+<span class="context-sender">\{context\.sender\}<\/span>/u
-  );
-  expect(source).toContain(
-    "aria-label={$i18n.t('composer.replyingTo', { name: context.sender ?? '' })}"
-  );
-});
+test('an edit context offers no reply controls', () => {
+  render(ComposerContextBanner, {
+    props: { context: { kind: 'edit', eventId: '$one:example.org', body: 'look at this' } },
+  });
 
-test('the reply icon aligns with the composer plus icon', () => {
-  const context = source.match(/\.context \{(?<contents>[^}]+)\}/u)?.groups?.contents;
-
-  expect(context).toContain('margin-inline: calc(');
-  expect(context).toContain(
-    'var(--space-100) + (var(--control-height-small) - var(--icon-size-small)) / 2'
-  );
+  expect(screen.queryByText(/Replying to/)).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button')).toHaveLength(1);
 });

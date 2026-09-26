@@ -47,6 +47,52 @@ test('the thread screen keeps the timeline and the composer inside the viewport'
   expect(fit.composer).toBeLessThanOrEqual(0);
 });
 
+test('the formatting toolbar keeps the thread composer inside its panel', async ({
+  app,
+  page,
+  core,
+  installRoomCore,
+}) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ formattingToolbar: true }));
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  const subscription = await core.subscription();
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'reset',
+      values: [
+        {
+          ...timelineItem('thread-root', 'Root message'),
+          thread_summary: {
+            num_replies: 3,
+            latest_body: 'a reply',
+            latest_sender: '@bob:example.test',
+          },
+        },
+      ],
+    },
+  ]);
+
+  await page.locator('.thread-summary').first().click();
+  const panel = page.locator('.thread-panel');
+  await expect(panel.locator('.thread-composer .formatting')).toBeVisible();
+
+  const fit = await panel.evaluate((node) => {
+    const composer = node.querySelector('.thread-composer');
+    if (!composer) throw new Error('the panel has no composer');
+    return {
+      composer: composer.getBoundingClientRect().right - node.getBoundingClientRect().right,
+      overflow: node.scrollWidth - node.clientWidth,
+    };
+  });
+
+  expect(fit.composer).toBeLessThanOrEqual(0.5);
+  expect(fit.overflow).toBeLessThanOrEqual(0);
+});
+
 test.describe('on mobile', () => {
   test.use({ viewport: { width: 412, height: 839 } });
 
