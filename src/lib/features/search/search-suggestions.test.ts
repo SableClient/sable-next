@@ -47,13 +47,18 @@ test('the operator cheat-sheet is available on request', () => {
     'with:',
     'is:',
     'pinned:',
+    'regex:',
   ]);
 });
 
 test('is:, pinned:, has:pin and with: suggest their values', () => {
-  expect(suggestionsFor('is:', sources).map((entry) => entry.label)).toEqual(['thread']);
+  expect(suggestionsFor('is:', sources).map((entry) => entry.label)).toEqual(['thread', 'state']);
   expect(suggestionsFor('pinned:', sources).map((entry) => entry.label)).toEqual(['true', 'false']);
-  expect(suggestionsFor('has:p', sources).map((entry) => entry.label)).toEqual(['pin']);
+  expect(suggestionsFor('has:p', sources).map((entry) => entry.label)).toEqual([
+    'poll',
+    'pin',
+    'pdf',
+  ]);
   expect(suggestionsFor('with:', sources).map((entry) => entry.label)).toEqual(
     suggestionsFor('from:', sources).map((entry) => entry.label)
   );
@@ -109,7 +114,9 @@ test('has: suggests the attachment kinds the core knows', () => {
     'audio',
     'file',
     'link',
+    'poll',
     'pin',
+    'pdf',
   ]);
   expect(suggestionsFor('has:im', sources).map((entry) => entry.label)).toEqual(['image']);
 });

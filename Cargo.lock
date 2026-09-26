@@ -6642,6 +6642,7 @@ dependencies = [
  "mime",
  "probly-search",
  "qrcode",
+ "regex",
  "reqwest",
  "ruma",
  "rust-stemmers",

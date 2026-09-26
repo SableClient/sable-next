@@ -12,7 +12,8 @@ export type SearchOperator =
   | 'on'
   | 'with'
   | 'is'
-  | 'pinned';
+  | 'pinned'
+  | 'regex';
 
 export interface SearchToken {
   operator: SearchOperator;
@@ -43,6 +44,7 @@ export const SEARCH_OPERATORS: readonly SearchOperator[] = [
   'with',
   'is',
   'pinned',
+  'regex',
 ];
 
 const DATE_OPERATORS = ['before', 'after', 'during', 'on'];
@@ -54,7 +56,63 @@ const ATTACHMENTS: Record<string, SearchAttachment | undefined> = {
   sound: 'audio',
   file: 'file',
   link: 'link',
+  poll: 'poll',
 };
+
+const FILE_EXTENSION = /^\.[a-z0-9]{1,10}$/i;
+const FILE_TYPES = new Set([
+  'pdf',
+  'zip',
+  'txt',
+  'md',
+  'csv',
+  'json',
+  'doc',
+  'docx',
+  'odt',
+  'xls',
+  'xlsx',
+  'ods',
+  'ppt',
+  'pptx',
+  'odp',
+  'gif',
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+  'svg',
+  'mp3',
+  'ogg',
+  'opus',
+  'wav',
+  'flac',
+  'mp4',
+  'mkv',
+  'webm',
+  'mov',
+  'apk',
+  'exe',
+  'tar',
+  'gz',
+  '7z',
+  'rar',
+  'iso',
+]);
+
+function fileTypeOf(value: string): string | null {
+  if (FILE_EXTENSION.test(value)) return value.slice(1);
+  return FILE_TYPES.has(value) ? value : null;
+}
+
+function patternOf(value: string): RegExp | null {
+  if (value.length < 3 || !value.startsWith('/') || !value.endsWith('/')) return null;
+  try {
+    return new RegExp(value.slice(1, -1), 'iu');
+  } catch {
+    return null;
+  }
+}
 
 const SEGMENT = /-?[A-Za-z]+:"[^"]*"|-?"[^"]*"|\S+/g;
 
@@ -145,6 +203,7 @@ function periodOf(value: string): [number, number] | null {
 export interface QueryResolvers {
   roomId: (value: string) => string | undefined;
   userId: (value: string) => string | undefined;
+  usersMatching?: (pattern: RegExp) => string[];
   spaceRooms: (value: string) => string[] | undefined;
   directRooms: (value: string) => string[] | undefined;
 }
@@ -181,6 +240,10 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
     exclude: [...parsed.exclude],
     pinned: null,
     in_thread: null,
+    file_types: [],
+    not_file_types: [],
+    pattern: null,
+    state_events: null,
   };
 
   for (const token of parsed.tokens) {
@@ -204,24 +267,35 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
         else filter.rooms.push(...roomIds);
         break;
       }
-      case 'from': {
-        const userId = resolve.userId(token.value);
-        if (userId) (token.negated ? filter.not_senders : filter.senders).push(userId);
-        else unresolved.push(token);
-        break;
-      }
+      case 'from':
       case 'mentions': {
-        const userId = resolve.userId(token.value);
-        if (userId) (token.negated ? filter.not_mentions : filter.mentions).push(userId);
-        else unresolved.push(token);
+        const pattern = patternOf(token.value);
+        const userIds = pattern
+          ? (resolve.usersMatching?.(pattern) ?? [])
+          : [resolve.userId(token.value)].filter((userId) => userId !== undefined);
+        const wanted = token.operator === 'from' ? filter.senders : filter.mentions;
+        const denied = token.operator === 'from' ? filter.not_senders : filter.not_mentions;
+        if (userIds.length === 0) unresolved.push(token);
+        else (token.negated ? denied : wanted).push(...userIds);
         break;
       }
       case 'has': {
-        const attachment = ATTACHMENTS[token.value.toLowerCase()];
-        if (token.value.toLowerCase() === 'pin') filter.pinned = !token.negated;
+        const value = token.value.toLowerCase();
+        const attachment = ATTACHMENTS[value];
+        if (value === 'pin') filter.pinned = !token.negated;
         else if (attachment !== undefined)
           (token.negated ? filter.not_has : filter.has).push(attachment);
+        else if (fileTypeOf(value) !== null)
+          (token.negated ? filter.not_file_types : filter.file_types).push(
+            fileTypeOf(value) ?? value
+          );
         else unresolved.push(token);
+        break;
+      }
+      case 'regex': {
+        const source = patternOf(token.value)?.source ?? token.value;
+        if (token.negated) unresolved.push(token);
+        else filter.pattern = source;
         break;
       }
       case 'after': {
@@ -257,7 +331,9 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
         break;
       }
       case 'is': {
-        if (token.value.toLowerCase() === 'thread') filter.in_thread = !token.negated;
+        const value = token.value.toLowerCase();
+        if (value === 'thread') filter.in_thread = !token.negated;
+        else if (value === 'state') filter.state_events = !token.negated;
         else unresolved.push(token);
         break;
       }

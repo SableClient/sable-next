@@ -185,6 +185,10 @@ const fn expressible(filter: &SearchFilter) -> bool {
         && filter.exclude.is_empty()
         && filter.pinned.is_none()
         && filter.in_thread.is_none()
+        && filter.file_types.is_empty()
+        && filter.not_file_types.is_empty()
+        && filter.pattern.is_none()
+        && filter.state_events.is_none()
 }
 
 fn request_for(query: &ServerQuery<'_>, limit: u64, next_batch: Option<&str>) -> Request {

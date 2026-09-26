@@ -1894,6 +1894,7 @@ pub enum SearchAttachment {
     Audio,
     File,
     Link,
+    Poll,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -2005,6 +2006,10 @@ pub struct SearchFilter {
     pub exclude: Vec<String>,
     pub pinned: Option<bool>,
     pub in_thread: Option<bool>,
+    pub file_types: Vec<String>,
+    pub not_file_types: Vec<String>,
+    pub pattern: Option<String>,
+    pub state_events: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]

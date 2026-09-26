@@ -20,8 +20,8 @@ export interface SuggestionSources {
   spaces?: SuggestionRoom[];
 }
 
-const ATTACHMENT_VALUES = ['image', 'video', 'audio', 'file', 'link', 'pin'];
-const IS_VALUES = ['thread'];
+const ATTACHMENT_VALUES = ['image', 'video', 'audio', 'file', 'link', 'poll', 'pin', 'pdf'];
+const IS_VALUES = ['thread', 'state'];
 const PINNED_VALUES = ['true', 'false'];
 
 const OPERATOR_HINTS: Record<SearchOperator, string> = {
@@ -29,14 +29,15 @@ const OPERATOR_HINTS: Record<SearchOperator, string> = {
   space: 'space',
   from: 'sender',
   mentions: 'pings a user',
-  has: 'attachment',
+  has: 'attachment, poll or file type',
   before: 'YYYY-MM-DD',
   after: 'YYYY-MM-DD',
   during: 'YYYY, YYYY-MM or YYYY-MM-DD',
   on: 'YYYY-MM-DD',
   with: 'direct messages with a user',
-  is: 'thread',
+  is: 'thread or state',
   pinned: 'true or false',
+  regex: '/pattern/',
 };
 const MAX_SUGGESTIONS = 8;
 const PARTIAL = /(-?)([A-Za-z]*)(:?)("?)([^"]*)$/;

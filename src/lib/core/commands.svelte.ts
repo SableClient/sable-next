@@ -151,6 +151,10 @@ const EMPTY_SEARCH_FILTER: SearchFilter = {
   exclude: [],
   pinned: null,
   in_thread: null,
+  file_types: [],
+  not_file_types: [],
+  pattern: null,
+  state_events: null,
 };
 
 export function createCommands(transport: () => Transport) {

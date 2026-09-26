@@ -310,3 +310,27 @@ test('in: a space searches the rooms inside it, like space:', () => {
   expect(filter('-in:eng deploy').not_rooms).toEqual(['!dev:example.org', '!ops:example.org']);
   expect(filter('in:dev deploy').rooms).toEqual(['!dev:example.org']);
 });
+
+test('has: takes polls and file types, is: takes state events', () => {
+  const filter = filterFor('has:poll has:PDF -has:.zip is:state');
+
+  expect(filter.has).toEqual(['poll']);
+  expect(filter.file_types).toEqual(['pdf']);
+  expect(filter.not_file_types).toEqual(['zip']);
+  expect(filter.state_events).toBe(true);
+});
+
+test('regex: sets a body pattern, and a /pattern/ picks every matching person', () => {
+  const people = {
+    ...resolve,
+    usersMatching: (pattern: RegExp) =>
+      ['@meow:example.org', '@meowmeow:example.org', '@bark:example.org'].filter((userId) =>
+        pattern.test(userId)
+      ),
+  };
+  const resolved = toSearchFilter(parseSearchQuery('regex:"me+ow" from:/^@meow/'), people);
+
+  expect(resolved.filter.pattern).toBe('me+ow');
+  expect(resolved.filter.senders).toEqual(['@meow:example.org', '@meowmeow:example.org']);
+  expect(toSearchFilter(parseSearchQuery('from:/nobody/'), people).unresolved).toHaveLength(1);
+});

@@ -47,6 +47,10 @@
   const search = new MessageSearch(core, () => ({
     roomId: (value) => resolveRoomTarget(roomList.rooms, value),
     userId: (value) => resolveUserTarget(knownSenders(), value),
+    usersMatching: (pattern) =>
+      knownSenders()
+        .filter((sender) => pattern.test(sender.userId) || pattern.test(sender.displayName))
+        .map((sender) => sender.userId),
     spaceRooms: (value) => resolveSpaceRooms(roomList.rooms, value),
     directRooms: (value) =>
       resolveDirectRooms(roomList.rooms, resolveUserTarget(knownSenders(), value) ?? value),

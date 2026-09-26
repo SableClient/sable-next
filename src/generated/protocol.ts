@@ -917,7 +917,7 @@ export type ScheduledMessageView = {
 	delivery_ts: number | null,
 };
 
-export type SearchAttachment = "image" | "video" | "audio" | "file" | "link";
+export type SearchAttachment = "image" | "video" | "audio" | "file" | "link" | "poll";
 
 export type SearchContextView = {
 	event_id: string,
@@ -952,6 +952,10 @@ export type SearchFilter = {
 	exclude: string[],
 	pinned: boolean | null,
 	in_thread: boolean | null,
+	file_types: string[],
+	not_file_types: string[],
+	pattern: string | null,
+	state_events: boolean | null,
 };
 
 export type SearchHitView = {

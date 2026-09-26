@@ -18,18 +18,20 @@ use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::event_cache::{RoomEventCache, RoomEventCacheUpdate};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::events::ignored_user_list::IgnoredUserListEventContent;
+use matrix_sdk::ruma::events::poll::unstable_start::UnstablePollStartEventContent;
 use matrix_sdk::ruma::events::relation::{RelationType, Replacement};
 use matrix_sdk::ruma::events::room::message::{
     GalleryItemType, MessageType, OriginalSyncRoomMessageEvent, Relation,
     RoomMessageEventContentWithoutRelation, sanitize::remove_plain_reply_fallback,
 };
 use matrix_sdk::ruma::events::{
-    AnySyncMessageLikeEvent, AnySyncTimelineEvent, Mentions, SyncMessageLikeEvent,
-    room::redaction::SyncRoomRedactionEvent,
+    AnySyncMessageLikeEvent, AnySyncStateEvent, AnySyncTimelineEvent, Mentions,
+    SyncMessageLikeEvent, room::redaction::SyncRoomRedactionEvent,
 };
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
 use probly_search::{Index, score::bm25};
+use regex::{Regex, RegexBuilder};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
@@ -87,6 +89,8 @@ struct Document {
     edited_at: Option<u64>,
     #[serde(default)]
     media: Vec<(Option<u32>, RoomAttachmentContentView)>,
+    #[serde(default)]
+    state: bool,
 }
 
 impl Document {
@@ -99,6 +103,7 @@ impl Document {
             && self.in_thread == other.in_thread
             && self.edited_at == other.edited_at
             && self.media == other.media
+            && self.state == other.state
     }
 
     fn attachment_items(&self, kind: RoomAttachmentKind) -> Vec<RoomAttachmentView> {
@@ -150,6 +155,30 @@ impl Document {
             SearchAttachment::Link => self.has_link,
             other => self.attachments.contains(&other),
         }
+    }
+
+    fn has_file_type(&self, kind: &str) -> bool {
+        let kind = kind.trim_start_matches('.').to_ascii_lowercase();
+        let named = |filename: &str, mime: Option<&str>| {
+            filename
+                .rsplit_once('.')
+                .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case(&kind))
+                || mime.is_some_and(|mime| {
+                    mime.rsplit_once('/')
+                        .is_some_and(|(_, subtype)| subtype.eq_ignore_ascii_case(&kind))
+                })
+        };
+        if self.media.is_empty() {
+            return !self.attachments.is_empty() && named(&self.body, None);
+        }
+        self.media.iter().any(|(_, content)| match content {
+            RoomAttachmentContentView::Image { filename, mime, .. }
+            | RoomAttachmentContentView::Video { filename, mime, .. }
+            | RoomAttachmentContentView::File { filename, mime, .. } => {
+                named(filename, mime.as_deref())
+            }
+            RoomAttachmentContentView::Link { .. } => false,
+        })
     }
 
     fn matches(&self, filter: &SearchFilter, terms: &FoldedTerms) -> bool {
@@ -214,6 +243,31 @@ impl Document {
             return false;
         }
 
+        if filter.state_events.unwrap_or(false) != self.state {
+            return false;
+        }
+        if !filter.file_types.is_empty()
+            && !filter
+                .file_types
+                .iter()
+                .any(|kind| self.has_file_type(kind))
+        {
+            return false;
+        }
+        if filter
+            .not_file_types
+            .iter()
+            .any(|kind| self.has_file_type(kind))
+        {
+            return false;
+        }
+        if terms
+            .pattern
+            .as_ref()
+            .is_some_and(|pattern| !pattern.matches(self))
+        {
+            return false;
+        }
         if !terms
             .phrases
             .iter()
@@ -233,12 +287,38 @@ struct FoldedTerms {
     phrases: Vec<String>,
     exclude: Vec<String>,
     pinned: HashSet<OwnedEventId>,
+    pattern: Option<BodyPattern>,
+}
+
+const PATTERN_SIZE_LIMIT: usize = 1 << 20;
+
+enum BodyPattern {
+    Regex(Regex),
+    Literal(String),
+}
+
+impl BodyPattern {
+    fn of(source: &str) -> Self {
+        RegexBuilder::new(source)
+            .case_insensitive(true)
+            .size_limit(PATTERN_SIZE_LIMIT)
+            .build()
+            .map_or_else(|_| Self::Literal(source.to_lowercase()), Self::Regex)
+    }
+
+    fn matches(&self, document: &Document) -> bool {
+        match self {
+            Self::Regex(pattern) => pattern.is_match(&document.body),
+            Self::Literal(text) => document.folded.contains(text.as_str()),
+        }
+    }
 }
 
 impl FoldedTerms {
     fn of(filter: &SearchFilter, pinned: HashSet<OwnedEventId>) -> Self {
         Self {
             pinned,
+            pattern: filter.pattern.as_deref().map(BodyPattern::of),
             phrases: filter
                 .phrases
                 .iter()
@@ -1385,6 +1465,7 @@ impl MessageIndex {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) async fn ingest(
         &mut self,
         room_id: &OwnedRoomId,
@@ -1428,9 +1509,23 @@ impl MessageIndex {
             }
             index.mark_classified(event_id.to_owned(), ts);
 
-            let Ok(AnySyncTimelineEvent::MessageLike(message)) = event.raw().deserialize() else {
-                continue;
+            let message = match event.raw().deserialize() {
+                Ok(AnySyncTimelineEvent::MessageLike(message)) => message,
+                Ok(AnySyncTimelineEvent::State(state)) => {
+                    if !index.redacted.contains(state.event_id()) {
+                        index.upsert(state_document(&state, raw_content(&event).as_ref()));
+                    }
+                    continue;
+                }
+                Err(_) => continue,
             };
+
+            if let Some(document) = poll_start_document(&message) {
+                if !index.redacted.contains(&document.event_id) {
+                    index.upsert(document);
+                }
+                continue;
+            }
 
             match message {
                 AnySyncMessageLikeEvent::RoomMessage(message) => {
@@ -1963,6 +2058,97 @@ fn document_of(
         in_thread: matches!(message.content.relates_to, Some(Relation::Thread(_))),
         edited_at: None,
         media: attachment_contents(&message.content.msgtype, content),
+        state: false,
+    }
+}
+
+fn poll_start_document(message: &AnySyncMessageLikeEvent) -> Option<Document> {
+    match message {
+        AnySyncMessageLikeEvent::UnstablePollStart(SyncMessageLikeEvent::Original(poll)) => {
+            let UnstablePollStartEventContent::New(content) = &poll.content else {
+                return None;
+            };
+            let block = &content.poll_start;
+            let lines = std::iter::once(block.question.text.as_str())
+                .chain(block.answers.iter().map(|answer| answer.text.as_str()));
+            Some(poll_document(
+                poll.event_id.clone(),
+                poll.sender.clone(),
+                poll.origin_server_ts.get().into(),
+                lines,
+            ))
+        }
+        AnySyncMessageLikeEvent::PollStart(SyncMessageLikeEvent::Original(poll)) => {
+            let block = &poll.content.poll;
+            let lines = std::iter::once(block.question.text.find_plain().unwrap_or_default())
+                .chain(
+                    block
+                        .answers
+                        .iter()
+                        .map(|answer| answer.text.find_plain().unwrap_or_default()),
+                );
+            Some(poll_document(
+                poll.event_id.clone(),
+                poll.sender.clone(),
+                poll.origin_server_ts.get().into(),
+                lines,
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn poll_document<'text>(
+    event_id: OwnedEventId,
+    sender: OwnedUserId,
+    origin_server_ts: u64,
+    lines: impl Iterator<Item = &'text str>,
+) -> Document {
+    let body = lines
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    Document {
+        event_id,
+        has_link: contains_link(&body),
+        folded: String::new(),
+        body,
+        sender,
+        origin_server_ts,
+        attachments: vec![SearchAttachment::Poll],
+        mentions: Vec::new(),
+        in_thread: false,
+        edited_at: None,
+        media: Vec::new(),
+        state: false,
+    }
+}
+
+fn state_document(state: &AnySyncStateEvent, content: Option<&serde_json::Value>) -> Document {
+    let body = content
+        .and_then(serde_json::Value::as_object)
+        .map(|fields| {
+            fields
+                .values()
+                .filter_map(serde_json::Value::as_str)
+                .filter(|value| !value.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default();
+    Document {
+        event_id: state.event_id().to_owned(),
+        has_link: false,
+        folded: String::new(),
+        body,
+        sender: state.sender().to_owned(),
+        origin_server_ts: state.origin_server_ts().get().into(),
+        attachments: Vec::new(),
+        mentions: Vec::new(),
+        in_thread: false,
+        edited_at: None,
+        media: Vec::new(),
+        state: true,
     }
 }
 
@@ -1979,6 +2165,7 @@ fn provisional_edit(edit: &OriginalSyncRoomMessageEvent, target: OwnedEventId) -
         in_thread: false,
         edited_at: None,
         media: Vec::new(),
+        state: false,
     }
 }
 
@@ -2784,6 +2971,7 @@ mod tests {
             in_thread: false,
             edited_at: None,
             media: Vec::new(),
+            state: false,
         }
     }
 
@@ -3857,6 +4045,123 @@ mod tests {
         );
 
         assert_eq!(hits, vec!["$erwan".to_owned()]);
+    }
+
+    #[test]
+    fn test_polls_and_state_events_become_searchable_documents() {
+        let poll: super::AnySyncMessageLikeEvent = serde_json::from_value(json!({
+            "type": "org.matrix.msc3381.poll.start",
+            "event_id": "$poll",
+            "sender": "@alice:localhost",
+            "origin_server_ts": 5,
+            "content": {
+                "org.matrix.msc3381.poll.start": {
+                    "question": { "org.matrix.msc1767.text": "Lunch spot?" },
+                    "kind": "org.matrix.msc3381.poll.disclosed",
+                    "max_selections": 1,
+                    "answers": [
+                        { "id": "a", "org.matrix.msc1767.text": "Ramen" },
+                        { "id": "b", "org.matrix.msc1767.text": "Tacos" }
+                    ]
+                },
+                "org.matrix.msc1767.text": "Lunch spot?\n1. Ramen\n2. Tacos"
+            }
+        }))
+        .expect("a poll start");
+        let poll = super::poll_start_document(&poll).expect("a poll document");
+        assert_eq!(poll.body, "Lunch spot?\nRamen\nTacos");
+        assert!(poll.carries(super::SearchAttachment::Poll));
+
+        let content = json!({ "name": "Design crew" });
+        let state: super::AnySyncStateEvent = serde_json::from_value(json!({
+            "type": "m.room.name",
+            "event_id": "$name",
+            "state_key": "",
+            "sender": "@alice:localhost",
+            "origin_server_ts": 6,
+            "content": content
+        }))
+        .expect("a state event");
+        let state = super::state_document(&state, Some(&content));
+        assert_eq!(state.body, "Design crew");
+        assert!(state.state);
+    }
+
+    #[test]
+    fn test_state_events_file_types_and_patterns_filter_documents() {
+        let (mut index, room) = filtered_index();
+        let room_index = index.rooms.get_mut(&room).expect("the room");
+        room_index.upsert(super::Document {
+            state: true,
+            ..document(
+                "renamed",
+                "deploy crew",
+                "@alice:localhost",
+                4_000,
+                None,
+                Vec::new(),
+            )
+        });
+        room_index.upsert(super::Document {
+            media: vec![(
+                None,
+                super::RoomAttachmentContentView::File {
+                    filename: "deploy-notes.pdf".to_owned(),
+                    source: "mxc://localhost/notes".to_owned(),
+                    mime: Some("application/pdf".to_owned()),
+                    size: None,
+                },
+            )],
+            ..document(
+                "notes",
+                "deploy-notes.pdf",
+                "@alice:localhost",
+                5_000,
+                Some(super::SearchAttachment::File),
+                Vec::new(),
+            )
+        });
+        let filter = |filter: super::SearchFilter| {
+            found(
+                &index,
+                "deploy",
+                &super::SearchFilter {
+                    rooms: vec![room.clone()],
+                    ..filter
+                },
+            )
+        };
+
+        let plain = filter(super::SearchFilter::default());
+        assert!(!plain.contains(&"$renamed".to_owned()));
+        assert_eq!(
+            filter(super::SearchFilter {
+                state_events: Some(true),
+                ..super::SearchFilter::default()
+            }),
+            vec!["$renamed".to_owned()]
+        );
+        assert_eq!(
+            filter(super::SearchFilter {
+                file_types: vec!["PDF".to_owned()],
+                ..super::SearchFilter::default()
+            }),
+            vec!["$notes".to_owned()]
+        );
+        assert!(
+            filter(super::SearchFilter {
+                pattern: Some(r"pipe\w+ is".to_owned()),
+                ..super::SearchFilter::default()
+            })
+            .contains(&"$erwan".to_owned())
+        );
+        assert!(
+            filter(super::SearchFilter {
+                pattern: Some("(unclosed".to_owned()),
+                ..super::SearchFilter::default()
+            })
+            .is_empty()
+        );
     }
 
     #[test]
@@ -6200,6 +6505,7 @@ mod stress {
             in_thread: false,
             edited_at: None,
             media: Vec::new(),
+            state: false,
         }
     }
 
