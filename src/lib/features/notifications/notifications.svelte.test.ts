@@ -120,6 +120,27 @@ test('an Android push for the room being read is immediately retired', () => {
   expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@me:example.org', '!room:example.org');
 });
 
+test("a read push for another account retires that account's alert and not the reader's", () => {
+  const notifications = center();
+  notifications.readRoom('!room:example.org');
+  mocks.retire.mockClear();
+
+  const handler = mocks.watchNativePushMessages.mock.calls[0]?.[0] as
+    | ((message: { message: string }) => void)
+    | undefined;
+  handler?.({
+    message: JSON.stringify({
+      notification: {
+        room_id: '!room:example.org',
+        user_id: '@other:example.org',
+        counts: { unread: 0 },
+      },
+    }),
+  });
+
+  expect(mocks.retire).toHaveBeenCalledExactlyOnceWith('@other:example.org', '!room:example.org');
+});
+
 function readThrough(eventId: string): RoomSummary {
   return { ...room(0), latest_event: { event_id: eventId } } as RoomSummary;
 }

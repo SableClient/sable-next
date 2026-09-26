@@ -211,6 +211,13 @@ export class NotificationCenter {
     const notification = parsePushPayload(raw)?.notification;
     if (notification?.room_id === undefined) return;
     const roomId = notification.room_id;
+    const userId = notification.user_id;
+    if (userId !== undefined && userId !== this.client?.session?.user_id) {
+      if (notification.counts?.unread === 0) {
+        void retireRoomAlerts(userId, roomId).catch(() => undefined);
+      }
+      return;
+    }
     if (notification.counts?.unread === 0 || this.reading === roomId) {
       this.retire(roomId);
       return;
