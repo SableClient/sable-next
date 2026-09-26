@@ -537,8 +537,21 @@
                       onclick={() => {
                         rememberReaction(emoji);
                         onPickUnicode?.(emoji);
-                      }}>{emoji}</button
+                      }}
                     >
+                      {#if emoji.startsWith('mxc://')}
+                        <MediaImage
+                          class="unicode-image"
+                          source={emoji}
+                          alt=""
+                          width={64}
+                          height={64}
+                          original
+                        />
+                      {:else}
+                        <span class="unicode-text">{emoji}</span>
+                      {/if}
+                    </button>
                   {/each}
                 </div>
               {/each}
@@ -797,6 +810,20 @@
     font-size: calc(var(--emote-cell) * 0.667);
     line-height: 1;
     width: 100%;
+  }
+
+  .grids .unicode button :global(.unicode-image) {
+    height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    width: calc(var(--emote-cell) * 0.667 * var(--media-ratio));
+  }
+
+  .unicode-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .grids li button:hover,
