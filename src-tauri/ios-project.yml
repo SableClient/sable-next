@@ -104,6 +104,7 @@ targets:
         NSMicrophoneUsageDescription: Sable uses your microphone for calls.
         NSCameraUsageDescription: Sable uses your camera for video calls.
         NSLocationWhenInUseUsageDescription: Sable shares your location in a conversation when you ask it to.
+        NSLocalNetworkUsageDescription: Sable connects to homeservers and call servers on your local network.
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
