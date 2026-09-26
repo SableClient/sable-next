@@ -66,6 +66,26 @@ describe('prepareSettings', () => {
 });
 
 describe('applySettings', () => {
+  it('keeps device notification preferences but takes the reading ones', () => {
+    const local: Preferences = {
+      ...base,
+      notificationSounds: true,
+      notificationContent: false,
+      notifyOnce: true,
+    };
+    const remote = {
+      v: 1,
+      settings: { notificationSounds: false, notificationContent: true, notifyOnce: false },
+      themes: noThemes,
+    };
+
+    const applied = applySettings(remote, local, noThemes, []);
+
+    expect(applied?.preferences.notificationSounds).toBe(true);
+    expect(applied?.preferences.notificationContent).toBe(false);
+    expect(applied?.preferences.notifyOnce).toBe(false);
+  });
+
   it('takes remote preferences and keeps the device-local ones', () => {
     const local: Preferences = { ...base, dateFormat: 'dmy', developerTools: true };
     const { content } = prepareSettings(
