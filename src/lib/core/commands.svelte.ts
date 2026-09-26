@@ -11,6 +11,7 @@ import type {
   PersonaView,
   PushFetchView,
   DefaultNotificationModesView,
+  DiagnosticPushView,
   DeviceView,
   EditVersionView,
   EncryptionStatusView,
@@ -1423,6 +1424,20 @@ export function createCommands(transport: () => Transport) {
     async webPushers(): Promise<RegisteredPusherView[]> {
       const response = await transport().send({ type: 'web_pushers' });
       return response.pushers;
+    },
+
+    async pingPushGateway(url: string): Promise<boolean | null> {
+      const response = await transport().send({ type: 'ping_push_gateway', url });
+      return response.reached;
+    },
+
+    async sendDiagnosticPush(pushkey: string, appId: string): Promise<DiagnosticPushView> {
+      const response = await transport().send({
+        type: 'send_diagnostic_push',
+        pushkey,
+        app_id: appId,
+      });
+      return response.push;
     },
 
     async ackWebPusher(appId: string, ackToken: string): Promise<void> {

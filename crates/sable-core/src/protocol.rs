@@ -856,6 +856,13 @@ pub enum Command {
         pusher: WebPusherView,
     },
     WebPushers,
+    PingPushGateway {
+        url: String,
+    },
+    SendDiagnosticPush {
+        pushkey: String,
+        app_id: String,
+    },
     AckWebPusher {
         app_id: String,
         ack_token: String,
@@ -1174,6 +1181,12 @@ pub enum CommandOk {
     SetWebPusher,
     WebPushers {
         pushers: Vec<RegisteredPusherView>,
+    },
+    PingPushGateway {
+        reached: Option<bool>,
+    },
+    SendDiagnosticPush {
+        push: DiagnosticPushView,
     },
     AckWebPusher,
     /// `null` when the event notifies nobody, or is gone, or cannot be read.
@@ -3231,6 +3244,20 @@ pub struct RegisteredPusherView {
     pub device_display_name: Option<String>,
     /// Some pusher kinds validate through a handshake; absent elsewhere.
     pub activated: Option<bool>,
+    pub gateway: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum DiagnosticPushView {
+    NoPusher,
+    NoGateway,
+    Rejected,
+    Sent {
+        event_id: String,
+        accepted: Option<bool>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

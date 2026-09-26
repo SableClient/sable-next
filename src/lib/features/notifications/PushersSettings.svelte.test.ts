@@ -37,6 +37,7 @@ const gateway: RegisteredPusherView = {
   kind: 'http',
   device_display_name: 'Element on phone',
   activated: null,
+  gateway: null,
 };
 
 const ownServer: RegisteredPusherView = {
@@ -45,6 +46,7 @@ const ownServer: RegisteredPusherView = {
   kind: 'org.matrix.msc4174.webpush',
   device_display_name: 'This browser',
   activated: false,
+  gateway: null,
 };
 
 const unnamed: RegisteredPusherView = {
@@ -53,6 +55,7 @@ const unnamed: RegisteredPusherView = {
   kind: 'email',
   device_display_name: null,
   activated: null,
+  gateway: null,
 };
 
 afterEach(() => {

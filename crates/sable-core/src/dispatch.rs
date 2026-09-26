@@ -69,7 +69,7 @@ use crate::profiles::profile_view;
 use crate::rooms::join_rule_support;
 use crate::verification::{encryption_status, sign_out_safety};
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, push_rules, session, spaces, view, webpush};
+use crate::{notifications, push_check, push_rules, session, spaces, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 const MAX_SEARCH_CONTEXT: usize = 3;
@@ -1978,6 +1978,16 @@ impl Core {
                 pushers: webpush::pushers(&self.client().await?)
                     .await
                     .map_err(|error| self.failed("webpushers", error))?,
+            }),
+
+            Command::PingPushGateway { url } => Ok(CommandOk::PingPushGateway {
+                reached: push_check::ping_gateway(&url).await,
+            }),
+
+            Command::SendDiagnosticPush { pushkey, app_id } => Ok(CommandOk::SendDiagnosticPush {
+                push: push_check::send_diagnostic_push(&self.client().await?, &pushkey, &app_id)
+                    .await
+                    .map_err(|error| self.failed("send_diagnostic_push", error))?,
             }),
 
             Command::AckWebPusher { app_id, ack_token } => {

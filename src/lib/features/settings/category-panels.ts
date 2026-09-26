@@ -9,6 +9,7 @@ import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svel
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
+import NotificationTroubleshooter from '#lib/features/notifications/NotificationTroubleshooter.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
 import NotificationPermission from '#lib/features/notifications/NotificationPermission.svelte';
 import NotificationKeywords from '#lib/features/settings/NotificationKeywords.svelte';
@@ -47,6 +48,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: NotificationKeywords },
     { component: PushersSettings },
     { component: PushGateway, when: usesPushGateway },
+    { component: NotificationTroubleshooter },
   ],
   calls: [{ component: CallDeviceSettings, section: 'call-devices' }],
   personas: [{ component: PersonaSettings }],

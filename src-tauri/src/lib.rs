@@ -339,6 +339,16 @@ async fn register_push(
 }
 
 #[tauri::command]
+#[allow(clippy::needless_pass_by_value)] // Tauri extracts command state by value
+fn device_pusher(
+    app: AppHandle<BrowserEngine>,
+    user_id: String,
+    device_id: String,
+) -> Result<Option<notifications::DevicePusher>, CommandErr> {
+    notifications::device_pusher(&app, &user_id, &device_id)
+}
+
+#[tauri::command]
 async fn unregister_push(app: AppHandle<BrowserEngine>) -> Result<(), CommandErr> {
     Box::pin(notifications::unregister_push(&app)).await
 }
@@ -701,6 +711,7 @@ pub fn run() {
             pending_deep_links,
             register_push,
             unregister_push,
+            device_pusher,
             dismiss_room_notification,
             dismiss_read_room_notifications,
             notification_permission,

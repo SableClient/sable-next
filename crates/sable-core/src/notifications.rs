@@ -432,7 +432,7 @@ pub(crate) async fn invite_notification(
 /// # Errors
 ///
 /// When the address is not a gateway's.
-fn gateway(url: &str) -> Result<String, String> {
+pub(crate) fn gateway(url: &str) -> Result<String, String> {
     let parsed = Url::parse(url).map_err(|_| "the push gateway is not a URL".to_owned())?;
     let plain = parsed.scheme() != "https";
     let addressed = !parsed.username().is_empty() || parsed.password().is_some();

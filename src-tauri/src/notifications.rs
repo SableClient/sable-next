@@ -73,6 +73,30 @@ fn registered_pushers(root: &std::path::Path) -> Result<Vec<RegisteredPusher>, C
     }
 }
 
+#[derive(serde::Serialize)]
+pub struct DevicePusher {
+    pushkey: String,
+    app_id: String,
+}
+
+/// # Errors
+///
+/// When the pusher ledger cannot be read.
+pub fn device_pusher<R: Runtime>(
+    app: &AppHandle<R>,
+    user_id: &str,
+    device_id: &str,
+) -> Result<Option<DevicePusher>, CommandErr> {
+    Ok(registered_pushers(&push_store(app)?)?
+        .into_iter()
+        .rev()
+        .find(|pusher| pusher.user_id == user_id && pusher.device_id == device_id)
+        .map(|pusher| DevicePusher {
+            pushkey: pusher.pushkey,
+            app_id: pusher.app_id,
+        }))
+}
+
 fn save_pushers(root: &std::path::Path, pushers: &[RegisteredPusher]) -> Result<(), CommandErr> {
     std::fs::create_dir_all(root).map_err(|_| CommandErr::Unavailable)?;
     let bytes = serde_json::to_vec(pushers).map_err(|_| CommandErr::Unavailable)?;

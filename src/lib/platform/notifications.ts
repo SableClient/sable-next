@@ -1,4 +1,5 @@
 import { isTauri } from '@tauri-apps/api/core';
+import { type as osType } from '@tauri-apps/plugin-os';
 
 import { isNativeMobile } from './os.js';
 import { hostsServiceWorker } from './service-worker.js';
@@ -24,4 +25,12 @@ export async function deliversNativePush(): Promise<boolean> {
 
 export function usesPushGateway(): boolean {
   return !isTauri() || isNativeMobile();
+}
+
+export type PushPlatform = 'web' | 'android' | 'ios' | 'desktop';
+
+export function pushPlatform(): PushPlatform {
+  if (!isTauri()) return 'web';
+  const os = osType();
+  return os === 'android' || os === 'ios' ? os : 'desktop';
 }

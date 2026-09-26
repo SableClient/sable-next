@@ -171,6 +171,14 @@ impl IncomingResponse for EmptyResponse {
 ///
 /// When the homeserver rejects the read.
 pub async fn pushers(client: &Client) -> Result<Vec<RegisteredPusherView>, String> {
+    Ok(raw_pushers(client)
+        .await?
+        .into_iter()
+        .map(Into::into)
+        .collect())
+}
+
+pub(crate) async fn raw_pushers(client: &Client) -> Result<Vec<RawPusher>, String> {
     let Webpushers { pushers } = client
         .send(ListWebPushers)
         .await
@@ -233,10 +241,10 @@ struct RawPushers {
     pushers: Vec<RawPusher>,
 }
 
-#[derive(Deserialize)]
-struct RawPusher {
-    pushkey: String,
-    app_id: String,
+#[derive(Debug, Deserialize)]
+pub(crate) struct RawPusher {
+    pub(crate) pushkey: String,
+    pub(crate) app_id: String,
     /// `http`, the web push kind, or a server-defined kind.
     #[serde(default)]
     kind: Option<String>,
@@ -245,11 +253,23 @@ struct RawPusher {
     /// Set by servers implementing the MSC4174 validation handshake.
     #[serde(default)]
     activated: Option<bool>,
+    #[serde(default)]
+    pub(crate) data: serde_json::Map<String, serde_json::Value>,
+}
+
+impl RawPusher {
+    pub(crate) fn gateway(&self) -> Option<String> {
+        self.data
+            .get("url")
+            .and_then(serde_json::Value::as_str)
+            .map(ToOwned::to_owned)
+    }
 }
 
 impl From<RawPusher> for RegisteredPusherView {
     fn from(pusher: RawPusher) -> Self {
         Self {
+            gateway: pusher.gateway(),
             pushkey: pusher.pushkey,
             app_id: pusher.app_id,
             kind: pusher.kind,
@@ -261,7 +281,7 @@ impl From<RawPusher> for RegisteredPusherView {
 
 #[derive(Debug)]
 struct Webpushers {
-    pushers: Vec<RegisteredPusherView>,
+    pushers: Vec<RawPusher>,
 }
 
 impl IncomingResponse for Webpushers {
@@ -271,9 +291,7 @@ impl IncomingResponse for Webpushers {
         response: http::Response<&[u8]>,
     ) -> Result<Self, DeserializationError> {
         let RawPushers { pushers } = serde_json::from_slice(response.body())?;
-        Ok(Self {
-            pushers: pushers.into_iter().map(Into::into).collect(),
-        })
+        Ok(Self { pushers })
     }
 }
 

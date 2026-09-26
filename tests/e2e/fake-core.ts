@@ -843,6 +843,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       web_pusher_support: () => ({ type: 'web_pusher_support', vapid: null }),
       web_pushers: () => ({ type: 'web_pushers', pushers: [] }),
+      ping_push_gateway: () => ({ type: 'ping_push_gateway', reached: null }),
+      send_diagnostic_push: () => ({ type: 'send_diagnostic_push', push: { kind: 'no_pusher' } }),
       notification: () => ({ type: 'notification', notification: null }),
       image_packs: () => ({ type: 'image_packs', packs: [], complete: true }),
       all_image_packs: () => ({ type: 'all_image_packs', packs: [] }),

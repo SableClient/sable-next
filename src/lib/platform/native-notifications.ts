@@ -114,6 +114,27 @@ export interface NativePushTransport {
   distributor: string | null;
 }
 
+export interface NativeDevicePusher {
+  pushkey: string;
+  appId: string;
+}
+
+export async function nativeDevicePusher(
+  userId: string,
+  deviceId: string
+): Promise<NativeDevicePusher | null> {
+  if (!isTauri()) return null;
+  try {
+    const pusher = await invoke<{ pushkey: string; app_id: string } | null>('device_pusher', {
+      userId,
+      deviceId,
+    });
+    return pusher === null ? null : { pushkey: pusher.pushkey, appId: pusher.app_id };
+  } catch {
+    return null;
+  }
+}
+
 export async function nativePushTransport(): Promise<NativePushTransport | null> {
   if (!isTauri()) return null;
   try {
