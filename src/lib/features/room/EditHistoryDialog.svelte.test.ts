@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
@@ -11,9 +12,16 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 import EditHistoryDialog from './EditHistoryDialog.svelte';
 
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', () => ({
+    matches: false,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
-  document.body.replaceChildren();
 });
 
 const versions = [
@@ -21,58 +29,43 @@ const versions = [
   { event_id: '$edit', timestamp: 2, body: 'hello', html: '<p><b>hello</b></p>' },
 ];
 
+async function versionRows(): Promise<HTMLElement[]> {
+  const dialog = await screen.findByRole('dialog');
+  return within(dialog).getAllByRole('listitem');
+}
+
 test('renders every version as a message body and replies to the one picked', async () => {
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }));
+  const user = userEvent.setup();
   const onReply = vi.fn();
-  const instance = mount(EditHistoryDialog, {
-    target: document.body,
-    props: { open: true, versions, onReply },
-  });
-  await tick();
+  render(EditHistoryDialog, { open: true, versions, onReply });
 
-  const bodies = [...document.querySelectorAll('.edit-history-version .formatted-body')];
-  expect(bodies.map((body) => body.textContent.trim())).toEqual(['helo', 'hello']);
-  expect(bodies[1].querySelector('b')?.textContent).toBe('hello');
-  expect(document.querySelectorAll('.edit-history-original')).toHaveLength(1);
+  const [original, edit] = await versionRows();
+  expect(within(original).getByText('helo')).toBeInTheDocument();
+  expect(within(edit).getByText('hello').tagName).toBe('B');
+  expect(within(original).getByText('Original')).toBeInTheDocument();
+  expect(within(edit).queryByText('Original')).not.toBeInTheDocument();
 
-  const replies = document.querySelectorAll<HTMLButtonElement>('.edit-history-reply');
-  replies[0].click();
+  await user.click(within(original).getByRole('button', { name: 'Reply' }));
   expect(onReply).toHaveBeenCalledWith(versions[0]);
-
-  await unmount(instance);
 });
 
-test('only the original can start a thread, and any version can be deleted', async () => {
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }));
+test('only the original can start a thread', async () => {
+  const user = userEvent.setup();
   const onThread = vi.fn();
-  const onDelete = vi.fn();
-  const instance = mount(EditHistoryDialog, {
-    target: document.body,
-    props: { open: true, versions, onThread, onDelete },
-  });
-  await tick();
+  render(EditHistoryDialog, { open: true, versions, onThread, onDelete: vi.fn() });
 
-  const threads = document.querySelectorAll<HTMLButtonElement>('.edit-history-thread');
-  expect(threads).toHaveLength(1);
-  threads[0].click();
+  const [original, edit] = await versionRows();
+  expect(within(edit).queryByRole('button', { name: 'Reply in thread' })).not.toBeInTheDocument();
+  await user.click(within(original).getByRole('button', { name: 'Reply in thread' }));
   expect(onThread).toHaveBeenCalledWith(versions[0]);
+});
 
-  await unmount(instance);
-  const again = mount(EditHistoryDialog, {
-    target: document.body,
-    props: { open: true, versions, onThread, onDelete },
-  });
-  await tick();
-  document.querySelectorAll<HTMLButtonElement>('.edit-history-delete')[1].click();
+test('any version can be deleted', async () => {
+  const user = userEvent.setup();
+  const onDelete = vi.fn();
+  render(EditHistoryDialog, { open: true, versions, onThread: vi.fn(), onDelete });
+
+  const [, edit] = await versionRows();
+  await user.click(within(edit).getByRole('button', { name: 'Delete message' }));
   expect(onDelete).toHaveBeenCalledWith(versions[1]);
-
-  await unmount(again);
 });

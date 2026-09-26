@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomAttachmentContentView, RoomAttachmentView } from '#src/generated/protocol';
@@ -15,7 +16,6 @@ const roomAttachments = vi.fn();
 Object.assign(core, { roomAttachments });
 
 afterEach(() => {
-  document.body.replaceChildren();
   roomAttachments.mockReset();
 });
 
@@ -44,7 +44,7 @@ function file(eventId: string, filename: string, timestamp = MARCH): RoomAttachm
   );
 }
 
-function render(
+function setup(
   props: {
     onJump?: () => void;
     onOpenMedia?: () => void;
@@ -52,8 +52,7 @@ function render(
     modal?: boolean;
   } = {}
 ) {
-  return mount(RoomAttachments, {
-    target: document.body,
+  return render(RoomAttachments, {
     props: {
       roomId: '!room:example.org',
       members: [],
@@ -66,13 +65,10 @@ function render(
   });
 }
 
-function tab(label: string): HTMLButtonElement {
-  const found = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="tab"]')).find(
-    (button) => button.textContent.trim() === label
-  );
-  if (!found) throw new Error(`${label} tab missing`);
-  return found;
-}
+const user = userEvent.setup();
+const tab = (name: string) => screen.getByRole('tab', { name });
+const openItem = (name: RegExp) => screen.getByRole('button', { name });
+const tiles = () => [...document.querySelectorAll<HTMLButtonElement>('.media-tile')];
 
 test('files are grouped by month, page on demand and open in the viewer', async () => {
   roomAttachments
@@ -80,28 +76,22 @@ test('files are grouped by month, page on demand and open in the viewer', async 
     .mockResolvedValueOnce({ items: [file('$a', 'notes.pdf')], next_batch: 'next' })
     .mockResolvedValueOnce({ items: [file('$b', 'slides.pdf', FEBRUARY)], next_batch: null });
   const onOpenMedia = vi.fn();
-  const instance = render({ onOpenMedia });
+  setup({ onOpenMedia });
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledWith('!room:example.org', 'media', 30, null);
   });
 
-  tab('Files').click();
-  flushSync();
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.attachment-row')).toHaveLength(1);
-  });
+  await user.click(tab('Files'));
+  expect(await screen.findByRole('button', { name: /notes\.pdf/ })).toBeInTheDocument();
   expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, null);
 
-  document.querySelector<HTMLButtonElement>('.attachments-more button')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.attachment-row')).toHaveLength(2);
-  });
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
+  expect(await screen.findByRole('button', { name: /slides\.pdf/ })).toBeInTheDocument();
   expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, 'next');
-  expect(document.querySelectorAll('.group-heading')).toHaveLength(2);
-  expect(document.querySelector('.attachments-more')).toBeNull();
+  expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
 
-  document.querySelectorAll<HTMLButtonElement>('.attachment-row')[1]?.click();
-  flushSync();
+  await user.click(openItem(/slides\.pdf/));
   expect(onOpenMedia).toHaveBeenCalledWith(
     [
       expect.objectContaining({ eventId: '$a', kind: 'file', filename: 'notes.pdf' }),
@@ -109,29 +99,25 @@ test('files are grouped by month, page on demand and open in the viewer', async 
     ],
     '$b'
   );
-  await unmount(instance);
 });
 
 test('the tabs follow the arrow keys and keep one tab stop', async () => {
   roomAttachments.mockResolvedValue({ items: [], next_batch: null });
-  const instance = render();
+  setup();
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);
   });
 
   const media = tab('Media');
-  expect(media.tabIndex).toBe(0);
-  expect(tab('Links').tabIndex).toBe(-1);
-  expect(media.getAttribute('aria-controls')).toBe('attachments-panel');
+  expect(media).toHaveAttribute('tabindex', '0');
+  expect(tab('Links')).toHaveAttribute('tabindex', '-1');
+  expect(media).toHaveAttribute('aria-controls', 'attachments-panel');
 
-  media.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-  flushSync();
-  expect(tab('Links').getAttribute('aria-selected')).toBe('true');
-  expect(document.activeElement).toBe(tab('Links'));
-  expect(document.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby')).toBe(
-    'attachments-tab-link'
-  );
-  await unmount(instance);
+  media.focus();
+  await user.keyboard('{ArrowLeft}');
+  expect(tab('Links')).toHaveAttribute('aria-selected', 'true');
+  expect(tab('Links')).toHaveFocus();
+  expect(screen.getByRole('tabpanel', { name: 'Links' })).toBeInTheDocument();
 });
 
 test('links show the host, cap the list and keep a named way back to the message', async () => {
@@ -151,28 +137,23 @@ test('links show the host, cap the list and keep a named way back to the message
     next_batch: null,
   });
   const onJump = vi.fn();
-  const instance = render({ onJump });
+  setup({ onJump });
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);
   });
 
-  tab('Links').click();
-  flushSync();
+  await user.click(tab('Links'));
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.link')).toHaveLength(3);
+    expect(screen.getAllByRole('link')).toHaveLength(3);
   });
-  const first = document.querySelector<HTMLAnchorElement>('.link');
-  expect(first?.getAttribute('href')).toBe('https://example.org/a');
-  expect(first?.getAttribute('rel')).toBe('noopener noreferrer');
-  expect(first?.querySelector('.link-host')?.textContent).toBe('example.org');
-  expect(document.querySelector('.link-more')?.textContent.trim()).toBe('+1 more link');
+  const [first] = screen.getAllByRole('link');
+  expect(first).toHaveAttribute('href', 'https://example.org/a');
+  expect(first).toHaveAttribute('rel', 'noopener noreferrer');
+  expect(first.querySelector('.link-host')).toHaveTextContent('example.org');
+  expect(screen.getByText('+1 more link')).toBeInTheDocument();
 
-  const back = document.querySelector<HTMLButtonElement>('.link-jump');
-  expect(back?.getAttribute('aria-label')).toContain('Jump to message');
-  back?.click();
-  flushSync();
+  await user.click(screen.getByRole('button', { name: /Jump to message/ }));
   expect(onJump).toHaveBeenCalledWith('$link');
-  await unmount(instance);
 });
 
 test('a spoilered picture is never loaded and says why it is hidden', async () => {
@@ -193,33 +174,25 @@ test('a spoilered picture is never loaded and says why it is hidden', async () =
     next_batch: null,
   });
   const onOpenMedia = vi.fn();
-  const instance = render({ onOpenMedia });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.tile-placeholder')).not.toBeNull();
-  });
+  setup({ onOpenMedia });
+  const tile = await screen.findByRole('button', { name: /Spoiler: the ending/ });
 
-  expect(document.querySelector('.media-image')).toBeNull();
-  const tile = document.querySelector<HTMLButtonElement>('.media-tile');
-  expect(tile?.getAttribute('aria-label')).toContain('Spoiler: the ending');
+  expect(tile.querySelector('.tile-placeholder')).toBeInTheDocument();
+  expect(document.querySelector('.media-image')).not.toBeInTheDocument();
 
-  tile?.click();
-  flushSync();
+  await user.click(tile);
   expect(onOpenMedia).toHaveBeenCalledWith(
     [expect.objectContaining({ eventId: '$secret', spoiler: 'the ending' })],
     '$secret'
   );
-  await unmount(instance);
 });
 
 test('an empty room says what was searched', async () => {
   roomAttachments.mockResolvedValueOnce({ items: [], next_batch: null });
-  const instance = render();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.attachments-status')?.textContent).toBe(
-      'No images or videos indexed on this device yet.'
-    );
-  });
-  await unmount(instance);
+  setup();
+  expect(
+    await screen.findByText('No images or videos indexed on this device yet.')
+  ).toBeInTheDocument();
 });
 
 function image(eventId: string): RoomAttachmentView {
@@ -240,16 +213,15 @@ test('an item the next page repeats is shown once', async () => {
   roomAttachments
     .mockResolvedValueOnce({ items: [image('$a'), image('$b')], next_batch: 'next' })
     .mockResolvedValueOnce({ items: [image('$b'), image('$c')], next_batch: null });
-  const instance = render();
+  setup();
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.media-tile')).toHaveLength(2);
+    expect(tiles()).toHaveLength(2);
   });
 
-  document.querySelector<HTMLButtonElement>('.attachments-more button')?.click();
+  await user.click(screen.getByRole('button', { name: 'Load more' }));
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.media-tile')).toHaveLength(3);
+    expect(tiles()).toHaveLength(3);
   });
-  await unmount(instance);
 });
 
 test('each gallery item gets its own tile and opens by its own id', async () => {
@@ -261,13 +233,12 @@ test('each gallery item gets its own tile and opens by its own id', async () => 
     next_batch: null,
   });
   const onOpenMedia = vi.fn();
-  const instance = render({ onOpenMedia });
+  setup({ onOpenMedia });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.media-tile')).toHaveLength(2);
+    expect(tiles()).toHaveLength(2);
   });
 
-  document.querySelectorAll<HTMLButtonElement>('.media-tile')[1]?.click();
-  flushSync();
+  await user.click(tiles()[1]);
 
   expect(onOpenMedia).toHaveBeenCalledWith(
     [
@@ -276,7 +247,6 @@ test('each gallery item gets its own tile and opens by its own id', async () => 
     ],
     '$gallery:gallery:2'
   );
-  await unmount(instance);
 });
 
 test('the grid is one tab stop that the arrow keys move through', async () => {
@@ -284,20 +254,17 @@ test('the grid is one tab stop that the arrow keys move through', async () => {
     items: [image('$a'), image('$b'), image('$c'), image('$d')],
     next_batch: null,
   });
-  const instance = render();
+  setup();
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.media-tile')).toHaveLength(4);
+    expect(tiles()).toHaveLength(4);
   });
 
-  const tiles = () => Array.from(document.querySelectorAll<HTMLButtonElement>('.media-tile'));
   expect(tiles().map((tile) => tile.tabIndex)).toEqual([0, -1, -1, -1]);
 
-  tiles()[0]?.focus();
-  tiles()[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-  flushSync();
-  expect(document.activeElement).toBe(tiles()[3]);
-  expect(tiles()[3]?.tabIndex).toBe(0);
-  await unmount(instance);
+  tiles()[0].focus();
+  await user.keyboard('{ArrowDown}');
+  expect(tiles()[3]).toHaveFocus();
+  expect(tiles()[3]).toHaveAttribute('tabindex', '0');
 });
 
 test('a matrix.to link routes inside the app instead of opening a tab', async () => {
@@ -312,25 +279,19 @@ test('a matrix.to link routes inside the app instead of opening a tab', async ()
     next_batch: null,
   });
   const onMatrixLink = vi.fn();
-  const instance = render({ onMatrixLink });
+  setup({ onMatrixLink });
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);
   });
 
-  tab('Links').click();
-  flushSync();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.link')).not.toBeNull();
-  });
-  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-  document.querySelector('.link')?.dispatchEvent(click);
+  await user.click(tab('Links'));
+  const link = await screen.findByRole('link');
 
-  expect(click.defaultPrevented).toBe(true);
+  expect(await fireEvent.click(link)).toBe(false);
   expect(onMatrixLink).toHaveBeenCalledWith(
     expect.objectContaining({ kind: 'event', eventId: '$target' }),
     expect.any(HTMLAnchorElement)
   );
-  await unmount(instance);
 });
 
 test('an audio file opens in the viewer as audio', async () => {
@@ -347,21 +308,15 @@ test('an audio file opens in the viewer as audio', async () => {
     next_batch: null,
   });
   const onOpenMedia = vi.fn();
-  const instance = render({ onOpenMedia });
+  setup({ onOpenMedia });
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);
   });
 
-  tab('Files').click();
-  flushSync();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.attachment-row')).not.toBeNull();
-  });
-  document.querySelector<HTMLButtonElement>('.attachment-row')?.click();
-  flushSync();
+  await user.click(tab('Files'));
+  await user.click(await screen.findByRole('button', { name: /memo\.ogg/ }));
   expect(onOpenMedia).toHaveBeenCalledWith(
     [expect.objectContaining({ kind: 'audio', filename: 'memo.ogg' })],
     '$voice'
   );
-  await unmount(instance);
 });

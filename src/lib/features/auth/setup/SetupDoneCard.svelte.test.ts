@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { flushSync } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -24,28 +26,24 @@ function setEncryption(verification: string, recovery: string) {
   });
 }
 
-async function render() {
+async function setup() {
   const onComplete = vi.fn();
-  const instance = mount(SetupDoneCard, {
-    target: document.body,
-    props: { active: true, onComplete },
-  });
+  render(SetupDoneCard, { active: true, onComplete });
   await vi.waitFor(() => {
     expect(present.permissionState).toHaveBeenCalled();
   });
   await Promise.resolve();
   flushSync();
-  return { instance, onComplete };
+  return { onComplete };
 }
 
 const lines = () =>
-  [...document.querySelectorAll('.setup-done-list li')].map((item) => ({
+  screen.getAllByRole('listitem').map((item) => ({
     text: item.textContent.trim(),
     done: item.classList.contains('done'),
   }));
 
 afterEach(() => {
-  document.body.replaceChildren();
   preferences.settingsSync = false;
   vi.clearAllMocks();
 });
@@ -53,7 +51,7 @@ afterEach(() => {
 test('says where the device ended up, including what was skipped', async () => {
   setEncryption('unverified', 'disabled');
   present.permissionState.mockResolvedValueOnce('denied');
-  const { instance } = await render();
+  await setup();
 
   expect(lines()).toEqual([
     { text: 'Not confirmed yet', done: false },
@@ -62,18 +60,15 @@ test('says where the device ended up, including what was skipped', async () => {
     { text: 'Group chats: all messages', done: true },
     { text: 'Settings stay on this device', done: false },
   ]);
-
-  await unmount(instance);
 });
 
 test('a finished setup reads as finished, and the button leaves', async () => {
   setEncryption('verified', 'enabled');
   preferences.settingsSync = true;
-  const { instance, onComplete } = await render();
+  const user = userEvent.setup();
+  const { onComplete } = await setup();
 
   expect(lines().every((line) => line.done)).toBe(true);
-  document.querySelector<HTMLButtonElement>('.setup-done-card button')?.click();
+  await user.click(screen.getByRole('button', { name: 'Go to your chats' }));
   expect(onComplete).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });

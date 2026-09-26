@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount, type ComponentProps } from 'svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick, type ComponentProps } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -15,15 +17,22 @@ afterEach(() => {
   core.forgetMedia.mockClear();
   preferences.autoplayGifs = true;
   preferences.pauseAnimationsWhenInactive = false;
-  document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
+const user = userEvent.setup({ delay: null });
+const retryButton = () => screen.getByRole('button', { name: /Retry/ });
+
+function find(selector: string): HTMLElement {
+  const element = document.querySelector<HTMLElement>(selector);
+  if (!element) throw new Error(`${selector} was not rendered`);
+  return element;
+}
+
 test('does not retry a failed media request in a render loop', async () => {
   core.fetchMedia.mockRejectedValue(new Error('thumbnail failed'));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/image',
       alt: 'Image',
@@ -35,7 +44,6 @@ test('does not retry a failed media request in a render loop', async () => {
   await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('does not re-request media that the homeserver cannot provide', async () => {
@@ -46,24 +54,22 @@ test('does not re-request media that the homeserver cannot provide', async () =>
     width: 800,
     height: 600,
   };
-  const first = mount(MediaImage, { target: document.body, props });
+  const first = render(MediaImage, { props });
 
   await settle();
-  await unmount(first);
+  first.unmount();
 
-  const second = mount(MediaImage, { target: document.body, props });
+  render(MediaImage, { props });
   await tick();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
-  await unmount(second);
 });
 
 test('shows an unavailable state instead of a blank image', async () => {
   core.fetchMedia
     .mockRejectedValueOnce(new Error('media unavailable'))
     .mockResolvedValueOnce(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/unavailable-state',
       alt: 'Holiday photo',
@@ -76,23 +82,18 @@ test('shows an unavailable state instead of a blank image', async () => {
 
   await settle();
 
-  expect(document.querySelector('.media-image-unavailable')?.textContent).toContain(
-    'Holiday photo: Media unavailable'
-  );
-  const retry = document.querySelector<HTMLButtonElement>('.retry-media');
-  expect(retry?.disabled).toBe(false);
-  retry?.click();
+  expect(screen.getByText(/Holiday photo: Media unavailable/)).toBeInTheDocument();
+  expect(retryButton()).toBeEnabled();
+  await user.click(retryButton());
   await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(document.querySelector('.media-image-unavailable')).toBeNull();
-  await unmount(instance);
 });
 
 test('backs off repeated manual retries', async () => {
   core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/retry-backoff',
       alt: 'Holiday photo',
@@ -103,22 +104,19 @@ test('backs off repeated manual retries', async () => {
   });
 
   await settle();
-  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await user.click(retryButton());
   await vi.waitFor(() => {
     expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   });
 
-  const retry = document.querySelector<HTMLButtonElement>('.retry-media');
-  expect(retry?.disabled).toBe(true);
-  expect(retry?.textContent).toContain('Retry in 2 seconds');
-  await unmount(instance);
+  expect(retryButton()).toBeDisabled();
+  expect(retryButton()).toHaveTextContent('Retry in 2 seconds');
 });
 
 test('counts the retry backoff down while it waits', async () => {
   vi.useFakeTimers();
   core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  const instance = render(MediaImage, {
     props: {
       source: 'mxc://example.org/retry-countdown',
       alt: 'Holiday photo',
@@ -130,26 +128,25 @@ test('counts the retry backoff down while it waits', async () => {
 
   await vi.advanceTimersByTimeAsync(0);
   await tick();
-  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await user.click(retryButton());
   await vi.advanceTimersByTimeAsync(0);
   await tick();
 
-  expect(document.querySelector('.retry-media')?.textContent).toContain('Retry in 2 seconds');
+  expect(retryButton()).toHaveTextContent('Retry in 2 seconds');
 
   await vi.advanceTimersByTimeAsync(1000);
   await tick();
 
-  expect(document.querySelector('.retry-media')?.textContent).toContain('Retry in 1 second');
+  expect(retryButton()).toHaveTextContent('Retry in 1 second');
 
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
 test('renders clickable media as a button', async () => {
   const onclick = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/interactive',
       alt: 'Image',
@@ -158,15 +155,12 @@ test('renders clickable media as a button', async () => {
       onclick,
     },
   });
-  const image = document.querySelector<HTMLElement>('.media-image');
-  if (!image) throw new Error('interactive media image was not rendered');
+  const image = screen.getByRole('button', { name: 'Open Image' });
 
-  image.click();
-  await tick();
+  await user.click(image);
 
-  expect(image.tagName).toBe('BUTTON');
+  expect(image).toHaveClass('media-image');
   expect(onclick).toHaveBeenCalledOnce();
-  await unmount(instance);
 });
 
 test('shares a pending media request across component instances', async () => {
@@ -184,22 +178,20 @@ test('shares a pending media request across component instances', async () => {
     height: 600,
   };
 
-  const first = mount(MediaImage, { target: document.body, props });
-  const second = mount(MediaImage, { target: document.body, props });
+  const first = render(MediaImage, { props });
+  render(MediaImage, { props });
   await tick();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   resolve(new Uint8Array(new ArrayBuffer()));
   await settle();
   expect(createObjectURL).toHaveBeenCalledTimes(1);
-  await unmount(first);
-  await unmount(second);
+  first.unmount();
 });
 
 test('loads SVG images from the original rather than a thumbnail', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/vector',
       alt: 'Vector image',
@@ -212,13 +204,11 @@ test('loads SVG images from the original rather than a thumbnail', async () => {
   await tick();
   await Promise.resolve();
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/vector', 0, 0);
-  await unmount(instance);
 });
 
 test('loads GIFs from the original so they animate', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/autoplayed',
       alt: 'Animated image',
@@ -231,15 +221,13 @@ test('loads GIFs from the original so they animate', async () => {
   await tick();
   await Promise.resolve();
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/autoplayed', 0, 0);
-  await unmount(instance);
 });
 
 test('shows a static GIF preview until its play button is pressed', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:animated');
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/animated',
       alt: 'Animated image',
@@ -256,29 +244,26 @@ test('shows a static GIF preview until its play button is pressed', async () => 
   });
   const preview = container.querySelector<HTMLImageElement>('.gif-preview-source');
   if (!preview) throw new Error('GIF preview source was not rendered');
-  preview.dispatchEvent(new Event('load'));
+  void fireEvent.load(preview);
   await tick();
 
   expect(container.querySelector('canvas')).not.toBeNull();
   expect(container.querySelector('.play-gif')).not.toBeNull();
   expect(container.querySelector('img:not(.gif-preview-source)')).toBeNull();
 
-  document.querySelector<HTMLButtonElement>('.play-gif')?.click();
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
   // The one image plays: hidden behind the canvas until now, shown from here.
   const playing = document.querySelector<HTMLImageElement>('img');
   expect(playing?.src).toBe('blob:animated');
   expect(playing?.getAttribute('aria-hidden')).toBeNull();
   expect(document.querySelector('.play-gif')).toBeNull();
-  await unmount(instance);
 });
 
 test('an autoplay prop overrides the GIF preference in both directions', async () => {
   preferences.autoplayGifs = true;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:held');
-  const instance = mount(MediaImage, {
-    target: document.body,
+  const instance = render(MediaImage, {
     props: {
       source: 'mxc://example.org/held',
       alt: 'Animated sticker',
@@ -294,11 +279,10 @@ test('an autoplay prop overrides the GIF preference in both directions', async (
   await vi.waitFor(() => {
     expect(container.querySelector('.gif-preview-source')).not.toBeNull();
   });
-  await unmount(instance);
+  instance.unmount();
 
   preferences.autoplayGifs = false;
-  const playing = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/playing',
       alt: 'Animated sticker',
@@ -313,15 +297,13 @@ test('an autoplay prop overrides the GIF preference in both directions', async (
     expect(document.querySelector('.gif-preview-source')).toBeNull();
     expect(document.querySelector('.media-image img')).not.toBeNull();
   });
-  await unmount(playing);
 });
 
 test('stops a playing GIF instead of opening the viewer', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onclick = vi.fn();
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/stoppable',
       alt: 'Animated image',
@@ -335,21 +317,17 @@ test('stops a playing GIF instead of opening the viewer', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('.gif-preview-source')).not.toBeNull();
   });
-  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('.gif-preview-source'));
   await tick();
-  document.querySelector<HTMLButtonElement>('.play-gif')?.click();
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
 
-  const playing = document.querySelector<HTMLButtonElement>('button.media-image');
-  if (!playing) throw new Error('playing GIF was not interactive');
-  playing.click();
-  await tick();
+  const playing = screen.getByRole('button', { name: 'Stop GIF' });
+  await user.click(playing);
 
   expect(onclick).not.toHaveBeenCalled();
   expect(document.querySelector('.play-gif')).not.toBeNull();
   // The wrapper never changes element, only what pressing it means.
-  expect(document.querySelector('button.media-image')?.getAttribute('aria-label')).toBe('Play GIF');
-  await unmount(instance);
+  expect(playing).toHaveAccessibleName('Play GIF');
 });
 
 test('keeps the GIF on screen until the decoder has painted a frame', async () => {
@@ -375,8 +353,7 @@ test('keeps the GIF on screen until the decoder has painted a frame', async () =
     }
   );
 
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/pending-frames',
       alt: 'Animated image',
@@ -394,7 +371,6 @@ test('keeps the GIF on screen until the decoder has painted a frame', async () =
 
   expect(document.querySelector<HTMLImageElement>('.gif-preview-source')?.src).toBe('blob:pending');
   expect(document.querySelector('.gif-preview-source.ready')).toBeNull();
-  await unmount(instance);
 });
 
 test('steps GIF frames itself and stops on the frame it held', async () => {
@@ -424,8 +400,7 @@ test('steps GIF frames itself and stops on the frame it held', async () => {
     }
   );
 
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/stepped',
       alt: 'Animated image',
@@ -443,20 +418,18 @@ test('steps GIF frames itself and stops on the frame it held', async () => {
   expect(decoded.at(-1)).toBe(0);
 
   const held = decoded.length;
-  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await user.click(screen.getByRole('button', { name: 'Play GIF' }));
   await vi.waitFor(() => {
     expect(decoded.length).toBeGreaterThan(held + 2);
   });
   expect(decoded.slice(held, held + 3)).toEqual([1, 2, 0]);
   expect(document.querySelector('.play-gif')).toBeNull();
 
-  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Stop GIF' }));
   const stopped = decoded.length;
   await new Promise((resolve) => setTimeout(resolve, 120));
   expect(decoded.length).toBe(stopped);
   expect(document.querySelector('.play-gif')).not.toBeNull();
-  await unmount(instance);
 });
 
 async function settle(): Promise<void> {
@@ -471,7 +444,7 @@ async function settle(): Promise<void> {
 async function mountAndLoad(
   props: ComponentProps<typeof MediaImage>,
   served: { width: number; height: number } | null
-): Promise<() => Promise<void>> {
+): Promise<void> {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:served');
   if (served === null) {
@@ -479,14 +452,12 @@ async function mountAndLoad(
   } else {
     vi.stubGlobal('createImageBitmap', () => Promise.resolve({ ...served, close: () => {} }));
   }
-  const instance = mount(MediaImage, { target: document.body, props });
+  render(MediaImage, { props });
   await settle();
-
-  return () => unmount(instance);
 }
 
 test('takes its shape from the served file when the event has no dimensions', async () => {
-  const dispose = await mountAndLoad(
+  await mountAndLoad(
     { source: 'mxc://example.org/no-dimensions', alt: 'Image', width: 800, height: 600 },
     { width: 1000, height: 400 }
   );
@@ -494,13 +465,12 @@ test('takes its shape from the served file when the event has no dimensions', as
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(1000 / 400)}`
   );
-  await dispose();
 });
 
 test('keeps the event dimensions when the served file disagrees', async () => {
   // The served file is a thumbnail and need not share the original's shape, so
   // adopting it would resize the row on load and shift everything below.
-  const dispose = await mountAndLoad(
+  await mountAndLoad(
     {
       source: 'mxc://example.org/thumbnailed',
       alt: 'Image',
@@ -515,11 +485,10 @@ test('keeps the event dimensions when the served file disagrees', async () => {
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(600 / 900)}`
   );
-  await dispose();
 });
 
 test('keeps the requested box when the file cannot be decoded', async () => {
-  const dispose = await mountAndLoad(
+  await mountAndLoad(
     { source: 'mxc://example.org/undecodable', alt: 'Image', width: 800, height: 600 },
     null
   );
@@ -527,7 +496,6 @@ test('keeps the requested box when the file cannot be decoded', async () => {
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(800 / 600)}`
   );
-  await dispose();
 });
 
 test.each([
@@ -537,8 +505,7 @@ test.each([
   { intrinsicWidth: 0, intrinsicHeight: 900, expected: 800 / 600 },
 ])('reserves a valid aspect ratio for $intrinsicWidth x $intrinsicHeight', async (size) => {
   core.fetchMedia.mockRejectedValue(new Error('not needed'));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: `mxc://example.org/ratio-${String(size.intrinsicWidth)}-${String(size.intrinsicHeight)}`,
       alt: 'Image',
@@ -553,7 +520,6 @@ test.each([
   expect(document.querySelector('.media-image')?.getAttribute('style')).toContain(
     `--media-ratio: ${String(size.expected)}`
   );
-  await unmount(instance);
 });
 
 test('a cached image does not come back blurred', async () => {
@@ -566,29 +532,25 @@ test('a cached image does not come back blurred', async () => {
     blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
   };
 
-  const first = mount(MediaImage, { target: document.body, props });
+  const first = render(MediaImage, { props });
   await vi.waitFor(() => {
     expect(document.querySelector('img.media-image-content')).not.toBeNull();
   });
-  document
-    .querySelector<HTMLImageElement>('img.media-image-content')
-    ?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('img.media-image-content'));
   await tick();
-  await unmount(first);
+  first.unmount();
 
-  const second = mount(MediaImage, { target: document.body, props });
+  render(MediaImage, { props });
   await tick();
   await tick();
 
   const placeholder = document.querySelector('.media-image-blurhash');
   expect(placeholder === null || placeholder.classList.contains('loaded')).toBe(true);
-  await unmount(second);
 });
 
 test('holds a placeholder until the image paints', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/slow-photo',
       alt: 'photo',
@@ -604,20 +566,16 @@ test('holds a placeholder until the image paints', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('img.media-image-content')).not.toBeNull();
   });
-  document
-    .querySelector<HTMLImageElement>('img.media-image-content')
-    ?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('img.media-image-content'));
   await tick();
 
   expect(document.querySelector('.media-image-placeholder.loaded')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('an undecodable file falls back instead of spinning forever', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
   const onfailed = vi.fn();
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/corrupt',
       alt: 'photo',
@@ -632,16 +590,13 @@ test('an undecodable file falls back instead of spinning forever', async () => {
     await vi.waitFor(() => {
       expect(document.querySelector('img.media-image-content'), request).not.toBeNull();
     });
-    document
-      .querySelector<HTMLImageElement>('img.media-image-content')
-      ?.dispatchEvent(new Event('error'));
+    void fireEvent.error(find('img.media-image-content'));
     await tick();
   }
 
   expect(onfailed).toHaveBeenCalledOnce();
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
   expect(document.querySelector('.media-image-progress')).toBeNull();
-  await unmount(instance);
 });
 
 test('an undecodable thumbnail falls back to the original, then stops', async () => {
@@ -649,28 +604,27 @@ test('an undecodable thumbnail falls back to the original, then stops', async ()
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
   const onfailed = vi.fn();
   const source = 'mxc://example.org/undecodable-thumbnail';
-  const instance = mount(MediaImage, {
-    target: document.body,
+  const instance = render(MediaImage, {
     props: { source, alt: 'photo', width: 800, height: 600, onfailed },
   });
   const image = (): HTMLImageElement | null =>
     document.querySelector<HTMLImageElement>('img.media-image-content');
 
   await vi.advanceTimersByTimeAsync(0);
-  image()?.dispatchEvent(new Event('error'));
+  void fireEvent.error(image() ?? find('img.media-image-content'));
   await vi.advanceTimersByTimeAsync(0);
 
   expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 0, 0);
   expect(onfailed).not.toHaveBeenCalled();
 
-  image()?.dispatchEvent(new Event('error'));
+  void fireEvent.error(image() ?? find('img.media-image-content'));
   await vi.advanceTimersByTimeAsync(120_000);
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(onfailed).toHaveBeenCalledOnce();
   expect(image()).toBeNull();
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -684,55 +638,52 @@ test('an effect re-run after an undecodable original does not bring the retries 
     height: 600,
     mime: 'image/png',
   });
-  const instance = mount(MediaImage, { target: document.body, props });
+  const instance = render(MediaImage, { props });
   const image = (): HTMLImageElement | null =>
     document.querySelector<HTMLImageElement>('img.media-image-content');
 
   for (let step = 0; step < 2; step += 1) {
     await vi.advanceTimersByTimeAsync(0);
-    image()?.dispatchEvent(new Event('error'));
+    void fireEvent.error(image() ?? find('img.media-image-content'));
   }
   props.mime = 'image/jpeg';
   await vi.advanceTimersByTimeAsync(120_000);
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
   expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
 test('a manual retry of an undecodable image drops the stored copy first', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
   const source = 'mxc://example.org/undecodable-retried';
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: { source, alt: 'photo', width: 800, height: 600, retryable: true },
   });
   const breakImage = async (): Promise<void> => {
     await vi.waitFor(() => {
       expect(document.querySelector('img.media-image-content')).not.toBeNull();
     });
-    document.querySelector('img.media-image-content')?.dispatchEvent(new Event('error'));
+    void fireEvent.error(find('img.media-image-content'));
     await tick();
   };
 
   await breakImage();
   await breakImage();
-  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  await user.click(retryButton());
 
   await vi.waitFor(() => {
     expect(core.fetchMedia).toHaveBeenCalledTimes(3);
   });
   expect(core.forgetMedia).toHaveBeenCalledWith(source);
   expect(core.fetchMedia).toHaveBeenLastCalledWith(source, 800, 600);
-  await unmount(instance);
 });
 
 test('a GIF pressed while it downloads keeps its placeholder', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockReturnValue(new Promise(() => undefined));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/slow-gif',
       alt: 'Animated image',
@@ -743,18 +694,16 @@ test('a GIF pressed while it downloads keeps its placeholder', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await user.click(find('button.media-image'));
   await tick();
 
   expect(document.querySelector('.media-image-placeholder.loaded')).toBeNull();
   expect(document.querySelector('.media-image-progress')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('shows a spinner and the byte size until the image paints', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/heavy',
       alt: 'photo',
@@ -771,20 +720,16 @@ test('shows a spinner and the byte size until the image paints', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('img.media-image-content')).not.toBeNull();
   });
-  document
-    .querySelector<HTMLImageElement>('img.media-image-content')
-    ?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('img.media-image-content'));
   await tick();
 
   expect(document.querySelector('.media-image-progress')).toBeNull();
   expect(document.querySelector('.media-image-size')).toBeNull();
-  await unmount(instance);
 });
 
 test('loads animation-capable formats from the original', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/animated-webp',
       alt: 'dancing.webp',
@@ -797,14 +742,12 @@ test('loads animation-capable formats from the original', async () => {
   await tick();
   await Promise.resolve();
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/animated-webp', 0, 0);
-  await unmount(instance);
 });
 
 test('a held GIF with no blurhash is covered while it downloads', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://gifs.example.org/picked',
       alt: 'a group of people dancing.gif',
@@ -823,18 +766,16 @@ test('a held GIF with no blurhash is covered while it downloads', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('.gif-preview-source')).not.toBeNull();
   });
-  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('.gif-preview-source'));
   await tick();
 
   expect(document.querySelector('.media-image-placeholder.loaded')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('a held GIF is covered while it downloads', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/covered',
       alt: 'Animated image',
@@ -852,15 +793,14 @@ test('a held GIF is covered while it downloads', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('.gif-preview-source')).not.toBeNull();
   });
-  document.querySelector('.gif-preview-source')?.dispatchEvent(new Event('load'));
+  void fireEvent.load(find('.gif-preview-source'));
   await tick();
 
   expect(document.querySelector('.media-image-blurhash.loaded')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('falls back to the original when the thumbnail comes back sideways', async () => {
-  const dispose = await mountAndLoad(
+  await mountAndLoad(
     {
       source: 'mxc://example.org/sideways',
       alt: 'Image',
@@ -874,11 +814,10 @@ test('falls back to the original when the thumbnail comes back sideways', async 
 
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/sideways', 800, 600);
   expect(core.fetchMedia).toHaveBeenLastCalledWith('mxc://example.org/sideways', 0, 0);
-  await dispose();
 });
 
 test('keeps the thumbnail when the served shape is merely different', async () => {
-  const dispose = await mountAndLoad(
+  await mountAndLoad(
     {
       source: 'mxc://example.org/cropped',
       alt: 'Image',
@@ -891,7 +830,6 @@ test('keeps the thumbnail when the served shape is merely different', async () =
   );
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
-  await dispose();
 });
 
 test('measures the thumbnail even once the original has been measured', async () => {
@@ -908,18 +846,16 @@ test('measures the thumbnail even once the original has been measured', async ()
   const objectUrls = ['blob:original', 'blob:thumbnail'];
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => objectUrls.shift() ?? 'blob:extra');
 
-  const viewer = mount(MediaImage, { target: document.body, props: { ...props, original: true } });
+  const viewer = render(MediaImage, { props: { ...props, original: true } });
   await settle();
-  await unmount(viewer);
+  viewer.unmount();
 
-  const timeline = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: { ...props, intrinsicWidth: 3024, intrinsicHeight: 4032 },
   });
   await settle();
 
   expect(document.querySelector('img')?.getAttribute('src')).toBe('blob:original');
-  await unmount(timeline);
 });
 
 test('does not flash the loading overlay over a GIF it has already fetched', async () => {
@@ -955,16 +891,15 @@ test('does not flash the loading overlay over a GIF it has already fetched', asy
     }
   );
 
-  const first = mount(MediaImage, { target: document.body, props });
+  const first = render(MediaImage, { props });
   await settle();
-  await unmount(first);
+  first.unmount();
 
-  const second = mount(MediaImage, { target: document.body, props });
+  render(MediaImage, { props });
   await tick();
 
   expect(document.querySelector('.media-image-progress')).toBeNull();
   expect(document.querySelector('.media-image-size')).toBeNull();
-  await unmount(second);
 });
 
 test('retries a failed load on its own, without a retry button', async () => {
@@ -972,8 +907,7 @@ test('retries a failed load on its own, without a retry button', async () => {
   core.fetchMedia
     .mockRejectedValueOnce(new Error('media unavailable'))
     .mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaImage, {
-    target: document.body,
+  const instance = render(MediaImage, {
     props: {
       source: 'mxc://remote.example/cold-avatar',
       alt: '',
@@ -988,13 +922,12 @@ test('retries a failed load on its own, without a retry button', async () => {
   await vi.advanceTimersByTimeAsync(2000);
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
 async function mountLoadedEmote(source: string): Promise<{
   image: () => HTMLImageElement | null;
-  dispose: () => Promise<void>;
 }> {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(4)));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue(`blob:${source}`);
@@ -1002,8 +935,7 @@ async function mountLoadedEmote(source: string): Promise<{
     drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D);
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;still');
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: { source, alt: 'party', width: 32, height: 32, original: true },
   });
   const image = () => document.querySelector<HTMLImageElement>('img.media-image-content');
@@ -1015,16 +947,16 @@ async function mountLoadedEmote(source: string): Promise<{
   Object.defineProperty(loaded, 'complete', { value: true });
   Object.defineProperty(loaded, 'naturalWidth', { value: 32 });
   Object.defineProperty(loaded, 'naturalHeight', { value: 32 });
-  loaded.dispatchEvent(new Event('load'));
+  void fireEvent.load(loaded);
   await tick();
-  return { image, dispose: () => unmount(instance) };
+  return { image };
 }
 
 test('holds an animated emote on a still frame while the window is inactive', async () => {
   preferences.pauseAnimationsWhenInactive = true;
   let focused = true;
   vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
-  const { image, dispose } = await mountLoadedEmote('mxc://example.org/inactive-emote');
+  const { image } = await mountLoadedEmote('mxc://example.org/inactive-emote');
   const element = image();
   expect(element?.getAttribute('src')).toBe('blob:mxc://example.org/inactive-emote');
 
@@ -1038,21 +970,18 @@ test('holds an animated emote on a still frame while the window is inactive', as
   window.dispatchEvent(new Event('focus'));
   await tick();
   expect(element?.getAttribute('src')).toBe('blob:mxc://example.org/inactive-emote');
-
-  await dispose();
 });
 
 test('keeps animating while the window is inactive when the preference is off', async () => {
   let focused = true;
   vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
-  const { image, dispose } = await mountLoadedEmote('mxc://example.org/unpaused-emote');
+  const { image } = await mountLoadedEmote('mxc://example.org/unpaused-emote');
 
   focused = false;
   window.dispatchEvent(new Event('blur'));
   await tick();
 
   expect(image()?.getAttribute('src')).toBe('blob:mxc://example.org/unpaused-emote');
-  await dispose();
 });
 
 test('a GIF played by hand holds its frame while the window is inactive', async () => {
@@ -1081,8 +1010,7 @@ test('a GIF played by hand holds its frame while the window is inactive', async 
       close() {}
     }
   );
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/held-by-hand',
       alt: 'Animated image',
@@ -1094,7 +1022,7 @@ test('a GIF played by hand holds its frame while the window is inactive', async 
   await vi.waitFor(() => {
     expect(document.querySelector('.play-gif')).not.toBeNull();
   });
-  document.querySelector<HTMLButtonElement>('button.media-image')?.click();
+  await user.click(find('button.media-image'));
   await vi.waitFor(() => {
     expect(decoded.length).toBeGreaterThan(2);
   });
@@ -1112,14 +1040,12 @@ test('a GIF played by hand holds its frame while the window is inactive', async 
   await vi.waitFor(() => {
     expect(decoded.length).toBeGreaterThan(held);
   });
-  await unmount(instance);
 });
 
 test('an encrypted picture loads the sender thumbnail instead of the original', async () => {
   const source = JSON.stringify({ url: 'mxc://example.org/sealed-original' });
   const thumbnail = JSON.stringify({ url: 'mxc://example.org/sealed-thumbnail' });
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: { source, thumbnail, alt: 'Photo', width: 800, height: 600 },
   });
 
@@ -1127,12 +1053,10 @@ test('an encrypted picture loads the sender thumbnail instead of the original', 
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   expect(core.fetchMedia).toHaveBeenCalledWith(thumbnail, 800, 600);
-  await unmount(instance);
 });
 
 test('a plain picture keeps the server thumbnail of the original', async () => {
-  const instance = mount(MediaImage, {
-    target: document.body,
+  render(MediaImage, {
     props: {
       source: 'mxc://example.org/plain-original',
       thumbnail: 'mxc://example.org/plain-thumbnail',
@@ -1145,5 +1069,4 @@ test('a plain picture keeps the server thumbnail of the original', async () => {
   await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/plain-original', 800, 600);
-  await unmount(instance);
 });

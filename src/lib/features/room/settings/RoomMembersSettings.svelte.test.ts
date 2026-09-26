@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import type {
   MemberView,
@@ -60,33 +61,28 @@ const permissions: RoomPermissionsView = {
   can_manage_children: false,
 };
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
+async function renderMembers(roomPermissions: RoomPermissionsView = permissions) {
+  render(RoomMembersSettings, { room, permissions: roomPermissions });
+  await screen.findByText('Alice');
+  return userEvent.setup();
+}
+
+const search = () => screen.getByRole('searchbox');
+const invites = () => screen.queryByRole('region', { name: 'Invite people' });
 
 test('collects an optional reason before kicking a member', async () => {
   core.roomMembers.mockResolvedValue([alice]);
   core.kickUser.mockResolvedValue(undefined);
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row')).not.toBeNull();
-  });
+  const user = await renderMembers();
 
-  document.querySelectorAll<HTMLButtonElement>('.row-control button').forEach((button) => {
-    if (button.textContent.trim() === 'Remove from room') button.click();
-  });
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Remove from room' }));
+  const dialog = await screen.findByRole('dialog');
+  await user.type(
+    within(dialog).getByRole('textbox', { name: 'Reason (optional, shown to the room)' }),
+    'spamming links'
+  );
+  await user.click(within(dialog).getByRole('button', { name: 'Remove from room' }));
 
-  const reasonInput = document.querySelector<HTMLInputElement>('.moderation input');
-  if (!reasonInput) throw new Error('reason input missing');
-  reasonInput.value = 'spamming links';
-  reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-
-  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.kickUser).toHaveBeenCalledWith(
       '!room:example.org',
@@ -94,32 +90,20 @@ test('collects an optional reason before kicking a member', async () => {
       'spamming links'
     );
   });
-
-  await unmount(instance);
 });
 
 test('sends no reason when the moderation reason is left blank', async () => {
   core.roomMembers.mockResolvedValue([alice]);
   core.banUser.mockResolvedValue(undefined);
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row')).not.toBeNull();
-  });
+  const user = await renderMembers();
 
-  document.querySelectorAll<HTMLButtonElement>('.row-control button').forEach((button) => {
-    if (button.textContent.trim() === 'Ban from room') button.click();
-  });
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Ban from room' }));
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('button', { name: 'Ban from room' }));
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });
-
-  await unmount(instance);
 });
 
 test('searches the directory and invites from the members list', async () => {
@@ -132,125 +116,59 @@ test('searches the directory and invites from the members list', async () => {
     ],
   });
   core.inviteUser.mockResolvedValue(undefined);
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions: { ...permissions, can_invite: true } },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row')).not.toBeNull();
-  });
+  const user = await renderMembers({ ...permissions, can_invite: true });
 
-  const input = document.querySelector<HTMLInputElement>('.search input');
-  if (!input) throw new Error('search input missing');
-  input.value = 'bo';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await user.type(search(), 'bo');
 
-  const inviteSection = () =>
-    document.querySelector('[aria-labelledby="room-settings-members-invite"]');
   await vi.waitFor(() => {
     expect(core.searchUserDirectory).toHaveBeenCalledWith('bo', 10);
-    expect(inviteSection()?.querySelectorAll('.setting-row')).toHaveLength(1);
+    expect(invites()).toHaveTextContent('@bob:example.org');
   });
-  expect(inviteSection()?.textContent).toContain('@bob:example.org');
-  expect(inviteSection()?.textContent).not.toContain('@alice:example.org');
+  const section = within(invites() ?? document.body);
+  expect(section.getAllByRole('button', { name: 'Invite' })).toHaveLength(1);
+  expect(invites()).not.toHaveTextContent('@alice:example.org');
 
-  inviteSection()?.querySelector<HTMLButtonElement>('.row-control button')?.click();
+  await user.click(section.getByRole('button', { name: 'Invite' }));
   await vi.waitFor(() => {
     expect(core.inviteUser).toHaveBeenCalledWith('!room:example.org', '@bob:example.org');
-    expect(inviteSection()?.querySelector('.row-control button')).toBeNull();
-    expect(inviteSection()?.textContent).toContain('Invited');
+    expect(section.queryByRole('button', { name: 'Invite' })).not.toBeInTheDocument();
+    expect(section.getByText('Invited')).toBeInTheDocument();
   });
-
-  await unmount(instance);
 });
 
 test('offers a typed user id the directory does not know', async () => {
   core.roomMembers.mockResolvedValue([alice]);
   core.searchUserDirectory.mockResolvedValue({ limited: false, results: [] });
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions: { ...permissions, can_invite: true } },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row')).not.toBeNull();
-  });
+  const user = await renderMembers({ ...permissions, can_invite: true });
 
-  const input = document.querySelector<HTMLInputElement>('.search input');
-  if (!input) throw new Error('search input missing');
-  input.value = '@carol:elsewhere.org';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
+  await user.type(search(), '@carol:elsewhere.org');
 
-  const section = document.querySelector('[aria-labelledby="room-settings-members-invite"]');
-  expect(section?.textContent).toContain('@carol:elsewhere.org');
-
-  await unmount(instance);
+  expect(invites()).toHaveTextContent('@carol:elsewhere.org');
 });
 
 test('offers no invite without the permission', async () => {
   core.roomMembers.mockResolvedValue([alice]);
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.setting-row')).not.toBeNull();
-  });
+  const user = await renderMembers();
 
-  expect(document.querySelector('.search button')).toBeNull();
-  const input = document.querySelector<HTMLInputElement>('.search input');
-  if (!input) throw new Error('search input missing');
-  input.value = '@carol:elsewhere.org';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-  expect(document.querySelector('[aria-labelledby="room-settings-members-invite"]')).toBeNull();
-
-  await unmount(instance);
+  expect(search()).toHaveAccessibleName('Search members');
+  await user.type(search(), '@carol:elsewhere.org');
+  expect(invites()).not.toBeInTheDocument();
 });
-
-async function press(element: Element): Promise<void> {
-  element.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      button: 0,
-      isPrimary: true,
-    })
-  );
-  element.dispatchEvent(
-    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
-  );
-  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
-  await tick();
-}
 
 test('keeps a changed power level when the reload still returns the old one', async () => {
   const bob: MemberView = { ...alice, user_id: '@bob:example.org', display_name: 'Bob' };
   core.roomMembers.mockResolvedValue([alice, bob]);
   core.setUserPowerLevel.mockResolvedValue(undefined);
-  const instance = mount(RoomMembersSettings, {
-    target: document.body,
-    props: { room, permissions: { ...permissions, can_change_power_levels: true } },
-  });
+  const user = await renderMembers({ ...permissions, can_change_power_levels: true });
   const names = () =>
     Array.from(document.querySelectorAll('.setting-row'), (row) =>
       row.textContent.includes('Bob') ? 'Bob' : 'Alice'
     );
-  await vi.waitFor(() => {
-    expect(names()).toEqual(['Alice', 'Bob']);
-  });
+  expect(names()).toEqual(['Alice', 'Bob']);
 
-  const triggers = document.querySelectorAll<HTMLElement>('.setting-row .select');
-  await press(triggers[1]);
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('[role="option"]').length).toBeGreaterThan(0);
-  });
-  const moderator = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
-    (option) => option.textContent.includes('Moderator')
-  );
-  if (!moderator) throw new Error('moderator option missing');
-  await press(moderator);
+  const [, bobRole] = screen.getAllByRole('button', { name: 'Change role' });
+  await user.click(bobRole);
+  await user.click(await screen.findByRole('option', { name: /Moderator/ }));
 
   await vi.waitFor(() => {
     expect(core.setUserPowerLevel).toHaveBeenCalledWith(
@@ -262,6 +180,4 @@ test('keeps a changed power level when the reload still returns the old one', as
   await vi.waitFor(() => {
     expect(names()).toEqual(['Bob', 'Alice']);
   });
-
-  await unmount(instance);
 });

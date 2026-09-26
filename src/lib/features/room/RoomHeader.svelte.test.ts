@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, type RenderResult } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 
 import RoomHeader from './RoomHeader.svelte';
@@ -33,9 +34,8 @@ function mountHeader(props: {
   callParticipants: readonly string[];
   onToggleChat?: (() => void) | null;
   chatOpen?: boolean;
-}): ReturnType<typeof mount> {
-  return mount(RoomHeader, {
-    target: document.body,
+}): RenderResult<typeof RoomHeader> {
+  return render(RoomHeader, {
     props: {
       roomId: '!general:example.org',
       roomName: 'General',
@@ -49,68 +49,49 @@ function mountHeader(props: {
   });
 }
 
-test('a voice room with nobody in it is marked as a voice room', async () => {
-  const instance = mountHeader({ isVoice: true, callParticipants: [] });
-  await tick();
+test('a voice room with nobody in it is marked as a voice room', () => {
+  mountHeader({ isVoice: true, callParticipants: [] });
 
-  const chip = document.querySelector('.voice-chip');
-  expect(chip?.getAttribute('role')).toBe('img');
-  expect(chip?.getAttribute('aria-label')).toBe('Voice room');
-  expect(chip?.classList.contains('live')).toBe(false);
-  expect(chip?.querySelector('.voice-count')).toBeNull();
-
-  await unmount(instance);
+  const chip = screen.getByRole('img', { name: 'Voice room' });
+  expect(chip).not.toHaveClass('live');
+  expect(chip.querySelector('.voice-count')).not.toBeInTheDocument();
 });
 
-test('participants name themselves in the chip, whatever the room type', async () => {
-  const instance = mountHeader({
+test('participants name themselves in the chip, whatever the room type', () => {
+  mountHeader({
     isVoice: false,
     callParticipants: ['@bob:example.org', '@carol:example.org'],
   });
-  await tick();
 
-  const chip = document.querySelector('.voice-chip');
-  expect(chip?.getAttribute('aria-label')).toBe('In voice: Bob, Carol');
-  expect(chip?.classList.contains('live')).toBe(true);
-  expect(chip?.querySelectorAll('.avatar-root')).toHaveLength(2);
-  expect(chip?.querySelector('.voice-count')?.textContent).toBe('2');
-
-  await unmount(instance);
+  const chip = screen.getByRole('img', { name: 'In voice: Bob, Carol' });
+  expect(chip).toHaveClass('live');
+  expect(chip.querySelectorAll('.avatar-root')).toHaveLength(2);
+  expect(chip).toHaveTextContent('2');
 });
 
-test('a text room with no call shows no chip', async () => {
-  const instance = mountHeader({ isVoice: false, callParticipants: [] });
-  await tick();
+test('a text room with no call shows no chip', () => {
+  mountHeader({ isVoice: false, callParticipants: [] });
 
-  expect(document.querySelector('.voice-chip')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByRole('img', { name: /voice/i })).not.toBeInTheDocument();
 });
 
 test('a voice room swaps the timeline in and out from the header', async () => {
+  const user = userEvent.setup();
   let toggled = 0;
-  const instance = mountHeader({
+  mountHeader({
     isVoice: true,
     callParticipants: [],
     onToggleChat: () => {
       toggled += 1;
     },
   });
-  await tick();
 
-  const toggle = document.querySelector<HTMLButtonElement>('.chat-toggle');
-  expect(toggle?.getAttribute('aria-label')).toBe('Show chat');
-  toggle?.click();
+  await user.click(screen.getByRole('button', { name: 'Show chat' }));
   expect(toggled).toBe(1);
-
-  await unmount(instance);
 });
 
-test('a text room has no chat toggle', async () => {
-  const instance = mountHeader({ isVoice: false, callParticipants: [] });
-  await tick();
+test('a text room has no chat toggle', () => {
+  mountHeader({ isVoice: false, callParticipants: [] });
 
-  expect(document.querySelector('.chat-toggle')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByRole('button', { name: /chat$/ })).not.toBeInTheDocument();
 });

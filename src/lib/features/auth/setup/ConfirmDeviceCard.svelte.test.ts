@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { flushSync } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
@@ -57,112 +59,95 @@ const device = (device_id: string, is_own: boolean, cross_signed: boolean): Devi
   last_seen_ip: null,
 });
 
-function render() {
+function setup() {
   const props = { onComplete: vi.fn(), onSkip: vi.fn(), onReset: vi.fn() };
-  const instance = mount(ConfirmDeviceCard, { target: document.body, props });
-  flushSync();
-  return { instance, ...props };
+  render(ConfirmDeviceCard, props);
+  return { user: userEvent.setup(), ...props };
 }
 
-const button = (name: RegExp) =>
-  [...document.querySelectorAll('button')].find((element) => name.test(element.textContent));
+const button = (name: RegExp) => screen.queryByRole('button', { name });
+const press = (user: ReturnType<typeof userEvent.setup>, name: RegExp) =>
+  user.click(screen.getByRole('button', { name }));
 
 afterEach(() => {
-  document.body.replaceChildren();
   live.encryption = null;
   live.deviceList = [];
   vi.clearAllMocks();
 });
 
-test('waits for the status instead of offering anything', async () => {
-  const { instance, onComplete } = render();
+test('waits for the status instead of offering anything', () => {
+  const { onComplete } = setup();
 
-  expect(document.body.textContent).toContain('Checking this device');
-  expect(button(/Use recovery key/)).toBeUndefined();
+  expect(screen.getByText(/Checking this device/)).toBeInTheDocument();
+  expect(button(/Use recovery key/)).not.toBeInTheDocument();
   expect(onComplete).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
-test('offers another device only when one is cross-signed by the account', async () => {
+test('offers another device only when one is cross-signed by the account', () => {
   live.encryption = status('unverified');
   live.deviceList = [device('THIS', true, false), device('OLD', false, false)];
-  const { instance } = render();
+  setup();
 
-  expect(button(/Use another device/)).toBeUndefined();
-  expect(button(/Use recovery key/)).toBeDefined();
+  expect(button(/Use another device/)).not.toBeInTheDocument();
+  expect(button(/Use recovery key/)).toBeInTheDocument();
 
   live.deviceList = [device('THIS', true, false), device('PHONE', false, true)];
   flushSync();
-  expect(button(/Use another device/)).toBeDefined();
-
-  await unmount(instance);
+  expect(button(/Use another device/)).toBeInTheDocument();
 });
 
-test('with no other device and no recovery, reset is the one way forward', async () => {
+test('with no other device and no recovery, reset is the one way forward', () => {
   live.encryption = status('unverified', 'disabled');
-  const { instance } = render();
+  setup();
 
-  expect(document.body.textContent).toContain('has to be reset');
-  expect(button(/Use recovery key/)).toBeUndefined();
-  expect(button(/Reset my digital identity/)).toBeDefined();
-  expect(button(/Can't confirm/)).toBeUndefined();
-
-  await unmount(instance);
+  expect(screen.getByText(/has to be reset/)).toBeInTheDocument();
+  expect(button(/Use recovery key/)).not.toBeInTheDocument();
+  expect(button(/Reset my digital identity/)).toBeInTheDocument();
+  expect(button(/Can't confirm/)).not.toBeInTheDocument();
 });
 
 test('a device confirmed elsewhere shows it and waits for Continue', async () => {
   live.encryption = status('unverified');
-  const { instance, onComplete } = render();
+  const { user, onComplete } = setup();
 
   live.encryption = status('verified');
   flushSync();
 
-  expect(document.body.textContent).toContain('Device confirmed');
+  expect(screen.getByText(/Device confirmed/)).toBeInTheDocument();
   expect(onComplete).not.toHaveBeenCalled();
-  button(/Continue/)?.click();
+  await press(user, /Continue/);
   expect(onComplete).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });
 
 test('skipping asks first, and only the second tap skips', async () => {
   live.encryption = status('unverified');
-  const { instance, onSkip } = render();
+  const { user, onSkip } = setup();
 
-  button(/Skip for now/)?.click();
-  flushSync();
+  await press(user, /Skip for now/);
   expect(onSkip).not.toHaveBeenCalled();
-  expect(document.body.textContent).toContain('Skip confirming this device?');
+  expect(await screen.findByText(/Skip confirming this device\?/)).toBeInTheDocument();
 
-  button(/Skip anyway/)?.click();
+  await press(user, /Skip anyway/);
   await vi.waitFor(() => {
     expect(onSkip).toHaveBeenCalledOnce();
   });
-
-  await unmount(instance);
 });
 
 test('a reset needs the acknowledgement and hands its recovery key on', async () => {
   live.encryption = status('unverified', 'disabled');
-  const { instance, onReset } = render();
+  const { user, onReset } = setup();
 
-  button(/Reset my digital identity/)?.click();
-  flushSync();
-  const reset = button(/Reset my digital identity/);
-  expect(reset?.disabled).toBe(true);
+  await press(user, /Reset my digital identity/);
+  const reset = screen.getByRole('button', { name: /Reset my digital identity/ });
+  expect(reset).toBeDisabled();
 
-  const understood = document.querySelector<HTMLInputElement>('input[type="checkbox"]');
-  understood?.click();
-  flushSync();
-  expect(reset?.disabled).toBe(false);
+  await user.click(screen.getByRole('checkbox'));
+  expect(reset).toBeEnabled();
 
-  reset?.click();
+  await user.click(reset);
   await vi.waitFor(() => {
     expect(onReset).toHaveBeenCalledWith('new key');
   });
-
-  await unmount(instance);
 });
 
 test('a device confirmed while its reset is running still hands the new key on', async () => {
@@ -173,14 +158,11 @@ test('a device confirmed while its reset is running still hands the new key on',
       finish = resolve;
     })
   );
-  const { instance, onReset, onComplete } = render();
+  const { user, onReset, onComplete } = setup();
 
-  button(/Reset my digital identity/)?.click();
-  flushSync();
-  document.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-  flushSync();
-  button(/Reset my digital identity/)?.click();
-  flushSync();
+  await press(user, /Reset my digital identity/);
+  await user.click(screen.getByRole('checkbox'));
+  await press(user, /Reset my digital identity/);
 
   live.encryption = status('verified');
   flushSync();
@@ -190,6 +172,4 @@ test('a device confirmed while its reset is running still hands the new key on',
     expect(onReset).toHaveBeenCalledWith('raced key');
   });
   expect(onComplete).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });

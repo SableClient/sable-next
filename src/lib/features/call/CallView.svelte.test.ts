@@ -1,22 +1,19 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, expect, test } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test } from 'vitest';
 
 import type { CallSession } from './call-session.svelte.js';
 import type { CallParticipant } from './call-transport';
 import { idleTransportState } from './call-transport';
 import CallViewHarness from './CallViewHarness.test.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
-const screen = { id: 's', muted: false, subscribed: true };
+const shared = { id: 's', muted: false, subscribed: true };
 
 function mountBothSharing() {
-  const self: CallParticipant = { identity: 'me:AAAA', local: true, screenShare: screen };
-  const other: CallParticipant = { identity: 'me:BBBB', screenShare: screen };
+  const self: CallParticipant = { identity: 'me:AAAA', local: true, screenShare: shared };
+  const other: CallParticipant = { identity: 'me:BBBB', screenShare: shared };
   const session = {
     lifecycle: 'active',
     mediaReady: true,
@@ -41,43 +38,31 @@ function mountBothSharing() {
     },
     roomFor: () => undefined,
   } as unknown as CallSession;
-  return mount(CallViewHarness, { target: document.body, props: { session, members: [] } });
+  return render(CallViewHarness, { session, members: [] });
 }
 
-const featured = () =>
-  document.querySelector('.featured .tile')?.querySelector('.tag')?.textContent;
-const pinButton = (tile: Element | null | undefined) =>
-  tile?.querySelector<HTMLButtonElement>('.actions button[aria-pressed]');
-const stripTiles = () => [...document.querySelectorAll('.strip .tile')];
-
 test('pins either screen of an account sharing from two devices, and unpins to the grid', async () => {
-  const instance = mountBothSharing();
-  flushSync();
+  const user = userEvent.setup();
+  const { container } = mountBothSharing();
+  const spotlight = () => {
+    const featured = container.querySelector<HTMLElement>('.featured');
+    if (!featured) throw new Error('no featured tile');
+    return within(featured);
+  };
+  const strip = () => within(screen.getByRole('list', { name: /participants?$/ }));
 
-  expect(document.querySelector('.featured')).not.toBeNull();
-  const autoFeatured = featured();
-  expect(autoFeatured).toContain('@there:x');
-  const featuredPin = pinButton(document.querySelector('.featured .tile'));
-  expect(featuredPin?.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    spotlight().getByRole('button', { name: "Unpin @there:x's screen", pressed: true })
+  ).toBeInTheDocument();
 
-  const ownScreen = stripTiles().find((tile) => tile.classList.contains('screen'));
-  pinButton(ownScreen)?.click();
-  flushSync();
-  expect(featured()).toContain('@here:x');
-  expect(stripTiles().filter((tile) => tile.classList.contains('screen'))).toHaveLength(1);
-  const pinnedLabel = pinButton(document.querySelector('.featured .tile'))?.getAttribute(
-    'aria-label'
-  );
-  expect(pinnedLabel).toMatch(/^Unpin/);
+  await user.click(strip().getByRole('button', { name: "Pin @here:x's screen" }));
+  expect(spotlight().getByRole('button', { name: "Unpin @here:x's screen" })).toBeInTheDocument();
+  expect(strip().getAllByRole('button', { name: /^Pin .*'s screen$/ })).toHaveLength(1);
 
-  pinButton(document.querySelector('.featured .tile'))?.click();
-  flushSync();
-  expect(featured()).toBe(autoFeatured);
+  await user.click(spotlight().getByRole('button', { name: "Unpin @here:x's screen" }));
+  expect(spotlight().getByRole('button', { name: "Unpin @there:x's screen" })).toBeInTheDocument();
 
-  pinButton(document.querySelector('.featured .tile'))?.click();
-  flushSync();
-  expect(document.querySelector('.featured')).toBeNull();
-  expect(document.querySelector('.grid')).not.toBeNull();
-
-  await unmount(instance);
+  await user.click(spotlight().getByRole('button', { name: "Unpin @there:x's screen" }));
+  expect(container.querySelector('.featured')).not.toBeInTheDocument();
+  expect(container.querySelector('.grid')).toBeInTheDocument();
 });

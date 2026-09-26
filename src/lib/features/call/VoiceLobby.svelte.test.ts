@@ -1,18 +1,14 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import VoiceLobby from './VoiceLobby.svelte';
 import VoiceLobbyHarness from './VoiceLobbyHarness.test.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
-test('hides the permission error when a call service is unavailable', async () => {
-  const instance = mount(VoiceLobby, {
-    target: document.body,
+test('hides the permission error when a call service is unavailable', () => {
+  render(VoiceLobby, {
     props: {
       participants: [],
       members: [],
@@ -24,17 +20,13 @@ test('hides the permission error when a call service is unavailable', async () =
       onJoin: vi.fn(),
     },
   });
-  await tick();
 
-  expect(document.body.textContent).not.toContain("You don't have permission to join.");
-  expect(document.querySelector('button')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByText("You don't have permission to join.")).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
-test('shows the permission error when joining is forbidden', async () => {
-  const instance = mount(VoiceLobby, {
-    target: document.body,
+test('shows the permission error when joining is forbidden', () => {
+  render(VoiceLobby, {
     props: {
       participants: [],
       members: [],
@@ -46,18 +38,12 @@ test('shows the permission error when joining is forbidden', async () => {
       onJoin: vi.fn(),
     },
   });
-  await tick();
 
-  expect(document.querySelector('.alert-warning')?.textContent).toContain(
-    "You don't have permission to join."
-  );
-
-  await unmount(instance);
+  expect(screen.getByText(/You don't have permission to join\./)).toBeInTheDocument();
 });
 
-test('says the homeserver cannot host calls when it has no call server', async () => {
-  const instance = mount(VoiceLobby, {
-    target: document.body,
+test('says the homeserver cannot host calls when it has no call server', () => {
+  render(VoiceLobby, {
     props: {
       participants: [],
       members: [],
@@ -70,19 +56,19 @@ test('says the homeserver cannot host calls when it has no call server', async (
       onJoin: vi.fn(),
     },
   });
-  await tick();
 
-  expect(document.querySelector('.alert-warning')?.textContent).toContain(
-    "This homeserver can't host calls."
-  );
-  expect(document.body.textContent).not.toContain("You don't have permission to join.");
-
-  await unmount(instance);
+  expect(screen.getByText(/This homeserver can't host calls\./)).toBeInTheDocument();
+  expect(screen.queryByText(/You don't have permission to join/)).not.toBeInTheDocument();
 });
 
+function dock(container: HTMLElement) {
+  const element = container.querySelector<HTMLElement>('.dock');
+  if (!element) throw new Error('no call dock');
+  return within(element);
+}
+
 function mountJoinable(extra: Record<string, unknown> = {}) {
-  return mount(VoiceLobbyHarness, {
-    target: document.body,
+  return render(VoiceLobbyHarness, {
     props: {
       participants: ['@alice:example.org', '@bob:example.org'],
       members: [],
@@ -99,57 +85,42 @@ function mountJoinable(extra: Record<string, unknown> = {}) {
   });
 }
 
-test('lays the lobby out like the call: a tile per person and the call dock', async () => {
-  const instance = mountJoinable();
-  await tick();
+test('lays the lobby out like the call: a tile per person and the call dock', () => {
+  const { container } = mountJoinable();
 
-  const tiles = Array.from(document.querySelectorAll('.grid > .tile'));
+  const tiles = Array.from(container.querySelectorAll('.grid > .tile'));
   expect(tiles).toHaveLength(3);
-  expect(tiles[0].textContent).toContain('@me:example.org');
-  expect(document.querySelector('.status')?.textContent).toContain('Hangout');
+  expect(tiles[0]).toHaveTextContent('@me:example.org');
+  expect(container.querySelector('.status')).toHaveTextContent('Hangout');
 
-  const dock = document.querySelector('.dock .controls');
-  expect(dock).not.toBeNull();
-  expect(dock?.querySelector('button[aria-label="Unmute microphone"]')?.classList).toContain(
-    'btn-danger'
-  );
-  expect(dock?.querySelector('button[aria-label="Deafen"]')).toBeNull();
-  expect(dock?.querySelector('button[aria-label="Hang up"]')).toBeNull();
-  const join = Array.from(dock?.querySelectorAll('button') ?? []).filter((node) =>
-    node.textContent.includes('Join voice')
-  );
-  expect(join).toHaveLength(1);
-  expect(dock?.textContent).toContain('Test mic');
-
-  await unmount(instance);
+  const controls = dock(container);
+  expect(controls.getByRole('button', { name: 'Unmute microphone' })).toHaveClass('btn-danger');
+  expect(controls.queryByRole('button', { name: 'Deafen' })).not.toBeInTheDocument();
+  expect(controls.queryByRole('button', { name: 'Hang up' })).not.toBeInTheDocument();
+  expect(controls.getAllByRole('button', { name: /Join voice/ })).toHaveLength(1);
+  expect(controls.getByRole('button', { name: /Test mic/ })).toBeInTheDocument();
 });
 
 test('joins and opens call settings from the dock', async () => {
   const onJoin = vi.fn();
   const onOpenSettings = vi.fn();
-  const instance = mountJoinable({ onJoin, onOpenSettings });
-  await tick();
+  const user = userEvent.setup();
+  const { container } = mountJoinable({ onJoin, onOpenSettings });
 
-  const dock = document.querySelector('.dock');
-  dock?.querySelector<HTMLButtonElement>('button[aria-label="Call settings"]')?.click();
+  await user.click(dock(container).getByRole('button', { name: 'Call settings' }));
   expect(onOpenSettings).toHaveBeenCalledOnce();
-  Array.from(dock?.querySelectorAll<HTMLButtonElement>('button') ?? [])
-    .find((node) => node.textContent.includes('Join voice'))
-    ?.click();
+  await user.click(dock(container).getByRole('button', { name: /Join voice/ }));
   expect(onJoin).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });
 
-test('groups each device toggle with its menu in the dock', async () => {
+test('groups each device toggle with its menu in the dock', () => {
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
     value: { enumerateDevices: () => Promise.resolve([]) },
   });
   const instance = mountJoinable();
-  await tick();
 
-  const groups = Array.from(document.querySelectorAll('.dock .group'));
+  const groups = Array.from(instance.container.querySelectorAll('.dock .group'));
   expect(groups.map((group) => group.getAttribute('data-tone'))).toEqual([
     'danger',
     'neutral',
@@ -160,6 +131,6 @@ test('groups each device toggle with its menu in the dock', async () => {
     expect(group.querySelectorAll('.divider')).toHaveLength(1);
   }
 
-  await unmount(instance);
+  instance.unmount();
   Reflect.deleteProperty(navigator, 'mediaDevices');
 });

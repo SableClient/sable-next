@@ -4,7 +4,9 @@ import type { ImagePackView, MemberView } from '#src/generated/protocol';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
-import { mount, tick, unmount } from 'svelte';
+import { cleanup, fireEvent, render, type RenderResult } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ComposerContext } from './composer-context';
@@ -22,7 +24,7 @@ import { composerSchema } from './editor/schema';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
+  cleanup();
   clearDrafts();
   setPreference('formattingToolbar', false);
   setPreference('composerFormatButton', true);
@@ -113,14 +115,13 @@ interface ComposerProps {
   registerRoom?: (set: (roomId: string) => void) => void;
 }
 
-function render({
+function setup({
   registerReply,
   registerContext,
   registerRoom,
   ...composer
-}: ComposerProps): ReturnType<typeof mount> {
-  return mount(Harness, {
-    target: document.body,
+}: ComposerProps): RenderResult<typeof Harness> {
+  return render(Harness, {
     props: {
       core: core(),
       registerReply,
@@ -142,8 +143,17 @@ function fileInput(): HTMLInputElement {
   return element;
 }
 
+const user = userEvent.setup({ applyAccept: false, delay: null });
+
 function submit(): void {
-  document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true }));
+  const form = document.querySelector('form');
+  if (!form) throw new Error('composer form not found');
+  void fireEvent.submit(form);
+}
+
+async function press(element: Element | null): Promise<void> {
+  if (!element) throw new Error('nothing to press');
+  await user.click(element);
 }
 
 function editorText(): string {
@@ -155,36 +165,32 @@ function stagedNames(): (string | null)[] {
 }
 
 async function pick(...files: File[]): Promise<void> {
-  const input = fileInput();
-  Object.defineProperty(input, 'files', { configurable: true, value: files });
-  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await user.upload(fileInput(), files);
   await tick();
 }
 
 test('the editor mounts as a labelled combobox surface', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   const editable = document.querySelector('[role="combobox"]');
   expect(editable?.getAttribute('aria-label')).toBe('Send a message…');
   expect(editable?.getAttribute('contenteditable')).toBe('true');
-
-  void unmount(instance);
 });
 
 test('an unmount stops the typing notice for the room it was mounted with', async () => {
   const typing = vi.fn(async () => {});
-  const instance = render({ roomId: '!first:example.org', onTyping: typing });
+  const instance = setup({ roomId: '!first:example.org', onTyping: typing });
   await tick();
 
-  await unmount(instance);
+  instance.unmount();
 
   expect(typing).toHaveBeenLastCalledWith('!first:example.org', false);
 });
 
 test('stages any selected attachment, not only images, and sends it on submit', async () => {
   const attachment = vi.fn(async () => {});
-  const instance = render({ roomId: '!room:example.org', onSendAttachment: attachment });
+  setup({ roomId: '!room:example.org', onSendAttachment: attachment });
   const file = new File(['report'], 'report.pdf', { type: 'application/pdf' });
 
   await pick(file);
@@ -196,13 +202,12 @@ test('stages any selected attachment, not only images, and sends it on submit', 
   await tick();
 
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: false });
-  void unmount(instance);
 });
 
 test('sends multiple staged files as one gallery', async () => {
   const gallery = vi.fn(async () => {});
   const attachment = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: attachment,
     onSendGallery: gallery,
@@ -220,14 +225,13 @@ test('sends multiple staged files as one gallery', async () => {
     mentions: { userIds: [], room: false },
   });
   expect(attachment).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test('sends each staged file on its own when galleries are off', async () => {
   setPreference('sendAttachmentsAsGallery', false);
   const gallery = vi.fn(async () => {});
   const attachment = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: attachment,
     onSendGallery: gallery,
@@ -242,7 +246,6 @@ test('sends each staged file on its own when galleries are off', async () => {
   expect(gallery).not.toHaveBeenCalled();
   expect(attachment).toHaveBeenNthCalledWith(1, '!room:example.org', first, { spoiler: false });
   expect(attachment).toHaveBeenNthCalledWith(2, '!room:example.org', second, { spoiler: false });
-  void unmount(instance);
 });
 
 function dragEvent(type: string, types: string[] = ['Files']): Event {
@@ -252,7 +255,7 @@ function dragEvent(type: string, types: string[] = ['Files']): Event {
 }
 
 test('a file dragged anywhere over the window opens the drop overlay', async () => {
-  const instance = render({ roomId: '!room:example.org', roomName: 'Design' });
+  setup({ roomId: '!room:example.org', roomName: 'Design' });
 
   window.dispatchEvent(dragEvent('dragover'));
   await tick();
@@ -266,22 +269,20 @@ test('a file dragged anywhere over the window opens the drop overlay', async () 
   await tick();
 
   expect(document.querySelector('.drop-overlay')).toBeNull();
-  void unmount(instance);
 });
 
 test('dragging something that is not a file does not open the overlay', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
 
   window.dispatchEvent(dragEvent('dragover', ['text/plain']));
   await tick();
 
   expect(document.querySelector('.drop-overlay')).toBeNull();
-  void unmount(instance);
 });
 
 test('a read-only room shows no overlay and stages nothing', async () => {
   const attachment = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     readOnly: true,
     onSendAttachment: attachment,
@@ -299,11 +300,10 @@ test('a read-only room shows no overlay and stages nothing', async () => {
 
   expect(drop.defaultPrevented).toBe(false);
   expect(stagedNames()).toEqual([]);
-  void unmount(instance);
 });
 
 test('a sidebar reorder drag opens no drop overlay and stages nothing', async () => {
-  const instance = render({ roomId: '!room:example.org', roomName: 'Design' });
+  setup({ roomId: '!room:example.org', roomName: 'Design' });
 
   window.dispatchEvent(dragEvent('dragover', ['Files', REORDER_DRAG_TYPE]));
   await tick();
@@ -319,11 +319,10 @@ test('a sidebar reorder drag opens no drop overlay and stages nothing', async ()
 
   expect(drop.defaultPrevented).toBe(false);
   expect(stagedNames()).toEqual([]);
-  void unmount(instance);
 });
 
 test('a file dropped outside the composer is staged', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   const file = new File(['one'], 'one.png', { type: 'image/png' });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
   Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } });
@@ -333,12 +332,11 @@ test('a file dropped outside the composer is staged', async () => {
 
   expect(drop.defaultPrevented).toBe(true);
   expect(stagedNames()).toEqual(['one.png']);
-  void unmount(instance);
 });
 
 test('stages files dropped on the composer, and drops one on demand', async () => {
   const attachment = vi.fn(async () => {});
-  const instance = render({ roomId: '!room:example.org', onSendAttachment: attachment });
+  setup({ roomId: '!room:example.org', onSendAttachment: attachment });
   const first = new File(['one'], 'one.png', { type: 'image/png' });
   const second = new File(['two'], 'two.png', { type: 'image/png' });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
@@ -354,7 +352,7 @@ test('stages files dropped on the composer, and drops one on demand', async () =
 
   const remove = document.querySelector('.staged-remove');
   if (!(remove instanceof HTMLButtonElement)) throw new Error('remove control not found');
-  remove.click();
+  await press(remove);
   await tick();
 
   submit();
@@ -362,13 +360,12 @@ test('stages files dropped on the composer, and drops one on demand', async () =
 
   expect(attachment).toHaveBeenCalledTimes(1);
   expect(attachment).toHaveBeenCalledWith('!room:example.org', second, { spoiler: false });
-  void unmount(instance);
 });
 
 test('text rides a lone attachment as its caption', async () => {
   const attachment = vi.fn(async () => {});
   const message = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: attachment,
     onSend: message,
@@ -388,7 +385,6 @@ test('text rides a lone attachment as its caption', async () => {
     spoiler: false,
   });
   expect(message).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test.each([true, false])(
@@ -406,7 +402,7 @@ test.each([true, false])(
       ]),
     ]);
     writeDraft('!room:example.org', { doc: caption.toJSON(), staged: [], nextStagedId: 0 });
-    const instance = render({
+    setup({
       roomId: '!room:example.org',
       onSendAttachment: attachment,
     });
@@ -425,14 +421,13 @@ test.each([true, false])(
       mentions: { userIds: ['@one:example.org'], room: false },
       spoiler: false,
     });
-    await unmount(instance);
   }
 );
 
 test('the caption toggle sends text beside a lone attachment', async () => {
   const attachment = vi.fn(async () => {});
   const message = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: attachment,
     onSend: message,
@@ -445,7 +440,7 @@ test('the caption toggle sends text beside a lone attachment', async () => {
   const toggle = document.querySelector('.staged-caption');
   if (!(toggle instanceof HTMLButtonElement)) throw new Error('caption toggle not found');
   expect(toggle.getAttribute('aria-pressed')).toBe('true');
-  toggle.click();
+  await press(toggle);
   await tick();
   expect(toggle.getAttribute('aria-pressed')).toBe('false');
 
@@ -459,11 +454,10 @@ test('the caption toggle sends text beside a lone attachment', async () => {
     userIds: [],
     room: false,
   });
-  void unmount(instance);
 });
 
 test('the caption toggle only offers itself for a lone attachment', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
@@ -471,13 +465,12 @@ test('the caption toggle only offers itself for a lone attachment', async () => 
 
   await pick(new File(['two'], 'two.png', { type: 'image/png' }));
   expect(document.querySelector('.staged-caption')).toBeNull();
-  void unmount(instance);
 });
 
 test('text follows two attachments as its own message', async () => {
   const attachment = vi.fn(async () => {});
   const message = vi.fn(async () => {});
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: attachment,
     onSend: message,
@@ -505,11 +498,10 @@ test('text follows two attachments as its own message', async () => {
     userIds: [],
     room: false,
   });
-  void unmount(instance);
 });
 
 test('a drop the editor already took is not staged a second time', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   const editable = document.querySelector('[role="combobox"]');
@@ -526,11 +518,10 @@ test('a drop the editor already took is not staged a second time', async () => {
   await tick();
 
   expect(stagedNames()).toEqual([]);
-  void unmount(instance);
 });
 
 test('the send verb stays disabled until there is something to send', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   const send = document.querySelector('button[type="submit"]');
   if (!(send instanceof HTMLButtonElement)) throw new Error('send control not found');
 
@@ -539,11 +530,10 @@ test('the send verb stays disabled until there is something to send', async () =
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
 
   expect(send.disabled).toBe(false);
-  void unmount(instance);
 });
 
 test('the editor stays editable after a send', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
@@ -553,11 +543,10 @@ test('the editor stays editable after a send', async () => {
   });
 
   expect(document.querySelector('[role="combobox"]')?.getAttribute('contenteditable')).toBe('true');
-  void unmount(instance);
 });
 
 test('sending returns focus to the editor', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
 
   const editor = document.querySelector('[role="combobox"]');
@@ -566,21 +555,17 @@ test('sending returns focus to the editor', async () => {
 
   const send = document.querySelector('button[type="submit"]');
   if (!(send instanceof HTMLButtonElement)) throw new Error('send control not found');
-  const mousedown = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
-  send.dispatchEvent(mousedown);
-  expect(mousedown.defaultPrevented).toBe(true);
+  expect(await fireEvent.mouseDown(send)).toBe(false);
   submit();
 
   await vi.waitFor(() => {
     expect(document.activeElement).toBe(document.querySelector('[role="combobox"]'));
   });
-
-  void unmount(instance);
 });
 
 test('replying to the same event restores focus to the editor', async () => {
   let reply: (() => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
     registerReply: (next) => {
@@ -601,11 +586,10 @@ test('replying to the same event restores focus to the editor', async () => {
   await vi.waitFor(() => {
     expect(document.activeElement).toBe(editor);
   });
-  void unmount(instance);
 });
 
 test('a long reply sender keeps both context actions in the composer', async () => {
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     context: {
       kind: 'reply',
@@ -619,13 +603,11 @@ test('a long reply sender keeps both context actions in the composer', async () 
   const contextKind = document.querySelector('.context-kind');
   expect(contextKind).not.toBeNull();
   expect(document.querySelectorAll('.context button')).toHaveLength(2);
-
-  void unmount(instance);
 });
 
 test('the editor keeps focus while a send is pending', async () => {
   let resolveSend: (() => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSend: () =>
       new Promise<void>((resolve) => {
@@ -636,8 +618,8 @@ test('the editor keeps focus while a send is pending', async () => {
 
   const editor = document.querySelector('[role="combobox"]');
   if (!(editor instanceof HTMLElement)) throw new Error('editor not found');
-  editor.focus();
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
+  editor.focus();
   submit();
   await tick();
 
@@ -648,8 +630,6 @@ test('the editor keeps focus while a send is pending', async () => {
   await vi.waitFor(() => {
     expect(document.querySelector('.staged-name')).toBeNull();
   });
-
-  void unmount(instance);
 });
 
 test.each([
@@ -660,7 +640,7 @@ test.each([
   async (_outcome, onSend, expectedCalls) => {
     const clearHistory = vi.spyOn(ComposerEditor.prototype, 'clearHistory');
     try {
-      const instance = render({
+      const instance = setup({
         roomId: '!room:example.org',
         onSend,
         context: { kind: 'edit', eventId: '$one:example.org', body: 'hold on' },
@@ -678,7 +658,7 @@ test.each([
         });
       }
       expect(clearHistory).toHaveBeenCalledTimes(expectedCalls);
-      void unmount(instance);
+      instance.unmount();
     } finally {
       clearHistory.mockRestore();
     }
@@ -686,7 +666,7 @@ test.each([
 );
 
 test('a failed send puts the message back in the editor', async () => {
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSend: () => Promise.reject(new Error('offline')),
     context: { kind: 'edit', eventId: '$one:example.org', body: 'hold on' },
@@ -701,7 +681,6 @@ test('a failed send puts the message back in the editor', async () => {
   });
 
   expect(editorText()).toBe('hold on');
-  void unmount(instance);
 });
 
 test('a partly sent batch only restages what did not go out', async () => {
@@ -710,7 +689,7 @@ test('a partly sent batch only restages what did not go out', async () => {
     sent.push(file.name);
     return file.name === 'two.png' ? Promise.reject(new Error('offline')) : Promise.resolve();
   });
-  const instance = render({ roomId: '!room:example.org', onSendAttachment: attachment });
+  setup({ roomId: '!room:example.org', onSendAttachment: attachment });
 
   await pick(
     new File(['one'], 'one.png', { type: 'image/png' }),
@@ -723,11 +702,10 @@ test('a partly sent batch only restages what did not go out', async () => {
 
   expect(sent).toEqual(['one.png', 'two.png']);
   expect(stagedNames()).toEqual(['two.png']);
-  void unmount(instance);
 });
 
 test('a failed attachment keeps the file staged and reports the failure', async () => {
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSendAttachment: () => Promise.reject(new Error('offline')),
   });
@@ -739,11 +717,10 @@ test('a failed attachment keeps the file staged and reports the failure', async 
   });
 
   expect(stagedNames()).toEqual(['one.png']);
-  void unmount(instance);
 });
 
 test('a read-only room offers an empty box in place of the composer', async () => {
-  const instance = render({ roomId: '!room:example.org', readOnly: true });
+  setup({ roomId: '!room:example.org', readOnly: true });
   await tick();
 
   expect(document.querySelector('p.locked')?.textContent).toBe(
@@ -751,35 +728,30 @@ test('a read-only room offers an empty box in place of the composer', async () =
   );
   expect(document.querySelector('[role="combobox"]')).toBeNull();
   expect(document.querySelectorAll('.composer button')).toHaveLength(0);
-  void unmount(instance);
 });
 
 test('a staged file survives leaving the room and coming back', async () => {
-  const first = render({ roomId: '!room:example.org' });
+  const first = setup({ roomId: '!room:example.org' });
   await tick();
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
 
-  await unmount(first);
-  document.body.replaceChildren();
-  const second = render({ roomId: '!room:example.org' });
+  first.unmount();
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   expect(stagedNames()).toEqual(['one.png']);
-  void unmount(second);
 });
 
 test('another room does not inherit the draft', async () => {
-  const first = render({ roomId: '!room:example.org' });
+  const first = setup({ roomId: '!room:example.org' });
   await tick();
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
 
-  await unmount(first);
-  document.body.replaceChildren();
-  const second = render({ roomId: '!other:example.org' });
+  first.unmount();
+  setup({ roomId: '!other:example.org' });
   await tick();
 
   expect(stagedNames()).toEqual([]);
-  void unmount(second);
 });
 
 test('switching rooms saves the active draft under its original room', async () => {
@@ -788,7 +760,7 @@ test('switching rooms saves the active draft under its original room', async () 
   ]);
   writeDraft('!first:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
   let switchRoom: ((roomId: string) => void) | undefined;
-  const first = render({
+  const first = setup({
     roomId: '!first:example.org',
     registerRoom: (set) => {
       switchRoom = set;
@@ -799,14 +771,12 @@ test('switching rooms saves the active draft under its original room', async () 
 
   switchRoom?.('!second:example.org');
   await tick();
-  await unmount(first);
-  document.body.replaceChildren();
+  first.unmount();
 
-  const reopened = render({ roomId: '!first:example.org' });
+  setup({ roomId: '!first:example.org' });
   await tick();
 
   expect(editorText()).toBe('half a thought');
-  void unmount(reopened);
 });
 
 test('an unmount keeps the typed draft for the next mount', async () => {
@@ -814,16 +784,14 @@ test('an unmount keeps the typed draft for the next mount', async () => {
     composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  const first = render({ roomId: '!room:example.org' });
+  const first = setup({ roomId: '!room:example.org' });
   await tick();
 
-  await unmount(first);
-  document.body.replaceChildren();
-  const reopened = render({ roomId: '!room:example.org' });
+  first.unmount();
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   expect(editorText()).toBe('half a thought');
-  void unmount(reopened);
 });
 
 test('typing saves the draft without leaving the room', async () => {
@@ -832,7 +800,7 @@ test('typing saves the draft without leaving the room', async () => {
     composerSchema.node('paragraph', null, [composerSchema.text('half a thought')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   clearEditor();
@@ -840,11 +808,10 @@ test('typing saves the draft without leaving the room', async () => {
 
   expect(readDraft('!room:example.org')).toBeUndefined();
   vi.useRealTimers();
-  void unmount(instance);
 });
 
 test('a draft from another device appears in the open composer', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   const draft = composerSchema.node('doc', null, [
@@ -854,28 +821,23 @@ test('a draft from another device appears in the open composer', async () => {
   await tick();
 
   expect(editorText()).toBe('from the desktop');
-  void unmount(instance);
 });
 
 test('a thread keeps its draft out of the room it hangs off', async () => {
-  const thread = render({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
+  const thread = setup({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
   await tick();
   await pick(new File(['one'], 'thread.png', { type: 'image/png' }));
 
-  await unmount(thread);
-  document.body.replaceChildren();
-  const room = render({ roomId: '!room:example.org' });
+  thread.unmount();
+  const room = setup({ roomId: '!room:example.org' });
   await tick();
 
   expect(stagedNames()).toEqual([]);
-  void unmount(room);
-
-  document.body.replaceChildren();
-  const reopened = render({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
+  room.unmount();
+  setup({ roomId: '!room:example.org', threadRoot: '$root:example.org' });
   await tick();
 
   expect(stagedNames()).toEqual(['thread.png']);
-  void unmount(reopened);
 });
 
 test('an edit hands back the draft it interrupted', async () => {
@@ -884,7 +846,7 @@ test('an edit hands back the draft it interrupted', async () => {
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
   let setContext: ((next: ComposerContext | null) => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     registerContext: (set) => {
       setContext = set;
@@ -900,12 +862,11 @@ test('an edit hands back the draft it interrupted', async () => {
   await tick();
 
   expect(editorText()).toBe('half a thought');
-  void unmount(instance);
 });
 
 test('cancelling an edit clears the message being edited', async () => {
   let setContext: ((next: ComposerContext | null) => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     registerContext: (set) => {
       setContext = set;
@@ -919,7 +880,6 @@ test('cancelling an edit clears the message being edited', async () => {
   await tick();
 
   expect(editorText()).toBe('');
-  void unmount(instance);
 });
 
 function clearEditor(): void {
@@ -941,7 +901,7 @@ function deleteDialogButton(): HTMLButtonElement {
 test('emptying an edit offers to delete the message instead of sending nothing', async () => {
   const message = vi.fn(async () => {});
   const deleted = vi.fn();
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSend: message,
     onDeleteEdited: deleted,
@@ -956,17 +916,16 @@ test('emptying an edit offers to delete the message instead of sending nothing',
   submit();
   await tick();
 
-  deleteDialogButton().click();
+  await press(deleteDialogButton());
   await tick();
 
   expect(deleted).toHaveBeenCalledWith('$one:example.org', null);
   expect(message).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test('an empty composer only offers to delete while an edit is in flight', async () => {
   const deleted = vi.fn();
-  const instance = render({ roomId: '!room:example.org', onDeleteEdited: deleted });
+  setup({ roomId: '!room:example.org', onDeleteEdited: deleted });
   await tick();
 
   submit();
@@ -974,11 +933,10 @@ test('an empty composer only offers to delete while an edit is in flight', async
 
   expect(document.body.textContent).not.toContain('Delete message');
   expect(deleted).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test('an oversized file is refused before it is staged', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
   const huge = new File(['x'], 'huge.bin', { type: 'application/octet-stream' });
   Object.defineProperty(huge, 'size', { value: 101 * 1024 * 1024 });
@@ -987,11 +945,10 @@ test('an oversized file is refused before it is staged', async () => {
 
   expect(stagedNames()).toEqual([]);
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('huge.bin');
-  void unmount(instance);
 });
 
 test('a batch over the limit is refused as a batch', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
   const half = (): File => {
     const file = new File(['x'], 'half.bin', { type: 'application/octet-stream' });
@@ -1006,7 +963,6 @@ test('a batch over the limit is refused as a batch', async () => {
 
   expect(stagedNames()).toEqual(['half.bin']);
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('more than');
-  void unmount(instance);
 });
 
 function formattingToggle(): HTMLElement {
@@ -1020,36 +976,33 @@ function formattingBar(): Element | null {
 }
 
 test('the formatting toolbar follows its setting', async () => {
-  const app = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
   expect(formattingBar()).toBeNull();
 
   setPreference('formattingToolbar', true);
   await tick();
   expect(formattingBar()).not.toBeNull();
-
-  void unmount(app);
 });
 
 test('the toolbar toggle writes the setting back, so it survives a remount', async () => {
-  const first = render({ roomId: '!room:example.org' });
+  const first = setup({ roomId: '!room:example.org' });
   await tick();
-  formattingToggle().click();
+  await press(formattingToggle());
   await tick();
 
   expect(formattingToggle().getAttribute('aria-pressed')).toBe('true');
-  void unmount(first);
+  first.unmount();
 
-  const second = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
   expect(formattingBar()).not.toBeNull();
-  void unmount(second);
 });
 
 test('without rich text the toolbar offers only what markdown can write', async () => {
   setPreference('formattingToolbar', true);
   setPreference('richTextComposer', false);
-  const app = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   expect(document.querySelector('.composer-format')).not.toBeNull();
@@ -1059,21 +1012,19 @@ test('without rich text the toolbar offers only what markdown can write', async 
   expect(labels).toContain('Bold');
   expect(labels).not.toContain('Underline');
   expect(labels).not.toContain('Edit as Markdown');
-  void unmount(app);
 });
 
 test('the formatting button can be hidden on its own', async () => {
   setPreference('composerFormatButton', false);
-  const app = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   expect(document.querySelector('.composer-format')).toBeNull();
-  void unmount(app);
 });
 
 test('a staged picture marked as a spoiler is sent as one', async () => {
   const attachment = vi.fn(async () => {});
-  const instance = render({ roomId: '!room:example.org', onSendAttachment: attachment });
+  setup({ roomId: '!room:example.org', onSendAttachment: attachment });
   const file = new File(['one'], 'one.png', { type: 'image/png' });
 
   await pick(file);
@@ -1081,7 +1032,7 @@ test('a staged picture marked as a spoiler is sent as one', async () => {
   const toggle = document.querySelector('.staged-spoiler');
   if (!(toggle instanceof HTMLButtonElement)) throw new Error('spoiler control not found');
   expect(toggle.getAttribute('aria-pressed')).toBe('false');
-  toggle.click();
+  await press(toggle);
   await tick();
   expect(document.querySelector('.staged-spoiler')?.getAttribute('aria-pressed')).toBe('true');
 
@@ -1089,16 +1040,14 @@ test('a staged picture marked as a spoiler is sent as one', async () => {
   await tick();
 
   expect(attachment).toHaveBeenCalledWith('!room:example.org', file, { spoiler: true });
-  void unmount(instance);
 });
 
 test('a document carries no spoiler control', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
 
   await pick(new File(['report'], 'report.pdf', { type: 'application/pdf' }));
 
   expect(document.querySelector('.staged-spoiler')).toBeNull();
-  void unmount(instance);
 });
 
 test('holding the send button opens the schedule dialog instead of sending', async () => {
@@ -1108,7 +1057,7 @@ test('holding the send button opens the schedule dialog instead of sending', asy
     composerSchema.node('paragraph', null, [composerSchema.text('later')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  const instance = render({
+  const instance = setup({
     roomId: '!room:example.org',
     onSend: send,
     onSchedule: async () => {},
@@ -1117,16 +1066,14 @@ test('holding the send button opens the schedule dialog instead of sending', asy
 
   const button = document.querySelector('.composer-send');
   if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
-  button.dispatchEvent(
-    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
-  );
+  await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
   await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
 
   expect(document.body.textContent).toContain('Schedule this message');
   expect(send).not.toHaveBeenCalled();
 
-  void unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -1135,7 +1082,7 @@ test('a touch contextmenu leaves the schedule dialog to the long press', async (
     composerSchema.node('paragraph', null, [composerSchema.text('later')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  const instance = render({ roomId: '!room:example.org', onSchedule: async () => {} });
+  setup({ roomId: '!room:example.org', onSchedule: async () => {} });
   await tick();
 
   const button = document.querySelector('.composer-send');
@@ -1150,8 +1097,6 @@ test('a touch contextmenu leaves the schedule dialog to the long press', async (
 
   expect(menu.defaultPrevented).toBe(true);
   expect(document.body.textContent).not.toContain('Schedule this message');
-
-  void unmount(instance);
 });
 
 test('right-clicking the send button opens the schedule dialog', async () => {
@@ -1160,7 +1105,7 @@ test('right-clicking the send button opens the schedule dialog', async () => {
     composerSchema.node('paragraph', null, [composerSchema.text('later')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSend: send,
     onSchedule: async () => {},
@@ -1169,22 +1114,16 @@ test('right-clicking the send button opens the schedule dialog', async () => {
 
   const button = document.querySelector('.composer-send');
   if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
-  const menu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
-  button.dispatchEvent(menu);
-  await tick();
-
-  expect(menu.defaultPrevented).toBe(true);
-  expect(document.body.textContent).toContain('Schedule this message');
+  expect(await fireEvent.contextMenu(button)).toBe(false);
+  expect(document.body).toHaveTextContent('Schedule this message');
   expect(send).not.toHaveBeenCalled();
-
-  void unmount(instance);
 });
 
 test('an edited scheduled message loads its text and saves through its own time', async () => {
   const send = vi.fn(async () => {});
   const schedule = vi.fn(async () => {});
   const dueTs = new Date('2099-09-20T14:30:00').getTime();
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onSend: send,
     onSchedule: schedule,
@@ -1207,56 +1146,49 @@ test('an edited scheduled message loads its text and saves through its own time'
     document.querySelector(`.schedule [data-segment="${part}"]`)?.textContent;
   expect([segment('hour'), segment('minute'), segment('dayPeriod')]).toEqual(['02', '30', 'PM']);
 
-  document
-    .querySelector('.schedule')
-    ?.closest('form')
-    ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-  await tick();
+  const scheduleForm = document.querySelector('.schedule')?.closest('form');
+  if (!scheduleForm) throw new Error('schedule form not found');
+  await fireEvent.submit(scheduleForm);
 
   expect(schedule).toHaveBeenCalledWith('!room:example.org', 'see you tomorow', null, dueTs);
-
-  void unmount(instance);
 });
 
 test('a press beside the text focuses the editor, and one on a button does not', async () => {
-  const instance = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   const row = document.querySelector('form');
   const editable = document.querySelector('[role="combobox"]');
-  row?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  const button = document.querySelector('form button');
+  if (!row || !button) throw new Error('composer row not found');
+  void fireEvent.mouseDown(row);
 
-  expect(document.activeElement).toBe(editable);
+  expect(editable).toHaveFocus();
 
   (document.activeElement as HTMLElement | null)?.blur();
-  document
-    .querySelector('form button')
-    ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  void fireEvent.mouseDown(button);
 
-  expect(document.activeElement).not.toBe(editable);
-
-  void unmount(instance);
+  expect(editable).not.toHaveFocus();
 });
 
 test('the format button follows the configured button order', async () => {
   setPreference('composerButtonOrder', ['format', 'emoticon', 'gif', 'sticker', 'persona']);
-  const app = render({ roomId: '!room:example.org' });
+  setup({ roomId: '!room:example.org' });
   await tick();
 
   const after = document.querySelector('.composer-after');
   expect(after?.firstElementChild?.classList.contains('composer-format')).toBe(true);
-  void unmount(app);
 });
 
 function pressInEditor(init: KeyboardEventInit): void {
-  document
-    .querySelector('[role="combobox"]')
-    ?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+  const editor = document.querySelector('[role="combobox"]');
+  if (!editor) throw new Error('editor not found');
+  void fireEvent.keyDown(editor, init);
 }
 
 test('Escape cancels a reply context', async () => {
   const cancel = vi.fn();
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
     onCancelContext: cancel,
@@ -1266,13 +1198,12 @@ test('Escape cancels a reply context', async () => {
   pressInEditor({ key: 'Escape' });
 
   expect(cancel).toHaveBeenCalledOnce();
-  void unmount(instance);
 });
 
 test('Ctrl+Up and Ctrl+Down step the reply unless an edit is in flight', async () => {
   const step = vi.fn();
   let setContext: ((next: ComposerContext | null) => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onReplyStep: step,
     registerContext: (set) => {
@@ -1289,13 +1220,12 @@ test('Ctrl+Up and Ctrl+Down step the reply unless an edit is in flight', async (
   await tick();
   pressInEditor({ key: 'ArrowUp', ctrlKey: true });
   expect(step).toHaveBeenCalledTimes(2);
-  void unmount(instance);
 });
 
 test('Up in an untouched edit moves to the previous message, a changed one stays', async () => {
   const editLast = vi.fn();
   let setContext: ((next: ComposerContext | null) => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onEditLast: editLast,
     registerContext: (set) => {
@@ -1316,13 +1246,12 @@ test('Up in an untouched edit moves to the previous message, a changed one stays
   await new Promise((resolve) => setTimeout(resolve, 0));
   pressInEditor({ key: 'ArrowUp' });
   expect(editLast).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test('Down in an untouched edit moves to the next message, a changed one stays', async () => {
   const editNext = vi.fn();
   let setContext: ((next: ComposerContext | null) => void) | undefined;
-  const instance = render({
+  setup({
     roomId: '!room:example.org',
     onEditNext: editNext,
     registerContext: (set) => {
@@ -1343,5 +1272,4 @@ test('Down in an untouched edit moves to the next message, a changed one stays',
   await new Promise((resolve) => setTimeout(resolve, 0));
   pressInEditor({ key: 'ArrowDown' });
   expect(editNext).not.toHaveBeenCalled();
-  void unmount(instance);
 });

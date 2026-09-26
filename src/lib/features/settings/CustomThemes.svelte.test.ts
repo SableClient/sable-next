@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
@@ -71,37 +72,34 @@ function stubCatalog(): void {
   );
 }
 
+const user = userEvent.setup();
+
 async function openCatalog(): Promise<void> {
-  button('Theme catalogue')?.click();
+  await user.click(button('Theme catalogue'));
   await vi.waitFor(() => {
     expect(installButtons()).toHaveLength(2);
   });
 }
 
-function installButtons(): HTMLButtonElement[] {
-  return [...document.querySelectorAll<HTMLButtonElement>('.catalog .tile-actions button')];
+const catalog = () => within(screen.getByRole('tabpanel'));
+
+function installButtons(): HTMLElement[] {
+  return catalog().queryAllByRole('button', { name: 'Install' });
 }
 
-function installButton(name: string): HTMLButtonElement | null | undefined {
-  return catalogTile(name)
-    ?.closest('.tile')
-    ?.querySelector<HTMLButtonElement>('.tile-actions button');
+function catalogCard(name: string) {
+  return within(catalog().getByTitle(name).closest<HTMLElement>('.tile') ?? document.body);
 }
 
-function tile(name: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('.tile-hit')].find((node) =>
-    node.textContent.includes(name)
-  );
+function installButton(name: string): HTMLElement | null {
+  return catalogCard(name).queryByRole('button', { name: 'Install' });
 }
 
-function catalogTile(name: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('.catalog .tile-hit')].find((node) =>
-    node.textContent.includes(name)
-  );
+function tile(name: string): HTMLElement {
+  return screen.getAllByTitle(name)[0];
 }
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.unstubAllGlobals();
   replaceCustomThemes({
     themes: [],
@@ -116,50 +114,43 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function button(label: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-    (node) => node.textContent.trim() === label
-  );
-}
+const button = (name: string) => screen.getByRole('button', { name });
 
-test('offers the built-in theme in both slots, chosen by default', async () => {
-  const instance = mount(CustomThemes, { target: document.body });
+test('offers the built-in theme in both slots, chosen by default', () => {
+  render(CustomThemes);
 
-  const radios = [...document.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+  const radios = screen.getAllByRole('radio');
   expect(radios.map((radio) => radio.textContent.trim())).toEqual([
     'Sable (default)',
     'Sable (default)',
   ]);
-  expect(radios.every((radio) => radio.getAttribute('aria-checked') === 'true')).toBe(true);
-  await unmount(instance);
+  for (const radio of radios) expect(radio).toBeChecked();
 });
 
 test('onboarding selects one mode and activates a theme chosen from the catalogue', async () => {
   stubCatalog();
   const onThemeChosen = vi.fn();
-  const instance = mount(CustomThemes, {
-    target: document.body,
-    props: { onboarding: true, onThemeChosen },
-  });
+  render(CustomThemes, { onboarding: true, onThemeChosen });
 
-  const radios = [...document.querySelectorAll('.mode-choices [role="radio"]')];
-  expect(radios.map((radio) => radio.textContent.trim())).toEqual(['Light', 'Dark']);
-  expect(radios.filter((radio) => radio.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+  const modes = within(screen.getByRole('radiogroup', { name: 'Theme' }));
+  expect(modes.getAllByRole('radio').map((radio) => radio.textContent.trim())).toEqual([
+    'Light',
+    'Dark',
+  ]);
+  expect(modes.getAllByRole('radio', { checked: true })).toHaveLength(1);
 
-  button('Browse more themes')?.click();
+  await user.click(button('Browse more themes'));
   await vi.waitFor(() => {
     expect(installButtons()).toHaveLength(2);
   });
-  installButton('Night')?.click();
+  await user.click(installButton('Night') ?? document.body);
   await vi.waitFor(() => {
     expect(onThemeChosen).toHaveBeenCalledWith('dark');
   });
   expect(customThemes.darkThemeId).toBe(customThemes.themes[0]?.id);
-
-  await unmount(instance);
 });
 
-test('keeps the selected installed theme first in the scrollable list', async () => {
+test('keeps the selected installed theme first in the scrollable list', () => {
   replaceCustomThemes({
     themes: Array.from({ length: 5 }, (_, index) => ({
       id: `dark-${String(index + 1)}`,
@@ -172,23 +163,16 @@ test('keeps the selected installed theme first in the scrollable list', async ()
     darkThemeId: 'dark-5',
     enabledTweakIds: [],
   });
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
 
-  expect(tile('Dark 5')).toBeDefined();
-  expect(tile('Dark 4')).toBeDefined();
-  expect(
-    tile('Dark 5')?.querySelector<HTMLElement>('.preview')?.style.getPropertyValue('--tile-radius')
-  ).toBe('0');
-  expect(
-    tile('Dark 5')
-      ?.querySelector<HTMLElement>('.preview')
-      ?.style.getPropertyValue('--tile-radius-inner')
-  ).toBe('2px');
-
-  await unmount(instance);
+  expect(tile('Dark 5')).toBeInTheDocument();
+  expect(tile('Dark 4')).toBeInTheDocument();
+  const preview = tile('Dark 5').querySelector<HTMLElement>('.preview');
+  expect(preview?.style.getPropertyValue('--tile-radius')).toBe('0');
+  expect(preview?.style.getPropertyValue('--tile-radius-inner')).toBe('2px');
 });
 
-test('lists each slot by theme kind, keeping a cross-kind choice', async () => {
+test('lists each slot by theme kind, keeping a cross-kind choice', () => {
   replaceCustomThemes({
     themes: [
       { id: 'dawn', name: 'Dawn', kind: 'light', css: '/* @sable-theme */' },
@@ -200,69 +184,62 @@ test('lists each slot by theme kind, keeping a cross-kind choice', async () => {
     darkThemeId: null,
     enabledTweakIds: [],
   });
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
 
   const names = (slot: string): string[] =>
-    [...document.querySelectorAll(`#theme-slot-${slot}-items .tile-name`)].map((node) =>
-      node.textContent.trim()
-    );
+    within(document.getElementById(`theme-slot-${slot}-items`) ?? document.body)
+      .getAllByRole('radio')
+      .map((radio) => radio.getAttribute('title') ?? '');
   expect(names('light')).toEqual(['Sable (default)', 'Dawn', 'Dusk']);
   expect(names('dark')).toEqual(['Sable (default)', 'Night', 'Dusk']);
-  await unmount(instance);
 });
 
 test('installs a catalogue theme into its own mode without using it, and undoes it', async () => {
   stubCatalog();
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
 
   await openCatalog();
-  expect(document.body.textContent).not.toContain('elsewhere');
+  expect(screen.queryByText(/elsewhere/)).not.toBeInTheDocument();
   expect(fetched.some((url) => url.includes('evil.example'))).toBe(false);
 
-  installButton('Night')?.click();
+  await user.click(installButton('Night') ?? document.body);
   await vi.waitFor(() => {
     expect(customThemes.themes.map((theme) => theme.source)).toEqual([NIGHT_URL]);
   });
   expect(customThemes.darkThemeId).toBeNull();
-  flushSync();
-  expect(installButton('Night')).toBeNull();
-  expect(catalogTile('Night')?.closest('.tile')?.textContent).toContain('Installed');
+  expect(installButton('Night')).not.toBeInTheDocument();
+  expect(catalogCard('Night').getByText('Installed')).toBeInTheDocument();
 
   const toast = toasts.items.find((item) => item.message === 'Night installed');
   expect(toast?.action?.label).toBe('Undo');
   toast?.action?.run();
   expect(customThemes.themes).toEqual([]);
-  await unmount(instance);
 });
 
 test('tapping a card previews it without installing, and Use installs it', async () => {
   stubCatalog();
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
   await openCatalog();
 
-  tile('Night')?.click();
+  await user.click(catalog().getByTitle('Night'));
   await vi.waitFor(() => {
     expect(themePreview.current?.name).toBe('Night');
   });
   expect(customThemes.themes).toEqual([]);
 
-  flushSync();
-  button('Use for dark mode')?.click();
+  await user.click(button('Use for dark mode'));
   expect(themePreview.current).toBeNull();
   expect(customThemes.themes.map((theme) => theme.name)).toEqual(['Night']);
   expect(customThemes.darkThemeId).toBe(customThemes.themes[0]?.id);
-  flushSync();
-  expect(catalogTile('Night')?.closest('.tile')?.textContent).toContain('In use for dark mode');
+  expect(catalogCard('Night').getByText('In use for dark mode')).toBeInTheDocument();
 
-  tile('Dawn')?.click();
+  await user.click(catalog().getByTitle('Dawn'));
   await vi.waitFor(() => {
     expect(themePreview.current?.name).toBe('Dawn');
   });
-  document.querySelector<HTMLButtonElement>('[aria-label="Close catalogue"]')?.click();
-  flushSync();
+  await user.click(button('Close catalogue'));
   expect(themePreview.current).toBeNull();
   expect(customThemes.themes.map((theme) => theme.name)).toEqual(['Night']);
-  await unmount(instance);
 });
 
 test('undo of back-to-back installs reverts only those installs', async () => {
@@ -274,11 +251,11 @@ test('undo of back-to-back installs reverts only those installs', async () => {
     enabledTweakIds: [],
   });
   stubCatalog();
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
   await openCatalog();
 
   for (const name of ['Night', 'Dawn']) {
-    installButton(name)?.click();
+    await user.click(installButton(name) ?? document.body);
     await vi.waitFor(() => {
       expect(customThemes.themes.some((theme) => theme.name === name)).toBe(true);
     });
@@ -290,7 +267,6 @@ test('undo of back-to-back installs reverts only those installs', async () => {
   expect(customThemes.themes.map((theme) => theme.id)).toEqual(['mine']);
   expect(customThemes.darkThemeId).toBe('mine');
   expect(customThemes.lightThemeId).toBeNull();
-  await unmount(instance);
 });
 
 test('removing a theme offers an undo that restores it to its slot', async () => {
@@ -301,10 +277,9 @@ test('removing a theme offers an undo that restores it to its slot', async () =>
     darkThemeId: 'night',
     enabledTweakIds: [],
   });
-  const instance = mount(CustomThemes, { target: document.body });
+  render(CustomThemes);
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Remove Night"]')?.click();
-  flushSync();
+  await user.click(button('Remove Night'));
   expect(customThemes.themes).toEqual([]);
   expect(customThemes.darkThemeId).toBeNull();
 
@@ -312,7 +287,6 @@ test('removing a theme offers an undo that restores it to its slot', async () =>
   toast?.action?.run();
   expect(customThemes.themes.map((theme) => theme.id)).toEqual(['night']);
   expect(customThemes.darkThemeId).toBe('night');
-  await unmount(instance);
 });
 
 test('arrow keys move the choice within a slot and Delete removes the focused theme', async () => {
@@ -326,31 +300,25 @@ test('arrow keys move the choice within a slot and Delete removes the focused th
     darkThemeId: null,
     enabledTweakIds: [],
   });
-  const instance = mount(CustomThemes, { target: document.body });
-  const radios = (): HTMLButtonElement[] => [
-    ...document.querySelectorAll<HTMLButtonElement>('#theme-slot-dark-items [role="radio"]'),
-  ];
+  render(CustomThemes);
+  const radios = () =>
+    within(document.getElementById('theme-slot-dark-items') ?? document.body).getAllByRole('radio');
   expect(radios().map((radio) => radio.tabIndex)).toEqual([0, -1, -1]);
 
-  const press = async (key: string): Promise<void> => {
-    document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-    await tick();
-  };
-  radios()[0]?.focus();
-  await press('ArrowRight');
+  radios()[0].focus();
+  await user.keyboard('{ArrowRight}');
   expect(customThemes.darkThemeId).toBe('night');
   await vi.waitFor(() => {
-    expect(document.activeElement).toBe(radios()[1]);
+    expect(radios()[1]).toHaveFocus();
   });
-  await press('End');
+  await user.keyboard('{End}');
   expect(customThemes.darkThemeId).toBe('dusk');
-  await press('ArrowRight');
+  await user.keyboard('{ArrowRight}');
   expect(customThemes.darkThemeId).toBeNull();
 
-  await press('End');
-  await press('Delete');
+  await user.keyboard('{End}');
+  await user.keyboard('{Delete}');
   expect(customThemes.themes.map((theme) => theme.id)).toEqual(['night']);
-  await unmount(instance);
 });
 
 test('a failed catalogue install says so on its own card', async () => {
@@ -360,17 +328,14 @@ test('a failed catalogue install says so on its own card', async () => {
       Promise.resolve(url === DAWN_URL ? new Response('', { status: 500 }) : respond(url))
     )
   );
-  const instance = mount(CustomThemes, { target: document.body });
-  button('Theme catalogue')?.click();
+  render(CustomThemes);
+  await user.click(button('Theme catalogue'));
   await vi.waitFor(() => {
-    expect(installButton('Dawn')).toBeDefined();
+    expect(installButton('Dawn')).toBeInTheDocument();
   });
 
-  installButton('Dawn')?.click();
-  await vi.waitFor(() => {
-    expect(catalogTile('Dawn')?.closest('.tile')?.querySelector('[role="alert"]')).not.toBeNull();
-  });
-  expect(catalogTile('Night')?.closest('.tile')?.querySelector('[role="alert"]')).toBeNull();
+  await user.click(installButton('Dawn') ?? document.body);
+  expect(await catalogCard('Dawn').findByRole('alert')).toBeInTheDocument();
+  expect(catalogCard('Night').queryByRole('alert')).not.toBeInTheDocument();
   expect(customThemes.themes).toEqual([]);
-  await unmount(instance);
 });

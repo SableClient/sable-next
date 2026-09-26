@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -30,19 +31,12 @@ function invite(roomId: string, name: string): RoomSummary {
 }
 
 afterEach(() => {
-  document.body.replaceChildren();
   dismissedInvites.stop();
   rooms.length = 0;
 });
 
 function names(): string[] {
   return [...document.querySelectorAll('.name-text')].map((node) => node.textContent);
-}
-
-function button(label: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find((node) =>
-    node.textContent.trim().startsWith(label)
-  );
 }
 
 function triaged(
@@ -64,7 +58,9 @@ function triaged(
 }
 
 function groupTitles(): string[] {
-  return [...document.querySelectorAll('.group h3')].map((node) => node.textContent.trim());
+  return screen
+    .getAllByRole('heading', { level: 3 })
+    .map((heading) => heading.textContent.replace(/\s+/g, ' ').trim());
 }
 
 test('a hidden invite moves behind the hidden toggle and can be restored', async () => {
@@ -74,7 +70,7 @@ test('a hidden invite moves behind the hidden toggle and can be restored', async
     ['!b:example.org', '@friend:example.org', true],
   ]);
   dismissedInvites.start(core as unknown as CoreClient);
-  const instance = mount(InviteList, { target: document.body });
+  render(InviteList);
   await vi.waitFor(() => {
     expect(names()).toEqual(['Alpha', 'Beta']);
   });
@@ -84,10 +80,8 @@ test('a hidden invite moves behind the hidden toggle and can be restored', async
     expect(names()).toEqual(['Beta']);
   });
 
-  button('1 hidden')?.click();
-  flushSync();
+  await userEvent.click(screen.getByRole('button', { name: /^1 hidden/ }));
   expect(names()).toEqual(['Alpha']);
-  await unmount(instance);
 });
 
 test('invites are grouped by sender and accept all only covers people you know', async () => {
@@ -106,13 +100,13 @@ test('invites are grouped by sender and accept all only covers people you know',
   const joinRoom = vi.fn((roomId: string) => Promise.resolve(roomId));
   Object.assign(core.commands, { joinRoom });
   dismissedInvites.start(core as unknown as CoreClient);
-  const instance = mount(InviteList, { target: document.body });
+  render(InviteList);
   await vi.waitFor(() => {
     expect(groupTitles()).toEqual(['From people you know 2', 'From strangers 1', 'Likely spam 1']);
   });
   expect(names()).toEqual(['Alpha', 'Beta', 'Gamma']);
 
-  button('Accept all')?.click();
+  await userEvent.click(screen.getByRole('button', { name: /^Accept all/ }));
   await vi.waitFor(() => {
     expect(joinRoom).toHaveBeenCalledTimes(2);
   });
@@ -120,5 +114,4 @@ test('invites are grouped by sender and accept all only covers people you know',
     '!a:example.org',
     '!b:example.org',
   ]);
-  await unmount(instance);
 });

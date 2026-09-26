@@ -1,13 +1,12 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { expect, test, vi } from 'vitest';
 
 import LegacyRegistrationForm from './LegacyRegistrationForm.svelte';
 
-function render(serverLabel: string, username: string) {
-  const instance = mount(LegacyRegistrationForm, {
-    target: document.body,
+function setup(serverLabel: string, username: string) {
+  render(LegacyRegistrationForm, {
     props: {
       serverLabel,
       registrationToken: null,
@@ -30,32 +29,19 @@ function render(serverLabel: string, username: string) {
       onConfirmPasswordInput: vi.fn(),
     },
   });
-  flushSync();
-  return instance;
 }
 
-const hint = () => document.querySelector('.address-hint')?.textContent.trim();
+const username = () => screen.getByRole('textbox', { name: 'Username' });
 
-afterEach(() => {
-  document.body.replaceChildren();
+test('shows the address a username becomes on a named server', () => {
+  setup('matrix.org', 'Erwan');
+
+  expect(username()).toHaveAccessibleDescription(/@Erwan:matrix\.org/);
 });
 
-test('shows the address a username becomes on a named server', async () => {
-  const instance = render('matrix.org', 'Erwan');
+test('does not invent a domain for a server entered as a URL', () => {
+  setup('https://matrix-client.example.org', 'erwan');
 
-  expect(hint()).toContain('@Erwan:matrix.org');
-  expect(
-    document.querySelector('#registration-username')?.getAttribute('aria-describedby')
-  ).toContain('-address');
-
-  await unmount(instance);
-});
-
-test('does not invent a domain for a server entered as a URL', async () => {
-  const instance = render('https://matrix-client.example.org', 'erwan');
-
-  expect(hint()).not.toContain('@erwan');
-  expect(hint()).toContain('becomes your Matrix address');
-
-  await unmount(instance);
+  expect(username()).not.toHaveAccessibleDescription(/@erwan/);
+  expect(username()).toHaveAccessibleDescription(/becomes your Matrix address/);
 });

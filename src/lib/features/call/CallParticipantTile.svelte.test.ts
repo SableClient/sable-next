@@ -1,104 +1,80 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import CallParticipantTile from './CallParticipantTile.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 function mountTile() {
-  return mount(CallParticipantTile, {
-    target: document.body,
-    props: {
-      participant: { identity: '@bob:example.org:DEVICE', microphone: undefined },
-      source: 'camera',
-      room: undefined,
-      name: 'Bob',
-      userId: '@bob:example.org',
-      avatar: null,
-    },
+  render(CallParticipantTile, {
+    participant: { identity: '@bob:example.org:DEVICE', microphone: undefined },
+    source: 'camera',
+    room: undefined,
+    name: 'Bob',
+    userId: '@bob:example.org',
+    avatar: null,
   });
+  return userEvent.setup();
 }
 
-function openFromContextMenu(): void {
-  document
-    .querySelector('li.tile')
-    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  flushSync();
+async function openFromContextMenu(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.pointer({ keys: '[MouseRight]', target: screen.getByRole('listitem') });
 }
 
-const panel = () => document.querySelector('.volume');
+const panel = () => screen.queryByRole('slider', { name: 'Volume for Bob' });
 
 test('closes the volume panel on a pointer down outside it', async () => {
-  const instance = mountTile();
-  openFromContextMenu();
-  expect(panel()).not.toBeNull();
+  const user = mountTile();
+  await openFromContextMenu(user);
+  expect(panel()).toBeInTheDocument();
 
-  panel()?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  flushSync();
-  expect(panel()).not.toBeNull();
+  await user.pointer({ keys: '[MouseLeft]', target: screen.getByText('100%') });
+  expect(panel()).toBeInTheDocument();
 
-  document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  flushSync();
-  expect(panel()).toBeNull();
-
-  await unmount(instance);
+  await user.pointer({ keys: '[MouseLeft]', target: document.body });
+  expect(panel()).not.toBeInTheDocument();
 });
 
 test('closes the volume panel on Escape', async () => {
-  const instance = mountTile();
-  openFromContextMenu();
+  const user = mountTile();
+  await openFromContextMenu(user);
 
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  flushSync();
-  expect(panel()).toBeNull();
-
-  await unmount(instance);
+  await user.keyboard('{Escape}');
+  expect(panel()).not.toBeInTheDocument();
 });
 
-test('our own camera on a native call is a slot for the native view', async () => {
+test('our own camera on a native call is a slot for the native view', () => {
   const localVideo = {
     place: vi.fn(() => Promise.resolve()),
     clear: vi.fn(() => Promise.resolve()),
   };
-  const instance = mount(CallParticipantTile, {
-    target: document.body,
-    props: {
-      participant: {
-        identity: '@erwan:example.org:PHONE',
-        local: true,
-        camera: { id: 'camera', muted: false, subscribed: true },
-      },
-      source: 'camera',
-      room: undefined,
-      localVideo,
-      name: 'Erwan',
-      userId: '@erwan:example.org',
-      avatar: null,
+  const { container, unmount } = render(CallParticipantTile, {
+    participant: {
+      identity: '@erwan:example.org:PHONE',
+      local: true,
+      camera: { id: 'camera', muted: false, subscribed: true },
     },
+    source: 'camera',
+    room: undefined,
+    localVideo,
+    name: 'Erwan',
+    userId: '@erwan:example.org',
+    avatar: null,
   });
-  flushSync();
 
-  expect(document.querySelector('video')).toBeNull();
-  expect(document.querySelector('div.video')).not.toBeNull();
-  expect(document.body.textContent).toContain('Erwan');
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  expect(container.querySelector('div.video')).toBeInTheDocument();
+  expect(screen.getByText('Erwan')).toBeInTheDocument();
 
-  await unmount(instance);
+  unmount();
   expect(localVideo.clear).toHaveBeenCalled();
 });
 
 test('the volume button still toggles the panel closed', async () => {
-  const instance = mountTile();
-  openFromContextMenu();
+  const user = mountTile();
+  await openFromContextMenu(user);
 
-  const toggle = document.querySelector<HTMLButtonElement>('[data-volume-toggle]');
-  toggle?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  toggle?.click();
-  flushSync();
-  expect(panel()).toBeNull();
-
-  await unmount(instance);
+  await user.click(screen.getByRole('button', { name: 'Volume for Bob' }));
+  expect(panel()).not.toBeInTheDocument();
 });

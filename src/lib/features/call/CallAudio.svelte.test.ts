@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 import { RoomEvent, Track, type RemoteTrack, type Room } from 'livekit-client';
 
 import CallAudio from './CallAudio.svelte';
@@ -72,21 +73,13 @@ function fakeRoom(initialTrack?: RemoteTrack): FakeRoom {
   };
 }
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
-test('attaches existing and newly subscribed remote audio and reports playback status', async () => {
+test('attaches existing and newly subscribed remote audio and reports playback status', () => {
   const initial = fakeTrack('initial');
   const next = fakeTrack('next');
   const room = fakeRoom(initial);
   const telemetry = { event: vi.fn(), failure: vi.fn() };
 
-  const instance = mount(CallAudio, {
-    target: document.body,
-    props: { room: room.room, telemetry },
-  });
-  await tick();
+  const instance = render(CallAudio, { room: room.room, telemetry });
 
   expect(initial.attach).toHaveBeenCalledOnce();
   expect(document.querySelectorAll('audio')).toHaveLength(1);
@@ -104,7 +97,7 @@ test('attaches existing and newly subscribed remote audio and reports playback s
     'audio.playback_allowed': false,
   });
 
-  await unmount(instance);
+  instance.unmount();
   expect(initial.detach).toHaveBeenCalledOnce();
   expect(next.detach).toHaveBeenCalledOnce();
   expect(room.listenerCount(RoomEvent.TrackSubscribed)).toBe(0);
@@ -112,24 +105,18 @@ test('attaches existing and newly subscribed remote audio and reports playback s
   expect(room.listenerCount(RoomEvent.AudioPlaybackStatusChanged)).toBe(0);
 });
 
-test('applies a per-participant volume to attached audio', async () => {
+test('applies a per-participant volume to attached audio', () => {
   const initial = fakeTrack('initial');
   const room = fakeRoom(initial);
   const volumes: Record<string, number> = { participant: 0.4, next: 0 };
 
-  const instance = mount(CallAudio, {
-    target: document.body,
-    props: { room: room.room, volumeOf: (identity: string) => volumes[identity] ?? 1 },
-  });
-  await tick();
+  render(CallAudio, { room: room.room, volumeOf: (identity: string) => volumes[identity] ?? 1 });
 
   const elements = () => [...document.querySelectorAll('audio')];
   expect(elements()[0].volume).toBe(0.4);
 
   room.emit(RoomEvent.TrackSubscribed, fakeTrack('next'), undefined, { identity: 'next' });
   expect(elements()[1].volume).toBe(0);
-
-  await unmount(instance);
 });
 
 test('replaces room listeners and tracks with the current room', async () => {
@@ -138,20 +125,13 @@ test('replaces room listeners and tracks with the current room', async () => {
   const first = fakeRoom(firstTrack);
   const second = fakeRoom(secondTrack);
 
-  const instance = mount(CallAudioHarness, {
-    target: document.body,
-    props: { first: first.room, second: second.room },
-  });
-  await tick();
+  render(CallAudioHarness, { first: first.room, second: second.room });
 
   expect(firstTrack.attach).toHaveBeenCalledOnce();
-  document.querySelector('button')?.click();
-  await tick();
+  await userEvent.click(screen.getByRole('button', { name: 'replace' }));
 
   expect(firstTrack.detach).toHaveBeenCalledOnce();
   expect(secondTrack.attach).toHaveBeenCalledOnce();
   expect(first.listenerCount(RoomEvent.TrackSubscribed)).toBe(0);
   expect(second.listenerCount(RoomEvent.TrackSubscribed)).toBe(1);
-
-  await unmount(instance);
 });

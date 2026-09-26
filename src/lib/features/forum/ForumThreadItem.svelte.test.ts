@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
 
@@ -93,81 +94,62 @@ const thread: ForumThread = {
   unread: false,
 };
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
+const card = () => screen.getAllByRole('article')[0];
 
 test('uses the timeline context menu for a forum thread', async () => {
+  const user = userEvent.setup();
   const onOpen = vi.fn();
   const onEdit = vi.fn();
   const onDelete = vi.fn();
-  const item = mount(ForumThreadItemHarness, {
-    target: document.body,
-    props: {
-      thread,
-      onOpen,
-      canDelete: true,
-      onEdit,
-      onDelete,
-      roomId: '!forum:example.org',
-      onReact: vi.fn(),
-      loadImagePacks: vi.fn(() => Promise.resolve([])),
-      onCopyLink: vi.fn(),
-    },
+  render(ForumThreadItemHarness, {
+    thread,
+    onOpen,
+    canDelete: true,
+    onEdit,
+    onDelete,
+    roomId: '!forum:example.org',
+    onReact: vi.fn(),
+    loadImagePacks: vi.fn(() => Promise.resolve([])),
+    onCopyLink: vi.fn(),
   });
-  await tick();
 
-  const card = document.querySelector('.forum-thread-card');
-  if (!card) throw new Error('forum thread card was not rendered');
-  card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
+  await user.pointer({ keys: '[MouseRight]', target: card() });
 
-  const context = document.querySelector<HTMLElement>('.message-menu');
-  if (!context) throw new Error('timeline context menu was not rendered');
-  expect(context.textContent).toContain('Reply in thread');
-  expect(context.textContent).toContain('Edit message');
-  expect(context.textContent).toContain('Copy message');
-  expect(context.textContent).toContain('Delete message');
+  const menu = await screen.findByRole('menu');
+  for (const action of ['Reply in thread', 'Edit message', 'Copy message', 'Delete message']) {
+    expect(within(menu).getByRole('menuitem', { name: action })).toBeInTheDocument();
+  }
 
-  const edit = [...context.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-    (entry) => entry.textContent.trim() === 'Edit message'
-  );
-  if (!edit) throw new Error('edit action was not rendered');
-  edit.click();
+  await user.click(within(menu).getByRole('menuitem', { name: 'Edit message' }));
   expect(onEdit).toHaveBeenCalledWith(thread);
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(document.body.style.pointerEvents).toBe('');
+  });
 
-  const remove = [...context.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-    (entry) => entry.textContent.trim() === 'Delete message'
+  await user.pointer({ keys: '[MouseRight]', target: card() });
+  await user.click(
+    within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Delete message' })
   );
-  if (!remove) throw new Error('delete action was not rendered');
-  remove.click();
-  await tick();
-  expect(document.body.textContent).toContain('Delete thread?');
-
-  await unmount(item);
+  expect(await screen.findByText('Delete thread?')).toBeInTheDocument();
 });
 
 test('renders the thread root through the timeline renderer', async () => {
+  const user = userEvent.setup();
   const onOpen = vi.fn();
-  const item = mount(ForumThreadItemHarness, {
-    target: document.body,
-    props: {
-      thread,
-      onOpen,
-      canDelete: false,
-      onDelete: vi.fn(),
-      roomId: '!forum:example.org',
-      loadImagePacks: vi.fn(() => Promise.resolve([])),
-      onCopyLink: vi.fn(),
-    },
+  render(ForumThreadItemHarness, {
+    thread,
+    onOpen,
+    canDelete: false,
+    onDelete: vi.fn(),
+    roomId: '!forum:example.org',
+    loadImagePacks: vi.fn(() => Promise.resolve([])),
+    onCopyLink: vi.fn(),
   });
-  await tick();
 
-  expect(document.querySelector('.forum-thread-card .sender')?.textContent).toContain('Alice');
-  const body = document.querySelector<HTMLElement>('.forum-thread-card .formatted-body');
-  expect(body?.querySelector('strong')?.textContent).toBe('Topic');
-  body?.click();
+  expect(within(card()).getByText('Alice')).toBeInTheDocument();
+  const topic = within(card()).getByText('Topic');
+  expect(topic.tagName).toBe('STRONG');
+  await user.click(topic);
   expect(onOpen).toHaveBeenCalledWith('$thread:example.org');
-
-  await unmount(item);
 });

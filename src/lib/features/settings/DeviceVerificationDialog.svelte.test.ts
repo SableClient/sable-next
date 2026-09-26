@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -28,20 +28,13 @@ Object.assign(core, {
 import DeviceVerificationDialog from './DeviceVerificationDialog.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
-test('renders every SAS emoji slot when a symbol repeats', async () => {
-  const instance = mount(DeviceVerificationDialog, { target: document.body });
-  await tick();
+test('renders every SAS emoji slot when a symbol repeats', () => {
+  render(DeviceVerificationDialog);
 
-  expect(
-    Array.from(document.querySelectorAll('.emoji-item span'), (node) => node.textContent)
-  ).toEqual(['🐶', '🐶']);
-  expect(
-    Array.from(document.querySelectorAll('.emoji-item small'), (node) => node.textContent)
-  ).toEqual(['Dog', 'Dog again']);
-
-  await unmount(instance);
+  expect(screen.getAllByText('🐶')).toHaveLength(2);
+  expect(screen.getByText('Dog')).toBeInTheDocument();
+  expect(screen.getByText('Dog again')).toBeInTheDocument();
 });

@@ -1,29 +1,22 @@
 // @vitest-environment happy-dom
 
-import { mount, tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import ColorSetting from './ColorSetting.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('opens the picker from its swatch', async () => {
-  mount(ColorSetting, {
-    target: document.body,
-    props: {
-      label: 'Profile color',
-      value: '',
-      onCommit: vi.fn(),
-      onReset: vi.fn(),
-    },
+  const user = userEvent.setup();
+  render(ColorSetting, {
+    label: 'Profile color',
+    value: '',
+    onCommit: vi.fn(),
+    onReset: vi.fn(),
   });
 
-  const trigger = document.querySelector<HTMLButtonElement>('[aria-label="Choose Profile color"]');
-  expect(trigger?.tagName).toBe('BUTTON');
-  trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
-  await tick();
+  const trigger = screen.getByRole('button', { name: 'Choose Profile color' });
+  await user.click(trigger);
 
-  expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+  expect(trigger).toHaveAttribute('aria-expanded', 'true');
 });

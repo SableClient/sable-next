@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render } from '@testing-library/svelte';
+import { flushSync } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
 import LogList from './log-list.svelte';
@@ -98,20 +99,17 @@ test('console output during render does not feed back into the log store', async
   const before = debugLog.entries.length;
   expect(before).toBeGreaterThan(0);
 
-  const target = document.createElement('div');
-  document.body.appendChild(target);
   const warnDuringRender = (): void => {
     console.warn('[svelte] state_unsafe_mutation');
   };
-  const component = mount(LogList, { target, props: { warn: warnDuringRender } });
+  const component = render(LogList, { warn: warnDuringRender });
 
   try {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     expect(debugLog.entries.length - before).toBeLessThanOrEqual(1);
   } finally {
-    await unmount(component);
-    target.remove();
+    component.unmount();
     setDebugLogging(false);
     console.warn = originalWarn;
   }

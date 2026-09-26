@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
@@ -69,108 +70,76 @@ const other2: DeviceView = {
 
 afterEach(() => {
   history.state.overlay = undefined;
-  document.body.replaceChildren();
 });
 
-test('signs out the selected devices in one batch', async () => {
+async function renderDevices(devices: DeviceView[]) {
   core.encryptionStatus.mockResolvedValue(status);
-  core.devices.mockResolvedValue({ devices: [own, other1, other2], accountManagement: false });
-  core.deleteDevice.mockResolvedValue(null);
-  const instance = mount(DevicesSettings, { target: document.body });
+  core.devices.mockResolvedValue({ devices, accountManagement: false });
+  render(DevicesSettings);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.device').length).toBe(3);
+    expect(screen.getAllByText(/^(This device|Phone|Tablet)$/).length).toBeGreaterThanOrEqual(
+      devices.length
+    );
   });
+  return userEvent.setup();
+}
 
-  document.querySelectorAll<HTMLInputElement>('.device-select').forEach((checkbox) => {
-    checkbox.click();
-  });
-  await tick();
+async function signOutOthers(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('checkbox', { name: 'Select Phone' }));
+  await user.click(screen.getByRole('checkbox', { name: 'Select Tablet' }));
+  const [bulk] = screen.getAllByRole('button', { name: 'Sign out selected' });
+  await user.click(bulk);
+  const confirm = screen.getAllByRole('button', { name: 'Sign out selected' }).at(-1);
+  if (!confirm || confirm === bulk) throw new Error('no bulk sign-out confirmation');
+  await user.click(confirm);
+}
 
-  document.querySelector<HTMLButtonElement>('.bulk-bar .btn-danger')?.click();
-  await tick();
+test('signs out the selected devices in one batch', async () => {
+  core.deleteDevice.mockResolvedValue(null);
+  const user = await renderDevices([own, other1, other2]);
 
-  document.querySelector<HTMLButtonElement>('.bulk-remove-form .btn-danger')?.click();
+  await signOutOthers(user);
   await vi.waitFor(() => {
     expect(core.deleteDevice).toHaveBeenCalledWith('DEV1', null);
     expect(core.deleteDevice).toHaveBeenCalledWith('DEV2', null);
   });
-
-  await unmount(instance);
 });
 
 test('reports which devices failed instead of a blanket success', async () => {
-  core.encryptionStatus.mockResolvedValue(status);
-  core.devices.mockResolvedValue({ devices: [own, other1, other2], accountManagement: false });
   core.deleteDevice.mockImplementation((deviceId: string) =>
     deviceId === 'DEV2' ? Promise.reject(new Error('denied')) : Promise.resolve(null)
   );
-  const instance = mount(DevicesSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.device').length).toBe(3);
-  });
+  const user = await renderDevices([own, other1, other2]);
 
-  document.querySelectorAll<HTMLInputElement>('.device-select').forEach((checkbox) => {
-    checkbox.click();
-  });
-  await tick();
-
-  document.querySelector<HTMLButtonElement>('.bulk-bar .btn-danger')?.click();
-  await tick();
-
-  document.querySelector<HTMLButtonElement>('.bulk-remove-form .btn-danger')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.settings-error')?.textContent).toContain('Tablet');
-  });
-
-  await unmount(instance);
+  await signOutOthers(user);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Tablet');
 });
 
 test('renames the current device', async () => {
-  core.encryptionStatus.mockResolvedValue(status);
-  core.devices.mockResolvedValue({ devices: [own, other1, other2], accountManagement: false });
-  const instance = mount(DevicesSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.device').length).toBe(3);
-  });
+  const user = await renderDevices([own, other1, other2]);
 
-  document.querySelectorAll<HTMLButtonElement>('.device-actions .icon-button')[0].click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('#device-OWN')).not.toBeNull();
-  });
+  await user.click(screen.getAllByRole('button', { name: 'Rename This device' })[0]);
+  const input = await screen.findByRole('textbox', { name: 'Device name' });
+  await user.clear(input);
+  await user.type(input, 'Laptop');
+  await user.click(
+    within(input.closest('form') ?? document.body).getByRole('button', { name: 'Save' })
+  );
 
-  const input = document.querySelectorAll<HTMLInputElement>('#device-OWN')[0];
-  input.value = 'Laptop';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-
-  document.querySelectorAll<HTMLFormElement>('.device-form')[0].requestSubmit();
   await vi.waitFor(() => {
     expect(core.renameDevice).toHaveBeenCalledWith('OWN', 'Laptop');
   });
-
-  await unmount(instance);
 });
 
 test('asks for confirmation before resetting the recovery key', async () => {
-  core.encryptionStatus.mockResolvedValue(status);
-  core.devices.mockResolvedValue({ devices: [own], accountManagement: false });
   core.resetRecoveryKey.mockResolvedValue('NEW KEY');
-  const instance = mount(DevicesSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelector('div.setting-row .btn')).not.toBeNull();
-  });
+  const user = await renderDevices([own]);
 
-  document.querySelector<HTMLButtonElement>('div.setting-row .btn')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.confirm')).not.toBeNull();
-  });
+  await user.click(await screen.findByRole('button', { name: 'Reset recovery key' }));
+  const dialog = await screen.findByRole('dialog');
   expect(core.resetRecoveryKey).not.toHaveBeenCalled();
 
-  document.querySelector<HTMLButtonElement>('.confirm .btn-danger')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.recovery-key code')?.textContent).toBe('NEW KEY');
-  });
+  await user.click(within(dialog).getByRole('button', { name: 'Reset recovery key' }));
+  expect(await screen.findByText('NEW KEY')).toBeInTheDocument();
   expect(core.resetRecoveryKey).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -17,52 +18,41 @@ Object.assign(core, { accountData });
 
 import SettingsSyncCard from './SettingsSyncCard.svelte';
 
-async function render() {
+async function setup() {
   const props = { onComplete: vi.fn(), onSkip: vi.fn() };
-  const instance = mount(SettingsSyncCard, { target: document.body, props });
+  render(SettingsSyncCard, props);
   await vi.waitFor(() => {
-    expect(button(/Turn on sync|Use synced settings/)?.disabled).toBe(false);
+    expect(screen.getByRole('button', { name: /Turn on sync|Use synced settings/ })).toBeEnabled();
   });
-  return { instance, ...props };
+  return { user: userEvent.setup(), ...props };
 }
 
-const button = (name: RegExp) =>
-  [...document.querySelectorAll('button')].find((element) => name.test(element.textContent.trim()));
-
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
 test('says the data is unencrypted before offering to turn sync on', async () => {
-  const { instance, onComplete } = await render();
+  const { user, onComplete } = await setup();
 
   expect(accountData).toHaveBeenCalledWith('moe.sable.next.settings');
-  expect(document.body.textContent).toContain('unencrypted data');
-  button(/^Turn on sync$/)?.click();
+  expect(screen.getByText(/unencrypted data/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'Turn on sync' }));
   expect(prefs.setPreference).toHaveBeenCalledWith('settingsSync', true);
   expect(onComplete).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });
 
 test('an account with synced settings is offered them to adopt', async () => {
   accountData.mockResolvedValueOnce({ version: 1, settings: {} });
-  const { instance } = await render();
+  await setup();
 
-  expect(document.body.textContent).toContain('Synced settings found');
-  expect(button(/^Use synced settings$/)).toBeDefined();
-
-  await unmount(instance);
+  expect(screen.getByText(/Synced settings found/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Use synced settings' })).toBeInTheDocument();
 });
 
 test('not now leaves sync off', async () => {
-  const { instance, onSkip } = await render();
+  const { user, onSkip } = await setup();
 
-  button(/^Not now$/)?.click();
-  flushSync();
+  await user.click(screen.getByRole('button', { name: 'Not now' }));
   expect(onSkip).toHaveBeenCalledOnce();
   expect(prefs.setPreference).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });

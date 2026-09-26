@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import type { CalendarView } from '#src/generated/protocol';
 
@@ -84,34 +85,22 @@ const core = Object.assign(baseCore, {
   ),
 });
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('lists who answered each event, by name', async () => {
-  mount(CalendarPage, { target: document.body, props: { roomId: '!cal:x' } });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.calendar-event-people')).not.toBeNull();
-  });
-  await tick();
-  flushSync();
+  render(CalendarPage, { roomId: '!cal:x' });
 
-  const rows = [...document.querySelectorAll('.calendar-event-people > div')].map((row) => [
-    row.querySelector('dt')?.textContent,
-    row.querySelector('dd')?.textContent,
-  ]);
-  expect(rows).toEqual([
-    ['Going', 'Alice and Carol'],
-    ['Maybe', '@bob:x'],
-  ]);
+  await vi.waitFor(() => {
+    expect(screen.getAllByRole('definition').map((answer) => answer.textContent)).toEqual([
+      'Alice and Carol',
+      '@bob:x',
+    ]);
+  });
+  expect(screen.getAllByRole('term').map((term) => term.textContent)).toEqual(['Going', 'Maybe']);
   expect(core.roomMembers).toHaveBeenCalledWith('!cal:x');
 });
 
 test('reloads when the core reports a change in this calendar, and only this one', async () => {
-  mount(CalendarPage, { target: document.body, props: { roomId: '!cal:x' } });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.calendar-event')).not.toBeNull();
-  });
+  render(CalendarPage, { roomId: '!cal:x' });
+  expect(await screen.findByRole('heading', { name: 'Raid' })).toBeInTheDocument();
   core.calendarEntries.mockClear();
 
   listener?.({ type: 'calendar_changed', room_id: '!other:x' });
@@ -152,21 +141,21 @@ test('answers and counts each occurrence of a recurring event on its own', async
       ],
     })
   );
-  mount(CalendarPage, { target: document.body, props: { roomId: '!cal:x' } });
+  const user = userEvent.setup();
+  render(CalendarPage, { roomId: '!cal:x' });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.calendar-event')).toHaveLength(2);
+    expect(screen.getAllByRole('heading', { name: 'Weekly' })).toHaveLength(2);
   });
-  await tick();
-  flushSync();
+  const [first, second] = screen
+    .getAllByRole('heading', { name: 'Weekly' })
+    .map((heading) => within(heading.closest('li') ?? document.body));
 
-  const [first, second] = document.querySelectorAll('.calendar-event');
-  expect(first.querySelector('.calendar-event-people')).toBeNull();
-  expect(second.querySelector('.calendar-event-people dd')?.textContent).toBe('@bob:x');
+  await vi.waitFor(() => {
+    expect(second.getByRole('definition')).toHaveTextContent('@bob:x');
+  });
+  expect(first.queryByRole('definition')).not.toBeInTheDocument();
 
-  const going = [...first.querySelectorAll('button')].find((button) =>
-    button.textContent.trim().startsWith('Going')
-  );
-  going?.click();
+  await user.click(first.getByRole('button', { name: /^Going/ }));
   expect(core.sendRawEvent).toHaveBeenCalledWith('!cal:x', 'moe.sable.calendar.rsvp', {
     uid: 'weekly',
     recurrenceId: local(soon),

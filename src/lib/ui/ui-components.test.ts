@@ -1,67 +1,47 @@
 // @vitest-environment happy-dom
 
-import { mount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import ChatCircleDotsIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
-import { afterEach, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import ActionCard from './ActionCard.svelte';
 import SableBrandMark from './SableBrandMark.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('action cards use links for navigation', () => {
-  mount(ActionCard, {
-    target: document.body,
-    props: {
-      icon: ChatCircleDotsIcon,
-      title: 'Explore',
-      description: 'Browse public rooms.',
-      href: '/explore',
-    },
+  render(ActionCard, {
+    icon: ChatCircleDotsIcon,
+    title: 'Explore',
+    description: 'Browse public rooms.',
+    href: '/explore',
   });
 
-  const card = document.querySelector('a');
-  expect(card?.getAttribute('href')).toBe('/explore');
-  expect(card?.textContent).toContain('Browse public rooms.');
+  const card = screen.getByRole('link', { name: /Explore/ });
+  expect(card).toHaveAttribute('href', '/explore');
+  expect(card).toHaveTextContent('Browse public rooms.');
 });
 
-test('action cards use buttons for in-app actions', () => {
+test('action cards use buttons for in-app actions', async () => {
+  const user = userEvent.setup();
   const onclick = vi.fn();
-  mount(ActionCard, {
-    target: document.body,
-    props: {
-      icon: ChatCircleDotsIcon,
-      title: 'Join a room',
-      onclick,
-    },
-  });
+  render(ActionCard, { icon: ChatCircleDotsIcon, title: 'Join a room', onclick });
 
-  const card = document.querySelector('button');
-  card?.click();
+  const card = screen.getByRole('button', { name: 'Join a room' });
+  expect(card).toBeEnabled();
+  await user.click(card);
 
-  expect(card?.disabled).toBe(false);
   expect(onclick).toHaveBeenCalledOnce();
 });
 
 test('inactive action cards are disabled semantically', () => {
-  mount(ActionCard, {
-    target: document.body,
-    props: {
-      icon: ChatCircleDotsIcon,
-      title: 'Join a room',
-      disabled: true,
-    },
-  });
+  render(ActionCard, { icon: ChatCircleDotsIcon, title: 'Join a room', disabled: true });
 
-  expect(document.querySelector('button')?.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Join a room' })).toBeDisabled();
 });
 
 test('the Sable brand mark stays decorative', () => {
-  mount(SableBrandMark, { target: document.body });
+  const { container } = render(SableBrandMark);
 
-  const mark = document.querySelector('img');
-  expect(mark?.getAttribute('alt')).toBe('');
-  expect(mark?.className).toContain('brand-mark');
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(container.querySelector('img')).toHaveClass('brand-mark');
 });

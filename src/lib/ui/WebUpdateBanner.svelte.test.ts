@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
 import { version } from '$app/env';
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import WebUpdateBanner from './WebUpdateBanner.svelte';
@@ -24,7 +26,6 @@ async function settle(): Promise<void> {
 }
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -40,17 +41,17 @@ test('offers to refresh when a worker is waiting', async () => {
   vi.stubGlobal('navigator', { serviceWorker });
   vi.stubGlobal('location', { reload });
 
-  const instance = mount(WebUpdateBanner, { target: document.body });
+  const user = userEvent.setup();
+  render(WebUpdateBanner);
   await settle();
 
-  document.querySelector<HTMLButtonElement>('.btn-primary')?.click();
+  await user.click(screen.getByRole('button', { name: 'Refresh' }));
 
   expect(postMessage).toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
   expect(reload).not.toHaveBeenCalled();
 
   serviceWorker.dispatchEvent(new Event('controllerchange'));
   expect(reload).toHaveBeenCalledOnce();
-  await unmount(instance);
 });
 
 test('keeps checking for a new worker while the tab stays open', async () => {
@@ -63,14 +64,14 @@ test('keeps checking for a new worker while the tab stays open', async () => {
   vi.stubGlobal('navigator', { serviceWorker });
   vi.stubGlobal('location', { reload: vi.fn() });
 
-  const instance = mount(WebUpdateBanner, { target: document.body });
+  const instance = render(WebUpdateBanner);
   await vi.advanceTimersByTimeAsync(0);
   expect(update).toHaveBeenCalledOnce();
 
   await vi.advanceTimersByTimeAsync(600_000);
   expect(update).toHaveBeenCalledTimes(3);
 
-  await unmount(instance);
+  instance.unmount();
   await vi.advanceTimersByTimeAsync(300_000);
   expect(update).toHaveBeenCalledTimes(3);
   vi.useRealTimers();
@@ -86,10 +87,9 @@ test('activates a worker built from the same version without prompting', async (
   vi.stubGlobal('navigator', { serviceWorker });
   vi.stubGlobal('location', { reload: vi.fn() });
 
-  const instance = mount(WebUpdateBanner, { target: document.body });
+  render(WebUpdateBanner);
   await settle();
 
-  expect(document.querySelector('.btn-primary')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   expect(postMessage).toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
-  await unmount(instance);
 });

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import type { LoginFlowsView } from '#src/generated/protocol';
 
@@ -18,10 +19,9 @@ const flows: LoginFlowsView = {
   sso_identity_providers: [],
 };
 
-function render(onValidateHomeserver: () => Promise<LoginFlowsView | null>) {
+function setup(onValidateHomeserver: () => Promise<LoginFlowsView | null>) {
   const onLogin = vi.fn(() => Promise.resolve());
-  const instance = mount(LoginForm, {
-    target: document.body,
+  render(LoginForm, {
     props: {
       homeserver: 'matrix.org',
       loginFlows: flows,
@@ -37,64 +37,51 @@ function render(onValidateHomeserver: () => Promise<LoginFlowsView | null>) {
       onLogin,
     },
   });
-  return { instance, onLogin };
+  return { onLogin };
 }
 
-function enterUsername(value: string): void {
-  const input = document.querySelector<HTMLInputElement>('#username');
-  if (!input) throw new Error('missing username');
-  input.value = value;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new FocusEvent('blur'));
-  flushSync();
+async function enterUsername(value: string): Promise<void> {
+  const user = userEvent.setup();
+  const input = screen.getByRole('textbox', { name: 'Username, Matrix ID or email' });
+  await user.clear(input);
+  await user.type(input, value);
+  await user.tab();
 }
 
-const homeserverValue = () => document.querySelector<HTMLInputElement>('#homeserver')?.value;
-
-afterEach(() => {
-  document.body.replaceChildren();
-});
+const homeserver = () => screen.getByRole('combobox', { name: 'Account provider' });
 
 test('a full Matrix ID moves the provider to its server and says so', async () => {
   const validate = vi.fn(() => Promise.resolve(flows));
-  const { instance } = render(validate);
+  setup(validate);
 
-  enterUsername('@alice:example.org');
+  await enterUsername('@alice:example.org');
 
-  expect(homeserverValue()).toBe('example.org');
+  expect(homeserver()).toHaveValue('example.org');
   expect(validate).toHaveBeenCalledOnce();
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('Signing in on example.org');
-  });
-
-  await unmount(instance);
+  expect(await screen.findByText(/Signing in on example\.org/)).toBeInTheDocument();
 });
 
 test('a server that cannot be found puts the provider back and explains', async () => {
-  const { instance, onLogin } = render(() => Promise.resolve(null));
+  const { onLogin } = setup(() => Promise.resolve(null));
 
-  enterUsername('@alice:nowhere.invalid');
+  await enterUsername('@alice:nowhere.invalid');
 
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain(
+  expect(
+    await screen.findByText(
       "We couldn't find nowhere.invalid. Check the address or choose a provider."
-    );
-  });
-  expect(homeserverValue()).toBe('matrix.org');
+    )
+  ).toBeInTheDocument();
+  expect(homeserver()).toHaveValue('matrix.org');
   expect(onLogin).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('a localpart or an email leaves the provider alone', async () => {
   const validate = vi.fn(() => Promise.resolve(flows));
-  const { instance } = render(validate);
+  setup(validate);
 
-  enterUsername('alice');
-  enterUsername('alice@example.org');
+  await enterUsername('alice');
+  await enterUsername('alice@example.org');
 
-  expect(homeserverValue()).toBe('matrix.org');
+  expect(homeserver()).toHaveValue('matrix.org');
   expect(validate).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });

@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { createRawSnippet, mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { createRawSnippet, tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -62,7 +64,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight');
-  document.body.replaceChildren();
 });
 
 function timeline(): RoomTimeline {
@@ -153,8 +154,7 @@ test('fills a short live timeline until the server reports the timeline start', 
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 3));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -170,15 +170,13 @@ test('fills a short live timeline until the server reports the timeline start', 
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(3);
-  await unmount(instance);
 });
 
 test('announces new arrivals separately from virtualized history', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('initial')];
   roomTimeline.backwardPagination = 'end';
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -203,7 +201,6 @@ test('announces new arrivals separately from virtualized history', async () => {
   roomTimeline.items = [...roomTimeline.items, { ...item('own'), is_own: true }];
   await runAnimationFrames();
   expect(announcement()).toBe('1 new message');
-  await unmount(instance);
 });
 
 test('a permalink whose context does not fill the viewport paginates on its own', async () => {
@@ -215,8 +212,7 @@ test('a permalink whose context does not fill the viewport paginates on its own'
     return Promise.resolve();
   });
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -233,7 +229,6 @@ test('a permalink whose context does not fill the viewport paginates on its own'
   await runAnimationFrames();
 
   expect(future).toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('stops focused automatic pagination after a failed or empty page', async () => {
@@ -241,8 +236,7 @@ test('stops focused automatic pagination after a failed or empty page', async ()
   roomTimeline.items = [item('target')];
   roomTimeline.mode = { kind: 'focused', eventId: '$target' };
   const future = vi.fn(async () => {});
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -256,7 +250,6 @@ test('stops focused automatic pagination after a failed or empty page', async ()
   viewport();
   for (let page = 0; page < 20; page += 1) await runAnimationFrames();
   expect(future).toHaveBeenCalledTimes(5);
-  await unmount(instance);
 });
 
 test('does not keep retrying a focused page when the timeline reports a load error', async () => {
@@ -267,8 +260,7 @@ test('does not keep retrying a focused page when the timeline reports a load err
     roomTimeline.error = 'load_failed';
     return Promise.resolve();
   });
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -282,7 +274,6 @@ test('does not keep retrying a focused page when the timeline reports a load err
   viewport();
   for (let page = 0; page < 10; page += 1) await runAnimationFrames();
   expect(future).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
@@ -298,8 +289,7 @@ test.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
           finish = resolve;
         })
     );
-    const instance = mount(TimelineListHarness, {
-      target: document.body,
+    render(TimelineListHarness, {
       props: {
         list: {
           timeline: roomTimeline,
@@ -327,7 +317,6 @@ test.each(['wheel', 'touchstart', 'pointerdown', 'keydown'])(
     finish();
     await runAnimationFrames();
     expect(element.scrollTop).toBe(500);
-    await unmount(instance);
   }
 );
 
@@ -335,8 +324,7 @@ test('limits empty opening refills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -354,7 +342,6 @@ test('limits empty opening refills', async () => {
   }
 
   expect(history).toHaveBeenCalledTimes(5);
-  await unmount(instance);
 });
 
 test('fills past several filtered pages until the opening viewport has enough messages', async () => {
@@ -366,8 +353,7 @@ test('fills past several filtered pages until the opening viewport has enough me
     }
     return Promise.resolve(false);
   });
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -384,15 +370,13 @@ test('fills past several filtered pages until the opening viewport has enough me
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(5);
-  await unmount(instance);
 });
 
 test('a reset that leaves one message refills the viewport on its own', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -418,7 +402,6 @@ test('a reset that leaves one message refills the viewport on its own', async ()
   await runAnimationFrames();
 
   expect(history.mock.calls.length).toBeGreaterThan(opening);
-  await unmount(instance);
 });
 
 test('an empty snapshot keeps the skeleton until the first page decides', async () => {
@@ -431,8 +414,7 @@ test('an empty snapshot keeps the skeleton until the first page decides', async 
         releaseHistory = resolve;
       })
   );
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -456,15 +438,13 @@ test('an empty snapshot keeps the skeleton until the first page decides', async 
   await runAnimationFrames();
 
   expect(document.querySelector('.timeline-empty')).toBeNull();
-  await unmount(instance);
 });
 
 test('an empty room reports it once the start is reached', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [];
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -480,7 +460,6 @@ test('an empty room reports it once the start is reached', async () => {
   await runAnimationFrames();
 
   expect(document.querySelector('.timeline-empty')).not.toBeNull();
-  await unmount(instance);
 });
 
 test("the timeline start renders the caller's notice in its row", async () => {
@@ -489,8 +468,7 @@ test("the timeline start renders the caller's notice in its row", async () => {
     { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
     item('first'),
   ];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -512,7 +490,6 @@ test("the timeline start renders the caller's notice in its row", async () => {
   expect(start?.querySelector('.predecessor-stub')).not.toBeNull();
   expect(start?.querySelector('.separator')).toBeNull();
   expect(document.querySelectorAll('.predecessor-stub')).toHaveLength(1);
-  await unmount(instance);
 });
 
 test('the timeline start keeps its separator without a notice', async () => {
@@ -521,8 +498,7 @@ test('the timeline start keeps its separator without a notice', async () => {
     { ...item('start'), event_id: null, content: { kind: 'timeline_start' } },
     item('first'),
   ];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -538,7 +514,6 @@ test('the timeline start keeps its separator without a notice', async () => {
   await runAnimationFrames();
 
   expect(document.querySelector('[data-item-id="start"] .separator')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('a permalink that fails to load says so and offers the way back', async () => {
@@ -547,8 +522,7 @@ test('a permalink that fails to load says so and offers the way back', async () 
   roomTimeline.mode = { kind: 'focused', eventId: '$missing' };
   roomTimeline.error = 'load_failed';
   const jumpToLive = vi.fn();
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -565,20 +539,19 @@ test('a permalink that fails to load says so and offers the way back', async () 
   await tick();
   await runAnimationFrames();
 
-  const empty = document.querySelector('.timeline-empty');
-  expect(empty?.textContent).toContain('This message could not be loaded');
-  expect(document.querySelector('.timeline-error')).toBeNull();
-  empty?.querySelector('button')?.click();
+  const empty = document.querySelector<HTMLElement>('.timeline-empty');
+  if (!empty) throw new Error('no empty state');
+  expect(empty).toHaveTextContent('This message could not be loaded');
+  expect(document.querySelector('.timeline-error')).not.toBeInTheDocument();
+  await userEvent.click(within(empty).getByRole('button', { name: 'Jump to latest' }));
   expect(jumpToLive).toHaveBeenCalledOnce();
-  await unmount(instance);
 });
 
 test('a live timeline that fails to load does not read as an empty room', async () => {
   const roomTimeline = timeline();
   roomTimeline.hasSnapshot = false;
   roomTimeline.error = 'load_failed';
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -596,7 +569,6 @@ test('a live timeline that fails to load does not read as an empty room', async 
   const empty = document.querySelector('.timeline-empty');
   expect(empty?.textContent).toContain('Unable to load messages');
   expect(document.querySelector('.timeline-error')).toBeNull();
-  await unmount(instance);
 });
 
 test('reveals a short timeline at once and pads it out behind the reader', async () => {
@@ -611,8 +583,7 @@ test('reveals a short timeline at once and pads it out behind the reader', async
         };
       })
   );
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -635,7 +606,6 @@ test('reveals a short timeline at once and pads it out behind the reader', async
   await runAnimationFrames();
 
   expect(timelineViewport().classList.contains('initial')).toBe(false);
-  await unmount(instance);
 });
 
 test('keeps a timeline with an unread marker hidden until it has landed on it', async () => {
@@ -650,8 +620,7 @@ test('keeps a timeline with an unread marker hidden until it has landed on it', 
         };
       })
   );
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -674,7 +643,6 @@ test('keeps a timeline with an unread marker hidden until it has landed on it', 
   await runAnimationFrames();
 
   expect(timelineViewport().classList.contains('initial')).toBe(false);
-  await unmount(instance);
 });
 
 test('a notification lands on its event in the live timeline, not on the unread marker', async () => {
@@ -683,8 +651,7 @@ test('a notification lands on its event in the live timeline, not on the unread 
   roomTimeline.items = [readMarker('marker'), item('first'), item('notified'), item('latest')];
   const future = vi.fn(() => Promise.resolve());
   const landed = vi.fn();
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -707,7 +674,6 @@ test('a notification lands on its event in the live timeline, not on the unread 
   expect(roomTimeline.mode.kind).toBe('live');
   expect(future).not.toHaveBeenCalled();
   expect(landed).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('a notification lands on its event once it arrives after the room opened', async () => {
@@ -715,8 +681,7 @@ test('a notification lands on its event once it arrives after the room opened', 
   const landed = vi.fn();
   const roomTimeline = timeline();
   roomTimeline.items = [readMarker('marker'), item('latest')];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -746,7 +711,6 @@ test('a notification lands on its event once it arrives after the room opened', 
   );
   expect(landed).toHaveBeenCalledTimes(1);
   expect(document.querySelector('.message.highlighted')?.textContent).toContain('late');
-  await unmount(instance);
 });
 
 test('a notification whose event arrives after the reader scrolled leaves them alone', async () => {
@@ -754,8 +718,7 @@ test('a notification whose event arrives after the reader scrolled leaves them a
   const landed = vi.fn();
   const roomTimeline = timeline();
   roomTimeline.items = [readMarker('marker'), item('latest')];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -784,15 +747,13 @@ test('a notification whose event arrives after the reader scrolled leaves them a
     expect.any(Boolean)
   );
   expect(document.querySelector('.message.highlighted')).toBeNull();
-  await unmount(instance);
 });
 
 test('a notification whose event is not loaded falls back to the unread marker', async () => {
   const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
   const roomTimeline = timeline();
   roomTimeline.items = [readMarker('marker'), item('latest')];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -809,15 +770,13 @@ test('a notification whose event is not loaded falls back to the unread marker',
   await runAnimationFrames();
 
   expect(jumps).toHaveBeenCalledWith(expect.stringContaining('marker'), 'start');
-  await unmount(instance);
 });
 
 test('does not eagerly paginate a scrollable initial timeline', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -838,14 +797,12 @@ test('does not eagerly paginate a scrollable initial timeline', async () => {
   await runAnimationFrames();
 
   expect(history).not.toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('does not read a viewport removed during initial positioning', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  const instance = render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -858,7 +815,7 @@ test('does not read a viewport removed during initial positioning', async () => 
 
   viewport();
   await tick();
-  await unmount(instance);
+  instance.unmount();
   await runAnimationFrames();
 });
 
@@ -867,8 +824,7 @@ test('leaves follow mode for a scroll it did not write, whatever produced it', a
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.backwardPagination = 'end';
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -893,7 +849,6 @@ test('leaves follow mode for a scroll it did not write, whatever produced it', a
 
   expect(document.querySelector('.jump-to-latest')).not.toBeNull();
   expect(history).not.toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('requests one history page until the viewport leaves the top threshold', async () => {
@@ -901,8 +856,7 @@ test('requests one history page until the viewport leaves the top threshold', as
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.mode = { kind: 'live' };
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -931,15 +885,13 @@ test('requests one history page until the viewport leaves the top threshold', as
   await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('requests history from upward input when already at the top', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -964,7 +916,6 @@ test('requests history from upward input when already at the top', async () => {
   await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('requests history before an upward wheel gesture settles', async () => {
@@ -972,8 +923,7 @@ test('requests history before an upward wheel gesture settles', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1003,15 +953,13 @@ test('requests history before an upward wheel gesture settles', async () => {
   await vi.advanceTimersByTimeAsync(160);
   await tick();
   expect(history).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('a fresh upward input requests the next settled history page', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1046,7 +994,6 @@ test('a fresh upward input requests the next settled history page', async () => 
   await finishWheelGesture(element);
 
   expect(history).toHaveBeenCalledTimes(2);
-  await unmount(instance);
 });
 
 test('rate limits sparse history fill and continues until the server reports the end', async () => {
@@ -1055,8 +1002,7 @@ test('rate limits sparse history fill and continues until the server reports the
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
     const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
-    const instance = mount(TimelineListHarness, {
-      target: document.body,
+    const instance = render(TimelineListHarness, {
       props: {
         list: {
           timeline: roomTimeline,
@@ -1091,7 +1037,7 @@ test('rate limits sparse history fill and continues until the server reports the
     await vi.advanceTimersByTimeAsync(TIMELINE_LAYOUT.historyRequestMinInterval * 30);
     expect(history).toHaveBeenCalledTimes(25);
 
-    await unmount(instance);
+    instance.unmount();
   } finally {
     vi.useRealTimers();
   }
@@ -1103,8 +1049,7 @@ test('cancels sparse history fill on downward input', async () => {
     const roomTimeline = timeline();
     roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
     const history = vi.fn(() => Promise.resolve(false));
-    const instance = mount(TimelineListHarness, {
-      target: document.body,
+    const instance = render(TimelineListHarness, {
       props: {
         list: {
           timeline: roomTimeline,
@@ -1131,7 +1076,7 @@ test('cancels sparse history fill on downward input', async () => {
     await vi.advanceTimersByTimeAsync(1_000);
 
     expect(history).toHaveBeenCalledTimes(1);
-    await unmount(instance);
+    instance.unmount();
   } finally {
     vi.useRealTimers();
   }
@@ -1146,8 +1091,7 @@ test('retries marking the latest event read after a failed request', async () =>
     .fn<(_: string) => Promise<void>>()
     .mockRejectedValueOnce(new Error('temporary failure'))
     .mockResolvedValueOnce();
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  const instance = render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1170,7 +1114,7 @@ test('retries marking the latest event read after a failed request', async () =>
   await vi.advanceTimersByTimeAsync(500);
 
   expect(read).toHaveBeenCalledTimes(2);
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -1202,8 +1146,7 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
     followingLive: false,
   };
   currentLiveList = list;
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  const instance = render(TimelineListHarness, {
     props: { list },
   });
   let scrollHeight = roomTimeline.items.length * ROW;
@@ -1230,7 +1173,7 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
 test('a backward pagination keeps its loading pill between pages, then fades it away', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element } = await mountLive(roomTimeline);
+  const { element } = await mountLive(roomTimeline);
   const beforeScroll = element.scrollTop;
   const beforeHeight = contentHeight();
   expect(document.querySelector('.history-loading')).toBeNull();
@@ -1264,8 +1207,6 @@ test('a backward pagination keeps its loading pill between pages, then fades it 
   await tick();
   await runAnimationFrames();
   expect(document.querySelector('.history-loading')?.hasAttribute('inert')).toBe(true);
-
-  await unmount(instance);
 });
 
 async function dragTo(element: HTMLDivElement, from: number, to: number): Promise<void> {
@@ -1289,7 +1230,7 @@ function liveItems(count: number): TimelineItemView[] {
 test('reading back inside the near-latest band leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
   expect(document.querySelectorAll('.item').length).toBeGreaterThan(0);
   expect(followingLive()).toBe(true);
 
@@ -1297,25 +1238,23 @@ test('reading back inside the near-latest band leaves follow mode', async () => 
 
   expect(followingLive()).toBe(false);
   expect(document.querySelector('.jump-to-latest')).toBeNull();
-  await unmount(instance);
 });
 
 test('reading back past the band anchors', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
 
   expect(followingLive()).toBe(false);
   expect(document.querySelector('.jump-to-latest')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('shows the jump control once the reader is a page behind the latest message', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - element.clientHeight + 1);
   expect(followingLive()).toBe(false);
@@ -1327,14 +1266,12 @@ test('shows the jump control once the reader is a page behind the latest message
 
   await dragTo(element, end - element.clientHeight, end - element.clientHeight + 1);
   expect(document.querySelector('.jump-to-latest')).toBeNull();
-
-  await unmount(instance);
 });
 
 test('follows an own echo appended while the reader is still near latest', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 30);
   expect(followingLive()).toBe(false);
@@ -1358,7 +1295,6 @@ test('follows an own echo appended while the reader is still near latest', async
   expect(document.querySelectorAll('.item')).toHaveLength(21);
   expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
   expect(followingLive()).toBe(true);
-  await unmount(instance);
 });
 
 function focusComposer(): void {
@@ -1370,7 +1306,7 @@ function focusComposer(): void {
 test('focusing the composer near latest follows the latest message', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 30);
   touch(element, 'touchend', 170);
@@ -1384,13 +1320,12 @@ test('focusing the composer near latest follows the latest message', async () =>
 
   expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
   expect(followingLive()).toBe(true);
-  await unmount(instance);
 });
 
 test('focusing the composer leaves a reader past the band where they are', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
   touch(element, 'touchend', 170);
@@ -1403,13 +1338,12 @@ test('focusing the composer leaves a reader past the band where they are', async
 
   expect(element.scrollTop).toBe(end - 900);
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('leaves a reader deep in history where they are when they send', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
   expect(followingLive()).toBe(false);
@@ -1433,13 +1367,12 @@ test('leaves a reader deep in history where they are when they send', async () =
   await runAnimationFrames();
 
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('scrolling back to the end restores follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
   expect(followingLive()).toBe(false);
@@ -1447,13 +1380,12 @@ test('scrolling back to the end restores follow mode', async () => {
   await dragTo(element, end - 900, end);
 
   expect(followingLive()).toBe(true);
-  await unmount(instance);
 });
 
 test('hides the jump control when a content shrink clamps an anchored reader to the end', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end, setScrollHeight } = await mountLive(roomTimeline);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 900);
   expect(followingLive()).toBe(false);
@@ -1464,7 +1396,6 @@ test('hides the jump control when a content shrink clamps an anchored reader to 
   await tick();
 
   expect(followingLive()).toBe(true);
-  await unmount(instance);
 });
 
 function contentHeight(): number {
@@ -1476,7 +1407,7 @@ function contentHeight(): number {
 test('a tab restore keeps the row heights it measured', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance } = await mountLive(roomTimeline);
+  await mountLive(roomTimeline);
   const measured = contentHeight();
   expect(measured).toBeGreaterThan(20 * ROW * 0.5);
 
@@ -1484,13 +1415,12 @@ test('a tab restore keeps the row heights it measured', async () => {
   await runAnimationFrames();
 
   expect(contentHeight()).toBeGreaterThanOrEqual(measured);
-  await unmount(instance);
 });
 
 test('a tab restore re-reads a rendered row whose measurement went stale', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance } = await mountLive(roomTimeline);
+  await mountLive(roomTimeline);
   const measured = contentHeight();
 
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
@@ -1505,13 +1435,12 @@ test('a tab restore re-reads a rendered row whose measurement went stale', async
     configurable: true,
     value: ROW,
   });
-  await unmount(instance);
 });
 
 test('a wheel notch inside the band also leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   element.dispatchEvent(new WheelEvent('wheel', { deltaY: -30 }));
   element.scrollTop = end - 30;
@@ -1519,13 +1448,12 @@ test('a wheel notch inside the band also leaves follow mode', async () => {
   await tick();
 
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('a repeated scroll notification near latest preserves the reading position', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   await dragTo(element, end, end - 30);
   expect(followingLive()).toBe(false);
@@ -1533,13 +1461,12 @@ test('a repeated scroll notification near latest preserves the reading position'
   await tick();
 
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('middle-button autoscroll leaves follow mode', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   element.dispatchEvent(new PointerEvent('pointerdown', { button: 1 }));
   element.scrollTop = end - 900;
@@ -1547,13 +1474,12 @@ test('middle-button autoscroll leaves follow mode', async () => {
   await tick();
 
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('a scrollbar drag leaves follow mode like any other reading back', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
-  const { instance, element, end } = await mountLive(roomTimeline);
+  const { element, end } = await mountLive(roomTimeline);
 
   element.dispatchEvent(new PointerEvent('pointerdown', { button: 0 }));
   element.scrollTop = end - 900;
@@ -1561,15 +1487,13 @@ test('a scrollbar drag leaves follow mode like any other reading back', async ()
   await tick();
 
   expect(followingLive()).toBe(false);
-  await unmount(instance);
 });
 
 test('limits hidden opening refills', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [hiddenItem('renamed')];
   const history = vi.fn(() => Promise.resolve(history.mock.calls.length >= 25));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1587,15 +1511,13 @@ test('limits hidden opening refills', async () => {
   }
 
   expect(history).toHaveBeenCalledTimes(5);
-  await unmount(instance);
 });
 
 test('a window of hidden events keeps the skeleton rather than the filtered notice', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [hiddenItem('renamed')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1618,7 +1540,6 @@ test('a window of hidden events keeps the skeleton rather than the filtered noti
   await runAnimationFrames();
 
   expect(document.querySelector('.timeline-empty')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('waits out a page in flight when the room opens', async () => {
@@ -1626,8 +1547,7 @@ test('waits out a page in flight when the room opens', async () => {
   roomTimeline.items = [item('latest')];
   roomTimeline.backwardPagination = 'loading';
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1649,15 +1569,13 @@ test('waits out a page in flight when the room opens', async () => {
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('asks for history again when the timeline is cleared mid-session', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(false));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1679,15 +1597,13 @@ test('asks for history again when the timeline is cleared mid-session', async ()
   await runAnimationFrames();
 
   expect(history.mock.calls.length).toBeGreaterThan(opening);
-  await unmount(instance);
 });
 
 test('a cleared timeline is not held back by the start it reached before', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1709,15 +1625,13 @@ test('a cleared timeline is not held back by the start it reached before', async
   await runAnimationFrames();
 
   expect(history.mock.calls.length).toBeGreaterThan(opening);
-  await unmount(instance);
 });
 
 test('an empty timeline stops when its refill reports the timeline start', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('latest')];
   const history = vi.fn(() => Promise.resolve(true));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1746,7 +1660,6 @@ test('an empty timeline stops when its refill reports the timeline start', async
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(afterClear);
-  await unmount(instance);
 });
 
 test('a failed history request does not pass for the timeline start', async () => {
@@ -1755,8 +1668,7 @@ test('a failed history request does not pass for the timeline start', async () =
   const history = vi.fn(() =>
     history.mock.calls.length === 1 ? Promise.reject(new Error('offline')) : Promise.resolve(false)
   );
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1779,14 +1691,12 @@ test('a failed history request does not pass for the timeline start', async () =
   await runAnimationFrames();
 
   expect(history).toHaveBeenCalledTimes(2);
-  await unmount(instance);
 });
 
 test('a reset during a held touch does not paint placeholders over the rendered rows', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1813,7 +1723,6 @@ test('a reset during a held touch does not paint placeholders over the rendered 
     placeholder: document.querySelector('.timeline-placeholder') !== null,
     rendered: document.querySelectorAll('.window-rows > .item').length > 0,
   }).not.toEqual({ placeholder: true, rendered: true });
-  await unmount(instance);
 });
 
 test('a permalink offers a way back to the live timeline', async () => {
@@ -1822,8 +1731,7 @@ test('a permalink offers a way back to the live timeline', async () => {
   roomTimeline.mode = { kind: 'focused', eventId: '$5' };
   roomTimeline.forwardPagination = 'end';
   const jumpToLive = vi.fn();
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1840,19 +1748,17 @@ test('a permalink offers a way back to the live timeline', async () => {
   await tick();
   await runAnimationFrames();
 
-  const jump = document.querySelector<HTMLElement>('.jump-to-latest');
-  expect(jump, 'a focused timeline has no other way back to the present').not.toBeNull();
-  jump?.click();
+  const jump = screen.queryByRole('button', { name: 'Jump to latest' });
+  expect(jump, 'a focused timeline has no other way back to the present').toBeInTheDocument();
+  if (jump) await userEvent.click(jump);
   expect(jumpToLive).toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('paginating forward out of a permalink reports that it is loading', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 20 }, (_, index) => item(String(index)));
   roomTimeline.mode = { kind: 'focused', eventId: '$5' };
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1873,15 +1779,13 @@ test('paginating forward out of a permalink reports that it is loading', async (
   await tick();
 
   expect(document.querySelector('.future-loading')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('stops rendering the read marker once the reader is following live', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = Array.from({ length: 5 }, (_, index) => item(`old-${String(index)}`));
   const read = vi.fn(() => Promise.resolve());
-  const instance = mount(TimelineListHarness, {
-    target: document.body,
+  render(TimelineListHarness, {
     props: {
       list: {
         timeline: roomTimeline,
@@ -1905,5 +1809,4 @@ test('stops rendering the read marker once the reader is following live', async 
 
   expect(document.querySelector('.unread')).toBeNull();
   expect(document.querySelector('[data-item-id="arrival"]')).not.toBeNull();
-  await unmount(instance);
 });

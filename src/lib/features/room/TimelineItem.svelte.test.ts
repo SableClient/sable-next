@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent, TimelineItemView, UrlPreviewView } from '#src/generated/protocol';
@@ -57,6 +59,26 @@ import { preferences, setPreference } from '#lib/settings/preferences.svelte.js'
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
+
+const user = userEvent.setup({ delay: null });
+
+async function press(element: Element | null | undefined): Promise<void> {
+  if (!element) throw new Error('nothing to press');
+  await user.click(element);
+}
+
+async function openMenu(element: Element | null | undefined): Promise<void> {
+  if (!element) throw new Error('nothing to open a menu on');
+  await user.pointer({ keys: '[MouseRight]', target: element });
+}
+
+async function hover(element: Element | null | undefined): Promise<void> {
+  if (!element) throw new Error('nothing to hover');
+  await user.hover(element);
+}
+
+const menuItem = (name: string) => screen.getByRole('menuitem', { name: new RegExp(name) });
+const menuLabels = () => screen.getAllByRole('menuitem').map((row) => row.textContent.trim());
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -130,8 +152,7 @@ function replyItem(
 test('places a connected reply preview above the sender header', async () => {
   setPreference('replyPreviewStyle', 'connected');
   const onJumpToEvent = vi.fn();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: replyItem(), collapsed: false, onJumpToEvent },
@@ -147,26 +168,21 @@ test('places a connected reply preview above the sender header', async () => {
   expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
   expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
   expect(reply?.querySelector('.reply-name')?.textContent).toBe('Bob');
-  reply?.click();
+  await press(reply);
   expect(onJumpToEvent).toHaveBeenCalledWith('$original');
-
-  await unmount(instance);
 });
 
 test.each(['connected', 'compact', 'expanded'] as const)(
   'separates reply names from bodies in %s previews',
   async (replyPreviewStyle) => {
     setPreference('replyPreviewStyle', replyPreviewStyle);
-    const instance = mount(TimelineItemHarness, {
-      target: document.body,
+    render(TimelineItemHarness, {
       props: { core, item: { item: replyItem(), collapsed: false } },
     });
     await tick();
 
     const copy = document.querySelector('.reply-preview .reply-copy');
     expect(copy?.querySelector('.reply-name + .reply-body')).toBeInstanceOf(HTMLElement);
-
-    await unmount(instance);
   }
 );
 
@@ -174,8 +190,7 @@ test.each(['connected', 'compact', 'expanded'] as const)(
   'marks a pinged reply target with an at sign in %s previews',
   async (replyPreviewStyle) => {
     setPreference('replyPreviewStyle', replyPreviewStyle);
-    const instance = mount(TimelineItemHarness, {
-      target: document.body,
+    render(TimelineItemHarness, {
       props: {
         core,
         item: {
@@ -188,15 +203,12 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     await tick();
 
     expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('@Bob');
-
-    await unmount(instance);
   }
 );
 
 test('leaves an unpinged reply target without an at sign', async () => {
   setPreference('replyPreviewStyle', 'connected');
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -209,14 +221,11 @@ test('leaves an unpinged reply target without an at sign', async () => {
   await tick();
 
   expect(document.querySelector('.reply-preview .reply-name')?.textContent).toBe('Bob');
-
-  await unmount(instance);
 });
 
 test('switches between compact and expanded reply cards', async () => {
   setPreference('replyPreviewStyle', 'compact');
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: replyItem(), collapsed: false } },
   });
   await tick();
@@ -228,13 +237,10 @@ test('switches between compact and expanded reply cards', async () => {
   const expanded = document.querySelector('.message-main > .reply-expanded');
   expect(expanded?.textContent).toContain('Bob');
   expect(expanded?.textContent).toContain('A reply with enough text');
-
-  await unmount(instance);
 });
 
 test('renders placeholders through the standard message layout', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -255,13 +261,10 @@ test('renders placeholders through the standard message layout', async () => {
       ?.textContent
   ).toBe('x'.repeat(24));
   expect(message?.getAttribute('aria-hidden')).toBe('true');
-
-  await unmount(instance);
 });
 
 test("shows the sender's role icon after their name", async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: item(false), collapsed: false },
@@ -273,12 +276,10 @@ test("shows the sender's role icon after their name", async () => {
   const icon = document.querySelector('header .role-tag-icon');
   expect(icon?.textContent).toBe('🛡️');
   expect(icon?.previousElementSibling?.classList.contains('sender-identity')).toBe(true);
-  await unmount(instance);
 });
 
 test('reads an emote as one sentence, with the name only in the action', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(true), collapsed: false } },
   });
   await tick();
@@ -286,7 +287,6 @@ test('reads an emote as one sentence, with the name only in the action', async (
   expect(document.querySelector('.emote')?.textContent.trim()).toBe('* Alice waves');
   expect(document.querySelector('header .sender')).toBeNull();
   expect(document.querySelector('header time')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('badges a message with its own readers, and only in that placement', async () => {
@@ -303,8 +303,7 @@ test('badges a message with its own readers, and only in that placement', async 
       service: false,
     },
   ];
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: read, collapsed: false, members, currentUserId: '@alice:example.org' },
@@ -326,7 +325,6 @@ test('badges a message with its own readers, and only in that placement', async 
   expect(document.querySelector('.read-receipt-stack')).toBeNull();
 
   setPreference('hideReadReceipts', false);
-  await unmount(instance);
 });
 
 test('a deleted message keeps its receipts on the tombstone line', async () => {
@@ -335,15 +333,13 @@ test('a deleted message keeps its receipts on the tombstone line', async () => {
     content: { kind: 'redacted', reason: null } as const,
     read_by: ['@bob:example.org'],
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: deleted, collapsed: true, currentUserId: '@alice:example.org' } },
   });
   await tick();
 
   expect(document.querySelector('.has-receipts .redacted')).not.toBeNull();
   expect(document.querySelector('.has-receipts .read-receipt-stack')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('the receipt dialog lists readers of later messages, not only the badge', async () => {
@@ -375,8 +371,7 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
     },
   ];
   const read = { ...item(false), read_by: [] };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  const instance = render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -394,23 +389,18 @@ test('the receipt dialog lists readers of later messages, not only the badge', a
 
   const message = document.querySelector('.message');
   if (!message) throw new Error('message was not rendered');
-  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(message);
   await tick();
 
-  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find((row) =>
-    row.textContent.includes('Read receipts')
-  );
-  if (!entry) throw new Error('read receipts entry was not rendered');
-  (entry as HTMLElement).click();
+  await user.click(menuItem('Read receipts'));
   await tick();
 
-  const listed = [...document.querySelectorAll('.receipts-dialog li')].map((row) =>
-    row.textContent.trim()
-  );
+  const dialog = within(await screen.findByRole('dialog'));
+  const listed = dialog.getAllByRole('listitem').map((row) => row.textContent);
   expect(listed.some((row) => row.includes('Bob'))).toBe(true);
   expect(listed.some((row) => row.includes('Carol'))).toBe(true);
 
-  await unmount(instance);
+  instance.unmount();
   vi.unstubAllGlobals();
 });
 
@@ -421,35 +411,26 @@ test('an open message dialog outlives its row leaving the window', async () => {
     readers: ['@bob:example.org'],
     showItem: true,
   });
-  const instance = mount(TimelineItemHarness, { target: document.body, props });
+  render(TimelineItemHarness, { props });
   await tick();
 
-  document
-    .querySelector('.message')
-    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(document.querySelector('.message'));
   await tick();
-  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find((row) =>
-    row.textContent.includes('Read receipts')
-  );
-  if (!entry) throw new Error('read receipts entry was not rendered');
-  (entry as HTMLElement).click();
-  await tick();
-  expect(document.querySelector('.receipts-dialog')).not.toBeNull();
+  await user.click(menuItem('Read receipts'));
+  const dialog = await screen.findByRole('dialog');
 
   props.showItem = false;
   await tick();
 
-  expect(document.querySelector('.message')).toBeNull();
-  expect(document.querySelector('.receipts-dialog')).not.toBeNull();
-  await unmount(instance);
+  expect(document.querySelector('.message')).not.toBeInTheDocument();
+  expect(dialog).toBeInTheDocument();
 });
 
 test.each([
   [true, true],
   [false, false],
 ])('offers pinning when canPin is %s', async (canPin, offered) => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: item(false), collapsed: false, roomId: '!room:example.org', canPin },
@@ -457,34 +438,26 @@ test.each([
   });
   await tick();
 
-  document
-    .querySelector('.message')
-    ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(document.querySelector('.message'));
   await tick();
 
-  const labels = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].map((row) =>
-    row.textContent.trim()
-  );
+  const labels = menuLabels();
   expect(labels.length).toBeGreaterThan(0);
   expect(labels.some((label) => label.includes('Pin message'))).toBe(offered);
-  await unmount(instance);
 });
 
 test('keeps the sender header for an ordinary message', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
 
   expect(document.querySelector('header .sender')?.textContent).toBe('Alice');
   expect(document.querySelector('.emote')).toBeNull();
-  await unmount(instance);
 });
 
 test('strips a per-message-profile fallback from a thread summary', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -514,13 +487,10 @@ test('strips a per-message-profile fallback from a thread summary', async () => 
   await tick();
 
   expect(document.querySelector('.thread-latest')?.textContent).toBe('the latest reply');
-
-  await unmount(instance);
 });
 
 test('keeps a thread summary body without a fallback', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -541,14 +511,11 @@ test('keeps a thread summary body without a fallback', async () => {
   await tick();
 
   expect(document.querySelector('.thread-latest')?.textContent).toBe('we shipped it: finally');
-
-  await unmount(instance);
 });
 
 test('clicking the sender name mentions the account behind it', async () => {
   const onMentionUser = vi.fn();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -571,18 +538,16 @@ test('clicking the sender name mentions the account behind it', async () => {
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('header button.sender')?.click();
+  await press(document.querySelector<HTMLButtonElement>('header button.sender'));
 
   expect(onMentionUser).toHaveBeenCalledWith('@alice:example.org', 'Alice');
-  await unmount(instance);
 });
 
 test('with profile on name click, the sender name opens the profile instead', async () => {
   preferences.usernameClick = 'profile';
   const onMentionUser = vi.fn();
   const onSenderProfile = vi.fn();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: item(false), collapsed: false, onMentionUser, onSenderProfile },
@@ -590,12 +555,11 @@ test('with profile on name click, the sender name opens the profile instead', as
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('header button.sender')?.click();
+  await press(document.querySelector<HTMLButtonElement>('header button.sender'));
 
   expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement));
   expect(onMentionUser).not.toHaveBeenCalled();
   preferences.usernameClick = 'mention';
-  await unmount(instance);
 });
 
 test('edits an own image caption without dropping its media details', async () => {
@@ -606,20 +570,16 @@ test('edits an own image caption without dropping its media details', async () =
     is_own: true,
     content: { ...imageItem().content, caption: 'caption' },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: image, collapsed: false, onEdit } },
   });
   await tick();
 
-  document
-    .querySelector('.message')
-    ?.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await hover(document.querySelector('.message'));
   await tick();
-  document.querySelector<HTMLButtonElement>('.message-actions button')?.click();
+  await press(document.querySelector<HTMLButtonElement>('.message-actions button'));
 
   expect(onEdit).toHaveBeenCalledWith('$item', 'caption', null, true);
-  await unmount(instance);
 });
 
 test('drops the right-hand side of a bubble when own alignment is off', async () => {
@@ -628,8 +588,7 @@ test('drops the right-hand side of a bubble when own alignment is off', async ()
     [true, true],
     [false, false],
   ] as const) {
-    const instance = mount(TimelineItemHarness, {
-      target: document.body,
+    const instance = render(TimelineItemHarness, {
       props: {
         core,
         item: { item: own, collapsed: false, layout: 'bubble', alignOwn },
@@ -639,13 +598,12 @@ test('drops the right-hand side of a bubble when own alignment is off', async ()
 
     expect(document.querySelector('.message.own')?.classList.contains('align-own')).toBe(expected);
 
-    await unmount(instance);
+    instance.unmount();
   }
 });
 
 test('wraps non-text messages in a bubble in bubble layout', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -660,8 +618,6 @@ test('wraps non-text messages in a bubble in bubble layout', async () => {
   expect(document.querySelector('.message.layout-bubble .content-bubble')).toBeInstanceOf(
     HTMLElement
   );
-
-  await unmount(instance);
 });
 
 test('uses the sender profile name color in every message layout', async () => {
@@ -669,8 +625,7 @@ test('uses the sender profile name color in every message layout', async () => {
     name_color_light: '#2f5a1f',
     name_color_dark: '#9fd07c',
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
@@ -683,13 +638,11 @@ test('uses the sender profile name color in every message layout', async () => {
   expect(
     document.querySelector<HTMLElement>('.message')?.style.getPropertyValue('--name-color-on-dark')
   ).toBe('#9fd07c');
-  await unmount(instance);
 });
 
 test('falls back to the role colour when the sender profile has none', async () => {
   core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: item(false), collapsed: false },
@@ -702,7 +655,6 @@ test('falls back to the role colour when the sender profile has none', async () 
   expect(document.querySelector('.sender')?.classList.contains('tinted')).toBe(true);
   expect(message?.style.getPropertyValue('--name-color-on-light')).toBe('#b8383a');
   expect(message?.style.getPropertyValue('--name-color-on-dark')).toBe('#ee6a65');
-  await unmount(instance);
 });
 
 test.each(['connected', 'compact', 'expanded'] as const)(
@@ -716,8 +668,7 @@ test.each(['connected', 'compact', 'expanded'] as const)(
           : { name_color_light: null, name_color_dark: null }
       )
     );
-    const instance = mount(TimelineItemHarness, {
-      target: document.body,
+    render(TimelineItemHarness, {
       props: { core, item: { item: replyItem(), collapsed: false } },
     });
     await tick();
@@ -727,13 +678,11 @@ test.each(['connected', 'compact', 'expanded'] as const)(
     expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
     expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
     expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
-    await unmount(instance);
   }
 );
 
 test('does not mount hidden message dialogs', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
@@ -742,14 +691,12 @@ test('does not mount hidden message dialogs', async () => {
   expect(document.querySelector('.delete')).toBeNull();
   expect(document.querySelector('.member-list-dialog')).toBeNull();
   expect(document.querySelector('.receipts-dialog')).toBeNull();
-  await unmount(instance);
 });
 
 test('opens an image from a mobile pointer interaction', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onOpenMedia = vi.fn();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: imageItem(), collapsed: false, onOpenMedia } },
   });
   await tick();
@@ -758,10 +705,9 @@ test('opens an image from a mobile pointer interaction', async () => {
 
   image.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
   image.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
-  image.click();
+  await press(image);
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item');
-  await unmount(instance);
 });
 
 test('opens a per-message profile avatar through viewer callback', async () => {
@@ -778,8 +724,7 @@ test('opens a per-message profile avatar through viewer callback', async () => {
       has_fallback: false,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
@@ -789,19 +734,18 @@ test('opens a per-message profile avatar through viewer callback', async () => {
 
   const profileTrigger = document.querySelector<HTMLButtonElement>('.avatar-button');
   if (!profileTrigger) throw new Error('persona profile trigger was not rendered');
-  profileTrigger.click();
+  await press(profileTrigger);
   await tick();
 
   const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
   if (!avatarButton) throw new Error('persona avatar button was not rendered');
-  avatarButton.click();
+  await press(avatarButton);
   await tick();
 
   expect(onPersonaAvatarClick).toHaveBeenCalledWith('mxc://example.org/kris', 'Kris');
   expect(
     profileTrigger.getAttribute('aria-expanded') ?? profileTrigger.getAttribute('data-state')
   ).toMatch(/false|closed/);
-  await unmount(instance);
 });
 
 test('a per-message profile takes the sender position and names the account behind it', async () => {
@@ -822,8 +766,7 @@ test('a per-message profile takes the sender position and names the account behi
       has_fallback: false,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: persona, collapsed: false, onSenderProfile },
@@ -840,14 +783,12 @@ test('a per-message profile takes the sender position and names the account behi
 
   const viaButton = via?.querySelector<HTMLButtonElement>('.name-button');
   if (!viaButton) throw new Error('the account behind the persona was not a button');
-  viaButton.click();
+  await press(viaButton);
   expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', viaButton);
-  await unmount(instance);
 });
 
 test('without a persona the hover-only via keeps the account MXID', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await tick();
@@ -855,7 +796,6 @@ test('without a persona the hover-only via keeps the account MXID', async () => 
   const via = document.querySelector('header .via');
   expect(via?.className).toContain('via-hidden');
   expect(via?.textContent).toContain('@alice:example.org');
-  await unmount(instance);
 });
 
 test('provides a formatted reaction attribution tooltip', async () => {
@@ -863,8 +803,7 @@ test('provides a formatted reaction attribution tooltip', async () => {
     ...item(false),
     reactions: [{ key: '👍', senders: ['@alice:example.org'] }],
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -890,18 +829,16 @@ test('provides a formatted reaction attribution tooltip', async () => {
   const reaction = document.querySelector<HTMLButtonElement>('.reaction');
   if (!reaction) throw new Error('reaction was not rendered');
   vi.useFakeTimers();
-  reaction.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await hover(reaction);
   await vi.advanceTimersByTimeAsync(400);
   await tick();
 
   expect(document.querySelector('.tooltip')?.textContent).toBe('Alice reacted with 👍');
   vi.useRealTimers();
-  await unmount(instance);
 });
 
 test('keeps a long text reaction separate from its count', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -925,12 +862,10 @@ test('keeps a long text reaction separate from its count', async () => {
     'this is an absurdly long reaction to test the reaction layout'
   );
   expect(reaction?.querySelector('.reaction-count')?.textContent).toBe('1');
-  await unmount(instance);
 });
 
 test('mounts the action bar on hover and keeps it while its menu is open', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: item(false), collapsed: false, onReply: vi.fn(), onCopyLink: vi.fn() },
@@ -941,35 +876,28 @@ test('mounts the action bar on hover and keeps it while its menu is open', async
   if (!message) throw new Error('message was not rendered');
   expect(document.querySelector('.message-actions')).toBeNull();
 
-  message.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await hover(message);
   await tick();
   expect(document.querySelector('.message-actions')).not.toBeNull();
 
-  document
-    .querySelector<HTMLButtonElement>('.message-actions [data-dropdown-menu-trigger]')
-    ?.click();
-  await tick();
-  message.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true, pointerType: 'mouse' }));
+  await press(document.querySelector('.message-actions [data-dropdown-menu-trigger]'));
+  await fireEvent.pointerLeave(message, { pointerType: 'mouse' });
   await tick();
   expect(document.querySelector('.message-actions')).not.toBeNull();
-
-  await unmount(instance);
 });
 
 test('opens message actions on right click', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
   const message = document.querySelector('.message');
   if (!message) throw new Error('message was not rendered');
 
-  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(message);
   await tick();
 
-  expect(document.querySelector('.menu-surface')?.textContent).toContain('Reply');
-  await unmount(instance);
+  expect(menuLabels()).toContain('Reply');
 });
 
 test('downloads an image from its message menu, with progress on the message', async () => {
@@ -996,21 +924,16 @@ test('downloads an image from its message menu, with progress on the message', a
   fetchMedia.mockImplementation((_source, width) =>
     width === 0 ? original : new Promise(() => {})
   );
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  const instance = render(TimelineItemHarness, {
     props: { core, item: { item: imageItem(), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
   const message = document.querySelector('.message');
   if (!message) throw new Error('message was not rendered');
 
-  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(message);
   await tick();
-  const entry = [...document.querySelectorAll('.menu-surface [role="menuitem"]')].find(
-    (row) => row.textContent.trim() === 'Download'
-  );
-  if (!entry) throw new Error('download entry was not rendered');
-  (entry as HTMLElement).click();
+  await user.click(screen.getByRole('menuitem', { name: 'Download' }));
   await vi.waitFor(() => {
     expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/photo', 0, 0);
   });
@@ -1027,33 +950,30 @@ test('downloads an image from its message menu, with progress on the message', a
     expect(saveBytes).toHaveBeenCalledWith(bytes, 'photo.png', 'image/png');
   });
   expect(document.querySelector('progress.upload')).toBeNull();
-  await unmount(instance);
+  instance.unmount();
   subscribe.mockImplementation(() => () => {});
   fetchMedia.mockImplementation(() => new Promise(() => {}));
 });
 
 test('offers no download for a text message', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
   const message = document.querySelector('.message');
   if (!message) throw new Error('message was not rendered');
 
-  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(message);
   await tick();
 
-  expect(document.querySelector('.menu-surface')?.textContent).toContain('Reply');
-  expect(document.querySelector('.menu-surface')?.textContent).not.toContain('Download');
-  await unmount(instance);
+  expect(menuLabels()).toContain('Reply');
+  expect(menuLabels()).not.toContain('Download');
 });
 
 test('long pressing a reaction opens its people list without toggling it', async () => {
   vi.useFakeTimers();
   const onToggleReaction = vi.fn();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -1079,16 +999,15 @@ test('long pressing a reaction opens its people list without toggling it', async
   const reaction = document.querySelector<HTMLButtonElement>('.reaction');
   if (!reaction) throw new Error('reaction was not rendered');
 
-  reaction.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
+  await fireEvent.pointerDown(reaction, { pointerType: 'touch' });
   await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
-  reaction.click();
+  await fireEvent.click(reaction);
 
-  expect(document.querySelector('.member-list-dialog')?.textContent).toContain('Alice');
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Alice');
   expect(document.querySelector('.sheet-list')).toBeNull();
   expect(onToggleReaction).not.toHaveBeenCalled();
   vi.useRealTimers();
-  await unmount(instance);
 });
 
 test('renders a redacted row and a worded state change without throwing', async () => {
@@ -1113,14 +1032,14 @@ test('renders a redacted row and a worded state change without throwing', async 
   ]) {
     const target = document.createElement('div');
     document.body.append(target);
-    const component = mount(TimelineItemHarness, {
+    const component = render(TimelineItemHarness, {
       target,
       props: { core, item: { item: { ...item(false), content }, collapsed: false } },
     });
     await tick();
 
     expect(target.textContent.trim(), `${content.kind} rendered empty`).not.toBe('');
-    void unmount(component);
+    component.unmount();
     target.remove();
   }
 });
@@ -1132,20 +1051,17 @@ test('shows every pronoun set from the sender account profile', async () => {
       { summary: 'they/them', language: null },
     ],
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
     expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
   });
-  await unmount(instance);
 });
 
 test('lifts trailing pronouns out of the display name into a pill', async () => {
   core.userProfile.mockResolvedValue({ pronouns: [] });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
@@ -1158,15 +1074,13 @@ test('lifts trailing pronouns out of the display name into a pill', async () => 
     expect(pills).toHaveLength(1);
     expect(pills[0].textContent).toBe('she/it');
   });
-  await unmount(instance);
 });
 
 test('adds the display name pronouns after the structured sets', async () => {
   core.userProfile.mockResolvedValue({
     pronouns: [{ summary: 'they/them', language: null }],
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
@@ -1178,14 +1092,12 @@ test('adds the display name pronouns after the structured sets', async () => {
     const pills = document.querySelectorAll('header .sender-identity-pronoun');
     expect([...pills].map((pill) => pill.textContent)).toEqual(['they/them', 'she/it']);
   });
-  await unmount(instance);
 });
 
 test('keeps the display name suffix when pronoun pills are hidden', async () => {
   setPreference('showPronouns', false);
   core.userProfile.mockResolvedValue({ pronouns: [] });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  const instance = render(TimelineItemHarness, {
     props: {
       core,
       item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
@@ -1196,7 +1108,7 @@ test('keeps the display name suffix when pronoun pills are hidden', async () => 
     'sugary (she/it)'
   );
   expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(0);
-  await unmount(instance);
+  instance.unmount();
   setPreference('showPronouns', true);
 });
 
@@ -1207,8 +1119,7 @@ test('shows only the sets tagged with the reader language', async () => {
       { summary: 'elle', language: 'fr' },
     ],
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
@@ -1216,7 +1127,6 @@ test('shows only the sets tagged with the reader language', async () => {
     expect(pills).toHaveLength(1);
     expect(pills[0].textContent).toBe('she/her');
   });
-  await unmount(instance);
 });
 
 test('shows every set once the language filter is switched off', async () => {
@@ -1227,8 +1137,7 @@ test('shows every set once the language filter is switched off', async () => {
       { summary: 'elle', language: 'fr' },
     ],
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
@@ -1238,7 +1147,6 @@ test('shows every set once the language filter is switched off', async () => {
   await vi.waitFor(() => {
     expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(1);
   });
-  await unmount(instance);
 });
 
 test('caps the pills at three and counts the rest', async () => {
@@ -1250,8 +1158,7 @@ test('caps the pills at three and counts the rest', async () => {
       { summary: 'it/its', language: 'en' },
     ],
   });
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false } },
   });
   await vi.waitFor(() => {
@@ -1260,13 +1167,11 @@ test('caps the pills at three and counts the rest', async () => {
     expect(pills[3].textContent).toBe('+1');
     expect(pills[3].getAttribute('title')).toBe('it/its (en)');
   });
-  await unmount(instance);
 });
 
 test('a touch long press opens the sheet without also opening the context menu', async () => {
   vi.useFakeTimers();
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  const instance = render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
@@ -1288,13 +1193,12 @@ test('a touch long press opens the sheet without also opening the context menu',
   expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
   expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
 
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
 test('a touch context menu the row never saw pressed opens the sheet', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
   });
   await tick();
@@ -1310,13 +1214,10 @@ test('a touch context menu the row never saw pressed opens the sheet', async () 
   expect(native.defaultPrevented).toBe(true);
   expect(document.querySelectorAll('[data-context-menu-content]')).toHaveLength(0);
   expect(document.querySelector('[data-dialog-content]')).not.toBeNull();
-
-  await unmount(instance);
 });
 
 test('a deleted message keeps its sender, its time and its menu', async () => {
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: {
       core,
       item: {
@@ -1334,10 +1235,9 @@ test('a deleted message keeps its sender, its time and its menu', async () => {
   expect(document.querySelector('header .sender')?.textContent).toContain('Alice');
   expect(document.querySelector('.redacted')?.textContent.trim()).toBe('Message deleted');
 
-  message.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await hover(message);
   await tick();
   expect(document.querySelector('.message-actions')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('offers to add a message inline emote to your own pack', async () => {
@@ -1355,19 +1255,17 @@ test('offers to add a message inline emote to your own pack', async () => {
       edited: false,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
   });
   await tick();
   const message = document.querySelector('.message');
   if (!message) throw new Error('message was not rendered');
 
-  message.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await openMenu(message);
   await tick();
 
-  expect(document.querySelector('.menu-surface')?.textContent).toContain('Add emote to my pack');
-  await unmount(instance);
+  expect(menuLabels()).toContain('Add emote to my pack');
 });
 
 test('a message of only inline emotes reads at jumbo size', async () => {
@@ -1383,14 +1281,12 @@ test('a message of only inline emotes reads at jumbo size', async () => {
       edited: false,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: emoteItem, collapsed: false, onReply: vi.fn() } },
   });
   await tick();
 
   expect(document.querySelector('.jumbo-1')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('a membership row keeps its notice look and still carries the action layer', async () => {
@@ -1404,8 +1300,7 @@ test('a membership row keeps its notice look and still carries the action layer'
       reason: null,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: joined, collapsed: false, onReply: vi.fn() } },
   });
   await tick();
@@ -1415,11 +1310,9 @@ test('a membership row keeps its notice look and still carries the action layer'
   expect(row.querySelector('.state')).not.toBeNull();
   expect(row.querySelector('header .sender')).toBeNull();
 
-  row.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true, pointerType: 'mouse' }));
+  await hover(row);
   await tick();
   expect(document.querySelector('.message-actions')).not.toBeNull();
-
-  await unmount(instance);
 });
 
 test('a date divider stays a plain annotation with nothing to act on', async () => {
@@ -1428,16 +1321,13 @@ test('a date divider stays a plain annotation with nothing to act on', async () 
     event_id: null,
     content: { kind: 'date_divider', timestamp: 0 },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: divider, collapsed: false, onReply: vi.fn() } },
   });
   await tick();
 
   expect(document.querySelector('article')).toBeNull();
   expect(document.querySelector('.date-divider')).not.toBeNull();
-
-  await unmount(instance);
 });
 
 test('shows an indeterminate upload bar until the core reports progress', async () => {
@@ -1447,8 +1337,7 @@ test('shows an indeterminate upload bar until the core reports progress', async 
     is_own: true,
     send_state: { status: 'sending', progress: null },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: upload, collapsed: false } },
   });
   await tick();
@@ -1456,7 +1345,6 @@ test('shows an indeterminate upload bar until the core reports progress', async 
   const bar = document.querySelector<HTMLProgressElement>('progress.upload');
   expect(bar).not.toBeNull();
   expect(bar?.hasAttribute('value')).toBe(false);
-  await unmount(instance);
 });
 
 test('fills one bar across a gallery and names the item uploading', async () => {
@@ -1479,15 +1367,13 @@ test('fills one bar across a gallery and names the item uploading', async () => 
       })),
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  render(TimelineItemHarness, {
     props: { core, item: { item: gallery, collapsed: false } },
   });
   await tick();
 
   expect(document.querySelector<HTMLProgressElement>('progress.upload')?.value).toBeCloseTo(0.375);
   expect(document.querySelector('.transfer-count')?.textContent.trim()).toBe('2 of 4');
-  await unmount(instance);
 });
 
 test('renders a link preview for every link in a message', async () => {
@@ -1503,8 +1389,7 @@ test('renders a link preview for every link in a message', async () => {
       edited: false,
     },
   };
-  const instance = mount(TimelineItemHarness, {
-    target: document.body,
+  const instance = render(TimelineItemHarness, {
     props: { core, item: { item: message, collapsed: false, encrypted: false } },
   });
   await vi.waitFor(() => {
@@ -1512,6 +1397,6 @@ test('renders a link preview for every link in a message', async () => {
       [...document.querySelectorAll<HTMLAnchorElement>('a.link-preview')].map((link) => link.href)
     ).toEqual(['https://example.org/one', 'https://example.org/two']);
   });
-  await unmount(instance);
+  instance.unmount();
   setPreference('urlPreviews', false);
 });

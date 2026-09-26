@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
@@ -37,27 +38,19 @@ const members = [
   },
 ];
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('renders readers in order and closes from the header', async () => {
+  const user = userEvent.setup();
   const onClose = vi.fn();
-  const instance = mount(MemberUserList, {
-    target: document.body,
-    props: {
-      title: 'Seen by',
-      userIds: ['@bob:example.org', '@carol:example.org'],
-      members,
-      onMemberProfile: vi.fn(),
-      onClose,
-    },
+  render(MemberUserList, {
+    title: 'Seen by',
+    userIds: ['@bob:example.org', '@carol:example.org'],
+    members,
+    onMemberProfile: vi.fn(),
+    onClose,
   });
-  await tick();
 
-  expect(document.querySelector('.member-user-list')?.textContent).toContain('Bob');
-  expect(document.querySelector('.member-user-list')?.textContent).toContain('Carol');
-  (document.querySelector('[aria-label="Close members"]') as HTMLButtonElement).click();
+  const names = screen.getAllByText(/^(Bob|Carol)$/).map((name) => name.textContent);
+  expect(names).toEqual(['Bob', 'Carol']);
+  await user.click(screen.getByRole('button', { name: 'Close members' }));
   expect(onClose).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });

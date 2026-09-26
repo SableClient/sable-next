@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -31,56 +32,46 @@ function poll(overrides: Partial<PollView> = {}): PollView {
   };
 }
 
-function render(props: Record<string, unknown>) {
-  const target = document.createElement('div');
-  document.body.append(target);
-  const component = mount(TimelinePoll, {
-    target,
-    props: { poll: poll(), eventId: '$poll', canEnd: false, ...props },
-  });
+function setup(props: Record<string, unknown>) {
+  const view = render(TimelinePoll, { poll: poll(), eventId: '$poll', canEnd: false, ...props });
   return {
-    target,
-    answers: () => [...target.querySelectorAll<HTMLButtonElement>('.answer')],
-    cleanup: () => {
-      void unmount(component);
-      target.remove();
-    },
+    user: userEvent.setup(),
+    answer: (text: string) =>
+      within(view.container).getByRole('button', { name: new RegExp(text) }),
+    answers: () =>
+      within(view.container)
+        .getAllByRole('button')
+        .filter((button) => button.classList.contains('answer')),
+    container: view.container,
   };
 }
 
 test('a single-choice vote replaces the selection', async () => {
   const onVote = vi.fn();
-  const view = render({ onVote });
-  await tick();
+  const view = setup({ onVote });
 
-  view.answers()[1].click();
-  await tick();
+  await view.user.click(view.answer('curry'));
 
   expect(onVote).toHaveBeenCalledWith('$poll', ['1']);
-  view.cleanup();
 });
 
 test('clicking the answer already picked withdraws the vote', async () => {
   const onVote = vi.fn();
   const answers = poll().answers.map((answer, index) => ({ ...answer, selected: index === 0 }));
-  const view = render({ poll: poll({ answers }), onVote });
-  await tick();
+  const view = setup({ poll: poll({ answers }), onVote });
 
-  view.answers()[0].click();
-  await tick();
+  expect(view.answer('ramen')).toHaveAttribute('aria-pressed', 'true');
+  await view.user.click(view.answer('ramen'));
 
   expect(onVote).toHaveBeenCalledWith('$poll', []);
-  view.cleanup();
 });
 
 test('a multi-choice poll adds to the selection and stops at the cap', async () => {
   const onVote = vi.fn();
   const answers = poll().answers.map((answer, index) => ({ ...answer, selected: index === 0 }));
-  const view = render({ poll: poll({ answers, max_selections: 2 }), onVote });
-  await tick();
+  const view = setup({ poll: poll({ answers, max_selections: 2 }), onVote });
 
-  view.answers()[1].click();
-  await tick();
+  await view.user.click(view.answer('curry'));
   expect(onVote).toHaveBeenCalledWith('$poll', ['0', '1']);
 
   onVote.mockClear();
@@ -88,56 +79,41 @@ test('a multi-choice poll adds to the selection and stops at the cap', async () 
     answers: poll().answers.map((answer) => ({ ...answer, selected: true })),
     max_selections: 2,
   });
-  const capped = render({ poll: full, onVote });
-  await tick();
+  const capped = setup({ poll: full, onVote });
   // Both are picked, so a third click has nothing left to add.
-  capped.answers()[0].click();
-  await tick();
+  await capped.user.click(capped.answer('ramen'));
   expect(onVote).toHaveBeenCalledWith('$poll', ['1']);
-
-  view.cleanup();
-  capped.cleanup();
 });
 
 test('a closed poll accepts no vote and offers no close button', async () => {
   const onVote = vi.fn();
-  const view = render({ poll: poll({ ended_at: 1000 }), onVote, canEnd: true });
-  await tick();
+  const view = setup({ poll: poll({ ended_at: 1000 }), onVote, canEnd: true });
 
-  expect(view.answers().every((button) => button.disabled)).toBe(true);
-  view.answers()[0].click();
-  await tick();
+  for (const answer of view.answers()) expect(answer).toBeDisabled();
+  await view.user.click(view.answer('ramen'));
 
   expect(onVote).not.toHaveBeenCalled();
-  expect(view.target.querySelector('.end')).toBeNull();
-  view.cleanup();
+  expect(screen.queryByRole('button', { name: 'Close poll' })).not.toBeInTheDocument();
 });
 
-test('a local echo cannot be voted on', async () => {
-  const onVote = vi.fn();
-  const view = render({ eventId: null, onVote });
-  await tick();
+test('a local echo cannot be voted on', () => {
+  const view = setup({ eventId: null, onVote: vi.fn() });
 
-  expect(view.answers().every((button) => button.disabled)).toBe(true);
-  view.cleanup();
+  for (const answer of view.answers()) expect(answer).toBeDisabled();
 });
 
-test('an undisclosed poll shows no tally', async () => {
+test('an undisclosed poll shows no tally', () => {
   const answers = poll().answers.map((answer) => ({ ...answer, votes: null }));
-  const view = render({ poll: poll({ answers, undisclosed: true }) });
-  await tick();
+  const view = setup({ poll: poll({ answers, undisclosed: true }) });
 
-  expect(view.target.querySelector('.count')).toBeNull();
-  view.cleanup();
+  expect(view.container.querySelector('.count')).not.toBeInTheDocument();
 });
 
-test('a null voters list shows the vote count with no affordance to open it', async () => {
-  const view = render({});
-  await tick();
+test('a null voters list shows the vote count with no affordance to open it', () => {
+  setup({});
 
-  expect(view.target.querySelector('.count-button')).toBeNull();
-  expect(view.target.querySelector('.count')?.textContent).toContain('3 votes');
-  view.cleanup();
+  expect(screen.queryByRole('button', { name: /See who voted/ })).not.toBeInTheDocument();
+  expect(screen.getByText('3 votes')).toBeInTheDocument();
 });
 
 test('tapping a vote count with voters opens the voters dialog', async () => {
@@ -145,16 +121,13 @@ test('tapping a vote count with voters opens the voters dialog', async () => {
     ...answer,
     voters: answer.id === '0' ? ['@alice:example.org', '@bob:example.org'] : ['@carol:example.org'],
   }));
-  const view = render({ poll: poll({ answers }) });
-  await tick();
+  const view = setup({ poll: poll({ answers }) });
 
-  view.target.querySelector<HTMLButtonElement>('.count-button')?.click();
-  await tick();
+  await view.user.click(screen.getByRole('button', { name: 'See who voted for "ramen"' }));
 
-  const dialog = document.body.querySelector('[role="tablist"]');
-  expect(dialog).not.toBeNull();
-  expect(document.body.textContent).toContain('alice');
-  view.cleanup();
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getByRole('tablist')).toBeInTheDocument();
+  expect(dialog).toHaveTextContent('alice');
 });
 
 test('a voters tab switches the list to that answer', async () => {
@@ -162,33 +135,27 @@ test('a voters tab switches the list to that answer', async () => {
     ...answer,
     voters: answer.id === '0' ? ['@alice:example.org'] : ['@carol:example.org'],
   }));
-  const view = render({ poll: poll({ answers }) });
-  await tick();
+  const view = setup({ poll: poll({ answers }) });
 
-  view.target.querySelector<HTMLButtonElement>('.count-button')?.click();
-  await tick();
+  await view.user.click(screen.getByRole('button', { name: 'See who voted for "ramen"' }));
 
-  const tabs = [...document.body.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  const dialog = await screen.findByRole('dialog');
+  const tabs = within(dialog).getAllByRole('tab');
   expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['true', 'false']);
 
-  tabs[1].click();
-  await tick();
+  await view.user.click(tabs[1]);
 
   expect(tabs.map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true']);
-  const list = document.body.querySelector('.member-list-dialog ul')?.textContent ?? '';
-  expect(list).toContain('carol');
-  expect(list).not.toContain('alice');
-  view.cleanup();
+  const list = within(dialog).getByRole('list');
+  expect(list).toHaveTextContent('carol');
+  expect(list).not.toHaveTextContent('alice');
 });
 
 test('the close button reaches the handler only when allowed', async () => {
   const onEnd = vi.fn();
-  const view = render({ canEnd: true, onEnd });
-  await tick();
+  const view = setup({ canEnd: true, onEnd });
 
-  view.target.querySelector<HTMLButtonElement>('.end')?.click();
-  await tick();
+  await view.user.click(screen.getByRole('button', { name: 'Close poll' }));
 
   expect(onEnd).toHaveBeenCalledWith('$poll');
-  view.cleanup();
 });

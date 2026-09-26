@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -19,21 +20,17 @@ const core = Object.assign(baseCore, {
 afterEach(() => {
   preferences.dateFormat = 'auto';
   preferences.hour24Clock = false;
-  document.body.replaceChildren();
 });
 
 test('shows the moment in the reader format and jumps on Enter', async () => {
+  const user = userEvent.setup();
   preferences.dateFormat = 'ymd';
   preferences.hour24Clock = true;
   const onJump = vi.fn();
-  mount(JumpToTimeDialog, {
-    target: document.body,
-    props: { open: true, roomId: '!r:x', onOpenChange: vi.fn(), onJump },
-  });
-  await tick();
-  flushSync();
+  render(JumpToTimeDialog, { open: true, roomId: '!r:x', onOpenChange: vi.fn(), onJump });
 
-  const segments = [...document.querySelectorAll('[data-segment]')];
+  const dialog = await screen.findByRole('dialog');
+  const segments = [...dialog.querySelectorAll('[data-segment]')];
   expect(segments.slice(0, 5).map((segment) => segment.getAttribute('data-segment'))).toEqual([
     'year',
     'literal',
@@ -41,15 +38,11 @@ test('shows the moment in the reader format and jumps on Enter', async () => {
     'literal',
     'day',
   ]);
-  expect(document.querySelector('[data-segment="dayPeriod"]')).toBeNull();
+  expect(dialog.querySelector('[data-segment="dayPeriod"]')).toBeNull();
 
-  document
-    .querySelector('.shortcuts button')
-    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  flushSync();
-  document
-    .querySelector('[data-segment="day"]')
-    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  await user.click(screen.getByRole('button', { name: 'Today' }));
+  dialog.querySelector<HTMLElement>('[data-segment="day"]')?.focus();
+  await user.keyboard('{Enter}');
 
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);

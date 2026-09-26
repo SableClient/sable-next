@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -12,7 +13,6 @@ import type { TimelineItemView } from '#src/generated/protocol';
 import StateEventText from './StateEventText.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });
@@ -52,12 +52,10 @@ test.each([
   [{ kind: 'malformed', event_type: 'm.room.message' }, 'Could not read event: m.room.message'],
 ] satisfies [TimelineItemView['content'], string][])(
   'renders the event notice for %j',
-  async (content, expected) => {
+  (content, expected) => {
     const item = { ...membership('joined', '@alice:example.org', 'Alice'), content };
-    const instance = mount(StateEventText, { target: document.body, props: { item } });
-    await tick();
-    expect(document.body.textContent).toContain(expected);
-    await unmount(instance);
+    const { container } = render(StateEventText, { item });
+    expect(container).toHaveTextContent(expected);
   }
 );
 
@@ -78,21 +76,18 @@ test('tints a clickable state-event name from the sender profile', async () => {
     animal: null,
     extra: [],
   });
+  const user = userEvent.setup();
   const onSenderProfile = vi.fn();
-  const instance = mount(StateEventText, {
-    target: document.body,
-    props: {
-      item: membership('left', '@bob:example.org', 'Bob'),
-      onSenderProfile,
-    },
+  const { container } = render(StateEventText, {
+    item: membership('left', '@bob:example.org', 'Bob'),
+    onSenderProfile,
   });
-  await tick();
-  await tick();
 
-  const name = document.querySelector<HTMLButtonElement>('.state-subject');
-  expect(name?.classList.contains('tinted')).toBe(true);
-  expect(document.body.textContent).toContain('Bob left');
-  name?.click();
+  const name = screen.getByRole('button', { name: /Bob/ });
+  await vi.waitFor(() => {
+    expect(name).toHaveClass('tinted');
+  });
+  expect(container).toHaveTextContent('Bob left');
+  await user.click(name);
   expect(onSenderProfile).toHaveBeenCalledWith('@bob:example.org', name);
-  await unmount(instance);
 });

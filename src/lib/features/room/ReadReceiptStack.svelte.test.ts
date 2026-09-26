@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test } from 'vitest';
 
 import ReadReceiptStack from './ReadReceiptStack.svelte';
@@ -29,37 +30,30 @@ const members = [
 ];
 
 test('names every reader and reports the open dialog', async () => {
+  const user = userEvent.setup();
   let anchor: HTMLButtonElement | null = null;
-  const instance = mount(ReadReceiptStack, {
-    target: document.body,
-    props: {
-      readers: ['@bob:example.org', '@carol:example.org'],
-      members,
-      onOpen: (element: HTMLButtonElement) => {
-        anchor = element;
-      },
+  render(ReadReceiptStack, {
+    readers: ['@bob:example.org', '@carol:example.org'],
+    members,
+    onOpen: (element: HTMLButtonElement) => {
+      anchor = element;
     },
   });
-  await tick();
 
-  const trigger = document.querySelector('button') as HTMLButtonElement;
-  expect(trigger.getAttribute('aria-label')).toBe('Seen by Bob, Carol. Open the list.');
-  expect(trigger.getAttribute('aria-haspopup')).toBe('dialog');
-  expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  expect(trigger.getAttribute('title')).toBe('Bob, Carol');
+  const trigger = screen.getByRole('button', { name: 'Seen by Bob, Carol. Open the list.' });
+  expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+  expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  expect(trigger).toHaveAttribute('title', 'Bob, Carol');
   expect(trigger.querySelectorAll('.avatar-root')).toHaveLength(2);
-  expect(trigger.querySelector('.overflow')).toBeNull();
+  expect(trigger.querySelector('.overflow')).not.toBeInTheDocument();
 
-  trigger.click();
+  await user.click(trigger);
   expect(anchor).toBe(trigger);
-
-  await unmount(instance);
 });
 
-test('caps the stack at three faces and renders nothing without readers', async () => {
+test('caps the stack at three faces and renders nothing without readers', () => {
   const many = Array.from({ length: 12 }, (_, index) => `@user${String(index)}:example.org`);
-  const instance = mount(ReadReceiptStack, {
-    target: document.body,
+  const instance = render(ReadReceiptStack, {
     props: {
       readers: many,
       members: many.map((user_id) => ({
@@ -75,20 +69,14 @@ test('caps the stack at three faces and renders nothing without readers', async 
       onOpen: () => {},
     },
   });
-  await tick();
 
-  expect(document.querySelectorAll('.stack .avatar-root')).toHaveLength(3);
-  expect(document.querySelector('.overflow')?.textContent).toBe('+9');
+  const trigger = screen.getByRole('button');
+  expect(trigger.querySelectorAll('.stack .avatar-root')).toHaveLength(3);
+  expect(trigger).toHaveTextContent('+9');
 
-  await unmount(instance);
+  instance.unmount();
 
-  const empty = mount(ReadReceiptStack, {
-    target: document.body,
-    props: { readers: [], members: [], onOpen: () => {} },
-  });
-  await tick();
+  render(ReadReceiptStack, { readers: [], members: [], onOpen: () => {} });
 
-  expect(document.querySelector('.read-receipt-stack')).toBeNull();
-
-  await unmount(empty);
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });

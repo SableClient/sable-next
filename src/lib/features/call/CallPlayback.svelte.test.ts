@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
+import { expect, test, vi } from 'vitest';
 import { RoomEvent, type Room } from 'livekit-client';
 
 import CallPlayback from './CallPlayback.svelte';
@@ -58,10 +60,6 @@ function fakeRoom(allowed: boolean): FakeRoom {
   };
 }
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('starts every blocked room from one click and hides after playback recovers', async () => {
   const first = fakeRoom(false);
   const second = fakeRoom(false);
@@ -74,25 +72,20 @@ test('starts every blocked room from one click and hides after playback recovers
     { backendId: 'first', room: first.room },
     { backendId: 'second', room: second.room },
   ];
-  const instance = mount(CallPlayback, {
-    target: document.body,
-    props: { rooms, telemetry },
-  });
-  await tick();
+  const user = userEvent.setup();
+  const instance = render(CallPlayback, { rooms, telemetry });
 
-  const button = document.querySelector('button');
-  expect(button?.textContent).toContain('Enable audio');
-  button?.click();
+  await user.click(screen.getByRole('button', { name: /Enable audio/ }));
   expect(first.startAudio).toHaveBeenCalledOnce();
   expect(second.startAudio).toHaveBeenCalledOnce();
 
   first.emit();
   second.emit();
   await tick();
-  expect(document.querySelector('button')).toBeNull();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
   expect(telemetry.step).toHaveBeenCalledWith('call.audio.playback_enable', expect.any(Function));
 
-  await unmount(instance);
+  instance.unmount();
   expect(first.off).toHaveBeenCalledWith(
     RoomEvent.AudioPlaybackStatusChanged,
     expect.any(Function)
@@ -108,15 +101,10 @@ test('reports playback failure and keeps the button visible', async () => {
     failure: vi.fn(),
     step: vi.fn(<T>(_stage: string, action: () => Promise<T>): Promise<T> => action()),
   } as unknown as TelemetryStub;
-  const instance = mount(CallPlayback, {
-    target: document.body,
-    props: { rooms: [{ backendId: 'first', room: room.room }], telemetry },
-  });
-  await tick();
-  document.querySelector('button')?.click();
-  await tick();
+  const user = userEvent.setup();
+  render(CallPlayback, { rooms: [{ backendId: 'first', room: room.room }], telemetry });
+  await user.click(screen.getByRole('button', { name: /Enable audio/ }));
 
   expect(telemetry.failure).toHaveBeenCalledWith('call.audio.playback_enable', error);
-  expect(document.querySelector('button')).not.toBeNull();
-  await unmount(instance);
+  expect(screen.getByRole('button', { name: /Enable audio/ })).toBeInTheDocument();
 });

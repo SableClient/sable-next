@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, type RenderResult } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
@@ -73,11 +75,11 @@ function permissions(canChangeJoinRule: boolean): RoomPermissionsView {
   };
 }
 
-async function render(
+async function setup(
   canChangeJoinRule: boolean,
   hasSpaceParent = false,
   isSpace = false
-): Promise<ReturnType<typeof mount>> {
+): Promise<RenderResult<typeof RoomSettingsDialog>> {
   core.roomPermissions.mockResolvedValue(permissions(canChangeJoinRule));
   core.roomPowerLevels.mockResolvedValue({
     ban: 50,
@@ -95,8 +97,7 @@ async function render(
   core.roomAliases.mockResolvedValue([]);
   core.roomDirectoryVisibility.mockResolvedValue(false);
   core.roomHasSpaceParent.mockResolvedValue(hasSpaceParent);
-  const instance = mount(RoomSettingsDialog, {
-    target: document.body,
+  const instance = render(RoomSettingsDialog, {
     props: {
       open: true,
       room: { ...room, is_space: isSpace },
@@ -109,34 +110,31 @@ async function render(
 }
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
 test('does not offer to replace an unsupported join rule without permission', async () => {
-  const instance = await render(false);
+  await setup(false);
 
-  expect(document.body.textContent).not.toContain('room.settingsJoinRuleUnsettable');
-
-  await unmount(instance);
+  expect(screen.queryByText(/room\.settingsJoinRuleUnsettable/)).not.toBeInTheDocument();
 });
 
 test('warns authorized users before replacing an unsupported join rule', async () => {
-  const instance = await render(true);
+  await setup(true);
 
-  expect(document.body.textContent).toContain('room.settingsJoinRuleUnsettable');
-
-  await unmount(instance);
+  expect(await screen.findByText(/room\.settingsJoinRuleUnsettable/)).toBeInTheDocument();
 });
 
 test('offers space-based rules to a room in a space', async () => {
-  const instance = await render(true, true);
+  await setup(true, true);
 
-  expect(document.body.textContent).toContain('room.settingsJoinRuleRestricted');
-  expect(document.body.textContent).toContain('room.settingsJoinRuleKnockRestricted');
-  expect(document.body.textContent).not.toContain('room.settingsJoinRuleUnsettable');
-
-  await unmount(instance);
+  expect(
+    await screen.findByRole('radio', { name: /room\.settingsJoinRuleRestricted/ })
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole('radio', { name: /room\.settingsJoinRuleKnockRestricted/ })
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/room\.settingsJoinRuleUnsettable/)).not.toBeInTheDocument();
 });
 
 test.each([false, true])('non-admins can inspect and copy data (space: %s)', async (isSpace) => {
@@ -149,44 +147,30 @@ test.each([false, true])('non-admins can inspect and copy data (space: %s)', asy
     if (type === 'm.space.child') return Promise.reject(new Error('state unavailable'));
     return Promise.resolve(type === 'm.room.avatar' ? [avatarEvent] : []);
   });
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  const clipboard = vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(writeText);
-  const instance = await render(false, false, isSpace);
-  const click = async (label: string) => {
-    const button = Array.from(document.querySelectorAll('button')).find((entry) =>
-      entry.textContent.includes(label)
-    );
-    if (!button) throw new Error(`Missing button: ${label}`);
-    button.click();
-    await tick();
-    await tick();
-  };
-  try {
-    await click('room.settingsDeveloper');
-    expect(document.body.textContent).toContain(
-      isSpace ? 'room.devSpaceDataTitle' : 'room.devRoomDataTitle'
-    );
-    expect(document.body.textContent).not.toContain('room.devSend');
-    await click('room.devDataLoad');
-    await vi.waitFor(() => {
-      expect(document.querySelector('#room-dev-data')).not.toBeNull();
-    });
-    const field = document.querySelector<HTMLTextAreaElement>('#room-dev-data');
-    if (!field) throw new Error('Missing diagnostic data');
-    const data: unknown = JSON.parse(field.value);
-    expect(field.readOnly).toBe(true);
-    expect(data).toMatchObject({
-      room: { room_id: room.room_id, is_space: isSpace, avatar_url: null },
-      cached_state: {
-        'm.room.avatar': { events: [avatarEvent] },
-        'm.space.child': { error: 'state unavailable' },
-      },
-    });
-    expect(core.roomStateEventsRaw).toHaveBeenCalledWith(room.room_id, 'm.space.parent', null);
-    await click('room.devDataCopy');
-    expect(writeText).toHaveBeenCalledWith(field.value);
-  } finally {
-    clipboard.mockRestore();
-    await unmount(instance);
-  }
+  const user = userEvent.setup();
+  await setup(false, false, isSpace);
+  const click = (label: string) =>
+    user.click(screen.getByRole('button', { name: new RegExp(label.replace('.', '\\.')) }));
+
+  await click('room.settingsDeveloper');
+  expect(
+    screen.getByRole('heading', {
+      name: isSpace ? 'room.devSpaceDataTitle' : 'room.devRoomDataTitle',
+    })
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/room\.devSend/)).not.toBeInTheDocument();
+  await click('room.devDataLoad');
+  const field = await screen.findByRole('textbox', { name: 'room.devDataJson' });
+  const data: unknown = JSON.parse((field as HTMLTextAreaElement).value);
+  expect(field).toHaveAttribute('readonly');
+  expect(data).toMatchObject({
+    room: { room_id: room.room_id, is_space: isSpace, avatar_url: null },
+    cached_state: {
+      'm.room.avatar': { events: [avatarEvent] },
+      'm.space.child': { error: 'state unavailable' },
+    },
+  });
+  expect(core.roomStateEventsRaw).toHaveBeenCalledWith(room.room_id, 'm.space.parent', null);
+  await click('room.devDataCopy');
+  expect(await navigator.clipboard.readText()).toBe((field as HTMLTextAreaElement).value);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -11,104 +12,84 @@ import { core } from '#lib/core/__mocks__/context.js';
 
 const enableRecovery = vi.fn(() => Promise.resolve('EsTa bLiS hEd'));
 Object.assign(core, { enableRecovery });
-const writeText = vi.fn(() => Promise.resolve());
-Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
 
 import RecoverySetupCard from './RecoverySetupCard.svelte';
 
-function render(recoveryKey: string | null = null) {
+function setup(recoveryKey: string | null = null) {
   const props = { recoveryKey, onComplete: vi.fn(), onSkip: vi.fn() };
-  const instance = mount(RecoverySetupCard, { target: document.body, props });
-  flushSync();
-  return { instance, ...props };
+  render(RecoverySetupCard, props);
+  return { user: userEvent.setup(), ...props };
 }
 
-const button = (name: RegExp) =>
-  [...document.querySelectorAll('button')].find((element) => name.test(element.textContent.trim()));
-const keyField = () => document.querySelector<HTMLInputElement>('#new-account-recovery-key');
+const button = (name: RegExp) => screen.queryByRole('button', { name });
+const keyField = () => screen.getByRole('textbox', { name: 'Recovery key' });
+const writtenDown = () => screen.getByRole('checkbox');
+const continueButton = () => screen.getByRole('button', { name: /^Continue$/ });
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
 test('a created key cannot be left before it is kept somewhere', async () => {
-  const { instance, onComplete } = render();
+  const { user, onComplete } = setup();
 
-  button(/Create recovery key/)?.click();
+  await user.click(screen.getByRole('button', { name: /Create recovery key/ }));
   await vi.waitFor(() => {
-    expect(keyField()?.value).toBe('EsTa bLiS hEd');
+    expect(keyField()).toHaveValue('EsTa bLiS hEd');
   });
-  expect(button(/Skip for now/)).toBeUndefined();
-  expect(button(/^Continue$/)?.disabled).toBe(true);
-  document.querySelector('form')?.requestSubmit();
+  expect(button(/Skip for now/)).not.toBeInTheDocument();
+  expect(continueButton()).toBeDisabled();
+  await user.type(keyField(), '{Enter}');
   expect(onComplete).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('copying the key is not enough without ticking the box', async () => {
-  const { instance, onComplete } = render('given key');
+  const { user, onComplete } = setup('given key');
 
-  button(/^Copy$/)?.click();
-  await vi.waitFor(() => {
-    expect(button(/^Copied$/)).toBeDefined();
-  });
-  expect(writeText).toHaveBeenCalledWith('given key');
-  expect(button(/^Continue$/)?.disabled).toBe(true);
-  document.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-  flushSync();
-  button(/^Continue$/)?.click();
+  await user.click(screen.getByRole('button', { name: /^Copy$/ }));
+  expect(await screen.findByRole('button', { name: /^Copied$/ })).toBeInTheDocument();
+  expect(await navigator.clipboard.readText()).toBe('given key');
+  expect(continueButton()).toBeDisabled();
+  await user.click(writtenDown());
+  await user.click(continueButton());
   expect(onComplete).toHaveBeenCalledOnce();
-
-  await unmount(instance);
 });
 
 test('downloading the key saves it as a text file but still needs the box', async () => {
-  const { instance } = render('given key');
+  const { user } = setup('given key');
 
-  button(/^Download$/)?.click();
-  await vi.waitFor(() => {
-    expect(button(/^Downloaded$/)).toBeDefined();
-  });
-  expect(button(/^Continue$/)?.disabled).toBe(true);
+  await user.click(screen.getByRole('button', { name: /^Download$/ }));
+  expect(await screen.findByRole('button', { name: /^Downloaded$/ })).toBeInTheDocument();
+  expect(continueButton()).toBeDisabled();
   expect(files.saveBytes).toHaveBeenCalledWith(
     new TextEncoder().encode('given key\n'),
     'sable-recovery-key.txt',
     'text/plain'
   );
-
-  await unmount(instance);
 });
 
 test('a cancelled download does not count as kept', async () => {
   files.saveBytes.mockResolvedValueOnce('cancelled' as never);
-  const { instance } = render('given key');
+  const { user } = setup('given key');
 
-  button(/^Download$/)?.click();
-  await Promise.resolve();
-  await Promise.resolve();
-  flushSync();
-  expect(button(/^Continue$/)?.disabled).toBe(true);
-
-  await unmount(instance);
+  await user.click(screen.getByRole('button', { name: /^Download$/ }));
+  await vi.waitFor(() => {
+    expect(files.saveBytes).toHaveBeenCalled();
+  });
+  expect(button(/^Downloaded$/)).not.toBeInTheDocument();
+  expect(continueButton()).toBeDisabled();
 });
 
 test('writing it down by hand is enough', async () => {
-  const { instance } = render('given key');
+  const { user } = setup('given key');
 
-  document.querySelector<HTMLInputElement>('input[type="checkbox"]')?.click();
-  flushSync();
-  expect(button(/^Continue$/)?.disabled).toBe(false);
-
-  await unmount(instance);
+  await user.click(writtenDown());
+  expect(continueButton()).toBeEnabled();
 });
 
-test('a key handed over from an identity reset is shown without creating another', async () => {
-  const { instance } = render('reset key');
+test('a key handed over from an identity reset is shown without creating another', () => {
+  setup('reset key');
 
-  expect(keyField()?.value).toBe('reset key');
+  expect(keyField()).toHaveValue('reset key');
   expect(enableRecovery).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });

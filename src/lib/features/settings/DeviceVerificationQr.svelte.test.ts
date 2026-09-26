@@ -1,13 +1,22 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { VerificationView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
-vi.mock('$app/navigation', () => ({ goto: vi.fn(() => Promise.resolve()) }));
-vi.mock('$app/state', () => ({ page: { state: {}, url: new URL('http://localhost/rooms') } }));
+const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
+vi.mock('$app/navigation', () => ({
+  goto: (_href: string, options?: { state?: Record<string, unknown> }) => {
+    Object.assign(history.state, options?.state);
+    return Promise.resolve();
+  },
+}));
+vi.mock('$app/state', () => ({
+  page: { state: history.state, url: new URL('http://localhost/rooms') },
+}));
 vi.mock('./VerificationQrScanner.svelte', async () => ({
   default: (await import('./ScannerStub.test.svelte')).default,
 }));
@@ -26,64 +35,54 @@ import DeviceVerificationDialog from './DeviceVerificationDialog.svelte';
 
 const code = { width: 21, modules: '1'.repeat(21 * 21) };
 
-function render(state: VerificationView) {
+function setup(state: VerificationView) {
   Object.assign(core, { verification: { flowId: 'flow', state } });
-  const instance = mount(DeviceVerificationDialog, { target: document.body });
-  flushSync();
-  return instance;
+  render(DeviceVerificationDialog);
+  return userEvent.setup();
 }
 
-const button = (name: RegExp) =>
-  [...document.querySelectorAll('button')].find((element) => name.test(element.textContent.trim()));
+const button = (name: RegExp) => screen.queryByRole('button', { name });
+const qr = () => screen.queryByRole('img', { name: 'Verification code' });
 
 afterEach(() => {
-  document.body.replaceChildren();
+  history.state.overlay = undefined;
   vi.clearAllMocks();
 });
 
 test('shows this device’s code with the logo, and offers the other ways', async () => {
-  const instance = render({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
+  const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
 
-  expect(document.querySelector('svg[aria-label="Verification code"] image')).not.toBeNull();
-  expect(button(/Scan their code instead/)).toBeDefined();
-  button(/Compare emoji instead/)?.click();
+  expect(qr()?.querySelector('image')).toBeInTheDocument();
+  expect(button(/Scan their code instead/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /Compare emoji instead/ }));
   expect(commands.startSasVerification).toHaveBeenCalledWith('@alice:example.org', 'flow');
-
-  await unmount(instance);
 });
 
 test('a scanned code goes to the core as base64', async () => {
-  const instance = render({ phase: 'choose', qr: code, can_scan: true, can_compare: false });
+  const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: false });
 
-  button(/Scan their code instead/)?.click();
-  flushSync();
-  expect(document.querySelector('svg[aria-label="Verification code"]')).toBeNull();
-  button(/scan stub/)?.click();
+  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  expect(qr()).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'scan stub' }));
 
   await vi.waitFor(() => {
     expect(commands.scanVerificationQr).toHaveBeenCalledWith('@alice:example.org', 'flow', 'TUH/');
   });
-  expect(button(/Compare emoji instead/)).toBeUndefined();
-
-  await unmount(instance);
+  expect(button(/Compare emoji instead/)).not.toBeInTheDocument();
 });
 
-test('without a code of our own, the scanner opens straight away', async () => {
-  const instance = render({ phase: 'choose', qr: null, can_scan: true, can_compare: true });
+test('without a code of our own, the scanner opens straight away', () => {
+  setup({ phase: 'choose', qr: null, can_scan: true, can_compare: true });
 
-  expect(button(/scan stub/)).toBeDefined();
-  expect(button(/Scan their code instead/)).toBeUndefined();
-
-  await unmount(instance);
+  expect(button(/scan stub/)).toBeInTheDocument();
+  expect(button(/Scan their code instead/)).not.toBeInTheDocument();
 });
 
 test('the other device scanning our code needs our confirmation', async () => {
-  const instance = render({ phase: 'scanned' });
+  const user = setup({ phase: 'scanned' });
 
-  button(/Yes, it worked/)?.click();
+  await user.click(screen.getByRole('button', { name: /Yes, it worked/ }));
   expect(commands.confirmVerification).toHaveBeenCalledWith('@alice:example.org', 'flow');
-  button(/^No$/)?.click();
+  await user.click(screen.getByRole('button', { name: /^No$/ }));
   expect(commands.cancelVerification).toHaveBeenCalledWith('@alice:example.org', 'flow', true);
-
-  await unmount(instance);
 });

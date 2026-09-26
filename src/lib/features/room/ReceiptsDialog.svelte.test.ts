@@ -1,9 +1,13 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { afterEach, expect, test, vi } from 'vitest';
 
 import ReceiptsDialog from './ReceiptsDialog.svelte';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 test('uses the draggable sheet for read receipts on mobile', async () => {
   vi.stubGlobal('matchMedia', () => ({
@@ -11,19 +15,11 @@ test('uses the draggable sheet for read receipts on mobile', async () => {
     addEventListener: () => {},
     removeEventListener: () => {},
   }));
-  const instance = mount(ReceiptsDialog, {
-    target: document.body,
-    props: {
-      open: true,
-      readers: [],
-      members: [],
-    },
-  });
-  await tick();
+  render(ReceiptsDialog, { open: true, readers: [], members: [] });
 
-  expect(document.querySelector('.bottom-sheet-grip')).not.toBeNull();
-  expect(document.querySelector('.bottom-sheet-handle')).not.toBeNull();
-
-  await unmount(instance);
-  vi.unstubAllGlobals();
+  const sheet = await screen.findByRole('dialog');
+  expect(sheet.querySelector('.bottom-sheet-grip')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Close read receipts' })).toHaveClass(
+    'bottom-sheet-handle'
+  );
 });

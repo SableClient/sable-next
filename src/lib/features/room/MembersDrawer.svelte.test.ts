@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -31,17 +33,24 @@ const observerBackup = globalThis.IntersectionObserver;
 
 afterEach(() => {
   offline.clear();
-  document.body.replaceChildren();
   localStorage.clear();
   setPreference('memberSort', 'name-asc');
   setPreference('groupMembersByPresence', true);
   globalThis.IntersectionObserver = observerBackup;
 });
 
+const user = userEvent.setup();
+const memberNames = () =>
+  screen
+    .queryAllByRole('button', { name: /^Open .*'s profile$/ })
+    .map((member) => member.querySelector('.member-name')?.textContent);
+const groups = () =>
+  screen.queryAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
+const drawer = () => screen.getByRole('complementary');
+
 test('sorts members by power then name and opens their profile', async () => {
   const onMemberProfile = vi.fn();
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -82,22 +91,14 @@ test('sorts members by power then name and opens their profile', async () => {
   });
   await tick();
 
-  const members = [
-    ...document.querySelectorAll<HTMLButtonElement>('.member.member-identity-button'),
-  ];
-  expect(members.map((member) => member.querySelector('.member-name')?.textContent)).toEqual([
-    'Amy',
-    'Bob',
-    'Zoe',
-  ]);
-  members[0]?.click();
-  expect(onMemberProfile).toHaveBeenCalledWith('@amy:example.org', members[0]);
-  await unmount(instance);
+  expect(memberNames()).toEqual(['Amy', 'Bob', 'Zoe']);
+  const amy = screen.getByRole('button', { name: "Open Amy's profile" });
+  await user.click(amy);
+  expect(onMemberProfile).toHaveBeenCalledWith('@amy:example.org', amy);
 });
 
 test('uses a role tag for its group, member colour and emoji', async () => {
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -119,15 +120,13 @@ test('uses a role tag for its group, member colour and emoji', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.group-label')?.textContent).toBe('🛡️Sentinel');
-  expect(document.querySelector('.member-identity-row .role-tag-icon')).toBeNull();
-  expect(document.querySelector('.member-name')?.getAttribute('style')).toContain('#cf0000');
-  await unmount(instance);
+  expect(groups()).toEqual(['🛡️Sentinel']);
+  expect(document.querySelector('.member-identity-row .role-tag-icon')).not.toBeInTheDocument();
+  expect(screen.getByText('Amy')).toHaveAttribute('style', expect.stringContaining('#cf0000'));
 });
 
 test('waits for room role tags instead of briefly rendering default labels', async () => {
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -149,49 +148,40 @@ test('waits for room role tags instead of briefly rendering default labels', asy
   });
   await tick();
 
-  expect(document.querySelector('.status')?.textContent).toContain('Loading members');
-  expect(document.querySelector('.group-label')).toBeNull();
-  await unmount(instance);
+  expect(screen.getByText(/Loading members/)).toBeInTheDocument();
+  expect(groups()).toEqual([]);
 });
 
 test('resizes the desktop drawer with the keyboard', async () => {
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() },
   });
   await tick();
 
-  const drawer = document.querySelector<HTMLElement>('.members-drawer');
-  const handle = document.querySelector<HTMLButtonElement>('.resize-handle');
-  handle?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-  await tick();
+  screen.getByRole('slider').focus();
+  await user.keyboard('{ArrowLeft}');
 
-  expect(drawer?.style.width).toBe('282px');
-  await unmount(instance);
+  expect(drawer().style.width).toBe('282px');
 });
 
 test('reopens the desktop drawer at the width it was resized to', async () => {
   const props = { loading: false, members: [], onClose: vi.fn(), onMemberProfile: vi.fn() };
-  const first = mount(MembersDrawer, { target: document.body, props });
+  const first = render(MembersDrawer, { props });
   await tick();
-  document
-    .querySelector<HTMLButtonElement>('.resize-handle')
-    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-  await tick();
-  await unmount(first);
+  screen.getByRole('slider').focus();
+  await user.keyboard('{ArrowLeft}');
+  first.unmount();
 
-  const second = mount(MembersDrawer, { target: document.body, props });
+  render(MembersDrawer, { props });
   await tick();
 
-  expect(document.querySelector<HTMLElement>('.members-drawer')?.style.width).toBe('282px');
-  await unmount(second);
+  expect(drawer().style.width).toBe('282px');
 });
 
 test('honours the sort preference and fetches the membership a filter names', async () => {
   setPreference('memberSort', 'name-desc');
   const loadMembership = vi.fn(() => Promise.resolve([]));
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -223,12 +213,8 @@ test('honours the sort preference and fetches the membership a filter names', as
   });
   await tick();
 
-  const names = [...document.querySelectorAll('.member .member-name')].map(
-    (node) => node.textContent
-  );
-  expect(names).toEqual(['Zoe', 'Amy']);
+  expect(memberNames()).toEqual(['Zoe', 'Amy']);
   expect(loadMembership).not.toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('renders a first page of members and grows when the sentinel shows', async () => {
@@ -256,27 +242,24 @@ test('renders a first page of members and grows when the sentinel shows', async 
     kicked: false,
     service: false,
   }));
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: { loading: false, members, onClose: vi.fn(), onMemberProfile: vi.fn() },
   });
   await tick();
 
-  expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(30);
-  expect(document.querySelector('.load-sentinel')).not.toBeNull();
+  expect(memberNames()).toHaveLength(30);
+  expect(document.querySelector('.load-sentinel')).toBeInTheDocument();
 
   observers[0]([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as never);
   await tick();
 
-  expect(document.querySelectorAll('.member.member-identity-button')).toHaveLength(40);
-  expect(document.querySelector('.load-sentinel')).toBeNull();
-  await unmount(instance);
+  expect(memberNames()).toHaveLength(40);
+  expect(document.querySelector('.load-sentinel')).not.toBeInTheDocument();
 });
 
 test('sinks members without presence under offline and drops service members', async () => {
   offline.add('@zoe:example.org');
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -317,23 +300,15 @@ test('sinks members without presence under offline and drops service members', a
   });
   await tick();
 
-  const names = [...document.querySelectorAll('.member .member-name')].map(
-    (node) => node.textContent
-  );
-  expect(names).toEqual(['Amy', 'Zoe']);
-  expect([...document.querySelectorAll('.group-label')].map((node) => node.textContent)).toEqual([
-    'Member',
-    'Offline',
-  ]);
-  expect(document.querySelector('header p')?.textContent).toBe('2 members');
-  await unmount(instance);
+  expect(memberNames()).toEqual(['Amy', 'Zoe']);
+  expect(groups()).toEqual(['Member', 'Offline']);
+  expect(screen.getByText('2 members')).toBeInTheDocument();
 });
 
 test('keeps power-level groups when presence grouping is off', async () => {
   setPreference('groupMembersByPresence', false);
   offline.add('@zoe:example.org');
-  const instance = mount(MembersDrawer, {
-    target: document.body,
+  render(MembersDrawer, {
     props: {
       loading: false,
       members: [
@@ -364,9 +339,5 @@ test('keeps power-level groups when presence grouping is off', async () => {
   });
   await tick();
 
-  expect([...document.querySelectorAll('.group-label')].map((node) => node.textContent)).toEqual([
-    'Admin',
-    'Member',
-  ]);
-  await unmount(instance);
+  expect(groups()).toEqual(['Admin', 'Member']);
 });

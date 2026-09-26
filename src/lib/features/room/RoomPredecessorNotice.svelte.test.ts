@@ -1,23 +1,20 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
 import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
 
 test('says the room continues another and opens it', async () => {
+  const user = userEvent.setup();
   const onOpen = vi.fn();
-  const instance = mount(RoomPredecessorNotice, { target: document.body, props: { onOpen } });
+  render(RoomPredecessorNotice, { onOpen });
 
-  expect(document.body.textContent).toContain(
-    'This room is a continuation of another conversation.'
-  );
-  const button = Array.from(document.querySelectorAll('button')).find(
-    (candidate) => candidate.textContent.trim() === 'View older messages'
-  );
-  button?.click();
-  flushSync();
+  expect(
+    screen.getByText('This room is a continuation of another conversation.')
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'View older messages' }));
 
   expect(onOpen).toHaveBeenCalledOnce();
-  await unmount(instance);
 });

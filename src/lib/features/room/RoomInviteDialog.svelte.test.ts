@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary, UserDirectoryEntryView } from '#src/generated/protocol';
@@ -20,7 +21,6 @@ import RoomInviteDialog from './RoomInviteDialog.svelte';
 const room = { room_id: '!room:example.org', name: 'Room', is_direct: false } as RoomSummary;
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.unstubAllGlobals();
 });
 
@@ -35,31 +35,16 @@ test('suggests people from the directory and invites the one picked', async () =
     results: [{ user_id: '@bob:example.org', display_name: 'Bob', avatar_url: null }],
   });
   core.inviteUser.mockResolvedValue(undefined);
-  const instance = mount(RoomInviteDialog, {
-    target: document.body,
-    props: { open: true, room, onOpenChange: () => {} },
-  });
+  const user = userEvent.setup();
+  render(RoomInviteDialog, { open: true, room, onOpenChange: () => {} });
 
-  const input = await vi.waitFor(() => {
-    const found = document.querySelector<HTMLInputElement>('#room-invite-user');
-    if (!found) throw new Error('invite input missing');
-    return found;
-  });
-  input.value = 'bo';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await user.type(await screen.findByRole('textbox', { name: 'Invite people' }), 'bo');
 
-  const suggestion = await vi.waitFor(() => {
-    expect(core.searchUserDirectory).toHaveBeenCalledWith('bo', 10);
-    const found = document.querySelector<HTMLButtonElement>('.suggestions button');
-    if (!found) throw new Error('suggestion missing');
-    return found;
-  });
-  expect(suggestion.textContent).toContain('@bob:example.org');
+  const suggestion = await screen.findByRole('button', { name: /@bob:example\.org/ });
+  expect(core.searchUserDirectory).toHaveBeenCalledWith('bo', 10);
 
-  suggestion.click();
+  await user.click(suggestion);
   await vi.waitFor(() => {
     expect(core.inviteUser).toHaveBeenCalledWith('!room:example.org', '@bob:example.org');
   });
-
-  await unmount(instance);
 });

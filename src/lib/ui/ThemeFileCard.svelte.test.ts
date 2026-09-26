@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { customThemes, replaceCustomThemes } from '#lib/settings/custom-themes.svelte.js';
@@ -15,7 +16,6 @@ kind: dark
 :root { --sable-bg-container: #101018; --sable-primary-main: #7c5cff; }`;
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.unstubAllGlobals();
   replaceCustomThemes({
     themes: [],
@@ -27,54 +27,35 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function button(label: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-    (node) => node.textContent.trim() === label
-  );
-}
-
 test('previews a shared theme and installs it once confirmed', async () => {
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.resolve(new Response(THEME)))
   );
-  const instance = mount(ThemeFileCard, {
-    target: document.body,
-    props: { src: 'blob:theme', name: 'night-owl.sable.css' },
-  });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.theme-file-name')?.textContent).toBe('Night Owl');
-  });
-  expect(document.querySelector('.theme-file-kind')?.textContent).toBe('Dark theme');
-  expect(document.querySelectorAll('.swatch')).toHaveLength(2);
+  const user = userEvent.setup();
+  const { container } = render(ThemeFileCard, { src: 'blob:theme', name: 'night-owl.sable.css' });
+  expect(await screen.findByText('Night Owl')).toBeInTheDocument();
+  expect(screen.getByText('Dark theme')).toBeInTheDocument();
+  expect(container.querySelectorAll('.swatch')).toHaveLength(2);
 
-  button('Install')?.click();
-  flushSync();
+  await user.click(screen.getByRole('button', { name: 'Install' }));
   expect(customThemes.themes).toEqual([]);
 
-  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
-    (node) => node.textContent.trim() === 'Install'
+  await user.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Install' })
   );
-  confirm?.click();
-  flushSync();
 
   expect(customThemes.themes.map((theme) => theme.name)).toEqual(['Night Owl']);
-  expect(button('Installed')?.disabled).toBe(true);
-  await unmount(instance);
+  expect(screen.getByRole('button', { name: 'Installed' })).toBeDisabled();
 });
 
 test('shows nothing for a css file that is not a theme', async () => {
   const fetch = vi.fn(() => Promise.resolve(new Response('.x { color: red }')));
   vi.stubGlobal('fetch', fetch);
-  const instance = mount(ThemeFileCard, {
-    target: document.body,
-    props: { src: 'blob:plain', name: 'plain.sable.css' },
-  });
+  render(ThemeFileCard, { src: 'blob:plain', name: 'plain.sable.css' });
   await vi.waitFor(() => {
     expect(fetch).toHaveBeenCalled();
   });
-  flushSync();
 
-  expect(document.querySelector('.theme-file-card')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });

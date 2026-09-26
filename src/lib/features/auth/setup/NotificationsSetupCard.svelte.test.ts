@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { flushSync } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -23,106 +25,88 @@ Object.assign(core, { setDefaultNotificationMode, defaultNotificationModes });
 
 import NotificationsSetupCard from './NotificationsSetupCard.svelte';
 
-async function render(askDefault = true) {
+async function setup(askDefault = true) {
   const props = { askDefault, onComplete: vi.fn(), onSkip: vi.fn() };
-  const instance = mount(NotificationsSetupCard, { target: document.body, props });
+  render(NotificationsSetupCard, props);
   await vi.waitFor(() => {
     expect(present.permissionState).toHaveBeenCalled();
   });
   await Promise.resolve();
   flushSync();
-  return { instance, ...props };
+  return { user: userEvent.setup(), ...props };
 }
 
-const button = (name: RegExp) =>
-  [...document.querySelectorAll('button')].find((element) => name.test(element.textContent.trim()));
-const radio = (name: RegExp) =>
-  [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((element) =>
-    name.test(element.textContent)
-  );
+const button = (name: RegExp) => screen.queryByRole('button', { name });
+const radio = (name: RegExp) => screen.queryByRole('radio', { name });
+const continueButton = () => screen.getByRole('button', { name: /^Continue$/ });
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
 test('mentions and keywords is the pre-selected group default, written to push rules', async () => {
-  const { instance, onComplete } = await render();
+  const { user, onComplete } = await setup();
 
-  expect(radio(/Mentions and keywords/)?.getAttribute('aria-checked')).toBe('true');
-  button(/^Continue$/)?.click();
+  expect(radio(/Mentions and keywords/)).toBeChecked();
+  await user.click(continueButton());
   await vi.waitFor(() => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
   expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'mentions');
-
-  await unmount(instance);
 });
 
 test('choosing all messages writes the spec default instead', async () => {
-  const { instance } = await render();
+  const { user } = await setup();
 
-  radio(/All messages/)?.click();
-  flushSync();
-  button(/^Continue$/)?.click();
+  await user.click(screen.getByRole('radio', { name: /All messages/ }));
+  await user.click(continueButton());
   await vi.waitFor(() => {
     expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'all');
   });
-
-  await unmount(instance);
 });
 
 test('shows the account’s saved group choice', async () => {
   defaultNotificationModes.mockResolvedValueOnce({ group: 'all', direct: 'all' });
-  const { instance } = await render();
-  expect(radio(/All messages/)?.getAttribute('aria-checked')).toBe('true');
-  await unmount(instance);
+  await setup();
+  expect(radio(/All messages/)).toBeChecked();
 });
 
 test('an account that already chose only asks this device for its permission', async () => {
-  const { instance, onComplete } = await render(false);
+  const { user, onComplete } = await setup(false);
 
-  expect(radio(/All messages/)).toBeUndefined();
-  button(/^Continue$/)?.click();
+  expect(radio(/All messages/)).not.toBeInTheDocument();
+  await user.click(continueButton());
   expect(onComplete).toHaveBeenCalledOnce();
   expect(setDefaultNotificationMode).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('the OS prompt runs inside the click, and a grant turns the alerts on', async () => {
-  const { instance } = await render();
+  await setup();
 
-  button(/Allow notifications/)?.click();
+  void fireEvent.click(screen.getByRole('button', { name: /Allow notifications/ }));
   expect(present.grantPermission).toHaveBeenCalledOnce();
   await vi.waitFor(() => {
     expect(prefs.setPreference).toHaveBeenCalledWith('systemNotifications', true);
   });
-  expect(button(/Allow notifications/)).toBeUndefined();
-  expect(document.body.textContent).toContain('Notifications are on');
-
-  await unmount(instance);
+  await vi.waitFor(() => {
+    expect(button(/Allow notifications/)).not.toBeInTheDocument();
+  });
+  expect(screen.getByText(/Notifications are on/)).toBeInTheDocument();
 });
 
 test('a permission already denied is not asked for again', async () => {
   present.permissionState.mockResolvedValueOnce('denied');
-  const { instance } = await render();
+  await setup();
 
-  expect(button(/Allow notifications/)).toBeUndefined();
-  expect(document.body.textContent).toContain('Notifications are off');
-
-  await unmount(instance);
+  expect(button(/Allow notifications/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Notifications are off/)).toBeInTheDocument();
 });
 
 test('a failed write stays on the step and says so', async () => {
   setDefaultNotificationMode.mockRejectedValueOnce(new Error('offline'));
-  const { instance, onComplete } = await render();
+  const { user, onComplete } = await setup();
 
-  button(/^Continue$/)?.click();
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain("couldn't be saved");
-  });
+  await user.click(continueButton());
+  expect(await screen.findByText(/couldn't be saved/)).toBeInTheDocument();
   expect(onComplete).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });

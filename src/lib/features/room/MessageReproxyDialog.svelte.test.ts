@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import MessageReproxyDialog from './MessageReproxyDialog.svelte';
@@ -18,14 +18,9 @@ test.each([
     addEventListener: () => {},
     removeEventListener: () => {},
   }));
-  const instance = mount(MessageReproxyDialog, {
-    target: document.body,
-    props: { open: true, personas: [], current: null, onChoose: () => {} },
-  });
-  await tick();
+  render(MessageReproxyDialog, { open: true, personas: [], current: null, onChoose: () => {} });
 
-  expect(document.querySelector('.bottom-sheet-grip') !== null).toBe(sheet);
-  expect(document.querySelector('.dialog-content-verification') !== null).toBe(!sheet);
-
-  await unmount(instance);
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog.querySelector('.bottom-sheet-grip') !== null).toBe(sheet);
+  expect(dialog.classList.contains('dialog-content-verification')).toBe(!sheet);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -28,7 +29,6 @@ import type { ShareInbox } from './share-inbox.svelte.js';
 import ShareTargetSheet from './ShareTargetSheet.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   mocks.rooms.length = 0;
   mocks.goto.mockClear();
   mocks.afterOverlayPops.mockReset();
@@ -56,10 +56,10 @@ test('picking a room navigates there only once the sheet has popped its history 
     clear,
   } as unknown as ShareInbox;
 
-  const instance = mount(ShareTargetSheet, { target: document.body, props: { inbox } });
-  await tick();
+  const user = userEvent.setup();
+  render(ShareTargetSheet, { inbox });
 
-  document.querySelector<HTMLButtonElement>('[role="option"]')?.click();
+  await user.click(await screen.findByRole('option', { name: /Alpha/ }));
   await vi.waitFor(() => {
     expect(mocks.afterOverlayPops).toHaveBeenCalled();
   });
@@ -72,5 +72,4 @@ test('picking a room navigates there only once the sheet has popped its history 
       replace: true,
     });
   });
-  await unmount(instance);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const presence = vi.hoisted(() => ({
@@ -56,7 +57,6 @@ function profileFor(userId: string) {
 }
 
 afterEach(() => {
-  document.body.replaceChildren();
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
   presence.entry = null;
@@ -79,35 +79,29 @@ test('tints the name from the profile and opens the profile card from the row', 
     animal: null,
     extra: [],
   });
+  const user = userEvent.setup();
   const onProfile = vi.fn();
-  const instance = mount(MemberIdentityRow, {
-    target: document.body,
-    props: {
-      userId: '@bob:example.org',
-      members,
-      onProfile,
-    },
-  });
-  await tick();
-  await tick();
+  render(MemberIdentityRow, { userId: '@bob:example.org', members, onProfile });
 
-  expect(document.querySelector('.member-name')?.classList.contains('tinted')).toBe(true);
-  const pronouns = document.querySelector('.sender-identity-pronouns');
-  expect(pronouns?.textContent.trim()).toBe('he/him');
-  expect(pronouns?.classList.contains('tinted')).toBe(true);
-  const row = document.querySelector<HTMLButtonElement>('.member-identity-button');
-  row?.click();
+  const row = screen.getByRole('button', { name: "Open Bob's profile" });
+  await vi.waitFor(() => {
+    expect(within(row).getByText('Bob')).toHaveClass('tinted');
+  });
+  expect(within(row).getByText('he/him').closest('.sender-identity-pronouns')).toHaveClass(
+    'tinted'
+  );
+  await user.click(row);
   expect(onProfile).toHaveBeenCalledWith('@bob:example.org', row);
-  await unmount(instance);
 });
 
 async function mountRow(props: Record<string, unknown>) {
-  const instance = mount(MemberIdentityRow, {
-    target: document.body,
+  const instance = render(MemberIdentityRow, {
     props: { userId: '@bob:example.org', members, ...props },
   });
-  await tick();
-  await tick();
+  await vi.waitFor(() => {
+    expect(core.userProfile).toHaveBeenCalled();
+  });
+  await Promise.resolve();
   return instance;
 }
 
@@ -116,33 +110,26 @@ test('shows the profile status, emoji first', async () => {
     ...profileFor('@bob:example.org'),
     status: { text: 'Shipping', emoji: '\u{1F680}' },
   });
-  const instance = await mountRow({ showStatus: true });
+  await mountRow({ showStatus: true });
 
-  expect(document.querySelector('.member-identity-status')?.textContent.trim()).toBe(
-    '\u{1F680}Shipping'
-  );
-  await unmount(instance);
+  expect(await screen.findByText('Shipping')).toHaveTextContent('\u{1F680}Shipping');
 });
 
 test('renders a medium presence marker', async () => {
   presence.entry = { presence: 'online', statusMessage: null };
-  const instance = await mountRow({});
+  await mountRow({});
 
   const dot = document.querySelector('[data-presence="online"]');
-  expect(dot?.classList.contains('presence-dot-medium')).toBe(true);
-  expect(dot?.classList.contains('presence-dot-large')).toBe(false);
-  await unmount(instance);
+  expect(dot).toHaveClass('presence-dot-medium');
+  expect(dot).not.toHaveClass('presence-dot-large');
 });
 
 test('falls back to the presence message when the profile has no status', async () => {
   core.userProfile.mockResolvedValue({ ...profileFor('@bob:example.org'), status: null });
   presence.entry = { presence: 'online', statusMessage: 'In a meeting' };
-  const instance = await mountRow({ showStatus: true });
+  await mountRow({ showStatus: true });
 
-  expect(document.querySelector('.member-identity-status')?.textContent.trim()).toBe(
-    'In a meeting'
-  );
-  await unmount(instance);
+  expect(await screen.findByText('In a meeting')).toBeInTheDocument();
 });
 
 test('leaves the status out unless the row asks for it', async () => {
@@ -150,8 +137,7 @@ test('leaves the status out unless the row asks for it', async () => {
     ...profileFor('@bob:example.org'),
     status: { text: 'Shipping', emoji: null },
   });
-  const instance = await mountRow({});
+  await mountRow({});
 
-  expect(document.querySelector('.member-identity-status')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByText('Shipping')).not.toBeInTheDocument();
 });

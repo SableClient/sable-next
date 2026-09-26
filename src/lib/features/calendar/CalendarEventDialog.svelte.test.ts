@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -11,7 +12,6 @@ import CalendarEventDialog from './CalendarEventDialog.svelte';
 afterEach(() => {
   preferences.dateFormat = 'auto';
   preferences.hour24Clock = false;
-  document.body.replaceChildren();
 });
 
 function item(overrides: Partial<CalendarItem>): CalendarItem {
@@ -36,12 +36,8 @@ async function open(
   value: CalendarItem | null,
   onSave = vi.fn<(draft: CalendarDraft) => Promise<void>>(() => Promise.resolve())
 ) {
-  mount(CalendarEventDialog, {
-    target: document.body,
-    props: { open: true, item: value, onOpenChange: vi.fn(), onSave },
-  });
-  await tick();
-  flushSync();
+  render(CalendarEventDialog, { open: true, item: value, onOpenChange: vi.fn(), onSave });
+  await screen.findByRole('dialog');
   return onSave;
 }
 
@@ -51,9 +47,13 @@ function fields(): string[] {
   );
 }
 
+async function save(): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+}
+
 test('shows Never for an event that does not repeat, and no until field', async () => {
   await open(null);
-  expect(document.querySelector('[data-select-trigger]')?.textContent).toContain('Never');
+  expect(screen.getByLabelText('Repeats')).toHaveTextContent('Never');
   expect(fields()).toEqual(['Starts', 'Ends']);
 });
 
@@ -75,7 +75,7 @@ test('offers the until date of a repeating event and saves it', async () => {
   );
   expect(fields()).toEqual(['Starts', 'Ends', 'Until']);
 
-  document.querySelector<HTMLFormElement>('form.calendar-form')?.requestSubmit();
+  await save();
   await vi.waitFor(() => {
     expect(onSave).toHaveBeenCalledOnce();
   });
@@ -88,7 +88,7 @@ test('edits an all-day event as dates, with an inclusive last day', async () => 
   );
   expect(document.querySelector('[data-segment="hour"]')).toBeNull();
 
-  document.querySelector<HTMLFormElement>('form.calendar-form')?.requestSubmit();
+  await save();
   await vi.waitFor(() => {
     expect(onSave).toHaveBeenCalledOnce();
   });

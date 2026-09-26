@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -40,8 +42,10 @@ function mountVideo() {
     width: 1920,
     height: 1080,
   });
-  return { instance: mount(MediaContent, { target: document.body, props }), props };
+  return { instance: render(MediaContent, { props }), props };
 }
+
+const playButton = () => screen.queryByRole('button', { name: /^Play / });
 
 async function settle(): Promise<void> {
   for (let i = 0; i < 6; i++) {
@@ -70,23 +74,21 @@ afterEach(() => {
   videoStreamMime.mockClear();
   delete (core as Record<string, unknown>).streamVideo;
   delete (core as Record<string, unknown>).videoStreamMime;
-  document.body.replaceChildren();
 });
 
 test('a re-encode does not start until the play button is pressed', async () => {
-  const { instance } = mountVideo();
+  mountVideo();
   await settle();
 
   expect(streamVideo).not.toHaveBeenCalled();
-  expect(document.querySelector('.media-play')).not.toBeNull();
-  await unmount(instance);
+  expect(playButton()).toBeInTheDocument();
 });
 
 test('a re-render does not restart the re-encode', async () => {
-  const { instance, props } = mountVideo();
+  const { props } = mountVideo();
   await settle();
 
-  document.querySelector<HTMLButtonElement>('.media-play')?.click();
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
   await settle();
   expect(streamVideo).toHaveBeenCalledTimes(1);
 
@@ -96,34 +98,31 @@ test('a re-render does not restart the re-encode', async () => {
   await settle();
 
   expect(streamVideo).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('a decodable video never reaches the re-encoder', async () => {
   resetVideoSupport();
   canPlayType('probably');
 
-  const { instance } = mountVideo();
+  mountVideo();
   await settle();
 
-  document.querySelector<HTMLButtonElement>('.media-play')?.click();
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
   await settle();
 
   expect(streamVideo).not.toHaveBeenCalled();
-  expect(document.querySelector('.media-play')).toBeNull();
-  await unmount(instance);
+  expect(playButton()).not.toBeInTheDocument();
 });
 
 test('a build without the native re-encoder leaves the video alone', async () => {
   videoStreamMime.mockRejectedValueOnce(new Error('unknown command'));
 
-  const { instance } = mountVideo();
+  mountVideo();
   await settle();
 
-  document.querySelector<HTMLButtonElement>('.media-play')?.click();
+  await userEvent.click(screen.getByRole('button', { name: /^Play / }));
   await settle();
 
   expect(streamVideo).not.toHaveBeenCalled();
-  expect(document.querySelector('.media-play')).toBeNull();
-  await unmount(instance);
+  expect(playButton()).not.toBeInTheDocument();
 });

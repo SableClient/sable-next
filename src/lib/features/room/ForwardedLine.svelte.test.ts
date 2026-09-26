@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -18,51 +19,42 @@ vi.mock('#lib/rooms/permalink.js', () => ({
 import ForwardedLine from './ForwardedLine.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   rooms.length = 0;
 });
 
-test('a forward from a joined room links to the original', async () => {
+test('a forward from a joined room links to the original', () => {
   rooms.push({ room_id: '!origin:example.org', name: 'Origin' } as RoomSummary);
-  const instance = mount(ForwardedLine, {
-    target: document.body,
-    props: {
-      forwarded: { timestamp: null, room_id: '!origin:example.org', event_id: '$event' },
-      roomId: '!here:example.org',
-    },
+  render(ForwardedLine, {
+    forwarded: { timestamp: null, room_id: '!origin:example.org', event_id: '$event' },
+    roomId: '!here:example.org',
   });
-  const link = document.querySelector('a');
-  expect(link?.textContent.trim()).toBe('Forwarded from Origin');
-  expect(link?.getAttribute('href')).toBe('/rooms/!origin:example.org?event=$event');
-  await unmount(instance);
+
+  expect(screen.getByRole('link', { name: 'Forwarded from Origin' })).toHaveAttribute(
+    'href',
+    '/rooms/!origin:example.org?event=$event'
+  );
 });
 
 test('a forward from earlier in the room jumps in place', async () => {
+  const user = userEvent.setup();
   const onJumpToEvent = vi.fn();
-  const instance = mount(ForwardedLine, {
-    target: document.body,
-    props: {
-      forwarded: { timestamp: null, room_id: '!here:example.org', event_id: '$event' },
-      roomId: '!here:example.org',
-      onJumpToEvent,
-    },
+  render(ForwardedLine, {
+    forwarded: { timestamp: null, room_id: '!here:example.org', event_id: '$event' },
+    roomId: '!here:example.org',
+    onJumpToEvent,
   });
-  const button = document.querySelector('button');
-  expect(button?.textContent.trim()).toBe('Forwarded from earlier');
-  button?.click();
+
+  await user.click(screen.getByRole('button', { name: 'Forwarded from earlier' }));
   expect(onJumpToEvent).toHaveBeenCalledWith('$event');
-  await unmount(instance);
 });
 
-test('a private forward names no origin', async () => {
-  const instance = mount(ForwardedLine, {
-    target: document.body,
-    props: {
-      forwarded: { timestamp: null, room_id: null, event_id: null },
-      roomId: '!here:example.org',
-    },
+test('a private forward names no origin', () => {
+  const { container } = render(ForwardedLine, {
+    forwarded: { timestamp: null, room_id: null, event_id: null },
+    roomId: '!here:example.org',
   });
-  expect(document.querySelector('a, button')).toBeNull();
-  expect(document.body.textContent.trim()).toBe('Forwarded');
-  await unmount(instance);
+
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  expect(container).toHaveTextContent(/^Forwarded$/);
 });

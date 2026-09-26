@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { MediaItem } from './MediaViewer.svelte';
@@ -83,167 +85,124 @@ function rect(width: number, height: number): DOMRect {
 
 afterEach(() => {
   core.fetchMedia.mockReset();
-  document.body.replaceChildren();
   vi.restoreAllMocks();
 });
 
+const user = userEvent.setup();
+
+function stage(): HTMLElement {
+  const element = document.querySelector<HTMLElement>('.stage');
+  if (!element) throw new Error('viewer stage missing');
+  return element;
+}
+
+async function openImage(
+  items: MediaItem[] = [imageItem],
+  onClose = () => {}
+): Promise<HTMLElement> {
+  render(MediaViewer, { items, selectedEventId: '$image', onClose });
+  return screen.findByRole('img');
+}
+
+async function swipe(from: number, to: number): Promise<void> {
+  await user.pointer([
+    { keys: '[TouchA>]', target: stage(), coords: { clientX: 100, clientY: from } },
+    { pointerName: 'TouchA', target: stage(), coords: { clientX: 100, clientY: to } },
+  ]);
+}
+
 test('renders a video attachment with a player and no zoom controls', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [videoItem], selectedEventId: '$video', onClose: () => {} },
-  });
+  render(MediaViewer, { items: [videoItem], selectedEventId: '$video', onClose: () => {} });
 
   await vi.waitFor(() => {
-    expect(document.querySelector('video')).not.toBeNull();
+    expect(document.querySelector('video')).toBeInTheDocument();
   });
 
-  expect(document.querySelector('.zoom-controls')).toBeNull();
-  expect(document.querySelector('.reset')).toBeNull();
-  expect(document.querySelector('[aria-label="viewer.downloadVideo"]')).not.toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('button', { name: 'viewer.zoomIn' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'viewer.reset' })).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'viewer.downloadVideo' })).toBeInTheDocument();
 });
 
 test('a spoiler opened in the viewer is not fetched or exposed before reveal', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: {
-      items: [{ ...imageItem, source: 'mxc://example.org/spoiler', spoiler: 'Ending' }],
-      selectedEventId: '$image',
-      onClose: () => {},
-    },
+  render(MediaViewer, {
+    items: [{ ...imageItem, source: 'mxc://example.org/spoiler', spoiler: 'Ending' }],
+    selectedEventId: '$image',
+    onClose: () => {},
   });
   await tick();
   expect(core.fetchMedia).not.toHaveBeenCalled();
-  expect(document.querySelector('img')).toBeNull();
-  expect(document.body.textContent).not.toContain('photo.png');
-  const reveal = document.querySelector<HTMLButtonElement>('.spoiler-reveal');
-  expect(reveal?.textContent).toContain('Ending');
-  reveal?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
-  await unmount(instance);
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(screen.queryByText(/photo\.png/)).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: /Ending/ }));
+  expect(await screen.findByRole('img')).toBeInTheDocument();
 });
 
 test('renders an audio attachment with a player', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [audioItem], selectedEventId: '$audio', onClose: () => {} },
-  });
+  render(MediaViewer, { items: [audioItem], selectedEventId: '$audio', onClose: () => {} });
 
   await vi.waitFor(() => {
-    expect(document.querySelector('audio')).not.toBeNull();
+    expect(document.querySelector('audio')).toBeInTheDocument();
   });
 
-  expect(document.querySelector('[aria-label="viewer.downloadAudio"]')).not.toBeNull();
-  await unmount(instance);
+  expect(screen.getByRole('button', { name: 'viewer.downloadAudio' })).toBeInTheDocument();
 });
 
 test('clamps pointer drag panning to the zoomed overflow', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [imageItem], selectedEventId: '$image', onClose: () => {} },
-  });
+  const img = await openImage();
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
-  const img = document.querySelector('img');
-  const stage = document.querySelector('.stage');
-  expect(stage).not.toBeNull();
+  await user.click(screen.getByRole('button', { name: 'viewer.zoomIn' }));
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: stage(), coords: { clientX: 0, clientY: 0 } },
+    { target: stage(), coords: { clientX: -5000, clientY: -5000 } },
+  ]);
 
-  document.querySelector<HTMLButtonElement>('[aria-label="viewer.zoomIn"]')?.click();
-  await tick();
+  expect(img.style.transform).toContain('translate(-400px, -300px)');
 
-  stage?.dispatchEvent(
-    new PointerEvent('pointerdown', { pointerId: 1, clientX: 0, clientY: 0, bubbles: true })
-  );
-  stage?.dispatchEvent(
-    new PointerEvent('pointermove', {
-      pointerId: 1,
-      clientX: -5000,
-      clientY: -5000,
-      bubbles: true,
-    })
-  );
-  await tick();
+  await user.pointer({ keys: '[/MouseLeft]', target: stage() });
+  await user.click(screen.getByRole('button', { name: 'viewer.reset' }));
 
-  expect(img?.style.transform).toContain('translate(-400px, -300px)');
-
-  stage?.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
-  document.querySelector<HTMLButtonElement>('.reset')?.click();
-  await tick();
-
-  expect(img?.style.transform).toContain('translate(0px, 0px)');
-  await unmount(instance);
+  expect(img.style.transform).toContain('translate(0px, 0px)');
 });
 
 test('arrow keys pan when zoomed and navigate otherwise', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: {
-      items: [imageItem, videoItem],
-      selectedEventId: '$image',
-      onClose: () => {},
-    },
-  });
+  const img = await openImage([imageItem, videoItem]);
+
+  await user.click(screen.getByRole('button', { name: 'viewer.zoomIn' }));
+  await user.keyboard('{ArrowRight}');
+
+  expect(img.style.transform).toContain('translate(-40px, 0px)');
+  expect(screen.getByText('Alice')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'viewer.reset' }));
+  await user.keyboard('{ArrowRight}');
 
   await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
+    expect(document.querySelector('video')).toBeInTheDocument();
   });
-
-  document.querySelector<HTMLButtonElement>('[aria-label="viewer.zoomIn"]')?.click();
-  await tick();
-
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-  await tick();
-
-  const img = document.querySelector('img');
-  expect(img?.style.transform).toContain('translate(-40px, 0px)');
-  expect(document.querySelector('strong')?.textContent).toBe('Alice');
-
-  document.querySelector<HTMLButtonElement>('.reset')?.click();
-  await tick();
-  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
-
-  await vi.waitFor(() => {
-    expect(document.querySelector('video')).not.toBeNull();
-  });
-  await unmount(instance);
 });
 
 test('takes a typed zoom percentage', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [imageItem], selectedEventId: '$image', onClose: () => {} },
-  });
+  const img = await openImage();
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
+  await user.click(screen.getByRole('button', { name: '100%' }));
 
-  document.querySelector<HTMLButtonElement>('button.zoom-level')?.click();
-  await tick();
+  const input = screen.getByRole('textbox', { name: 'viewer.setZoom' });
+  expect(input).toHaveValue('100');
+  await user.clear(input);
+  await user.type(input, '250{Enter}');
 
-  const input = document.querySelectorAll<HTMLInputElement>('.zoom-level input')[0];
-  expect(input.value).toBe('100');
-  input.value = '250';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  await tick();
-
-  expect(document.querySelector('img')?.style.transform).toContain('scale(2.5)');
-  expect(document.querySelector('button.zoom-level')?.textContent).toBe('250%');
-  await unmount(instance);
+  expect(img.style.transform).toContain('scale(2.5)');
+  expect(screen.getByRole('button', { name: '250%' })).toBeInTheDocument();
 });
 
 test('double click zooms in, and again returns to the fitted size', async () => {
@@ -251,139 +210,60 @@ test('double click zooms in, and again returns to the fitted size', async () => 
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const clock = vi.spyOn(Date, 'now');
   clock.mockReturnValue(1_000);
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [imageItem], selectedEventId: '$image', onClose: () => {} },
-  });
+  const img = await openImage();
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
-  const stage = document.querySelectorAll('.stage')[0];
+  const tap = () =>
+    user.pointer({ keys: '[MouseLeft]', target: stage(), coords: { clientX: 400, clientY: 300 } });
 
-  const tap = (): void => {
-    stage.dispatchEvent(
-      new PointerEvent('pointerdown', { pointerId: 1, clientX: 400, clientY: 300, bubbles: true })
-    );
-    stage.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
-  };
-
-  tap();
+  await tap();
   clock.mockReturnValue(1_100);
-  tap();
-  await tick();
+  await tap();
 
-  expect(document.querySelector('img')?.style.transform).toContain('scale(2)');
+  expect(img.style.transform).toContain('scale(2)');
 
   clock.mockReturnValue(2_000);
-  tap();
+  await tap();
   clock.mockReturnValue(2_100);
-  tap();
-  await tick();
+  await tap();
 
-  expect(document.querySelector('img')?.style.transform).toContain('scale(1)');
-  await unmount(instance);
+  expect(img.style.transform).toContain('scale(1)');
 });
 
 test('a downward swipe past the threshold dismisses the viewer', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onClose = vi.fn();
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [imageItem], selectedEventId: '$image', onClose },
-  });
+  const img = await openImage([imageItem], onClose);
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
-  const stage = document.querySelectorAll('.stage')[0];
+  await swipe(100, 220);
 
-  stage.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      pointerId: 1,
-      pointerType: 'touch',
-      clientX: 100,
-      clientY: 100,
-      bubbles: true,
-    })
-  );
-  stage.dispatchEvent(
-    new PointerEvent('pointermove', {
-      pointerId: 1,
-      pointerType: 'touch',
-      clientX: 100,
-      clientY: 220,
-      bubbles: true,
-    })
-  );
-  await tick();
+  expect(img.style.transform).toContain('translate(0px, 120px)');
 
-  expect(document.querySelector('img')?.style.transform).toContain('translate(0px, 120px)');
-
-  stage.dispatchEvent(
-    new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', bubbles: true })
-  );
+  await user.pointer({ keys: '[/TouchA]', target: stage() });
   expect(onClose).toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('a short swipe springs back instead of dismissing', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onClose = vi.fn();
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [imageItem], selectedEventId: '$image', onClose },
-  });
+  const img = await openImage([imageItem], onClose);
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('img')).not.toBeNull();
-  });
-  const stage = document.querySelectorAll('.stage')[0];
-
-  stage.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      pointerId: 1,
-      pointerType: 'touch',
-      clientX: 100,
-      clientY: 100,
-      bubbles: true,
-    })
-  );
-  stage.dispatchEvent(
-    new PointerEvent('pointermove', {
-      pointerId: 1,
-      pointerType: 'touch',
-      clientX: 100,
-      clientY: 130,
-      bubbles: true,
-    })
-  );
-  stage.dispatchEvent(
-    new PointerEvent('pointerup', { pointerId: 1, pointerType: 'touch', bubbles: true })
-  );
-  await tick();
+  await swipe(100, 130);
+  await user.pointer({ keys: '[/TouchA]', target: stage() });
 
   expect(onClose).not.toHaveBeenCalled();
-  expect(document.querySelector('img')?.style.transform).toContain('translate(0px, 0px)');
-
-  await unmount(instance);
+  expect(img.style.transform).toContain('translate(0px, 0px)');
 });
 
 test('closes instead of throwing when the selected media is no longer in the timeline', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onClose = vi.fn();
-  const instance = mount(MediaViewer, {
-    target: document.body,
-    props: { items: [], selectedEventId: '$image', onClose },
-  });
+  render(MediaViewer, { items: [], selectedEventId: '$image', onClose });
 
   await tick();
 
   expect(onClose).toHaveBeenCalled();
   expect(core.fetchMedia).not.toHaveBeenCalled();
-  expect(document.querySelector('.stage')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { render } from '@testing-library/svelte';
+import { flushSync, tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { SearchMetricsView } from '#src/generated/protocol';
@@ -63,15 +64,13 @@ test('it shows the crawl rate and budget from the core metrics', async () => {
   core.session = { account_id: 'account' };
   core.searchMetrics.mockResolvedValue(metrics);
 
-  const instance = mount(DeveloperSearchMetrics, { target: document.body });
+  render(DeveloperSearchMetrics);
   await settle();
 
   expect(row('search-rate')).toContain('3,000');
   expect(row('search-events')).toContain('6,000');
   expect(row('search-events')).toContain('20,000');
   expect(row('search-pushbacks')).toContain('3');
-
-  await unmount(instance);
 });
 
 test('it keeps polling while mounted and stops once unmounted', async () => {
@@ -79,14 +78,14 @@ test('it keeps polling while mounted and stops once unmounted', async () => {
   core.session = { account_id: 'account' };
   core.searchMetrics.mockResolvedValue(metrics);
 
-  const instance = mount(DeveloperSearchMetrics, { target: document.body });
+  const instance = render(DeveloperSearchMetrics);
   await settle();
   expect(core.searchMetrics).toHaveBeenCalledTimes(1);
 
   await vi.advanceTimersByTimeAsync(2000);
   expect(core.searchMetrics).toHaveBeenCalledTimes(2);
 
-  await unmount(instance);
+  instance.unmount();
   await vi.advanceTimersByTimeAsync(4000);
   expect(core.searchMetrics).toHaveBeenCalledTimes(2);
 });

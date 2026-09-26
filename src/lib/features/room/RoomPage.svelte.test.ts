@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -34,7 +35,6 @@ import RoomPage from './RoomPage.svelte';
 
 afterEach(() => {
   rendered.length = 0;
-  document.body.replaceChildren();
 });
 
 async function settle(): Promise<void> {
@@ -48,17 +48,16 @@ test('a joined room the list filters out still opens', async () => {
   const room = { room_id: '!old:example.org', state: 'joined' } as RoomSummary;
   const roomSummary = vi.fn(() => Promise.resolve(room));
   Object.assign(core, { roomSummary });
-  const instance = mount(RoomPage, { target: document.body });
+  render(RoomPage);
   await settle();
 
   expect(roomSummary).toHaveBeenCalledWith('!old:example.org');
   expect(rendered.at(-1)).toEqual({ kind: 'view', roomId: '!old:example.org', extra: room });
-  await unmount(instance);
 });
 
 test('a room we are not in goes through the join, with its via', async () => {
   Object.assign(core, { roomSummary: vi.fn(() => Promise.reject(new Error('unknown_room'))) });
-  const instance = mount(RoomPage, { target: document.body });
+  render(RoomPage);
   await settle();
 
   expect(rendered.at(-1)).toEqual({
@@ -66,15 +65,13 @@ test('a room we are not in goes through the join, with its via', async () => {
     roomId: '!old:example.org',
     extra: ['example.org'],
   });
-  await unmount(instance);
 });
 
 test('a room we left goes through the join', async () => {
   const room = { room_id: '!old:example.org', state: 'left' } as RoomSummary;
   Object.assign(core, { roomSummary: vi.fn(() => Promise.resolve(room)) });
-  const instance = mount(RoomPage, { target: document.body });
+  render(RoomPage);
   await settle();
 
   expect(rendered.at(-1)?.kind).toBe('join');
-  await unmount(instance);
 });

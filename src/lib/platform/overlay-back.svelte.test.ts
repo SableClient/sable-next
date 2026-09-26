@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import * as fakeHistory from './overlay-back-history.test.svelte.js';
@@ -24,25 +25,22 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.restoreAllMocks();
 });
 
 test('an open overlay holds one history entry', async () => {
   const onClose = vi.fn();
-  const component = mount(Harness, { target: document.body, props: { open: true, onClose } });
+  render(Harness, { props: { open: true, onClose } });
   await settle();
 
   expect(fakeHistory.entries()).toBe(2);
   expect(fakeHistory.pageStub.state.overlay).toBe(1);
   expect(onClose).not.toHaveBeenCalled();
-
-  void unmount(component);
 });
 
 test('a back press closes the overlay rather than leaving the page', async () => {
   const onClose = vi.fn();
-  const component = mount(Harness, { target: document.body, props: { open: true, onClose } });
+  render(Harness, { props: { open: true, onClose } });
   await settle();
 
   fakeHistory.go(-1);
@@ -50,15 +48,12 @@ test('a back press closes the overlay rather than leaving the page', async () =>
 
   expect(onClose).toHaveBeenCalledTimes(1);
   expect(fakeHistory.entries()).toBe(1);
-
-  void unmount(component);
 });
 
 test('back unwinds one level at a time when a second level is held', async () => {
   const onClose = vi.fn();
   const onCloseNested = vi.fn();
-  const component = mount(Harness, {
-    target: document.body,
+  render(Harness, {
     props: { open: true, nested: true, onClose, onCloseNested },
   });
   await settle();
@@ -71,20 +66,17 @@ test('back unwinds one level at a time when a second level is held', async () =>
   expect(onCloseNested).toHaveBeenCalledTimes(1);
   expect(onClose).not.toHaveBeenCalled();
   expect(fakeHistory.entries()).toBe(2);
-
-  void unmount(component);
 });
 
 test('closing from inside pops the entries it pushed, and no more', async () => {
   const onClose = vi.fn();
-  const component = mount(Harness, {
-    target: document.body,
+  const component = render(Harness, {
     props: { open: true, nested: true, onClose },
   });
   await settle();
   expect(fakeHistory.entries()).toBe(3);
 
-  void unmount(component);
+  component.unmount();
   await settle();
 
   expect(fakeHistory.entries()).toBe(1);

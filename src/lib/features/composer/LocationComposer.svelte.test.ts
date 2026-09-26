@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const geolocation = vi.hoisted(() => ({
@@ -21,68 +22,52 @@ vi.mock('#lib/i18n.js', () => ({
 import LocationComposer from './LocationComposer.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
-function render(onSend = vi.fn()): { instance: ReturnType<typeof mount>; onSend: typeof onSend } {
-  const instance = mount(LocationComposer, {
-    target: document.body,
-    props: { open: true, onSend },
-  });
-  return { instance, onSend };
+async function setup(onSend = vi.fn()) {
+  render(LocationComposer, { open: true, onSend });
+  await screen.findByRole('dialog');
+  return { user: userEvent.setup(), onSend };
 }
 
-function field(id: string): HTMLInputElement {
-  const element = document.querySelector(`#${id}`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`${id} not found`);
-  return element;
-}
+const latitude = () => screen.getByRole('textbox', { name: 'composer.locationLatitude' });
+const longitude = () => screen.getByRole('textbox', { name: 'composer.locationLongitude' });
+const send = () => screen.getByRole('button', { name: 'composer.locationSend' });
+const useCurrent = () => screen.queryByRole('button', { name: /composer\.locationUseCurrent/ });
 
-function fill(id: string, value: string): void {
-  const input = field(id);
-  input.value = value;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function button(label: string): HTMLButtonElement {
-  const found = [...document.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent.includes(label)
-  );
-  if (!found) throw new Error(`${label} not found`);
-  return found;
+async function fill(
+  user: ReturnType<typeof userEvent.setup>,
+  field: HTMLElement,
+  value: string
+): Promise<void> {
+  await user.clear(field);
+  await user.type(field, value);
 }
 
 test('sending stays disabled until the coordinates are in range', async () => {
-  const { instance } = render();
-  await tick();
+  const { user } = await setup();
 
-  expect(button('composer.locationSend').disabled).toBe(true);
+  expect(send()).toBeDisabled();
 
-  fill('location-latitude', '48.8584');
-  fill('location-longitude', '2.2945');
-  await tick();
+  await fill(user, latitude(), '48.8584');
+  await fill(user, longitude(), '2.2945');
 
-  expect(button('composer.locationSend').disabled).toBe(false);
+  expect(send()).toBeEnabled();
 
-  fill('location-latitude', '91');
-  await tick();
+  await fill(user, latitude(), '91');
 
-  expect(button('composer.locationSend').disabled).toBe(true);
-  await unmount(instance);
+  expect(send()).toBeDisabled();
 });
 
 test('a label rides along, and the coordinates stand in when there is none', async () => {
-  const { instance, onSend } = render();
-  await tick();
+  const { user, onSend } = await setup();
 
-  fill('location-latitude', '48.8584');
-  fill('location-longitude', '2.2945');
-  await tick();
-  button('composer.locationSend').click();
+  await fill(user, latitude(), '48.8584');
+  await fill(user, longitude(), '2.2945');
+  await user.click(send());
 
   expect(onSend).toHaveBeenCalledWith('48.8584,2.2945', 'geo:48.8584,2.2945');
-  await unmount(instance);
 });
 
 test('the current fix fills the fields', async () => {
@@ -90,43 +75,36 @@ test('the current fix fills the fields', async () => {
     kind: 'fix',
     fix: { latitude: 1.5, longitude: -2.5 },
   });
-  const { instance } = render();
-  await tick();
+  const { user } = await setup();
 
-  button('composer.locationUseCurrent').click();
+  const current = useCurrent();
+  if (!current) throw new Error('no current-location button');
+  await user.click(current);
   await vi.waitFor(() => {
-    expect(field('location-latitude').value).toBe('1.5');
+    expect(latitude()).toHaveValue('1.5');
   });
 
-  expect(field('location-longitude').value).toBe('-2.5');
-  await unmount(instance);
+  expect(longitude()).toHaveValue('-2.5');
 });
 
 test('a refused fix leaves manual entry usable', async () => {
   geolocation.currentFix.mockResolvedValue({ kind: 'denied' });
-  const { instance } = render();
-  await tick();
+  const { user } = await setup();
 
-  button('composer.locationUseCurrent').click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain(
-      'composer.locationDenied'
-    );
-  });
+  const current = useCurrent();
+  if (!current) throw new Error('no current-location button');
+  await user.click(current);
+  expect(await screen.findByRole('alert')).toHaveTextContent('composer.locationDenied');
 
-  fill('location-latitude', '1');
-  fill('location-longitude', '2');
-  await tick();
+  await fill(user, latitude(), '1');
+  await fill(user, longitude(), '2');
 
-  expect(button('composer.locationSend').disabled).toBe(false);
-  await unmount(instance);
+  expect(send()).toBeEnabled();
 });
 
 test('a webview without geolocation offers no button for it', async () => {
   geolocation.locates.mockReturnValue(false);
-  const { instance } = render();
-  await tick();
+  await setup();
 
-  expect(document.body.textContent).not.toContain('composer.locationUseCurrent');
-  await unmount(instance);
+  expect(useCurrent()).not.toBeInTheDocument();
 });

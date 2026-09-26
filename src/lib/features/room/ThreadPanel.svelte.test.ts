@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -19,7 +20,6 @@ import ThreadPanelHarness from './ThreadPanelHarness.test.svelte';
 afterEach(() => {
   vi.restoreAllMocks();
   core.fetchMedia.mockReset();
-  document.body.replaceChildren();
 });
 
 function image(eventId: string, filename: string): TimelineItemView {
@@ -66,24 +66,15 @@ test('an image in a thread opens the viewer on that image', async () => {
     return Promise.resolve();
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
-  const instance = mount(ThreadPanelHarness, {
-    target: document.body,
-    props: { panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} } },
+  const user = userEvent.setup();
+  render(ThreadPanelHarness, {
+    panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
   });
 
-  const second = await vi.waitFor(() => {
-    const button = document.querySelector<HTMLButtonElement>(
-      '[data-event-id="$second"] button.media-image'
-    );
-    if (!button) throw new Error('the thread image was not rendered');
-    return button;
-  });
-  second.click();
-  await tick();
+  await user.click(await screen.findByRole('button', { name: /second\.png/ }));
 
-  const viewer = document.querySelector('.viewer');
-  expect(viewer?.textContent).toContain('Alice');
-  expect(viewer?.textContent).toContain('2 of 2');
+  const viewer = await screen.findByRole('dialog', { name: 'Media viewer' });
+  expect(viewer).toHaveTextContent('Alice');
+  expect(viewer).toHaveTextContent('2 of 2');
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/second.png', 0, 0);
-  await unmount(instance);
 });

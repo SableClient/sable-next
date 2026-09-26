@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
@@ -10,12 +12,15 @@ vi.mock('#lib/core/context.js');
 import { core } from '#lib/core/__mocks__/context.js';
 vi.mock('$app/state', () => ({ page: { url: { pathname: '/home' }, params: {}, state: {} } }));
 vi.mock('$app/navigation', () => ({ goto: () => Promise.resolve() }));
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: {},
+  getDocument: () => ({ promise: new Promise(() => {}), destroy: () => Promise.resolve() }),
+}));
 
 import MediaContent from './MediaContent.svelte';
 
 afterEach(() => {
   core.fetchMedia.mockReset();
-  document.body.replaceChildren();
 });
 
 async function settle(): Promise<void> {
@@ -27,21 +32,20 @@ async function settle(): Promise<void> {
 }
 
 test.each([
-  { kind: 'video' as const, selector: 'video', width: 1920, height: 1080, start: '.media-play' },
+  { kind: 'video' as const, selector: 'video', width: 1920, height: 1080, start: /^Play / },
   { kind: 'audio' as const, selector: 'audio', width: null, height: null, start: null },
   {
     kind: 'file' as const,
     selector: 'a[download="report.pdf"]',
     width: null,
     height: null,
-    start: '.media-download',
+    start: /^Download/,
   },
 ])(
   'renders a $kind attachment from the original media',
   async ({ kind, selector, width, height, start }) => {
     core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-    const instance = mount(MediaContent, {
-      target: document.body,
+    render(MediaContent, {
       props: {
         kind,
         source: `mxc://example.org/${kind}`,
@@ -55,7 +59,7 @@ test.each([
     await settle();
     if (start !== null) {
       expect(core.fetchMedia).not.toHaveBeenCalled();
-      document.querySelector<HTMLButtonElement>(start)?.click();
+      await userEvent.click(screen.getByRole('button', { name: start }));
       await settle();
     }
 
@@ -65,14 +69,12 @@ test.each([
       expect(document.querySelector('video')?.getAttribute('width')).toBe('1920');
       expect(document.querySelector('video')?.getAttribute('height')).toBe('1080');
     }
-    await unmount(instance);
   }
 );
 
 test('renders the extension badge and human-readable size for a file attachment', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'file',
       source: 'mxc://example.org/file',
@@ -84,17 +86,15 @@ test('renders the extension badge and human-readable size for a file attachment'
 
   await settle();
 
-  expect(document.querySelector('.media-file-ext')?.textContent).toBe('zip');
-  expect(document.querySelector('.media-file-size')?.textContent).toBe('1.5 MB');
-  expect(document.querySelector('.media-download')?.textContent).toContain('Download (1.5 MB)');
-  await unmount(instance);
+  expect(screen.getByText('zip')).toHaveClass('media-file-ext');
+  expect(screen.getByText('1.5 MB')).toHaveClass('media-file-size');
+  expect(screen.getByText('Download (1.5 MB)')).toBeInTheDocument();
 });
 
 test('offers a PDF as a file plus a preview that opens the viewer', async () => {
   const onOpen = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'file',
       source: 'mxc://example.org/pdf',
@@ -106,11 +106,10 @@ test('offers a PDF as a file plus a preview that opens the viewer', async () => 
 
   await settle();
 
-  expect(document.querySelector('.pdf-viewer')).toBeNull();
-  expect(document.querySelector('a[download="report.pdf"]')).not.toBeNull();
-  document.querySelector<HTMLButtonElement>('.pdf-thumbnail')?.click();
+  expect(document.querySelector('.pdf-viewer')).not.toBeInTheDocument();
+  expect(document.querySelector('a[download="report.pdf"]')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Open report.pdf' }));
   expect(onOpen).toHaveBeenCalledTimes(1);
-  await unmount(instance);
 });
 
 test('previews a readable text attachment and leaves an opaque one alone', async () => {
@@ -120,8 +119,7 @@ test('previews a readable text attachment and leaves an opaque one alone', async
     vi.fn(() => Promise.resolve(new Response('{ "hello": "world" }')))
   );
 
-  const previewed = mount(MediaContent, {
-    target: document.body,
+  const previewed = render(MediaContent, {
     props: {
       kind: 'file',
       source: 'mxc://example.org/json',
@@ -134,13 +132,10 @@ test('previews a readable text attachment and leaves an opaque one alone', async
 
   await settle();
 
-  const preview = document.querySelector<HTMLButtonElement>('.text-preview');
-  expect(preview?.textContent).toContain('"hello"');
-  expect(preview?.getAttribute('aria-label')).toBe('Open payload.json');
-  await unmount(previewed);
+  expect(screen.getByRole('button', { name: 'Open payload.json' })).toHaveTextContent('"hello"');
+  previewed.unmount();
 
-  const opaque = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'file',
       source: 'mxc://example.org/zip',
@@ -151,16 +146,13 @@ test('previews a readable text attachment and leaves an opaque one alone', async
 
   await settle();
 
-  expect(document.querySelector('.text-preview')).toBeNull();
-  expect(document.querySelector('.text-open')).toBeNull();
-  await unmount(opaque);
+  expect(screen.queryByRole('button', { name: 'Open archive.zip' })).not.toBeInTheDocument();
   vi.unstubAllGlobals();
 });
 
 test('renders a voice message with a waveform when a waveform is present', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'audio',
       source: 'mxc://example.org/voice',
@@ -176,13 +168,11 @@ test('renders a voice message with a waveform when a waveform is present', async
   expect(document.querySelector('.voice-message-player')).not.toBeNull();
   expect(document.querySelectorAll('.voice-bar')).toHaveLength(5);
   expect(document.querySelector('audio.media-content')).toBeNull();
-  await unmount(instance);
 });
 
 test('falls back to the plain audio player when there is no waveform', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'audio',
       source: 'mxc://example.org/audio-no-waveform',
@@ -196,15 +186,13 @@ test('falls back to the plain audio player when there is no waveform', async () 
 
   expect(document.querySelector('.voice-message-player')).toBeNull();
   expect(document.querySelector('audio.media-content')).not.toBeNull();
-  await unmount(instance);
 });
 
 test('labels unavailable attachments', async () => {
   core.fetchMedia
     .mockRejectedValueOnce(new Error('media unavailable'))
     .mockResolvedValueOnce(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'file',
       source: 'mxc://example.org/unavailable-file',
@@ -215,15 +203,12 @@ test('labels unavailable attachments', async () => {
 
   await settle();
 
-  expect(document.querySelector('.media-error')?.textContent).toContain(
-    'report.pdf: Media unavailable'
-  );
-  document.querySelector<HTMLButtonElement>('.retry-media')?.click();
+  expect(screen.getByText(/report\.pdf: Media unavailable/)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /Retry/ }));
   await settle();
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(2);
-  expect(document.querySelector('.media-error')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByText(/Media unavailable/)).not.toBeInTheDocument();
 });
 
 test('shows the download percentage while the original is fetched', async () => {
@@ -235,12 +220,11 @@ test('shows the download percentage while the original is fetched', async () => 
     listeners.push(onEvent);
     return () => {};
   });
-  const instance = mount(MediaContent, {
-    target: document.body,
+  const instance = render(MediaContent, {
     props: { kind: 'file', source: 'mxc://example.org/big', mime: null, filename: 'big.zip' },
   });
   await settle();
-  document.querySelector<HTMLButtonElement>('.media-download')?.click();
+  await userEvent.click(screen.getByRole('button', { name: /^Download/ }));
   await settle();
 
   for (const listener of listeners) {
@@ -249,14 +233,13 @@ test('shows the download percentage while the original is fetched', async () => 
   }
   await tick();
 
-  expect(document.querySelector('.media-loading-label')?.textContent.trim()).toBe('40%');
-  await unmount(instance);
+  expect(screen.getByText('40%')).toHaveClass('media-loading-label');
+  instance.unmount();
   subscribe.mockImplementation(() => () => {});
 });
 
 test('a video shows its thumbnail and waits for play before fetching', async () => {
-  const instance = mount(MediaContent, {
-    target: document.body,
+  render(MediaContent, {
     props: {
       kind: 'video',
       source: 'mxc://example.org/waiting-video',
@@ -273,5 +256,4 @@ test('a video shows its thumbnail and waits for play before fetching', async () 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/waiting-poster', 800, 600);
   expect(document.querySelector('.media-poster')).not.toBeNull();
-  await unmount(instance);
 });

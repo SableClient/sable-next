@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const windows = vi.hoisted(() => ({
@@ -27,74 +27,61 @@ vi.mock('#lib/platform/window-decorations.js', () => ({
 import TitleBar from './TitleBar.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.useRealTimers();
   vi.clearAllMocks();
   windows.supported = true;
 });
 
-function maximize(): HTMLButtonElement {
-  const button = document.querySelector<HTMLButtonElement>('button[aria-label="Maximise"]');
-  if (!button) throw new Error('maximize button not found');
-  return button;
-}
+const maximize = () => screen.getByRole('button', { name: 'Maximise' });
 
 test('resting on maximize opens Snap Layouts and leaving hands it to the pointer', () => {
   vi.useFakeTimers();
-  const instance = mount(TitleBar, { target: document.body, props: { kind: 'desktop' } });
-  flushSync();
+  render(TitleBar, { kind: 'desktop' });
 
-  maximize().dispatchEvent(new MouseEvent('mouseenter'));
+  void fireEvent.mouseEnter(maximize());
   vi.advanceTimersByTime(600);
   expect(windows.show).not.toHaveBeenCalled();
   vi.advanceTimersByTime(20);
   expect(windows.show).toHaveBeenCalledOnce();
 
-  maximize().dispatchEvent(new MouseEvent('mouseleave'));
+  void fireEvent.mouseLeave(maximize());
   expect(windows.release).toHaveBeenCalledOnce();
-  void unmount(instance);
 });
 
 test('passing over maximize without resting opens nothing and closes nothing', () => {
   vi.useFakeTimers();
-  const instance = mount(TitleBar, { target: document.body, props: { kind: 'desktop' } });
-  flushSync();
+  render(TitleBar, { kind: 'desktop' });
 
-  maximize().dispatchEvent(new MouseEvent('mouseenter'));
+  void fireEvent.mouseEnter(maximize());
   vi.advanceTimersByTime(300);
-  maximize().dispatchEvent(new MouseEvent('mouseleave'));
-  maximize().click();
+  void fireEvent.mouseLeave(maximize());
+  void fireEvent.click(maximize());
   vi.advanceTimersByTime(1000);
 
   expect(windows.show).not.toHaveBeenCalled();
   expect(windows.release).not.toHaveBeenCalled();
   expect(windows.dismiss).not.toHaveBeenCalled();
-  void unmount(instance);
 });
 
 test('clicking maximize with the flyout open closes it first', () => {
   vi.useFakeTimers();
-  const instance = mount(TitleBar, { target: document.body, props: { kind: 'desktop' } });
-  flushSync();
+  render(TitleBar, { kind: 'desktop' });
 
-  maximize().dispatchEvent(new MouseEvent('mouseenter'));
+  void fireEvent.mouseEnter(maximize());
   vi.advanceTimersByTime(620);
-  maximize().click();
+  void fireEvent.click(maximize());
 
   expect(windows.dismiss).toHaveBeenCalledOnce();
   expect(windows.toggle).toHaveBeenCalledOnce();
-  void unmount(instance);
 });
 
 test('stays out of the way where Windows Snap Layouts do not exist', () => {
   vi.useFakeTimers();
   windows.supported = false;
-  const instance = mount(TitleBar, { target: document.body, props: { kind: 'desktop' } });
-  flushSync();
+  render(TitleBar, { kind: 'desktop' });
 
-  maximize().dispatchEvent(new MouseEvent('mouseenter'));
+  void fireEvent.mouseEnter(maximize());
   vi.advanceTimersByTime(1000);
 
   expect(windows.show).not.toHaveBeenCalled();
-  void unmount(instance);
 });

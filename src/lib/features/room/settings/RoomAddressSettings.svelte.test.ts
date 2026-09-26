@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomPowerLevelsView, RoomSummary } from '#src/generated/protocol';
@@ -30,31 +31,23 @@ const levels = {
 } as unknown as RoomPowerLevelsView;
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
   core.session = null;
 });
 
 test('a bare address is created on your own server, not the room id', async () => {
+  const user = userEvent.setup();
   core.session = { user_id: '@me:home.example' };
   const room = { room_id: '!v12roomhashwithoutserver' } as RoomSummary;
-  const instance = mount(RoomAddressSettings, {
-    target: document.body,
-    props: { room, levels, ownPowerLevel: 100 },
-  });
-  await tick();
+  render(RoomAddressSettings, { room, levels, ownPowerLevel: 100 });
 
-  const input = document.querySelector<HTMLInputElement>('input[aria-label="room.addressesAdd"]');
-  if (!input) throw new Error('address input missing');
-  input.value = 'lounge';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  flushSync();
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  await tick();
+  await user.type(
+    await screen.findByRole('textbox', { name: 'room.addressesAdd' }),
+    'lounge{Enter}'
+  );
 
   expect(core.createRoomAlias).toHaveBeenCalledWith(
     '!v12roomhashwithoutserver',
     '#lounge:home.example'
   );
-  void unmount(instance);
 });

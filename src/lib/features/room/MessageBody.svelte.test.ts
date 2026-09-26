@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemContentView, TimelineItemView } from '#src/generated/protocol';
@@ -14,6 +16,10 @@ core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   useRoomList: () => ({ rooms: [] }),
 }));
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: {},
+  getDocument: () => ({ promise: new Promise(() => {}), destroy: () => Promise.resolve() }),
+}));
 
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
@@ -22,7 +28,6 @@ import MessageBody from './MessageBody.svelte';
 afterEach(() => {
   setPreference('captionPosition', 'below');
   core.commands.fetchMedia.mockClear();
-  document.body.replaceChildren();
 });
 
 function item(content: TimelineItemContentView): TimelineItemView {
@@ -93,25 +98,18 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
 test.each(['image', 'video', 'audio', 'file'] as const)(
   'renders formatted mention and custom emote captions for %s attachments',
   async (kind) => {
-    const instance = mount(MessageBody, {
-      target: document.body,
-      props: { item: item(attachment(kind)), canRedactOthers: false },
-    });
+    render(MessageBody, { item: item(attachment(kind)), canRedactOthers: false });
     await tick();
 
-    const mention = document.querySelector<HTMLAnchorElement>('a[href*="matrix.to"]');
-    expect(mention?.dataset.matrixLink).toBe('user');
-    expect(mention?.textContent).toBe('@ana');
-    expect(document.querySelector('img[data-mx-emoticon]')?.getAttribute('alt')).toBe('party');
-
-    await unmount(instance);
+    const mention = screen.getByRole('link', { name: '@ana' });
+    expect(mention).toHaveAttribute('data-matrix-link', 'user');
+    expect(screen.getByRole('img', { name: 'party' })).toHaveAttribute('data-mx-emoticon');
   }
 );
 
 test('opens the selected gallery image', async () => {
   const onOpenMedia = vi.fn();
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'gallery',
@@ -152,19 +150,16 @@ test('opens the selected gallery image', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.gallery')).not.toBeNull();
-  expect(document.body.textContent).toContain('Weekend');
-  const images = document.querySelectorAll<HTMLButtonElement>('.gallery .media-image');
-  images.item(1).click();
+  expect(document.querySelector('.gallery')).toBeInTheDocument();
+  expect(screen.getByText('Weekend')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Open two.png' }));
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item:gallery:1');
-  await unmount(instance);
 });
 
 test('opens a gallery pdf in the viewer', async () => {
   const onOpenMedia = vi.fn();
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'gallery',
@@ -204,15 +199,13 @@ test('opens a gallery pdf in the viewer', async () => {
   await Promise.resolve();
   await tick();
 
-  document.querySelector<HTMLButtonElement>('.gallery .pdf-thumbnail')?.click();
+  await userEvent.click(screen.getByRole('button', { name: 'Open report.pdf' }));
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item:gallery:1');
-  await unmount(instance);
 });
 
 test('renders gallery items with their captions, sizes and waveforms', async () => {
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'gallery',
@@ -260,18 +253,14 @@ test('renders gallery items with their captions, sizes and waveforms', async () 
   await Promise.resolve();
   await tick();
 
-  expect(document.querySelector('.gallery .media-image')?.getAttribute('aria-label')).toBe(
-    'Open the beach'
-  );
-  expect(document.querySelector('.gallery .item-caption')?.textContent).toBe('the beach');
-  expect(document.querySelector('.gallery .voice-message-player')).not.toBeNull();
-  expect(document.querySelector('.gallery .media-file-size')?.textContent).toBe('1.5 MB');
-  await unmount(instance);
+  expect(screen.getByRole('button', { name: 'Open the beach' })).toBeInTheDocument();
+  expect(screen.getByText('the beach')).toHaveClass('item-caption');
+  expect(document.querySelector('.gallery .voice-message-player')).toBeInTheDocument();
+  expect(screen.getByText('1.5 MB')).toHaveClass('media-file-size');
 });
 
 test('hides a spoilered gallery item until it is revealed', async () => {
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'gallery',
@@ -296,20 +285,15 @@ test('hides a spoilered gallery item until it is revealed', async () => {
   });
   await tick();
 
-  expect(document.querySelectorAll('.gallery .media-image')).toHaveLength(1);
-  const reveal = document.querySelector<HTMLButtonElement>('.gallery .spoiler-reveal');
-  expect(reveal?.textContent).toContain('sunburn');
+  expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(1);
 
-  reveal?.click();
-  await tick();
+  await userEvent.click(screen.getByRole('button', { name: /sunburn/ }));
 
-  expect(document.querySelectorAll('.gallery .media-image')).toHaveLength(2);
-  await unmount(instance);
+  expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(2);
 });
 
 test('keeps an image filename hidden without the alt-text preference', async () => {
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'image',
@@ -330,23 +314,17 @@ test('keeps an image filename hidden without the alt-text preference', async () 
   });
   await tick();
 
-  expect(document.querySelector('.body')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByText('photo.png')).not.toBeInTheDocument();
 });
 
 test.each(['image', 'video', 'audio', 'file'] as const)(
   'renders a plain caption under a %s attachment',
   async (kind) => {
     const content = { ...attachment(kind), html: null } as TimelineItemContentView;
-    const instance = mount(MessageBody, {
-      target: document.body,
-      props: { item: item(content), canRedactOthers: false },
-    });
+    render(MessageBody, { item: item(content), canRedactOthers: false });
     await tick();
 
-    expect(document.querySelector('.body')?.textContent).toBe('caption');
-
-    await unmount(instance);
+    expect(screen.getByText('caption')).toHaveClass('body');
   }
 );
 
@@ -354,23 +332,17 @@ test.each(['image', 'video', 'audio', 'file'] as const)(
   'never reads a %s filename as a caption',
   async (kind) => {
     const content = { ...attachment(kind), html: null, caption: null } as TimelineItemContentView;
-    const instance = mount(MessageBody, {
-      target: document.body,
-      props: { item: item(content), canRedactOthers: false },
-    });
+    render(MessageBody, { item: item(content), canRedactOthers: false });
     await tick();
 
-    expect(document.querySelector('.body')).toBeNull();
-
-    await unmount(instance);
+    expect(document.querySelector('.body')).not.toBeInTheDocument();
   }
 );
 
 test.each(['javascript:alert(document.domain)', 'data:text/html,unsafe', 'geo:invalid'])(
   'does not turn an invalid location into a navigable link: %s',
   async (geoUri) => {
-    const instance = mount(MessageBody, {
-      target: document.body,
+    render(MessageBody, {
       props: {
         item: item({
           kind: 'location',
@@ -383,15 +355,13 @@ test.each(['javascript:alert(document.domain)', 'data:text/html,unsafe', 'geo:in
       },
     });
     await tick();
-    expect(document.querySelector('a[href]')).toBeNull();
-    expect(document.body.textContent).toContain('Here');
-    await unmount(instance);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText(/Here/)).toBeInTheDocument();
   }
 );
 
 test('opens a valid location using validated coordinates', async () => {
-  const instance = mount(MessageBody, {
-    target: document.body,
+  render(MessageBody, {
     props: {
       item: item({
         kind: 'location',
@@ -404,35 +374,26 @@ test('opens a valid location using validated coordinates', async () => {
     },
   });
   await tick();
-  expect(document.querySelector('a')?.getAttribute('href')).toBe('geo:48.8,2.3');
-  await unmount(instance);
+  expect(screen.getByRole('link')).toHaveAttribute('href', 'geo:48.8,2.3');
 });
 
 test.each(['image', 'video'] as const)(
   'hides %s spoilers and their captions until revealed',
   async (kind) => {
     const content = { ...attachment(kind), spoiler: 'Ending' } as TimelineItemContentView;
-    const instance = mount(MessageBody, {
-      target: document.body,
-      props: { item: item(content), canRedactOthers: false },
-    });
+    render(MessageBody, { item: item(content), canRedactOthers: false });
     await tick();
     expect(core.commands.fetchMedia).not.toHaveBeenCalled();
-    expect(document.querySelector('img, video, .formatted-body')).toBeNull();
-    const reveal = document.querySelector<HTMLButtonElement>('button');
-    expect(reveal?.textContent).toContain('Ending');
-    reveal?.click();
-    await tick();
-    expect(document.querySelector('.formatted-body')).not.toBeNull();
-    await unmount(instance);
+    expect(document.querySelector('img, video, .formatted-body')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Ending/ }));
+    expect(document.querySelector('.formatted-body')).toBeInTheDocument();
   }
 );
 
 test('live location expires without another SDK update and keeps its last known coordinates', async () => {
   vi.useFakeTimers();
   vi.setSystemTime(1_000);
-  const instance = mount(MessageBody, {
-    target: document.body,
+  const instance = render(MessageBody, {
     props: {
       item: item({
         kind: 'live_location',
@@ -447,54 +408,40 @@ test('live location expires without another SDK update and keeps its last known 
     },
   });
   await tick();
-  expect(document.body.textContent).toContain('Sharing live location');
+  expect(screen.getByText(/Sharing live location/)).toBeInTheDocument();
   await vi.advanceTimersByTimeAsync(1_000);
   await tick();
-  expect(document.body.textContent).toContain('Location sharing ended');
-  expect(document.querySelector('a')?.getAttribute('href')).toBe('geo:48.8,2.3');
-  await unmount(instance);
+  expect(screen.getByText(/Location sharing ended/)).toBeInTheDocument();
+  expect(screen.getByRole('link')).toHaveAttribute('href', 'geo:48.8,2.3');
+  instance.unmount();
   vi.useRealTimers();
 });
 
 test('a deleted message keeps its reason', async () => {
-  const instance = mount(MessageBody, {
-    target: document.body,
-    props: { item: item({ kind: 'redacted', reason: 'spam' }), canRedactOthers: false },
-  });
+  render(MessageBody, { item: item({ kind: 'redacted', reason: 'spam' }), canRedactOthers: false });
   await tick();
 
-  expect(document.querySelector('.redacted')?.textContent).toContain('spam');
-  await unmount(instance);
+  expect(screen.getByText(/spam/)).toBeInTheDocument();
 });
 
 test.each(['above', 'below', 'inline'] as const)(
   'places an attachment caption %s the media',
   async (position) => {
     setPreference('captionPosition', position);
-    const instance = mount(MessageBody, {
-      target: document.body,
-      props: { item: item(attachment('image')), canRedactOthers: false },
-    });
+    render(MessageBody, { item: item(attachment('image')), canRedactOthers: false });
     await tick();
 
     const wrapper = document.querySelector('.captioned');
-    expect(wrapper?.classList.contains(`caption-${position}`)).toBe(true);
-    expect(wrapper?.querySelector('.formatted-body')).not.toBeNull();
-
-    await unmount(instance);
+    expect(wrapper).toHaveClass(`caption-${position}`);
+    expect(wrapper?.querySelector('.formatted-body')).toBeInTheDocument();
   }
 );
 
 test.each(['image', 'file'] as const)('a hidden caption is not rendered for %s', async (kind) => {
   setPreference('captionPosition', 'hidden');
-  const instance = mount(MessageBody, {
-    target: document.body,
-    props: { item: item(attachment(kind)), canRedactOthers: false },
-  });
+  render(MessageBody, { item: item(attachment(kind)), canRedactOthers: false });
   await tick();
 
-  expect(document.querySelector('.formatted-body')).toBeNull();
-  expect(document.querySelector('.body')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByText('caption')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: '@ana' })).not.toBeInTheDocument();
 });

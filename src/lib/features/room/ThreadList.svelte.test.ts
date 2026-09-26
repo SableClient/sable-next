@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -49,7 +50,6 @@ const listThreads = vi.fn();
 Object.assign(core, { listThreads });
 
 afterEach(() => {
-  document.body.replaceChildren();
   listThreads.mockReset();
 });
 
@@ -77,45 +77,40 @@ function root(id: string, body: string): TimelineItemView {
   };
 }
 
+const rows = () => within(screen.getByRole('list')).getAllByRole('listitem');
+
 test('lists thread roots page by page and opens the one picked', async () => {
+  const user = userEvent.setup();
   listThreads
     .mockResolvedValueOnce({ roots: [root('$a', 'First topic')], next_batch: 'next' })
     .mockResolvedValueOnce({ roots: [root('$b', 'Second topic')], next_batch: null });
   const onOpenThread = vi.fn();
-  const instance = mount(ThreadList, {
-    target: document.body,
-    props: { roomId: '!room:example.org', members: [], onOpenThread, onClose: vi.fn() },
-  });
+  render(ThreadList, { roomId: '!room:example.org', members: [], onOpenThread, onClose: vi.fn() });
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.thread-root')).toHaveLength(1);
+    expect(rows()).toHaveLength(1);
   });
-  expect(document.querySelector('.thread-root .sender')?.textContent).toContain('Ana');
-  expect(document.querySelector('.thread-root .formatted-body')?.textContent).toContain(
-    'First topic'
-  );
+  expect(within(rows()[0]).getByText('Ana')).toBeInTheDocument();
+  expect(within(rows()[0]).getByText('First topic')).toBeInTheDocument();
 
-  document.querySelector<HTMLButtonElement>('.thread-list-more button')?.click();
+  await user.click(screen.getByRole('button', { name: 'Load more threads' }));
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.thread-root')).toHaveLength(2);
+    expect(rows()).toHaveLength(2);
   });
   expect(listThreads).toHaveBeenLastCalledWith('!room:example.org', 'next');
-  expect(document.querySelector('.thread-list-more')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Load more threads' })).not.toBeInTheDocument();
 
-  document.querySelectorAll<HTMLElement>('.thread-root .formatted-body')[1]?.click();
-  flushSync();
+  await user.click(within(rows()[1]).getByText('Second topic'));
   expect(onOpenThread).toHaveBeenCalledWith('$b');
-  await unmount(instance);
 });
 
 test('says so when a room has no threads', async () => {
   listThreads.mockResolvedValueOnce({ roots: [], next_batch: null });
-  const instance = mount(ThreadList, {
-    target: document.body,
-    props: { roomId: '!room:example.org', members: [], onOpenThread: vi.fn(), onClose: vi.fn() },
+  render(ThreadList, {
+    roomId: '!room:example.org',
+    members: [],
+    onOpenThread: vi.fn(),
+    onClose: vi.fn(),
   });
-  await tick();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.thread-list-status')).not.toBeNull();
-  });
-  await unmount(instance);
+
+  expect(await screen.findByText('No threads in this room yet.')).toBeInTheDocument();
 });

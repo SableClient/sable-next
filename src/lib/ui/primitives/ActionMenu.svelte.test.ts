@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const history = vi.hoisted(() => ({ state: {} as Record<string, unknown> }));
@@ -20,7 +21,6 @@ import ActionMenuHarness from './ActionMenuHarness.test.svelte';
 afterEach(() => {
   history.state.overlay = undefined;
   vi.unstubAllGlobals();
-  document.body.replaceChildren();
 });
 
 function narrowViewport(): void {
@@ -31,90 +31,62 @@ function narrowViewport(): void {
   }));
 }
 
-async function press(element: Element): Promise<void> {
-  element.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      button: 0,
-      isPrimary: true,
-    })
-  );
-  element.dispatchEvent(
-    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
-  );
-  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
-  await tick();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await tick();
-}
+test('a wide viewport opens the anchored menu, and Escape gives the page back', async () => {
+  const user = userEvent.setup();
+  render(ActionMenuHarness, { onPick: vi.fn() });
 
-test('a wide viewport opens the anchored menu', async () => {
-  const onPick = vi.fn();
-  const instance = mount(ActionMenuHarness, { target: document.body, props: { onPick } });
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'Room options' }));
 
-  const trigger = document.querySelector('.probe-trigger');
-  expect(trigger).not.toBeNull();
-  if (trigger) await press(trigger);
+  expect(await screen.findByRole('menu', { name: 'Room options' })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-  expect(document.querySelector('.menu-surface')).not.toBeNull();
-  expect(document.querySelector('.dialog-content-sheet')).toBeNull();
+  await user.keyboard('{Escape}');
 
-  await unmount(instance);
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(document.body.style.pointerEvents).toBe('');
+  });
 });
 
 test('a narrow viewport closes its sheet and then runs the menu action', async () => {
   narrowViewport();
+  const user = userEvent.setup();
   const onPick = vi.fn();
-  const instance = mount(ActionMenuHarness, { target: document.body, props: { onPick } });
-  await tick();
+  render(ActionMenuHarness, { onPick });
 
-  const trigger = document.querySelector('.probe-trigger');
-  expect(trigger).not.toBeNull();
-  if (trigger) await press(trigger);
+  await user.click(screen.getByRole('button', { name: 'Room options' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Mark as read' }));
 
-  const action = document.querySelector('[role="menu"] .menu-item');
-  expect(action).not.toBeNull();
-  if (action) await press(action);
-
-  expect(document.querySelector('.dialog-content-sheet')).toBeNull();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   await vi.waitFor(() => {
     expect(onPick).toHaveBeenCalledOnce();
   });
-  await unmount(instance);
 });
 
 test('a narrow viewport opens a bottom sheet, and a submenu pushes a second one', async () => {
   narrowViewport();
+  const user = userEvent.setup();
   const onPick = vi.fn();
-  const instance = mount(ActionMenuHarness, { target: document.body, props: { onPick } });
-  await tick();
+  render(ActionMenuHarness, { onPick });
 
-  const trigger = document.querySelector('.probe-trigger');
-  expect(trigger).not.toBeNull();
-  if (trigger) await press(trigger);
+  await user.click(screen.getByRole('button', { name: 'Room options' }));
 
-  expect(document.querySelectorAll('.dialog-content-sheet')).toHaveLength(1);
-  expect(document.querySelector('.menu-surface')).toBeNull();
+  expect(await screen.findAllByRole('dialog')).toHaveLength(1);
+  expect(screen.getAllByRole('menuitem').map((row) => row.textContent.trim())).toEqual([
+    'Mark as read',
+    'Notifications',
+  ]);
 
-  const rows = [...document.querySelectorAll('[role="menu"] .menu-item')];
-  expect(rows.map((row) => row.textContent.trim())).toEqual(['Mark as read', 'Notifications']);
+  await user.click(screen.getByRole('menuitem', { name: 'Notifications' }));
 
-  const submenu = rows[1];
-  await press(submenu);
+  expect(await screen.findAllByRole('dialog')).toHaveLength(2);
+  const checked = screen.getByRole('menuitemradio', { name: 'All messages' });
+  expect(checked).toBeChecked();
 
-  expect(document.querySelectorAll('.dialog-content-sheet')).toHaveLength(2);
-  const checked = document.querySelector('[role="menuitemradio"]');
-  expect(checked?.getAttribute('aria-checked')).toBe('true');
+  await user.click(checked);
 
-  if (checked) await press(checked);
-
-  expect(document.querySelectorAll('.dialog-content-sheet')).toHaveLength(0);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   await vi.waitFor(() => {
     expect(onPick).toHaveBeenCalledOnce();
   });
-
-  await unmount(instance);
 });

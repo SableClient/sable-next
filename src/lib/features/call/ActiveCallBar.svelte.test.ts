@@ -1,14 +1,10 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { expect, test, vi } from 'vitest';
 
 import ActiveCallBar from './ActiveCallBarHarness.test.svelte';
 import type { CallSession } from './call-session.svelte.js';
-
-afterEach(() => {
-  document.body.replaceChildren();
-});
 
 function session(lifecycle: CallSession['lifecycle'], mediaReady: boolean): CallSession {
   return {
@@ -25,24 +21,23 @@ function session(lifecycle: CallSession['lifecycle'], mediaReady: boolean): Call
   } as unknown as CallSession;
 }
 
-test('announces the call status', async () => {
-  const joining = mount(ActiveCallBar, {
-    target: document.body,
-    props: { session: session('joining', false), roomName: 'Sable voice', onReturn: vi.fn() },
+test('announces the call status', () => {
+  const joining = render(ActiveCallBar, {
+    session: session('joining', false),
+    roomName: 'Sable voice',
+    onReturn: vi.fn(),
   });
-  await tick();
 
-  expect(document.querySelector('[role="status"]')?.textContent).toContain('Joining call');
-  expect(document.querySelector('.call-bar')?.classList).not.toContain('live');
-  await unmount(joining);
+  expect(screen.getByRole('status')).toHaveTextContent('Joining call');
+  expect(joining.container.querySelector('.call-bar')).not.toHaveClass('live');
+  joining.unmount();
 
-  const active = mount(ActiveCallBar, {
-    target: document.body,
-    props: { session: session('active', true), roomName: 'Sable voice', onReturn: vi.fn() },
+  const active = render(ActiveCallBar, {
+    session: session('active', true),
+    roomName: 'Sable voice',
+    onReturn: vi.fn(),
   });
-  await tick();
 
-  expect(document.querySelector('[role="status"]')?.textContent).toContain('Connected');
-  expect(document.querySelector('.call-bar')?.classList).toContain('live');
-  await unmount(active);
+  expect(screen.getByRole('status')).toHaveTextContent('Connected');
+  expect(active.container.querySelector('.call-bar')).toHaveClass('live');
 });

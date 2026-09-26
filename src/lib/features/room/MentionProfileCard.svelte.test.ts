@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
+import { expect, test, vi } from 'vitest';
 
 import type { MutualRoomView, ProfileView } from '#src/generated/protocol';
 
@@ -68,13 +70,20 @@ const emptyProfile: ProfileView = {
 
 core.userRelations.mockResolvedValue({ mutualRooms: [], ignored: false });
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
+const user = userEvent.setup();
+
+async function press(element: Element | null | undefined): Promise<void> {
+  if (!element) throw new Error('nothing to press');
+  await user.click(element);
+}
+
+async function chooseAction(name: string): Promise<void> {
+  await user.click(screen.getByRole('button', { name: 'More actions' }));
+  await user.click(await screen.findByRole('menuitem', { name: new RegExp(name) }));
+}
 
 test('keeps the clicked room member identity when the global profile loads', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -99,12 +108,10 @@ test('keeps the clicked room member identity when the global profile loads', asy
 
   expect(document.querySelector('.profile-card-name')?.textContent).toBe('Room Alice');
   expect(document.querySelector('.profile-card-bio strong')?.textContent).toBe('Global bio');
-  await unmount(instance);
 });
 
 test('uses the room role name, emoji and colour when the profile has no name colour', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -127,12 +134,10 @@ test('uses the room role name, emoji and colour when the profile has no name col
   expect(document.querySelector('.profile-card-meta')?.textContent).toContain('🛡️');
   expect(document.querySelector('.profile-card-meta')?.textContent).toContain('Sentinel');
   expect(document.querySelector('.profile-card')?.getAttribute('style')).toContain('#cf0000');
-  await unmount(instance);
 });
 
 test('leaves out the bio and metadata panels when the profile has neither', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -145,14 +150,12 @@ test('leaves out the bio and metadata panels when the profile has neither', asyn
   expect(document.querySelector('.profile-card-bio')).toBeNull();
   expect(document.querySelector('.profile-card-meta')).toBeNull();
   expect(document.querySelector('.profile-card-footer')).toBeNull();
-  await unmount(instance);
 });
 
 test('opens a profile avatar through viewer callback', async () => {
   const onAvatarClick = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -163,20 +166,16 @@ test('opens a profile avatar through viewer callback', async () => {
   });
   await tick();
 
-  const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
-  if (!avatarButton) throw new Error('profile avatar button missing');
-  expect(avatarButton.getAttribute('aria-label')).toBe("View Alice's avatar");
-  expect(avatarButton.querySelector('.avatar-root')?.getAttribute('aria-hidden')).toBe('true');
-  avatarButton.click();
+  const avatarButton = screen.getByRole('button', { name: "View Alice's avatar" });
+  expect(avatarButton.querySelector('.avatar-root')).toHaveAttribute('aria-hidden', 'true');
+  await user.click(avatarButton);
 
   expect(onAvatarClick).toHaveBeenCalledWith('mxc://example.org/avatar', 'Alice');
-  await unmount(instance);
 });
 
 test('loads a member card avatar from the original media', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array([0x47, 0x49, 0x46, 0x38]));
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -188,14 +187,12 @@ test('loads a member card avatar from the original media', async () => {
   await vi.waitFor(() => {
     expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/animated', 0, 0);
   });
-  await unmount(instance);
 });
 
 test('sends a direct message from the composer', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   core.sendMessage.mockResolvedValue(undefined);
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -205,12 +202,7 @@ test('sends a direct message from the composer', async () => {
   });
   await tick();
 
-  const input = document.querySelector<HTMLInputElement>('.profile-composer-input');
-  if (!input) throw new Error('composer input missing');
-  input.value = 'hi there';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-  document.querySelector('.profile-composer')?.dispatchEvent(new Event('submit'));
+  await user.type(screen.getByRole('textbox'), 'hi there{Enter}');
   await vi.waitFor(() => {
     expect(core.sendMessage).toHaveBeenCalledWith('!dm:example.org', 'hi there');
   });
@@ -219,13 +211,11 @@ test('sends a direct message from the composer', async () => {
   await vi.waitFor(() => {
     expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
   });
-  await unmount(instance);
 });
 
 test('opens the chat without sending when the composer is empty', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -235,17 +225,15 @@ test('opens the chat without sending when the composer is empty', async () => {
   });
   await tick();
 
-  const submit = document.querySelector<HTMLButtonElement>('.profile-composer [type="submit"]');
-  expect(submit?.getAttribute('aria-label')).toBe('Open chat');
-  expect(submit?.disabled).toBe(false);
-  document.querySelector('.profile-composer')?.dispatchEvent(new Event('submit'));
+  const submit = screen.getByRole('button', { name: 'Open chat' });
+  expect(submit).toBeEnabled();
+  await user.click(submit);
   await vi.waitFor(() => {
     expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
   });
 
   expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
   expect(core.sendMessage).not.toHaveBeenCalled();
-  await unmount(instance);
 });
 
 function extraKeys(): string[] {
@@ -255,15 +243,14 @@ function extraKeys(): string[] {
 }
 
 async function openExtra(key: string): Promise<void> {
-  [...document.querySelectorAll<HTMLButtonElement>('.profile-keys button')]
-    .find((button) => button.textContent.trim() === key)
-    ?.click();
-  await tick();
+  const button = [...document.querySelectorAll<HTMLButtonElement>('.profile-keys button')].find(
+    (candidate) => candidate.textContent.trim() === key
+  );
+  await press(button);
 }
 
 test('renders the extended profile fields', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -293,16 +280,14 @@ test('renders the extended profile fields', async () => {
   const toggle = document.querySelector<HTMLButtonElement>('button.profile-extra');
   expect(toggle?.textContent.trim()).toBe('Show misc. data (1 value)');
   expect(toggle?.getAttribute('aria-expanded')).toBe('false');
-  toggle?.click();
+  await press(toggle);
   await tick();
   expect(toggle?.getAttribute('aria-expanded')).toBe('true');
   expect(extraKeys()).toEqual(['net.example.mood']);
-  await unmount(instance);
 });
 
 test('renders a flat map field as a collapsed key/value table and anything else as JSON', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -322,7 +307,7 @@ test('renders a flat map field as a collapsed key/value table and anything else 
   expect(toggle?.textContent.trim()).toBe('Show misc. data (2 values)');
   expect(document.querySelector('.profile-extra-open')).toBeNull();
 
-  toggle?.click();
+  await press(toggle);
   await tick();
   expect(extraKeys()).toEqual(['net.example.links', 'net.example.nested']);
 
@@ -339,19 +324,17 @@ test('renders a flat map field as a collapsed key/value table and anything else 
   ]);
   expect(document.querySelector('.profile-extra-open b')).toBeNull();
 
-  toggle?.click();
+  await press(toggle);
   await tick();
-  toggle?.click();
+  await press(toggle);
   await tick();
   await openExtra('net.example.nested');
   expect(document.querySelector('.profile-extra-open table')).toBeNull();
   expect(document.querySelector('.profile-extra-open')?.textContent.trim()).toBe('{"a":{"b":"c"}}');
-  await unmount(instance);
 });
 
 test('does not invent an animal need', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -367,12 +350,10 @@ test('does not invent an animal need', async () => {
   expect(document.querySelector('.profile-card-meta .profile-meta-item')?.textContent).toBe(
     'Is cat!'
   );
-  await unmount(instance);
 });
 
 test('reserves the metadata row while the profile is still loading', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -383,12 +364,10 @@ test('reserves the metadata row while the profile is still loading', async () =>
   await tick();
 
   expect(document.querySelectorAll('.profile-card-meta .skeleton')).toHaveLength(2);
-  await unmount(instance);
 });
 
 test('keeps a failed profile silent when the room member still names the user', async () => {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -410,13 +389,11 @@ test('keeps a failed profile silent when the room member still names the user', 
 
   expect(document.querySelector('[role="status"]')).toBeNull();
   expect(document.querySelector('.profile-card-name')?.textContent).toBe('Room Alice');
-  await unmount(instance);
 });
 
 test('collects an optional reason before kicking a member', async () => {
   core.kickUser.mockResolvedValue(undefined);
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -451,22 +428,14 @@ test('collects an optional reason before kicking a member', async () => {
   });
   await tick();
 
-  document
-    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
-    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  await tick();
-  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
-    if (item.textContent.includes('Remove from room')) item.click();
-  });
-  await tick();
+  await chooseAction('Remove from room');
 
-  const reasonInput = document.querySelector<HTMLInputElement>('.moderation input');
-  if (!reasonInput) throw new Error('reason input missing');
-  reasonInput.value = 'spamming links';
-  reasonInput.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-
-  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
+  const dialog = await screen.findByRole('dialog');
+  await user.type(
+    within(dialog).getByRole('textbox', { name: 'Reason (optional, shown to the room)' }),
+    'spamming links'
+  );
+  await user.click(within(dialog).getByRole('button', { name: 'Remove from room' }));
   await vi.waitFor(() => {
     expect(core.kickUser).toHaveBeenCalledWith(
       '!room:example.org',
@@ -474,14 +443,11 @@ test('collects an optional reason before kicking a member', async () => {
       'spamming links'
     );
   });
-
-  await unmount(instance);
 });
 
 test('sends no reason when the moderation reason is left blank', async () => {
   core.banUser.mockResolvedValue(undefined);
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -516,26 +482,17 @@ test('sends no reason when the moderation reason is left blank', async () => {
   });
   await tick();
 
-  document
-    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
-    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  await tick();
-  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
-    if (item.textContent.includes('Ban from room')) item.click();
-  });
-  await tick();
+  await chooseAction('Ban from room');
 
-  document.querySelector<HTMLButtonElement>('.moderation-actions .btn-danger')?.click();
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('button', { name: 'Ban from room' }));
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });
-
-  await unmount(instance);
 });
 
 async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<void> {
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  const instance = render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -571,20 +528,8 @@ async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<vo
   });
   await tick();
 
-  document
-    .querySelector<HTMLButtonElement>('[aria-label="More actions"]')
-    ?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-  await tick();
-  document.querySelectorAll<HTMLElement>('[role="menuitem"]').forEach((item) => {
-    if (item.textContent.includes('Change role')) item.click();
-  });
-  await vi.waitFor(() => {
-    const moderator = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-      (item) => item.textContent.includes('Moderator')
-    );
-    if (!moderator) throw new Error('moderator item missing');
-    moderator.click();
-  });
+  await chooseAction('Change role');
+  await user.click(await screen.findByRole('menuitem', { name: /Moderator/ }));
   await vi.waitFor(() => {
     expect(core.setUserPowerLevel).toHaveBeenCalledWith(
       '!room:example.org',
@@ -593,7 +538,7 @@ async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<vo
     );
   });
   await Promise.resolve();
-  await unmount(instance);
+  instance.unmount();
 }
 
 test('reports a successful role change so the member list can follow it', async () => {
@@ -630,8 +575,7 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
     ],
     ignored: false,
   });
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -639,22 +583,7 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
       profile: emptyProfile,
     },
   });
-  const rooms = await vi.waitFor(() => {
-    const chip = [...document.querySelectorAll<HTMLButtonElement>('.profile-action')].find(
-      (button) => button.textContent.includes('2 mutual rooms')
-    );
-    if (!chip) throw new Error('mutual rooms chip not rendered');
-    return chip;
-  });
-  rooms.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      button: 0,
-      isPrimary: true,
-    })
-  );
+  await user.click(await screen.findByRole('button', { name: /2 mutual rooms/ }));
   await tick();
   await tick();
 
@@ -663,7 +592,6 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
   );
   expect(names).toEqual(['General', 'Alice']);
   expect(document.querySelector('.profile-card-bio')).toBeNull();
-  await unmount(instance);
 });
 
 test('moves the mutual rooms and spaces into the overflow menu when the row cannot fit them', async () => {
@@ -694,8 +622,7 @@ test('moves the mutual rooms and spaces into the overflow menu when the row cann
     ],
     ignored: false,
   });
-  const instance = mount(MentionProfileCard, {
-    target: document.body,
+  render(MentionProfileCard, {
     props: {
       userId: '@alice:example.org',
       roomId: '!room:example.org',
@@ -703,31 +630,16 @@ test('moves the mutual rooms and spaces into the overflow menu when the row cann
       profile: emptyProfile,
     },
   });
+
   await vi.waitFor(() => {
     expect(core.userRelations).toHaveBeenCalled();
   });
-  document.querySelector('.profile-action-overflow')?.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      button: 0,
-      isPrimary: true,
-    })
-  );
+  await user.click(screen.getByRole('button', { name: 'More actions' }));
 
-  const items = await vi.waitFor(() => {
-    const labels = [...document.querySelectorAll('[role="menuitem"]')].map(
-      (node) => node.textContent
-    );
-    if (labels.length === 0) throw new Error('overflow menu not open');
-    return labels;
-  });
-  expect(items.some((label) => label.includes('1 mutual room'))).toBe(true);
-  expect(items.some((label) => label.includes('1 mutual space'))).toBe(true);
-  const chips = [...document.querySelectorAll('.profile-action')].map((node) => node.textContent);
-  expect(chips.some((label) => label.includes('mutual'))).toBe(false);
-  await unmount(instance);
+  expect(await screen.findByRole('menuitem', { name: /1 mutual room/ })).toBeTruthy();
+  expect(screen.getByRole('menuitem', { name: /1 mutual space/ })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: /1 mutual room/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /1 mutual space/ })).toBeNull();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -735,8 +647,7 @@ test('moves the mutual rooms and spaces into the overflow menu when the row cann
 test('shows a misc field in full as JSON with developer tools on, and a preview without', async () => {
   const value = JSON.stringify({ site: 'x'.repeat(300) });
   const open = async () => {
-    const instance = mount(MentionProfileCard, {
-      target: document.body,
+    const instance = render(MentionProfileCard, {
       props: {
         userId: '@alice:example.org',
         roomId: '!room:example.org',
@@ -745,25 +656,24 @@ test('shows a misc field in full as JSON with developer tools on, and a preview 
       },
     });
     await tick();
-    document.querySelector<HTMLButtonElement>('button.profile-extra')?.click();
+    await press(document.querySelector('button.profile-extra'));
     await tick();
-    document.querySelector<HTMLButtonElement>('.profile-keys button')?.click();
+    await press(document.querySelector('.profile-keys button'));
     await tick();
     return instance;
   };
 
   preferences.developerTools = true;
-  let instance = await open();
+  const instance = await open();
   expect(document.querySelector('.profile-extra-json')?.textContent).toBe(
     JSON.stringify(JSON.parse(value), null, 2)
   );
-  await unmount(instance);
+  instance.unmount();
 
   preferences.developerTools = false;
-  instance = await open();
+  await open();
   expect(document.querySelector('.profile-extra-json')).toBeNull();
   expect(document.querySelector('.profile-extra-open')?.textContent.trim()).toBe(
     value.slice(0, 256)
   );
-  await unmount(instance);
 });

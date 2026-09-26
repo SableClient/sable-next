@@ -1,4 +1,5 @@
-import { mount, tick, unmount } from 'svelte';
+import { render } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -52,14 +53,13 @@ test.each(['thread', 'focused'] as const)('%s receipt scope is respected', async
   timeline.mode = kind === 'thread' ? { kind, rootEventId: '$root' } : { kind, eventId: '$latest' };
   timeline.items = [item()];
   const read = vi.fn().mockResolvedValue(undefined);
-  const instance = mount(TimelineReadReceipt, {
-    target: document.body,
+  const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', onRead: read },
   });
   await tick();
   await vi.advanceTimersByTimeAsync(500);
   expect(read).toHaveBeenCalledTimes(kind === 'thread' ? 1 : 0);
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -69,8 +69,7 @@ test('does not duplicate a read receipt while the first request is pending', asy
   timeline.items = [item()];
   const pending = deferred<undefined>();
   const read = vi.fn(() => pending.promise);
-  const instance = mount(TimelineReadReceipt, {
-    target: document.body,
+  const instance = render(TimelineReadReceipt, {
     props: {
       timeline,
       visibleEventId: '$latest',
@@ -86,7 +85,7 @@ test('does not duplicate a read receipt while the first request is pending', asy
 
   expect(read).toHaveBeenCalledTimes(1);
   pending.resolve(undefined);
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -95,8 +94,7 @@ test('a queued receipt is discarded when switching to focused history', async ()
   const timeline = new RoomTimeline({} as CoreClient);
   timeline.items = [item()];
   const read = vi.fn().mockResolvedValue(undefined);
-  const instance = mount(TimelineReadReceipt, {
-    target: document.body,
+  const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', onRead: read },
   });
   await tick();
@@ -104,7 +102,7 @@ test('a queued receipt is discarded when switching to focused history', async ()
   await tick();
   await vi.advanceTimersByTimeAsync(500);
   expect(read).not.toHaveBeenCalled();
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -114,14 +112,13 @@ test('a focused timeline read to the live end sends a receipt', async () => {
   timeline.mode = { kind: 'focused', eventId: '$latest' };
   timeline.items = [item()];
   const read = vi.fn().mockResolvedValue(undefined);
-  const instance = mount(TimelineReadReceipt, {
-    target: document.body,
+  const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$latest', atLatest: true, onRead: read },
   });
   await tick();
   await vi.advanceTimersByTimeAsync(500);
   expect(read).toHaveBeenCalledWith('$latest');
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -135,7 +132,7 @@ test('a fast scroll across many rows sends one receipt for the newest', async ()
   timeline.items = [itemWithId('a'), itemWithId('b'), itemWithId('c')];
   const read = vi.fn(() => Promise.resolve(undefined));
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   props.visibleEventId = '$b';
@@ -150,7 +147,7 @@ test('a fast scroll across many rows sends one receipt for the newest', async ()
   expect(read).toHaveBeenCalledTimes(1);
   expect(read).toHaveBeenCalledWith('$c');
 
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -164,7 +161,7 @@ test('waits for the current receipt before sending the newer one', async () => {
     .mockImplementationOnce(() => first.promise)
     .mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
@@ -177,7 +174,7 @@ test('waits for the current receipt before sending the newer one', async () => {
   await tick();
 
   expect(read).toHaveBeenNthCalledWith(2, '$b');
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -188,7 +185,7 @@ test('drops an older candidate queued while a newer receipt is pending', async (
   const newest = deferred<undefined>();
   const read = vi.fn(() => newest.promise);
   const props = $state({ timeline, visibleEventId: '$c', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
@@ -198,7 +195,7 @@ test('drops an older candidate queued while a newer receipt is pending', async (
   await tick();
 
   expect(read).toHaveBeenCalledTimes(1);
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -209,13 +206,13 @@ test('does not flush a queued receipt after unmount', async () => {
   const first = deferred<undefined>();
   const read = vi.fn(() => first.promise);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
   props.visibleEventId = '$c';
   await tick();
-  await unmount(instance);
+  instance.unmount();
   first.resolve(undefined);
   await tick();
 
@@ -233,7 +230,7 @@ test('keeps the newest queued receipt when the viewport moves backward', async (
     .mockImplementationOnce(() => first.promise)
     .mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
@@ -245,7 +242,7 @@ test('keeps the newest queued receipt when the viewport moves backward', async (
   await tick();
 
   expect(read).toHaveBeenNthCalledWith(2, '$c');
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -259,7 +256,7 @@ test('flushes the queued newer receipt after hiding during an in-flight request'
     .mockImplementationOnce(() => first.promise)
     .mockResolvedValue(undefined);
   const props = $state({ timeline, visibleEventId: '$a', onRead: read });
-  const instance = mount(TimelineReadReceipt, { target: document.body, props });
+  const instance = render(TimelineReadReceipt, { props });
 
   await tick();
   await vi.advanceTimersByTimeAsync(500);
@@ -273,7 +270,7 @@ test('flushes the queued newer receipt after hiding during an in-flight request'
 
   expect(read).toHaveBeenNthCalledWith(2, '$c');
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });
 
@@ -282,8 +279,7 @@ test('hiding the document sends the pending receipt rather than losing it', asyn
   const timeline = new RoomTimeline({} as CoreClient);
   timeline.items = [itemWithId('a')];
   const read = vi.fn(() => Promise.resolve(undefined));
-  const instance = mount(TimelineReadReceipt, {
-    target: document.body,
+  const instance = render(TimelineReadReceipt, {
     props: { timeline, visibleEventId: '$a', onRead: read },
   });
 
@@ -297,6 +293,6 @@ test('hiding the document sends the pending receipt rather than losing it', asyn
   expect(read).toHaveBeenCalledWith('$a');
 
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-  await unmount(instance);
+  instance.unmount();
   vi.useRealTimers();
 });

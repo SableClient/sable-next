@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { PersonaView } from '#src/generated/protocol';
@@ -44,11 +45,12 @@ vi.mock('#lib/personas/personas.svelte.js', () => ({
 
 import PersonaSettings from './PersonaSettings.svelte';
 
+const SYSTEM_LABEL = 'System ID';
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   mocks.isTauri.mockReturnValue(false);
-  document.body.replaceChildren();
 });
 
 test.each([
@@ -73,130 +75,93 @@ test.each([
   mocks.save.mockResolvedValue();
   mocks.load.mockResolvedValue();
 
-  const instance = mount(PersonaSettings, { target: document.body });
-  try {
-    const input = document.querySelector<HTMLInputElement>('.import-form input');
-    if (!input) throw new Error('Missing system input');
-    input.value = 'system';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    await tick();
-    const form = document.querySelector<HTMLFormElement>('.import-form');
-    if (!form) throw new Error('Missing import form');
-    form.requestSubmit();
+  const user = userEvent.setup();
+  render(PersonaSettings);
+  await user.type(screen.getByRole('textbox', { name: SYSTEM_LABEL }), 'system{Enter}');
 
-    await vi.waitFor(() => {
-      expect(mocks.save).toHaveBeenCalledWith(
-        expect.objectContaining({ avatar_url: failed ? null : 'mxc://example.org/avatar' }),
-        null
-      );
-    });
-    if (failed) {
-      expect(document.querySelector('.import-form')?.textContent).toContain(
-        'pictures could not be fetched'
-      );
-    }
-    if (native) {
-      expect(mocks.invoke).toHaveBeenCalledWith('import_persona_avatar', { url: avatar });
-      expect(fetchMock).not.toHaveBeenCalledWith(avatar);
-      expect(mocks.uploadMedia).not.toHaveBeenCalled();
-    } else {
-      expect(fetchMock).toHaveBeenCalledWith(avatar);
-      expect(mocks.uploadMedia).toHaveBeenCalledWith('image/png', bytes);
-    }
-  } finally {
-    await unmount(instance);
+  await vi.waitFor(() => {
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({ avatar_url: failed ? null : 'mxc://example.org/avatar' }),
+      null
+    );
+  });
+  if (failed) {
+    expect(await screen.findByText(/pictures could not be fetched/)).toBeInTheDocument();
+  }
+  if (native) {
+    expect(mocks.invoke).toHaveBeenCalledWith('import_persona_avatar', { url: avatar });
+    expect(fetchMock).not.toHaveBeenCalledWith(avatar);
+    expect(mocks.uploadMedia).not.toHaveBeenCalled();
+  } else {
+    expect(fetchMock).toHaveBeenCalledWith(avatar);
+    expect(mocks.uploadMedia).toHaveBeenCalledWith('image/png', bytes);
   }
 });
 
-function choose(input: HTMLInputElement | null, text: string): void {
-  if (!input) throw new Error('Missing file input');
-  Object.defineProperty(input, 'files', {
-    configurable: true,
-    value: [new File([text], 'export.json', { type: 'application/json' })],
-  });
-  input.dispatchEvent(new Event('change', { bubbles: true }));
+async function choose(index: number, text: string): Promise<void> {
+  const input = document.querySelectorAll<HTMLInputElement>('input[type="file"]').item(index);
+  await userEvent.upload(input, new File([text], 'export.json', { type: 'application/json' }));
 }
 
 test('imports the members of a PluralKit export file', async () => {
   mocks.save.mockResolvedValue();
   mocks.load.mockResolvedValue();
-  const instance = mount(PersonaSettings, { target: document.body });
-  try {
-    choose(
-      document.querySelector('.import-form input[type="file"]'),
-      JSON.stringify({ members: [{ id: 'abcde', name: 'Member', proxy_tags: [{ prefix: 'm:' }] }] })
-    );
+  render(PersonaSettings);
+  await choose(
+    0,
+    JSON.stringify({ members: [{ id: 'abcde', name: 'Member', proxy_tags: [{ prefix: 'm:' }] }] })
+  );
 
-    await vi.waitFor(() => {
-      expect(mocks.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'Member',
-          triggers: [expect.objectContaining({ prefix: 'm:' })],
-        }),
-        null
-      );
-    });
-    expect(document.querySelector('.import-form')?.textContent).toContain('Imported 1 members.');
-  } finally {
-    await unmount(instance);
-  }
+  await vi.waitFor(() => {
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'Member',
+        triggers: [expect.objectContaining({ prefix: 'm:' })],
+      }),
+      null
+    );
+  });
+  expect(await screen.findByText('Imported 1 members.')).toBeInTheDocument();
 });
 
 test('reports an export file that holds no members', async () => {
   mocks.load.mockResolvedValue();
-  const instance = mount(PersonaSettings, { target: document.body });
-  try {
-    choose(document.querySelector('.import-form input[type="file"]'), '{"id":"abcde"}');
+  render(PersonaSettings);
+  await choose(0, '{"id":"abcde"}');
 
-    await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('That file could not be imported.');
-    });
-    expect(mocks.save).not.toHaveBeenCalled();
-  } finally {
-    await unmount(instance);
-  }
+  expect(await screen.findByText(/That file could not be imported\./)).toBeInTheDocument();
+  expect(mocks.save).not.toHaveBeenCalled();
 });
 
 test('restores a backup only after confirmation', async () => {
   mocks.load.mockResolvedValue();
   mocks.setAccountData.mockResolvedValue();
   const catalog = { profiles: [{ id: 'kris' }] };
-  const instance = mount(PersonaSettings, { target: document.body });
-  try {
-    const input = document.querySelectorAll<HTMLInputElement>('input[type="file"]')[1];
-    choose(input, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v3': catalog }));
+  render(PersonaSettings);
+  await choose(1, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v3': catalog }));
 
-    await vi.waitFor(() => {
-      expect(document.querySelector('.confirm')).not.toBeNull();
-    });
-    expect(mocks.setAccountData).not.toHaveBeenCalled();
+  const dialog = await screen.findByRole('dialog');
+  expect(mocks.setAccountData).not.toHaveBeenCalled();
 
-    document.querySelector<HTMLButtonElement>('.confirm .btn-danger')?.click();
-    await vi.waitFor(() => {
-      expect(mocks.load).toHaveBeenCalledWith(true);
-    });
-    expect(mocks.setAccountData).toHaveBeenCalledWith(
-      'fi.mau.msc4461.per_message_profiles.v3',
-      catalog
-    );
-  } finally {
-    await unmount(instance);
-  }
+  const [confirm] = within(dialog)
+    .getAllByRole('button')
+    .filter((button) => button.classList.contains('btn-danger'));
+  await userEvent.click(confirm);
+  await vi.waitFor(() => {
+    expect(mocks.load).toHaveBeenCalledWith(true);
+  });
+  expect(mocks.setAccountData).toHaveBeenCalledWith(
+    'fi.mau.msc4461.per_message_profiles.v3',
+    catalog
+  );
 });
 
 test('rejects a backup without the v3 catalog', async () => {
   mocks.load.mockResolvedValue();
-  const instance = mount(PersonaSettings, { target: document.body });
-  try {
-    const input = document.querySelectorAll<HTMLInputElement>('input[type="file"]')[1];
-    choose(input, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v2': { profiles: [] } }));
+  render(PersonaSettings);
+  await choose(1, JSON.stringify({ 'fi.mau.msc4461.per_message_profiles.v2': { profiles: [] } }));
 
-    await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('not a per-message profile backup');
-    });
-    expect(document.querySelector('.confirm')).toBeNull();
-    expect(mocks.setAccountData).not.toHaveBeenCalled();
-  } finally {
-    await unmount(instance);
-  }
+  expect(await screen.findByText(/not a per-message profile backup/)).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(mocks.setAccountData).not.toHaveBeenCalled();
 });

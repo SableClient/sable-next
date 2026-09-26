@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -33,7 +35,6 @@ const safe: SignOutSafetyView = {
 };
 
 afterEach(() => {
-  document.body.replaceChildren();
   mocks.goto.mockClear();
 });
 
@@ -42,68 +43,54 @@ async function openWarning(safety: SignOutSafetyView) {
     commands: { signOutSafety: () => Promise.resolve(safety) },
   } as unknown as CoreClient);
   const proceed = vi.fn(() => Promise.resolve());
-  const instance = mount(SignOutWarningDialog, { target: document.body, props: { guard } });
+  render(SignOutWarningDialog, { guard });
   await guard.request(proceed);
   await tick();
-  return { guard, proceed, instance };
+  return { user: userEvent.setup(), guard, proceed };
 }
 
-function button(name: string): HTMLButtonElement | undefined {
-  return [...document.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent.trim() === name
-  );
-}
+const button = (name: string) => screen.queryByRole('button', { name });
 
 test('stays closed when the sign-out is safe', async () => {
-  const { proceed, instance } = await openWarning(safe);
+  const { proceed } = await openWarning(safe);
 
   expect(proceed).toHaveBeenCalledOnce();
-  expect(document.querySelector('[role="dialog"]')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 test('explains the risk and signs out only when asked to', async () => {
-  const { proceed, instance } = await openWarning({
+  const { user, proceed } = await openWarning({
     ...safe,
     encryption: { ...safe.encryption, recovery: 'disabled' },
   });
 
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
-    'Recovery is not set up.'
-  );
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Recovery is not set up.');
   expect(proceed).not.toHaveBeenCalled();
 
-  button('Log out anyway')?.click();
+  await user.click(screen.getByRole('button', { name: 'Log out anyway' }));
   await vi.waitFor(() => {
     expect(proceed).toHaveBeenCalledOnce();
   });
-
-  await unmount(instance);
 });
 
 test('routes an unverified session to the security settings instead', async () => {
-  const { guard, proceed, instance } = await openWarning({
+  const { user, guard, proceed } = await openWarning({
     ...safe,
     encryption: { ...safe.encryption, verification: 'unverified' },
   });
 
-  button('Verify this session')?.click();
+  await user.click(await screen.findByRole('button', { name: 'Verify this session' }));
   await vi.waitFor(() => {
     expect(mocks.goto).toHaveBeenCalledWith('/settings/devices');
   });
   expect(guard.risk).toBeNull();
   expect(proceed).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('offers only the export while keys are still uploading', async () => {
-  const { instance } = await openWarning({ ...safe, backup_uploaded: false });
+  await openWarning({ ...safe, backup_uploaded: false });
 
-  expect(button('Export keys')).toBeDefined();
-  expect(button('Set up recovery')).toBeUndefined();
-  expect(button('Verify this session')).toBeUndefined();
-
-  await unmount(instance);
+  expect(await screen.findByRole('button', { name: 'Export keys' })).toBeInTheDocument();
+  expect(button('Set up recovery')).not.toBeInTheDocument();
+  expect(button('Verify this session')).not.toBeInTheDocument();
 });

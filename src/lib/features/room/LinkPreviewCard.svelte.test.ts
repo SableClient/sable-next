@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { UrlPreviewView } from '#src/generated/protocol';
@@ -32,50 +33,38 @@ afterEach(() => {
   core.urlPreview.mockReset();
   preferences.urlPreviews = false;
   preferences.encryptedUrlPreviews = false;
-  document.body.replaceChildren();
   vi.restoreAllMocks();
 });
 
 test('renders the resolved preview as a link', async () => {
   preferences.urlPreviews = true;
   core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/render' }));
-  const instance = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/render', encrypted: false },
-  });
+  render(LinkPreviewCard, { url: 'https://example.org/render', encrypted: false });
 
   await tick();
   await Promise.resolve();
   await tick();
 
-  const link = document.body.querySelector('a.link-preview');
-  expect(link?.getAttribute('href')).toBe('https://example.org/render');
-  expect(link?.textContent).toContain('Example');
-  await unmount(instance);
+  const link = screen.getByRole('link', { name: /Example/ });
+  expect(link).toHaveAttribute('href', 'https://example.org/render');
+  expect(link).toHaveClass('link-preview');
 });
 
 test('a second card for the same url does not re-request it', async () => {
   preferences.urlPreviews = true;
   core.urlPreview.mockResolvedValue(preview({ url: 'https://example.org/cached' }));
-  const first = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/cached', encrypted: false },
-  });
+  const first = render(LinkPreviewCard, { url: 'https://example.org/cached', encrypted: false });
   await tick();
   await Promise.resolve();
   await tick();
-  await unmount(first);
+  first.unmount();
 
-  const second = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/cached', encrypted: false },
-  });
+  render(LinkPreviewCard, { url: 'https://example.org/cached', encrypted: false });
   await tick();
   await Promise.resolve();
   await tick();
 
   expect(core.urlPreview).toHaveBeenCalledTimes(1);
-  await unmount(second);
 });
 
 test('an in-flight request does not write into a torn-down component', async () => {
@@ -86,13 +75,10 @@ test('an in-flight request does not write into a torn-down component', async () 
       resolve = res;
     })
   );
-  const instance = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/b', encrypted: false },
-  });
+  const instance = render(LinkPreviewCard, { url: 'https://example.org/b', encrypted: false });
   await tick();
 
-  await unmount(instance);
+  instance.unmount();
   expect(() => {
     resolve(preview({ url: 'https://example.org/b' }));
   }).not.toThrow();
@@ -102,51 +88,37 @@ test('an in-flight request does not write into a torn-down component', async () 
 test('does nothing while url previews are disabled', async () => {
   preferences.urlPreviews = false;
   core.urlPreview.mockResolvedValue(preview());
-  const instance = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/c', encrypted: false },
-  });
+  render(LinkPreviewCard, { url: 'https://example.org/c', encrypted: false });
 
   await tick();
   await Promise.resolve();
   await tick();
 
   expect(core.urlPreview).not.toHaveBeenCalled();
-  expect(document.body.querySelector('a.link-preview')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
 
 test('an encrypted room needs its own consent, and an unknown one is treated as encrypted', async () => {
   preferences.urlPreviews = true;
   core.urlPreview.mockResolvedValue(preview());
-  const encrypted = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/d', encrypted: true },
-  });
-  const unknown = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/e', encrypted: null },
-  });
+  const encrypted = render(LinkPreviewCard, { url: 'https://example.org/d', encrypted: true });
+  const unknown = render(LinkPreviewCard, { url: 'https://example.org/e', encrypted: null });
 
   await tick();
   await Promise.resolve();
   await tick();
 
   expect(core.urlPreview).not.toHaveBeenCalled();
-  await unmount(encrypted);
-  await unmount(unknown);
+  encrypted.unmount();
+  unknown.unmount();
 
   preferences.encryptedUrlPreviews = true;
-  const consented = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/f', encrypted: true },
-  });
+  render(LinkPreviewCard, { url: 'https://example.org/f', encrypted: true });
   await tick();
   await Promise.resolve();
   await tick();
 
   expect(core.urlPreview).toHaveBeenCalledWith('https://example.org/f');
-  await unmount(consented);
 });
 
 test('an image-only preview renders inline instead of as a card', async () => {
@@ -162,20 +134,16 @@ test('an image-only preview renders inline instead of as a card', async () => {
       image_height: 240,
     })
   );
-  const instance = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://media.example/anim.gif', encrypted: false },
-  });
+  render(LinkPreviewCard, { url: 'https://media.example/anim.gif', encrypted: false });
 
   await tick();
   await Promise.resolve();
   await tick();
 
-  expect(document.body.querySelector('a.link-preview')).toBeNull();
-  const link = document.body.querySelector('a.link-preview-link');
-  expect(link?.getAttribute('href')).toBe('https://media.example/anim.gif');
-  expect(link?.querySelector('.link-preview-inline')).not.toBeNull();
-  await unmount(instance);
+  const link = screen.getByRole('link');
+  expect(link).not.toHaveClass('link-preview');
+  expect(link).toHaveAttribute('href', 'https://media.example/anim.gif');
+  expect(link.querySelector('.link-preview-inline')).toBeInTheDocument();
 });
 
 test('a preview carrying a title stays a card even with an image', async () => {
@@ -183,16 +151,13 @@ test('a preview carrying a title stays a card even with an image', async () => {
   core.urlPreview.mockResolvedValue(
     preview({ url: 'https://example.org/post', image: 'mxc://example.org/hero' })
   );
-  const instance = mount(LinkPreviewCard, {
-    target: document.body,
-    props: { url: 'https://example.org/post', encrypted: false },
-  });
+  render(LinkPreviewCard, { url: 'https://example.org/post', encrypted: false });
 
   await tick();
   await Promise.resolve();
   await tick();
 
-  expect(document.body.querySelector('a.link-preview')).not.toBeNull();
-  expect(document.body.querySelector('a.link-preview-link')).toBeNull();
-  await unmount(instance);
+  const link = screen.getByRole('link', { name: /Example/ });
+  expect(link).toHaveClass('link-preview');
+  expect(link).not.toHaveClass('link-preview-link');
 });

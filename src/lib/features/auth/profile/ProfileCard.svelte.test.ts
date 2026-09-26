@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
 import ProfileCard from './ProfileCard.svelte';
 
 test('Enter in a field continues, and a save error is shown in the status line', async () => {
+  const user = userEvent.setup();
   const onContinue = vi.fn();
   const props = {
     userId: '@new:example.org',
@@ -26,13 +28,10 @@ test('Enter in a field continues, and a save error is shown in the status line',
     onContinue,
     onSkip: vi.fn(),
   };
-  const instance = mount(ProfileCard, { target: document.body, props });
-  flushSync();
+  render(ProfileCard, props);
 
-  document.querySelector('form')?.requestSubmit();
+  await user.type(screen.getByRole('textbox', { name: 'Display name' }), '{Enter}');
+
   expect(onContinue).toHaveBeenCalledOnce();
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not save');
-
-  await unmount(instance);
-  document.body.replaceChildren();
+  expect(screen.getByRole('alert')).toHaveTextContent('Could not save');
 });

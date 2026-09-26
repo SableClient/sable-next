@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import Alert from './Alert.svelte';
 import AppPageShell from './AppPageShell.svelte';
@@ -16,155 +17,108 @@ import Spinner from './Spinner.svelte';
 import StatusBadge from './StatusBadge.svelte';
 import TextArea from './TextArea.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('button variants expose loading and disabled state consistently', () => {
-  mount(Button, {
-    target: document.body,
-    props: { variant: 'primary', size: 'large', loading: true, block: true },
-  });
+  render(Button, { variant: 'primary', size: 'large', loading: true, block: true });
 
-  const button = document.querySelector('button');
-  expect(button).not.toBeNull();
-  expect(button?.className).toContain('btn-primary');
-  expect(button?.className).toContain('btn-large');
-  expect(button?.className).toContain('btn-loading');
-  expect(button?.className).toContain('btn-block');
-  expect(button?.disabled).toBe(true);
-  expect(button?.getAttribute('aria-busy')).toBe('true');
+  const button = screen.getByRole('button');
+  expect(button).toHaveClass('btn-primary', 'btn-large', 'btn-loading', 'btn-block');
+  expect(button).toBeDisabled();
+  expect(button).toHaveAttribute('aria-busy', 'true');
 });
 
 test('icon and link buttons retain accessible labels and shared styling', () => {
-  mount(IconButton, {
-    target: document.body,
-    props: { label: 'Close', variant: 'ghost', size: 'small' },
-  });
-  mount(LinkButton, {
-    target: document.body,
-    props: { href: '/home', variant: 'primary', block: true },
-  });
+  render(IconButton, { label: 'Close', variant: 'ghost', size: 'small' });
+  render(LinkButton, { href: '/home', variant: 'primary', block: true });
 
-  expect(document.querySelector('button')?.getAttribute('aria-label')).toBe('Close');
-  expect(document.querySelector('button')?.className).toContain('icon-button-small');
-  expect(document.querySelector('a')?.getAttribute('href')).toBe('/home');
-  expect(document.querySelector('a')?.className).toContain('btn-primary');
-  expect(document.querySelector('a')?.className).toContain('btn-block');
+  expect(screen.getByRole('button', { name: 'Close' })).toHaveClass('icon-button-small');
+  const link = screen.getByRole('link');
+  expect(link).toHaveAttribute('href', '/home');
+  expect(link).toHaveClass('btn-primary', 'btn-block');
 });
 
 test('content primitives expose semantic state and input affordances', () => {
-  mount(TextArea, {
-    target: document.body,
-    props: { value: 'draft', error: true, disabled: true },
-  });
-  mount(Avatar, {
-    target: document.body,
-    props: { initials: 'S', alt: 'Sable', size: 'small' },
-  });
-  mount(Alert, {
-    target: document.body,
-    props: { variant: 'critical', role: 'alert' },
-  });
-  mount(StatusBadge, {
-    target: document.body,
-    props: { label: 'Verified', variant: 'success' },
-  });
+  render(TextArea, { value: 'draft', error: true, disabled: true });
+  render(Avatar, { initials: 'S', alt: 'Sable', size: 'small' });
+  render(Alert, { variant: 'critical', role: 'alert' });
+  render(StatusBadge, { label: 'Verified', variant: 'success' });
 
-  expect(document.querySelector('textarea')?.className).toContain('form-control-error');
-  expect(document.querySelector('textarea')?.disabled).toBe(true);
-  expect(document.querySelector('.avatar-root')?.getAttribute('role')).toBe('img');
-  expect(document.querySelector('.avatar-root')?.getAttribute('aria-label')).toBe('Sable');
-  expect(document.querySelector('[role="alert"]')?.className).toContain('alert-critical');
-  expect(document.querySelector('.status-badge')?.className).toContain('status-badge-success');
+  const textbox = screen.getByRole('textbox');
+  expect(textbox).toHaveClass('form-control-error');
+  expect(textbox).toBeDisabled();
+  expect(screen.getByRole('img', { name: 'Sable' })).toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveClass('alert-critical');
+  expect(screen.getByText('Verified').closest('.status-badge')).toHaveClass('status-badge-success');
 });
 
 test('decorative avatars stay out of the accessibility tree', () => {
-  mount(Avatar, {
-    target: document.body,
-    props: { initials: 'S', decorative: true },
-  });
+  const { container } = render(Avatar, { initials: 'S', decorative: true });
 
-  expect(document.querySelector('.avatar-root')?.getAttribute('aria-hidden')).toBe('true');
-  expect(document.querySelector('.avatar-root')?.getAttribute('aria-label')).toBeNull();
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  expect(container.querySelector('.avatar-root')).toHaveAttribute('aria-hidden', 'true');
 });
 
-test('option cards are one radio group with a single checked item', () => {
+test('option cards are one radio group with a single checked item', async () => {
+  const user = userEvent.setup();
   const onSelect = vi.fn();
-  mount(OptionCards, {
-    target: document.body,
-    props: {
-      label: 'Visibility',
-      value: 'private',
-      onSelect,
-      options: [
-        { value: 'private', label: 'Private', hint: 'Invite only' },
-        { value: 'public', label: 'Public' },
-        { value: 'space', label: 'Space', disabled: true },
-      ],
-    },
+  render(OptionCards, {
+    label: 'Visibility',
+    value: 'private',
+    onSelect,
+    options: [
+      { value: 'private', label: 'Private', hint: 'Invite only' },
+      { value: 'public', label: 'Public' },
+      { value: 'space', label: 'Space', disabled: true },
+    ],
   });
 
-  const radios = [...document.querySelectorAll<HTMLElement>('[role="radio"]')];
-
-  expect(document.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe(
-    'Visibility'
-  );
+  expect(screen.getByRole('radiogroup', { name: 'Visibility' })).toBeInTheDocument();
+  const radios = screen.getAllByRole('radio');
   expect(radios).toHaveLength(3);
-  expect(radios.map((radio) => radio.getAttribute('aria-checked'))).toEqual([
-    'true',
-    'false',
-    'false',
-  ]);
-  expect(radios[2].getAttribute('data-disabled')).not.toBeNull();
+  expect(screen.getByRole('radio', { checked: true })).toHaveAccessibleName(/Private/);
+  expect(screen.getByRole('radio', { name: 'Space' })).toHaveAttribute('data-disabled');
   expect(radios.filter((radio) => radio.getAttribute('tabindex') !== '-1')).toHaveLength(1);
 
-  radios[1].click();
+  await user.click(screen.getByRole('radio', { name: 'Public' }));
 
   expect(onSelect).toHaveBeenCalledWith('public');
 });
 
 test('a labelled spinner announces loading without exposing the glyph', () => {
-  mount(Spinner, {
-    target: document.body,
-    props: { label: 'Loading' },
-  });
+  const { container } = render(Spinner, { label: 'Loading' });
 
-  const status = document.querySelector('[role="status"]');
-  expect(status?.textContent).toContain('Loading');
-  expect(document.querySelector('.spinner')?.getAttribute('aria-hidden')).toBe('true');
+  expect(screen.getByRole('status')).toHaveTextContent('Loading');
+  expect(container.querySelector('.spinner')).toHaveAttribute('aria-hidden', 'true');
 });
 
 test('an unlabelled spinner stays a decorative glyph', () => {
-  mount(Spinner, { target: document.body });
+  const { container } = render(Spinner);
 
-  expect(document.querySelector('[role="status"]')).toBeNull();
-  expect(document.querySelector('.spinner')?.getAttribute('aria-hidden')).toBe('true');
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(container.querySelector('.spinner')).toHaveAttribute('aria-hidden', 'true');
 });
 
 test('skeletons are decorative and forward presentation attributes', () => {
-  mount(Skeleton, {
-    target: document.body,
-    props: { class: 'message-placeholder', style: 'width: 12rem' },
+  const { container } = render(Skeleton, {
+    class: 'message-placeholder',
+    style: 'width: 12rem',
   });
 
-  const skeleton = document.querySelector('.skeleton');
-  expect(skeleton?.getAttribute('aria-hidden')).toBe('true');
-  expect(skeleton?.className).toContain('message-placeholder');
-  expect(skeleton?.getAttribute('style')).toContain('width: 12rem');
+  const skeleton = container.querySelector('.skeleton');
+  expect(skeleton).toHaveAttribute('aria-hidden', 'true');
+  expect(skeleton).toHaveClass('message-placeholder');
+  expect(skeleton).toHaveAttribute('style', expect.stringContaining('width: 12rem'));
 });
 
 test('page composition primitives provide labelled layout landmarks', () => {
-  mount(EmptyState, {
-    target: document.body,
-    props: { title: 'Nothing here', description: 'Try another place', titleId: 'empty-heading' },
+  render(EmptyState, {
+    title: 'Nothing here',
+    description: 'Try another place',
+    titleId: 'empty-heading',
   });
-  mount(AppPageShell, {
-    target: document.body,
-    props: { title: 'Settings', description: 'Manage your account' },
-  });
+  render(AppPageShell, { title: 'Settings', description: 'Manage your account' });
 
-  expect(document.querySelector('#empty-heading')?.textContent).toContain('Nothing here');
-  expect(document.querySelector('main h1')?.textContent).toContain('Settings');
-  expect(document.querySelector('main')?.className).toContain('app-page-shell');
+  expect(screen.getByText('Nothing here')).toHaveAttribute('id', 'empty-heading');
+  const main = screen.getByRole('main');
+  expect(main).toHaveClass('app-page-shell');
+  expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
 });

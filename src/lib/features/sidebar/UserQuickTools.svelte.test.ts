@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { mount, unmount } from 'svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const pageState = vi.hoisted(() => ({
@@ -28,49 +28,39 @@ vi.mock('./AccountSwitcher.svelte', () => ({ default: () => null }));
 import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
 import UserQuickTools from './UserQuickTools.svelte';
 
-let dispose: (() => void) | undefined;
-
 afterEach(() => {
-  dispose?.();
-  dispose = undefined;
   paletteState.open = false;
-  document.body.replaceChildren();
 });
 
-function render(props: { mobile?: boolean; compact?: boolean } = { mobile: true }): void {
-  const target = document.createElement('div');
-  document.body.append(target);
-  const component = mount(UserQuickTools, { target, props });
-  dispose = () => void unmount(component);
+function setup(props: { mobile?: boolean; compact?: boolean } = { mobile: true }): void {
+  render(UserQuickTools, props);
 }
 
-test('the mobile bar links navigation and inbox as pages, not overlays', () => {
-  render();
+test('the mobile bar links navigation and inbox as pages, not overlays', async () => {
+  setup();
 
-  const navigate = document.querySelector<HTMLAnchorElement>(
-    'a[aria-label="shortcuts.openRoomSearch"]'
-  );
-  expect(navigate?.getAttribute('href')).toBe('/navigate');
-  navigate?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  const navigate = screen.getByRole('link', { name: 'shortcuts.openRoomSearch' });
+  expect(navigate).toHaveAttribute('href', '/navigate');
+  await fireEvent.click(navigate);
   expect(paletteState.open).toBe(false);
 
-  const inbox = document.querySelector<HTMLAnchorElement>('.mobile-tools a[href="/inbox"]');
-  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-  inbox?.dispatchEvent(click);
-  expect(click.defaultPrevented).toBe(false);
+  const inbox = screen.getByRole('link', { name: 'nav.inbox' });
+  expect(inbox).toHaveAttribute('href', '/inbox');
+  expect(await fireEvent.click(inbox)).toBe(true);
 });
 
 test('the mobile bar keeps a slot per tool', () => {
-  render();
+  setup();
 
-  const bar = document.querySelector<HTMLElement>('.mobile-tools');
-  expect(bar?.style.getPropertyValue('--mobile-slot-count')).toBe('4');
-  expect(document.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
+  const bar = screen.getByRole('navigation', { name: 'nav.quickTools' });
+  expect(bar.style.getPropertyValue('--mobile-slot-count')).toBe('4');
+  expect(bar.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
 });
 
 test('the collapsed sidebar leaves message search to the rail', () => {
-  render({ compact: true });
+  setup({ compact: true });
 
-  expect(document.querySelector('.compact-tools')).not.toBeNull();
-  expect(document.querySelector('a[href="/search"]')).toBeNull();
+  expect(screen.getByRole('navigation', { name: 'nav.quickTools' })).toHaveClass('compact-tools');
+  expect(screen.queryByRole('link', { name: 'nav.search' })).not.toBeInTheDocument();
+  expect(document.querySelector('a[href="/search"]')).not.toBeInTheDocument();
 });

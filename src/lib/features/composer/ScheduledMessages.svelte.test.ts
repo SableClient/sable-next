@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { flushSync } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -19,7 +21,6 @@ const sendScheduledMessage = vi.fn();
 Object.assign(core, { scheduledMessages, cancelScheduledMessage, sendScheduledMessage });
 
 afterEach(() => {
-  document.body.replaceChildren();
   for (const toast of toasts.items) toasts.dismiss(toast.id);
   adoptQueue([]);
   scheduledMessages.mockReset();
@@ -31,14 +32,11 @@ function serverMessage(delayId: string, body: string) {
   return { delay_id: delayId, body, formatted: null, delivery_ts: Date.now() + 60_000 };
 }
 
-async function render() {
-  const instance = mount(ScheduledMessages, { target: document.body, props: { roomId: ROOM } });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pill')).not.toBeNull();
-  });
-  document.querySelector<HTMLButtonElement>('.pill')?.click();
-  flushSync();
-  return instance;
+const user = userEvent.setup();
+
+async function setup(): Promise<void> {
+  render(ScheduledMessages, { roomId: ROOM });
+  await user.click(await screen.findByRole('button', { name: /scheduled$/ }));
 }
 
 function bodies(): string[] {
@@ -46,30 +44,19 @@ function bodies(): string[] {
 }
 
 async function choose(body: string, action: string): Promise<void> {
-  document
-    .querySelector<HTMLButtonElement>(
-      `button[aria-label="Actions for the scheduled message “${body}”"]`
-    )
-    ?.click();
-  flushSync();
-  const item = await vi.waitFor(() => {
-    const found = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
-      (node) => node.textContent.trim() === action
-    );
-    if (!found) throw new Error(`no ${action} item`);
-    return found;
-  });
-  item.click();
+  await user.click(
+    screen.getByRole('button', { name: `Actions for the scheduled message “${body}”` })
+  );
+  await user.click(await screen.findByRole('menuitem', { name: action }));
   await vi.waitFor(() => {
-    expect(document.querySelector('[role="menuitem"]')).toBeNull();
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
   });
-  flushSync();
 }
 
 test('deleting waits for the toast to close before cancelling on the server', async () => {
   scheduledMessages.mockResolvedValue([serverMessage('d1', 'hello later')]);
   cancelScheduledMessage.mockResolvedValue(undefined);
-  const instance = await render();
+  await setup();
 
   await choose('hello later', 'Delete');
   expect(bodies()).toEqual([]);
@@ -81,12 +68,11 @@ test('deleting waits for the toast to close before cancelling on the server', as
   await vi.waitFor(() => {
     expect(cancelScheduledMessage).toHaveBeenCalledWith('d1');
   });
-  await unmount(instance);
 });
 
 test('undoing a delete keeps the message and never cancels it', async () => {
   scheduledMessages.mockResolvedValue([serverMessage('d1', 'hello later')]);
-  const instance = await render();
+  await setup();
 
   await choose('hello later', 'Delete');
   toasts.items.at(-1)?.action?.run();
@@ -94,37 +80,30 @@ test('undoing a delete keeps the message and never cancels it', async () => {
 
   expect(bodies()).toEqual(['hello later']);
   expect(cancelScheduledMessage).not.toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('a failed cancel puts the message back and says so', async () => {
   scheduledMessages.mockResolvedValue([serverMessage('d1', 'hello later')]);
   cancelScheduledMessage.mockRejectedValue(new Error('offline'));
-  const instance = await render();
+  await setup();
 
   await choose('hello later', 'Delete');
   const toast = toasts.items.at(-1);
   if (toast) toasts.dismiss(toast.id);
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('could not be deleted');
-  });
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be deleted');
   expect(bodies()).toEqual(['hello later']);
-  await unmount(instance);
 });
 
 test('a failed send-now puts the message back and says so', async () => {
   scheduledMessages.mockResolvedValue([serverMessage('d1', 'hello later')]);
   sendScheduledMessage.mockRejectedValue(new Error('offline'));
-  const instance = await render();
+  await setup();
 
   await choose('hello later', 'Send now');
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('could not be sent');
-  });
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be sent');
   expect(bodies()).toEqual(['hello later']);
-  await unmount(instance);
 });
 
 test('sending a queued message now takes it off the queue, and a failure puts it back', async () => {
@@ -140,16 +119,13 @@ test('sending a queued message now takes it off the queue, and a failure puts it
     owner: 'DEV',
   };
   adoptQueue([queued]);
-  const instance = await render();
+  await setup();
 
   await choose('queued', 'Send now');
 
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')).not.toBeNull();
-  });
+  expect(await screen.findByRole('alert')).toBeInTheDocument();
   expect(sendMessage).toHaveBeenCalledWith(ROOM, 'queued', { formatted: null });
   expect(scheduledQueue()).toEqual([queued]);
-  await unmount(instance);
 });
 
 test('deleting a queued message can be undone', async () => {
@@ -163,7 +139,7 @@ test('deleting a queued message can be undone', async () => {
     owner: 'DEV',
   };
   adoptQueue([queued]);
-  const instance = await render();
+  await setup();
 
   await choose('queued', 'Delete');
   expect(scheduledQueue()).toEqual([]);
@@ -171,5 +147,4 @@ test('deleting a queued message can be undone', async () => {
   toasts.items.at(-1)?.action?.run();
   flushSync();
   expect(scheduledQueue()).toEqual([queued]);
-  await unmount(instance);
 });

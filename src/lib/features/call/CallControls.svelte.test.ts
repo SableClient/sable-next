@@ -1,17 +1,13 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 import CallControlsHarness from './CallControlsHarness.test.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 function mountControls(state: { microphoneEnabled: boolean; cameraEnabled: boolean }) {
-  return mount(CallControlsHarness, {
-    target: document.body,
+  return render(CallControlsHarness, {
     props: {
       ...state,
       screenShareEnabled: false,
@@ -27,23 +23,19 @@ function mountControls(state: { microphoneEnabled: boolean; cameraEnabled: boole
   });
 }
 
-const button = (label: string) => document.querySelector(`button[aria-label="${label}"]`);
+const button = (name: string) => screen.getByRole('button', { name });
 
-test('uses the shared button variants for the call toggles', async () => {
-  const instance = mountControls({ microphoneEnabled: false, cameraEnabled: true });
-  await tick();
+test('uses the shared button variants for the call toggles', () => {
+  mountControls({ microphoneEnabled: false, cameraEnabled: true });
 
-  expect(button('Unmute microphone')?.classList).toContain('btn-danger');
-  expect(button('Turn camera off')?.classList).toContain('btn-primary');
-  expect(button('Deafen')?.classList).toContain('btn-secondary');
-
-  await unmount(instance);
+  expect(button('Unmute microphone')).toHaveClass('btn-danger');
+  expect(button('Turn camera off')).toHaveClass('btn-primary');
+  expect(button('Deafen')).toHaveClass('btn-secondary');
 });
 
 test('keeps a muted mic legible and focusable while media is not ready', async () => {
   const onToggleMicrophone = vi.fn();
-  const instance = mount(CallControlsHarness, {
-    target: document.body,
+  render(CallControlsHarness, {
     props: {
       microphoneEnabled: false,
       cameraEnabled: false,
@@ -58,21 +50,17 @@ test('keeps a muted mic legible and focusable while media is not ready', async (
       onHangUp: vi.fn(),
     },
   });
-  await tick();
 
-  const mic = button('Unmute microphone') as HTMLButtonElement;
-  expect(mic.classList).toContain('btn-danger');
-  expect(mic.disabled).toBe(false);
-  expect(mic.getAttribute('aria-disabled')).toBe('true');
-  mic.click();
+  const mic = button('Unmute microphone');
+  expect(mic).toHaveClass('btn-danger');
+  expect(mic).not.toHaveAttribute('disabled');
+  expect(mic).toHaveAttribute('aria-disabled', 'true');
+  await userEvent.click(mic);
   expect(onToggleMicrophone).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
-test('uses borderless neutral toggles in the compact sidebar bar', async () => {
-  const instance = mount(CallControlsHarness, {
-    target: document.body,
+test('uses borderless neutral toggles in the compact sidebar bar', () => {
+  render(CallControlsHarness, {
     props: {
       compact: true,
       microphoneEnabled: false,
@@ -88,11 +76,8 @@ test('uses borderless neutral toggles in the compact sidebar bar', async () => {
       onHangUp: vi.fn(),
     },
   });
-  await tick();
 
-  expect(button('Unmute microphone')?.classList).toContain('btn-danger');
-  expect(button('Deafen')?.classList).toContain('btn-ghost');
-  expect(button('Turn camera on')?.classList).toContain('btn-ghost');
-
-  await unmount(instance);
+  expect(button('Unmute microphone')).toHaveClass('btn-danger');
+  expect(button('Deafen')).toHaveClass('btn-ghost');
+  expect(button('Turn camera on')).toHaveClass('btn-ghost');
 });

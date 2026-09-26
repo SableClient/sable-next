@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import YoutubeEmbed from './YoutubeEmbed.svelte';
@@ -9,7 +11,6 @@ declare const window: Window & { happyDOM: { settings: { disableIframePageLoadin
 window.happyDOM.settings.disableIframePageLoading = true;
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.unstubAllGlobals();
 });
 
@@ -25,29 +26,30 @@ test('shows the title and plays the video in place', async () => {
     Promise.resolve(Response.json({ title: 'A video', author_name: 'A channel' }))
   );
   vi.stubGlobal('fetch', fetch);
-  const instance = mount(YoutubeEmbed, {
-    target: document.body,
-    props: { url: 'https://youtu.be/aaaaaaaaaaa?t=42' },
-  });
+  const user = userEvent.setup();
+  const { container } = render(YoutubeEmbed, { url: 'https://youtu.be/aaaaaaaaaaa?t=42' });
   await settle();
 
   expect(fetch).toHaveBeenCalledWith(
     expect.objectContaining({ host: 'www.youtube.com', pathname: '/oembed' })
   );
-  expect(document.querySelector('.youtube-title')?.textContent).toBe('A video');
-  expect(document.querySelector('.youtube-site')?.textContent).toBe('A channel');
-  expect(document.querySelector('.youtube-poster img')?.getAttribute('src')).toBe(
+  expect(screen.getByRole('link', { name: 'A channel A video' })).toHaveAttribute(
+    'href',
+    'https://youtu.be/aaaaaaaaaaa?t=42'
+  );
+  const play = screen.getByRole('button', { name: 'Play A video' });
+  expect(play.querySelector('img')).toHaveAttribute(
+    'src',
     'https://i.ytimg.com/vi/aaaaaaaaaaa/hqdefault.jpg'
   );
-  expect(document.querySelector('iframe')).toBeNull();
+  expect(container.querySelector('iframe')).not.toBeInTheDocument();
 
-  document.querySelector<HTMLButtonElement>('.youtube-poster')?.click();
-  flushSync();
+  await user.click(play);
 
-  expect(document.querySelector('iframe')?.getAttribute('src')).toBe(
+  expect(container.querySelector('iframe')).toHaveAttribute(
+    'src',
     'https://www.youtube-nocookie.com/embed/aaaaaaaaaaa?autoplay=1&start=42'
   );
-  await unmount(instance);
 });
 
 test('renders nothing for a video YouTube will not describe', async () => {
@@ -55,12 +57,9 @@ test('renders nothing for a video YouTube will not describe', async () => {
     'fetch',
     vi.fn(() => Promise.resolve(new Response('Not Found', { status: 404 })))
   );
-  const instance = mount(YoutubeEmbed, {
-    target: document.body,
-    props: { url: 'https://youtu.be/bbbbbbbbbbb' },
-  });
+  render(YoutubeEmbed, { url: 'https://youtu.be/bbbbbbbbbbb' });
   await settle();
 
-  expect(document.querySelector('.youtube-embed')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });

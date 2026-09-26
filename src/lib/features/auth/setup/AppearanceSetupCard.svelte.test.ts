@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { flushSync, mount, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 const prefs = vi.hoisted(() => ({ setPreference: vi.fn() }));
@@ -12,27 +13,27 @@ vi.mock('#lib/settings/preferences.svelte.js', async (importOriginal) => ({
 import AppearanceSetupCard from './AppearanceSetupCard.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
 test('shows both modes and follows the device when its mode is selected', async () => {
+  const user = userEvent.setup();
   const onComplete = vi.fn();
-  const instance = mount(AppearanceSetupCard, { target: document.body, props: { onComplete } });
-  flushSync();
+  render(AppearanceSetupCard, { onComplete });
 
-  expect(document.body.textContent).toContain('Browse more themes');
-  const choices = [...document.querySelectorAll<HTMLButtonElement>('.mode-choices [role="radio"]')];
-  expect(choices.map((choice) => choice.textContent.trim())).toEqual(['Light', 'Dark']);
-  expect(choices.map((choice) => choice.getAttribute('aria-checked'))).toEqual(['true', 'false']);
-  choices[1]?.click();
+  expect(screen.getByText('Browse more themes')).toBeInTheDocument();
+  expect(screen.getAllByRole('radio').map((choice) => choice.textContent.trim())).toEqual([
+    'Light',
+    'Dark',
+  ]);
+  expect(screen.getByRole('radio', { name: 'Light' })).toBeChecked();
+  expect(screen.getByRole('radio', { name: 'Dark' })).not.toBeChecked();
+
+  await user.click(screen.getByRole('radio', { name: 'Dark' }));
   expect(prefs.setPreference).toHaveBeenCalledWith('theme', 'dark');
-  choices[0]?.click();
+  await user.click(screen.getByRole('radio', { name: 'Light' }));
   expect(prefs.setPreference).toHaveBeenCalledWith('theme', 'system');
 
-  [...document.querySelectorAll('button')]
-    .find((button) => button.textContent.trim() === 'Continue')
-    ?.click();
+  await user.click(screen.getByRole('button', { name: 'Continue' }));
   expect(onComplete).toHaveBeenCalledOnce();
-  await unmount(instance);
 });

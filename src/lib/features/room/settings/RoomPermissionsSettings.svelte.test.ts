@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type {
@@ -73,7 +74,6 @@ const permissions = {
 } as RoomPermissionsView;
 
 afterEach(() => {
-  document.body.replaceChildren();
   extraRooms.length = 0;
 });
 
@@ -96,21 +96,12 @@ test('syncing copies the parent space levels and roles into the room', async () 
   );
   core.sendStateEvent.mockResolvedValue(undefined);
 
-  const instance = mount(RoomPermissionsSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('Sync with Guild');
-  });
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room, permissions });
+  expect(await screen.findByText(/Sync with Guild/)).toBeInTheDocument();
 
-  [...document.querySelectorAll<HTMLButtonElement>('.row-control button')]
-    .find((button) => button.textContent.trim() === 'Sync')
-    ?.click();
-  await tick();
-  [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')]
-    .find((button) => button.textContent.trim() === 'Sync')
-    ?.click();
+  await user.click(screen.getByRole('button', { name: 'Sync' }));
+  await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sync' }));
 
   await vi.waitFor(() => {
     expect(core.sendStateEvent).toHaveBeenCalledTimes(2);
@@ -131,8 +122,6 @@ test('syncing copies the parent space levels and roles into the room', async () 
     '',
     { '50': { name: 'Moderator' } }
   );
-
-  await unmount(instance);
 });
 
 test('saves a role emoji with its name and colour', async () => {
@@ -143,25 +132,17 @@ test('saves a role emoji with its name and colour', async () => {
   });
   core.sendStateEvent.mockResolvedValue(undefined);
 
-  const instance = mount(RoomPermissionsSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room, permissions });
   await vi.waitFor(() => {
-    expect(document.querySelector('.role-chip')?.textContent).toContain('Sentinel');
+    expect(document.querySelector('.role-chip')).toHaveTextContent('Sentinel');
   });
 
-  const row = document.querySelector('.role-chip')?.closest('li');
-  row?.querySelector<HTMLButtonElement>('button[aria-label="Edit role"]')?.click();
-  await tick();
-
-  const icon = document.querySelector<HTMLInputElement>('#room-perm-role-icon');
-  if (!icon) throw new Error('role emoji input missing');
-  icon.value = '🛡️';
-  icon.dispatchEvent(new Event('input', { bubbles: true }));
-  document
-    .querySelector<HTMLFormElement>('.settings-form')
-    ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  const row = within(
+    document.querySelector<HTMLElement>('.role-chip')?.closest('li') ?? document.body
+  );
+  await user.click(row.getByRole('button', { name: 'Edit role' }));
+  await user.type(screen.getByRole('textbox', { name: 'Icon' }), '🛡️{Enter}');
 
   await vi.waitFor(() => {
     expect(core.sendStateEvent).toHaveBeenCalledWith(
@@ -173,7 +154,6 @@ test('saves a role emoji with its name and colour', async () => {
       }
     );
   });
-  await unmount(instance);
 });
 
 test('uses tagged default roles in permission controls and opens their editor', async () => {
@@ -181,30 +161,28 @@ test('uses tagged default roles in permission controls and opens their editor', 
   core.roomPowerLevels.mockResolvedValue(base);
   core.roomStateEvent.mockResolvedValue({ '0': { name: 'Test' } });
 
-  const instance = mount(RoomPermissionsSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room, permissions });
   await vi.waitFor(() => {
-    expect(document.querySelector('button[aria-label="Invite"]')?.textContent).toContain('Test');
+    expect(screen.getByRole('button', { name: 'Invite' })).toHaveTextContent('Test');
   });
 
-  const row = [...document.querySelectorAll('li')].find((item) =>
-    item.textContent.includes('Test')
-  );
+  const row = screen
+    .getAllByRole('listitem')
+    .find(
+      (item) =>
+        within(item).queryByRole('button', { name: 'Edit role' }) !== null &&
+        item.textContent.includes('Test')
+    );
   if (!row) throw new Error('tagged permission row missing');
-  const edit = row.querySelector<HTMLButtonElement>('button[aria-label="Edit role"]');
-  if (!edit) throw new Error('role edit button missing');
   const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
-  edit.click();
-  await tick();
+  await user.click(within(row).getByRole('button', { name: 'Edit role' }));
 
-  const name = document.querySelector<HTMLInputElement>('#room-perm-role-name');
-  expect(name?.value).toBe('Test');
-  expect(document.activeElement).toBe(name);
+  const name = screen.getByRole('textbox', { name: 'Role name' });
+  expect(name).toHaveValue('Test');
+  expect(name).toHaveFocus();
   expect(scrollIntoView).toHaveBeenCalled();
   scrollIntoView.mockRestore();
-  await unmount(instance);
 });
 
 test('opens a role editor for a power level that no permission currently uses', async () => {
@@ -212,22 +190,13 @@ test('opens a role editor for a power level that no permission currently uses', 
   core.roomPowerLevels.mockResolvedValue(base);
   core.roomStateEvent.mockResolvedValue({});
 
-  const instance = mount(RoomPermissionsSettings, {
-    target: document.body,
-    props: { room, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('Add role');
-  });
-  [...document.querySelectorAll<HTMLButtonElement>('button')]
-    .find((button) => button.textContent.trim() === 'Add role')
-    ?.click();
-  await tick();
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room, permissions });
+  await user.click(await screen.findByRole('button', { name: 'Add role' }));
 
-  expect(document.querySelector('#room-perm-role-level')).not.toBeNull();
-  expect(document.querySelector('#room-perm-role-name')).not.toBeNull();
-  expect(document.querySelector('#room-perm-role-icon')).not.toBeNull();
-  await unmount(instance);
+  expect(screen.getByLabelText('Power level')).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Role name' })).toBeInTheDocument();
+  expect(screen.getByRole('textbox', { name: 'Icon' })).toBeInTheDocument();
 });
 
 test('a space applies its levels to the rooms below it that you can edit', async () => {
@@ -240,34 +209,20 @@ test('a space applies its levels to the rooms below it that you can edit', async
   core.roomStateEvent.mockResolvedValue(null);
   core.sendStateEvent.mockClear();
 
-  const instance = mount(RoomPermissionsSettings, {
-    target: document.body,
-    props: { room: space as RoomSummary, permissions },
-  });
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('Apply to 1 room');
-  });
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room: space as RoomSummary, permissions });
+  expect(await screen.findByText(/Apply to 1 room/)).toBeInTheDocument();
 
-  [...document.querySelectorAll<HTMLButtonElement>('button')]
-    .find((button) => button.textContent.trim() === 'Apply')
-    ?.click();
-  await tick();
-  [
-    ...document.querySelectorAll<HTMLButtonElement>(
-      '[role="alertdialog"] button, [role="dialog"] button'
-    ),
-  ]
-    .find((button) => button.textContent.trim() === 'Apply')
-    ?.click();
+  await user.click(screen.getByRole('button', { name: 'Apply' }));
+  await user.click(
+    within(await screen.findByRole('dialog')).getByRole('button', { name: 'Apply' })
+  );
 
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('Updated 1 room, 0 skipped.');
-  });
+  expect(await screen.findByText(/Updated 1 room, 0 skipped\./)).toBeInTheDocument();
   expect(core.sendStateEvent).toHaveBeenCalledWith(
     '!room:example.org',
     'm.room.power_levels',
     '',
     expect.objectContaining({ invite: 50 })
   );
-  await unmount(instance);
 });

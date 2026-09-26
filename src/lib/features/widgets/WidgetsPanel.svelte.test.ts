@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 // @vitest-environment-options { "settings": { "disableIframePageLoading": true } }
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -14,7 +15,6 @@ import WidgetsPanel from './WidgetsPanel.svelte';
 import type { RoomWidget } from './widget-content.js';
 
 afterEach(() => {
-  document.body.replaceChildren();
   localStorage.clear();
 });
 
@@ -42,130 +42,83 @@ const commonProps = {
   avatarUrl: 'mxc://example.org/avatar',
 };
 
-test('shows an empty message when there are no widgets', async () => {
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets: [], onClose: vi.fn() },
-  });
-  await tick();
+const panel = () => screen.getByRole('complementary', { name: 'Widgets' });
 
-  expect(document.querySelector('.widgets-empty')).not.toBeNull();
-  expect(document.querySelector('iframe')).toBeNull();
-  await unmount(instance);
+test('shows an empty message when there are no widgets', () => {
+  const { container } = render(WidgetsPanel, { ...commonProps, widgets: [], onClose: vi.fn() });
+
+  expect(screen.getByText('This room has no widgets.')).toBeInTheDocument();
+  expect(container.querySelector('iframe')).not.toBeInTheDocument();
 });
 
-test('renders a sandboxed iframe for the first widget, templated', async () => {
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets, onClose: vi.fn() },
-  });
-  await tick();
+test('renders a sandboxed iframe for the first widget, templated', () => {
+  render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
 
-  const iframe = document.querySelector<HTMLIFrameElement>('iframe');
-  expect(iframe?.title).toBe('Jitsi');
-  expect(iframe?.getAttribute('sandbox')).toContain('allow-scripts');
-  expect(iframe?.getAttribute('allow')).toContain('camera');
-  const src = new URL(iframe?.src ?? '');
+  const iframe = screen.getByTitle<HTMLIFrameElement>('Jitsi');
+  expect(iframe.tagName).toBe('IFRAME');
+  expect(iframe).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'));
+  expect(iframe).toHaveAttribute('allow', expect.stringContaining('camera'));
+  const src = new URL(iframe.src);
   expect(src.searchParams.get('user')).toBe(commonProps.userId);
   expect(src.searchParams.get('wid')).toBe('widget-1');
-  await unmount(instance);
 });
 
 test('switches the active widget on tab click', async () => {
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets, onClose: vi.fn() },
-  });
-  await tick();
+  const user = userEvent.setup();
+  render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
 
-  const tabs = [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  const tabs = screen.getAllByRole('tab');
   expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Jitsi', 'Other']);
-  tabs[1].click();
-  await tick();
+  await user.click(screen.getByRole('tab', { name: 'Other' }));
 
-  expect(document.querySelector('iframe')?.title).toBe('Other');
-  await unmount(instance);
+  expect(screen.getByTitle('Other').tagName).toBe('IFRAME');
 });
 
 test('shows a remove action only when the caller can manage widgets', async () => {
+  const user = userEvent.setup();
   const onRemove = vi.fn();
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets, canManage: true, onClose: vi.fn(), onRemove },
-  });
-  await tick();
+  render(WidgetsPanel, { ...commonProps, widgets, canManage: true, onClose: vi.fn(), onRemove });
 
-  document.querySelectorAll('.widgets-tab')[0].querySelectorAll('button')[1].click();
+  await user.click(within(panel()).getByRole('button', { name: 'Remove Jitsi' }));
   expect(onRemove).not.toHaveBeenCalled();
 
-  const confirm = await vi.waitFor(() => {
-    const dialog = document.querySelector('[role="dialog"]');
-    expect(dialog).not.toBeNull();
-    const confirm = dialog
-      ? [...dialog.querySelectorAll('button')].find(
-          (button) => button.textContent.trim() === 'Remove Jitsi'
-        )
-      : null;
-    expect(confirm).not.toBeNull();
-    return confirm as HTMLButtonElement;
-  });
-  confirm.click();
-  await tick();
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('button', { name: 'Remove Jitsi' }));
 
   expect(onRemove).toHaveBeenCalledWith('widget-1');
-  await unmount(instance);
 });
 
-test('omits the remove action when the caller cannot manage widgets', async () => {
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets, canManage: false, onClose: vi.fn() },
-  });
-  await tick();
+test('omits the remove action when the caller cannot manage widgets', () => {
+  render(WidgetsPanel, { ...commonProps, widgets, canManage: false, onClose: vi.fn() });
 
-  const tab = document.querySelectorAll('.widgets-tab')[0];
-  expect(tab.querySelectorAll('button').length).toBe(1);
-  await unmount(instance);
+  expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument();
 });
 
 test('calls onClose from the close button', async () => {
+  const user = userEvent.setup();
   const onClose = vi.fn();
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets, onClose },
-  });
-  await tick();
+  render(WidgetsPanel, { ...commonProps, widgets, onClose });
 
-  document.querySelector<HTMLButtonElement>('.widgets-header button')?.click();
+  await user.click(screen.getByRole('button', { name: 'Close widgets' }));
   expect(onClose).toHaveBeenCalled();
-  await unmount(instance);
 });
 
 test('resizes the side panel and reopens at that width', async () => {
+  const user = userEvent.setup();
   const props = { ...commonProps, widgets: [], onClose: vi.fn() };
-  const first = mount(WidgetsPanel, { target: document.body, props });
-  await tick();
+  const first = render(WidgetsPanel, props);
 
-  document
-    .querySelector<HTMLButtonElement>('.resize-handle')
-    ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-  await tick();
-  expect(document.querySelector<HTMLElement>('.widgets-panel')?.style.width).toBe('23rem');
-  await unmount(first);
+  screen.getByRole('slider', { name: 'Resize widgets' }).focus();
+  await user.keyboard('{ArrowLeft}');
+  expect(panel().style.width).toBe('23rem');
+  first.unmount();
 
-  const second = mount(WidgetsPanel, { target: document.body, props });
-  await tick();
-  expect(document.querySelector<HTMLElement>('.widgets-panel')?.style.width).toBe('23rem');
-  await unmount(second);
+  render(WidgetsPanel, props);
+  expect(panel().style.width).toBe('23rem');
 });
 
-test('leaves the drawer variant unresizable', async () => {
-  const instance = mount(WidgetsPanel, {
-    target: document.body,
-    props: { ...commonProps, widgets: [], modal: true, onClose: vi.fn() },
-  });
-  await tick();
+test('leaves the drawer variant unresizable', () => {
+  render(WidgetsPanel, { ...commonProps, widgets: [], modal: true, onClose: vi.fn() });
 
-  expect(document.querySelector('.resize-handle')).toBeNull();
-  await unmount(instance);
+  expect(screen.queryByRole('slider')).not.toBeInTheDocument();
 });

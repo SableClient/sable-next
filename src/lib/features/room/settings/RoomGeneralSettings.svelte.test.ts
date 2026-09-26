@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type {
@@ -92,7 +93,6 @@ const levels: RoomPowerLevelsView = {
 };
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
@@ -101,28 +101,13 @@ test('saves an access change with join-rule permission alone', async () => {
   core.roomAliases.mockResolvedValue([]);
   core.roomDirectoryVisibility.mockResolvedValue(false);
   core.setRoomJoinRule.mockResolvedValue(undefined);
-  const instance = mount(RoomGeneralSettings, {
-    target: document.body,
-    props: { room, permissions, levels, onClose: () => {} },
-  });
-  await tick();
+  const user = userEvent.setup();
+  render(RoomGeneralSettings, { room, permissions, levels, onClose: () => {} });
 
-  const publicOption = Array.from(document.querySelectorAll<HTMLElement>('[role="radio"]')).find(
-    (option) => option.textContent.includes('room.settingsJoinRulePublic')
-  );
-  if (!publicOption) throw new Error('Public access option missing');
-  publicOption.click();
-  await tick();
-
-  const save = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
-    button.textContent.includes('room.settingsSave')
-  );
-  if (!save) throw new Error('Save button missing');
-  save.click();
+  await user.click(await screen.findByRole('radio', { name: /room\.settingsJoinRulePublic/ }));
+  await user.click(screen.getByRole('button', { name: 'room.settingsSave' }));
 
   await vi.waitFor(() => {
     expect(core.setRoomJoinRule).toHaveBeenCalledWith('!room:example.org', 'public');
   });
-
-  await unmount(instance);
 });

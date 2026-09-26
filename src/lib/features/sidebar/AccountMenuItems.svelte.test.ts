@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/i18n.js', () => ({
   i18n: {
@@ -38,27 +39,28 @@ const accounts = [
   },
 ];
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
+const user = userEvent.setup();
 
-async function press(element: Element): Promise<void> {
-  element.dispatchEvent(
-    new PointerEvent('pointerdown', {
-      bubbles: true,
-      cancelable: true,
-      pointerType: 'mouse',
-      button: 0,
-      isPrimary: true,
-    })
-  );
-  element.dispatchEvent(
-    new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerType: 'mouse' })
-  );
-  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
-  await tick();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await tick();
+async function openMenu(): Promise<HTMLElement> {
+  await vi.waitFor(() => {
+    expect(document.body.style.pointerEvents).toBe('');
+  });
+  await user.click(screen.getByRole('button', { name: 'Account options' }));
+  return screen.findByRole('menu');
+}
+
+async function openSwitcher(): Promise<void> {
+  const menu = await openMenu();
+  await user.click(within(menu).getByRole('menuitem', { name: 'nav.switchAccount' }));
+}
+
+const account = (userId: string) =>
+  screen.getByRole('menuitemradio', { name: new RegExp(userId.replace(/\./g, '\\.')) });
+
+function accountRow(userId: string) {
+  const row = account(userId).closest<HTMLElement>('.account-row');
+  if (!row) throw new Error(`no row for ${userId}`);
+  return within(row);
 }
 
 function directoryWith(userProfile: (userId: string) => Promise<unknown>): AccountDirectory {
@@ -72,43 +74,26 @@ function directoryWith(userProfile: (userId: string) => Promise<unknown>): Accou
 test('opens account choices in the switch-account submenu', async () => {
   const onSwitch = vi.fn();
   const onLogoutAccount = vi.fn();
-  const instance = mount(AccountMenuItemsHarness, {
-    target: document.body,
-    props: {
-      accounts,
-      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
-      onSwitch,
-      onLogoutAccount,
-    },
+  render(AccountMenuItemsHarness, {
+    accounts,
+    profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
+    onSwitch,
+    onLogoutAccount,
   });
-  await tick();
-
-  async function openSwitcher(): Promise<void> {
-    const outerMenu = document.querySelector('.account-menu-trigger');
-    expect(outerMenu).not.toBeNull();
-    if (outerMenu) await press(outerMenu);
-    const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
-      item.textContent.includes('nav.switchAccount')
-    );
-    expect(switcher).not.toBeUndefined();
-    if (switcher) await press(switcher);
-  }
 
   await openSwitcher();
 
-  const rows = document.querySelectorAll('.account-row');
-  expect(rows).toHaveLength(2);
-  const activeRow = rows.item(0);
-  const otherRow = rows.item(1);
-  expect((activeRow.querySelector('.account-select') as HTMLButtonElement).disabled).toBe(true);
-  await press(otherRow.querySelector('.btn-danger') as HTMLButtonElement);
+  expect(screen.getAllByRole('menuitemradio')).toHaveLength(2);
+  expect(account('@current:example.org')).toBeDisabled();
+  expect(account('@current:example.org')).toBeChecked();
+  await user.click(
+    accountRow('@other:example.net').getByRole('button', { name: 'settings.logout' })
+  );
   expect(onLogoutAccount).toHaveBeenCalledWith('other');
 
   await openSwitcher();
-  const otherAccount = document.querySelectorAll('.account-row').item(1);
-  await press(otherAccount.querySelector('.account-select') as HTMLButtonElement);
+  await user.click(account('@other:example.net'));
   expect(onSwitch).toHaveBeenCalledWith('other');
-  await unmount(instance);
 });
 
 test('loads the profile avatar of every account', async () => {
@@ -119,88 +104,59 @@ test('loads the profile avatar of every account', async () => {
     return Promise.resolve({ display_name: null, avatar_url: null });
   });
   const profiles = directoryWith(userProfile);
-  const instance = mount(AccountMenuItemsHarness, {
-    target: document.body,
-    props: { accounts, profiles, onSwitch: vi.fn(), onLogoutAccount: vi.fn() },
+  render(AccountMenuItemsHarness, {
+    accounts,
+    profiles,
+    onSwitch: vi.fn(),
+    onLogoutAccount: vi.fn(),
   });
-  await tick();
 
-  const outerMenu = document.querySelector('.account-menu-trigger');
-  expect(outerMenu).not.toBeNull();
-  if (outerMenu) await press(outerMenu);
-  const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
-    item.textContent.includes('nav.switchAccount')
-  );
-  expect(switcher).not.toBeUndefined();
-  if (switcher) await press(switcher);
+  await openSwitcher();
 
   await vi.waitFor(() => {
     expect(userProfile.mock.calls.map(([userId]) => userId)).toEqual(
       expect.arrayContaining(['@current:example.org', '@other:example.net'])
     );
   });
-
-  const otherRow = document.querySelectorAll('.account-row').item(1);
-  const avatar = otherRow.querySelector('.avatar-fallback');
-  expect(avatar?.textContent).toBe('Z');
-  await unmount(instance);
+  await vi.waitFor(() => {
+    expect(account('@other:example.net').querySelector('.avatar-fallback')).toHaveTextContent('Z');
+  });
 });
 
 test('a deployment without account switching offers neither switching nor adding', async () => {
-  const instance = mount(AccountMenuItemsHarness, {
-    target: document.body,
-    props: {
-      accounts,
-      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
-      onSwitch: vi.fn(),
-      onLogoutAccount: vi.fn(),
-      accountSwitching: false,
-    },
+  render(AccountMenuItemsHarness, {
+    accounts,
+    profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
+    onSwitch: vi.fn(),
+    onLogoutAccount: vi.fn(),
+    accountSwitching: false,
   });
-  await tick();
 
-  const outerMenu = document.querySelector('.account-menu-trigger');
-  expect(outerMenu).not.toBeNull();
-  if (outerMenu) await press(outerMenu);
+  const menu = within(await openMenu());
 
-  const labels = [...document.querySelectorAll('.menu-item')].map((item) => item.textContent);
-  expect(labels.some((label) => label.includes('nav.editProfile'))).toBe(true);
-  expect(labels.some((label) => label.includes('nav.switchAccount'))).toBe(false);
-  expect(labels.some((label) => label.includes('nav.addAccount'))).toBe(false);
-  await unmount(instance);
+  expect(menu.getByRole('menuitem', { name: 'nav.editProfile' })).toBeInTheDocument();
+  expect(menu.queryByRole('menuitem', { name: 'nav.switchAccount' })).not.toBeInTheDocument();
+  expect(menu.queryByRole('menuitem', { name: 'nav.addAccount' })).not.toBeInTheDocument();
 });
 
 test('a signed-out account says so and offers to sign in again', async () => {
   const onSwitch = vi.fn();
   const onReauth = vi.fn();
   const signedOut = { ...accounts[1], needs_reauth: true };
-  const instance = mount(AccountMenuItemsHarness, {
-    target: document.body,
-    props: {
-      accounts: [accounts[0], signedOut],
-      profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
-      onSwitch,
-      onLogoutAccount: vi.fn(),
-      onReauth,
-    },
+  render(AccountMenuItemsHarness, {
+    accounts: [accounts[0], signedOut],
+    profiles: directoryWith(() => Promise.reject(new Error('profile unavailable'))),
+    onSwitch,
+    onLogoutAccount: vi.fn(),
+    onReauth,
   });
-  await tick();
 
-  const outerMenu = document.querySelector('.account-menu-trigger');
-  expect(outerMenu).not.toBeNull();
-  if (outerMenu) await press(outerMenu);
-  const switcher = [...document.querySelectorAll('.menu-item')].find((item) =>
-    item.textContent.includes('nav.switchAccount')
-  );
-  expect(switcher).not.toBeUndefined();
-  if (switcher) await press(switcher);
+  await openSwitcher();
 
-  const row = document.querySelectorAll('.account-row').item(1);
-  const select = row.querySelector('.account-select') as HTMLButtonElement;
-  expect(select.disabled).toBe(false);
-  expect(select.textContent).toContain('nav.accountSignedOut');
-  await press(select);
+  const select = account('@other:example.net');
+  expect(select).toBeEnabled();
+  expect(select).toHaveTextContent('nav.accountSignedOut');
+  await user.click(select);
   expect(onReauth).toHaveBeenCalledWith(signedOut);
   expect(onSwitch).not.toHaveBeenCalled();
-  await unmount(instance);
 });
