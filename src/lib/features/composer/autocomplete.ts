@@ -1,4 +1,4 @@
-export type AutocompleteSigil = '@' | '#' | ':' | '/';
+export type AutocompleteSigil = '@' | '#' | ':' | '/' | '!';
 
 export interface Suggestion {
   id: string;
@@ -11,9 +11,9 @@ export interface Suggestion {
 
 export interface AutocompleteQuery {
   sigil: AutocompleteSigil;
-  /** Text between the sigil and the caret. */
+  /** Text between the sigil and the caret; for `!`, the whole command. */
   query: string;
-  /** Index of the sigil in the draft. */
+  /** Index of the sigil in the draft; for `!`, of the word being typed. */
   start: number;
   /** Caret position, i.e. the end of the replaceable range. */
   end: number;
@@ -33,6 +33,12 @@ const maxQueryLength = 32;
  */
 export function activeQuery(draft: string, caret: number): AutocompleteQuery | null {
   const upToCaret = draft.slice(0, caret);
+
+  const admin = /^\\?!([a-z]*)((?: [a-z0-9-]*)*)$/.exec(upToCaret);
+  if (admin && (admin[2] === '' ? 'admin'.startsWith(admin[1]) : admin[1] === 'admin')) {
+    const start = upToCaret.lastIndexOf(' ') + 1;
+    return { sigil: '!', query: upToCaret, start, end: caret };
+  }
 
   for (const [sigil, minQueryLength] of sigils) {
     const start = upToCaret.lastIndexOf(sigil);

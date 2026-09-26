@@ -71,3 +71,33 @@ test('replacing a query keeps whatever follows the caret', () => {
   if (!query) throw new Error('expected a query');
   expect(replaceQuery(draft, query, 'Member ')).toBe('hey Member  and more');
 });
+
+test('an admin command opens on its prefix and completes the word at the caret', () => {
+  expect(activeQuery('!', 1)).toEqual({ sigil: '!', query: '!', start: 0, end: 1 });
+  expect(activeQuery('\\!adm', 5)).toEqual({ sigil: '!', query: '\\!adm', start: 0, end: 5 });
+  expect(activeQuery('!admin rooms mod', 16)).toEqual({
+    sigil: '!',
+    query: '!admin rooms mod',
+    start: 13,
+    end: 16,
+  });
+  expect(activeQuery('!admin rooms ', 13)).toEqual({
+    sigil: '!',
+    query: '!admin rooms ',
+    start: 13,
+    end: 13,
+  });
+});
+
+test('other text after a bang is not an admin command', () => {
+  expect(activeQuery('!hello', 6)).toBeNull();
+  expect(activeQuery('!adminx', 7)).toBeNull();
+  expect(activeQuery('!hi there', 9)).toBeNull();
+  expect(activeQuery('hey !admin', 10)).toBeNull();
+  expect(activeQuery('!admin users create @no', 23)).toEqual({
+    sigil: '@',
+    query: 'no',
+    start: 20,
+    end: 23,
+  });
+});

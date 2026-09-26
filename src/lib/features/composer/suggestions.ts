@@ -3,6 +3,7 @@ import type { MemberView, PackImageView, RoomSummary } from '#src/generated/prot
 import { searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { t } from '#lib/i18n.js';
 
+import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
 import { descriptionKey, SLASH_COMMANDS } from './slash-commands';
 
@@ -151,9 +152,12 @@ export function suggestionsFor(
   members: readonly MemberView[],
   emotes: readonly PackImageView[],
   rooms: readonly RoomSummary[],
-  translate: Translate = t
+  translate: Translate = t,
+  admin: AdminScope = null,
+  adminCommands: readonly AdminCommand[] | null = null
 ): Suggestion[] {
   if (!query) return [];
+  if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
   const needle = query.query.toLowerCase();
 
   if (query.sigil === '/') return commandSuggestions(needle, translate);

@@ -1,0 +1,842 @@
+{
+  "version": "v26.9.0",
+  "commands": [
+    {
+      "name": "appservices",
+      "description": "Commands for managing appservices",
+      "restricted": true,
+      "children": [
+        {
+          "name": "register",
+          "description": "Register an appservice using its registration YAML",
+          "restricted": true
+        },
+        {
+          "name": "unregister",
+          "description": "Unregister an appservice using its ID",
+          "restricted": true
+        },
+        {
+          "name": "show-appservice-config",
+          "description": "Show an appservice's config using its ID",
+          "restricted": true
+        },
+        {
+          "name": "list-registered",
+          "description": "List all the currently registered appservices",
+          "restricted": true
+        },
+        {
+          "name": "ensure-puppets-active",
+          "description": "Ensure no appservice puppets are marked as deactivated. This is a debug command to fix issues caused by a faulty database migration in Continuwuity 26.6.0",
+          "restricted": true
+        }
+      ]
+    },
+    {
+      "name": "check",
+      "description": "Commands for checking integrity",
+      "children": [
+        {
+          "name": "check-all-users",
+          "description": "Uses the iterator in `src/database/key_value/users.rs` to iterator over every user in our database (remote and local). Reports total count, any errors if there were any, etc"
+        }
+      ]
+    },
+    {
+      "name": "debug",
+      "description": "Commands for debugging things",
+      "children": [
+        {
+          "name": "echo",
+          "description": "Echo input of admin command"
+        },
+        {
+          "name": "get-auth-chain",
+          "description": "Loads the auth_chain of a PDU, reporting how long it took"
+        },
+        {
+          "name": "show-auth-chain",
+          "description": "Walks & displays the auth_chain of a PDU in a mermaid graph format."
+        },
+        {
+          "name": "parse-pdu",
+          "description": "Parse and print a PDU from a JSON"
+        },
+        {
+          "name": "get-pdu",
+          "description": "Retrieve and print a PDU by EventID from the Continuwuity database"
+        },
+        {
+          "name": "get-short-pdu",
+          "description": "Retrieve and print a PDU by PduId from the Continuwuity database"
+        },
+        {
+          "name": "get-remote-pdu",
+          "description": "Attempts to retrieve a PDU from a remote server. **Does not** insert it into the database or persist it anywhere"
+        },
+        {
+          "name": "get-remote-pdu-list",
+          "description": "Same as `get-remote-pdu` but accepts a codeblock newline delimited list of PDUs and a single server to fetch from"
+        },
+        {
+          "name": "get-room-state",
+          "description": "Gets all the room state events for the specified room.",
+          "restricted": true
+        },
+        {
+          "name": "get-state-at",
+          "description": "Gets all the room state events at the specified event.",
+          "restricted": true
+        },
+        {
+          "name": "get-signing-keys",
+          "description": "Get and display signing keys from local cache or remote server"
+        },
+        {
+          "name": "get-verify-keys",
+          "description": "Get and display signing keys from local cache or remote server"
+        },
+        {
+          "name": "ping",
+          "description": "Sends a federation request to the remote server's `/_matrix/federation/v1/version` endpoint and measures the latency it took for the server to respond"
+        },
+        {
+          "name": "force-device-list-updates",
+          "description": "Forces device lists for all local and remote users to be updated (as having new keys available)"
+        },
+        {
+          "name": "change-log-level",
+          "description": "Change tracing log level/filter on the fly"
+        },
+        {
+          "name": "verify-json",
+          "description": "Verify JSON signatures"
+        },
+        {
+          "name": "verify-pdu",
+          "description": "Verify PDU"
+        },
+        {
+          "name": "first-pdu-in-room",
+          "description": "Prints the very first PDU in the specified room (typically m.room.create)",
+          "restricted": true
+        },
+        {
+          "name": "latest-pdu-in-room",
+          "description": "Prints the latest (\"last\") PDU in the specified room (typically a message)",
+          "restricted": true
+        },
+        {
+          "name": "force-set-room-state-from-server",
+          "description": "Forcefully replaces the room state of our local copy of the specified room, with the copy (auth chain and room state events) the specified remote server says.",
+          "restricted": true
+        },
+        {
+          "name": "resolve-true-destination",
+          "description": "Runs a server name through Continuwuity's true destination resolution process"
+        },
+        {
+          "name": "memory-stats",
+          "description": "Print extended memory usage"
+        },
+        {
+          "name": "runtime-metrics",
+          "description": "Print general tokio runtime metric totals"
+        },
+        {
+          "name": "runtime-interval",
+          "description": "Print detailed tokio runtime metrics accumulated since last command invocation"
+        },
+        {
+          "name": "time",
+          "description": "Print the current time"
+        },
+        {
+          "name": "database-stats",
+          "description": "Get database statistics"
+        },
+        {
+          "name": "trim-memory",
+          "description": "Trim memory usage"
+        },
+        {
+          "name": "database-files",
+          "description": "List database files"
+        },
+        {
+          "name": "send-test-email",
+          "description": "Send a test email to the invoking admin's email address",
+          "restricted": true
+        },
+        {
+          "name": "rooms-by-extremity-count",
+          "description": "Lists room IDs by forward extremity count in descending order"
+        },
+        {
+          "name": "tester",
+          "description": "Developer test stubs"
+        }
+      ]
+    },
+    {
+      "name": "federation",
+      "description": "Commands for managing federation",
+      "children": [
+        {
+          "name": "incoming-federation",
+          "description": "List all rooms we are currently handling an incoming pdu from"
+        },
+        {
+          "name": "disable-room",
+          "description": "Disables incoming federation handling for a room",
+          "restricted": true
+        },
+        {
+          "name": "enable-room",
+          "description": "Enables incoming federation handling for a room again",
+          "restricted": true
+        },
+        {
+          "name": "fetch-support-well-known",
+          "description": "Fetch `/.well-known/matrix/support` from the specified server"
+        },
+        {
+          "name": "remote-user-in-rooms",
+          "description": "Lists all the rooms we share/track with the specified *remote* user"
+        }
+      ]
+    },
+    {
+      "name": "media",
+      "description": "Commands for managing media",
+      "children": [
+        {
+          "name": "delete",
+          "description": "Deletes a single media file from our database and on the filesystem via a single MXC URL or event ID (not redacted)",
+          "restricted": true
+        },
+        {
+          "name": "delete-list",
+          "description": "Deletes a codeblock list of MXC URLs from our database and on the filesystem. This will always ignore errors",
+          "restricted": true
+        },
+        {
+          "name": "delete-past-remote-media",
+          "description": "Deletes all remote (and optionally local) media created before/after [duration] ago, using filesystem metadata first created at date, or fallback to last modified date. This will always ignore errors by default.",
+          "restricted": true
+        },
+        {
+          "name": "delete-all-from-user",
+          "description": "Deletes all the local media from a local user on our server. This will always ignore errors by default"
+        },
+        {
+          "name": "delete-all-from-server",
+          "description": "Deletes all remote media from the specified remote server. This will always ignore errors by default",
+          "restricted": true
+        },
+        {
+          "name": "delete-url-preview",
+          "description": "Deletes a cached URL preview, forcing it to be re-fetched. Use --all to purge all cached URL previews"
+        }
+      ]
+    },
+    {
+      "name": "oidc",
+      "description": "Commands for managing OIDC",
+      "restricted": true,
+      "children": [
+        {
+          "name": "link",
+          "description": "Link a user ID to the given subject claim",
+          "restricted": true
+        },
+        {
+          "name": "unlink",
+          "description": "Unlink the given subject claim from its associated user ID",
+          "restricted": true
+        }
+      ]
+    },
+    {
+      "name": "query",
+      "description": "Low-level queries for database getters and iterators",
+      "restricted": true,
+      "children": [
+        {
+          "name": "account-data",
+          "description": "account_data.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "changes-since",
+              "description": "Returns all changes to the account data that happened after `since`",
+              "restricted": true
+            },
+            {
+              "name": "account-data-get",
+              "description": "Searches the account data for a specific kind",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "appservice",
+          "description": "appservice.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "get-registration",
+              "description": "Gets the appservice registration info/details from the ID as a string",
+              "restricted": true
+            },
+            {
+              "name": "all",
+              "description": "Gets all appservice registrations with their ID and registration info",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "presence",
+          "description": "presence.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "get-presence",
+              "description": "Returns the latest presence event for the given user",
+              "restricted": true
+            },
+            {
+              "name": "presence-since",
+              "description": "Iterator of the most recent presence updates that happened after the event with id `since`",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "room-alias",
+          "description": "rooms/alias.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "local-aliases-for-room",
+              "description": "Iterator of all our local room aliases for the room ID",
+              "restricted": true
+            },
+            {
+              "name": "all-local-aliases",
+              "description": "Iterator of all our local aliases in our database with their room IDs",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "room-state-cache",
+          "description": "rooms/state_cache iterators and getters",
+          "restricted": true
+        },
+        {
+          "name": "room-timeline",
+          "description": "rooms/timeline iterators and getters",
+          "restricted": true
+        },
+        {
+          "name": "globals",
+          "description": "globals.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "signing-keys-for",
+              "description": "This returns an empty `Ok(BTreeMap<..>)` when there are no keys found for the server",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "sending",
+          "description": "sending.rs iterators and getters",
+          "restricted": true,
+          "children": [
+            {
+              "name": "active-requests",
+              "description": "Queries database for all `servercurrentevent_data`",
+              "restricted": true
+            },
+            {
+              "name": "active-requests-for",
+              "description": "Queries database for `servercurrentevent_data` but for a specific destination",
+              "restricted": true
+            },
+            {
+              "name": "queued-requests",
+              "description": "Queries database for `servernameevent_data` which are the queued up requests that will eventually be sent",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "users",
+          "description": "users.rs iterators and getters",
+          "restricted": true
+        },
+        {
+          "name": "resolver",
+          "description": "resolver service",
+          "restricted": true,
+          "children": [
+            {
+              "name": "cache",
+              "description": "Query the destinations or overrides cache, depending on the value of the `overrides` flag (default false)",
+              "restricted": true
+            },
+            {
+              "name": "flush-cache",
+              "description": "Flush a given server from the resolver caches or flush them completely",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "pusher",
+          "description": "pusher service",
+          "restricted": true,
+          "children": [
+            {
+              "name": "get-pushers",
+              "description": "Returns all the pushers for the user",
+              "restricted": true
+            },
+            {
+              "name": "delete-pusher",
+              "description": "Deletes a specific pusher by ID",
+              "restricted": true
+            },
+            {
+              "name": "delete-all-user",
+              "description": "Deletes all pushers for a user",
+              "restricted": true
+            },
+            {
+              "name": "delete-all-device",
+              "description": "Deletes all pushers associated with a device ID",
+              "restricted": true
+            }
+          ]
+        },
+        {
+          "name": "short",
+          "description": "short service",
+          "restricted": true
+        },
+        {
+          "name": "raw",
+          "description": "raw service",
+          "restricted": true,
+          "children": [
+            {
+              "name": "raw-maps",
+              "description": "List database maps",
+              "restricted": true
+            },
+            {
+              "name": "raw-get",
+              "description": "Raw database query",
+              "restricted": true
+            },
+            {
+              "name": "raw-del",
+              "description": "Raw database delete (for string keys)",
+              "restricted": true
+            },
+            {
+              "name": "raw-keys",
+              "description": "Raw database keys iteration",
+              "restricted": true
+            },
+            {
+              "name": "raw-keys-sizes",
+              "description": "Raw database key size breakdown",
+              "restricted": true
+            },
+            {
+              "name": "raw-keys-total",
+              "description": "Raw database keys total bytes",
+              "restricted": true
+            },
+            {
+              "name": "raw-vals-sizes",
+              "description": "Raw database values size breakdown",
+              "restricted": true
+            },
+            {
+              "name": "raw-vals-total",
+              "description": "Raw database values total bytes",
+              "restricted": true
+            },
+            {
+              "name": "raw-iter",
+              "description": "Raw database items iteration",
+              "restricted": true
+            },
+            {
+              "name": "raw-keys-from",
+              "description": "Raw database keys iteration",
+              "restricted": true
+            },
+            {
+              "name": "raw-iter-from",
+              "description": "Raw database items iteration",
+              "restricted": true
+            },
+            {
+              "name": "raw-count",
+              "description": "Raw database record count",
+              "restricted": true
+            },
+            {
+              "name": "compact",
+              "description": "Compact database",
+              "restricted": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rooms",
+      "description": "Commands for managing rooms",
+      "children": [
+        {
+          "name": "list",
+          "description": "List all rooms the server knows about"
+        },
+        {
+          "name": "info",
+          "description": "View information about a room we know about",
+          "children": [
+            {
+              "name": "list-joined-members",
+              "description": "List joined members in a room"
+            },
+            {
+              "name": "view-room-topic",
+              "description": "Displays room topic"
+            }
+          ]
+        },
+        {
+          "name": "moderation",
+          "description": "Manage moderation of remote or local rooms",
+          "children": [
+            {
+              "name": "ban-room",
+              "description": "Bans a room from local users joining and evicts all our local users (including server admins) from the room. Also blocks any invites (local and remote) for the banned room, and disables federation entirely with it"
+            },
+            {
+              "name": "ban-list-of-rooms",
+              "description": "Bans a list of rooms (room IDs and room aliases) from a newline delimited codeblock similar to `user deactivate-all`. Applies the same steps as ban-room"
+            },
+            {
+              "name": "unban-room",
+              "description": "Unbans a room to allow local users to join again"
+            },
+            {
+              "name": "list-banned-rooms",
+              "description": "List of all rooms we have banned"
+            }
+          ]
+        },
+        {
+          "name": "alias",
+          "description": "Manage rooms' aliases",
+          "children": [
+            {
+              "name": "set",
+              "description": "Make an alias point to a room"
+            },
+            {
+              "name": "remove",
+              "description": "Remove a local alias"
+            },
+            {
+              "name": "which",
+              "description": "Show which room is using an alias"
+            },
+            {
+              "name": "list",
+              "description": "List aliases currently being used"
+            }
+          ]
+        },
+        {
+          "name": "directory",
+          "description": "Manage the room directory",
+          "children": [
+            {
+              "name": "publish",
+              "description": "Publish a room to the room directory"
+            },
+            {
+              "name": "unpublish",
+              "description": "Unpublish a room to the room directory"
+            },
+            {
+              "name": "list",
+              "description": "List rooms that are published"
+            }
+          ]
+        },
+        {
+          "name": "exists",
+          "description": "Check if we know about a room"
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "description": "Commands for managing the server",
+      "children": [
+        {
+          "name": "uptime",
+          "description": "Time elapsed since startup"
+        },
+        {
+          "name": "show-config",
+          "description": "Show configuration values",
+          "restricted": true
+        },
+        {
+          "name": "reload-config",
+          "description": "Reload configuration values"
+        },
+        {
+          "name": "memory-usage",
+          "description": "Print database memory usage statistics"
+        },
+        {
+          "name": "clear-caches",
+          "description": "Clears all of Continuwuity's caches"
+        },
+        {
+          "name": "backup-database",
+          "description": "Performs an online backup of the database (only available for RocksDB at the moment)",
+          "restricted": true
+        },
+        {
+          "name": "list-backups",
+          "description": "List database backups"
+        },
+        {
+          "name": "admin-notice",
+          "description": "Send a message to the admin room"
+        },
+        {
+          "name": "reload",
+          "description": "Hot-reload the server"
+        },
+        {
+          "name": "restart",
+          "description": "Restart the server"
+        },
+        {
+          "name": "shutdown",
+          "description": "Shutdown the server",
+          "restricted": true
+        },
+        {
+          "name": "list-features",
+          "description": "List features built into the server"
+        },
+        {
+          "name": "build-info",
+          "description": "Build information"
+        }
+      ]
+    },
+    {
+      "name": "token",
+      "description": "Commands for managing registration tokens",
+      "restricted": true,
+      "children": [
+        {
+          "name": "issue",
+          "description": "Issue a new registration token",
+          "restricted": true
+        },
+        {
+          "name": "revoke",
+          "description": "Revoke a registration token",
+          "restricted": true
+        },
+        {
+          "name": "list",
+          "description": "List all registration tokens",
+          "restricted": true
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "description": "Commands for managing local users",
+      "restricted": true,
+      "children": [
+        {
+          "name": "create",
+          "description": "Create a new user",
+          "restricted": true
+        },
+        {
+          "name": "issue-token",
+          "description": "Issue an access token for a user. This command will not work on shadow users, such as appservice puppets or accounts imported from an identity provider",
+          "restricted": true
+        },
+        {
+          "name": "reset-password",
+          "description": "Reset user password",
+          "restricted": true
+        },
+        {
+          "name": "get-email",
+          "description": "Get a user's associated email address",
+          "restricted": true
+        },
+        {
+          "name": "get-user-by-email",
+          "description": "Get the user with the given email address",
+          "restricted": true
+        },
+        {
+          "name": "change-email",
+          "description": "Update or remove a user's email address.",
+          "restricted": true
+        },
+        {
+          "name": "deactivate",
+          "description": "Deactivate a user",
+          "restricted": true
+        },
+        {
+          "name": "deactivate-all",
+          "description": "Deactivate a list of users",
+          "restricted": true
+        },
+        {
+          "name": "logout",
+          "description": "Forcefully log a user out of all of their devices.",
+          "restricted": true
+        },
+        {
+          "name": "suspend",
+          "description": "Suspend a user",
+          "restricted": true
+        },
+        {
+          "name": "unsuspend",
+          "description": "Unsuspend a user",
+          "restricted": true
+        },
+        {
+          "name": "lock",
+          "description": "Lock a user",
+          "restricted": true
+        },
+        {
+          "name": "unlock",
+          "description": "Unlock a user",
+          "restricted": true
+        },
+        {
+          "name": "enable-login",
+          "description": "Enable login for a user",
+          "restricted": true
+        },
+        {
+          "name": "disable-login",
+          "description": "Disable login for a user",
+          "restricted": true
+        },
+        {
+          "name": "list",
+          "description": "List local users in the database",
+          "restricted": true
+        },
+        {
+          "name": "list-invited-rooms",
+          "description": "Lists all the rooms (local and remote) that the specified user is invited to",
+          "restricted": true
+        },
+        {
+          "name": "reject-all-invites",
+          "description": "Manually make a user reject all current invites",
+          "restricted": true
+        },
+        {
+          "name": "list-joined-rooms",
+          "description": "Lists all the rooms (local and remote) that the specified user is joined in",
+          "restricted": true
+        },
+        {
+          "name": "force-join-room",
+          "description": "Manually join a local user to a room",
+          "restricted": true
+        },
+        {
+          "name": "force-leave-room",
+          "description": "Manually leave a local user from a room",
+          "restricted": true
+        },
+        {
+          "name": "force-leave-remote-room",
+          "description": "Manually leave a remote room for a local user",
+          "restricted": true
+        },
+        {
+          "name": "force-demote",
+          "description": "Forces the specified user to drop their power levels to the room default, if their permissions allow and the auth check permits",
+          "restricted": true
+        },
+        {
+          "name": "make-user-admin",
+          "description": "Grant server-admin privileges to a user",
+          "restricted": true
+        },
+        {
+          "name": "put-room-tag",
+          "description": "Puts a room tag for the specified user and room ID.",
+          "restricted": true
+        },
+        {
+          "name": "delete-room-tag",
+          "description": "Deletes the room tag for the specified user and room ID",
+          "restricted": true
+        },
+        {
+          "name": "get-room-tags",
+          "description": "Gets all the room tags for the specified user and room ID",
+          "restricted": true
+        },
+        {
+          "name": "redact-event",
+          "description": "Attempts to forcefully redact the specified event ID from the sender user",
+          "restricted": true
+        },
+        {
+          "name": "force-join-list-of-local-users",
+          "description": "Force joins a specified list of local users to join the specified room.",
+          "restricted": true
+        },
+        {
+          "name": "force-join-all-local-users",
+          "description": "Force joins all local users to the specified room.",
+          "restricted": true
+        },
+        {
+          "name": "reset-push-rules",
+          "description": "Resets the push-rules (notification settings) of the target user to the server defaults",
+          "restricted": true
+        }
+      ]
+    }
+  ]
+}

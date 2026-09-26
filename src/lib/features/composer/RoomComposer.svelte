@@ -78,6 +78,7 @@
   import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
   import { ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
+  import { adminScope, loadAdminCommands, type AdminCommand } from './admin-commands';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
   import VoiceRecorder from './VoiceRecorder.svelte';
   import { isVoiceRecordingSupported } from './voice-recorder-support';
@@ -262,7 +263,22 @@
     if (preferences.personaPicker || preferences.personaProxying) void personas.load();
   });
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
-  let suggestions = $derived(suggestionsFor(query, members, emotes, roomList.rooms, $i18n.t));
+  let admin = $derived(adminScope(roomId, roomList.rooms, core.session?.user_id));
+  let adminCommands = $state.raw<readonly AdminCommand[] | null>(null);
+  let suggestions = $derived(
+    suggestionsFor(query, members, emotes, roomList.rooms, $i18n.t, admin, adminCommands)
+  );
+
+  $effect(() => {
+    if (query?.sigil !== '!' || !admin || adminCommands) return;
+    loadAdminCommands()
+      .then((commands) => {
+        adminCommands = commands;
+      })
+      .catch((error) => {
+        console.warn('[sable composer] loading admin commands failed', error);
+      });
+  });
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let placeholder = $derived(
     staged.length > 0
@@ -840,7 +856,7 @@
   );
 
   function nodeFor(sigil: string, suggestion: Suggestion): ProseMirrorNode {
-    if (sigil === '/') return composerSchema.text(suggestion.insert);
+    if (sigil === '/' || sigil === '!') return composerSchema.text(suggestion.insert);
 
     if (sigil === '@') {
       if (suggestion.id === ROOM_MENTION) return composerSchema.nodes.room_ping.create();
