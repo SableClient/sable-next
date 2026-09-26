@@ -16,7 +16,7 @@ test('reserves the receipt width on the last line it sits on', () => {
   const space = source.match(/\.receipt-space \{(?<body>[^}]+)\}/u)?.groups?.body;
   const inline = source.match(/\.has-receipts \.receipt-slot \{(?<body>[^}]+)\}/u)?.groups?.body;
 
-  expect(space).toContain('inline-size: calc(var(--receipt-reserve) + var(--space-200));');
+  expect(space).toContain('inline-size: var(--receipt-reserve);');
   expect(inline).toContain('position: absolute;');
   expect(inline).toContain('inset-block-end: 0;');
 });

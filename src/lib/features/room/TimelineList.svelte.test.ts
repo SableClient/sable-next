@@ -30,27 +30,27 @@ beforeEach(() => {
       playState: 'finished',
     }) as unknown as Animation;
   animationFrames = [];
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      const viewport = document.querySelector<HTMLElement>('.viewport');
-      const content = document.querySelector<HTMLElement>('.window-rows');
-      const rows = Array.from(content?.children ?? []) as HTMLElement[];
-      const heights = rows.map((row) => row.offsetHeight || 72);
-      const total = heights.reduce((sum, height) => sum + height, 0);
-      if (this === content) return new DOMRect(0, 0, 300, total);
-      const index = rows.indexOf(this);
-      if (index >= 0) {
-        const top =
-          Number.parseFloat((content?.parentElement as HTMLElement | null)?.style.height ?? '0') -
-          Number.parseFloat(content?.style.bottom ?? '0') -
-          total +
-          heights.slice(0, index).reduce((sum, value) => sum + value, 0) -
-          (viewport?.scrollTop ?? 0);
-        return new DOMRect(0, top, 300, heights[index]);
-      }
-      return new DOMRect(0, 0, 300, viewport?.clientHeight ?? 100);
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    const viewport = document.querySelector<HTMLElement>('.viewport');
+    const content = document.querySelector<HTMLElement>('.window-rows');
+    const rows = Array.from(content?.children ?? []) as HTMLElement[];
+    const heights = rows.map((row) => row.offsetHeight || 72);
+    const total = heights.reduce((sum, height) => sum + height, 0);
+    if (this === content) return new DOMRect(0, 0, 300, total);
+    const index = rows.indexOf(this);
+    if (index >= 0) {
+      const top =
+        Number.parseFloat((content?.parentElement as HTMLElement | null)?.style.height ?? '0') -
+        Number.parseFloat(content?.style.bottom ?? '0') -
+        total +
+        heights.slice(0, index).reduce((sum, value) => sum + value, 0) -
+        (viewport?.scrollTop ?? 0);
+      return new DOMRect(0, top, 300, heights[index]);
     }
-  );
+    return new DOMRect(0, 0, 300, viewport?.clientHeight ?? 100);
+  });
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     animationFrames.push(callback);
     return animationFrames.length;

@@ -10,6 +10,7 @@ vi.mock('@tauri-apps/plugin-os', () => ({ type: () => 'android' }));
 
 afterEach(() => {
   invoke.mockReset();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -34,11 +35,14 @@ test('repeated triggers sample on an interval, not once per trigger', async () =
     return 1;
   });
   const reads = vi.spyOn(document, 'elementFromPoint').mockReturnValue(null);
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
 
   const stop = startSystemBarSync();
   reads.mockClear();
 
   for (let i = 0; i < 20; i++) {
+    now += 1;
     window.dispatchEvent(new Event('resize'));
     await new Promise((resolve) => setTimeout(resolve, 0));
   }

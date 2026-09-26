@@ -31,7 +31,7 @@ test('a reply context shows a reply icon and sender with an accessible reply lab
 test('the reply icon aligns with the composer plus icon', () => {
   const context = source.match(/\.context \{(?<contents>[^}]+)\}/u)?.groups?.contents;
 
-  expect(context).toContain('margin-inline-start: calc(');
+  expect(context).toContain('margin-inline: calc(');
   expect(context).toContain(
     'var(--space-100) + (var(--control-height-small) - var(--icon-size-small)) / 2'
   );

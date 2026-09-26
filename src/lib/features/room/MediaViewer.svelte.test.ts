@@ -67,13 +67,13 @@ const audioItem: MediaItem = {
 };
 
 function stubRects(container: DOMRect, content: DOMRect): void {
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      if (this.classList.contains('stage')) return container;
-      if (this.tagName === 'IMG') return content;
-      return new DOMRect();
-    }
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement
+  ) {
+    if (this.classList.contains('stage')) return container;
+    if (this.tagName === 'IMG') return content;
+    return new DOMRect();
+  });
 }
 
 function rect(width: number, height: number): DOMRect {

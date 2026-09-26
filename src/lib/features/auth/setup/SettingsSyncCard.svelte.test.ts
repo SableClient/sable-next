@@ -38,7 +38,7 @@ test('says the data is unencrypted before offering to turn sync on', async () =>
   const { instance, onComplete } = await render();
 
   expect(accountData).toHaveBeenCalledWith('moe.sable.next.settings');
-  expect(document.body.textContent).toContain("isn't encrypted");
+  expect(document.body.textContent).toContain('unencrypted data');
   button(/^Turn on sync$/)?.click();
   expect(prefs.setPreference).toHaveBeenCalledWith('settingsSync', true);
   expect(onComplete).toHaveBeenCalledOnce();
@@ -50,7 +50,7 @@ test('an account with synced settings is offered them to adopt', async () => {
   accountData.mockResolvedValueOnce({ version: 1, settings: {} });
   const { instance } = await render();
 
-  expect(document.body.textContent).toContain('already has settings synced');
+  expect(document.body.textContent).toContain('Synced settings found');
   expect(button(/^Use synced settings$/)).toBeDefined();
 
   await unmount(instance);
