@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow};
 #[cfg(not(target_os = "linux"))]
 use tauri::tray::{MouseButton, TrayIconEvent};
 
-pub const MAIN_TRAY_ID: &str = "main";
+pub const MAIN_TRAY_ID: &str = "sable_next";
 pub const WINDOW_HIDDEN_TO_TRAY_EVENT: &str = "window-hidden-to-tray";
 const TRAY_MENU_SHOW_ID: &str = "tray_show";
 const TRAY_MENU_QUIT_ID: &str = "tray_quit";
@@ -227,6 +227,20 @@ const fn configure_interactions<R: Runtime>(builder: TrayIconBuilder<R>) -> Tray
     builder
 }
 
+#[cfg(target_os = "linux")]
+fn fresh_icon_dir<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<std::path::PathBuf> {
+    let root = app.path().app_cache_dir()?.join("tray-icon");
+    if let Ok(entries) = std::fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_millis());
+    Ok(root.join(stamp.to_string()))
+}
+
 fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     if !appindicator_available() {
@@ -275,7 +289,7 @@ fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     #[cfg(target_os = "linux")]
     {
-        builder = builder.temp_dir_path(app.path().app_cache_dir()?);
+        builder = builder.temp_dir_path(fresh_icon_dir(app)?);
     }
 
     builder.build(app)?;
