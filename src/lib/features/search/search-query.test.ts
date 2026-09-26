@@ -296,3 +296,17 @@ test('a space with no joined rooms matches nothing, and excluding it excludes no
   expect(toSearchFilter(parseSearchQuery('-space:new deploy'), empty).matchesNothing).toBe(false);
   expect(resolveFor('space:eng deploy').matchesNothing).toBe(false);
 });
+
+test('in: a space searches the rooms inside it, like space:', () => {
+  const spaced = {
+    ...resolve,
+    roomId: (value: string) => (value === 'eng' ? '!eng:example.org' : resolve.roomId(value)),
+    spaceRooms: (value: string) =>
+      value === '!eng:example.org' ? ['!dev:example.org', '!ops:example.org'] : undefined,
+  };
+  const filter = (query: string) => toSearchFilter(parseSearchQuery(query), spaced).filter;
+
+  expect(filter('in:eng deploy').rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+  expect(filter('-in:eng deploy').not_rooms).toEqual(['!dev:example.org', '!ops:example.org']);
+  expect(filter('in:dev deploy').rooms).toEqual(['!dev:example.org']);
+});

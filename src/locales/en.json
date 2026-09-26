@@ -2742,11 +2742,7 @@
     "coveragePartial_one": "{{count, number}} room could not be read and will be retried next time you sign in.",
     "coveragePartial_other": "{{count, number}} rooms could not be read and will be retried next time you sign in.",
     "coverageStopped": "Indexing stopped at this session's limit.",
-    "coverageUnknown": "We could not check how much history has been indexed, so these results may be incomplete.",
-    "scope": "Search scope",
-    "scopeAll": "All rooms",
-    "scopeSpace": "This space",
-    "scopeSpaceLabel": "Choose a space"
+    "coverageUnknown": "We could not check how much history has been indexed, so these results may be incomplete."
   },
   "personas": {
     "title": "Per-Message Profiles",

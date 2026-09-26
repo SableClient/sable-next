@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { SearchContextView, SearchHitView, SearchOrder } from '#src/generated/protocol';
   import { onDestroy, onMount } from 'svelte';
-  import { RadioGroup } from 'bits-ui';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
@@ -14,6 +13,7 @@
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
@@ -22,7 +22,6 @@
   import { MESSAGE_SEARCH_FIELD_ID, MessageSearch } from './message-search.svelte.js';
   import { clearRecentSearches, recentSearches, rememberSearch } from './recent-searches.svelte.js';
   import {
-    parentSpaceOf,
     resolveDirectRooms,
     resolveRoomTarget,
     resolveSpaceRooms,
@@ -88,6 +87,7 @@
     suggestionsOpen && !showOperatorList && search.query === '' && recent.length > 0
   );
 
+  let field = $derived(splitTokenField(search.query, search.parsed));
   let suggestions = $derived(
     showingRecent
       ? [
@@ -116,11 +116,10 @@
                 avatarUrl: space.avatar_url,
               })),
             },
-            showOperatorList
+            showOperatorList || field.draft.trim() === ''
           )
         : []
   );
-  let field = $derived(splitTokenField(search.query, search.parsed));
   let input = $state<HTMLInputElement>();
 
   let terms = $derived([...search.parsed.text.split(/\s+/), ...search.parsed.phrases]);
@@ -206,49 +205,6 @@
     suggestionsOpen = false;
     input?.focus();
     runSearch();
-  }
-
-  let spaceScopeToken = $derived(
-    field.chips.find((chip) => chip.operator === 'space' && !chip.negated)
-  );
-  let scope = $derived<'all' | 'space'>(spaceScopeToken ? 'space' : 'all');
-  let scopeSpaceId = $derived(
-    spaceScopeToken ? resolveSpaceTarget(roomList.rooms, spaceScopeToken.value) : undefined
-  );
-
-  function spaceTokenValue(space: (typeof spaces)[number]): string {
-    return space.canonical_alias ?? space.room_id;
-  }
-
-  function setScopeToken(value: string | null): void {
-    const kept = field.chips
-      .filter((chip) => chip.operator !== 'space')
-      .map((chip) => chipText(search.query, chip));
-    const next = value === null ? kept : [`space:${value}`, ...kept];
-
-    search.query = composeQuery(next, field.draft);
-    runSearch();
-  }
-
-  function chooseScope(next: 'all' | 'space'): void {
-    if (next === 'all') {
-      setScopeToken(null);
-      return;
-    }
-    if (spaceScopeToken || spaces.length === 0) return;
-    setScopeToken(spaceTokenValue(currentSpace() ?? spaces[0]));
-  }
-
-  function currentSpace(): (typeof spaces)[number] | undefined {
-    const roomChip = field.chips.find((chip) => chip.operator === 'in' && !chip.negated);
-    const roomId = roomChip ? resolveRoomTarget(roomList.rooms, roomChip.value) : undefined;
-    const spaceId = roomId === undefined ? undefined : parentSpaceOf(roomList.rooms, roomId);
-    return spaces.find((space) => space.room_id === spaceId);
-  }
-
-  function chooseSpace(roomId: string): void {
-    const space = spaces.find((entry) => entry.room_id === roomId);
-    if (space) setScopeToken(spaceTokenValue(space));
   }
 
   function onKeydown(event: KeyboardEvent): void {
@@ -398,147 +354,104 @@
 
 <AppPageShell title={$i18n.t('search.title')} density="compact">
   <div class="search-view">
-    <div class="orders" role="group" aria-label={$i18n.t('search.order')}>
-      {#each orders as option (option.value)}
-        <Button
-          variant={search.order === option.value ? 'primary' : 'ghost'}
-          size="small"
-          class="choice"
-          aria-pressed={search.order === option.value}
-          onclick={() => {
-            chooseOrder(option.value);
+    <div class="search-bar">
+      <div class="field">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div
+          class="form-control token-field"
+          onmousedown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.preventDefault();
+            input?.focus();
           }}
         >
-          {option.label}
-        </Button>
-      {/each}
-    </div>
-
-    <div class="scope-row">
-      <RadioGroup.Root
-        class="scope"
-        value={scope}
-        aria-label={$i18n.t('search.scope')}
-        onValueChange={(next) => {
-          chooseScope(next as 'all' | 'space');
-        }}
-      >
-        <RadioGroup.Item value="all" class="scope-option choice">
-          {$i18n.t('search.scopeAll')}
-        </RadioGroup.Item>
-        <RadioGroup.Item value="space" class="scope-option choice" disabled={spaces.length === 0}>
-          {$i18n.t('search.scopeSpace')}
-        </RadioGroup.Item>
-      </RadioGroup.Root>
-
-      {#if scope === 'space'}
-        <select
-          class="scope-space"
-          aria-label={$i18n.t('search.scopeSpaceLabel')}
-          value={scopeSpaceId ?? ''}
-          onchange={(event) => {
-            chooseSpace(event.currentTarget.value);
-          }}
-        >
-          {#if scopeSpaceId === undefined}
-            <option value="" disabled>{spaceScopeToken?.value}</option>
+          {#if field.chips.length > 0}
+            <ul class="chips" aria-label={$i18n.t('search.activeFilters')}>
+              {#each field.chips as chip (chip.start)}
+                <li class="chip" class:negated={chip.negated}>
+                  <span class="chip-operator">{chip.negated ? '-' : ''}{chip.operator}:</span>
+                  <span class="chip-value">{chipLabel(chip)}</span>
+                  <button
+                    class="chip-remove"
+                    type="button"
+                    aria-label={$i18n.t('search.removeFilter', {
+                      filter: `${chip.negated ? '-' : ''}${chip.operator}:${chipLabel(chip)}`,
+                    })}
+                    onclick={() => {
+                      dropChip(chip);
+                    }}
+                  >
+                    <XIcon />
+                  </button>
+                </li>
+              {/each}
+            </ul>
           {/if}
-          {#each spaces as space (space.room_id)}
-            <option value={space.room_id}
-              >{space.name ?? space.canonical_alias ?? space.room_id}</option
+
+          <input
+            bind:this={input}
+            id={MESSAGE_SEARCH_FIELD_ID}
+            class="token-input"
+            value={field.draft}
+            type="text"
+            autocomplete="off"
+            spellcheck="false"
+            enterkeyhint="search"
+            role="combobox"
+            aria-expanded={suggestions.length > 0}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={suggestions.length > 0
+              ? `${listboxId}-${String(activeSuggestion)}`
+              : undefined}
+            placeholder={field.chips.length > 0 ? '' : $i18n.t('search.placeholder')}
+            aria-label={$i18n.t('search.placeholder')}
+            oninput={onInput}
+            onkeydown={onKeydown}
+            onfocus={() => {
+              suggestionsOpen = true;
+            }}
+            onblur={() => {
+              suggestionsOpen = false;
+              showOperatorList = false;
+            }}
+          />
+          {#if search.query !== ''}
+            <button
+              class="query-clear"
+              type="button"
+              aria-label={$i18n.t('search.clear')}
+              onclick={clearQuery}
             >
-          {/each}
-        </select>
-      {/if}
-    </div>
+              <XIcon />
+            </button>
+          {/if}
+        </div>
 
-    <div class="field">
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        class="form-control token-field"
-        onmousedown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          event.preventDefault();
-          input?.focus();
-        }}
-      >
-        {#if field.chips.length > 0}
-          <ul class="chips" aria-label={$i18n.t('search.activeFilters')}>
-            {#each field.chips as chip (chip.start)}
-              <li class="chip" class:negated={chip.negated}>
-                <span class="chip-operator">{chip.negated ? '-' : ''}{chip.operator}:</span>
-                <span class="chip-value">{chipLabel(chip)}</span>
-                <button
-                  class="chip-remove"
-                  type="button"
-                  aria-label={$i18n.t('search.removeFilter', {
-                    filter: `${chip.negated ? '-' : ''}${chip.operator}:${chipLabel(chip)}`,
-                  })}
-                  onclick={() => {
-                    dropChip(chip);
-                  }}
-                >
-                  <XIcon />
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {/if}
-
-        <input
-          bind:this={input}
-          id={MESSAGE_SEARCH_FIELD_ID}
-          class="token-input"
-          value={field.draft}
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          enterkeyhint="search"
-          role="combobox"
-          aria-expanded={suggestions.length > 0}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          aria-activedescendant={suggestions.length > 0
-            ? `${listboxId}-${String(activeSuggestion)}`
-            : undefined}
-          placeholder={field.chips.length > 0 ? '' : $i18n.t('search.placeholder')}
-          aria-label={$i18n.t('search.placeholder')}
-          oninput={onInput}
-          onkeydown={onKeydown}
-          onfocus={() => {
-            suggestionsOpen = true;
-          }}
-          onblur={() => {
-            suggestionsOpen = false;
-            showOperatorList = false;
-          }}
-        />
-        {#if search.query !== ''}
-          <button
-            class="query-clear"
-            type="button"
-            aria-label={$i18n.t('search.clear')}
-            onclick={clearQuery}
-          >
-            <XIcon />
-          </button>
+        {#if suggestions.length > 0}
+          <div class="search-autocomplete">
+            <ComposerAutocomplete
+              id={listboxId}
+              {optionId}
+              heading={showingRecent
+                ? $i18n.t('search.recentSearches')
+                : $i18n.t('search.suggestions')}
+              {suggestions}
+              active={activeSuggestion}
+              onSelect={accept}
+            />
+          </div>
         {/if}
       </div>
-
-      {#if suggestions.length > 0}
-        <div class="search-autocomplete">
-          <ComposerAutocomplete
-            id={listboxId}
-            {optionId}
-            heading={showingRecent
-              ? $i18n.t('search.recentSearches')
-              : $i18n.t('search.suggestions')}
-            {suggestions}
-            active={activeSuggestion}
-            onSelect={accept}
-          />
-        </div>
-      {/if}
+      <Select
+        class="order-select"
+        items={orders}
+        value={search.order}
+        aria-label={$i18n.t('search.order')}
+        onValueChange={(next: string) => {
+          chooseOrder(orderFrom(next));
+        }}
+      />
     </div>
 
     {#if search.parsed.unsupported.length > 0}
@@ -865,57 +778,20 @@
     margin: 0;
   }
 
-  .orders {
+  .search-bar {
+    align-items: flex-start;
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-100);
+    gap: var(--space-200);
   }
 
-  .scope-row {
-    align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-100);
+  .search-bar .field {
+    flex: 1;
+    min-width: 0;
   }
 
-  :global(.scope) {
-    display: flex;
-    gap: var(--space-100);
-  }
-
-  :global(.scope-option) {
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius-pill);
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--font-size-small);
-    padding: var(--space-150) var(--space-200);
-  }
-
-  :global(.scope-option:hover:not([data-disabled], [data-state='checked'])) {
-    background: var(--bg-container-hover);
-  }
-
-  :global(.scope-option[data-disabled]) {
-    cursor: not-allowed;
-    opacity: var(--opacity-disabled);
-  }
-
-  :global(.scope-option:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  .scope-space {
-    background: var(--surface-container);
-    border: var(--border-width) solid var(--surface-container-line);
-    border-radius: var(--radius);
-    color: inherit;
-    font: inherit;
-    font-size: var(--font-size-small);
-    padding: var(--space-150) var(--space-200);
+  .search-bar :global(.order-select) {
+    flex: none;
+    width: auto;
   }
 
   .load-more {

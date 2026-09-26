@@ -2352,11 +2352,7 @@
     "coveragePartial_many": "",
     "coveragePartial_other": "{{count, number}} salons n’ont pas pu être lus et seront réessayés à votre prochaine connexion.",
     "coverageStopped": "L’indexation s’est arrêtée à la limite de cette session.",
-    "coverageUnknown": "Impossible de vérifier la part d’historique indexée ; ces résultats peuvent être incomplets.",
-    "scope": "Périmètre de recherche",
-    "scopeAll": "Tous les salons",
-    "scopeSpace": "Cet espace",
-    "scopeSpaceLabel": "Choisir un espace"
+    "coverageUnknown": "Impossible de vérifier la part d’historique indexée ; ces résultats peuvent être incomplets."
   },
   "personas": {
     "title": "Profils par message",

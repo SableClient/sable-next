@@ -1996,11 +1996,7 @@
     "coveragePartial_few": "{{count, number}} camere nu au putut fi indexate, și vor fi scoase când te conectezi din nou.",
     "coveragePartial_other": "{{count, number}} de camere nu au putut fi indexate, și vor fi scoase când te conectezi din nou.",
     "coverageStopped": "Indexarea s-a oprit la limita sesiunii.",
-    "coverageUnknown": "Nu am putut verifica cât din cronologie a fost indexat așa că rezultatele s-ar putea să fie incomplete.",
-    "scope": "Aria de căutare",
-    "scopeAll": "Toate camerele",
-    "scopeSpace": "Acest spațiu",
-    "scopeSpaceLabel": "Alege un spațiu"
+    "coverageUnknown": "Nu am putut verifica cât din cronologie a fost indexat așa că rezultatele s-ar putea să fie incomplete."
   },
   "personas": {
     "title": "Profiluri per-mesaj",

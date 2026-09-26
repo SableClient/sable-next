@@ -30,6 +30,15 @@ function searchField(page: Page) {
   return page.getByRole('combobox', { name: SEARCH_FIELD });
 }
 
+function orderControl(page: Page) {
+  return page.getByRole('button', { name: en.search.order });
+}
+
+async function chooseOrder(page: Page, label: string): Promise<void> {
+  await orderControl(page).click();
+  await page.getByRole('option', { name: label }).click();
+}
+
 async function awaitIndexed(page: Page): Promise<void> {
   await searchField(page).fill('welcome');
   await expect(hit(page, /Welcome to/).first()).toBeVisible({
@@ -51,26 +60,6 @@ test('the room header search button opens the search page scoped to that room', 
   await expect(searchField(page)).toHaveValue('');
 });
 
-test('this space scopes a room search to the space that room is in', async ({
-  page,
-  app,
-  searchCorpus,
-}) => {
-  await app.openRoom(searchCorpus.clubhouseId);
-  await page.getByRole('button', { name: 'Search messages' }).click();
-  await expect(page).toHaveURL(/\/search\?q=/);
-  await expect(page.locator('.chips .chip')).toHaveText(/in:\s*Clubhouse/);
-
-  await page.getByRole('radio', { name: en.search.scopeSpace }).click();
-
-  await expect(page.getByRole('combobox', { name: en.search.scopeSpaceLabel })).toHaveValue(
-    searchCorpus.clubId
-  );
-  await expect(page.locator('.chips .chip').filter({ hasText: 'space:' })).toHaveText(
-    /space:\s*Club/
-  );
-});
-
 test('message search from a space sidebar starts scoped to that space', async ({
   page,
   searchCorpus,
@@ -81,7 +70,6 @@ test('message search from a space sidebar starts scoped to that space', async ({
 
   await expect(page).toHaveURL(/\/search\?q=/);
   await expect(page.locator('.chips .chip')).toHaveText(/space:\s*Club/);
-  await expect(page.getByRole('radio', { name: en.search.scopeSpace })).toBeChecked();
 });
 
 test('a query returns hits grouped by room and opens the message it lands on', async ({ page }) => {
@@ -157,7 +145,7 @@ test('sorting by oldest puts the first message first', async ({ page }) => {
   await searchField(page).fill('message in:General ');
   await expect(page.locator('.hit-row').first()).toBeVisible(INDEXED);
 
-  await page.getByRole('button', { name: en.search.orderOldest }).click();
+  await chooseOrder(page, en.search.orderOldest);
 
   await expect(page).toHaveURL(/order=oldest/);
   await expect(page.locator('.hit-row').first()).toContainText('General message 1', INDEXED);
@@ -214,11 +202,8 @@ test('sorting by newest reorders the results', async ({ page }) => {
   await expect(page.locator('.hit-row').first()).toBeVisible(INDEXED);
   const firstBefore = await page.locator('.hit-row').first().innerText();
 
-  await page.getByRole('button', { name: 'Newest' }).click();
-  await expect(page.getByRole('button', { name: 'Newest' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  await chooseOrder(page, en.search.orderRecent);
+  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
 
   await expect.poll(async () => page.locator('.hit-row').first().innerText()).not.toBe(firstBefore);
 });
@@ -336,15 +321,12 @@ test('the sort order rides in the url and survives a reload', async ({ page }) =
   await page.goto('/search');
   await searchField(page).fill('message');
 
-  await page.getByRole('button', { name: 'Newest' }).click();
+  await chooseOrder(page, en.search.orderRecent);
   await expect(page).toHaveURL(/order=recent/);
 
   await page.reload();
 
-  await expect(page.getByRole('button', { name: 'Newest' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
 });
 
 test('zero results are announced and offer a way out', async ({ page, searchCorpus }) => {
@@ -526,12 +508,9 @@ test('the sort controls are not covered by the suggestions', async ({ page }) =>
   await searchField(page).fill('has:');
   await expect(page.getByRole('listbox')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Newest' }).click();
+  await chooseOrder(page, en.search.orderRecent);
 
-  await expect(page.getByRole('button', { name: 'Newest' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  await expect(orderControl(page)).toHaveText(en.search.orderRecent);
 });
 
 test('a pasted filter commits to a chip without stranding text in the input', async ({ page }) => {
@@ -659,4 +638,16 @@ test('a quoted phrase is marked whole in the result body', async ({ page }) => {
   await searchField(page).fill('"General message 1"');
 
   await expect.poll(() => marked(page), INDEXED).toContain('General message 1');
+});
+
+test('an empty field lists every operator, even after a chip', async ({ page }) => {
+  await page.goto('/search');
+  const field = searchField(page);
+
+  await field.fill('in:Random ');
+  await field.focus();
+
+  const listbox = page.getByRole('listbox');
+  await expect(listbox.getByRole('option', { name: /^from:/ })).toBeVisible();
+  await expect(listbox.getByRole('option', { name: /^mentions:/ })).toBeVisible();
 });

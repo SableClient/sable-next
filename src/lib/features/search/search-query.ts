@@ -187,8 +187,13 @@ export function toSearchFilter(parsed: ParsedQuery, resolve: QueryResolvers): Re
     switch (token.operator) {
       case 'in': {
         const roomId = resolve.roomId(token.value);
-        if (roomId) (token.negated ? filter.not_rooms : filter.rooms).push(roomId);
-        else unresolved.push(token);
+        const children = roomId === undefined ? undefined : resolve.spaceRooms(roomId);
+        if (roomId === undefined) unresolved.push(token);
+        else if (children === undefined)
+          (token.negated ? filter.not_rooms : filter.rooms).push(roomId);
+        else if (token.negated) filter.not_rooms.push(...children);
+        else if (children.length === 0) matchesNothing = true;
+        else filter.rooms.push(...children);
         break;
       }
       case 'space': {
