@@ -20,7 +20,10 @@
      only the first justifies withholding the timeline. */
   let listed = $state(false);
   $effect(() => {
-    void roomList.start().then(() => (listed = true));
+    void roomList
+      .start()
+      .then(() => (listed = true))
+      .catch(() => {});
   });
 
   let unlisted = $state.raw<RoomSummary | null>(null);

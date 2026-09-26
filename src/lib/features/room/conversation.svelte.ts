@@ -353,13 +353,11 @@ export class Conversation {
         (reaction) =>
           reaction.key === key && reaction.senders.includes(this.#core.session?.user_id ?? '')
       );
-    void this.#core.commands.toggleReaction(
-      this.#roomId(),
-      eventId,
-      key,
-      this.#threadRoot,
-      mine ? null : sourcePack
-    );
+    void this.#core.commands
+      .toggleReaction(this.#roomId(), eventId, key, this.#threadRoot, mine ? null : sourcePack)
+      .catch((error: unknown) => {
+        console.warn('[sable room] reaction failed', error);
+      });
   };
 
   readonly votePoll = (eventId: string, answers: string[]): void => {

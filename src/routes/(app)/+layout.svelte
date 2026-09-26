@@ -613,7 +613,9 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
-    void roomList.start();
+    void roomList.start().catch((error: unknown) => {
+      console.warn('[sable rooms] room list unavailable', error);
+    });
     void spaceSidebar.start(core);
     notifications.start(core, openNotification);
     presence.start(core);
