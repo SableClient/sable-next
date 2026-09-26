@@ -20,8 +20,16 @@
   );
 </script>
 
-{#if subject}{subject.before}<StateEventSubjectName
-    userId={subject.userId}
-    name={subjectName ?? subject.name}
-    onProfile={onSenderProfile}
-  />{subject.after}{:else}{stateEventText(item, $i18n.t)}{/if}
+<span class="state-event-text"
+  >{#if subject}{subject.before}<StateEventSubjectName
+      userId={subject.userId}
+      name={subjectName ?? subject.name}
+      onProfile={onSenderProfile}
+    />{subject.after}{:else}{stateEventText(item, $i18n.t)}{/if}</span
+>
+
+<style>
+  .state-event-text {
+    display: inline;
+  }
+</style>

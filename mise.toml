@@ -24,7 +24,7 @@ includes = ["scripts"]
 [tasks.setup]
 description = "Install mise tools, pnpm dependencies, and git hooks"
 run = ["mise install", "pnpm install"]
-sources = ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'mise.toml']
+sources = ['mise.toml', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
 outputs = ['node_modules/.pnpm/lock.yaml']
 
 [tasks.dev]

@@ -225,7 +225,7 @@
   }
 
   .state {
-    align-items: center;
+    align-items: first baseline;
     color: var(--surface-var-on-container);
     display: flex;
     font-size: var(--font-size-body);
@@ -237,6 +237,7 @@
 
   .state-icon {
     align-items: center;
+    align-self: start;
     display: flex;
     flex: 0 0 var(--avatar-size-small);
     justify-content: center;
