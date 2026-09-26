@@ -1,5 +1,6 @@
 import type {
   BookmarkView,
+  CalendarView,
   InboxFilter,
   InboxItemView,
   InviteTriageView,
@@ -755,6 +756,22 @@ export function createCommands(transport: () => Transport) {
         event_type: eventType,
         content,
       });
+    },
+
+    async calendarEntries(roomId: string): Promise<CalendarView> {
+      const { entries, rsvps } = await transport().send({
+        type: 'calendar_entries',
+        room_id: roomId,
+      });
+      return { entries, rsvps };
+    },
+
+    async saveCalendarEvent(
+      roomId: string,
+      event: unknown,
+      replaces: string | null
+    ): Promise<void> {
+      await transport().send({ type: 'save_calendar_event', room_id: roomId, event, replaces });
     },
 
     async sendSticker(
