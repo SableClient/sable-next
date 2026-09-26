@@ -1231,6 +1231,7 @@
     padding: 0;
     position: absolute;
     touch-action: none;
+    transition: background-color 0s;
     width: 100%;
     z-index: 1;
   }
@@ -1239,6 +1240,15 @@
   .room-banner-resize.dragging,
   .room-banner-resize:focus-visible {
     background: var(--primary-main);
+  }
+
+  .room-banner-resize:hover {
+    transition-delay: var(--motion-normal);
+  }
+
+  .room-banner-resize.dragging,
+  .room-banner-resize:focus-visible {
+    transition: none;
   }
 
   .room-banner-resize:focus-visible {
