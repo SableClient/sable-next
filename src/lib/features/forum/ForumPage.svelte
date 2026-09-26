@@ -52,9 +52,14 @@
   let desktop = $derived(sidePanels.matches);
   let threadRootId = $state<string | null>(null);
   let permissions = $state<RoomPermissionsView | null>(null);
-  let latestEventId = $derived(
-    forumThreads.roomTimeline.items.findLast((item) => item.event_id !== null)?.event_id ?? null
-  );
+  let latestEventId = $derived.by(() => {
+    const items = forumThreads.roomTimeline.items;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      const eventId = items[index]?.event_id;
+      if (eventId != null) return eventId;
+    }
+    return null;
+  });
   let autoFills = 0;
 
   const conversation = new Conversation({

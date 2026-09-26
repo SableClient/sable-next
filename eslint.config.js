@@ -40,8 +40,11 @@ export default defineConfig([
         { property: 'toSorted', message: 'Needs Chrome 110; use .slice().sort().' },
         { property: 'toReversed', message: 'Needs Chrome 110; use .slice().reverse().' },
         { property: 'toSpliced', message: 'Needs Chrome 110.' },
+        { property: 'findLast', message: 'Needs Chrome 97; walk the array backwards.' },
+        { property: 'findLastIndex', message: 'Needs Chrome 97; walk the array backwards.' },
         { object: 'Object', property: 'groupBy', message: 'Needs Chrome 117.' },
       ],
+      'no-alert': 'error',
       'no-restricted-globals': [
         'error',
         { name: 'structuredClone', message: 'Needs Chrome 98; use a JSON round trip.' },
