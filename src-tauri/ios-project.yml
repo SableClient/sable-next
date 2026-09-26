@@ -58,6 +58,7 @@ targets:
         SWIFT_OBJC_BRIDGING_HEADER: ../../ios/NotificationService/SablePush.h
         OTHER_LDFLAGS: ["$(inherited)", "$(DERIVED_FILE_DIR)/libsable_push.a", "-lc++", "-lz", "-liconv"]
     dependencies:
+      - sdk: CallKit.framework
       - sdk: Security.framework
       - sdk: SystemConfiguration.framework
     preBuildScripts:

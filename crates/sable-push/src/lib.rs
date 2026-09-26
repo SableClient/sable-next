@@ -76,9 +76,39 @@ fn notification(payload: &Value) -> &Value {
     payload.get("notification").unwrap_or(payload)
 }
 
+const RING_TYPES: [&str; 2] = ["m.rtc.notification", "org.matrix.msc4075.rtc.notification"];
+const DEFAULT_RING_LIFETIME_MS: u64 = 30_000;
+
+fn ring(event: &Value, notification: &Value) -> Option<Value> {
+    let kind = event.get("type")?.as_str()?;
+    let content = event.get("content")?;
+    if !RING_TYPES.contains(&kind) || content.get("notification_type")?.as_str()? != "ring" {
+        return None;
+    }
+    let sent = content
+        .get("sender_ts")
+        .and_then(Value::as_u64)
+        .or_else(|| event.get("origin_server_ts").and_then(Value::as_u64))?;
+    let lifetime = content
+        .get("lifetime")
+        .and_then(Value::as_u64)
+        .unwrap_or(DEFAULT_RING_LIFETIME_MS);
+    let caller = notification
+        .get("sender_display_name")
+        .or_else(|| event.get("sender"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "milliseconds since 1970 fit an f64 exactly for millennia"
+    )]
+    let expires_at = sent.saturating_add(lifetime) as f64 / 1000.0;
+    Some(json!({"caller_name": caller, "expires_at": expires_at}))
+}
+
 async fn render(root: &Path, payload: &Value) -> Option<Value> {
     let settings = policy(root);
-    if !settings.enabled || !settings.content {
+    if !settings.enabled {
         return None;
     }
     let notification = notification(payload);
@@ -97,9 +127,6 @@ async fn render(root: &Path, payload: &Value) -> Option<Value> {
     })?;
     let encrypted = notification.get("type")?.as_str()? == "m.room.encrypted";
     let event = if encrypted {
-        if !settings.encrypted_content {
-            return None;
-        }
         let mut event = notification.clone();
         event
             .as_object_mut()?
@@ -117,6 +144,12 @@ async fn render(root: &Path, payload: &Value) -> Option<Value> {
     } else {
         notification.clone()
     };
+    if let Some(ring) = ring(&event, notification) {
+        return Some(json!({"ring": ring, "room_id": room_id, "user_id": user}));
+    }
+    if !settings.content || (encrypted && !settings.encrypted_content) {
+        return None;
+    }
     let body = event.get("content")?.get("body")?.as_str()?;
     // Recheck policy after decryption, which may overlap a settings change.
     let current = policy(root);
@@ -246,6 +279,25 @@ mod tests {
     }
 
     #[test]
+    fn only_a_ring_notification_is_a_ring() {
+        let event = |kind: &str, notification_type: &str| {
+            json!({"type":kind,"sender":"@bob:example.org","origin_server_ts":2_000,
+                "content":{"notification_type":notification_type}})
+        };
+        let named = json!({"sender_display_name":"Bob"});
+
+        assert_eq!(
+            ring(
+                &event("org.matrix.msc4075.rtc.notification", "ring"),
+                &named
+            ),
+            Some(json!({"caller_name":"Bob","expires_at":32.0}))
+        );
+        assert!(ring(&event("m.rtc.notification", "notification"), &named).is_none());
+        assert!(ring(&event("m.room.message", "ring"), &named).is_none());
+    }
+
+    #[test]
     fn accepts_both_matrix_payload_envelopes() {
         let inner = json!({"room_id":"!room:example.org"});
         assert_eq!(notification(&inner), &inner);
@@ -296,6 +348,16 @@ mod tests {
         )
         .unwrap();
         assert!(render(&root, &payload).await.is_none());
+        let ringing = json!({"user_id":"@alice:example.org","notification":{
+            "room_id":"!room:example.org","type":"m.rtc.notification","sender":"@bob:example.org",
+            "content":{"notification_type":"ring","sender_ts":1_000,"lifetime":30_000}
+        }});
+        assert_eq!(
+            render(&root, &ringing)
+                .await
+                .and_then(|value| value.get("ring").cloned()),
+            Some(json!({"caller_name":"@bob:example.org","expires_at":31.0}))
+        );
         store.clear().await.unwrap();
         assert!(render(&root, &payload).await.is_none());
         std::fs::remove_dir_all(root).unwrap();

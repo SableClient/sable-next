@@ -1,3 +1,4 @@
+import CallKit
 import Foundation
 import UserNotifications
 
@@ -48,8 +49,15 @@ final class NotificationService: UNNotificationServiceExtension {
             guard let result else { self?.finish(content); return }
             defer { sable_push_free(result) }
             let bytes = Data(String(cString: result).utf8)
-            guard let rendered = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
-                  let body = rendered["body"] as? String else {
+            guard let rendered = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] else {
+                self?.finish(content)
+                return
+            }
+            if let ring = rendered["ring"] as? [String: Any], let room = rendered["room_id"] as? String {
+                self?.ring(ring, room: room, fallback: content)
+                return
+            }
+            guard let body = rendered["body"] as? String else {
                 self?.finish(content)
                 return
             }
@@ -62,6 +70,28 @@ final class NotificationService: UNNotificationServiceExtension {
                 updated.threadIdentifier = user + "\u{0}" + room
             }
             self?.finish(updated)
+        }
+    }
+
+    private func ring(_ ring: [String: Any], room: String, fallback: UNMutableNotificationContent) {
+        let caller = (ring["caller_name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "Someone"
+        guard let alert = fallback.mutableCopy() as? UNMutableNotificationContent else {
+            finish(fallback)
+            return
+        }
+        alert.body = "\(caller) is calling"
+        var payload: [AnyHashable: Any] = [
+            "room_id": room,
+            "uuid": UUID().uuidString,
+            "caller_name": caller,
+        ]
+        if let expiresAt = ring["expires_at"] as? Double { payload["expires_at"] = expiresAt }
+        CXProvider.reportNewIncomingVoIPPushPayload(payload) { [weak self] error in
+            if error == nil {
+                self?.complete(UNNotificationContent())
+            } else {
+                self?.finish(alert)
+            }
         }
     }
 
