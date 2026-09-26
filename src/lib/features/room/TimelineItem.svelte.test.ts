@@ -259,6 +259,23 @@ test('renders placeholders through the standard message layout', async () => {
   await unmount(instance);
 });
 
+test("shows the sender's role icon after their name", async () => {
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: item(false), collapsed: false },
+      roleIcons: { '@alice:example.org': '🛡️' },
+    },
+  });
+  await tick();
+
+  const icon = document.querySelector('header .role-tag-icon');
+  expect(icon?.textContent).toBe('🛡️');
+  expect(icon?.previousElementSibling?.classList.contains('sender-identity')).toBe(true);
+  await unmount(instance);
+});
+
 test('reads an emote as one sentence, with the name only in the action', async () => {
   const instance = mount(TimelineItemHarness, {
     target: document.body,

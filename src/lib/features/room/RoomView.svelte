@@ -92,7 +92,12 @@
   import TimelineList from './TimelineList.svelte';
   import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
   import { galleryEventId, timelineMediaItems } from './media-items.js';
-  import { parsePowerLevelTags, type PowerLevelTagMap } from './settings/power-level-tags.js';
+  import {
+    parsePowerLevelTags,
+    tagForLevel,
+    type PowerLevelTagMap,
+  } from './settings/power-level-tags.js';
+  import { provideSenderRoleIcons } from './sender-role-icons.js';
   import { readTombstone } from './settings/room-upgrade.js';
   import { splitVia } from './join-address';
   import type { MatrixLink } from './matrix-link';
@@ -361,6 +366,17 @@
   const abbreviations = new RoomAbbreviations(core.commands);
   provideRoomAbbreviations(abbreviations);
   provideRoomMemberNames({ displayName: memberDisplayName });
+  let roleIcons = $derived.by((): Record<string, string> => {
+    const tags = powerTags;
+    if (!tags || !Object.values(tags).some((tag) => tag.icon)) return {};
+    return Object.fromEntries(
+      memberLoader.members.flatMap((member) => {
+        const icon = tagForLevel(tags, member.power_level)?.icon;
+        return icon ? [[member.user_id, icon]] : [];
+      })
+    );
+  });
+  provideSenderRoleIcons((userId) => roleIcons[userId] ?? null);
 
   const cosmetics = new RoomCosmetics(core);
   provideRoomCosmetics(cosmetics);

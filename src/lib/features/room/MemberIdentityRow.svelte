@@ -14,7 +14,6 @@
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
 
   import { findMember, senderDisplayColors } from './members.js';
-  import RoleTagIcon from './RoleTagIcon.svelte';
   import SenderName from './SenderName.svelte';
   import type { PowerLevelTag } from './settings/power-level-tags.js';
 
@@ -115,9 +114,6 @@
         nameClass="member-name"
         compact={pronouns.visible.length === 0}
       />
-      {#if powerTag?.icon}
-        <RoleTagIcon icon={powerTag.icon} class="member-identity-role-icon" />
-      {/if}
       {#if userStatus}
         <span class="member-identity-status">
           {#if userStatus.emoji}<span class="member-identity-status-emoji">{userStatus.emoji}</span
@@ -209,12 +205,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  :global(.member-identity-role-icon) {
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-    line-height: 1;
   }
 
   .member-identity-status-emoji {

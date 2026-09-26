@@ -59,6 +59,8 @@
   import ReadReceiptStack from './ReadReceiptStack.svelte';
   import { trailingReceipt } from './receipt-fit';
   import SenderName from './SenderName.svelte';
+  import RoleTagIcon from './RoleTagIcon.svelte';
+  import { hasSenderRoleIcons, useSenderRoleIcons } from './sender-role-icons.js';
   import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import ForwardedLine from './ForwardedLine.svelte';
   import type { MatrixLink } from './matrix-link';
@@ -169,6 +171,7 @@
   const core = useCoreClient();
   const personaStore = usePersonaStore();
   const roomCosmetics = useRoomCosmetics();
+  const senderRoleIcons = hasSenderRoleIcons() ? useSenderRoleIcons() : null;
   const dialogs = useMessageDialogs();
   const openMessageMenu = useMessageMenu();
   let profile = $state<ProfileView | null>(null);
@@ -335,6 +338,7 @@
     senderDisplayColors(item.sender ?? '', profile, persona, item.is_own, senderCosmetics)
   );
   let senderFont = $derived(persona ? null : (senderCosmetics?.font ?? null));
+  let senderRoleIcon = $derived(item.sender ? (senderRoleIcons?.(item.sender) ?? null) : null);
 
   let senderId = $derived(item.sender);
   $effect(() => {
@@ -909,6 +913,9 @@
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
               onViaProfile={persona ? openSenderProfileAt : undefined}
             />
+            {#if senderRoleIcon}
+              <RoleTagIcon icon={senderRoleIcon} />
+            {/if}
           {/if}
           <div class="message-details">
             {#if item.sender}
