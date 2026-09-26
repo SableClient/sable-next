@@ -353,3 +353,24 @@ test('a reply the SDK cannot embed takes its preview from the event source', asy
   expect(fallback.sender).toBe('@ana:example.org');
   expect(fallback.body).toContain('🎉');
 });
+
+test('editing steps back to the own message before the one being edited', () => {
+  const me = '@kris:example.org';
+  const { conversation } = setup(
+    [
+      item('$one:example.org', me),
+      item('$two:example.org', '@ana:example.org'),
+      item('$three:example.org', me),
+    ],
+    me
+  );
+
+  conversation.editLast();
+  expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$three:example.org' });
+
+  conversation.editLast('$three:example.org');
+  expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$one:example.org' });
+
+  conversation.editLast('$one:example.org');
+  expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$one:example.org' });
+});

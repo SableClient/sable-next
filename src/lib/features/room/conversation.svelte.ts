@@ -424,12 +424,17 @@ export class Conversation {
     this.context = { kind: 'edit', eventId, timelineItemId: item?.id, body, html, mediaCaption };
   };
 
-  readonly editLast = (): void => {
+  readonly editLast = (before?: string): void => {
     const userId = this.#core.session?.user_id;
     if (!userId) return;
 
-    for (let index = this.#timeline.items.length - 1; index >= 0; index -= 1) {
-      const item = this.#timeline.items[index];
+    const items = this.#timeline.items;
+    const end =
+      before === undefined
+        ? items.length
+        : items.findIndex((entry) => entry.event_id === before || entry.transaction_id === before);
+    for (let index = end - 1; index >= 0; index -= 1) {
+      const item = items[index];
       const itemId = item.event_id ?? item.transaction_id;
       if (!itemId || item.sender !== userId) continue;
       if (item.content.kind !== 'message') continue;

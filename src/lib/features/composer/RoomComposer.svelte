@@ -128,7 +128,7 @@
     onCancelContext?: () => void;
     onToggleSilentReply?: () => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
-    onEditLast?: () => void;
+    onEditLast?: (before?: string) => void;
     onReplyStep?: (direction: ReplyDirection) => void;
     threadRoot?: string | null;
   }
@@ -172,6 +172,7 @@
   let activeDraftKey = $state<string | null>(null);
   let nextStagedId = 0;
   let preEdit: ProseMirrorNode | undefined;
+  let prefilledDoc: ProseMirrorNode | undefined;
   let loadedMembersFor = $state<string | null>(null);
   let loadedEmotesFor = $state<string | null>(null);
   let typingTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -435,9 +436,11 @@
       if (formatted === null) editor.setText(context.body);
       else if (richText) editor.setHtml(formatted);
       else editor.setText(plainEditSource(context.body, formatted));
+      prefilledDoc = editor.doc();
     } else if (context === null) {
       const wasEditing = prefilledFor !== null;
       prefilledFor = null;
+      prefilledDoc = undefined;
       if (preEdit) {
         editor.setDoc(preEdit);
         preEdit = undefined;
@@ -913,6 +916,17 @@
     if (!panelOpen) {
       if (key === 'ArrowUp' && empty && staged.length === 0 && !context && onEditLast) {
         onEditLast();
+        return true;
+      }
+      if (
+        key === 'ArrowUp' &&
+        context?.kind === 'edit' &&
+        onEditLast &&
+        prefilledDoc !== undefined &&
+        editor.doc()?.eq(prefilledDoc) &&
+        editor.atTopEdge()
+      ) {
+        onEditLast(context.eventId);
         return true;
       }
       if (key === 'Escape' && context) {
