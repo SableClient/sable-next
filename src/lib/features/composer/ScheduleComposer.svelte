@@ -2,10 +2,9 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DateTimeField from '#lib/ui/primitives/DateTimeField.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import FormField from '#lib/ui/primitives/FormField.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { presetOffsets, scheduleAt, scheduleInputs } from './schedule-time.js';
@@ -26,17 +25,19 @@
     onSchedule,
   }: Props = $props();
 
-  const uid = $props.id();
-  let date = $derived(scheduleInputs(dueTs).date);
-  let time = $derived(scheduleInputs(dueTs).time);
-  let timeInput: HTMLInputElement | null = null;
+  let moment = $derived(momentOf(dueTs));
 
-  let chosen = $derived(scheduleAt(date, time, Date.now()));
+  let chosen = $derived(scheduleAt(moment.slice(0, 10), moment.slice(11, 16), Date.now()));
   let blocked = $derived(encrypted === true && !preferences.scheduleInEncryptedRooms);
   let unavailable = $derived(empty || blocked);
 
+  function momentOf(ts: number | null): string {
+    const { date, time } = scheduleInputs(ts);
+    return date === '' ? '' : `${date}T${time}`;
+  }
+
   function reset(): void {
-    ({ date, time } = scheduleInputs(dueTs));
+    moment = momentOf(dueTs);
   }
 
   function confirm(dueTs: number): void {
@@ -91,31 +92,9 @@
       {/each}
     </div>
 
-    <div class="pair">
-      <FormField fieldId="{uid}-date" label={$i18n.t('composer.scheduleDate')}>
-        <TextInput
-          id="{uid}-date"
-          type="date"
-          bind:value={date}
-          onchange={() => timeInput?.focus()}
-        />
-      </FormField>
-      <FormField fieldId="{uid}-time" label={$i18n.t('composer.scheduleTime')}>
-        <TextInput
-          id="{uid}-time"
-          type="time"
-          bind:value={time}
-          {@attach (node: HTMLInputElement) => {
-            timeInput = node;
-            return () => {
-              timeInput = null;
-            };
-          }}
-        />
-      </FormField>
-    </div>
+    <DateTimeField label={$i18n.t('composer.scheduleMoment')} bind:value={moment} />
 
-    {#if date !== '' && time !== '' && chosen === null}
+    {#if moment !== '' && chosen === null}
       <Alert variant="critical" role="alert">{$i18n.t('composer.schedulePast')}</Alert>
     {/if}
 
@@ -153,11 +132,5 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-300);
-  }
-
-  .pair {
-    display: grid;
-    gap: var(--space-300);
-    grid-template-columns: 1fr 1fr;
   }
 </style>

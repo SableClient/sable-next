@@ -6,10 +6,9 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DateTimeField from '#lib/ui/primitives/DateTimeField.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
-  import FormField from '#lib/ui/primitives/FormField.svelte';
-  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   interface Props {
     open: boolean;
@@ -50,7 +49,7 @@
   }
 
   async function jump(): Promise<void> {
-    const at = Date.parse(value);
+    const at = value === '' ? Number.NaN : new Date(value).getTime();
     if (Number.isNaN(at) || searching) return;
 
     searching = true;
@@ -72,23 +71,18 @@
   }
 </script>
 
-<DialogFrame {open} {onOpenChange} variant="verification" label={$i18n.t('room.jumpTitle')}>
+<DialogFrame
+  {open}
+  {onOpenChange}
+  variant="verification"
+  label={$i18n.t('room.jumpTitle')}
+  onConfirm={() => void jump()}
+>
   <div class="jump">
     <h2>{$i18n.t('room.jumpTitle')}</h2>
     <p class="explain">{$i18n.t('room.jumpBody')}</p>
 
-    <FormField fieldId="room-jump-at" label={$i18n.t('room.jumpMoment')}>
-      <TextInput
-        id="room-jump-at"
-        type="datetime-local"
-        bind:value
-        onkeydown={(event: KeyboardEvent) => {
-          if (event.key !== 'Enter') return;
-          event.preventDefault();
-          void jump();
-        }}
-      />
-    </FormField>
+    <DateTimeField label={$i18n.t('room.jumpMoment')} bind:value />
 
     <div class="shortcuts">
       <Button
@@ -127,12 +121,7 @@
           onOpenChange(false);
         }}>{$i18n.t('room.jumpCancel')}</Button
       >
-      <Button
-        loading={searching}
-        onclick={() => {
-          void jump();
-        }}>{$i18n.t('room.jumpSubmit')}</Button
-      >
+      <Button type="submit" loading={searching}>{$i18n.t('room.jumpSubmit')}</Button>
     </DialogActions>
   </div>
 </DialogFrame>

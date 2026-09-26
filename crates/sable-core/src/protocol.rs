@@ -1750,6 +1750,12 @@ pub enum CoreEvent {
         items: Vec<SidebarItemView>,
     },
 
+    /// A calendar entry, an answer or a redaction arrived in a calendar room.
+    CalendarChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+
     RoomCosmeticsChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -3598,6 +3604,7 @@ pub struct CalendarRsvpView {
     pub sender: String,
     pub calendar_event_id: String,
     pub uid: String,
+    pub recurrence_id: Option<String>,
     pub status: String,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub timestamp: u64,

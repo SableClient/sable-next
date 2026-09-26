@@ -13,12 +13,33 @@ const FREQUENCIES: readonly string[] = ['daily', 'weekly', 'monthly', 'yearly'];
 const LOCAL_DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 const DURATION = /^P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/;
 const MINUTE = 60_000;
+const DAY = 86_400_000;
+const MAX_STEPS = 100_000;
+const WEEKDAYS = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'];
+const UNMODELLED_PARTS = [
+  'byMonth',
+  'byYearDay',
+  'byWeekNo',
+  'byHour',
+  'byMinute',
+  'bySecond',
+  'bySetPosition',
+];
+
+interface NDay {
+  day: number;
+  nth: number | null;
+}
 
 interface Recurrence {
   frequency: Frequency;
   interval: number;
   count: number | null;
   until: string | null;
+  byDay: NDay[];
+  byMonthDay: number[];
+  firstDayOfWeek: number;
+  modelled: boolean;
 }
 
 export interface CalendarItem {
@@ -38,6 +59,7 @@ export interface CalendarItem {
 
 export interface Occurrence {
   item: CalendarItem;
+  recurrenceId: string | null;
   start: number;
   end: number;
 }
@@ -47,6 +69,7 @@ interface RsvpTally {
   tentative: number;
   declined: number;
   mine: RsvpStatus | null;
+  people: Record<RsvpStatus, string[]>;
 }
 
 function text(value: unknown): string {
@@ -125,14 +148,59 @@ export function epochToLocal(epoch: number): string {
   return `${String(at.getFullYear())}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}:00`;
 }
 
+function isRealDateTime(local: string): boolean {
+  const match = LOCAL_DATE_TIME.exec(local);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = groups(match);
+  const at = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  return (
+    at.getUTCFullYear() === year &&
+    at.getUTCMonth() === month - 1 &&
+    at.getUTCDate() === day &&
+    at.getUTCHours() === hour &&
+    at.getUTCMinutes() === minute
+  );
+}
+
+function readNDays(value: unknown): NDay[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) return null;
+  const days: NDay[] = [];
+  for (const entry of value) {
+    const day = isRecord(entry) ? WEEKDAYS.indexOf(text(entry.day)) : -1;
+    if (!isRecord(entry) || day === -1) return null;
+    const nth = entry.nthOfPeriod;
+    days.push({ day, nth: typeof nth === 'number' && nth !== 0 ? nth : null });
+  }
+  return days;
+}
+
 function readRecurrence(value: unknown): Recurrence | null {
   const rule: unknown = Array.isArray(value) ? value[0] : undefined;
   if (!isRecord(rule) || !FREQUENCIES.includes(text(rule.frequency))) return null;
+  const frequency = text(rule.frequency) as Frequency;
+  const byDay = readNDays(rule.byDay);
+  const byMonthDay = Array.isArray(rule.byMonthDay)
+    ? rule.byMonthDay.filter((day): day is number => Number.isInteger(day) && day !== 0)
+    : [];
+  const firstDayOfWeek = WEEKDAYS.indexOf(text(rule.firstDayOfWeek));
+  const modelled =
+    byDay !== null &&
+    (rule.rscale === undefined || text(rule.rscale).toLowerCase() === 'gregorian') &&
+    UNMODELLED_PARTS.every((part) => !Array.isArray(rule[part]) || rule[part].length === 0) &&
+    (byDay.length === 0 ||
+      frequency === 'monthly' ||
+      (frequency === 'weekly' && byDay.every((day) => day.nth === null))) &&
+    (byMonthDay.length === 0 || frequency === 'monthly');
   return {
-    frequency: text(rule.frequency) as Frequency,
+    frequency,
     interval: typeof rule.interval === 'number' && rule.interval > 0 ? rule.interval : 1,
     count: typeof rule.count === 'number' ? rule.count : null,
     until: typeof rule.until === 'string' ? rule.until : null,
+    byDay: byDay ?? [],
+    byMonthDay,
+    firstDayOfWeek: firstDayOfWeek === -1 ? 1 : firstDayOfWeek,
+    modelled,
   };
 }
 
@@ -147,7 +215,7 @@ export function readEntry(entry: CalendarEntryView): CalendarItem | null {
   if (!isRecord(event)) return null;
   const uid = text(event.uid);
   const start = text(event.start);
-  if (uid === '' || !LOCAL_DATE_TIME.test(start)) return null;
+  if (uid === '' || !isRealDateTime(start)) return null;
   return {
     eventId: entry.event_id,
     sender: entry.sender,
@@ -164,17 +232,61 @@ export function readEntry(entry: CalendarEntryView): CalendarItem | null {
   };
 }
 
-function step(local: string, recurrence: Recurrence, times: number): string {
-  const match = LOCAL_DATE_TIME.exec(local);
-  if (!match) return local;
+function monthDays(year: number, month: number, rule: Recurrence): number[] {
+  const length = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const days = new Set<number>();
+  for (const day of rule.byMonthDay) {
+    const date = day > 0 ? day : length + day + 1;
+    if (date >= 1 && date <= length) days.add(date);
+  }
+  for (const { day, nth } of rule.byDay) {
+    const first = ((day - new Date(Date.UTC(year, month, 1)).getUTCDay() + 7) % 7) + 1;
+    const matches: number[] = [];
+    for (let date = first; date <= length; date += 7) matches.push(date);
+    const picked = nth === null ? matches : [matches.at(nth > 0 ? nth - 1 : nth)];
+    for (const date of picked) if (date !== undefined) days.add(date);
+  }
+  return [...days].sort((left, right) => left - right);
+}
+
+function* wallTimes(start: string, rule: Recurrence | null): Generator<string> {
+  yield start;
+  const match = LOCAL_DATE_TIME.exec(start);
+  if (!rule?.modelled || !match) return;
   const [year, month, day, hour, minute, second] = groups(match);
-  const amount = recurrence.interval * times;
-  const at = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  if (recurrence.frequency === 'daily') at.setUTCDate(at.getUTCDate() + amount);
-  if (recurrence.frequency === 'weekly') at.setUTCDate(at.getUTCDate() + amount * 7);
-  if (recurrence.frequency === 'monthly') at.setUTCMonth(at.getUTCMonth() + amount);
-  if (recurrence.frequency === 'yearly') at.setUTCFullYear(at.getUTCFullYear() + amount);
-  return at.toISOString().slice(0, 19);
+  const first = Date.UTC(year, month - 1, day, hour, minute, second);
+  const iso = (at: number) => new Date(at).toISOString().slice(0, 19);
+  for (let period = 1; period < MAX_STEPS; period += 1) {
+    const amount = rule.interval * period;
+    if (rule.frequency === 'weekly' && rule.byDay.length > 0) {
+      const weekStart = first - ((new Date(first).getUTCDay() - rule.firstDayOfWeek + 7) % 7) * DAY;
+      const offsets = rule.byDay
+        .map(({ day: weekday }) => (weekday - rule.firstDayOfWeek + 7) % 7)
+        .sort((left, right) => left - right);
+      for (const offset of new Set(offsets)) {
+        const at = weekStart + ((period - 1) * rule.interval * 7 + offset) * DAY;
+        if (at > first) yield iso(at);
+      }
+    } else if (
+      rule.frequency === 'monthly' &&
+      (rule.byDay.length > 0 || rule.byMonthDay.length > 0)
+    ) {
+      const index = month - 1 + (period - 1) * rule.interval;
+      const inYear = year + Math.floor(index / 12);
+      for (const date of monthDays(inYear, index % 12, rule)) {
+        const at = Date.UTC(inYear, index % 12, date, hour, minute, second);
+        if (at > first) yield iso(at);
+      }
+    } else {
+      const at = new Date(first);
+      if (rule.frequency === 'daily') at.setUTCDate(at.getUTCDate() + amount);
+      if (rule.frequency === 'weekly') at.setUTCDate(at.getUTCDate() + amount * 7);
+      if (rule.frequency === 'monthly') at.setUTCMonth(at.getUTCMonth() + amount);
+      if (rule.frequency === 'yearly') at.setUTCFullYear(at.getUTCFullYear() + amount);
+      const monthly = rule.frequency === 'monthly' || rule.frequency === 'yearly';
+      if (!monthly || at.getUTCDate() === day) yield iso(at.getTime());
+    }
+  }
 }
 
 function occurrences(item: CalendarItem, from: number, to: number): Occurrence[] {
@@ -183,12 +295,15 @@ function occurrences(item: CalendarItem, from: number, to: number): Occurrence[]
     ? localToEpoch(item.recurrence.until.slice(0, 19), item.timeZone)
     : null;
   const limit = item.recurrence ? (item.recurrence.count ?? Infinity) : 1;
-  for (let index = 0; index < limit; index += 1) {
-    const local = item.recurrence ? step(item.start, item.recurrence, index) : item.start;
+  let produced = 0;
+  for (const local of wallTimes(item.start, item.recurrence)) {
+    if (produced >= limit) break;
+    produced += 1;
     const start = localToEpoch(local, item.timeZone);
     if (start === null || start >= to || (until !== null && start > until)) break;
     const end = start + item.durationMs;
-    if (end >= from) found.push({ item, start, end });
+    if (end >= from)
+      found.push({ item, recurrenceId: item.recurrence === null ? null : local, start, end });
   }
   return found;
 }
@@ -202,18 +317,27 @@ export function agenda(items: readonly CalendarItem[], from: number, to: number)
 export function tallyRsvps(
   rsvps: readonly CalendarRsvpView[],
   uid: string,
+  recurrenceId: string | null,
   userId: string | null
 ): RsvpTally {
   const latest = new Map<string, CalendarRsvpView>();
   for (const rsvp of rsvps) {
     if (rsvp.uid !== uid || !RSVP_STATUSES.includes(rsvp.status)) continue;
+    if (rsvp.recurrence_id !== null && rsvp.recurrence_id !== recurrenceId) continue;
     const previous = latest.get(rsvp.sender);
     if (!previous || previous.timestamp <= rsvp.timestamp) latest.set(rsvp.sender, rsvp);
   }
-  const tally: RsvpTally = { accepted: 0, tentative: 0, declined: 0, mine: null };
+  const tally: RsvpTally = {
+    accepted: 0,
+    tentative: 0,
+    declined: 0,
+    mine: null,
+    people: { accepted: [], tentative: [], declined: [] },
+  };
   for (const [sender, rsvp] of latest) {
     const status = rsvp.status as RsvpStatus;
     tally[status] += 1;
+    tally.people[status].push(sender);
     if (sender === userId) tally.mine = status;
   }
   return tally;
@@ -227,6 +351,7 @@ export interface CalendarDraft {
   end: number;
   allDay: boolean;
   frequency: Frequency | null;
+  until: string | null;
 }
 
 export function buildEvent(
@@ -248,16 +373,38 @@ export function buildEvent(
     uid,
     updated: new Date(now).toISOString().replace(/\.\d+Z$/, 'Z'),
     title: draft.title,
-    start: epochToLocal(draft.start),
-    timeZone,
-    duration: formatDuration(Math.max(0, draft.end - draft.start)),
+    start: draft.allDay
+      ? `${epochToLocal(draft.start).slice(0, 10)}T00:00:00`
+      : epochToLocal(draft.start),
+    timeZone: draft.allDay ? null : timeZone,
+    duration: draft.allDay
+      ? `P${String(Math.max(1, Math.round((draft.end - draft.start) / DAY)))}D`
+      : formatDuration(Math.max(0, draft.end - draft.start)),
     showWithoutTime: draft.allDay,
     ...(draft.description ? { description: draft.description } : {}),
     ...(draft.location
       ? { locations: { main: { '@type': 'Location', name: draft.location } } }
       : {}),
-    ...(draft.frequency
-      ? { recurrenceRules: [{ '@type': 'RecurrenceRule', frequency: draft.frequency }] }
-      : {}),
+    ...(draft.frequency ? { recurrenceRules: [recurrenceRule(draft, base)] } : {}),
+  };
+}
+
+function recurrenceRule(
+  draft: CalendarDraft,
+  base: Record<string, unknown> | null
+): Record<string, unknown> {
+  const previous: unknown = Array.isArray(base?.recurrenceRules)
+    ? base.recurrenceRules[0]
+    : undefined;
+  const {
+    until: _until,
+    count,
+    ...kept
+  } = isRecord(previous) && previous.frequency === draft.frequency ? previous : {};
+  return {
+    ...kept,
+    '@type': 'RecurrenceRule',
+    frequency: draft.frequency,
+    ...(draft.until ? { until: `${draft.until}T23:59:59` } : count === undefined ? {} : { count }),
   };
 }

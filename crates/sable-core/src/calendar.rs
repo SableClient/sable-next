@@ -1,11 +1,17 @@
 //! Calendar rooms in Commet's format (`chat.commet.calendar`), plus RSVPs.
 
+use std::collections::HashSet;
+use std::sync::Arc;
+
 use matrix_sdk::room::MessagesOptions;
+use matrix_sdk::ruma::events::AnySyncTimelineEvent;
+use matrix_sdk::ruma::room::RoomType;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, UInt};
 use serde_json::{Value, json};
 
 use crate::Core;
-use crate::protocol::{CalendarEntryView, CalendarRsvpView, CalendarView, CommandErr};
+use crate::protocol::{CalendarEntryView, CalendarRsvpView, CalendarView, CommandErr, CoreEvent};
 
 pub(crate) const CALENDAR_ROOM_TYPE: &str = "chat.commet.calendar";
 pub(crate) const RSVP_EVENT: &str = "moe.sable.calendar.rsvp";
@@ -16,6 +22,24 @@ const EVENT_FORMAT: &str = "chat.commet.calendar.event.rfc8984";
 const RSVP_STATUSES: [&str; 3] = ["accepted", "tentative", "declined"];
 const PAGE_SIZE: u32 = 100;
 const MAX_PAGES: usize = 100;
+const REDACTION: &str = "m.room.redaction";
+const ENCRYPTED: &str = "m.room.encrypted";
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RoomCalendar {
+    newest: Option<String>,
+    entries: Vec<CalendarEntryView>,
+    rsvps: Vec<(String, CalendarRsvpView)>,
+}
+
+impl RoomCalendar {
+    fn view(&self) -> CalendarView {
+        CalendarView {
+            entries: latest_entries(self.entries.clone()),
+            rsvps: self.rsvps.iter().map(|(_, rsvp)| rsvp.clone()).collect(),
+        }
+    }
+}
 
 impl Core {
     pub(crate) async fn calendar_entries(
@@ -23,10 +47,18 @@ impl Core {
         room_id: &OwnedRoomId,
     ) -> Result<CalendarView, CommandErr> {
         let room = self.room(room_id).await?;
-        let mut entries = Vec::new();
-        let mut rsvps = Vec::new();
+        let cached = self
+            .calendars
+            .lock()
+            .await
+            .get(room_id)
+            .cloned()
+            .unwrap_or_default();
+        let mut fresh = RoomCalendar::default();
+        let mut redacted = HashSet::new();
+        let mut anchored = false;
         let mut from: Option<String> = None;
-        for _ in 0..MAX_PAGES {
+        'pages: for _ in 0..MAX_PAGES {
             let mut options = MessagesOptions::backward().from(from.as_deref());
             options.limit = UInt::from(PAGE_SIZE);
             let messages = room
@@ -34,19 +66,68 @@ impl Core {
                 .await
                 .map_err(|error| self.room_error("calendar_entries", error))?;
             for event in &messages.chunk {
-                if let Ok(event) = event.raw().deserialize_as::<Value>() {
-                    collect(&event, &mut entries, &mut rsvps);
+                let Ok(event) = event.raw().deserialize_as::<Value>() else {
+                    continue;
+                };
+                let event_id = event.get("event_id").and_then(Value::as_str);
+                if event_id.is_some() && event_id == cached.newest.as_deref() {
+                    anchored = true;
+                    break 'pages;
                 }
+                if fresh.newest.is_none() {
+                    fresh.newest = event_id.map(str::to_owned);
+                }
+                if let Some(target) = redacts(&event) {
+                    redacted.insert(target.to_owned());
+                }
+                collect(&event, &mut fresh.entries, &mut fresh.rsvps);
             }
             match messages.end {
                 Some(end) if !messages.chunk.is_empty() => from = Some(end),
                 _ => break,
             }
         }
-        Ok(CalendarView {
-            entries: latest_entries(entries),
-            rsvps,
-        })
+        if anchored {
+            fresh.newest = fresh.newest.or(cached.newest);
+            fresh.entries.extend(cached.entries);
+            fresh.rsvps.extend(cached.rsvps);
+        }
+        fresh
+            .entries
+            .retain(|entry| !redacted.contains(&entry.event_id));
+        fresh
+            .rsvps
+            .retain(|(event_id, _)| !redacted.contains(event_id));
+        let view = fresh.view();
+        self.calendars.lock().await.insert(room_id.clone(), fresh);
+        Ok(view)
+    }
+
+    pub(crate) fn watch_calendars(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |event: Raw<AnySyncTimelineEvent>, room: matrix_sdk::Room| {
+                let core = core.clone();
+                async move {
+                    if room.room_type() != Some(RoomType::from(CALENDAR_ROOM_TYPE)) {
+                        return;
+                    }
+                    let kind = event.get_field::<String>("type").ok().flatten();
+                    if matches!(
+                        kind.as_deref(),
+                        Some(CALENDAR_EVENTS | RSVP_EVENT | REDACTION | ENCRYPTED)
+                    ) {
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::CalendarChanged {
+                                room_id: room.room_id().to_owned(),
+                            },
+                        );
+                    }
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
     }
 
     pub(crate) async fn save_calendar_event(
@@ -56,31 +137,7 @@ impl Core {
         replaces: Option<OwnedEventId>,
     ) -> Result<(), CommandErr> {
         let room = self.room(room_id).await?;
-        let existing = self
-            .room_state_event_content(room_id.clone(), CALENDARS.to_owned(), String::new())
-            .await?
-            .as_ref()
-            .and_then(|content| content.get("calendars"))
-            .and_then(Value::as_array)
-            .and_then(|calendars| calendars.first())
-            .and_then(Value::as_str)
-            .map(str::to_owned);
-        let calendar_id = if let Some(calendar_id) = existing {
-            calendar_id
-        } else {
-            let created = room
-                .send_raw(CALENDAR_CREATE, json!({}))
-                .await
-                .map_err(|error| self.room_error("save_calendar_event", error))?;
-            room.send_state_event_raw(
-                CALENDARS,
-                "",
-                json!({ "calendars": [created.response.event_id] }),
-            )
-            .await
-            .map_err(|error| self.room_error("save_calendar_event", error))?;
-            created.response.event_id.to_string()
-        };
+        let calendar_id = self.calendar_id(&room).await?;
         room.send_raw(
             CALENDAR_EVENTS,
             json!({
@@ -98,9 +155,55 @@ impl Core {
         }
         Ok(())
     }
+
+    pub(crate) async fn calendar_id(&self, room: &matrix_sdk::Room) -> Result<String, CommandErr> {
+        let existing = self
+            .room_state_event_content(
+                room.room_id().to_owned(),
+                CALENDARS.to_owned(),
+                String::new(),
+            )
+            .await?
+            .as_ref()
+            .and_then(|content| content.get("calendars"))
+            .and_then(Value::as_array)
+            .and_then(|calendars| calendars.first())
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        if let Some(calendar_id) = existing {
+            return Ok(calendar_id);
+        }
+        let created = room
+            .send_raw(CALENDAR_CREATE, json!({}))
+            .await
+            .map_err(|error| self.room_error("calendar_id", error))?;
+        room.send_state_event_raw(
+            CALENDARS,
+            "",
+            json!({ "calendars": [created.response.event_id] }),
+        )
+        .await
+        .map_err(|error| self.room_error("calendar_id", error))?;
+        Ok(created.response.event_id.to_string())
+    }
 }
 
-fn collect(event: &Value, entries: &mut Vec<CalendarEntryView>, rsvps: &mut Vec<CalendarRsvpView>) {
+fn redacts(event: &Value) -> Option<&str> {
+    if event.get("type").and_then(Value::as_str) != Some(REDACTION) {
+        return None;
+    }
+    event
+        .get("content")
+        .and_then(|content| content.get("redacts"))
+        .or_else(|| event.get("redacts"))
+        .and_then(Value::as_str)
+}
+
+fn collect(
+    event: &Value,
+    entries: &mut Vec<CalendarEntryView>,
+    rsvps: &mut Vec<(String, CalendarRsvpView)>,
+) {
     let text = |key: &str| event.get(key).and_then(Value::as_str).map(str::to_owned);
     let (Some(kind), Some(event_id), Some(sender)) =
         (text("type"), text("event_id"), text("sender"))
@@ -146,13 +249,20 @@ fn collect(event: &Value, entries: &mut Vec<CalendarEntryView>, rsvps: &mut Vec<
             if let (Some(status), Some(uid), Some(target)) = (status, uid, target)
                 && RSVP_STATUSES.contains(&status)
             {
-                rsvps.push(CalendarRsvpView {
-                    sender,
-                    calendar_event_id: target.to_owned(),
-                    uid: uid.to_owned(),
-                    status: status.to_owned(),
-                    timestamp,
-                });
+                rsvps.push((
+                    event_id,
+                    CalendarRsvpView {
+                        sender,
+                        calendar_event_id: target.to_owned(),
+                        uid: uid.to_owned(),
+                        recurrence_id: content
+                            .get("recurrenceId")
+                            .and_then(Value::as_str)
+                            .map(str::to_owned),
+                        status: status.to_owned(),
+                        timestamp,
+                    },
+                ));
             }
         }
         _ => {}
@@ -210,7 +320,7 @@ mod tests {
                 "type": "moe.sable.calendar.rsvp", "event_id": "$rsvp",
                 "sender": "@bob:example.org", "origin_server_ts": 4,
                 "content": {
-                    "uid": "raid", "status": "tentative",
+                    "uid": "raid", "status": "tentative", "recurrenceId": "2026-10-08T20:00:00",
                     "m.relates_to": { "rel_type": "m.reference", "event_id": "$new" }
                 }
             }),
@@ -232,7 +342,11 @@ mod tests {
         assert_eq!(entries[0].event_id, "$new");
         assert_eq!(entries[0].event["title"], "Raid night");
         assert_eq!(rsvps.len(), 1);
-        assert_eq!(rsvps[0].status, "tentative");
-        assert_eq!(rsvps[0].calendar_event_id, "$new");
+        assert_eq!(rsvps[0].1.status, "tentative");
+        assert_eq!(rsvps[0].1.calendar_event_id, "$new");
+        assert_eq!(
+            rsvps[0].1.recurrence_id.as_deref(),
+            Some("2026-10-08T20:00:00")
+        );
     }
 }

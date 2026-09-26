@@ -2903,3 +2903,215 @@ async fn an_invite_joined_without_a_required_state_member_becomes_joined() {
     .expect("the joined invite is marked joined");
     watcher.abort();
 }
+
+#[tokio::test]
+async fn redacting_an_event_outside_the_timeline_redacts_it_in_the_room() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!calendar:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server.mock_room_state_encryption().plain().mount().await;
+    server
+        .mock_room_redact()
+        .ok(event_id!("$redaction"))
+        .expect(1)
+        .mount()
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let response = core
+        .dispatch(Command::Redact {
+            room_id: room_id.to_owned(),
+            event_id: event_id!("$calendar-entry").to_owned(),
+            reason: None,
+            thread_root: None,
+        })
+        .await
+        .unwrap();
+
+    assert!(matches!(response, CommandOk::Redact));
+}
+
+#[tokio::test]
+async fn a_new_calendar_room_is_set_up_by_its_creator() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server.mock_create_room().ok().mock_once().mount().await;
+    server.mock_room_state_encryption().plain().mount().await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"/rooms/.*/state/chat\.commet\.calendars/?$"))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "Event not found.",
+        })))
+        .mount(server.server())
+        .await;
+    server
+        .mock_room_send()
+        .for_type("chat.commet.calendar_create".into())
+        .ok(event_id!("$calendar"))
+        .expect(1)
+        .mount()
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/rooms/.*/state/chat\.commet\.calendars/?$"))
+        .and(wiremock::matchers::body_json(
+            json!({ "calendars": ["$calendar"] }),
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({ "event_id": "$state" })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let response = core
+        .dispatch(Command::CreateRoom {
+            name: Some("Raids".to_owned()),
+            topic: None,
+            kind: crate::protocol::CreateRoomKind::Calendar,
+            public: false,
+            encrypted: false,
+            invite: Vec::new(),
+            parent_space: None,
+            alias: None,
+            room_version: None,
+            join_rule: None,
+            federate: true,
+        })
+        .await
+        .unwrap();
+
+    assert!(matches!(response, CommandOk::CreateRoom { .. }));
+}
+
+fn calendar_event(event_id: &str, uid: &str) -> serde_json::Value {
+    json!({
+        "type": "chat.commet.calendar_events", "event_id": event_id,
+        "sender": "@ana:example.org", "origin_server_ts": 1,
+        "room_id": "!calendar:example.org",
+        "content": {
+            "format": "chat.commet.calendar.event.rfc8984",
+            "events": [{ "event": { "uid": uid, "start": "2026-10-01T20:00:00" } }]
+        }
+    })
+}
+
+#[tokio::test]
+async fn a_calendar_reload_reads_back_only_to_what_it_already_has() {
+    let raw_timeline_event = |event: serde_json::Value| {
+        matrix_sdk::ruma::serde::Raw::new(&event)
+            .unwrap()
+            .cast_unchecked::<matrix_sdk::ruma::events::AnyTimelineEvent>()
+    };
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!calendar:example.org");
+    server.sync_joined_room(&client, room_id).await;
+    server
+        .mock_room_messages()
+        .ok(RoomMessagesResponseTemplate::default()
+            .events(vec![raw_timeline_event(calendar_event("$a", "raid"))]))
+        .mock_once()
+        .mount()
+        .await;
+    server
+        .mock_room_messages()
+        .ok(RoomMessagesResponseTemplate::default()
+            .events(vec![
+                raw_timeline_event(calendar_event("$b", "picnic")),
+                raw_timeline_event(json!({
+                    "type": "m.room.redaction", "event_id": "$r",
+                    "sender": "@ana:example.org", "origin_server_ts": 2,
+                    "room_id": "!calendar:example.org",
+                    "redacts": "$a", "content": { "redacts": "$a" }
+                })),
+                raw_timeline_event(calendar_event("$a", "raid")),
+            ])
+            .end_token("older"))
+        .mock_once()
+        .mount()
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let first = core.calendar_entries(&room_id.to_owned()).await.unwrap();
+    assert_eq!(first.entries.len(), 1);
+    assert_eq!(first.entries[0].event_id, "$a");
+
+    let second = core.calendar_entries(&room_id.to_owned()).await.unwrap();
+    let ids: Vec<_> = second
+        .entries
+        .iter()
+        .map(|entry| entry.event_id.as_str())
+        .collect();
+    assert_eq!(ids, ["$b"]);
+}
+
+#[tokio::test]
+async fn a_synced_calendar_entry_tells_the_page_to_reload() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let (core, mut events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    core.watch_calendars(&client, 1);
+
+    let room_id = room_id!("!calendar:example.org");
+    let state = |event: serde_json::Value| {
+        matrix_sdk::ruma::serde::Raw::new(&event)
+            .unwrap()
+            .cast_unchecked()
+    };
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_bulk([state(json!({
+                    "type": "m.room.create", "state_key": "", "event_id": "$create",
+                    "sender": "@ana:example.org", "origin_server_ts": 0,
+                    "content": { "room_version": "11", "type": "chat.commet.calendar" }
+                }))])
+                .add_timeline_event(
+                    matrix_sdk::ruma::serde::Raw::new(&calendar_event("$a", "raid"))
+                        .unwrap()
+                        .cast_unchecked::<matrix_sdk::ruma::events::AnySyncTimelineEvent>(),
+                ),
+        )
+        .await;
+
+    let changed = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Some(CoreEvent::CalendarChanged { room_id }) = events.recv().await {
+                break room_id;
+            }
+        }
+    })
+    .await
+    .expect("a calendar change");
+    assert_eq!(changed, room_id);
+}

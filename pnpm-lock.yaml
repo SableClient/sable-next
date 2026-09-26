@@ -175,6 +175,9 @@ importers:
       '@fontsource-variable/nunito':
         specifier: 5.3.0
         version: 5.3.0
+      '@internationalized/date':
+        specifier: ^3.12.4
+        version: 3.12.4
       '@leeoniya/ufuzzy':
         specifier: 1.0.19
         version: 1.0.19

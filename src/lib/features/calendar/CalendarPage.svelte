@@ -2,12 +2,13 @@
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
-  import type { CalendarView, RoomPermissionsView } from '#src/generated/protocol';
+  import type { CalendarView, MemberView, RoomPermissionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { memberName } from '#lib/features/room/members.js';
   import { backToRoomList, trackRoomEntry } from '#lib/features/room/room-navigation.js';
   import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
-  import { i18n } from '#lib/i18n.js';
+  import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -48,12 +49,12 @@
   let resolvedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
-  let latestEventId = $derived(resolvedRoom?.latest_event?.event_id ?? null);
   let userId = $derived(core.session?.user_id ?? null);
 
   let view = $state.raw<CalendarView | null>(null);
   let failed = $state(false);
   let permissions = $state<RoomPermissionsView | null>(null);
+  let members = $state.raw<MemberView[]>([]);
   let showPast = $state(false);
   let editing = $state<CalendarItem | null>(null);
   let dialogOpen = $state(false);
@@ -73,8 +74,12 @@
   let days = $derived(groupByDay(occurrences));
 
   $effect(() => {
-    void latestEventId;
-    void load(resolvedRoomId);
+    const activeRoomId = resolvedRoomId;
+    void load(activeRoomId);
+    return core.subscribeEvents((event) => {
+      if (event.type === 'calendar_changed' && event.room_id === activeRoomId)
+        void load(activeRoomId);
+    });
   });
 
   $effect(() => {
@@ -92,6 +97,28 @@
       current = false;
     };
   });
+
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    let current = true;
+    core.commands
+      .roomMembers(activeRoomId)
+      .then((next) => {
+        if (current) members = next;
+      })
+      .catch((error: unknown) => {
+        console.warn('[sable calendar] loading members failed', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  function people(userIds: readonly string[]): string {
+    return new Intl.ListFormat(currentLocale(), { type: 'conjunction' }).format(
+      userIds.map((userId) => memberName(members, userId))
+    );
+  }
 
   async function load(activeRoomId: string): Promise<void> {
     try {
@@ -167,12 +194,14 @@
     }
   }
 
-  async function answer(item: CalendarItem, status: RsvpStatus): Promise<void> {
+  async function answer(occurrence: Occurrence, status: RsvpStatus): Promise<void> {
+    const item = occurrence.item;
     try {
       await core.commands.sendRawEvent(resolvedRoomId, RSVP_EVENT, {
         uid: item.uid,
+        ...(occurrence.recurrenceId === null ? {} : { recurrenceId: occurrence.recurrenceId }),
         status,
-        'm.relates_to': { event_id: item.eventId },
+        'm.relates_to': { rel_type: 'm.reference', event_id: item.eventId },
       });
       await load(resolvedRoomId);
     } catch (error) {
@@ -182,7 +211,12 @@
   }
 
   function timeRange(occurrence: Occurrence): string {
-    if (occurrence.item.allDay) return $i18n.t('calendar.allDay');
+    if (occurrence.item.allDay) {
+      const last = occurrence.end - 1;
+      return new Date(occurrence.start).toDateString() === new Date(last).toDateString()
+        ? $i18n.t('calendar.allDay')
+        : $i18n.t('calendar.allDayUntil', { date: formatDate(last) });
+    }
     const sameDay =
       new Date(occurrence.start).toDateString() === new Date(occurrence.end).toDateString();
     const end = sameDay
@@ -249,7 +283,12 @@
           <ul>
             {#each day.list as occurrence (`${occurrence.item.eventId}:${String(occurrence.start)}`)}
               {@const item = occurrence.item}
-              {@const tally = tallyRsvps(view?.rsvps ?? [], item.uid, userId)}
+              {@const tally = tallyRsvps(
+                view?.rsvps ?? [],
+                item.uid,
+                occurrence.recurrenceId,
+                userId
+              )}
               <li class="calendar-event">
                 <div class="calendar-event-time">{timeRange(occurrence)}</div>
                 <div class="calendar-event-body">
@@ -260,6 +299,18 @@
                   {#if item.description}
                     <p class="calendar-event-description">{item.description}</p>
                   {/if}
+                  {#if STATUSES.some((status) => tally.people[status].length > 0)}
+                    <dl class="calendar-event-people">
+                      {#each STATUSES as status (status)}
+                        {#if tally.people[status].length > 0}
+                          <div>
+                            <dt>{$i18n.t(`calendar.people.${status}`)}</dt>
+                            <dd>{people(tally.people[status])}</dd>
+                          </div>
+                        {/if}
+                      {/each}
+                    </dl>
+                  {/if}
                   <div class="calendar-event-actions">
                     {#each STATUSES as status (status)}
                       <Button
@@ -267,7 +318,7 @@
                         variant={tally.mine === status ? 'primary' : 'secondary'}
                         aria-pressed={tally.mine === status}
                         disabled={permissions?.can_post === false}
-                        onclick={() => void answer(item, status)}
+                        onclick={() => void answer(occurrence, status)}
                       >
                         {$i18n.t(`calendar.rsvp.${status}`, { count: tally[status] })}
                       </Button>
@@ -399,6 +450,28 @@
 
   .calendar-event-description {
     white-space: pre-wrap;
+  }
+
+  .calendar-event-people {
+    display: grid;
+    font-size: var(--font-size-small);
+    gap: var(--space-100);
+    margin: 0;
+  }
+
+  .calendar-event-people div {
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .calendar-event-people dt {
+    color: var(--surface-var-on-container);
+    flex: 0 0 auto;
+  }
+
+  .calendar-event-people dd {
+    margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .calendar-event-actions {

@@ -48,7 +48,9 @@ use matrix_sdk::ruma::{
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
 };
-use matrix_sdk_ui::timeline::{RoomExt, TimelineEventItemId, TimelineFocus};
+use matrix_sdk_ui::timeline::{
+    Error as TimelineError, RedactError, RoomExt, TimelineEventItemId, TimelineFocus,
+};
 
 use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
@@ -1315,11 +1317,24 @@ impl Core {
                 reason,
                 thread_root,
             } => {
-                self.timeline_for(&room_id, thread_root.as_ref())
+                let redacted = self
+                    .timeline_for(&room_id, thread_root.as_ref())
                     .await?
-                    .redact(&TimelineEventItemId::EventId(event_id), reason.as_deref())
-                    .await
-                    .map_err(|error| self.failed("redact", error))?;
+                    .redact(
+                        &TimelineEventItemId::EventId(event_id.clone()),
+                        reason.as_deref(),
+                    )
+                    .await;
+                match redacted {
+                    Err(TimelineError::RedactError(RedactError::ItemNotFound(_))) => {
+                        self.room(&room_id)
+                            .await?
+                            .redact(&event_id, reason.as_deref(), None)
+                            .await
+                            .map_err(|error| self.failed("redact", error))?;
+                    }
+                    other => other.map_err(|error| self.failed("redact", error))?,
+                }
 
                 Ok(CommandOk::Redact)
             }
@@ -2601,6 +2616,12 @@ impl Core {
                     .create_room(request)
                     .await
                     .map_err(|error| self.failed("create_room", error))?;
+
+                if matches!(kind, CreateRoomKind::Calendar)
+                    && let Err(error) = self.calendar_id(&room).await
+                {
+                    tracing::warn!(?error, "calendar setup failed");
+                }
 
                 if let Some(space_id) = parent_space {
                     self.add_to_space(&space_id, room.room_id(), None).await?;

@@ -10,42 +10,30 @@ vi.mock('#lib/i18n.js', () => ({
       return () => {};
     },
   },
+  currentLocale: () => 'en',
 }));
 
-import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
 import ScheduleComposer from './ScheduleComposer.svelte';
 
 afterEach(() => {
   document.body.replaceChildren();
   setPreference('scheduleInEncryptedRooms', true);
+  preferences.dateFormat = 'auto';
+  preferences.hour24Clock = false;
 });
 
-function input(type: string): HTMLInputElement {
-  const element = document.querySelector(`input[type="${type}"]`);
-  if (!(element instanceof HTMLInputElement)) throw new Error(`${type} input not found`);
-  return element;
+function segments(): string {
+  return [...document.querySelectorAll('[data-segment]')]
+    .map((segment) => segment.textContent)
+    .join('')
+    .trim();
 }
 
-test('picking a date moves focus to the time, which closes the native picker', async () => {
-  const instance = mount(ScheduleComposer, {
-    target: document.body,
-    props: { open: true, empty: false, onSchedule: vi.fn() },
-  });
-  await tick();
-
-  const date = input('date');
-  date.focus();
-  date.value = '2026-09-20';
-  date.dispatchEvent(new Event('change', { bubbles: true }));
-  await tick();
-
-  expect(document.activeElement).toBe(input('time'));
-
-  void unmount(instance);
-});
-
 test('a scheduled message being edited opens on its own time and can be saved as is', async () => {
+  preferences.dateFormat = 'dmy';
+  preferences.hour24Clock = true;
   const dueTs = new Date('2099-09-20T14:30:00').getTime();
   const onSchedule = vi.fn();
   const instance = mount(ScheduleComposer, {
@@ -54,8 +42,7 @@ test('a scheduled message being edited opens on its own time and can be saved as
   });
   await tick();
 
-  expect(input('date').value).toBe('2099-09-20');
-  expect(input('time').value).toBe('14:30');
+  expect(segments()).toBe('20/09/2099, 14:30');
 
   const confirm = document.querySelector('button[type="submit"]');
   if (!(confirm instanceof HTMLButtonElement)) throw new Error('confirm button not found');

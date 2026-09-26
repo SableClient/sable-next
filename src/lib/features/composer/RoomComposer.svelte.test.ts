@@ -1202,8 +1202,9 @@ test('an edited scheduled message loads its text and saves through its own time'
   await tick();
 
   expect(send).not.toHaveBeenCalled();
-  const time = document.querySelector('input[type="time"]');
-  expect(time instanceof HTMLInputElement && time.value).toBe('14:30');
+  const segment = (part: string) =>
+    document.querySelector(`.schedule [data-segment="${part}"]`)?.textContent;
+  expect([segment('hour'), segment('minute'), segment('dayPeriod')]).toEqual(['02', '30', 'PM']);
 
   document
     .querySelector('.schedule')

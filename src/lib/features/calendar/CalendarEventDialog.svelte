@@ -4,6 +4,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import DateTimeField from '#lib/ui/primitives/DateTimeField.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
@@ -21,6 +22,8 @@
   } from './calendar-events.js';
 
   const HOUR = 3_600_000;
+  const DAY = 86_400_000;
+  const NEVER = 'never';
 
   interface Props {
     open: boolean;
@@ -36,28 +39,44 @@
   let start = $state('');
   let end = $state('');
   let allDay = $state(false);
-  let frequency = $state('');
+  let frequency = $state(NEVER);
+  let until = $state('');
   let location = $state('');
   let description = $state('');
   let saving = $state(false);
   let failed = $state(false);
 
-  let startAt = $derived(localToEpoch(start, null));
-  let endAt = $derived(localToEpoch(end, null));
+  let startAt = $derived(allDay ? dayStart(start) : localToEpoch(start, null));
+  let endAt = $derived.by(() => {
+    if (!allDay) return localToEpoch(end, null);
+    const last = dayStart(end);
+    return last === null ? null : last + DAY;
+  });
+  let untilDate = $derived(frequency === NEVER || until === '' ? null : until.slice(0, 10));
   let valid = $derived(
-    title.trim() !== '' && startAt !== null && endAt !== null && endAt >= startAt
+    title.trim() !== '' &&
+      startAt !== null &&
+      endAt !== null &&
+      endAt >= startAt &&
+      (untilDate === null || untilDate >= start.slice(0, 10))
   );
+
+  function dayStart(local: string): number | null {
+    return localToEpoch(`${local.slice(0, 10)}T00:00`, null);
+  }
 
   $effect(() => {
     if (!open) return;
     untrack(() => {
       const from = item ? localToEpoch(item.start, item.timeZone) : null;
       const at = from ?? Math.ceil(Date.now() / HOUR) * HOUR;
+      const length = item ? item.durationMs : HOUR;
       title = item?.title ?? '';
       start = epochToLocal(at).slice(0, 16);
-      end = epochToLocal(at + (item ? item.durationMs : HOUR)).slice(0, 16);
+      end = epochToLocal(at + (item?.allDay ? Math.max(0, length - DAY) : length)).slice(0, 16);
       allDay = item?.allDay ?? false;
-      frequency = item?.recurrence?.frequency ?? '';
+      frequency = item?.recurrence?.frequency ?? NEVER;
+      until = item?.recurrence?.until?.slice(0, 10) ?? '';
       location = item?.location ?? '';
       description = item?.description ?? '';
       failed = false;
@@ -76,7 +95,8 @@
         start: startAt,
         end: endAt,
         allDay,
-        frequency: frequency === '' ? null : (frequency as Frequency),
+        frequency: frequency === NEVER ? null : (frequency as Frequency),
+        until: untilDate,
       });
       onOpenChange(false);
     } catch (error) {
@@ -108,22 +128,31 @@
     </FormField>
 
     <div class="calendar-times">
-      <FormField fieldId="{fieldId}-start" label={$i18n.t('calendar.start')}>
-        <TextInput id="{fieldId}-start" type="datetime-local" bind:value={start} required />
-      </FormField>
-      <FormField fieldId="{fieldId}-end" label={$i18n.t('calendar.end')}>
-        <TextInput id="{fieldId}-end" type="datetime-local" bind:value={end} required />
-      </FormField>
+      <DateTimeField
+        label={$i18n.t('calendar.start')}
+        bind:value={start}
+        granularity={allDay ? 'day' : 'minute'}
+        required
+      />
+      <DateTimeField
+        label={$i18n.t('calendar.end')}
+        bind:value={end}
+        granularity={allDay ? 'day' : 'minute'}
+        required
+      />
     </div>
 
-    <Switch label={$i18n.t('calendar.allDay')} bind:checked={allDay} />
+    <div class="calendar-all-day">
+      <span>{$i18n.t('calendar.allDay')}</span>
+      <Switch label={$i18n.t('calendar.allDay')} bind:checked={allDay} />
+    </div>
 
     <FormField fieldId="{fieldId}-repeat" label={$i18n.t('calendar.repeat')}>
       <Select
         id="{fieldId}-repeat"
         bind:value={frequency}
         items={[
-          { value: '', label: $i18n.t('calendar.repeatNever') },
+          { value: NEVER, label: $i18n.t('calendar.repeatNever') },
           { value: 'daily', label: $i18n.t('calendar.repeatDaily') },
           { value: 'weekly', label: $i18n.t('calendar.repeatWeekly') },
           { value: 'monthly', label: $i18n.t('calendar.repeatMonthly') },
@@ -131,6 +160,10 @@
         ]}
       />
     </FormField>
+
+    {#if frequency !== NEVER}
+      <DateTimeField label={$i18n.t('calendar.repeatUntil')} bind:value={until} granularity="day" />
+    {/if}
 
     <FormField fieldId="{fieldId}-location" label={$i18n.t('calendar.location')}>
       <TextInput id="{fieldId}-location" bind:value={location} />
@@ -172,5 +205,12 @@
     display: grid;
     gap: var(--space-300);
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+
+  .calendar-all-day {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+    justify-content: space-between;
   }
 </style>
