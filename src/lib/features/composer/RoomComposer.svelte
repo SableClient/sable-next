@@ -130,6 +130,7 @@
     onToggleSilentReply?: () => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: (before?: string) => void;
+    onEditNext?: (after: string) => void;
     onReplyStep?: (direction: ReplyDirection) => void;
     threadRoot?: string | null;
   }
@@ -153,6 +154,7 @@
     onToggleSilentReply,
     onDeleteEdited,
     onEditLast,
+    onEditNext,
     onReplyStep,
     threadRoot = null,
   }: Props = $props();
@@ -943,6 +945,17 @@
         editor.atTopEdge()
       ) {
         onEditLast(context.eventId);
+        return true;
+      }
+      if (
+        key === 'ArrowDown' &&
+        context?.kind === 'edit' &&
+        onEditNext &&
+        prefilledDoc !== undefined &&
+        editor.doc()?.eq(prefilledDoc) &&
+        editor.atBottomEdge()
+      ) {
+        onEditNext(context.eventId);
         return true;
       }
       if (key === 'Escape' && context) {

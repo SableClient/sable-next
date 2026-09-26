@@ -782,6 +782,11 @@ export class ComposerEditor {
     return view ? atDocumentEdge('up')(view.state, undefined, view) : false;
   }
 
+  atBottomEdge(): boolean {
+    const view = this.view;
+    return view ? atDocumentEdge('down')(view.state, undefined, view) : false;
+  }
+
   isEmpty(): boolean {
     const doc = this.doc();
     return doc ? isDocEmpty(doc) : true;

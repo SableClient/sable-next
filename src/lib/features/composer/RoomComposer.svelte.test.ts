@@ -104,6 +104,7 @@ interface ComposerProps {
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
   onReplyStep?: (direction: 'older' | 'newer') => void;
   onEditLast?: (before?: string) => void;
+  onEditNext?: (after: string) => void;
   threadRoot?: string | null;
   readOnly?: boolean;
   roomName?: string;
@@ -1315,5 +1316,32 @@ test('Up in an untouched edit moves to the previous message, a changed one stays
   await new Promise((resolve) => setTimeout(resolve, 0));
   pressInEditor({ key: 'ArrowUp' });
   expect(editLast).not.toHaveBeenCalled();
+  void unmount(instance);
+});
+
+test('Down in an untouched edit moves to the next message, a changed one stays', async () => {
+  const editNext = vi.fn();
+  let setContext: ((next: ComposerContext | null) => void) | undefined;
+  const instance = render({
+    roomId: '!room:example.org',
+    onEditNext: editNext,
+    registerContext: (set) => {
+      setContext = set;
+    },
+  });
+  await tick();
+
+  setContext?.({ kind: 'edit', eventId: '$one:example.org', body: 'first' });
+  await tick();
+  pressInEditor({ key: 'ArrowDown' });
+  expect(editNext).toHaveBeenCalledWith('$one:example.org');
+
+  editNext.mockClear();
+  const editable = document.querySelector<HTMLElement>('[role="combobox"]');
+  if (editable) editable.textContent = 'first changed';
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  pressInEditor({ key: 'ArrowDown' });
+  expect(editNext).not.toHaveBeenCalled();
   void unmount(instance);
 });

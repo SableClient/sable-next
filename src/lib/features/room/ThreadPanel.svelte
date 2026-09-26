@@ -252,6 +252,7 @@
         {readOnly}
         onDeleteEdited={conversation.redact}
         onEditLast={conversation.editLast}
+        onEditNext={conversation.editNext}
         onReplyStep={(direction) =>
           conversation.moveReply(timelineList?.stepReply(direction) ?? null)}
       />

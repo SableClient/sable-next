@@ -374,3 +374,22 @@ test('editing steps back to the own message before the one being edited', () => 
   conversation.editLast('$one:example.org');
   expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$one:example.org' });
 });
+
+test('editing steps forward to the next own message and leaves after the last', () => {
+  const me = '@kris:example.org';
+  const { conversation } = setup(
+    [
+      item('$one:example.org', me),
+      item('$two:example.org', '@ana:example.org'),
+      item('$three:example.org', me),
+    ],
+    me
+  );
+
+  conversation.editLast('$three:example.org');
+  conversation.editNext('$one:example.org');
+  expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$three:example.org' });
+
+  conversation.editNext('$three:example.org');
+  expect(conversation.context).toBeNull();
+});

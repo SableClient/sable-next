@@ -444,6 +444,27 @@ export class Conversation {
     }
   };
 
+  readonly editNext = (after: string): void => {
+    const userId = this.#core.session?.user_id;
+    if (!userId) return;
+
+    const items = this.#timeline.items;
+    const start = items.findIndex(
+      (entry) => entry.event_id === after || entry.transaction_id === after
+    );
+    if (start < 0) return;
+    for (let index = start + 1; index < items.length; index += 1) {
+      const item = items[index];
+      const itemId = item.event_id ?? item.transaction_id;
+      if (!itemId || item.sender !== userId) continue;
+      if (item.content.kind !== 'message') continue;
+
+      this.edit(itemId, item.content.body, item.content.html);
+      return;
+    }
+    this.context = null;
+  };
+
   readonly clearContext = (): void => {
     this.context = null;
   };
