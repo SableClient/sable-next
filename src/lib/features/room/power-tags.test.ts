@@ -14,7 +14,11 @@ describe('powerTag', () => {
   });
 
   it('names a room-version-12 creator, whose power level is infinite', () => {
-    expect(powerTag(2_147_483_647, t).name).toBe('timeline.powerTagFounder');
+    expect(powerTag(Number.MAX_SAFE_INTEGER + 1, t).name).toBe('timeline.powerTagFounder');
+  });
+
+  it('does not name the highest 32-bit power level as founder', () => {
+    expect(powerTag(2_147_483_647, t).name).not.toBe('timeline.powerTagFounder');
   });
 
   it('prefers the room tag and carries its colour', () => {

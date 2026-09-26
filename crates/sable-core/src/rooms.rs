@@ -200,7 +200,7 @@ impl Core {
             .await
             .map_err(|error| self.failed("room_via_servers", error))?;
 
-        let ranked: Vec<(String, i32)> = members
+        let ranked: Vec<(String, i64)> = members
             .iter()
             .map(|member| {
                 (

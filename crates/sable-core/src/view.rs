@@ -520,8 +520,8 @@ pub fn hierarchy_child_edges(
 /// user who is at least PL 50, then the next servers by population, up to three
 /// in total. Fewer when the room cannot supply that many.
 #[must_use]
-pub fn via_servers(members: &[(String, i32)]) -> Vec<String> {
-    const MODERATOR: i32 = 50;
+pub fn via_servers(members: &[(String, i64)]) -> Vec<String> {
+    const MODERATOR: i64 = 50;
     const WANTED: usize = 3;
 
     let server_of = |user_id: &str| {
@@ -2083,16 +2083,10 @@ pub fn room_permissions(power_levels: &RoomPowerLevels, user_id: &UserId) -> Roo
     }
 }
 
-pub(crate) fn clamp_power_level(level: UserPowerLevel) -> i32 {
+pub(crate) fn clamp_power_level(level: UserPowerLevel) -> i64 {
     match level {
-        UserPowerLevel::Int(level) => i32::try_from(level).unwrap_or_else(|_| {
-            if level.is_negative() {
-                i32::MIN
-            } else {
-                i32::MAX
-            }
-        }),
-        _ => i32::MAX,
+        UserPowerLevel::Int(level) => i64::from(level),
+        _ => i64::from(Int::MAX) + 1,
     }
 }
 
@@ -2404,7 +2398,7 @@ mod tests {
         assert_eq!(serialized["latitude"], serde_json::Value::Null);
     }
 
-    fn members(entries: &[(&str, i32)]) -> Vec<(String, i32)> {
+    fn members(entries: &[(&str, i64)]) -> Vec<(String, i64)> {
         entries
             .iter()
             .map(|(user_id, power)| ((*user_id).to_owned(), *power))
@@ -2549,17 +2543,23 @@ mod tests {
     }
 
     #[test]
-    fn saturates_a_power_level_that_does_not_fit_and_treats_infinite_as_the_ceiling() {
+    fn keeps_every_power_level_and_ranks_infinite_above_them() {
         use matrix_sdk::ruma::Int;
 
         assert_eq!(clamp_power_level(UserPowerLevel::Int(Int::from(50))), 50);
         assert_eq!(
-            clamp_power_level(UserPowerLevel::Int(Int::MAX)),
-            i32::MAX,
-            "a level above i32 must not wrap into a demotion"
+            clamp_power_level(UserPowerLevel::Int(Int::from(i32::MAX))),
+            i64::from(i32::MAX)
         );
-        assert_eq!(clamp_power_level(UserPowerLevel::Int(Int::MIN)), i32::MIN);
-        assert_eq!(clamp_power_level(UserPowerLevel::Infinite), i32::MAX);
+        assert_eq!(
+            clamp_power_level(UserPowerLevel::Int(Int::MAX)),
+            i64::from(Int::MAX)
+        );
+        assert_eq!(
+            clamp_power_level(UserPowerLevel::Int(Int::MIN)),
+            i64::from(Int::MIN)
+        );
+        assert!(clamp_power_level(UserPowerLevel::Infinite) > i64::from(Int::MAX));
     }
 
     #[test]

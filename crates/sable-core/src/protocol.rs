@@ -2607,7 +2607,8 @@ pub struct PredecessorRoomView {
 // Each field is an independent capability, not a state machine.
 #[allow(clippy::struct_excessive_bools)]
 pub struct RoomPermissionsView {
-    pub own_power_level: i32,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub own_power_level: i64,
     pub can_post: bool,
     pub can_react: bool,
     /// Redacting your own event, which needs the level to send `m.room.redaction`.
@@ -3427,7 +3428,8 @@ pub struct MemberView {
     pub user_id: OwnedUserId,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
-    pub power_level: i32,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub power_level: i64,
     pub membership: MembershipView,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub member_ts: Option<u64>,
