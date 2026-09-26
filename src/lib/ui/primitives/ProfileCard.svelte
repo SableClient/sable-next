@@ -200,28 +200,28 @@
   }
 
   .profile-card.tinted {
-    --profile-tint: 20%;
-    --profile-card-ground: color-mix(
-      in oklab,
-      var(--profile-hero) var(--profile-tint),
-      var(--surface-container)
-    );
-    --profile-panel-ground: color-mix(
-      in oklab,
-      var(--profile-hero) var(--profile-tint),
-      var(--surface-var-container)
-    );
-    --profile-text-muted: color-mix(in oklab, var(--profile-hero) 35%, var(--bg-on-container));
+    --profile-ink: var(--bg-on-container);
+    --profile-card-ground: var(--profile-hero);
+    --profile-panel-ground: color-mix(in oklab, var(--profile-hero) 88%, var(--profile-ink));
+    --profile-text-muted: color-mix(in oklab, var(--profile-ink) 75%, var(--profile-hero));
     --profile-icon: var(--profile-text-muted);
-    --profile-line: color-mix(in oklab, var(--profile-hero) 40%, var(--surface-container-line));
+    --profile-line: color-mix(in oklab, var(--profile-ink) 20%, var(--profile-hero));
+
+    color: var(--profile-ink);
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .profile-card.tinted {
+      --profile-ink: oklch(from var(--profile-hero) clamp(0, (0.62 - l) * 1000, 1) 0 0deg);
+    }
   }
 
   .profile-card.tinted.tint-dark {
-    --profile-tint: 30%;
+    --profile-ink: var(--profile-ink-light);
   }
 
   .profile-card.tinted.tint-light {
-    --profile-tint: 12%;
+    --profile-ink: var(--profile-ink-dark);
   }
 
   .profile-card-cover {
@@ -463,6 +463,23 @@
   @supports (color: oklch(from red l c h)) {
     :root.dark .profile-card-name.tinted,
     :root.dark :global(.profile-card-tinted) {
+      color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
+    }
+  }
+
+  .profile-card.tinted .profile-card-name.tinted,
+  .profile-card.tinted :global(.profile-card-tinted) {
+    color: var(--profile-ink);
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .profile-card.tinted.tint-light .profile-card-name.tinted,
+    .profile-card.tinted.tint-light :global(.profile-card-tinted) {
+      color: oklch(from var(--profile-name-color) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h);
+    }
+
+    .profile-card.tinted.tint-dark .profile-card-name.tinted,
+    .profile-card.tinted.tint-dark :global(.profile-card-tinted) {
       color: oklch(from var(--profile-name-color-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h);
     }
   }

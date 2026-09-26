@@ -96,6 +96,8 @@ html {
   --overlay: rgb(0 0 0 / 40%);
   --picker-black: #000;
   --picker-white: #fff;
+  --profile-ink-dark: #000;
+  --profile-ink-light: #fff;
   --media-scrim: rgb(0 0 0 / 60%);
   --media-scrim-clear: rgb(0 0 0 / 0%);
   --media-scrim-solid: rgb(0 0 0 / 100%);
