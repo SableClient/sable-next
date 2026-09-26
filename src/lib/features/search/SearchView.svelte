@@ -4,6 +4,7 @@
   import { RadioGroup } from 'bits-ui';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -12,6 +13,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
@@ -29,6 +31,9 @@
   } from './resolve-targets';
   import { coverageMessage } from './coverage';
   import { snippetAround } from './highlight';
+  import { markTerms } from './mark-terms';
+  import MessagePreview from '../room/MessagePreview.svelte';
+  import { opensFrom } from '../room/message-preview';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
   import type { Suggestion } from '../composer/autocomplete';
   import { applySuggestion, enterAccepts, suggestionsFor } from './search-suggestions';
@@ -579,37 +584,63 @@
             <ul class="hit-list">
               {#each group.hits as hit (hit.event_id)}
                 {@const snippet = snippetAround(hit.body, terms)}
-                <li>
-                  <button class="hit-row" type="button" onclick={() => void openHit(hit)}>
-                    <Avatar
-                      id={hit.sender}
-                      src={senders.identity(hit.sender).avatarUrl}
-                      name={senders.identity(hit.sender).displayName}
-                      size="small"
-                    />
-                    <span class="hit-text">
-                      {#each hit.context_before as line (line.event_id)}
-                        {@render contextLine(line)}
-                      {/each}
-                      <span class="hit-meta">
-                        <span class="hit-sender">{senders.identity(hit.sender).displayName}</span>
-                        <time datetime={new Date(hit.origin_server_ts).toISOString()}>
-                          {formatDate(hit.origin_server_ts)}
-                          {formatTime(hit.origin_server_ts)}
-                        </time>
-                      </span>
-                      <span class="hit-body">
-                        {#if snippet.clippedStart}…{/if}
-                        {#each snippet.segments as segment, index (index)}
-                          {#if segment.match}<mark>{segment.text}</mark>{:else}{segment.text}{/if}
-                        {/each}
-                        {#if snippet.clippedEnd}…{/if}
-                      </span>
-                      {#each hit.context_after as line (line.event_id)}
-                        {@render contextLine(line)}
-                      {/each}
-                    </span>
-                  </button>
+                <li class="hit">
+                  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                  <div
+                    class="hit-row"
+                    onclick={(event) => {
+                      if (opensFrom(event)) void openHit(hit);
+                    }}
+                  >
+                    {#each hit.context_before as line (line.event_id)}
+                      {@render contextLine(line)}
+                    {/each}
+                    <div class="hit-message" {@attach markTerms(terms)}>
+                      <MessagePreview roomId={hit.room_id} eventId={hit.event_id}>
+                        {#snippet fallback()}
+                          <span class="hit-fallback">
+                            <Avatar
+                              id={hit.sender}
+                              src={senders.identity(hit.sender).avatarUrl}
+                              name={senders.identity(hit.sender).displayName}
+                              size="small"
+                            />
+                            <span class="hit-text">
+                              <span class="hit-meta">
+                                <span class="hit-sender"
+                                  >{senders.identity(hit.sender).displayName}</span
+                                >
+                                <time datetime={new Date(hit.origin_server_ts).toISOString()}>
+                                  {formatDate(hit.origin_server_ts)}
+                                  {formatTime(hit.origin_server_ts)}
+                                </time>
+                              </span>
+                              <span class="hit-body">
+                                {#if snippet.clippedStart}…{/if}
+                                {#each snippet.segments as segment, index (index)}
+                                  {#if segment.match}<mark>{segment.text}</mark
+                                    >{:else}{segment.text}{/if}
+                                {/each}
+                                {#if snippet.clippedEnd}…{/if}
+                              </span>
+                            </span>
+                          </span>
+                        {/snippet}
+                      </MessagePreview>
+                    </div>
+                    {#each hit.context_after as line (line.event_id)}
+                      {@render contextLine(line)}
+                    {/each}
+                  </div>
+                  <IconButton
+                    class="hit-open"
+                    variant="ghost"
+                    size="small"
+                    label={$i18n.t('search.openResult')}
+                    onclick={() => void openHit(hit)}
+                  >
+                    <ArrowSquareOutIcon aria-hidden="true" />
+                  </IconButton>
                 </li>
               {/each}
             </ul>
@@ -926,29 +957,43 @@
     padding: 0;
   }
 
-  .hit-row {
+  .hit {
     align-items: flex-start;
-    background: none;
-    border: none;
     border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
     display: flex;
-    font: inherit;
-    gap: var(--space-300);
-    padding: var(--space-200);
-    text-align: left;
-    width: 100%;
-  }
-
-  .hit-row:focus-visible {
-    background: var(--surface-var-container);
+    gap: var(--space-200);
+    padding: 0 var(--space-200) 0 var(--space-400);
   }
 
   @media (hover: hover) and (pointer: fine) {
-    .hit-row:hover {
+    .hit:hover {
       background: var(--surface-var-container);
     }
+  }
+
+  .hit-row {
+    cursor: pointer;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    padding-block: var(--space-200);
+  }
+
+  .hit :global(.hit-open) {
+    flex: none;
+    margin-block-start: var(--space-200);
+  }
+
+  :global(::highlight(search-match)) {
+    background: var(--primary-container);
+    color: var(--primary-on-container);
+  }
+
+  .hit-fallback {
+    align-items: flex-start;
+    display: flex;
+    gap: var(--space-300);
   }
 
   .hit-text {

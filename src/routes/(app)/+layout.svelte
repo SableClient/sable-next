@@ -15,6 +15,8 @@
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
+  import { EventItems, provideEventItems } from '#lib/features/room/event-items.svelte.js';
+  import { provideRoomScopes, RoomScopes } from '#lib/features/room/message-scope.svelte.js';
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -116,6 +118,8 @@
   providePersonaStore(new PersonaStore(core));
   const bookmarks = new Bookmarks(core.commands);
   provideBookmarks(bookmarks);
+  provideEventItems(new EventItems(core.commands, () => core.session?.user_id ?? null));
+  provideRoomScopes(new RoomScopes(core));
   const presence = new PresenceStore();
   providePresenceStore(presence);
   const notifications = new NotificationCenter();

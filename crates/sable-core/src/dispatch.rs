@@ -37,7 +37,6 @@ use matrix_sdk::ruma::events::room::message::{
 };
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
-use matrix_sdk::ruma::events::{AnySyncMessageLikeEvent, AnySyncTimelineEvent};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
 use matrix_sdk::ruma::room::RoomType;
 use matrix_sdk::ruma::serde::Raw;
@@ -56,7 +55,7 @@ use crate::protocol::{
     HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView,
     MembershipView, MessageKind, MutualRoomView, PackImageInfoView, PaginationDirection,
     ProfilePropagationView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
-    RoomVersionsView, ThreadRootView, UrlPreviewView,
+    RoomVersionsView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -74,22 +73,6 @@ use crate::{notifications, session, spaces, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 const MAX_SEARCH_CONTEXT: usize = 3;
-
-fn thread_root(raw: &Raw<AnySyncTimelineEvent>) -> Option<ThreadRootView> {
-    let event = raw.deserialize().ok()?;
-    let AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(message)) = event
-    else {
-        return None;
-    };
-    let original = message.as_original()?;
-
-    Some(ThreadRootView {
-        event_id: original.event_id.clone(),
-        sender: original.sender.clone(),
-        body: original.content.body().to_owned(),
-        timestamp: Some(u64::from(original.origin_server_ts.0)),
-    })
-}
 
 fn preview_refused(error: &matrix_sdk::HttpError) -> bool {
     error
@@ -1005,11 +988,17 @@ impl Core {
                     .await
                     .map_err(|error| self.room_error("list_threads", error))?;
 
-                let roots = threads
-                    .chunk
-                    .iter()
-                    .filter_map(|event| thread_root(event.raw()))
-                    .collect();
+                let push = room.push_context().await.ok().flatten();
+                let roots = futures_util::future::join_all(
+                    threads
+                        .chunk
+                        .into_iter()
+                        .map(|event| view::standalone_item(&room, event, None, push.as_ref())),
+                )
+                .await
+                .into_iter()
+                .flatten()
+                .collect();
 
                 Ok(CommandOk::ListThreads {
                     roots,
@@ -1234,6 +1223,10 @@ impl Core {
                 self.report_message(&room_id, event_id, reason).await?;
                 Ok(CommandOk::ReportMessage)
             }
+
+            Command::EventItems { room_id, event_ids } => Ok(CommandOk::EventItems {
+                items: self.event_items(&room_id, &event_ids).await?,
+            }),
 
             Command::EventSource { room_id, event_id } => Ok(CommandOk::EventSource {
                 source: self.event_source(&room_id, &event_id).await?,

@@ -18,13 +18,21 @@ function anyGroup(page: Page, name: string) {
   return group(page, name).first();
 }
 
+function hit(page: Page, text: RegExp) {
+  return page.locator('.hit').filter({ has: page.locator('.formatted-body', { hasText: text }) });
+}
+
+function marked(page: Page): Promise<string[]> {
+  return page.evaluate(() => [...(CSS.highlights.get('search-match') ?? [])].map(String));
+}
+
 function searchField(page: Page) {
   return page.getByRole('combobox', { name: SEARCH_FIELD });
 }
 
 async function awaitIndexed(page: Page): Promise<void> {
   await searchField(page).fill('welcome');
-  await expect(page.getByRole('button', { name: /Welcome to/ }).first()).toBeVisible({
+  await expect(hit(page, /Welcome to/).first()).toBeVisible({
     timeout: 60_000,
   });
 }
@@ -82,12 +90,12 @@ test('a query returns hits grouped by room and opens the message it lands on', a
   const field = searchField(page);
   await field.fill('welcome');
 
-  const results = page.getByRole('button', { name: /Welcome to/ });
+  const results = hit(page, /Welcome to/);
   await expect(results.first()).toBeVisible(INDEXED);
   await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
   await expect(anyGroup(page, 'Random')).toBeVisible(INDEXED);
 
-  await results.first().click();
+  await results.first().locator('.formatted-body').click();
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toMatch(/^\$/);
 });
 
@@ -108,7 +116,7 @@ test('a quoted phrase and an exclusion change the result set', async ({ page }) 
   const field = searchField(page);
 
   await field.fill('"General message 1"');
-  await expect(page.getByRole('button', { name: /General message 1$/ })).toBeVisible(INDEXED);
+  await expect(hit(page, /General message 1(?!\d)/)).toBeVisible(INDEXED);
 
   await field.fill('message -Random');
   await expect(group(page, 'Random')).toHaveCount(0);
@@ -122,7 +130,7 @@ test('the query survives a reload through the url', async ({ page }) => {
   await page.reload();
 
   await expect(searchField(page)).toHaveValue('welcome');
-  await expect(page.getByRole('button', { name: /Welcome to/ }).first()).toBeVisible(INDEXED);
+  await expect(hit(page, /Welcome to/).first()).toBeVisible(INDEXED);
 });
 
 test('pinned:true keeps only the pinned message', async ({ page }) => {
@@ -131,8 +139,8 @@ test('pinned:true keeps only the pinned message', async ({ page }) => {
   await searchField(page).fill('Clubhouse pinned:true ');
 
   await expect(page.locator('.chips .chip')).toHaveText(/pinned:\s*true/);
-  await expect(page.getByRole('button', { name: /Clubhouse notice board/ })).toBeVisible(INDEXED);
-  await expect(page.getByRole('button', { name: /Clubhouse thread reply/ })).toHaveCount(0);
+  await expect(hit(page, /Clubhouse notice board/)).toBeVisible(INDEXED);
+  await expect(hit(page, /Clubhouse thread reply/)).toHaveCount(0);
 });
 
 test('is:thread keeps only thread replies', async ({ page }) => {
@@ -140,8 +148,8 @@ test('is:thread keeps only thread replies', async ({ page }) => {
 
   await searchField(page).fill('Clubhouse is:thread ');
 
-  await expect(page.getByRole('button', { name: /Clubhouse thread reply/ })).toBeVisible(INDEXED);
-  await expect(page.getByRole('button', { name: /Clubhouse notice board/ })).toHaveCount(0);
+  await expect(hit(page, /Clubhouse thread reply/)).toBeVisible(INDEXED);
+  await expect(hit(page, /Clubhouse notice board/)).toHaveCount(0);
 });
 
 test('sorting by oldest puts the first message first', async ({ page }) => {
@@ -313,7 +321,7 @@ test('matched terms are marked in the result body', async ({ page }) => {
 
   await searchField(page).fill('welcome');
 
-  await expect(page.locator('.hit-body mark').first()).toHaveText(/Welcome/i, INDEXED);
+  await expect.poll(() => marked(page), INDEXED).toContainEqual(expect.stringMatching(/Welcome/i));
 });
 
 test('the result count is announced', async ({ page }) => {
@@ -402,7 +410,7 @@ test('a stemmed match is still marked in the body', async ({ page }) => {
 
   await searchField(page).fill('messag');
 
-  await expect(page.locator('.hit-body mark').first()).toHaveText(/message/i, INDEXED);
+  await expect.poll(() => marked(page), INDEXED).toContainEqual(expect.stringMatching(/message/i));
 });
 
 test('a result row names the sender and shows their avatar initials', async ({ page }) => {
@@ -410,7 +418,7 @@ test('a result row names the sender and shows their avatar initials', async ({ p
 
   await searchField(page).fill('welcome');
 
-  await expect(page.locator('.hit-sender').first()).toHaveText('Alice', INDEXED);
+  await expect(page.locator('.hit .sender').first()).toHaveText('Alice', INDEXED);
   await expect(page.locator('.hit-row').first().locator('.avatar-root')).toBeVisible();
 });
 
@@ -469,7 +477,7 @@ test('from: suggestions show display names', async ({ page, app, searchCorpus })
   await page.goto('/search');
 
   await searchField(page).fill('welcome');
-  await expect(page.locator('.hit-sender').first()).toHaveText('Alice', INDEXED);
+  await expect(page.locator('.hit .sender').first()).toHaveText('Alice', INDEXED);
 
   await searchField(page).fill('welcome from:Ali');
 
@@ -650,5 +658,5 @@ test('a quoted phrase is marked whole in the result body', async ({ page }) => {
 
   await searchField(page).fill('"General message 1"');
 
-  await expect(page.locator('.hit-body mark').first()).toHaveText('General message 1', INDEXED);
+  await expect.poll(() => marked(page), INDEXED).toContain('General message 1');
 });

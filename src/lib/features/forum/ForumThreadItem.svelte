@@ -8,7 +8,8 @@
   import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
   import { i18n } from '#lib/i18n.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
+  import { opensFrom } from '#lib/features/room/message-preview.js';
 
   import type { ForumThread } from './forum-threads';
 
@@ -93,38 +94,36 @@
     onpointercancel={rowPress.end}
     oncontextmenu={openContextMenu}
   >
-    <button
-      type="button"
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div
       class="forum-thread-button"
-      aria-label={accessibleLabel}
-      onclick={() => onOpen(thread.eventId)}
+      onclick={(event) => {
+        if (opensFrom(event)) onOpen(thread.eventId);
+      }}
     >
-      <Avatar
-        class="forum-thread-avatar"
-        id={thread.sender}
-        src={thread.senderAvatar}
-        name={displayName}
-        size="medium"
-      />
-      <span class="forum-thread-body">
-        <span class="forum-thread-top">
-          <span class="forum-thread-sender">{displayName}</span>
-          <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
-        </span>
-        <span class="forum-thread-preview">{thread.preview}</span>
-        <span class="forum-thread-meta">
-          <span class="forum-thread-replies">{replyLabel}</span>
-          {#if thread.lastBody}
-            <span class="forum-thread-last">
-              {thread.lastSenderName ?? displayName}: {thread.lastBody}
-            </span>
-          {/if}
-        </span>
-      </span>
-      {#if thread.unread}
-        <span class="forum-thread-unread-dot" aria-hidden="true"></span>
-      {/if}
-    </button>
+      <MessagePreview {roomId} eventId={thread.eventId} item={thread.item}>
+        {#snippet fallback()}
+          <span class="forum-thread-preview">{thread.preview}</span>
+        {/snippet}
+      </MessagePreview>
+      <button
+        type="button"
+        class="forum-thread-meta"
+        aria-label={accessibleLabel}
+        onclick={() => onOpen(thread.eventId)}
+      >
+        <span class="forum-thread-replies">{replyLabel}</span>
+        {#if thread.lastBody}
+          <span class="forum-thread-last">
+            {thread.lastSenderName ?? displayName}: {thread.lastBody}
+          </span>
+        {/if}
+        <span class="forum-thread-time">{formatMessageTimestamp(thread.lastActivityAt)}</span>
+        {#if thread.unread}
+          <span class="forum-thread-unread-dot" aria-hidden="true"></span>
+        {/if}
+      </button>
+    </div>
     <MessageActions {...actions} />
   </article>
 </li>
@@ -147,17 +146,14 @@
   }
 
   .forum-thread-button {
-    align-items: center;
-    background: var(--surface-var-container);
-    border: 0;
-    border-radius: var(--radii-400);
     box-sizing: border-box;
     cursor: pointer;
     display: flex;
-    gap: var(--space-300);
-    padding: var(--space-400);
-    text-align: left;
-    width: 100%;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--space-200);
+    min-width: 0;
+    padding: var(--space-200) var(--space-400) var(--space-400);
   }
 
   .forum-thread-card {
@@ -169,7 +165,7 @@
   }
 
   .forum-thread-card:has(.forum-thread-button:hover),
-  .forum-thread-card:has(.forum-thread-button:focus-visible) {
+  .forum-thread-card:has(.forum-thread-meta:focus-visible) {
     background: var(--surface-container-hover);
   }
 
@@ -185,32 +181,9 @@
     background: var(--surface-container-hover);
   }
 
-  .forum-thread-body {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    gap: var(--space-200);
-    min-width: 0;
-  }
-
-  .forum-thread-top {
-    align-items: baseline;
-    display: flex;
-    gap: var(--space-300);
-    justify-content: space-between;
-  }
-
-  .forum-thread-sender {
-    font-weight: var(--font-weight-500);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .forum-thread-time {
-    color: var(--surface-var-on-container);
     flex: 0 0 auto;
-    font-size: var(--font-size-small);
+    margin-inline-start: auto;
   }
 
   .forum-thread-preview {
@@ -223,11 +196,22 @@
 
   .forum-thread-meta {
     align-items: center;
+    background: none;
+    border: 0;
+    border-radius: var(--radius);
     color: var(--surface-var-on-container);
+    cursor: pointer;
     display: flex;
+    font: inherit;
     font-size: var(--font-size-small);
     gap: var(--space-300);
     overflow: hidden;
+    padding: 0;
+    text-align: start;
+  }
+
+  .forum-thread-meta:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
   }
 
   .forum-thread-replies {

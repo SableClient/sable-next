@@ -13,9 +13,10 @@
     class?: ClassValue;
     children: Snippet;
     trailing: Snippet;
+    message?: Snippet;
   }
 
-  let { roomId, eventId, name, class: className, children, trailing }: Props = $props();
+  let { roomId, eventId, name, class: className, children, trailing, message }: Props = $props();
   const roomList = useRoomList();
 
   let avatarUrl = $derived(roomList.byId(roomId)?.avatar_url ?? null);
@@ -30,12 +31,16 @@
     </span>
   </a>
   {@render trailing()}
+  {#if message}
+    <div class="message">{@render message()}</div>
+  {/if}
 </li>
 
 <style>
   li {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
     padding-right: var(--space-300);
   }
@@ -64,6 +69,12 @@
   .row:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: calc(var(--focus-ring-width) * -1);
+  }
+
+  .message {
+    flex: 1 0 100%;
+    min-width: 0;
+    padding: 0 0 var(--space-200) var(--space-400);
   }
 
   .body {

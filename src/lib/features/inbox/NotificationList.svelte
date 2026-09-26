@@ -12,6 +12,7 @@
   import { focusRowAt, formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
   import InboxFeedRow from './InboxFeedRow.svelte';
+  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
   import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
@@ -194,7 +195,6 @@
   {:else}
     <ul class="feed">
       {#each rows as item (item.event_id)}
-        {@const where = item.is_direct ? null : roomName(item)}
         <InboxFeedRow
           roomId={item.room_id}
           eventId={item.event_id}
@@ -202,22 +202,30 @@
           class={{ read: item.read }}
         >
           <span class="head">
-            <span class="name">{sender(item)}</span>
-            {#if where}<span class="where">{where}</span>{/if}
+            <span class="name">{roomName(item)}</span>
+            {#if item.highlight}
+              <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
+                <AtIcon aria-hidden="true" />
+              </span>
+            {/if}
             <time
               class="when"
               datetime={new Date(item.ts).toISOString()}
               title={formatMessageTimestamp(item.ts)}>{formatCompactTimestamp(item.ts)}</time
             >
           </span>
-          <span class="foot">
-            <span class={['preview', { placeholder: item.body === null }]}>{preview(item)}</span>
-            {#if item.highlight}
-              <span class="mention" role="img" aria-label={$i18n.t('inbox.mention')}>
-                <AtIcon aria-hidden="true" />
-              </span>
-            {/if}
-          </span>
+          {#snippet message()}
+            <MessagePreview roomId={item.room_id} eventId={item.event_id}>
+              {#snippet fallback()}
+                <span class="foot">
+                  <span class="sender">{sender(item)}</span>
+                  <span class={['preview', { placeholder: item.body === null }]}
+                    >{preview(item)}</span
+                  >
+                </span>
+              {/snippet}
+            </MessagePreview>
+          {/snippet}
           {#snippet trailing()}
             {#if item.read}
               <span class="mark-read-spacer" aria-hidden="true"></span>
@@ -308,19 +316,14 @@
     white-space: nowrap;
   }
 
-  .where {
-    color: var(--surface-var-on-container);
+  .sender {
     flex: 0 1 auto;
     font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-  }
-
-  .where::before {
-    content: '·';
-    padding-right: var(--space-200);
   }
 
   .when {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { MemberView, ThreadRootView } from '#src/generated/protocol';
+  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -11,8 +11,8 @@
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
-  import { memberName } from './members';
-  import { formatMessageTimestamp } from './timeline-format';
+  import MessagePreview from './MessagePreview.svelte';
+  import { opensFrom } from './message-preview';
 
   interface Props {
     roomId: string;
@@ -25,7 +25,7 @@
   let { roomId, members, modal = false, onOpenThread, onClose }: Props = $props();
 
   const core = useCoreClient();
-  let roots = $state.raw<ThreadRootView[]>([]);
+  let roots = $state.raw<TimelineItemView[]>([]);
   let nextBatch = $state<string | null>(null);
   let loading = $state(false);
   let failed = $state(false);
@@ -72,23 +72,30 @@
     <div class="thread-list-body">
       {#if roots.length > 0}
         <ul>
-          {#each roots as root (root.event_id)}
+          {#each roots as root (root.id)}
+            {@const rootId = root.event_id ?? root.id}
             <li>
-              <button
-                type="button"
-                class="thread-root choice"
-                onclick={() => {
-                  onOpenThread(root.event_id);
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+              <div
+                class="thread-root"
+                onclick={(event) => {
+                  if (opensFrom(event)) onOpenThread(rootId);
                 }}
               >
-                <span class="thread-root-meta">
-                  <span class="thread-root-sender">{memberName(members, root.sender)}</span>
-                  {#if root.timestamp !== null}
-                    <time>{formatMessageTimestamp(root.timestamp)}</time>
-                  {/if}
-                </span>
-                <span class="thread-root-body">{root.body}</span>
-              </button>
+                <MessagePreview {roomId} eventId={rootId} item={root} {members}>
+                  {#snippet fallback()}{/snippet}
+                </MessagePreview>
+              </div>
+              <Button
+                size="small"
+                variant="ghost"
+                class="thread-open"
+                onclick={() => {
+                  onOpenThread(rootId);
+                }}
+              >
+                {$i18n.t('timeline.threadsOpenRoot')}
+              </Button>
             </li>
           {/each}
         </ul>
@@ -160,60 +167,21 @@
     padding: var(--space-200);
   }
 
-  .thread-root {
-    background: none;
-    border: 0;
+  li {
     border-radius: var(--radius);
-    color: inherit;
-    cursor: pointer;
     display: grid;
-    font: inherit;
-    gap: var(--space-100);
-    padding: var(--space-200) var(--space-300);
-    text-align: start;
-    width: 100%;
+    justify-items: start;
+    padding: 0 var(--space-300) var(--space-200) var(--space-400);
   }
 
-  .thread-root:hover {
+  li:hover {
     background: var(--bg-container-hover);
   }
 
-  .thread-root:focus-visible {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: calc(var(--focus-ring-width) * -1);
-  }
-
-  .thread-root-meta {
-    align-items: baseline;
-    display: flex;
-    gap: var(--space-200);
-    justify-content: space-between;
+  .thread-root {
+    cursor: pointer;
     min-width: 0;
-  }
-
-  .thread-root-sender {
-    font-weight: var(--font-weight-medium);
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  time {
-    color: var(--surface-var-on-container);
-    flex: none;
-    font-size: var(--font-size-small);
-  }
-
-  .thread-root-body {
-    -webkit-box-orient: vertical;
-    color: var(--surface-var-on-container);
-    display: -webkit-box;
-    font-size: var(--font-size-small);
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-    overflow-wrap: anywhere;
+    width: 100%;
   }
 
   .thread-list-status {

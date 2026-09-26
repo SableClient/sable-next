@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use futures_util::future::join_all;
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::room::{IncludeRelations, MessagesOptions, RelationsOptions};
 use matrix_sdk::ruma::api::Direction;
@@ -8,7 +9,9 @@ use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent, Mentions};
 use matrix_sdk::ruma::room::JoinRule;
-use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, UInt};
+use matrix_sdk::ruma::{
+    EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, UInt,
+};
 
 use crate::Core;
 use crate::matrix_html::{
@@ -16,8 +19,8 @@ use crate::matrix_html::{
     strip_profile_fallback_html,
 };
 use crate::personas::PER_MESSAGE_PROFILE;
-use crate::protocol::{CommandErr, EditVersionView};
-use crate::view::per_message_profile;
+use crate::protocol::{CommandErr, EditVersionView, TimelineItemView};
+use crate::view::{per_message_profile, standalone_item};
 
 pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Mentions {
     let mut mentions = Mentions::with_user_ids(user_ids);
@@ -373,6 +376,39 @@ impl Core {
             .chain(edits)
             .collect())
     }
+
+    pub(crate) async fn event_items(
+        &self,
+        room_id: &OwnedRoomId,
+        event_ids: &[OwnedEventId],
+    ) -> Result<Vec<TimelineItemView>, CommandErr> {
+        let room = self.room(room_id).await?;
+        let push = room.push_context().await.ok().flatten();
+        let (room, push) = (&room, push.as_ref());
+        let items = join_all(event_ids.iter().map(|event_id| async move {
+            let (event, replacements) = room
+                .load_or_fetch_event_with_relations(
+                    event_id,
+                    Some(vec![RelationType::Replacement]),
+                    None,
+                )
+                .await
+                .inspect_err(|error| tracing::debug!(%event_id, "event item unavailable: {error}"))
+                .ok()?;
+            let latest = valid_replacements(&event, &replacements)
+                .max_by_key(|replacement| {
+                    replacement
+                        .raw()
+                        .get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
+                        .ok()
+                        .flatten()
+                })
+                .cloned();
+            standalone_item(room, event, latest, push).await
+        }))
+        .await;
+        Ok(items.into_iter().flatten().collect())
+    }
 }
 
 fn valid_replacements<'a>(
@@ -436,7 +472,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use matrix_sdk::{
-        ruma::{event_id, room_id},
+        ruma::{event_id, room_id, user_id},
         test_utils::mocks::MatrixMockServer,
     };
     use matrix_sdk_ui::sync_service::SyncService;
@@ -622,6 +658,81 @@ mod tests {
             ]
         );
         assert_eq!(versions[2].html, "<b>third</b>");
+    }
+
+    #[tokio::test]
+    async fn event_items_render_the_latest_valid_edit_and_skip_missing_events() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let room = room_id!("!pins:example.org");
+        server.sync_joined_room(&client, room).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room}/event/$pinned"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "type": "m.room.message", "event_id": "$pinned", "sender": "@alice:example.org",
+                "origin_server_ts": 1, "room_id": room,
+                "content": {"msgtype": "m.text", "body": "**rules**",
+                    "format": "org.matrix.custom.html", "formatted_body": "<b>rules</b>"}
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v1/rooms/{room}/relations/$pinned/m.replace"
+            )))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": [
+                {"type": "m.room.message", "event_id": "$edit", "sender": "@alice:example.org",
+                 "origin_server_ts": 2, "room_id": room,
+                 "content": {"msgtype": "m.text", "body": "* new rules",
+                    "m.relates_to": {"rel_type": "m.replace", "event_id": "$pinned"},
+                    "m.new_content": {"msgtype": "m.text", "body": "new rules",
+                        "format": "org.matrix.custom.html",
+                        "formatted_body": "<em>new</em> rules"}}},
+                {"type": "m.room.message", "event_id": "$forged", "sender": "@mallory:example.org",
+                 "origin_server_ts": 3, "room_id": room,
+                 "content": {"msgtype": "m.text", "body": "* forged",
+                    "m.relates_to": {"rel_type": "m.replace", "event_id": "$pinned"},
+                    "m.new_content": {"msgtype": "m.text", "body": "forged"}}}
+            ]})))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path(format!("/_matrix/client/v3/rooms/{room}/event/$gone")))
+            .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+                "errcode": "M_NOT_FOUND", "error": "Event not found"
+            })))
+            .mount(server.server())
+            .await;
+        let core = core(&server, client).await;
+        let items = core
+            .event_items(
+                &room.to_owned(),
+                &[
+                    event_id!("$pinned").to_owned(),
+                    event_id!("$gone").to_owned(),
+                ],
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(items.len(), 1);
+        let item = &items[0];
+        assert_eq!(item.event_id.as_deref(), Some(event_id!("$pinned")));
+        assert_eq!(item.sender.as_deref(), Some(user_id!("@alice:example.org")));
+        assert_eq!(item.timestamp, 1);
+        let crate::protocol::TimelineItemContentView::Message {
+            body, html, edited, ..
+        } = &item.content
+        else {
+            panic!("expected a message, got {:?}", item.content);
+        };
+        assert_eq!(body, "new rules");
+        assert_eq!(html, "<em>new</em> rules");
+        assert!(edited);
     }
 
     #[tokio::test]

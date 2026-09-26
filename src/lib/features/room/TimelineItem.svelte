@@ -118,6 +118,7 @@
     onPersonaOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
+    preview?: boolean;
   }
 
   let {
@@ -158,6 +159,7 @@
     events,
     onPersonaOpenChange,
     placeholder = false,
+    preview = false,
     placeholderCharacters = 35,
   }: Props = $props();
 
@@ -280,7 +282,7 @@
   let savingSlow = $state(false);
   const saving = mediaProgress(core, () => savingSource);
 
-  let actionable = $derived(item.event_id !== null && stalled === null && !pending);
+  let actionable = $derived(!preview && item.event_id !== null && stalled === null && !pending);
   let editable = $derived(
     item.is_own && (item.content.kind === 'message' || item.content.kind === 'image')
   );

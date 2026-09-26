@@ -15,6 +15,7 @@
   import { DisplayNames } from './display-names.svelte';
   import { filteredBookmarks, focusRowAt, formatCompactTimestamp } from './inbox';
   import InboxFeedRow from './InboxFeedRow.svelte';
+  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
 
   let { standalone = false }: { standalone?: boolean } = $props();
@@ -110,10 +111,16 @@
               >{formatCompactTimestamp(bookmark.bookmarked_ts)}</time
             >
           </span>
-          <span class="preview">
-            {#if from}<span class="sender">{from}:</span>&nbsp;{/if}{bookmark.body_preview ??
-              $i18n.t('inbox.bookmarkPreviewEmpty')}
-          </span>
+          {#snippet message()}
+            <MessagePreview roomId={bookmark.room_id} eventId={bookmark.event_id}>
+              {#snippet fallback()}
+                <span class="preview">
+                  {#if from}<span class="sender">{from}:</span>&nbsp;{/if}{bookmark.body_preview ??
+                    $i18n.t('inbox.bookmarkPreviewEmpty')}
+                </span>
+              {/snippet}
+            </MessagePreview>
+          {/snippet}
           {#snippet trailing()}
             <IconButton
               class="remove"

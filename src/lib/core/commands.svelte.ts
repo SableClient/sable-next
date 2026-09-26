@@ -56,7 +56,6 @@ import type {
   UrlPreviewView,
   RoomAttachmentKind,
   RoomAttachmentView,
-  ThreadRootView,
   RoomSummary,
   SidebarItemView,
   SpaceHierarchyRoomView,
@@ -371,7 +370,7 @@ export function createCommands(transport: () => Transport) {
     async listThreads(
       roomId: string,
       from: string | null
-    ): Promise<{ roots: ThreadRootView[]; next_batch: string | null }> {
+    ): Promise<{ roots: TimelineItemView[]; next_batch: string | null }> {
       const response = await transport().send({ type: 'list_threads', room_id: roomId, from });
       return { roots: response.roots, next_batch: response.next_batch };
     },
@@ -930,6 +929,15 @@ export function createCommands(transport: () => Transport) {
         event_id: eventId,
         reason,
       });
+    },
+
+    async eventItems(roomId: string, eventIds: readonly string[]): Promise<TimelineItemView[]> {
+      const response = await transport().send({
+        type: 'event_items',
+        room_id: roomId,
+        event_ids: [...eventIds],
+      });
+      return response.items;
     },
 
     async eventSource(roomId: string, eventId: string): Promise<string> {

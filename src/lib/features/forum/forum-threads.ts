@@ -2,6 +2,7 @@ import type { TimelineItemContentView, TimelineItemView } from '#src/generated/p
 
 export interface ForumThread {
   id: string;
+  item: TimelineItemView;
   eventId: string;
   sender: string | null;
   senderName: string | null;
@@ -78,6 +79,7 @@ export function collectForumThreads(
     const latest = latestReply ?? root;
     threads.push({
       id: root.id,
+      item: root,
       eventId: rootId,
       sender: root.sender,
       senderName: root.sender_name,

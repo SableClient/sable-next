@@ -1,9 +1,10 @@
 <script lang="ts">
+  import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
-  import type { MemberView } from '#src/generated/protocol';
+  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -19,9 +20,9 @@
     unreadPinCount,
     type PinReadMarker,
   } from './pin-marker';
-  import { formatMessageTimestamp } from './timeline-format';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
-  import { memberAvatar, memberName } from './members.js';
+  import { useEventItems } from './event-items.svelte.js';
+  import MessagePreview from './MessagePreview.svelte';
+  import { opensFrom } from './message-preview';
 
   interface Props {
     roomId: string;
@@ -33,23 +34,18 @@
 
   let { roomId, members, canPin, revision = 0, onJump }: Props = $props();
   const core = useCoreClient();
-
-  interface PinnedEntry {
-    eventId: string;
-    sender: string | null;
-    body: string | null;
-    timestamp: number | null;
-  }
+  const eventItems = useEventItems();
 
   let open = $state(false);
   let loading = $state(false);
   let pinnedIds = $state.raw<string[]>([]);
-  let entries = $state.raw<PinnedEntry[]>([]);
+  let shownIds = $state.raw<string[]>([]);
+  let entries = $state.raw<ReadonlyMap<string, TimelineItemView>>(new Map());
   let marker = $state.raw<PinReadMarker | null>(null);
   let currentHash = $state<string | null>(null);
   let run = 0;
 
-  let ordered = $derived([...entries].reverse());
+  let ordered = $derived([...shownIds].reverse());
   let unreadCount = $derived(unreadPinCount(pinnedIds, marker, currentHash));
 
   $effect(() => {
@@ -102,38 +98,16 @@
       if (current !== run) return;
       pinnedIds = ids;
 
-      const loaded = await Promise.all(ids.map((eventId) => readEvent(target, eventId)));
+      const loaded = await core.commands.eventItems(target, ids);
       if (current !== run) return;
-      entries = loaded;
+      entries = new Map(loaded.map((item) => [item.event_id ?? item.id, item]));
+      shownIds = ids;
+      eventItems.put(target, loaded);
       await markSeen(target, ids);
     } catch (error) {
       console.debug('[sable room] pins unavailable', error);
     } finally {
       if (current === run) loading = false;
-    }
-  }
-
-  async function readEvent(target: string, eventId: string): Promise<PinnedEntry> {
-    try {
-      const source: unknown = JSON.parse(await core.commands.eventSource(target, eventId));
-      if (typeof source !== 'object' || source === null) {
-        return { eventId, sender: null, body: null, timestamp: null };
-      }
-
-      const event = source as {
-        sender?: unknown;
-        origin_server_ts?: unknown;
-        content?: { body?: unknown };
-      };
-      return {
-        eventId,
-        sender: typeof event.sender === 'string' ? event.sender : null,
-        body: typeof event.content?.body === 'string' ? event.content.body : null,
-        timestamp: typeof event.origin_server_ts === 'number' ? event.origin_server_ts : null,
-      };
-    } catch (error) {
-      console.debug('[sable room] pinned event unreadable', error);
-      return { eventId, sender: null, body: null, timestamp: null };
     }
   }
 
@@ -155,18 +129,10 @@
     }
   }
 
-  function senderName(userId: string | null): string {
-    return userId === null ? $i18n.t('timeline.unknownSender') : memberName(members, userId);
-  }
-
-  function senderAvatar(userId: string | null): string | null {
-    return userId === null ? null : memberAvatar(members, userId);
-  }
-
   async function unpin(eventId: string): Promise<void> {
     try {
       pinnedIds = await core.commands.setPinned(roomId, eventId, false);
-      entries = entries.filter((entry) => entry.eventId !== eventId);
+      shownIds = shownIds.filter((id) => id !== eventId);
     } catch (error) {
       console.warn('[sable room] unpin failed', error);
     }
@@ -226,43 +192,52 @@
       </div>
     {:else}
       <ul class="pin-list">
-        {#each ordered as entry (entry.eventId)}
-          <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, entry.eventId)}>
-            <button
-              class="pin-open selection-layer"
-              type="button"
-              onclick={() => {
-                jump(entry.eventId);
+        {#each ordered as eventId (eventId)}
+          <li class="pin-item" class:fresh={isNewPin(pinnedIds, marker, eventId)}>
+            <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+            <div
+              class="pin-open"
+              onclick={(event) => {
+                if (!opensFrom(event)) return;
+                jump(eventId);
               }}
             >
-              <Avatar
-                id={entry.sender}
-                src={senderAvatar(entry.sender)}
-                name={senderName(entry.sender)}
-                size="small"
-              />
-              <span class="pin-text">
-                <span class="pin-meta">
-                  <span class="pin-sender">{senderName(entry.sender)}</span>
-                  {#if entry.timestamp !== null}
-                    <span class="pin-time">{formatMessageTimestamp(entry.timestamp)}</span>
-                  {/if}
-                </span>
-                <span class="pin-body">{entry.body ?? $i18n.t('room.pinsUnreadable')}</span>
-              </span>
-            </button>
-            {#if canPin}
+              <MessagePreview
+                {roomId}
+                {eventId}
+                item={entries.get(eventId) ?? null}
+                {members}
+                onJumpToEvent={jump}
+              >
+                {#snippet fallback()}
+                  <p class="pin-unreadable">{$i18n.t('room.pinsUnreadable')}</p>
+                {/snippet}
+              </MessagePreview>
+            </div>
+            <div class="pin-actions">
               <IconButton
                 variant="ghost"
                 size="small"
-                label={$i18n.t('timeline.unpinMessage')}
+                label={$i18n.t('room.pinsJump')}
                 onclick={() => {
-                  void unpin(entry.eventId);
+                  jump(eventId);
                 }}
               >
-                <PushPinSlashIcon />
+                <ArrowSquareOutIcon />
               </IconButton>
-            {/if}
+              {#if canPin}
+                <IconButton
+                  variant="ghost"
+                  size="small"
+                  label={$i18n.t('timeline.unpinMessage')}
+                  onclick={() => {
+                    void unpin(eventId);
+                  }}
+                >
+                  <PushPinSlashIcon />
+                </IconButton>
+              {/if}
+            </div>
           </li>
         {/each}
       </ul>
@@ -353,11 +328,11 @@
   }
 
   .pin-item {
-    align-items: center;
+    align-items: flex-start;
     border-radius: var(--radius-inner);
     display: flex;
     gap: var(--space-200);
-    padding-right: var(--space-200);
+    padding: 0 var(--space-200) 0 var(--space-400);
   }
 
   .pin-item.fresh {
@@ -366,50 +341,21 @@
   }
 
   .pin-open {
-    align-items: center;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-inner);
-    color: inherit;
     cursor: pointer;
-    display: flex;
     flex: 1;
-    font: inherit;
-    gap: var(--space-300);
-    min-width: 0;
-    padding: var(--space-200) var(--space-300);
-    text-align: left;
-  }
-
-  .pin-text {
-    display: grid;
-    gap: var(--space-050);
     min-width: 0;
   }
 
-  .pin-meta {
-    align-items: baseline;
+  .pin-actions {
     display: flex;
-    gap: var(--space-200);
-    min-width: 0;
+    flex: none;
+    gap: var(--space-100);
+    padding-block-start: var(--space-200);
   }
 
-  .pin-sender {
-    font-weight: var(--font-weight-500);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .pin-time {
+  .pin-unreadable {
     color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    font-size: var(--font-size-small);
-  }
-
-  .pin-body {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    margin: 0;
+    padding: var(--space-300) 0;
   }
 </style>

@@ -995,6 +995,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             : '{}',
       }),
       edit_history: () => ({ type: 'edit_history', versions: [] }),
+      event_items: (command) => {
+        const room = rooms.get(command.room_id);
+        const items = room ? timelineItems(room.name ?? '') : [];
+        return {
+          type: 'event_items',
+          items: command.event_ids.flatMap((eventId) =>
+            items.filter((candidate) => candidate.event_id === eventId)
+          ),
+        };
+      },
       personas: () => ({
         type: 'personas',
         catalog: { personas: [], account: null, rooms: {}, disabled_rooms: [] },

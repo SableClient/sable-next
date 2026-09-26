@@ -3,7 +3,7 @@ use std::hash::BuildHasher;
 use std::sync::Arc;
 
 use futures_util::{StreamExt, pin_mut};
-use matrix_sdk::deserialized_responses::SyncOrStrippedState;
+use matrix_sdk::deserialized_responses::{SyncOrStrippedState, TimelineEvent};
 use matrix_sdk::room::{ParentSpace, PushContext, Room, RoomMember};
 use matrix_sdk::room_preview::RoomPreview;
 use matrix_sdk::ruma::directory::PublicRoomsChunk;
@@ -28,7 +28,8 @@ use matrix_sdk::ruma::room::{
     JoinRuleKind, JoinRuleSummary, RoomSummary as RumaRoomSummary, RoomType,
 };
 use matrix_sdk::ruma::{
-    EventId, OwnedEventId, OwnedRoomId, OwnedTransactionId, OwnedUserId, TransactionId, UserId,
+    EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedTransactionId,
+    OwnedUserId, TransactionId, UserId,
 };
 use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
@@ -803,6 +804,81 @@ pub fn aggregation_item(
     }
 }
 
+pub async fn standalone_item(
+    room: &Room,
+    event: TimelineEvent,
+    latest: Option<TimelineEvent>,
+    push: Option<&PushContext>,
+) -> Option<TimelineItemView> {
+    let event_id = event.event_id()?.to_owned();
+    let sender = event.raw().get_field::<OwnedUserId>("sender").ok()??;
+    let timestamp = event
+        .raw()
+        .get_field::<MilliSecondsSinceUnixEpoch>("origin_server_ts")
+        .ok()??;
+    let own_user_id = room.client().user_id().map(ToOwned::to_owned);
+    let is_own = own_user_id.as_deref() == Some(sender.as_ref());
+
+    let shown = latest.as_ref().unwrap_or(&event);
+    let raw = shown
+        .raw()
+        .deserialize_as_unchecked::<RawFields>()
+        .unwrap_or_default();
+    let item_content = TimelineItemContent::from_event(room, shown.clone()).await?;
+    let highlighted = match push {
+        Some(push) if !is_own => push
+            .for_event(shown.raw())
+            .await
+            .iter()
+            .any(Action::is_highlight),
+        _ => false,
+    };
+    let message_profile = per_message_profile(raw.content.as_ref());
+    let member = room.get_member_no_sync(&sender).await.ok().flatten();
+    let original = event
+        .raw()
+        .deserialize_as_unchecked::<RawFields>()
+        .unwrap_or_default();
+
+    let mut view_content = content(
+        &item_content,
+        message_profile.as_ref(),
+        &raw,
+        own_user_id.as_deref(),
+    );
+    if latest.is_some()
+        && let TimelineItemContentView::Message { edited, .. } = &mut view_content
+    {
+        *edited = true;
+    }
+
+    Some(TimelineItemView {
+        id: event_id.to_string(),
+        event_id: Some(event_id),
+        transaction_id: None,
+        send_state: None,
+        is_own,
+        sender_name: member
+            .as_ref()
+            .and_then(|member| member.display_name().map(ToOwned::to_owned)),
+        sender_avatar: member
+            .as_ref()
+            .and_then(|member| member.avatar_url().map(ToString::to_string)),
+        timestamp: timestamp.0.into(),
+        mention: content_mention(&item_content, is_own, own_user_id.as_deref(), highlighted),
+        in_reply_to: in_reply_to(&item_content),
+        thread_root: msg_like(&item_content).and_then(|msg| msg.thread_root.clone()),
+        thread_summary: thread_summary(&item_content),
+        content: view_content,
+        sender: Some(sender),
+        reactions: Vec::new(),
+        read_by: Vec::new(),
+        bundled_link_previews: bundled_link_previews(raw.content.as_ref()),
+        per_message_profile: message_profile,
+        forwarded: original.content.as_ref().and_then(forward_meta),
+    })
+}
+
 #[must_use]
 pub fn timeline_item(
     item: &Arc<TimelineItem>,
@@ -925,14 +1001,23 @@ fn mention(
     own_user_id: Option<&UserId>,
     highlighted: bool,
 ) -> MentionView {
-    if event.is_own() || event.content().is_redacted() {
+    content_mention(event.content(), event.is_own(), own_user_id, highlighted)
+}
+
+fn content_mention(
+    content: &TimelineItemContent,
+    is_own: bool,
+    own_user_id: Option<&UserId>,
+    highlighted: bool,
+) -> MentionView {
+    if is_own || content.is_redacted() {
         return MentionView::None;
     }
     if highlighted {
         return MentionView::Loud;
     }
 
-    let mentioned = msg_like(event.content())
+    let mentioned = msg_like(content)
         .and_then(|msg| match &msg.kind {
             MsgLikeKind::Message(message) => Some(message),
             _ => None,

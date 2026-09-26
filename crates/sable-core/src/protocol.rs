@@ -371,6 +371,12 @@ pub enum Command {
         room_id: OwnedRoomId,
         from: Option<String>,
     },
+    EventItems {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        event_ids: Vec<OwnedEventId>,
+    },
     RoomAttachments {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1261,12 +1267,15 @@ pub enum CommandOk {
         preview: Option<UrlPreviewView>,
     },
     ListThreads {
-        roots: Vec<ThreadRootView>,
+        roots: Vec<TimelineItemView>,
         next_batch: Option<String>,
     },
     RoomAttachments {
         items: Vec<RoomAttachmentView>,
         next_batch: Option<String>,
+    },
+    EventItems {
+        items: Vec<TimelineItemView>,
     },
     NotificationKeywords {
         keywords: Vec<String>,
@@ -2416,18 +2425,6 @@ pub enum MentionView {
     None,
     Silent,
     Loud,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[cfg_attr(feature = "typegen", derive(specta::Type))]
-pub struct ThreadRootView {
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub event_id: OwnedEventId,
-    #[cfg_attr(feature = "typegen", specta(type = String))]
-    pub sender: OwnedUserId,
-    pub body: String,
-    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
-    pub timestamp: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
