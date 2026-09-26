@@ -4,20 +4,27 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
+  import FormattedBody from './FormattedBody.svelte';
+  import type { MatrixLink } from './matrix-link';
+  import { topicHtml } from './topic-html';
+
   interface Props {
     open: boolean;
     roomName: string;
     topic: string;
     onOpenChange: (open: boolean) => void;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
   }
 
-  let { open, roomName, topic, onOpenChange }: Props = $props();
+  let { open, roomName, topic, onOpenChange, onMatrixLink }: Props = $props();
 </script>
 
 <DialogFrame {open} {onOpenChange} variant="verification" label={$i18n.t('room.topicTitle')}>
   <div class="topic-dialog">
     <h2>{roomName}</h2>
-    <p class="topic-full">{topic}</p>
+    <div class="topic-full">
+      <FormattedBody html={topicHtml(topic)} {onMatrixLink} />
+    </div>
     <DialogActions>
       <Button
         variant="ghost"
@@ -47,6 +54,5 @@
     max-height: 60vh;
     overflow-wrap: anywhere;
     overflow-y: auto;
-    white-space: pre-wrap;
   }
 </style>

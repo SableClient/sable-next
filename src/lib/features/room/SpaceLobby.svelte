@@ -19,7 +19,7 @@
   import { i18n } from '#lib/i18n.js';
   import { createDragList, type DropEdge, type DropInstruction } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
-  import { copyRoomLink, viaFor } from '#lib/rooms/permalink.js';
+  import { copyRoomLink, roomSectionPath, viaFor } from '#lib/rooms/permalink.js';
   import { roomPathParam, roomPathParamFromId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { layoutSpaceIds, withoutSpace, withSpace } from '#lib/spaces/sidebar-layout.js';
   import { useSpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
@@ -62,6 +62,10 @@
   import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
 
   import AddExistingDialog from './AddExistingDialog.svelte';
+  import FormattedBody from './FormattedBody.svelte';
+  import { splitVia } from './join-address';
+  import type { MatrixLink } from './matrix-link';
+  import { topicHtml } from './topic-html';
   import type { AddExistingKind } from './add-existing';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
@@ -97,6 +101,15 @@
   let addKind = $state<AddExistingKind>('rooms');
   let failed = $state(false);
   let topicOpen = $state(false);
+
+  function openTopicLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
+    if (link.kind === 'user') return;
+    topicOpen = false;
+    const { via } = splitVia(anchor.href);
+    void goto(
+      roomSectionPath(roomList.rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via)
+    );
+  }
   let permissions = $state<RoomPermissionsView | null>(null);
 
   const MAX_LEVEL_PAGES = 10;
@@ -756,7 +769,9 @@
 <DialogFrame bind:open={topicOpen} variant="verification" label={$i18n.t('room.lobbyTopicTitle')}>
   <div class="topic-dialog">
     <h2>{space?.name ?? $i18n.t('nav.space')}</h2>
-    <p class="topic-full">{space?.topic}</p>
+    <div class="topic-full">
+      <FormattedBody html={topicHtml(space?.topic ?? '')} onMatrixLink={openTopicLink} />
+    </div>
     <DialogActions>
       <Button
         variant="ghost"
@@ -902,7 +917,6 @@
     max-height: 60dvh;
     overflow: auto;
     overflow-wrap: break-word;
-    white-space: pre-wrap;
   }
 
   .loading-note {

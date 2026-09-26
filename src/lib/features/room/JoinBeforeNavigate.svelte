@@ -11,6 +11,8 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import FormattedBody from './FormattedBody.svelte';
+  import { topicHtml } from './topic-html';
 
   interface Props {
     roomId: string;
@@ -118,7 +120,7 @@
       {$i18n.t('join.members', { count: preview.num_joined_members })}
     </p>
     {#if preview.topic}
-      <p class="join-topic">{preview.topic}</p>
+      <div class="join-topic"><FormattedBody html={topicHtml(preview.topic)} /></div>
     {/if}
     {#if failedAction}
       <p role="alert">

@@ -1210,6 +1210,10 @@
     onOpenChange={(open: boolean) => {
       topicOpen = open;
     }}
+    onMatrixLink={(link, anchor) => {
+      topicOpen = false;
+      handleMatrixLink(link, anchor);
+    }}
   />
 
   <RoomInviteDialog
