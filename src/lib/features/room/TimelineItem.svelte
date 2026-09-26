@@ -118,7 +118,6 @@
     onPersonaOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
-    preview?: boolean;
   }
 
   let {
@@ -159,7 +158,6 @@
     events,
     onPersonaOpenChange,
     placeholder = false,
-    preview = false,
     placeholderCharacters = 35,
   }: Props = $props();
 
