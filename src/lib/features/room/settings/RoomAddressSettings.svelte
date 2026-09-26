@@ -41,7 +41,7 @@
 
   let roomId = $derived(room?.room_id ?? null);
   let canEdit = $derived(canSendState(levels, ownPowerLevel, CANONICAL_EVENT_TYPE));
-  let server = $derived(roomId?.split(':').slice(1).join(':') ?? '');
+  let server = $derived(core.session?.user_id.split(':').slice(1).join(':') ?? '');
   let published = $derived([
     ...(canonical === null ? [] : [canonical]),
     ...alternatives.filter((alias) => alias !== canonical),
