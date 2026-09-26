@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/sveltekit';
 import type { HandleClientError } from '@sveltejs/kit/hooks';
 
+import { tolerateUnknownListeners } from '#lib/platform/tauri-events.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import {
   installDynamicImportRecovery,
@@ -20,6 +21,7 @@ const SESSION_ERROR_LIMIT = 50;
 let sessionErrorCount = 0;
 
 installDynamicImportRecovery();
+tolerateUnknownListeners();
 
 if (dsn && preferences.errorReporting) {
   Sentry.init({
