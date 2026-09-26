@@ -32,6 +32,7 @@
     GRID_GAP_PX,
     NARROW_STAGE_PX,
     spotlightTile,
+    togglePin,
     type CallTile,
   } from './call-layout';
   import type { CallSession } from './call-session.svelte.js';
@@ -102,13 +103,8 @@
   let aspect = $derived(mediaWidth > 0 && mediaWidth < NARROW_STAGE_PX ? 1 : 16 / 9);
   let grid = $derived(bestGrid(tiles.length, mediaWidth, mediaHeight, GRID_GAP_PX, aspect));
 
-  function togglePin(tile: CallTile): void {
-    if (pinned === tile.key) {
-      pinned = null;
-      return;
-    }
-    pinned = tile.key;
-    gridForced = false;
+  function pin(tile: CallTile): void {
+    ({ pinned, gridForced } = togglePin(tiles, spotlight, tile));
   }
 
   function toggleLayout(): void {
@@ -414,8 +410,8 @@
     userId={profile.userId}
     avatar={profile.avatar}
     {featured}
-    pinned={pinned === item.key}
-    onPin={tiles.length > 1 ? () => togglePin(item) : undefined}
+    pinned={spotlight?.key === item.key}
+    onPin={tiles.length > 1 ? () => pin(item) : undefined}
     onVolumeChange={(identity, volume) => void session.setParticipantVolume(identity, volume)}
   />
 {/snippet}

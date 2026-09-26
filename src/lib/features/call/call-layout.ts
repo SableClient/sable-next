@@ -42,6 +42,17 @@ export function spotlightTile(tiles: readonly CallTile[], pinned: string | null)
   return screens.find((tile) => !tile.participant.local) ?? screens.at(0) ?? null;
 }
 
+export type CallPin = { pinned: string | null; gridForced: boolean };
+
+export function togglePin(
+  tiles: readonly CallTile[],
+  spotlight: CallTile | null,
+  tile: CallTile
+): CallPin {
+  if (spotlight?.key !== tile.key) return { pinned: tile.key, gridForced: false };
+  return { pinned: null, gridForced: spotlightTile(tiles, null)?.key === tile.key };
+}
+
 export const GRID_GAP_PX = 8;
 export const NARROW_STAGE_PX = 560;
 

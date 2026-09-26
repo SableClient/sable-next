@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bestGrid, callTiles, spotlightTile } from './call-layout';
+import { bestGrid, callTiles, spotlightTile, togglePin } from './call-layout';
 import type { CallParticipant } from './call-transport';
 
 const track = (muted = false) => ({ id: 't', muted, subscribed: true });
@@ -55,5 +55,30 @@ describe('spotlightTile', () => {
 
   it('falls back to the grid when nothing is shared or pinned', () => {
     expect(spotlightTile(callTiles([{ identity: 'x' }]), 'gone')).toBeNull();
+  });
+});
+
+describe('togglePin', () => {
+  const self: CallParticipant = { identity: 'me', local: true, screenShare: track() };
+  const remote: CallParticipant = { identity: 'them', screenShare: track() };
+  const tiles = callTiles([self, remote]);
+  const tile = (key: string) => tiles.find((candidate) => candidate.key === key) ?? tiles[0];
+
+  it('leaves for the grid when unpinning the screen shown on its own', () => {
+    const shown = tile('legacy:them:screen');
+    expect(togglePin(tiles, shown, shown)).toEqual({ pinned: null, gridForced: true });
+  });
+
+  it('goes back to the shared screen when unpinning a pinned camera', () => {
+    const camera = tile('legacy:me:camera');
+    expect(togglePin(tiles, camera, camera)).toEqual({ pinned: null, gridForced: false });
+  });
+
+  it('pins another tile over the spotlight', () => {
+    const own = tile('legacy:me:screen');
+    expect(togglePin(tiles, tile('legacy:them:screen'), own)).toEqual({
+      pinned: 'legacy:me:screen',
+      gridForced: false,
+    });
   });
 });
