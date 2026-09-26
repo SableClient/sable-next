@@ -41,6 +41,7 @@
   import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
   import { watchWindowFocus } from '#lib/platform/window-decorations.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
+  import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
   import idleFavicon from '#lib/assets/favicon.png';
   import unreadFavicon from '#lib/assets/res/svg/unread.svg';
@@ -431,6 +432,10 @@
       disposed = true;
       stop?.();
     };
+  });
+
+  $effect(() => {
+    if (core.status === 'ready') void keepStorage();
   });
 
   $effect(() => {

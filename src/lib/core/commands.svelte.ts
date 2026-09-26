@@ -380,16 +380,16 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       kind: RoomAttachmentKind,
       limit: number,
-      offset: number
-    ): Promise<{ items: RoomAttachmentView[]; exhausted: boolean }> {
+      from: string | null
+    ): Promise<{ items: RoomAttachmentView[]; next_batch: string | null }> {
       const response = await transport().send({
         type: 'room_attachments',
         room_id: roomId,
         kind,
         limit,
-        offset,
+        from,
       });
-      return { items: response.items, exhausted: response.exhausted };
+      return { items: response.items, next_batch: response.next_batch };
     },
 
     async urlPreview(url: string): Promise<UrlPreviewView | null> {
@@ -485,8 +485,10 @@ export function createCommands(transport: () => Transport) {
         order?: SearchOrder;
         limit?: number;
         offset?: number;
+        context?: number;
+        older?: string | null;
       } = {}
-    ): Promise<SearchHitView[]> {
+    ): Promise<{ hits: SearchHitView[]; older: string | null }> {
       const response = await transport().send({
         type: 'search_messages',
         query,
@@ -494,8 +496,10 @@ export function createCommands(transport: () => Transport) {
         order: options.order ?? 'rank',
         limit: options.limit ?? 30,
         offset: options.offset ?? 0,
+        context: options.context ?? 0,
+        older: options.older ?? null,
       });
-      return response.hits;
+      return { hits: response.hits, older: response.older };
     },
 
     async joinCall(

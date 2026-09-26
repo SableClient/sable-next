@@ -23,7 +23,16 @@ function hit(eventId: string): SearchHitView {
     sender: '@erwan:example.org',
     origin_server_ts: 1_700_000_000_000,
     score: 1,
+    context_before: [],
+    context_after: [],
   };
+}
+
+function page(
+  hits: SearchHitView[],
+  older: string | null = null
+): { hits: SearchHitView[]; older: string | null } {
+  return { hits, older };
 }
 
 function coreReturning(searchMessages: CoreCommands['searchMessages']): {
@@ -42,7 +51,7 @@ afterEach(() => {
 });
 
 test('an empty query clears results without asking the core', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([hit('$a')]);
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -61,7 +70,7 @@ test('an empty query clears results without asking the core', async () => {
 });
 
 test('typing again before the debounce elapses searches once', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([hit('$a')]);
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -76,7 +85,7 @@ test('typing again before the debounce elapses searches once', async () => {
   expect(searchMessages).toHaveBeenCalledTimes(1);
   expect(searchMessages).toHaveBeenCalledWith(
     'deploy',
-    expect.objectContaining({ order: 'rank', limit: 30, offset: 0 })
+    expect.objectContaining({ order: 'rank', limit: 30, offset: 0, context: 1 })
   );
 });
 
@@ -85,13 +94,13 @@ test('a slow response for an abandoned query never lands', async () => {
     .fn()
     .mockImplementationOnce(
       async () =>
-        new Promise<SearchHitView[]>((resolve) => {
+        new Promise<{ hits: SearchHitView[]; older: string | null }>((resolve) => {
           setTimeout(() => {
-            resolve([hit('$stale')]);
+            resolve(page([hit('$stale')]));
           }, 1_000);
         })
     )
-    .mockResolvedValueOnce([hit('$fresh')]);
+    .mockResolvedValueOnce(page([hit('$fresh')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -107,7 +116,7 @@ test('a slow response for an abandoned query never lands', async () => {
 });
 
 test('a short page marks the results exhausted', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([hit('$a'), hit('$b')]);
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$a'), hit('$b')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -125,8 +134,8 @@ test('a full page loads more and appends', async () => {
   const firstPage = Array.from({ length: 30 }, (_, index) => hit(`$first${String(index)}`));
   const searchMessages = vi
     .fn()
-    .mockResolvedValueOnce(firstPage)
-    .mockResolvedValueOnce([hit('$second')]);
+    .mockResolvedValueOnce(page(firstPage))
+    .mockResolvedValueOnce(page([hit('$second')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -145,6 +154,54 @@ test('a full page loads more and appends', async () => {
   expect(search.exhausted).toBe(true);
 });
 
+test('a short page with messages on disk continues into older pages', async () => {
+  const searchMessages = vi
+    .fn()
+    .mockResolvedValueOnce(page([hit('$recent')], ''))
+    .mockResolvedValueOnce(page([hit('$older')], '100:3:!room:example.org'))
+    .mockResolvedValueOnce(page([hit('$oldest')]));
+  const { core } = coreReturning(searchMessages);
+  const search = new MessageSearch(core, () => resolvers);
+
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(search.older).toBe(true);
+  expect(search.exhausted).toBe(false);
+
+  await search.loadMore();
+  expect(searchMessages).toHaveBeenLastCalledWith('deploy', expect.objectContaining({ older: '' }));
+  await search.loadMore();
+  expect(searchMessages).toHaveBeenLastCalledWith(
+    'deploy',
+    expect.objectContaining({ older: '100:3:!room:example.org' })
+  );
+
+  expect(search.hits.map((entry) => entry.event_id)).toEqual(['$recent', '$older', '$oldest']);
+  expect(search.exhausted).toBe(true);
+  expect(search.older).toBe(false);
+});
+
+test('an older page that finds nothing still counts as a page, so scrolling asks again', async () => {
+  const searchMessages = vi
+    .fn()
+    .mockResolvedValueOnce(page([hit('$recent')], ''))
+    .mockResolvedValueOnce(page([], '100:3:!room:example.org'));
+  const { core } = coreReturning(searchMessages);
+  const search = new MessageSearch(core, () => resolvers);
+
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+  const before = search.pages;
+
+  await search.loadMore();
+
+  expect(search.hits).toHaveLength(1);
+  expect(search.pages).toBe(before + 1);
+  expect(search.exhausted).toBe(false);
+});
+
 test('a failure reports itself and stops paging', async () => {
   const searchMessages = vi.fn().mockRejectedValue(new Error('core is gone'));
   const { core } = coreReturning(searchMessages);
@@ -161,7 +218,7 @@ test('a failure reports itself and stops paging', async () => {
 });
 
 test('disposing drops a pending search', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([hit('$a')]);
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -175,11 +232,13 @@ test('disposing drops a pending search', async () => {
 });
 
 test('interleaved rooms produce distinct group keys', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([
-    { ...hit('$a'), room_id: '!one:example.org' },
-    { ...hit('$b'), room_id: '!two:example.org' },
-    { ...hit('$c'), room_id: '!one:example.org' },
-  ]);
+  const searchMessages = vi.fn().mockResolvedValue(
+    page([
+      { ...hit('$a'), room_id: '!one:example.org' },
+      { ...hit('$b'), room_id: '!two:example.org' },
+      { ...hit('$c'), room_id: '!one:example.org' },
+    ])
+  );
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -205,9 +264,9 @@ test('a hit repeated across pages is kept once and the cursor still advances by 
   ];
   const searchMessages = vi
     .fn()
-    .mockResolvedValueOnce(firstPage)
-    .mockResolvedValueOnce(secondPage)
-    .mockResolvedValueOnce([]);
+    .mockResolvedValueOnce(page(firstPage))
+    .mockResolvedValueOnce(page(secondPage))
+    .mockResolvedValueOnce(page([]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => resolvers);
 
@@ -228,7 +287,7 @@ test('a hit repeated across pages is kept once and the cursor still advances by 
 });
 
 test('a space with no joined rooms finds nothing instead of searching everywhere', async () => {
-  const searchMessages = vi.fn().mockResolvedValue([hit('$a')]);
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$a')]));
   const { core } = coreReturning(searchMessages);
   const search = new MessageSearch(core, () => ({ ...resolvers, spaceRooms: () => [] }));
 

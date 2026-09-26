@@ -76,13 +76,13 @@ function tab(label: string): HTMLButtonElement {
 
 test('files are grouped by month, page on demand and open in the viewer', async () => {
   roomAttachments
-    .mockResolvedValueOnce({ items: [], exhausted: true })
-    .mockResolvedValueOnce({ items: [file('$a', 'notes.pdf')], exhausted: false })
-    .mockResolvedValueOnce({ items: [file('$b', 'slides.pdf', FEBRUARY)], exhausted: true });
+    .mockResolvedValueOnce({ items: [], next_batch: null })
+    .mockResolvedValueOnce({ items: [file('$a', 'notes.pdf')], next_batch: 'next' })
+    .mockResolvedValueOnce({ items: [file('$b', 'slides.pdf', FEBRUARY)], next_batch: null });
   const onOpenMedia = vi.fn();
   const instance = render({ onOpenMedia });
   await vi.waitFor(() => {
-    expect(roomAttachments).toHaveBeenCalledWith('!room:example.org', 'media', 30, 0);
+    expect(roomAttachments).toHaveBeenCalledWith('!room:example.org', 'media', 30, null);
   });
 
   tab('Files').click();
@@ -90,13 +90,13 @@ test('files are grouped by month, page on demand and open in the viewer', async 
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.attachment-row')).toHaveLength(1);
   });
-  expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, 0);
+  expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, null);
 
   document.querySelector<HTMLButtonElement>('.attachments-more button')?.click();
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.attachment-row')).toHaveLength(2);
   });
-  expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, 30);
+  expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'file', 30, 'next');
   expect(document.querySelectorAll('.group-heading')).toHaveLength(2);
   expect(document.querySelector('.attachments-more')).toBeNull();
 
@@ -112,22 +112,8 @@ test('files are grouped by month, page on demand and open in the viewer', async 
   await unmount(instance);
 });
 
-test('a page emptied by unreadable events moves on instead of claiming the room is empty', async () => {
-  roomAttachments
-    .mockResolvedValueOnce({ items: [], exhausted: false })
-    .mockResolvedValueOnce({ items: [file('$late', 'late.pdf')], exhausted: true });
-  const instance = render();
-  tab('Files');
-  await vi.waitFor(() => {
-    expect(roomAttachments).toHaveBeenCalledTimes(2);
-  });
-  expect(roomAttachments).toHaveBeenLastCalledWith('!room:example.org', 'media', 30, 30);
-  expect(document.querySelector('.attachments-status')).toBeNull();
-  await unmount(instance);
-});
-
 test('the tabs follow the arrow keys and keep one tab stop', async () => {
-  roomAttachments.mockResolvedValue({ items: [], exhausted: true });
+  roomAttachments.mockResolvedValue({ items: [], next_batch: null });
   const instance = render();
   await vi.waitFor(() => {
     expect(roomAttachments).toHaveBeenCalledTimes(1);
@@ -149,7 +135,7 @@ test('the tabs follow the arrow keys and keep one tab stop', async () => {
 });
 
 test('links show the host, cap the list and keep a named way back to the message', async () => {
-  roomAttachments.mockResolvedValueOnce({ items: [], exhausted: true }).mockResolvedValueOnce({
+  roomAttachments.mockResolvedValueOnce({ items: [], next_batch: null }).mockResolvedValueOnce({
     items: [
       attachment('$link', {
         kind: 'link',
@@ -162,7 +148,7 @@ test('links show the host, cap the list and keep a named way back to the message
         body: 'lots of links',
       }),
     ],
-    exhausted: true,
+    next_batch: null,
   });
   const onJump = vi.fn();
   const instance = render({ onJump });
@@ -204,7 +190,7 @@ test('a spoilered picture is never loaded and says why it is hidden', async () =
         spoiler: 'the ending',
       }),
     ],
-    exhausted: true,
+    next_batch: null,
   });
   const onOpenMedia = vi.fn();
   const instance = render({ onOpenMedia });
@@ -226,7 +212,7 @@ test('a spoilered picture is never loaded and says why it is hidden', async () =
 });
 
 test('an empty room says what was searched', async () => {
-  roomAttachments.mockResolvedValueOnce({ items: [], exhausted: true });
+  roomAttachments.mockResolvedValueOnce({ items: [], next_batch: null });
   const instance = render();
   await vi.waitFor(() => {
     expect(document.querySelector('.attachments-status')?.textContent).toBe(
@@ -252,8 +238,8 @@ function image(eventId: string): RoomAttachmentView {
 
 test('an item the next page repeats is shown once', async () => {
   roomAttachments
-    .mockResolvedValueOnce({ items: [image('$a'), image('$b')], exhausted: false })
-    .mockResolvedValueOnce({ items: [image('$b'), image('$c')], exhausted: true });
+    .mockResolvedValueOnce({ items: [image('$a'), image('$b')], next_batch: 'next' })
+    .mockResolvedValueOnce({ items: [image('$b'), image('$c')], next_batch: null });
   const instance = render();
   await vi.waitFor(() => {
     expect(document.querySelectorAll('.media-tile')).toHaveLength(2);
@@ -272,7 +258,7 @@ test('each gallery item gets its own tile and opens by its own id', async () => 
       { ...image('$gallery'), gallery_index: 0 },
       { ...image('$gallery'), gallery_index: 2 },
     ],
-    exhausted: true,
+    next_batch: null,
   });
   const onOpenMedia = vi.fn();
   const instance = render({ onOpenMedia });
@@ -296,7 +282,7 @@ test('each gallery item gets its own tile and opens by its own id', async () => 
 test('the grid is one tab stop that the arrow keys move through', async () => {
   roomAttachments.mockResolvedValueOnce({
     items: [image('$a'), image('$b'), image('$c'), image('$d')],
-    exhausted: true,
+    next_batch: null,
   });
   const instance = render();
   await vi.waitFor(() => {
@@ -315,7 +301,7 @@ test('the grid is one tab stop that the arrow keys move through', async () => {
 });
 
 test('a matrix.to link routes inside the app instead of opening a tab', async () => {
-  roomAttachments.mockResolvedValueOnce({ items: [], exhausted: true }).mockResolvedValueOnce({
+  roomAttachments.mockResolvedValueOnce({ items: [], next_batch: null }).mockResolvedValueOnce({
     items: [
       attachment('$permalink', {
         kind: 'link',
@@ -323,7 +309,7 @@ test('a matrix.to link routes inside the app instead of opening a tab', async ()
         body: 'look',
       }),
     ],
-    exhausted: true,
+    next_batch: null,
   });
   const onMatrixLink = vi.fn();
   const instance = render({ onMatrixLink });
@@ -347,25 +333,8 @@ test('a matrix.to link routes inside the app instead of opening a tab', async ()
   await unmount(instance);
 });
 
-test('after five empty pages it waits to be asked again', async () => {
-  roomAttachments.mockResolvedValue({ items: [], exhausted: false });
-  const instance = render();
-  await vi.waitFor(() => {
-    expect(roomAttachments).toHaveBeenCalledTimes(5);
-    expect(document.querySelector('.attachments-more button')).not.toBeNull();
-  });
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(roomAttachments).toHaveBeenCalledTimes(5);
-
-  document.querySelector<HTMLButtonElement>('.attachments-more button')?.click();
-  await vi.waitFor(() => {
-    expect(roomAttachments).toHaveBeenCalledTimes(10);
-  });
-  await unmount(instance);
-});
-
 test('an audio file opens in the viewer as audio', async () => {
-  roomAttachments.mockResolvedValueOnce({ items: [], exhausted: true }).mockResolvedValueOnce({
+  roomAttachments.mockResolvedValueOnce({ items: [], next_batch: null }).mockResolvedValueOnce({
     items: [
       attachment('$voice', {
         kind: 'file',
@@ -375,7 +344,7 @@ test('an audio file opens in the viewer as audio', async () => {
         size: null,
       }),
     ],
-    exhausted: true,
+    next_batch: null,
   });
   const onOpenMedia = vi.fn();
   const instance = render({ onOpenMedia });

@@ -376,7 +376,7 @@ pub enum Command {
         room_id: OwnedRoomId,
         kind: RoomAttachmentKind,
         limit: u32,
-        offset: u32,
+        from: Option<String>,
     },
     NotificationKeywords,
     AddNotificationKeyword {
@@ -1007,6 +1007,10 @@ pub enum Command {
         order: SearchOrder,
         limit: u32,
         offset: u32,
+        #[serde(default)]
+        context: u32,
+        #[serde(default)]
+        older: Option<String>,
     },
 
     JoinCall {
@@ -1124,6 +1128,7 @@ pub enum CommandOk {
     },
     SearchMessages {
         hits: Vec<SearchHitView>,
+        older: Option<String>,
     },
     JoinCall {
         session: CallSessionId,
@@ -1261,7 +1266,7 @@ pub enum CommandOk {
     },
     RoomAttachments {
         items: Vec<RoomAttachmentView>,
-        exhausted: bool,
+        next_batch: Option<String>,
     },
     NotificationKeywords {
         keywords: Vec<String>,
@@ -1893,6 +1898,7 @@ pub enum SearchCrawlPhase {
     #[default]
     Starting,
     Crawling,
+    Trickling,
     Yielding,
     BackingOff,
     Idle,
@@ -1907,7 +1913,15 @@ pub struct SearchMetricsView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub documents: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
-    pub capacity: usize,
+    pub documents_loaded: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub memory_bytes: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub memory_budget: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub disk_bytes: usize,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub disk_budget: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_joined: usize,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
@@ -2026,6 +2040,20 @@ pub struct SearchHitView {
     pub origin_server_ts: u64,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub score: f64,
+    pub context_before: Vec<SearchContextView>,
+    pub context_after: Vec<SearchContextView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchContextView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub event_id: OwnedEventId,
+    pub body: String,
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub sender: OwnedUserId,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub origin_server_ts: u64,
 }
 
 // Hand-narrowed, keeping the UI off the SDK's shapes.
@@ -2424,7 +2452,7 @@ pub struct RoomAttachmentView {
     pub content: RoomAttachmentContentView,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RoomAttachmentContentView {

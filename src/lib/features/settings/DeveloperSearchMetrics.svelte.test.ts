@@ -21,7 +21,11 @@ import DeveloperSearchMetrics from './DeveloperSearchMetrics.svelte';
 const metrics: SearchMetricsView = {
   phase: 'crawling',
   documents: 1200,
-  capacity: 50000,
+  documents_loaded: 900,
+  memory_bytes: 2_097_152,
+  memory_budget: 67_108_864,
+  disk_bytes: 1_048_576,
+  disk_budget: 536_870_912,
   rooms_joined: 40,
   rooms_indexed: 30,
   rooms_pending: 10,

@@ -7,9 +7,10 @@ use matrix_sdk::ruma::api::client::search::search_events::v3::{
 };
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::{AnyMessageLikeEvent, AnyTimelineEvent};
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, OwnedUserId, UInt};
 
-use super::{Hit, indexable_body};
+use super::{ContextLine, Hit, indexable_body};
 use crate::Core;
 use crate::protocol::{SearchFilter, SearchOrder};
 
@@ -24,6 +25,7 @@ pub(super) struct ServerQuery<'a> {
     pub(super) order: SearchOrder,
     pub(super) limit: usize,
     pub(super) offset: usize,
+    pub(super) context: usize,
 }
 
 impl ServerQuery<'_> {
@@ -33,11 +35,12 @@ impl ServerQuery<'_> {
             self.filter.clone(),
             self.order,
             self.room_id.clone(),
+            self.context,
         )
     }
 }
 
-type Signature = (String, SearchFilter, SearchOrder, OwnedRoomId);
+type Signature = (String, SearchFilter, SearchOrder, OwnedRoomId, usize);
 
 #[derive(Default)]
 pub(crate) struct ServerSearch {
@@ -132,7 +135,7 @@ impl Core {
             cursor.exhausted = cursor.next_batch.is_none();
 
             for result in &events.results {
-                let Some(hit) = hit_from(result) else {
+                let Some(mut hit) = hit_from(result) else {
                     continue;
                 };
 
@@ -145,6 +148,15 @@ impl Core {
                 };
 
                 if !muted {
+                    for line in hit.before.iter().chain(&hit.after) {
+                        if !ignored.contains_key(&line.sender) {
+                            let muted = client.is_user_ignored(&line.sender).await;
+                            ignored.insert(line.sender.clone(), muted);
+                        }
+                    }
+                    let shown = |line: &ContextLine| ignored.get(&line.sender) != Some(&true);
+                    hit.before.retain(shown);
+                    hit.after.retain(shown);
                     cursor.hits.push(hit);
                 }
             }
@@ -192,8 +204,9 @@ fn request_for(query: &ServerQuery<'_>, limit: u64, next_batch: Option<&str>) ->
         SearchOrder::Rank => OrderBy::Rank,
         SearchOrder::Recent | SearchOrder::Oldest => OrderBy::Recent,
     });
-    criteria.event_context.before_limit = UInt::MIN;
-    criteria.event_context.after_limit = UInt::MIN;
+    let context = UInt::try_from(query.context).unwrap_or(UInt::MIN);
+    criteria.event_context.before_limit = context;
+    criteria.event_context.after_limit = context;
     criteria.event_context.include_profile = false;
 
     let mut categories = Categories::new();
@@ -202,6 +215,25 @@ fn request_for(query: &ServerQuery<'_>, limit: u64, next_batch: Option<&str>) ->
     let mut request = Request::new(categories);
     request.next_batch = next_batch.map(ToOwned::to_owned);
     request
+}
+
+fn context_line(raw: &Raw<AnyTimelineEvent>) -> Option<ContextLine> {
+    let AnyTimelineEvent::MessageLike(AnyMessageLikeEvent::RoomMessage(message)) =
+        raw.deserialize().ok()?
+    else {
+        return None;
+    };
+    let original = message.as_original()?;
+    if matches!(original.content.relates_to, Some(Relation::Replacement(_))) {
+        return None;
+    }
+
+    Some(ContextLine {
+        event_id: original.event_id.clone(),
+        body: indexable_body(original.content.body()),
+        sender: original.sender.clone(),
+        origin_server_ts: original.origin_server_ts.get().into(),
+    })
 }
 
 fn hit_from(result: &SearchResult) -> Option<Hit> {
@@ -215,6 +247,14 @@ fn hit_from(result: &SearchResult) -> Option<Hit> {
         return None;
     }
 
+    let mut before: Vec<ContextLine> = result
+        .context
+        .events_before
+        .iter()
+        .filter_map(context_line)
+        .collect();
+    before.reverse();
+
     Some(Hit {
         room_id: original.room_id.clone(),
         event_id: original.event_id.clone(),
@@ -222,6 +262,13 @@ fn hit_from(result: &SearchResult) -> Option<Hit> {
         sender: original.sender.clone(),
         origin_server_ts: original.origin_server_ts.get().into(),
         score: result.rank.unwrap_or_default(),
+        before,
+        after: result
+            .context
+            .events_after
+            .iter()
+            .filter_map(context_line)
+            .collect(),
     })
 }
 
@@ -256,6 +303,39 @@ mod tests {
         .expect("a search result");
 
         assert!(hit_from(&result).is_none());
+    }
+
+    #[test]
+    fn test_the_server_context_reads_oldest_first() {
+        let message = |id: &str, ts: u64, body: &str| {
+            json!({
+                "type": "m.room.message",
+                "event_id": id,
+                "room_id": "!plain:localhost",
+                "sender": "@erwan:localhost",
+                "origin_server_ts": ts,
+                "content": { "msgtype": "m.text", "body": body }
+            })
+        };
+        let result: SearchResult = serde_json::from_value(json!({
+            "rank": 1.0,
+            "result": message("$hit", 3, "deploy"),
+            "context": {
+                "events_before": [message("$second", 2, "b"), message("$first", 1, "a")],
+                "events_after": [message("$after", 4, "c")]
+            }
+        }))
+        .expect("a search result");
+
+        let hit = hit_from(&result).expect("a hit");
+        let ids = |lines: &[super::ContextLine]| {
+            lines
+                .iter()
+                .map(|line| line.event_id.to_string())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(&hit.before), ["$first", "$second"]);
+        assert_eq!(ids(&hit.after), ["$after"]);
     }
 
     fn scoped() -> SearchFilter {

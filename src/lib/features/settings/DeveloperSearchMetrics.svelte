@@ -2,6 +2,7 @@
   import type { SearchCrawlPhase, SearchMetricsView } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { formatByteSize } from '#lib/ui/byte-size.js';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import '#lib/ui/primitives/settings-row.css';
@@ -41,6 +42,7 @@
   const phaseKeys: Record<SearchCrawlPhase, string> = {
     starting: 'settings.developerSearchPhaseStarting',
     crawling: 'settings.developerSearchPhaseCrawling',
+    trickling: 'settings.developerSearchPhaseTrickling',
     yielding: 'settings.developerSearchPhaseYielding',
     backing_off: 'settings.developerSearchPhaseBackingOff',
     idle: 'settings.developerSearchPhaseIdle',
@@ -49,7 +51,7 @@
   };
 
   let phaseVariant: 'success' | 'critical' | 'warning' = $derived(
-    metrics?.phase === 'crawling' || metrics?.phase === 'idle'
+    metrics?.phase === 'crawling' || metrics?.phase === 'trickling' || metrics?.phase === 'idle'
       ? 'success'
       : metrics?.phase === 'backing_off'
         ? 'critical'
@@ -62,6 +64,13 @@
 
   function count(value: number): string {
     return $i18n.t('settings.developerSearchCount', { count: value });
+  }
+
+  function bytes(value: number, total: number): string {
+    return $i18n.t('settings.developerSearchBytes', {
+      value: formatByteSize(value),
+      total: formatByteSize(total),
+    });
   }
 
   function ratio(value: number, total: number): string {
@@ -86,7 +95,16 @@
         <StatusBadge label={$i18n.t(phaseKeys[metrics.phase])} variant={phaseVariant} />
       </SettingsRow>
       <SettingsRow id="search-documents" title={$i18n.t('settings.developerSearchDocuments')}>
-        <code>{ratio(metrics.documents, metrics.capacity)}</code>
+        <code>{$i18n.t('settings.developerSearchCount', { count: metrics.documents })}</code>
+      </SettingsRow>
+      <SettingsRow id="search-loaded" title={$i18n.t('settings.developerSearchLoaded')}>
+        <code>{$i18n.t('settings.developerSearchCount', { count: metrics.documents_loaded })}</code>
+      </SettingsRow>
+      <SettingsRow id="search-memory" title={$i18n.t('settings.developerSearchMemory')}>
+        <code>{bytes(metrics.memory_bytes, metrics.memory_budget)}</code>
+      </SettingsRow>
+      <SettingsRow id="search-disk" title={$i18n.t('settings.developerSearchDisk')}>
+        <code>{bytes(metrics.disk_bytes, metrics.disk_budget)}</code>
       </SettingsRow>
       <SettingsRow id="search-events" title={$i18n.t('settings.developerSearchEvents')}>
         <code>{ratio(metrics.events_crawled, metrics.event_budget)}</code>

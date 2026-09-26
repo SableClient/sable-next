@@ -12,6 +12,7 @@ import {
 } from './search-query';
 
 const PAGE_SIZE = 30;
+const CONTEXT_LINES = 1;
 const DEBOUNCE_MS = 200;
 
 export const MESSAGE_SEARCH_FIELD_ID = 'message-search-field';
@@ -29,12 +30,15 @@ export class MessageSearch {
   searching = $state(false);
   failed = $state(false);
   exhausted = $state(true);
+  older = $state(false);
+  pages = $state(0);
 
   #core: CoreClient;
   #resolvers: () => QueryResolvers;
   #debounce: ReturnType<typeof setTimeout> | undefined;
   #generation = 0;
   #served = 0;
+  #olderCursor: string | null = null;
 
   constructor(core: CoreClient, resolvers: () => QueryResolvers) {
     this.#core = core;
@@ -104,7 +108,11 @@ export class MessageSearch {
     if (this.searching || this.exhausted) return;
 
     this.searching = true;
-    await this.#run(this.#generation, this.#served);
+    if (this.older && this.#olderCursor !== null) {
+      await this.#runOlder(this.#generation, this.#olderCursor);
+    } else {
+      await this.#run(this.#generation, this.#served);
+    }
   }
 
   dispose(): void {
@@ -121,20 +129,22 @@ export class MessageSearch {
         order: this.order,
         limit: PAGE_SIZE,
         offset,
+        context: CONTEXT_LINES,
       });
 
       if (generation !== this.#generation) return;
 
       if (offset === 0) {
-        this.hits = page;
+        this.hits = page.hits;
+        this.#olderCursor = page.older;
       } else {
-        const loaded = this.hits;
-        const unseen = page.filter((hit) => !loaded.some((kept) => kept.event_id === hit.event_id));
-        this.hits = [...loaded, ...unseen];
+        this.#append(page.hits);
       }
-      this.#served = offset + page.length;
-      this.exhausted = page.length < PAGE_SIZE;
+      this.#served = offset + page.hits.length;
+      this.older = page.hits.length < PAGE_SIZE && this.#olderCursor !== null;
+      this.exhausted = page.hits.length < PAGE_SIZE && !this.older;
       this.failed = false;
+      this.pages += 1;
     } catch {
       if (generation !== this.#generation) return;
       if (offset === 0) this.hits = [];
@@ -143,5 +153,36 @@ export class MessageSearch {
     } finally {
       if (generation === this.#generation) this.searching = false;
     }
+  }
+
+  async #runOlder(generation: number, cursor: string): Promise<void> {
+    try {
+      const page = await this.#core.commands.searchMessages(this.parsed.text, {
+        filter: this.resolved.filter,
+        order: this.order,
+        limit: PAGE_SIZE,
+        context: CONTEXT_LINES,
+        older: cursor,
+      });
+      if (generation !== this.#generation) return;
+      this.#append(page.hits);
+      this.#olderCursor = page.older;
+      this.older = page.older !== null;
+      this.exhausted = page.older === null;
+      this.failed = false;
+      this.pages += 1;
+    } catch {
+      if (generation !== this.#generation) return;
+      this.failed = true;
+      this.exhausted = true;
+    } finally {
+      if (generation === this.#generation) this.searching = false;
+    }
+  }
+
+  #append(hits: SearchHitView[]): void {
+    const loaded = this.hits;
+    const unseen = hits.filter((hit) => !loaded.some((kept) => kept.event_id === hit.event_id));
+    this.hits = [...loaded, ...unseen];
   }
 }

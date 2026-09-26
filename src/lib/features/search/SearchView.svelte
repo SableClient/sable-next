@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { SearchHitView, SearchOrder } from '#src/generated/protocol';
+  import type { SearchContextView, SearchHitView, SearchOrder } from '#src/generated/protocol';
   import { onDestroy, onMount } from 'svelte';
   import { RadioGroup } from 'bits-ui';
   import { goto } from '$app/navigation';
@@ -384,6 +384,13 @@
   ]);
 </script>
 
+{#snippet contextLine(line: SearchContextView)}
+  <span class="hit-context">
+    <span class="hit-context-sender">{senders.identity(line.sender).displayName}</span>
+    {line.body}
+  </span>
+{/snippet}
+
 <AppPageShell title={$i18n.t('search.title')} density="compact">
   <div class="search-view">
     <div class="orders" role="group" aria-label={$i18n.t('search.order')}>
@@ -581,6 +588,9 @@
                       size="small"
                     />
                     <span class="hit-text">
+                      {#each hit.context_before as line (line.event_id)}
+                        {@render contextLine(line)}
+                      {/each}
                       <span class="hit-meta">
                         <span class="hit-sender">{senders.identity(hit.sender).displayName}</span>
                         <time datetime={new Date(hit.origin_server_ts).toISOString()}>
@@ -595,6 +605,9 @@
                         {/each}
                         {#if snippet.clippedEnd}…{/if}
                       </span>
+                      {#each hit.context_after as line (line.event_id)}
+                        {@render contextLine(line)}
+                      {/each}
                     </span>
                   </button>
                 </li>
@@ -605,7 +618,7 @@
 
         {#if !search.exhausted}
           <div class="load-more">
-            {#key search.hits.length}
+            {#key search.pages}
               <div
                 class="load-sentinel"
                 aria-hidden="true"
@@ -618,7 +631,11 @@
               disabled={search.searching}
               onclick={() => void search.loadMore()}
             >
-              {search.searching ? $i18n.t('search.searching') : $i18n.t('search.loadMore')}
+              {search.searching
+                ? $i18n.t('search.searching')
+                : search.older
+                  ? $i18n.t('search.loadOlder')
+                  : $i18n.t('search.loadMore')}
             </Button>
           </div>
         {/if}
@@ -952,6 +969,18 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .hit-context {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hit-context-sender {
+    font-weight: var(--font-weight-medium);
   }
 
   .hit-body {

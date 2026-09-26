@@ -60,7 +60,6 @@
   }: Props = $props();
 
   const PAGE = 30;
-  const EMPTY_PAGES_BEFORE_PAUSE = 5;
   const LINKS_PER_ROW = 3;
   const PREFETCH_BAND = '0px 0px 240px 0px';
   const GRID_COLUMNS = 3;
@@ -74,11 +73,10 @@
   const core = useCoreClient();
   let kind = $state<RoomAttachmentKind>('media');
   let items = $state.raw<RoomAttachmentView[]>([]);
-  let offset = $state(0);
+  let cursor: string | null = null;
   let exhausted = $state(false);
   let loading = $state(true);
   let failed = $state(false);
-  let paused = $state(false);
   let activeTile = $state<string | null>(null);
   let generation = 0;
 
@@ -98,25 +96,15 @@
     const run = ++generation;
     const target = roomId;
     const wanted = kind;
-    let from = offset;
+    const from = cursor;
     loading = true;
     failed = false;
-    paused = false;
     try {
-      for (let hop = 0; ; hop += 1) {
-        const page = await core.commands.roomAttachments(target, wanted, PAGE, from);
-        if (run !== generation) return;
-        const fresh = from === 0 ? page.items : unseen(page.items);
-        items = from === 0 ? fresh : [...items, ...fresh];
-        from += PAGE;
-        offset = from;
-        exhausted = page.exhausted;
-        if (fresh.length > 0 || page.exhausted) break;
-        if (hop + 1 >= EMPTY_PAGES_BEFORE_PAUSE) {
-          paused = true;
-          break;
-        }
-      }
+      const page = await core.commands.roomAttachments(target, wanted, PAGE, from);
+      if (run !== generation) return;
+      items = from === null ? page.items : [...items, ...unseen(page.items)];
+      cursor = page.next_batch;
+      exhausted = page.next_batch === null;
     } catch (error) {
       console.debug('[sable room] attachments unavailable', error);
       if (run === generation) failed = true;
@@ -137,7 +125,7 @@
   }
 
   function loadMore(): void {
-    if (loading || exhausted || failed || paused) return;
+    if (loading || exhausted || failed) return;
     void load();
   }
 
@@ -146,7 +134,7 @@
     void kind;
     untrack(() => {
       items = [];
-      offset = 0;
+      cursor = null;
       exhausted = false;
       void load();
     });
@@ -589,19 +577,6 @@
         </div>
       {:else if loading && items.length > 0}
         <div class="attachments-more"><Spinner small /></div>
-      {:else if paused}
-        <div class="attachments-more">
-          <Button
-            size="small"
-            variant="secondary"
-            onclick={() => {
-              paused = false;
-              loadMore();
-            }}
-          >
-            {$i18n.t('timeline.attachmentsLoadMore')}
-          </Button>
-        </div>
       {:else if !exhausted && !loading}
         <div class="attachments-more" {@attach nearEnd}>
           <Button size="small" variant="secondary" onclick={loadMore}>

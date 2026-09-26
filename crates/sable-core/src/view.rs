@@ -61,9 +61,9 @@ use crate::protocol::{
     MemberView, MembershipChangeView, MembershipView, MentionView, PerMessageProfileView,
     PollAnswerView, PollView, PredecessorRoomView, PublicRoomView, ReactionGroup, ReplyView,
     RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView, RoomPreviewView, RoomStateView,
-    RoomSummary, RoomTag, SearchHitView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView,
-    StateChangeView, ThreadSummaryView, TimelineItemContentView, TimelineItemView,
-    UploadProgressView, UrlPreviewView, UtdCauseView, VectorDiff,
+    RoomSummary, RoomTag, SearchContextView, SearchHitView, SendStateView, SpaceChildEdge,
+    SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView, TimelineItemContentView,
+    TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -2038,6 +2038,17 @@ pub(crate) fn search_hit_view(hit: crate::search::Hit) -> SearchHitView {
         sender: hit.sender,
         origin_server_ts: hit.origin_server_ts,
         score: hit.score,
+        context_before: hit.before.into_iter().map(search_context_view).collect(),
+        context_after: hit.after.into_iter().map(search_context_view).collect(),
+    }
+}
+
+fn search_context_view(line: crate::search::ContextLine) -> SearchContextView {
+    SearchContextView {
+        event_id: line.event_id,
+        body: line.body,
+        sender: line.sender,
+        origin_server_ts: line.origin_server_ts,
     }
 }
 

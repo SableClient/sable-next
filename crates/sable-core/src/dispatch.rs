@@ -73,6 +73,7 @@ use crate::{Core, SubscriptionKind};
 use crate::{notifications, session, spaces, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
+const MAX_SEARCH_CONTEXT: usize = 3;
 
 fn thread_root(raw: &Raw<AnySyncTimelineEvent>) -> Option<ThreadRootView> {
     let event = raw.deserialize().ok()?;
@@ -690,19 +691,29 @@ impl Core {
                 order,
                 limit,
                 offset,
+                context,
+                older,
             } => {
-                let hits = self
-                    .search_messages(
-                        &query,
-                        &filter,
-                        order,
-                        (limit as usize).min(MAX_SEARCH_RESULTS),
-                        offset as usize,
-                    )
-                    .await;
+                let limit = (limit as usize).min(MAX_SEARCH_RESULTS);
+                let context = (context as usize).min(MAX_SEARCH_CONTEXT);
+                let (hits, older) = if let Some(cursor) = older {
+                    self.search_older(&query, &filter, order, limit, &cursor, context)
+                        .await
+                } else {
+                    let hits = self
+                        .search_messages(&query, &filter, order, limit, offset as usize, context)
+                        .await;
+                    let older = if self.searches_locally(&query, &filter, order).await {
+                        self.older_start(&filter).await
+                    } else {
+                        None
+                    };
+                    (hits, older)
+                };
 
                 Ok(CommandOk::SearchMessages {
                     hits: hits.into_iter().map(view::search_hit_view).collect(),
+                    older,
                 })
             }
 
@@ -1010,17 +1021,17 @@ impl Core {
                 room_id,
                 kind,
                 limit,
-                offset,
+                from,
             } => {
-                let (items, exhausted) = self
+                let (items, next_batch) = self
                     .room_attachments(
                         &room_id,
                         kind,
                         (limit as usize).min(MAX_SEARCH_RESULTS),
-                        offset as usize,
+                        from.as_deref(),
                     )
                     .await?;
-                Ok(CommandOk::RoomAttachments { items, exhausted })
+                Ok(CommandOk::RoomAttachments { items, next_batch })
             }
 
             Command::UrlPreview { url } => {

@@ -1,26 +1,17 @@
-use futures_util::{StreamExt, stream};
 use linkify::{LinkFinder, LinkKind};
-use matrix_sdk::Room;
 use matrix_sdk::ruma::{
     OwnedRoomId, UInt,
-    events::{
-        AnySyncMessageLikeEvent, AnySyncTimelineEvent, SyncMessageLikeEvent,
-        room::message::{
-            AudioMessageEventContent, FileMessageEventContent, GalleryItemType,
-            ImageMessageEventContent, MessageType, VideoMessageEventContent,
-        },
+    events::room::message::{
+        AudioMessageEventContent, FileMessageEventContent, GalleryItemType,
+        ImageMessageEventContent, MessageType, VideoMessageEventContent,
     },
 };
 
 use crate::Core;
 use crate::protocol::{
     CommandErr, RoomAttachmentContentView, RoomAttachmentKind, RoomAttachmentView,
-    SearchAttachment, SearchFilter, SearchOrder,
 };
-use crate::search::Hit;
 use crate::view::{image_thumbnail, media_source, spoiler_reason, video_thumbnail};
-
-const CONCURRENT_EVENT_READS: usize = 8;
 
 impl Core {
     pub(crate) async fn room_attachments(
@@ -28,87 +19,62 @@ impl Core {
         room_id: &OwnedRoomId,
         kind: RoomAttachmentKind,
         limit: usize,
-        offset: usize,
-    ) -> Result<(Vec<RoomAttachmentView>, bool), CommandErr> {
-        let room = self.room(room_id).await?;
-        let filter = SearchFilter {
-            rooms: vec![room_id.clone()],
-            has: searched(kind),
-            ..SearchFilter::default()
-        };
-        let hits = self
-            .search_messages("", &filter, SearchOrder::Recent, limit, offset)
+        from: Option<&str>,
+    ) -> Result<(Vec<RoomAttachmentView>, Option<String>), CommandErr> {
+        self.room(room_id).await?;
+        let before = from.and_then(parse_cursor);
+        let ignored = self.ignored_senders().await;
+        let (items, next) = self
+            .attachment_page(
+                room_id,
+                kind,
+                &ignored,
+                before
+                    .as_ref()
+                    .map(|(ts, event_id)| (*ts, event_id.as_str())),
+                limit,
+            )
             .await;
-        let exhausted = hits.len() < limit;
-
-        let items = match kind {
-            RoomAttachmentKind::Link => hits.into_iter().filter_map(link_view).collect(),
-            RoomAttachmentKind::Media | RoomAttachmentKind::File => {
-                stream::iter(hits.into_iter().map(|hit| media_views(&room, hit, kind)))
-                    .buffered(CONCURRENT_EVENT_READS)
-                    .flat_map(stream::iter)
-                    .collect()
-                    .await
-            }
-        };
-
-        Ok((items, exhausted))
+        Ok((items, next.map(|(ts, event_id)| format!("{ts}:{event_id}"))))
     }
 }
 
-fn searched(kind: RoomAttachmentKind) -> Vec<SearchAttachment> {
-    match kind {
-        RoomAttachmentKind::Media => vec![SearchAttachment::Image, SearchAttachment::Video],
-        RoomAttachmentKind::File => vec![SearchAttachment::File, SearchAttachment::Audio],
-        RoomAttachmentKind::Link => vec![SearchAttachment::Link],
-    }
+fn parse_cursor(cursor: &str) -> Option<(u64, String)> {
+    let (ts, event_id) = cursor.split_once(':')?;
+    Some((ts.parse().ok()?, event_id.to_owned()))
 }
 
-fn link_view(hit: Hit) -> Option<RoomAttachmentView> {
+pub(crate) fn link_urls(body: &str) -> Vec<String> {
     let mut finder = LinkFinder::new();
     finder.kinds(&[LinkKind::Url]);
     let mut urls: Vec<String> = Vec::new();
-    for url in finder.links(&hit.body).map(|link| link.as_str()) {
+    for url in finder.links(body).map(|link| link.as_str()) {
         let lower = url.to_ascii_lowercase();
         let http = lower.starts_with("https://") || lower.starts_with("http://");
         if http && !urls.iter().any(|seen| seen == url) {
             urls.push(url.to_owned());
         }
     }
-    if urls.is_empty() {
-        return None;
-    }
-
-    Some(RoomAttachmentView {
-        event_id: hit.event_id,
-        gallery_index: None,
-        sender: hit.sender,
-        timestamp: hit.origin_server_ts,
-        content: RoomAttachmentContentView::Link {
-            urls,
-            body: hit.body,
-        },
-    })
+    urls
 }
 
-async fn media_views(room: &Room, hit: Hit, kind: RoomAttachmentKind) -> Vec<RoomAttachmentView> {
-    let Some(event) = room.load_or_fetch_event(&hit.event_id, None).await.ok() else {
-        return Vec::new();
-    };
-    let Some(AnySyncTimelineEvent::MessageLike(AnySyncMessageLikeEvent::RoomMessage(
-        SyncMessageLikeEvent::Original(message),
-    ))) = event.raw().deserialize().ok()
-    else {
-        return Vec::new();
-    };
-    let raw_content = event
-        .raw()
-        .get_field::<serde_json::Value>("content")
-        .ok()
-        .flatten();
-    let spoiler = spoiler_reason(raw_content.as_ref());
+pub(crate) const fn fits(kind: RoomAttachmentKind, content: &RoomAttachmentContentView) -> bool {
+    match kind {
+        RoomAttachmentKind::Media => matches!(
+            content,
+            RoomAttachmentContentView::Image { .. } | RoomAttachmentContentView::Video { .. }
+        ),
+        RoomAttachmentKind::File => matches!(content, RoomAttachmentContentView::File { .. }),
+        RoomAttachmentKind::Link => false,
+    }
+}
 
-    let contents: Vec<(Option<u32>, RoomAttachmentContentView)> = match &message.content.msgtype {
+pub(crate) fn attachment_contents(
+    msgtype: &MessageType,
+    content: Option<&serde_json::Value>,
+) -> Vec<(Option<u32>, RoomAttachmentContentView)> {
+    let spoiler = spoiler_reason(content);
+    match msgtype {
         MessageType::Image(image) => vec![(None, image_view(image, spoiler))],
         MessageType::Video(video) => vec![(None, video_view(video, spoiler))],
         MessageType::File(file) => vec![(None, file_view(file))],
@@ -119,8 +85,7 @@ async fn media_views(room: &Room, hit: Hit, kind: RoomAttachmentKind) -> Vec<Roo
             .enumerate()
             .filter_map(|(position, item)| {
                 let spoiler = spoiler_reason(
-                    raw_content
-                        .as_ref()
+                    content
                         .and_then(|content| content.get("itemtypes"))
                         .and_then(|items| items.get(position)),
                 );
@@ -136,26 +101,7 @@ async fn media_views(room: &Room, hit: Hit, kind: RoomAttachmentKind) -> Vec<Roo
             .map(|(index, content)| (u32::try_from(index).ok(), content))
             .collect(),
         _ => Vec::new(),
-    };
-
-    contents
-        .into_iter()
-        .filter(|(_, content)| match kind {
-            RoomAttachmentKind::Media => matches!(
-                content,
-                RoomAttachmentContentView::Image { .. } | RoomAttachmentContentView::Video { .. }
-            ),
-            RoomAttachmentKind::File => matches!(content, RoomAttachmentContentView::File { .. }),
-            RoomAttachmentKind::Link => false,
-        })
-        .map(|(gallery_index, content)| RoomAttachmentView {
-            event_id: hit.event_id.clone(),
-            gallery_index,
-            sender: hit.sender.clone(),
-            timestamp: hit.origin_server_ts,
-            content,
-        })
-        .collect()
+    }
 }
 
 fn dimension(value: Option<UInt>) -> Option<u64> {
@@ -214,28 +160,21 @@ fn audio_view(audio: &AudioMessageEventContent) -> RoomAttachmentContentView {
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::{owned_event_id, owned_room_id, owned_user_id};
-
-    use super::link_view;
-    use crate::protocol::RoomAttachmentContentView;
-    use crate::search::Hit;
+    use super::{link_urls, parse_cursor};
 
     #[test]
-    fn link_view_lists_each_url_once() {
-        let hit = Hit {
-            room_id: owned_room_id!("!room:example.org"),
-            event_id: owned_event_id!("$event"),
-            body: "https://a.example https://b.example https://a.example".to_owned(),
-            sender: owned_user_id!("@alice:example.org"),
-            origin_server_ts: 0,
-            score: 0.0,
-        };
-        let Some(view) = link_view(hit) else {
-            panic!("expected a link view");
-        };
-        let RoomAttachmentContentView::Link { urls, .. } = view.content else {
-            panic!("expected link content");
-        };
-        assert_eq!(urls, ["https://a.example", "https://b.example"]);
+    fn link_urls_lists_each_url_once() {
+        assert_eq!(
+            link_urls("https://a.example https://b.example https://a.example"),
+            ["https://a.example", "https://b.example"]
+        );
+    }
+
+    #[test]
+    fn a_cursor_keeps_the_colon_of_a_v1_event_id() {
+        assert_eq!(
+            parse_cursor("1700:$event:example.org"),
+            Some((1700, "$event:example.org".to_owned()))
+        );
     }
 }

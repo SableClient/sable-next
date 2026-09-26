@@ -416,6 +416,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               sender: item.sender ?? '',
               origin_server_ts: item.timestamp,
               score: 1,
+              context_before: [],
+              context_after: [],
             }))
         )
         .sort((left, right) => (newestFirst ? right.origin_server_ts - left.origin_server_ts : 0))
@@ -765,7 +767,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           },
         ],
       }),
-      search_messages: (command) => ({ type: 'search_messages', hits: searchHits(command) }),
+      search_messages: (command) => ({
+        type: 'search_messages',
+        hits: searchHits(command),
+        older: null,
+      }),
       join_call: () => ({
         type: 'join_call',
         session: 1,
@@ -956,7 +962,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             : null,
       }),
       list_threads: () => ({ type: 'list_threads', roots: [], next_batch: null }),
-      room_attachments: () => ({ type: 'room_attachments', items: [], exhausted: true }),
+      room_attachments: () => ({ type: 'room_attachments', items: [], next_batch: null }),
       notification_keywords: () => ({
         type: 'notification_keywords',
         keywords: [...notificationKeywords],
@@ -1135,7 +1141,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         metrics: {
           phase: 'idle',
           documents: 0,
-          capacity: 50000,
+          documents_loaded: 0,
+          memory_bytes: 0,
+          memory_budget: 67108864,
+          disk_bytes: 0,
+          disk_budget: 536870912,
           rooms_joined: 0,
           rooms_indexed: 0,
           rooms_pending: 0,
