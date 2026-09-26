@@ -92,7 +92,9 @@ test('tints the name from the profile and opens the profile card from the row', 
   await tick();
 
   expect(document.querySelector('.member-name')?.classList.contains('tinted')).toBe(true);
-  expect(document.querySelector('.pronoun-pill')).toBeNull();
+  const pronouns = document.querySelector('.sender-identity-pronouns');
+  expect(pronouns?.textContent.trim()).toBe('he/him');
+  expect(pronouns?.classList.contains('tinted')).toBe(true);
   const row = document.querySelector<HTMLButtonElement>('.member-identity-button');
   row?.click();
   expect(onProfile).toHaveBeenCalledWith('@bob:example.org', row);

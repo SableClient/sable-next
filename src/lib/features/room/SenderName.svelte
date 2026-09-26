@@ -91,34 +91,12 @@
 
     {#if pronouns.length > 0}
       <PronounPill
-        class="sender-identity-pronoun"
-        style=" color={colors.tinted
-          ? undefined
-          : colors.nameColor} --name-color-on-light={colors.nameColorLight ??
-          undefined} --name-color-on-dark={colors.nameColorDark ?? undefined} "
+        class={['sender-identity-pronouns', { tinted: colors.tinted }]}
+        pillClass="sender-identity-pronoun"
+        style={colors.tinted ? undefined : `color: ${colors.nameColor};`}
         {pronouns}
       />
     {/if}
-
-    <!--<span
-        class="sender-identity-pronouns"
-        class:tinted={colors.tinted}
-        style:color={colors.tinted ? undefined : colors.nameColor}
-        style:--name-color-on-light={colors.nameColorLight ?? undefined}
-        style:--name-color-on-dark={colors.nameColorDark ?? undefined}
-      >
-        {#each pronouns.visible as pronoun, index (index)}
-          <span lang={pronoun.language ?? undefined} class="sender-identity-pronoun"
-            >{pronoun.summary}</span
-          >
-        {/each}{#if pronouns.overflow.length > 0}
-          <span class="sender-identity-pronoun" title={formatPronouns(pronouns.overflow)}>
-            {$i18n.t('timeline.morePronouns', {
-              count: pronouns.overflow.length,
-            })}
-          </span>
-        {/if}</span
-      >-->
     {#if accountName}
       <span class="sender-identity-via"
         >|

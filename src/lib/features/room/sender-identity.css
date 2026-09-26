@@ -40,22 +40,6 @@
   outline-offset: 0.15rem;
 }
 
-.sender-identity-pronouns {
-  display: inline-flex;
-  flex-flow: row wrap;
-  font-size: var(--font-size-x-small);
-  gap: var(--space-050);
-  height: 1rem;
-  line-height: 1rem;
-  overflow-y: clip;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sender-identity-pronoun {
-  background: var(--surface-var-container);
-}
-
 .sender-identity-via {
   font-size: var(--font-size-small);
   overflow: hidden;

@@ -32,7 +32,6 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
-  import { clampPronoun, preferredPronouns, pronounPillLength } from '#lib/personas/pronouns.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { lastSeenBucket, lastSeenMs, usePresenceStore } from '#lib/rooms/presence.svelte.js';
@@ -131,18 +130,7 @@
   let pronounSets = $derived(
     cosmetics?.pronouns.length ? cosmetics.pronouns : (currentProfile?.pronouns ?? [])
   );
-  let pronouns = $derived(
-    !preferences.showPronouns
-      ? ''
-      : (preferences.filterPronounsByLanguage
-          ? preferredPronouns(pronounSets, $i18n.resolvedLanguage ?? $i18n.language)
-          : pronounSets
-        )
-          .map((pronoun) =>
-            clampPronoun(pronoun.summary, pronounPillLength(preferences.pronounPillLength))
-          )
-          .join(', ')
-  );
+  let pronouns = $derived(preferences.showPronouns ? pronounSets : []);
   let localTime = $derived.by(() => {
     const timezone = currentProfile?.timezone;
     if (!timezone) return null;
@@ -223,7 +211,7 @@
   let sharedGroups = $derived(
     sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct !== true)
   );
-  let hasMeta = $derived(Boolean(pronouns || localTime || animalText || roleTag || presenceLabel));
+  let hasMeta = $derived(Boolean(localTime || animalText || roleTag || presenceLabel));
   let activeExtra = $state<ProfileFieldView | null>(null);
 
   $effect(() => {
@@ -373,8 +361,8 @@
 </script>
 
 {#snippet pronounRow()}
-  {#if pronounSets}
-    <PronounPill class="profile-pronoun-pill" pronouns={pronounSets} />
+  {#if pronouns.length > 0}
+    <PronounPill class="profile-pronoun-pill" {pronouns} />
   {/if}
 {/snippet}
 {#snippet metaRow()}
@@ -778,7 +766,8 @@
   }
 
   :global(.profile-pronoun-pill) {
-    background: var(--profile-panel-ground);
+    --pronoun-pill-ground: var(--profile-panel-ground);
+
     color: var(--profile-text-muted);
   }
 

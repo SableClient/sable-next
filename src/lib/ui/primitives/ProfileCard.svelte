@@ -137,9 +137,7 @@
     {/if}
   </div>
   <div class="profile-card-identity">
-    <span
-      style=" align-items: baseline;display: flex; flex-flow: row nowrap; gap: var(--space-200)"
-    >
+    <div class="profile-card-heading">
       <h2
         class="profile-card-name"
         class:tinted={nameColor}
@@ -148,7 +146,7 @@
         {displayName}
       </h2>
       {#if pronouns}{@render pronouns()}{/if}
-    </span>
+    </div>
     <button
       class="profile-card-user-id"
       type="button"
@@ -318,6 +316,13 @@
 
   .profile-card-identity {
     padding: var(--space-300) var(--space-400) var(--space-400);
+  }
+
+  .profile-card-heading {
+    align-items: baseline;
+    display: flex;
+    flex-flow: row nowrap;
+    gap: var(--space-200);
   }
 
   .profile-card-name,

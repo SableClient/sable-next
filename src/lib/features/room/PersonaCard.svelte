@@ -3,6 +3,7 @@
   import type { PerMessageProfileView } from '#src/generated/protocol';
 
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
 
@@ -27,13 +28,6 @@
   }: Props = $props();
   let displayName = $derived(profile.display_name ?? accountName);
   let accountLabel = $derived(displayName === accountName ? accountId : accountName);
-  // let pronouns = $derived(
-  //   !preferences.showPronouns
-  //     ? []
-  //     : preferences.filterPronounsByLanguage
-  //       ? preferredPronouns(profile.pronouns, $i18n.resolvedLanguage ?? $i18n.language)
-  //       : profile.pronouns
-  // );
 </script>
 
 <ProfileCard
@@ -48,7 +42,7 @@
   nameColorDark={profile.color_on_dark}
 >
   {#snippet pronouns()}
-    {#if profile.pronouns}
+    {#if preferences.showPronouns && profile.pronouns.length > 0}
       <PronounPill pronouns={profile.pronouns} class="persona-profile-pronoun-pill" />
     {/if}
   {/snippet}
@@ -61,8 +55,6 @@
 
 <style>
   :global(.persona-profile-pronoun-pill) {
-    background: var(--surface-var-container);
-
     --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
 
     color: var(--profile-text-muted);
