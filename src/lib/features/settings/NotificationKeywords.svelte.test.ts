@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -23,133 +25,97 @@ function listed(...keywords: string[]): KeywordNotificationView[] {
 import NotificationKeywords from './NotificationKeywords.svelte';
 
 afterEach(() => {
-  document.body.replaceChildren();
   vi.clearAllMocks();
 });
 
-function required<T extends Element>(selector: string, kind: new () => T): T {
-  const element = document.querySelector(selector);
-  if (!(element instanceof kind)) throw new Error(`expected to find ${selector}`);
-  return element;
-}
+const keywords = () =>
+  screen.queryAllByRole('listitem').map((item) => item.querySelector('.keyword-text')?.textContent);
+const input = () => screen.getByRole('textbox', { name: 'Add a keyword' });
 
-function setInput(input: HTMLInputElement, value: string): void {
-  input.value = value;
-  input.dispatchEvent(new Event('input'));
+async function confirmRemoval(user: ReturnType<typeof userEvent.setup>, keyword: string) {
+  await user.click(screen.getByRole('button', { name: `Remove keyword ${keyword}` }));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent(`Remove keyword ${keyword}?`);
+  return () => user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 }
 
 test('lists the account keywords and lets one be removed', async () => {
+  const user = userEvent.setup();
   core.notificationKeywords.mockResolvedValueOnce(listed('erwan', 'sable'));
   core.notificationKeywords.mockResolvedValueOnce(listed('sable'));
   core.removeNotificationKeyword.mockResolvedValue(undefined);
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(2);
+    expect(keywords()).toEqual(['erwan', 'sable']);
   });
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Remove keyword erwan"]')?.click();
-
-  const dialog = await vi.waitFor(() => {
-    const dialog = required('[role="dialog"]', HTMLElement);
-    expect(dialog.textContent).toContain('Remove keyword erwan?');
-    return dialog;
-  });
+  const confirm = await confirmRemoval(user, 'erwan');
   expect(core.removeNotificationKeyword).not.toHaveBeenCalled();
-
-  const confirm = [...dialog.querySelectorAll('button')].find(
-    (button) => button.textContent.trim() === 'Remove'
-  );
-  confirm?.click();
+  await confirm();
 
   await vi.waitFor(() => {
     expect(core.removeNotificationKeyword).toHaveBeenCalledWith('erwan');
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+    expect(keywords()).toEqual(['sable']);
   });
-
-  await unmount(instance);
 });
 
 test('refuses a blank or whitespace-only keyword', async () => {
+  const user = userEvent.setup();
   core.notificationKeywords.mockResolvedValue([]);
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
   await vi.waitFor(() => {
-    expect(document.querySelector('.keywords-empty')).not.toBeNull();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
-  const input = required('input.text-input', HTMLInputElement);
-  const form = required('.keyword-form', HTMLFormElement);
+  await user.type(input(), '   {Enter}');
 
-  setInput(input, '   ');
-  await tick();
-
-  form.dispatchEvent(new Event('submit', { cancelable: true }));
-  await tick();
-
+  expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
   expect(core.addNotificationKeyword).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('does not add a keyword already in the list', async () => {
+  const user = userEvent.setup();
   core.notificationKeywords.mockResolvedValue(listed('sable'));
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+    expect(keywords()).toEqual(['sable']);
   });
 
-  const input = required('input.text-input', HTMLInputElement);
-  const form = required('.keyword-form', HTMLFormElement);
-  setInput(input, 'sable');
-  await tick();
-
-  form.dispatchEvent(new Event('submit', { cancelable: true }));
-  await tick();
+  await user.type(input(), 'sable{Enter}');
 
   expect(core.addNotificationKeyword).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('does not leave the list showing an add the server rejected', async () => {
+  const user = userEvent.setup();
   core.notificationKeywords.mockResolvedValue(listed('sable'));
   core.addNotificationKeyword.mockRejectedValue(new Error('denied'));
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+    expect(keywords()).toEqual(['sable']);
   });
 
-  const input = required('input.text-input', HTMLInputElement);
-  const form = required('.keyword-form', HTMLFormElement);
-  setInput(input, 'erwan');
-  await tick();
+  await user.type(input(), 'erwan{Enter}');
 
-  form.dispatchEvent(new Event('submit', { cancelable: true }));
-
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="status"]')).not.toBeNull();
-  });
-  expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+  expect(await screen.findByRole('status')).toHaveTextContent('That keyword could not be added.');
+  expect(keywords()).toEqual(['sable']);
   expect(core.notificationKeywords).toHaveBeenCalledTimes(1);
-
-  await unmount(instance);
 });
 
 test('reports a load failure instead of showing an empty list', async () => {
   core.notificationKeywords.mockRejectedValue(new Error('denied'));
 
-  const instance = mount(NotificationKeywords, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="status"]')).not.toBeNull();
-  });
-
-  await unmount(instance);
+  render(NotificationKeywords);
+  expect(await screen.findByText('Your keywords could not be loaded.')).toBeInTheDocument();
+  expect(screen.queryByText('No keywords yet.')).not.toBeInTheDocument();
 });
 
 test('a slow initial load cannot overwrite the list a fresh add produced', async () => {
+  const user = userEvent.setup();
   let releaseInitial = (): void => {};
   const initial = new Promise<KeywordNotificationView[]>((resolve) => {
     releaseInitial = () => {
@@ -159,13 +125,9 @@ test('a slow initial load cannot overwrite the list a fresh add produced', async
   core.notificationKeywords.mockReturnValueOnce(initial);
   core.addNotificationKeyword.mockResolvedValue(undefined);
 
-  const instance = mount(NotificationKeywords, { target: document.body });
-  await tick();
-
-  const input = required('.keyword-form input', HTMLInputElement);
-  setInput(input, 'urgent');
-  await tick();
-  required('.keyword-form button', HTMLButtonElement).click();
+  render(NotificationKeywords);
+  await user.type(input(), 'urgent');
+  await user.click(screen.getByRole('button', { name: 'Add' }));
 
   await vi.waitFor(() => {
     expect(core.addNotificationKeyword).toHaveBeenCalledWith('urgent');
@@ -173,18 +135,16 @@ test('a slow initial load cannot overwrite the list a fresh add produced', async
 
   releaseInitial();
   await vi.waitFor(() => {
-    expect(document.querySelector('.keyword-list')).not.toBeNull();
+    expect(keywords()).toEqual(['urgent']);
   });
+  await tick();
 
-  expect(
-    [...document.querySelectorAll('.keyword-list .keyword-text')].map((n) => n.textContent)
-  ).toEqual(['urgent']);
+  expect(keywords()).toEqual(['urgent']);
   expect(core.notificationKeywords).toHaveBeenCalledTimes(1);
-
-  await unmount(instance);
 });
 
 test('a removal survives a load that was already in flight', async () => {
+  const user = userEvent.setup();
   let releaseInitial = (): void => {};
   const initial = new Promise<KeywordNotificationView[]>((resolve) => {
     releaseInitial = () => {
@@ -194,32 +154,18 @@ test('a removal survives a load that was already in flight', async () => {
   core.notificationKeywords.mockReturnValueOnce(initial);
   core.removeNotificationKeyword.mockResolvedValue(undefined);
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
   releaseInitial();
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(1);
+    expect(keywords()).toEqual(['sable']);
   });
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Remove keyword sable"]')?.click();
-
-  const confirm = await vi.waitFor(() => {
-    const dialog = document.querySelector('[role="dialog"]');
-    expect(dialog).not.toBeNull();
-    const confirm = dialog
-      ? [...dialog.querySelectorAll('button')].find(
-          (button) => button.textContent.trim() === 'Remove'
-        )
-      : null;
-    expect(confirm).not.toBeNull();
-    return confirm as HTMLButtonElement;
-  });
-  confirm.click();
+  const confirm = await confirmRemoval(user, 'sable');
+  await confirm();
 
   await vi.waitFor(() => {
-    expect(document.querySelectorAll('.keyword-list li').length).toBe(0);
+    expect(keywords()).toEqual([]);
   });
-
-  await unmount(instance);
 });
 
 test('shows each keyword at its own level, including one disabled elsewhere', async () => {
@@ -228,16 +174,8 @@ test('shows each keyword at its own level, including one disabled elsewhere', as
     { keyword: 'urgent', mode: 'loud' },
   ]);
 
-  const instance = mount(NotificationKeywords, { target: document.body });
+  render(NotificationKeywords);
 
-  await vi.waitFor(() => {
-    expect(
-      required('[aria-label="Notification level for urgent"]', HTMLElement).textContent
-    ).toContain('Loud');
-  });
-  expect(
-    required('[aria-label="Notification level for quiet"]', HTMLElement).textContent
-  ).toContain('Off');
-
-  await unmount(instance);
+  expect(await screen.findByLabelText('Notification level for urgent')).toHaveTextContent('Loud');
+  expect(screen.getByLabelText('Notification level for quiet')).toHaveTextContent('Off');
 });

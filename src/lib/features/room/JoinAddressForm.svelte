@@ -62,6 +62,7 @@
       autocapitalize="none"
       spellcheck={false}
       aria-invalid={invalid}
+      aria-describedby={invalid ? 'join-address-input-error' : undefined}
       placeholder={$i18n.t('room.joinAddressPlaceholder')}
     />
   </FormField>

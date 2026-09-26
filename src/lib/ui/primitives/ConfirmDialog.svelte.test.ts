@@ -1,63 +1,62 @@
 // @vitest-environment happy-dom
 
-import { createRawSnippet, mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { createRawSnippet } from 'svelte';
+import { expect, test, vi } from 'vitest';
 
 import ConfirmDialog from './ConfirmDialog.svelte';
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('confirms with the danger variant by default', async () => {
-  const instance = mount(ConfirmDialog, {
-    target: document.body,
-    props: { open: true, title: 'Remove', confirmLabel: 'Remove' },
-  });
-  await tick();
+  render(ConfirmDialog, { open: true, title: 'Remove', confirmLabel: 'Remove' });
 
-  expect(document.querySelector('button[type="submit"]')?.className).toContain('btn-danger');
-  expect(document.querySelector('[role="alert"]')).toBeNull();
-
-  await unmount(instance);
+  expect(await screen.findByRole('button', { name: 'Remove' })).toHaveClass('btn-danger');
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 test('reports a cancel', async () => {
+  const user = userEvent.setup();
   const onCancel = vi.fn();
   const onConfirm = vi.fn();
-  const instance = mount(ConfirmDialog, {
-    target: document.body,
-    props: { open: true, title: 'Remove', confirmLabel: 'Remove', onCancel, onConfirm },
+  render(ConfirmDialog, {
+    open: true,
+    title: 'Remove',
+    confirmLabel: 'Remove',
+    onCancel,
+    onConfirm,
   });
-  await tick();
 
-  document.querySelector<HTMLButtonElement>('button[type="button"]')?.click();
+  await user.click(await screen.findByRole('button', { name: 'Cancel' }));
 
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onConfirm).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('renders a field, the chosen confirm variant and an error line', async () => {
-  const instance = mount(ConfirmDialog, {
-    target: document.body,
-    props: {
-      open: true,
-      title: 'Rename',
-      confirmLabel: 'Save',
-      confirmVariant: 'secondary',
-      error: 'Name taken',
-      children: createRawSnippet(() => ({ render: () => '<input id="field" />' })),
-    },
+  render(ConfirmDialog, {
+    open: true,
+    title: 'Rename',
+    confirmLabel: 'Save',
+    confirmVariant: 'secondary',
+    error: 'Name taken',
+    children: createRawSnippet(() => ({ render: () => '<input id="field" />' })),
   });
-  await tick();
 
-  const submit = document.querySelector('button[type="submit"]');
-  expect(submit?.className).toContain('btn-secondary');
-  expect(submit?.className).not.toContain('btn-danger');
-  expect(document.querySelector('form #field')).not.toBeNull();
-  expect(document.querySelector('[role="alert"]')?.textContent.trim()).toBe('Name taken');
+  const submit = await screen.findByRole('button', { name: 'Save' });
+  expect(submit).toHaveClass('btn-secondary');
+  expect(submit).not.toHaveClass('btn-danger');
+  expect(submit).toHaveAttribute('type', 'submit');
+  expect(screen.getByRole('textbox').closest('form')).toBe(submit.closest('form'));
+  expect(screen.getByRole('alert')).toHaveTextContent('Name taken');
+});
 
-  await unmount(instance);
+test('announces its description with the dialog', async () => {
+  render(ConfirmDialog, {
+    open: true,
+    title: 'Remove',
+    description: 'This cannot be undone.',
+    confirmLabel: 'Remove',
+  });
+
+  expect(await screen.findByRole('dialog')).toHaveAccessibleDescription('This cannot be undone.');
 });

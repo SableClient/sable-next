@@ -25,7 +25,7 @@
     <Label for={fieldId}>{label}</Label>
   {/if}
   {@render children()}
-  {#if error}<p class="form-field-error error" role="alert">{error}</p>{/if}
+  {#if error}<p id="{fieldId}-error" class="form-field-error error" role="alert">{error}</p>{/if}
 </div>
 
 <style>

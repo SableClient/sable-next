@@ -148,7 +148,7 @@
 
   {#if loading}
     <p class="keywords-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
-  {:else if keywords.length === 0}
+  {:else if keywords.length === 0 && error !== 'settings.notificationKeywordsLoadFailed'}
     <p class="keywords-empty">{$i18n.t('settings.notificationKeywordsEmpty')}</p>
   {:else}
     <ul class="keyword-list">
@@ -186,10 +186,12 @@
       void addKeyword();
     }}
   >
-    <label class="field">
-      <span>{$i18n.t('settings.notificationKeywordsLabel')}</span>
+    <div class="field">
+      <label for="notification-keyword-draft">{$i18n.t('settings.notificationKeywordsLabel')}</label
+      >
       <div class="keyword-input-row">
         <TextInput
+          id="notification-keyword-draft"
           bind:value={draft}
           placeholder={$i18n.t('settings.notificationKeywordsPlaceholder')}
           autocomplete="off"
@@ -200,7 +202,7 @@
           {$i18n.t('settings.notificationKeywordsAdd')}
         </Button>
       </div>
-    </label>
+    </div>
   </form>
 </section>
 

@@ -116,6 +116,24 @@
     pinnedSpaceIds = new Set(),
     onUnpin,
   }: Props = $props();
+
+  const uid = $props.id();
+
+  function unreadId(key: string): string {
+    return `${uid}-unread-${key}`;
+  }
+
+  function unreadLabel(count: UnreadCount | undefined): string | undefined {
+    if (!count) return undefined;
+    if (count.highlight > 0) return $i18n.t('nav.unreadMentions', { count: count.highlight });
+    if (count.unread > 0) return $i18n.t('nav.unreadMessages', { count: count.unread });
+    return count.marked ? $i18n.t('nav.markedUnread') : undefined;
+  }
+
+  function describedBy(props: Record<string, unknown>, id: string): string {
+    const own = props['aria-describedby'];
+    return typeof own === 'string' ? `${own} ${id}` : id;
+  }
   const directRoot = resolve('direct');
   let spacePaths = $state(savedSpacePaths());
   let dragged = $state<LayoutRef | null>(null);
@@ -442,8 +460,8 @@
      as a void expression in an expression position -->
 {#snippet nothing()}{/snippet}
 
-{#snippet unreadMark(count: UnreadCount | undefined, dm: boolean)}
-  <UnreadBadge counts={count} {dm} aria-hidden="true" />
+{#snippet unreadMark(count: UnreadCount | undefined, dm: boolean, id: string)}
+  <UnreadBadge counts={count} {dm} {id} label={unreadLabel(count)} />
 {/snippet}
 
 {#snippet itemBody(item: RailItem, active: boolean)}
@@ -458,7 +476,7 @@
       uniform
     />
   {/if}
-  {@render unreadMark(item.unread, item.dm ?? false)}
+  {@render unreadMark(item.unread, item.dm ?? false, unreadId(item.roomId ?? item.href))}
   {#if item.inCall}
     <span class="call-mark" aria-hidden="true"><SpeakerHighIcon weight="fill" /></span>
   {/if}
@@ -479,6 +497,7 @@
         }
       : undefined}
     aria-label={$i18n.t(item.label)}
+    aria-describedby={describedBy(props, unreadId(item.roomId ?? item.href))}
     aria-current={active ? 'page' : undefined}
   >
     {@render itemBody(item, active)}
@@ -606,12 +625,13 @@
     data-current={folderActive(folder) ? 'true' : undefined}
     aria-expanded="false"
     aria-label={$i18n.t('nav.folderExpand', { name: folderLabel(folder) })}
+    aria-describedby={describedBy(props, unreadId(folder.id))}
     onclick={() => {
       onToggleFolder?.(folder.id);
     }}
   >
     {@render folderTiles(folder)}
-    {@render unreadMark(folderUnread(folder), false)}
+    {@render unreadMark(folderUnread(folder), false, unreadId(folder.id))}
   </button>
 {/snippet}
 

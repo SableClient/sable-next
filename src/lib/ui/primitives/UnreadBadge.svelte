@@ -13,10 +13,11 @@
   type Props = Omit<HTMLAttributes<HTMLSpanElement>, 'class' | 'children'> & {
     counts: UnreadBadgeCounts | undefined;
     dm?: boolean;
+    label?: string;
     class?: ClassValue;
   };
 
-  let { counts, dm = false, class: className = '', ...rest }: Props = $props();
+  let { counts, dm = false, label, class: className = '', ...rest }: Props = $props();
 
   let badge = $derived(
     hideQuietDot(resolveUnreadBadge(counts, preferences, dm), preferences.showUnreadDots)
@@ -31,7 +32,12 @@
       `unread-badge-${badge.mode}`,
       badge.highlight && 'unread-badge-highlight',
       className,
-    ]}>{badge.mode === 'count' ? formatUnreadCount(badge.count) : ''}</span
+    ]}
+    >{#if label}<span aria-hidden="true"
+        >{badge.mode === 'count' ? formatUnreadCount(badge.count) : ''}</span
+      ><span class="screen-reader-only">{label}</span>{:else}{badge.mode === 'count'
+        ? formatUnreadCount(badge.count)
+        : ''}{/if}</span
   >
 {/if}
 

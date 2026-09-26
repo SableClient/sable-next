@@ -160,7 +160,7 @@
 
   {#if loading}
     <p class="pushers-empty"><Spinner small label={$i18n.t('a11y.loading')} /></p>
-  {:else if pushers.length === 0}
+  {:else if pushers.length === 0 && error !== 'settings.pushersLoadFailed'}
     <p class="pushers-empty">{$i18n.t('settings.pushersEmpty')}</p>
   {:else}
     <ul class="pusher-list">

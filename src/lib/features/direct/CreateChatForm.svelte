@@ -52,6 +52,7 @@
       autocapitalize="none"
       spellcheck={false}
       aria-invalid={invalid}
+      aria-describedby={invalid ? 'create-chat-user-error' : undefined}
       placeholder={$i18n.t('direct.userIdPlaceholder')}
     />
   </FormField>

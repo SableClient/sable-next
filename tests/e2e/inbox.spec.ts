@@ -123,6 +123,8 @@ test.describe('on a pristine account', () => {
     await expect(page.getByRole('link', { name: 'Inbox, 2 waiting' }).first()).toBeVisible({
       timeout: 20_000,
     });
-    await expect(page.locator('a[href="/rooms"] .unread-badge-count').first()).toHaveText('1');
+    const rooms = page.locator('a[href="/rooms"]').first();
+    await expect(rooms.locator('.unread-badge-count [aria-hidden="true"]')).toHaveText('1');
+    await expect(rooms).toHaveAccessibleDescription(/^1 (unread messages|mentions)$/);
   });
 });

@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { beforeEach, expect, test, vi } from 'vitest';
 
 const navigation = vi.hoisted(() => ({ goto: vi.fn<() => Promise<void>>() }));
 
@@ -29,22 +30,12 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 import CreateChatForm from './CreateChatForm.svelte';
 
-async function mountForm() {
-  const instance = mount(CreateChatForm, { target: document.body });
-  await tick();
-  return instance;
-}
+const input = () => screen.getByRole('textbox', { name: 'direct.userIdLabel' });
 
-async function fill(value: string) {
-  const input = document.querySelector<HTMLInputElement>('#create-chat-user');
-  if (!input) throw new Error('user id input missing');
-  input.value = value;
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await tick();
-}
-
-function submit() {
-  document.querySelector('.create-chat')?.dispatchEvent(new Event('submit'));
+async function submit(value: string): Promise<void> {
+  const user = userEvent.setup();
+  await user.type(input(), value);
+  await user.click(screen.getByRole('button', { name: 'direct.submit' }));
 }
 
 beforeEach(() => {
@@ -53,48 +44,36 @@ beforeEach(() => {
   navigation.goto.mockResolvedValue(undefined);
 });
 
-afterEach(() => {
-  document.body.replaceChildren();
-});
-
 test('creates the chat and navigates to it under the direct section', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
-  const instance = await mountForm();
+  render(CreateChatForm);
 
-  await fill('@alice:example.org');
-  submit();
+  await submit('@alice:example.org');
   await vi.waitFor(() => {
     expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
   });
 
   expect(navigation.goto).toHaveBeenCalledWith('/(app)/direct/!dm%3Aexample.org');
-  await unmount(instance);
 });
 
 test('rejects an input that is not a user id without calling the core', async () => {
-  const instance = await mountForm();
+  render(CreateChatForm);
 
-  await fill('alice');
-  submit();
-  await tick();
+  await submit('alice');
 
   expect(core.createDm).not.toHaveBeenCalled();
-  expect(document.querySelector('.error')?.textContent).toBe('direct.invalid');
-  await unmount(instance);
+  expect(input()).toBeInvalid();
+  expect(input()).toHaveAccessibleDescription('direct.invalid');
 });
 
 test('reports a failed creation and stays on the page', async () => {
   core.createDm.mockRejectedValue(new Error('nope'));
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const instance = await mountForm();
+  render(CreateChatForm);
 
-  await fill('@alice:example.org');
-  submit();
-  await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('direct.failed');
-  });
+  await submit('@alice:example.org');
+  expect(await screen.findByRole('alert')).toHaveTextContent('direct.failed');
 
   expect(navigation.goto).not.toHaveBeenCalled();
   warn.mockRestore();
-  await unmount(instance);
 });

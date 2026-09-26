@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type { CoreEvent, RoomSummary } from '#src/generated/protocol';
 
@@ -69,7 +70,6 @@ import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 afterEach(() => {
-  document.body.replaceChildren();
   localStorage.clear();
   sidebarFixture.items = [];
 });
@@ -104,6 +104,24 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
   };
 }
 
+async function startRoomList(core: CoreClient): Promise<RoomList> {
+  const roomList = new RoomList(core);
+  fixture.roomList = roomList;
+  onTestFinished(() => {
+    roomList.stop();
+    fixture.roomList = null;
+  });
+  await roomList.start();
+  return roomList;
+}
+
+function railOrder(names: readonly string[]): (string | null)[] {
+  return screen
+    .getAllByRole('link')
+    .map((link) => link.getAttribute('aria-label'))
+    .filter((name) => name !== null && names.includes(name));
+}
+
 test('adds an incoming unread DM to the navbar and removes it when read', async () => {
   const room: RoomSummary = {
     ...space('!dm:example.org', 'Alice'),
@@ -125,48 +143,46 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
-  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  const selector = '.rail a[href="/direct/!dm%3Aexample.org"]';
-  try {
-    await tick();
-    expect(document.querySelector(selector)).toBeNull();
-    const incoming = {
-      ...room,
-      unread: 1,
-      notifying: 1,
-      latest_event: {
-        sender: '@alice:example.org',
-        body: 'Hello',
-        timestamp: 1000,
-        sending: false,
-        event_id: '$message',
-      },
-    };
-    for (const listener of listeners)
-      listener({
-        type: 'room_list_diff',
-        subscription: 1,
-        diffs: [{ op: 'set', index: 0, value: incoming }],
-      });
-    await tick();
-    expect(document.querySelector(selector)?.getAttribute('aria-label')).toBe('Alice');
-    expect(document.querySelector(`${selector} .unread-badge-count`)?.textContent).toBe('1');
-    for (const listener of listeners)
-      listener({
-        type: 'room_list_diff',
-        subscription: 1,
-        diffs: [{ op: 'set', index: 0, value: { ...incoming, unread: 0 } }],
-      });
-    await tick();
-    expect(document.querySelector(selector)).toBeNull();
-  } finally {
-    await unmount(instance);
-    roomList.stop();
-    fixture.roomList = null;
-  }
+  await startRoomList(core);
+  render(SidebarNav, { mobile: true });
+  await tick();
+
+  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
+
+  const incoming = {
+    ...room,
+    unread: 1,
+    notifying: 1,
+    latest_event: {
+      sender: '@alice:example.org',
+      body: 'Hello',
+      timestamp: 1000,
+      sending: false,
+      event_id: '$message',
+    },
+  };
+  for (const listener of listeners)
+    listener({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'set', index: 0, value: incoming }],
+    });
+  await tick();
+
+  const dm = screen.getByRole('link', { name: 'Alice' });
+  expect(dm).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
+  expect(within(dm).getByText('1').closest('.unread-badge')).toBeInTheDocument();
+  expect(dm).toHaveAccessibleDescription('nav.unreadMessages:1');
+
+  for (const listener of listeners)
+    listener({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'set', index: 0, value: { ...incoming, unread: 0 } }],
+    });
+  await tick();
+
+  expect(screen.queryByRole('link', { name: 'Alice' })).not.toBeInTheDocument();
 });
 
 test('keeps the rail order when a room-list reset reorders spaces', async () => {
@@ -186,31 +202,22 @@ test('keeps the rail order when a room-list reset reorders spaces', async () => 
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
-  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  try {
-    await tick();
-    const railOrder = () =>
-      [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
-    expect(railOrder()).toEqual(['Alpha', 'Beta']);
+  await startRoomList(core);
+  render(SidebarNav, { mobile: true });
+  await tick();
 
-    for (const listener of listeners) {
-      listener({
-        type: 'room_list_diff',
-        subscription: 1,
-        diffs: [{ op: 'reset', values: [beta, alpha] }],
-      });
-    }
-    await tick();
+  expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
 
-    expect(railOrder()).toEqual(['Alpha', 'Beta']);
-  } finally {
-    await unmount(instance);
-    roomList.stop();
-    fixture.roomList = null;
+  for (const listener of listeners) {
+    listener({
+      type: 'room_list_diff',
+      subscription: 1,
+      diffs: [{ op: 'reset', values: [beta, alpha] }],
+    });
   }
+  await tick();
+
+  expect(railOrder(['Alpha', 'Beta'])).toEqual(['Alpha', 'Beta']);
 });
 
 test('a subspace pinned in the stored layout joins the rail beside its parent', async () => {
@@ -229,27 +236,17 @@ test('a subspace pinned in the stored layout joins the rail beside its parent', 
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
-  const railOrder = () =>
-    [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
+  await startRoomList(core);
 
-  let instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  try {
-    await tick();
-    expect(railOrder()).toEqual(['Parent']);
-    await unmount(instance);
+  const first = render(SidebarNav, { mobile: true });
+  await tick();
+  expect(railOrder(['Child', 'Parent'])).toEqual(['Parent']);
+  first.unmount();
 
-    sidebarFixture.items = [{ kind: 'space', room_id: child.room_id }];
-    instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-    await tick();
-    expect(railOrder()).toEqual(['Child', 'Parent']);
-  } finally {
-    await unmount(instance);
-    roomList.stop();
-    fixture.roomList = null;
-  }
+  sidebarFixture.items = [{ kind: 'space', room_id: child.room_id }];
+  render(SidebarNav, { mobile: true });
+  await tick();
+  expect(railOrder(['Child', 'Parent'])).toEqual(['Child', 'Parent']);
 });
 
 test('a muted direct chat marked unread by hand still reaches the navbar', async () => {
@@ -271,20 +268,18 @@ test('a muted direct chat marked unread by hand still reaches the navbar', async
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
+  const roomList = await startRoomList(core);
   await vi.waitFor(() => {
     expect(roomList.notificationMode(room.room_id)).toBe('mute');
   });
 
-  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  try {
-    await tick();
-    expect(document.querySelector('.rail a[href="/direct/!muted%3Aexample.org"]')).not.toBeNull();
-  } finally {
-    await unmount(instance);
-  }
+  render(SidebarNav, { mobile: true });
+  await tick();
+
+  expect(screen.getByRole('link', { name: 'Bo' })).toHaveAttribute(
+    'href',
+    '/direct/!muted%3Aexample.org'
+  );
 });
 
 test('a muted room marked unread by hand still marks its section as unread', async () => {
@@ -304,21 +299,16 @@ test('a muted room marked unread by hand still marks its section as unread', asy
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
+  const roomList = await startRoomList(core);
   await vi.waitFor(() => {
     expect(roomList.notificationMode(room.room_id)).toBe('mute');
   });
 
-  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  try {
-    await tick();
-    const rooms = document.querySelector('.rail a[href="/rooms"]');
-    expect(rooms?.querySelector('.unread-badge-dot')).not.toBeNull();
-  } finally {
-    await unmount(instance);
-  }
+  render(SidebarNav, { mobile: true });
+  await tick();
+
+  const rooms = screen.getByRole('link', { name: 'nav.unspaced' });
+  expect(rooms.querySelector('.unread-badge-dot')).toBeInTheDocument();
 });
 
 test('a section totals its notifying rooms in green', async () => {
@@ -339,20 +329,16 @@ test('a section totals its notifying rooms in green', async () => {
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;
-  const roomList = new RoomList(core);
-  fixture.roomList = roomList;
-  await roomList.start();
+  const roomList = await startRoomList(core);
   await vi.waitFor(() => {
     expect(roomList.notificationMode(room.room_id)).toBe('all');
   });
 
-  const instance = mount(SidebarNav, { target: document.body, props: { mobile: true } });
-  try {
-    await tick();
-    const rooms = document.querySelector('.rail a[href="/rooms"]');
-    expect(rooms?.querySelector('.unread-badge-count')?.textContent).toBe('4');
-    expect(rooms?.querySelector('.unread-badge-highlight')).not.toBeNull();
-  } finally {
-    await unmount(instance);
-  }
+  render(SidebarNav, { mobile: true });
+  await tick();
+
+  const rooms = screen.getByRole('link', { name: 'nav.unspaced' });
+  expect(within(rooms).getByText('4').closest('.unread-badge')).toHaveClass(
+    'unread-badge-highlight'
+  );
 });

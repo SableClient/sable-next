@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { mount, tick, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
+import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
@@ -49,7 +51,7 @@ vi.mock('#lib/core/context.js');
 import { core } from '#lib/core/__mocks__/context.js';
 
 core.roomPermissions.mockResolvedValue({ can_manage_children: false });
-vi.mock('#lib/ui/primitives/Tooltip.svelte', () => ({ default: () => null }));
+vi.mock('#lib/ui/primitives/Tooltip.svelte', () => import('./TooltipStub.test.svelte'));
 
 import NavigationRail from './NavigationRail.svelte';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
@@ -57,10 +59,26 @@ import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { savedSpacePaths, spaceNavigationHref } from './space-paths.js';
 
 afterEach(() => {
-  document.body.replaceChildren();
   localStorage.clear();
   setPreference('showSearch', true);
 });
+
+const user = userEvent.setup();
+const tab = (name: string) => screen.getByRole('link', { name });
+const linkTo = (href: string) =>
+  screen.queryAllByRole('link').find((link) => link.getAttribute('href') === href) ?? null;
+const spaceOrder = () =>
+  [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'));
+
+async function openMenu(target: Element): Promise<HTMLElement[]> {
+  await user.pointer({ keys: '[MouseRight]', target });
+  await vi.waitFor(() => {
+    expect(screen.getAllByRole('menuitem').length).toBeGreaterThan(0);
+  });
+  return screen.getAllByRole('menuitem');
+}
+
+const labels = (items: HTMLElement[]) => items.map((item) => item.textContent.trim());
 
 function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
   return {
@@ -93,8 +111,7 @@ function space(roomId = '!space:example.org', name = 'Space'): RoomSummary {
 }
 
 test('badges unread direct chats', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [],
       directUnread: { unread: 3, highlight: 3 },
@@ -103,14 +120,14 @@ test('badges unread direct chats', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/direct"] .unread-badge-count')?.textContent).toBe('3');
-
-  await unmount(instance);
+  expect(within(tab('nav.direct')).getByText('3').closest('.unread-badge')).toHaveClass(
+    'unread-badge-count'
+  );
+  expect(tab('nav.direct')).toHaveAccessibleDescription('nav.unreadMentions:3');
 });
 
 test('badges the unspaced section', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [],
       unspacedUnread: { unread: 4, highlight: 2 },
@@ -119,39 +136,30 @@ test('badges the unspaced section', async () => {
   });
   await tick();
 
-  expect(document.querySelector('a[href="/rooms"] .unread-badge-count')?.textContent).toBe('2');
-
-  await unmount(instance);
+  expect(within(tab('nav.unspaced')).getByText('2').closest('.unread-badge')).toHaveClass(
+    'unread-badge-count'
+  );
 });
 
 test('search leaves the rail when the preference is off', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], mobile: true },
-  });
+  render(NavigationRail, { spaces: [], mobile: true });
   await tick();
 
-  expect(document.querySelector('a[href="/search"]')).not.toBeNull();
+  expect(tab('search.title')).toHaveAttribute('href', '/search');
 
   setPreference('showSearch', false);
   await tick();
 
-  expect(document.querySelector('a[href="/search"]')).toBeNull();
-
-  await unmount(instance);
+  expect(screen.queryByRole('link', { name: 'search.title' })).not.toBeInTheDocument();
 });
 
 test('uses a dot for ordinary unread messages outside spaces', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true },
-  });
+  render(NavigationRail, { spaces: [], unspacedUnread: { unread: 2, highlight: 0 }, mobile: true });
   await tick();
 
-  expect(document.querySelector('a[href="/rooms"] .unread-badge-dot')).not.toBeNull();
-  expect(document.querySelector('a[href="/rooms"] .unread-badge-count')).toBeNull();
-
-  await unmount(instance);
+  expect(tab('nav.unspaced').querySelector('.unread-badge-dot')).toBeInTheDocument();
+  expect(tab('nav.unspaced').querySelector('.unread-badge-count')).not.toBeInTheDocument();
+  expect(tab('nav.unspaced')).toHaveAccessibleDescription('nav.unreadMessages:2');
 });
 
 test('shows unread direct rooms as individual avatars', async () => {
@@ -182,24 +190,20 @@ test('shows unread direct rooms as individual avatars', async () => {
     marked_unread: false,
     latest_event: null,
   } satisfies RoomSummary;
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], directRooms: [directRoom], mobile: true },
-  });
+  render(NavigationRail, { spaces: [], directRooms: [directRoom], mobile: true });
   await tick();
 
-  const directLink = document.querySelector('a[href="/direct/!dm%3Aexample.org"]');
-  expect(directLink?.getAttribute('aria-label')).toBe('Alice');
-  expect(directLink?.querySelector('.space-initial')?.textContent.trim()).toBe('A');
-  expect(directLink?.querySelector('.unread-badge-count')?.textContent).toBe('2');
-  expect(directLink?.querySelector('.unread-badge-dot')).toBeNull();
-
-  await unmount(instance);
+  const directLink = tab('Alice');
+  expect(directLink).toHaveAttribute('href', '/direct/!dm%3Aexample.org');
+  expect(directLink.querySelector('.space-initial')).toHaveTextContent('A');
+  expect(within(directLink).getByText('2').closest('.unread-badge')).toHaveClass(
+    'unread-badge-count'
+  );
+  expect(directLink.querySelector('.unread-badge-dot')).not.toBeInTheDocument();
 });
 
 test('badges a space with its mentions and dots one with only unread messages', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       spaceUnread: new Map([
@@ -211,30 +215,21 @@ test('badges a space with its mentions and dots one with only unread messages', 
   });
   await tick();
 
-  const alpha = document.querySelector('a[aria-label="Alpha"]');
-  const beta = document.querySelector('a[aria-label="Beta"]');
-  expect(alpha?.querySelector('.unread-badge-count')?.textContent).toBe('3');
-  expect(beta?.querySelector('.unread-badge-count')).toBeNull();
-  expect(beta?.querySelector('.unread-badge-dot')).not.toBeNull();
-
-  await unmount(instance);
+  expect(within(tab('Alpha')).getByText('3').closest('.unread-badge')).toHaveClass(
+    'unread-badge-count'
+  );
+  expect(tab('Beta').querySelector('.unread-badge-count')).not.toBeInTheDocument();
+  expect(tab('Beta').querySelector('.unread-badge-dot')).toBeInTheDocument();
+  expect(tab('Beta')).toHaveAccessibleDescription('nav.unreadMessages:4');
+  expect(tab('nav.unspaced')).toHaveAccessibleDescription('');
 });
 
 test('outlines every tab but a space avatar', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
-  });
+  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
   await tick();
 
-  expect(document.querySelector('a[href="/rooms"]')?.classList.contains('nav-tab-outlined')).toBe(
-    true
-  );
-  expect(
-    document.querySelector('a[aria-label="Alpha"]')?.classList.contains('nav-tab-outlined')
-  ).toBe(false);
-
-  await unmount(instance);
+  expect(tab('nav.unspaced')).toHaveClass('nav-tab-outlined');
+  expect(tab('Alpha')).not.toHaveClass('nav-tab-outlined');
 });
 
 test('opens a space on its lobby when there is nothing to restore', () => {
@@ -257,28 +252,19 @@ test('opens a space on its lobby when there is nothing to restore', () => {
 });
 
 test('separates the spaces from the tabs above them, only when there are any', async () => {
-  const empty = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], mobile: true },
-  });
+  const empty = render(NavigationRail, { spaces: [], mobile: true });
   await tick();
   expect(document.querySelector('.rail-separator')).toBeNull();
-  await unmount(empty);
+  empty.unmount();
 
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space()], mobile: true },
-  });
+  render(NavigationRail, { spaces: [space()], mobile: true });
   await tick();
   expect(document.querySelector('.rail-separator')).not.toBeNull();
-
-  await unmount(instance);
 });
 
 test('marks a whole section read from the tab that badges it', async () => {
   const marked: string[] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [],
       directUnread: { unread: 2, highlight: 0 },
@@ -288,27 +274,15 @@ test('marks a whole section read from the tab that badges it', async () => {
   });
   await tick();
 
-  const anchor = document.querySelector('a[href="/direct"]')?.closest('.rail-section-anchor');
-  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-
-  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
-    (element) => element.textContent.trim() === 'nav.markSectionRead'
-  );
-  expect(item).not.toBeUndefined();
-  item?.click();
-  await tick();
+  await openMenu(tab('nav.direct'));
+  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
 
   expect(marked).toEqual(['direct']);
-
-  await unmount(instance);
 });
 
 test('marks the rooms outside spaces read from their tab', async () => {
   const marked: string[] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [],
       unspacedUnread: { unread: 2, highlight: 0 },
@@ -318,20 +292,10 @@ test('marks the rooms outside spaces read from their tab', async () => {
   });
   await tick();
 
-  const anchor = document.querySelector('a[href="/rooms"]')?.closest('.rail-section-anchor');
-  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-
-  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
-    (element) => element.textContent.trim() === 'nav.markSectionRead'
-  );
-  item?.click();
-  await tick();
+  await openMenu(tab('nav.unspaced'));
+  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
 
   expect(marked).toEqual(['unspaced']);
-
-  await unmount(instance);
 });
 
 test('restores a space to its last desktop route', () => {
@@ -354,7 +318,7 @@ test('restores a space to its last desktop route', () => {
 });
 
 test('records the active desktop space route without its event anchor', async () => {
-  const instance = mount(NavigationRail, { target: document.body, props: { spaces: [space()] } });
+  render(NavigationRail, { spaces: [space()] });
   await tick();
 
   pageState.url = {
@@ -367,8 +331,6 @@ test('records the active desktop space route without its event anchor', async ()
   expect(savedSpacePaths()).toEqual({
     '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org?via=example.org#reply',
   });
-
-  await unmount(instance);
 });
 
 test('opens a space root on mobile even when it has a saved route', async () => {
@@ -376,22 +338,14 @@ test('opens a space root on mobile even when it has a saved route', async () => 
     'sable-space-paths',
     JSON.stringify({ '!space:example.org': '/space/!space%3Aexample.org/!room%3Aexample.org' })
   );
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space()], mobile: true },
-  });
+  render(NavigationRail, { spaces: [space()], mobile: true });
   await tick();
 
-  expect(document.querySelector('[aria-label="Space"]')?.getAttribute('href')).toBe(
-    '/space/!space%3Aexample.org'
-  );
-
-  await unmount(instance);
+  expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org');
 });
 
 test('orders spaces by the stored layout and appends unplaced ones', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [{ kind: 'space', room_id: '!b:example.org' }],
@@ -400,17 +354,12 @@ test('orders spaces by the stored layout and appends unplaced ones', async () =>
   });
   await tick();
 
-  expect(
-    [...document.querySelectorAll('.rail-slot a')].map((link) => link.getAttribute('aria-label'))
-  ).toEqual(['Beta', 'Alpha']);
-
-  await unmount(instance);
+  expect(spaceOrder()).toEqual(['Beta', 'Alpha']);
 });
 
 test('shows a collapsed folder as one tab, with the names of the spaces inside', async () => {
   const toggled: string[] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
@@ -424,23 +373,20 @@ test('shows a collapsed folder as one tab, with the names of the spaces inside',
   });
   await tick();
 
-  const folder = document.querySelector<HTMLButtonElement>('.folder-preview');
-  expect(folder?.getAttribute('aria-label')).toBe('nav.folderExpand:Alpha, Beta');
-  expect(folder?.getAttribute('aria-expanded')).toBe('false');
-  expect(folder?.querySelectorAll('.folder-tile')).toHaveLength(2);
-  expect(folder?.querySelector('.unread-badge-dot')).not.toBeNull();
-  expect(document.querySelectorAll('.rail-slot a')).toHaveLength(0);
+  const folder = screen.getByRole('button', { name: 'nav.folderExpand:Alpha, Beta' });
+  expect(folder).toHaveAttribute('aria-expanded', 'false');
+  expect(folder.querySelectorAll('.folder-tile')).toHaveLength(2);
+  expect(folder.querySelector('.unread-badge-dot')).toBeInTheDocument();
+  expect(folder).toHaveAccessibleDescription('nav.unreadMessages:3');
+  expect(screen.queryByRole('link', { name: 'Alpha' })).not.toBeInTheDocument();
 
-  folder?.click();
+  await user.click(folder);
   expect(toggled).toEqual(['f']);
-
-  await unmount(instance);
 });
 
 test('shows the spaces of an open folder, and a way to shut it', async () => {
   const toggled: string[] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
       layout: [
@@ -453,26 +399,18 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.folder-preview')).toBeNull();
-  expect(
-    [...document.querySelectorAll('.folder-open .rail-slot a')].map((link) =>
-      link.getAttribute('aria-label')
-    )
-  ).toEqual(['Alpha', 'Beta']);
+  expect(screen.queryByRole('button', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
+  expect(spaceOrder()).toEqual(['Alpha', 'Beta']);
 
-  const collapse = document.querySelector<HTMLButtonElement>('.folder-collapse');
-  expect(collapse?.getAttribute('aria-label')).toBe('nav.folderCollapse:Work');
-  expect(collapse?.getAttribute('aria-expanded')).toBe('true');
-  expect(collapse?.classList.contains('selection-open')).toBe(false);
-  collapse?.click();
+  const collapse = screen.getByRole('button', { name: 'nav.folderCollapse:Work' });
+  expect(collapse).toHaveAttribute('aria-expanded', 'true');
+  expect(collapse).not.toHaveClass('selection-open');
+  await user.click(collapse);
   expect(toggled).toEqual(['f']);
-
-  await unmount(instance);
 });
 
 test('a space that left the room list drops out of its folder', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
@@ -484,19 +422,12 @@ test('a space that left the room list drops out of its folder', async () => {
   });
   await tick();
 
-  expect(
-    [...document.querySelectorAll('.folder-open .rail-slot a')].map((link) =>
-      link.getAttribute('aria-label')
-    )
-  ).toEqual(['Alpha']);
-
-  await unmount(instance);
+  expect(spaceOrder()).toEqual(['Alpha']);
 });
 
 test('offers a way out of a folder holding a single space', async () => {
   const removed: [string, string][] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [{ kind: 'folder', id: 'f', name: null, content: ['!a:example.org'] }],
@@ -507,39 +438,21 @@ test('offers a way out of a folder holding a single space', async () => {
   });
   await tick();
 
-  const anchor = document.querySelector('.folder-open .rail-menu-anchor');
-  expect(anchor).not.toBeNull();
-  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-
-  const item = [...document.querySelectorAll<HTMLElement>('.menu-item')].find(
-    (element) => element.textContent.trim() === 'nav.folderRemoveSpace'
-  );
-  expect(item).not.toBeUndefined();
-  item?.click();
-  await tick();
+  await openMenu(tab('Alpha'));
+  await user.click(screen.getByRole('menuitem', { name: 'nav.folderRemoveSpace' }));
 
   expect(removed).toEqual([['!a:example.org', 'f']]);
-
-  await unmount(instance);
 });
 
 test('the mobile rail does not arm dragging', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
-  });
+  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
   await tick();
 
-  expect(document.querySelector('.rail-slot')?.getAttribute('draggable')).toBeNull();
-
-  await unmount(instance);
+  expect(tab('Alpha').closest('.rail-slot')).not.toHaveAttribute('draggable');
 });
 
 test('a folder whose spaces are all unresolved renders nothing', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       layout: [
@@ -551,34 +464,17 @@ test('a folder whose spaces are all unresolved renders nothing', async () => {
   });
   await tick();
 
-  expect(document.querySelector('.folder-preview')).toBeNull();
-  expect(document.querySelectorAll('.rail-slot a')).toHaveLength(1);
-
-  await unmount(instance);
+  expect(screen.queryByRole('button', { name: /^nav\.folderExpand/ })).not.toBeInTheDocument();
+  expect(spaceOrder()).toEqual(['Alpha']);
 });
 
 test('right-clicking a top-level space opens its options menu', async () => {
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space('!a:example.org', 'Alpha')] },
-  });
+  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')] });
   await tick();
 
-  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
-    element.querySelector('.rail-slot')
-  );
-  expect(anchor).not.toBeUndefined();
-  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-
-  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
-    element.textContent.trim()
-  );
-  expect(labels).toContain('room.menuMarkRead');
-  expect(labels).not.toContain('settings.showUnreadCounts');
-
-  await unmount(instance);
+  const items = labels(await openMenu(tab('Alpha')));
+  expect(items).toContain('room.menuMarkRead');
+  expect(items).not.toContain('settings.showUnreadCounts');
 });
 
 test.each([
@@ -586,8 +482,7 @@ test.each([
   ['a top-level space', false],
 ])('%s offers unpinning from its options menu only when pinned', async (_, pinned) => {
   const onUnpin = vi.fn();
-  const instance = mount(NavigationRail, {
-    target: document.body,
+  render(NavigationRail, {
     props: {
       spaces: [space('!a:example.org', 'Alpha')],
       pinnedSpaceIds: new Set(pinned ? ['!a:example.org'] : []),
@@ -596,53 +491,31 @@ test.each([
   });
   await tick();
 
-  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
-    element.querySelector('.rail-slot')
-  );
-  anchor?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await tick();
-  await tick();
-
-  const unpin = [...document.querySelectorAll<HTMLElement>('.menu-item')].find((element) =>
-    element.textContent.includes('nav.unpinFromSidebar')
-  );
-  expect(unpin !== undefined).toBe(pinned);
-  unpin?.click();
+  await openMenu(tab('Alpha'));
+  const unpin = screen.queryByRole('menuitem', { name: /nav\.unpinFromSidebar/ });
+  expect(unpin !== null).toBe(pinned);
+  if (unpin) await user.click(unpin);
   await vi.waitFor(() => {
     expect(onUnpin).toHaveBeenCalledTimes(pinned ? 1 : 0);
   });
   if (pinned) expect(onUnpin).toHaveBeenCalledWith('!a:example.org');
-
-  await unmount(instance);
 });
 
 test('long-pressing a top-level space opens its options menu', async () => {
   vi.useFakeTimers();
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [space('!a:example.org', 'Alpha')], mobile: true },
-  });
-  await tick();
+  const touch = userEvent.setup({ advanceTimers: (ms) => vi.advanceTimersByTime(ms) });
+  render(NavigationRail, { spaces: [space('!a:example.org', 'Alpha')], mobile: true });
 
-  const anchor = [...document.querySelectorAll('.rail-menu-anchor')].find((element) =>
-    element.querySelector('.rail-slot')
-  );
-  anchor?.dispatchEvent(
-    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', clientX: 8, clientY: 8 })
-  );
+  const target = tab('Alpha');
+  await touch.pointer({ keys: '[TouchA>]', target, coords: { clientX: 8, clientY: 8 } });
   vi.advanceTimersByTime(LONG_PRESS_MS);
-  window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'touch' }));
+  await touch.pointer({ keys: '[/TouchA]', target });
   vi.advanceTimersByTime(500);
   vi.useRealTimers();
-  await tick();
-  await tick();
 
-  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
-    element.textContent.trim()
-  );
-  expect(labels).toContain('room.menuMarkRead');
-
-  await unmount(instance);
+  await vi.waitFor(() => {
+    expect(labels(screen.getAllByRole('menuitem'))).toContain('room.menuMarkRead');
+  });
 });
 
 test('restores the direct tab to its last desktop chat', () => {
@@ -659,56 +532,44 @@ test('opens the direct root on mobile even when it has a saved chat', async () =
     'sable-space-paths',
     JSON.stringify({ direct: '/direct/!dm%3Aexample.org' })
   );
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], mobile: true },
-  });
+  render(NavigationRail, { spaces: [], mobile: true });
   await tick();
 
-  expect(document.querySelector('a[href="/direct"]')).not.toBeNull();
-  expect(document.querySelector('a[href="/direct/!dm%3Aexample.org"]')).toBeNull();
-
-  await unmount(instance);
+  expect(tab('nav.direct')).toHaveAttribute('href', '/direct');
+  expect(linkTo('/direct/!dm%3Aexample.org')).not.toBeInTheDocument();
 });
 
 test('records the active desktop direct chat', async () => {
-  const instance = mount(NavigationRail, { target: document.body, props: { spaces: [] } });
+  render(NavigationRail, { spaces: [] });
   await tick();
 
   pageState.url = { pathname: '/direct/!dm%3Aexample.org', search: '?event=%24event', hash: '' };
   navigation.afterNavigate?.();
 
   expect(savedSpacePaths()).toEqual({ direct: '/direct/!dm%3Aexample.org' });
-
-  await unmount(instance);
 });
 
 test('offers join by address from the add button', async () => {
   const visited: string[] = [];
-  const instance = mount(NavigationRail, {
-    target: document.body,
-    props: { spaces: [], mobile: true, onNavigate: (href: string) => visited.push(href) },
+  render(NavigationRail, {
+    spaces: [],
+    mobile: true,
+    onNavigate: (href: string) => visited.push(href),
   });
   await tick();
 
-  document.querySelector<HTMLButtonElement>('button[aria-label="nav.add"]')?.click();
-  await tick();
-  await tick();
+  await user.click(screen.getByRole('button', { name: 'nav.add' }));
 
-  const labels = [...document.querySelectorAll<HTMLElement>('.menu-item')].map((element) =>
-    element.textContent.trim()
-  );
-  expect(labels).toEqual([
-    'nav.createRoom',
-    'nav.createSpace',
-    'nav.joinWithAddress',
-    'nav.explore',
-  ]);
+  await vi.waitFor(() => {
+    expect(labels(screen.getAllByRole('menuitem'))).toEqual([
+      'nav.createRoom',
+      'nav.createSpace',
+      'nav.joinWithAddress',
+      'nav.explore',
+    ]);
+  });
 
-  [...document.querySelectorAll<HTMLElement>('.menu-item')][2]?.click();
-  await tick();
+  await user.click(screen.getByRole('menuitem', { name: 'nav.joinWithAddress' }));
 
   expect(visited).toEqual(['/explore#explore-join-by-address']);
-
-  await unmount(instance);
 });

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { mount, unmount } from 'svelte';
+import { render, screen, within } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RegisteredPusherView } from '#src/generated/protocol';
@@ -59,30 +60,29 @@ const unnamed: RegisteredPusherView = {
 };
 
 afterEach(() => {
-  document.body.replaceChildren();
   Reflect.deleteProperty(navigator, 'serviceWorker');
   vi.clearAllMocks();
 });
 
+async function pushers(count: number): Promise<HTMLElement[]> {
+  render(PushersSettings);
+  await vi.waitFor(() => {
+    expect(screen.getAllByRole('listitem')).toHaveLength(count);
+  });
+  return screen.getAllByRole('listitem');
+}
+
 test('lists registered pushers and marks the Sable ones', async () => {
   core.webPushers.mockResolvedValue([gateway, ownServer, unnamed]);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.pusher').length).toBe(3);
-  });
+  const [phone, browser, email] = await pushers(3);
 
-  const names = [...document.querySelectorAll('.pusher-name')].map((node) => node.textContent);
-  expect(names).toEqual(['Element on phone', 'This browser', 'im.example.email']);
-  expect(document.querySelector('.pusher-name-line .status-badge-neutral')?.textContent).toBe(
-    'Sable'
-  );
-  expect(document.querySelector('.pusher-name-line .status-badge-primary')).toBeNull();
-  expect(document.querySelector('.status-badge-warning')?.textContent).toBe(
-    'Awaiting confirmation'
-  );
-
-  await unmount(instance);
+  expect(phone.querySelector('.pusher-name')).toHaveTextContent('Element on phone');
+  expect(browser.querySelector('.pusher-name')).toHaveTextContent('This browser');
+  expect(email.querySelector('.pusher-name')).toHaveTextContent('im.example.email');
+  expect(within(browser).getByText('Sable')).toHaveClass('status-badge-neutral');
+  expect(screen.queryByText('This device')).not.toBeInTheDocument();
+  expect(within(browser).getByText('Awaiting confirmation')).toHaveClass('status-badge-warning');
 });
 
 test('marks this browser own pusher as this device', async () => {
@@ -100,102 +100,66 @@ test('marks this browser own pusher as this device', async () => {
   });
   core.webPushers.mockResolvedValue([gateway, ownServer, unnamed]);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pusher-name-line .status-badge-primary')?.textContent).toBe(
-      'This device'
-    );
-  });
-  expect(document.querySelectorAll('.status-badge-primary').length).toBe(1);
-
-  await unmount(instance);
+  const [, browser] = await pushers(3);
+  expect(await within(browser).findByText('This device')).toHaveClass('status-badge-primary');
+  expect(screen.getAllByText('This device')).toHaveLength(1);
 });
 
 test('removes a pusher once the inline confirmation is accepted', async () => {
+  const user = userEvent.setup();
   core.webPushers.mockResolvedValueOnce([gateway, ownServer]).mockResolvedValueOnce([ownServer]);
   core.removePusher.mockResolvedValue(undefined);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.pusher').length).toBe(2);
-  });
+  const [phone] = await pushers(2);
+  await user.click(within(phone).getByRole('button', { name: 'Remove' }));
+  expect(
+    within(phone).getByText('Stop sending notifications to Element on phone?')
+  ).toBeInTheDocument();
 
-  document.querySelector<HTMLButtonElement>('.pusher-summary .btn-danger')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pusher-confirm')).not.toBeNull();
-  });
-
-  document.querySelector<HTMLButtonElement>('.pusher-confirm .btn-danger')?.click();
+  await user.click(within(phone).getByRole('button', { name: 'Remove Element on phone' }));
   await vi.waitFor(() => {
     expect(core.removePusher).toHaveBeenCalledWith('KEY-GATEWAY', 'im.vector.app');
   });
-
-  await unmount(instance);
 });
 
 test('cancels a removal confirmation', async () => {
+  const user = userEvent.setup();
   core.webPushers.mockResolvedValue([gateway]);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.pusher').length).toBe(1);
-  });
+  const [phone] = await pushers(1);
+  await user.click(within(phone).getByRole('button', { name: 'Remove' }));
+  await user.click(within(phone).getByRole('button', { name: 'Cancel' }));
 
-  document.querySelector<HTMLButtonElement>('.pusher-summary .btn-danger')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pusher-confirm')).not.toBeNull();
-  });
-
-  document.querySelector<HTMLButtonElement>('.pusher-confirm .btn-ghost')?.click();
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pusher-confirm')).toBeNull();
-  });
-
+  expect(
+    screen.queryByText('Stop sending notifications to Element on phone?')
+  ).not.toBeInTheDocument();
   expect(core.removePusher).not.toHaveBeenCalled();
-
-  await unmount(instance);
 });
 
 test('shows an empty state when no pusher is registered', async () => {
   core.webPushers.mockResolvedValue([]);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.pushers-empty')?.textContent).toContain(
-      'No apps are registered'
-    );
-  });
-
-  await unmount(instance);
+  render(PushersSettings);
+  expect(await screen.findByText(/No apps are registered/)).toBeInTheDocument();
 });
 
 test('copies the cropped value in full on click', async () => {
-  const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+  const user = userEvent.setup();
   core.webPushers.mockResolvedValue([gateway]);
 
-  const instance = mount(PushersSettings, { target: document.body });
-  await vi.waitFor(() => {
-    expect(document.querySelectorAll('.pusher').length).toBe(1);
-  });
+  const [phone] = await pushers(1);
+  await user.click(within(phone).getByRole('button', { name: 'Copy the push key' }));
 
-  document.querySelector<HTMLButtonElement>('[aria-label="Copy the push key"]')?.click();
-  await vi.waitFor(() => {
-    expect(writeText).toHaveBeenCalledWith('KEY-GATEWAY');
-    expect(document.querySelector('.pusher-meta')?.textContent).toContain('Copied');
-  });
-
-  await unmount(instance);
+  expect(await navigator.clipboard.readText()).toBe('KEY-GATEWAY');
+  expect(await within(phone).findByText('Copied')).toBeInTheDocument();
 });
 
 test('reports a load failure instead of an empty list', async () => {
   core.webPushers.mockRejectedValue(new Error('offline'));
 
-  const instance = mount(PushersSettings, { target: document.body });
+  render(PushersSettings);
   await vi.waitFor(() => {
-    expect(document.querySelector('.alert')?.textContent).toContain(
-      'registered apps could not be loaded'
-    );
+    expect(screen.getByRole('status')).toHaveTextContent('registered apps could not be loaded');
   });
-
-  await unmount(instance);
+  expect(screen.queryByText(/No apps are registered/)).not.toBeInTheDocument();
 });

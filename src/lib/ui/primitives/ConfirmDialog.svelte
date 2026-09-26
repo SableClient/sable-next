@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Dialog } from 'bits-ui';
   import type { Snippet } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
@@ -55,7 +56,11 @@
   <div class="confirm">
     <h2>{title}</h2>
     {#if description}
-      <p class="explain">{description}</p>
+      <Dialog.Description>
+        {#snippet child({ props })}
+          <p {...props} class="explain">{description}</p>
+        {/snippet}
+      </Dialog.Description>
     {/if}
     {@render children?.()}
     {#if error}
