@@ -5,11 +5,13 @@ const mocks = vi.hoisted(() => {
   const params: Partial<Record<string, string>> = {};
   return {
     goto: vi.fn<(target: string) => Promise<void>>(() => Promise.resolve()),
+    afterNavigate: vi.fn(),
+    back: vi.fn(),
     page: { url: new URL('https://app.test/rooms/room'), params },
   };
 });
 
-vi.mock('$app/navigation', () => ({ goto: mocks.goto }));
+vi.mock('$app/navigation', () => ({ goto: mocks.goto, afterNavigate: mocks.afterNavigate }));
 vi.mock('$app/state', () => ({ page: mocks.page }));
 vi.mock('$app/paths', () => ({
   resolve: (path: string, params: Partial<Record<string, string>> = {}) =>
@@ -26,13 +28,23 @@ import {
   leaveRoomView,
   scopedSearchPath,
   searchInRoom,
+  trackRoomEntry,
 } from './room-navigation';
 
 beforeEach(() => {
   mocks.goto.mockClear();
   mocks.page.params = {};
   vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+  mocks.back.mockClear();
+  vi.stubGlobal('history', { back: mocks.back });
 });
+
+function enter(from: string | null, type = 'link', delta?: number): void {
+  mocks.afterNavigate.mockClear();
+  trackRoomEntry();
+  const callback = mocks.afterNavigate.mock.calls[0]?.[0] as (navigation: unknown) => void;
+  callback({ from: from ? { url: new URL(`https://app.test${from}`) } : null, type, delta });
+}
 
 test.each([
   ['/direct/room', {}, 'direct'],
@@ -93,4 +105,25 @@ test('searching from a room scopes to it, from a space to the space, and elsewhe
     `/search?q=${encodeURIComponent('space:Eng ')}`
   );
   expect(contextSearchPath(rooms, undefined, undefined)).toBe('/search');
+});
+
+test('a room opened from its list goes back through history, so the back gesture animates', () => {
+  mocks.page.url = new URL('https://app.test/rooms/room');
+  enter('/rooms');
+
+  leaveRoomView();
+
+  expect(mocks.back).toHaveBeenCalledOnce();
+  expect(mocks.goto).not.toHaveBeenCalled();
+});
+
+test('a room reached by going back, or from elsewhere, navigates to its list', () => {
+  mocks.page.url = new URL('https://app.test/rooms/room');
+  enter('/rooms', 'popstate', -1);
+  leaveRoomView();
+  enter('/search');
+  leaveRoomView();
+
+  expect(mocks.back).not.toHaveBeenCalled();
+  expect(mocks.goto).toHaveBeenCalledTimes(2);
 });

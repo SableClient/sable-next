@@ -41,7 +41,7 @@
   import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
-  import { leaveRoomView, searchInRoom } from './room-navigation.js';
+  import { leaveRoomView, searchInRoom, trackRoomEntry } from './room-navigation.js';
   import {
     findRoomByPathId,
     roomPathParamFromId,
@@ -98,6 +98,7 @@
 
   let { roomId, eventId = null, notifiedEventId = null, room }: Props = $props();
   const core = useCoreClient();
+  trackRoomEntry();
   const personas = usePersonaStore();
   const roomList = useRoomList();
   const timelineOwner = Symbol('room-view');

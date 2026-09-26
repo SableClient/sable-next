@@ -1,4 +1,4 @@
-import { goto } from '$app/navigation';
+import { afterNavigate, goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 
@@ -7,21 +7,34 @@ import type { RoomSummary } from '#src/generated/protocol';
 import { findRoomByPathId, roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
 import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
 
-export function leaveRoomView(): void {
-  if (page.url.pathname.startsWith('/direct/')) {
-    void goto(resolve('direct'));
-    return;
-  }
+let enteredFrom: string | null = null;
+
+export function trackRoomEntry(): void {
+  afterNavigate((navigation) => {
+    const wentBack = navigation.type === 'popstate' && navigation.delta < 0;
+    enteredFrom = wentBack ? null : (navigation.from?.url.pathname ?? null);
+  });
+}
+
+function roomListPath(): string {
+  if (page.url.pathname.startsWith('/direct/')) return resolve('direct');
   if (page.url.pathname.startsWith('/space/') && page.params.spaceId) {
     const spaceId = roomPathParamFromId(page.params.spaceId);
-    void goto(
-      window.matchMedia(BREAKPOINTS.appLayout).matches
-        ? resolve('/(app)/space/[spaceId]/lobby', { spaceId })
-        : resolve('/(app)/space/[spaceId]', { spaceId })
-    );
+    return window.matchMedia(BREAKPOINTS.appLayout).matches
+      ? resolve('/(app)/space/[spaceId]/lobby', { spaceId })
+      : resolve('/(app)/space/[spaceId]', { spaceId });
+  }
+  return resolve('/(app)/rooms');
+}
+
+export function leaveRoomView(): void {
+  const target = roomListPath();
+  if (enteredFrom === target) {
+    enteredFrom = null;
+    history.back();
     return;
   }
-  void goto(resolve('/(app)/rooms'));
+  void goto(target);
 }
 
 export function scopedSearchPath(

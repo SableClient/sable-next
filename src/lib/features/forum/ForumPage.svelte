@@ -6,7 +6,11 @@
   import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
   import { Conversation } from '#lib/features/room/conversation.svelte.js';
   import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
-  import { leaveRoomView, searchInRoom } from '#lib/features/room/room-navigation.js';
+  import {
+    leaveRoomView,
+    searchInRoom,
+    trackRoomEntry,
+  } from '#lib/features/room/room-navigation.js';
   import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
   import MessageContextMenu from '#lib/features/room/MessageContextMenu.svelte';
   import {
@@ -36,6 +40,7 @@
   let { roomId }: Props = $props();
 
   const core = useCoreClient();
+  trackRoomEntry();
   const personas = usePersonaStore();
   const roomList = useRoomList();
   const messageMenu = provideMessageMenu(new OpenMessageMenu());
