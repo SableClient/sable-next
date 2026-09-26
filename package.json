@@ -134,7 +134,7 @@
       "version": "^24.14.0"
     }
   },
-  "packageManager": "pnpm@12.4.1",
+  "packageManager": "pnpm@12.5.1",
   "imports": {
     "#src/generated/*": "./src/generated/*.ts",
     "#src/generated/wasm/*.js": "./src/generated/wasm/*.js",
