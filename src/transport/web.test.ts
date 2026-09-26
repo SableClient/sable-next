@@ -239,6 +239,9 @@ test('resetCaches terminates the worker and drops the cached stores', async () =
 test('the page answers the requests the worker hands it', async () => {
   const probe = vi.fn(() => Promise.resolve(new Response(null)));
   vi.stubGlobal('fetch', probe);
+  vi.stubGlobal('navigator', {
+    permissions: { query: () => Promise.resolve({ state: 'granted' }) },
+  });
   const transport = await load();
   void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
   const port = FakeSharedWorker.last?.port;

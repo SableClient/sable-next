@@ -14,7 +14,14 @@ const HOMESERVER = 'https://matrix.lan';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
+
+function grantLocalNetwork(state: PermissionState = 'granted'): void {
+  vi.stubGlobal('navigator', {
+    permissions: { query: () => Promise.resolve({ state }) },
+  });
+}
 
 function blockedDirect(): ReturnType<typeof vi.fn<typeof fetch>> {
   return vi.fn<typeof fetch>(() =>
@@ -105,6 +112,43 @@ test('a failure the worker can probe past is not retried, so nothing is sent twi
     fetch(`${HOMESERVER}/_matrix/client/v3/rooms/!r/send/m.room.message/1`, { method: 'PUT' })
   ).rejects.toThrow('connection reset');
   expect(page.mock.calls.some(([request]) => 'fetch' in request)).toBe(false);
+});
+
+test('an origin the worker has reached is never handed to the page', async () => {
+  let blocked = false;
+  const direct = vi.fn<typeof fetch>(() =>
+    blocked ? Promise.reject(new TypeError('connection reset')) : Promise.resolve(new Response())
+  );
+  const page = pageReply(reachablePage);
+  const fetch = withPageFetchFallback(direct, page, OWN);
+  await fetch(`${HOMESERVER}/_matrix/client/v3/sync`);
+
+  blocked = true;
+  await expect(fetch(`${HOMESERVER}/_matrix/client/v3/sync`)).rejects.toThrow('connection reset');
+
+  expect(page).not.toHaveBeenCalled();
+  expect(direct).toHaveBeenCalledTimes(2);
+});
+
+test('a routed origin returns to the worker once the worker can reach it', async () => {
+  vi.useFakeTimers();
+  let blocked = true;
+  const direct = vi.fn<typeof fetch>(() =>
+    blocked ? Promise.reject(new TypeError('blocked')) : Promise.resolve(new Response('direct'))
+  );
+  const page = pageReply(reachablePage);
+  const fetch = withPageFetchFallback(direct, page, OWN);
+  await fetch(`${HOMESERVER}/_matrix/client/versions`);
+
+  blocked = false;
+  await fetch(`${HOMESERVER}/a`);
+  expect(page.mock.calls.filter(([request]) => 'fetch' in request)).toHaveLength(2);
+
+  vi.advanceTimersByTime(60_000);
+  await fetch(`${HOMESERVER}/b`);
+  await vi.waitFor(async () => {
+    expect(await (await fetch(`${HOMESERVER}/c`)).text()).toBe('direct');
+  });
 });
 
 test('a homeserver the page cannot reach either stays a network error', async () => {
@@ -316,6 +360,7 @@ test('an abort from the worker cancels the page request', async () => {
 });
 
 test('the page probes without credentials, following redirects as no-cors requires', async () => {
+  grantLocalNetwork();
   const probe = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null)));
   vi.stubGlobal('fetch', probe);
 
@@ -334,6 +379,30 @@ test('the page probes without credentials, following redirects as no-cors requir
     expect.objectContaining({ mode: 'no-cors', credentials: 'omit' })
   );
   expect(probe.mock.calls[0]?.[1]?.redirect ?? 'follow').toBe('follow');
+});
+
+test('the page does not vouch for an origin once local network access is denied', async () => {
+  const probe = vi.fn<typeof fetch>(() => Promise.resolve(new Response(null)));
+  vi.stubGlobal('fetch', probe);
+  const ask = () =>
+    requestThroughPage(
+      (request, ports) => {
+        servePageFetch(request, ports.at(0) as MessagePort);
+      },
+      { probe: `${HOMESERVER}/` },
+      [],
+      new AbortController().signal
+    );
+
+  grantLocalNetwork('denied');
+  expect(await ask()).toEqual({ reachable: false });
+  expect(probe).not.toHaveBeenCalled();
+
+  vi.stubGlobal('navigator', {
+    permissions: { query: () => Promise.reject(new TypeError('unknown permission')) },
+  });
+  expect(await ask()).toEqual({ reachable: true });
+  expect(probe).toHaveBeenCalledOnce();
 });
 
 test('the page refuses to fetch anything but http', async () => {

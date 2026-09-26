@@ -1,3 +1,5 @@
+import { mayHoldLocalNetworkGrant } from '#lib/platform/local-network.js';
+
 export type PageFetchInit = {
   url: string;
   method: string;
@@ -35,7 +37,12 @@ export type PageFetcher = (
 
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 const PROBE_TIMEOUT_MS = 60_000;
+const RECHECK_MS = 60_000;
 const BODYLESS_METHODS = new Set(['GET', 'HEAD']);
+
+function requestUrl(input: RequestInfo | URL): string {
+  return input instanceof Request ? input.url : String(input);
+}
 
 function httpOrigin(url: string): string | null {
   try {
@@ -113,24 +120,30 @@ export function withPageFetchFallback(
   pageFetch: PageFetcher,
   ownOrigin: string
 ): typeof fetch {
-  const routed = new Set<string>();
+  const reachedDirectly = new Set<string>();
+  const routed = new Map<string, number>();
   const checks = new Map<string, Promise<boolean>>();
+
+  async function reachableHere(origin: string): Promise<boolean> {
+    try {
+      await direct(`${origin}/`, probeInit(AbortSignal.timeout(PROBE_TIMEOUT_MS)));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   function blockedHere(origin: string): Promise<boolean> {
     let check = checks.get(origin);
     if (check) return check;
     check = (async () => {
-      try {
-        await direct(`${origin}/`, probeInit(AbortSignal.timeout(PROBE_TIMEOUT_MS)));
-        return false;
-      } catch {
-        const reply = await pageFetch(
-          { probe: `${origin}/` },
-          [],
-          AbortSignal.timeout(PROBE_TIMEOUT_MS)
-        );
-        return reply !== null && 'reachable' in reply && reply.reachable;
-      }
+      if (await reachableHere(origin)) return false;
+      const reply = await pageFetch(
+        { probe: `${origin}/` },
+        [],
+        AbortSignal.timeout(PROBE_TIMEOUT_MS)
+      );
+      return reply !== null && 'reachable' in reply && reply.reachable;
     })()
       .catch(() => false)
       .finally(() => {
@@ -138,6 +151,17 @@ export function withPageFetchFallback(
       });
     checks.set(origin, check);
     return check;
+  }
+
+  function recheck(origin: string): void {
+    const due = routed.get(origin);
+    if (due === undefined || Date.now() < due) return;
+    routed.set(origin, Date.now() + RECHECK_MS);
+    void reachableHere(origin).then((reachable) => {
+      if (!reachable) return;
+      routed.delete(origin);
+      reachedDirectly.add(origin);
+    });
   }
 
   async function throughPage(request: Request): Promise<Response> {
@@ -153,18 +177,25 @@ export function withPageFetchFallback(
   }
 
   return async (input, init) => {
+    const origin = httpOrigin(requestUrl(input));
+    if (origin === null || origin === ownOrigin || reachedDirectly.has(origin)) {
+      return direct(input, init);
+    }
     const request = new Request(input, init);
-    const origin = httpOrigin(request.url);
-    if (origin === null || origin === ownOrigin) return direct(request);
-    if (routed.has(origin)) return throughPage(request);
+    if (routed.has(origin)) {
+      recheck(origin);
+      return throughPage(request);
+    }
 
     const spare = request.body === null ? request : request.clone();
     try {
-      return await direct(request);
+      const response = await direct(request);
+      reachedDirectly.add(origin);
+      return response;
     } catch (error) {
       if (!(error instanceof TypeError) || request.signal.aborted) throw error;
       if (!(await abortable(blockedHere(origin), request.signal))) throw error;
-      routed.add(origin);
+      routed.set(origin, Date.now() + RECHECK_MS);
       return throughPage(spare);
     }
   };
@@ -200,6 +231,7 @@ async function answer(
 ): Promise<[PageFetchReply, Transferable[]]> {
   if ('probe' in request) {
     if (httpOrigin(request.probe) === null) return [{ reachable: false }, []];
+    if (!(await mayHoldLocalNetworkGrant())) return [{ reachable: false }, []];
     try {
       await fetch(request.probe, probeInit(signal));
       return [{ reachable: true }, []];
