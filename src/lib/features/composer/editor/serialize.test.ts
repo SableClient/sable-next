@@ -1,12 +1,15 @@
 // @vitest-environment happy-dom
 
-import { Fragment, Slice, type Node as ProseMirrorNode } from 'prosemirror-model';
+import { Fragment, Slice, type Mark, type Node as ProseMirrorNode } from 'prosemirror-model';
 import { describe, expect, test } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
+  composerMarkdown,
   markdownFromSlice,
   markdownSlice,
+  plainEditSource,
+  plainTextOf,
   richFromPlain,
   serializeComposer,
   serializePlain,
@@ -194,12 +197,103 @@ test('subtext sends the v1 markup and keeps its marker in the body', () => {
   expect(message.formatted).toBe('<p>hello</p><sub data-md="-#">edited</sub>');
 });
 
-test('a literal subtext marker in a formatted paragraph is escaped', () => {
+test('the body of a formatted message carries no markdown escapes', () => {
   const message = serializeComposer(
-    docOf(para([composerSchema.text('-# not small '), composerSchema.text('b', [strong.create()])]))
+    docOf(
+      para([composerSchema.text('-# not small '), composerSchema.text('b', [strong.create()])]),
+      para(composerSchema.text('[Access] [a](b) 5 * 3 _x_ `y`'))
+    )
   );
 
-  expect(message.body).toBe('\\-# not small **b**');
+  expect(message.body).toBe('-# not small **b**\n\n[Access] [a](b) 5 * 3 _x_ `y`');
+});
+
+test('a plain-mode edit keeps a body that reproduces its html', () => {
+  const body = 'look *here* and [there](https://a.b)';
+  const html = serializePlain(textDoc(body)).formatted ?? '';
+
+  expect(plainEditSource(body, html)).toBe(body);
+});
+
+test('a plain-mode edit rebuilds the source when the body would not reproduce the html', () => {
+  const message = serializeComposer(
+    docOf(
+      para([composerSchema.text('-# not small '), composerSchema.text('b', [strong.create()])]),
+      para(composerSchema.text('[a](b) 5 * 3'))
+    )
+  );
+  const html = message.formatted ?? '';
+  const source = plainEditSource(message.body, html);
+
+  expect(source).not.toBe(message.body);
+  expect(serializePlain(textDoc(source)).formatted).toBe(html);
+});
+
+describe('source mode keeps markdown typed as text', () => {
+  const { hard_break, code_block, horizontal_rule, table, table_row, table_header, table_cell } =
+    composerSchema.nodes;
+  const text = (value: string, marks: Mark[] = []) => composerSchema.text(value, marks);
+  const afterBreak = (value: string) => para([text('a'), hard_break.create(), text(value)]);
+  const cells = (header: ProseMirrorNode[], cell: ProseMirrorNode[]) =>
+    table.create(null, [
+      table_row.create(null, table_header.create(null, header)),
+      table_row.create(null, table_cell.create(null, cell)),
+    ]);
+
+  const cases: [string, ProseMirrorNode[]][] = [
+    ['a heading marker after a line break', [afterBreak('# b')]],
+    ['a list marker after a line break', [afterBreak('- b')]],
+    ['a quote marker after a line break', [afterBreak('> b')]],
+    ['an ordered marker after a line break', [afterBreak('1. b')]],
+    ['a subtext marker after a line break', [afterBreak('-# b')]],
+    ['a setext underline after a line break', [afterBreak('===')]],
+    [
+      'two line breaks in a row',
+      [para([text('a'), hard_break.create(), hard_break.create(), text('b')])],
+    ],
+    ['a parenthesised ordered marker', [para(text('1) x'))]],
+    ['lines shaped like a table', [para([text('| a |'), hard_break.create(), text('| - |')])]],
+    ['a heading that ends in a hash', [heading.create({ level: 2 }, text('a #'))]],
+    ['a fence inside a code block', [code_block.create({ language: '' }, text('a\n```\nb'))]],
+    ['an entity', [para(text('&amp; &#65;'))]],
+    ['spoiler bars', [para(text('||s||'))]],
+    ['an autolink', [para(text('<ab:c>'))]],
+    ['leading and trailing spaces', [para(text('a')), para(text('    b  '))]],
+    ['a spoiler holding bars', [para(text('a|', [spoiler.create()]))]],
+    [
+      'an image with bars inside a table cell',
+      [cells([text('h')], [composerSchema.nodes.image.create({ src: 'mxc://a/b', alt: '||a||' })])],
+    ],
+    ['a spoiler inside a table cell', [cells([text('h')], [text('s', [spoiler.create()])])]],
+    ['bars inside a table cell', [cells([text('||h||')], [text('a|b', [code.create()])])]],
+    [
+      'adjacent lists',
+      [
+        bullet_list.create(null, list_item.create(null, para(text('a')))),
+        bullet_list.create(null, list_item.create(null, horizontal_rule.create())),
+      ],
+    ],
+    [
+      'a link whose target has spaces',
+      [para(text('x', [link.create({ href: 'https://a.b/c%20d' })]))],
+    ],
+    [
+      'a link whose text is its target',
+      [para(text('https://a.b', [link.create({ href: 'https://a.b' })]))],
+    ],
+  ];
+
+  for (const [name, blocks] of cases) {
+    test(name, () => {
+      const source = docOf(...blocks);
+      const markdown = composerMarkdown(source);
+      expect(richFromPlain(textDoc(markdown)).toJSON(), markdown).toEqual(source.toJSON());
+    });
+  }
+});
+
+test('plain text keeps runs of blank lines', () => {
+  expect(plainTextOf(textDoc('a\n\n\nb\n\n\n\nc'))).toBe('a\n\n\nb\n\n\n\nc');
 });
 
 test('plain mode parses subtext on its own line and below text', () => {

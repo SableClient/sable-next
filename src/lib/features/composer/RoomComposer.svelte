@@ -75,7 +75,7 @@
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
-  import { serializeComposer, serializePlain } from './editor/serialize';
+  import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
   import { ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
@@ -431,11 +431,10 @@
     ) {
       if (prefilledFor === null && !editor.isEmpty()) preEdit = editor.doc();
       prefilledFor = context.eventId;
-      /* In plain-text mode the body already is the markdown source, so
-         parsing the HTML back into marks would lose it again on send. */
-      const formatted = richText ? formattedForEditing(context.html) : null;
+      const formatted = formattedForEditing(context.html);
       if (formatted === null) editor.setText(context.body);
-      else editor.setHtml(formatted);
+      else if (richText) editor.setHtml(formatted);
+      else editor.setText(plainEditSource(context.body, formatted));
     } else if (context === null) {
       const wasEditing = prefilledFor !== null;
       prefilledFor = null;

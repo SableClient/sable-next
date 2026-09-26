@@ -19,7 +19,8 @@ import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
 import { mfmPlugin } from './mfm';
-import { composerSchema, ROOM_PING } from './schema';
+import { composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
+import { docToMarkdown } from './to-markdown';
 
 export interface ComposerMessage {
   body: string;
@@ -50,6 +51,9 @@ function cellLine(row: ProseMirrorNode): string {
 const markdown = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
+    text: (state, node) => {
+      state.text(node.text ?? '', false);
+    },
     /* The default writes markdown's `\\` hard-break escape, which shows up as
        a stray backslash in clients that only render the plain body. */
     hard_break: (state, node, parent, index) => {
@@ -276,7 +280,7 @@ function html(doc: ProseMirrorNode): string {
 }
 
 export function composerMarkdown(doc: ProseMirrorNode): string {
-  return markdown.serialize(withoutTrailingParagraph(flattenRoomPings(doc))).trim();
+  return docToMarkdown(withoutTrailingParagraph(flattenRoomPings(doc)));
 }
 
 function spoilerFallback(node: ProseMirrorNode): ProseMirrorNode {
@@ -440,11 +444,19 @@ tokenizer.inline.ruler.at('text', (state, silent) => {
   return true;
 });
 
+function spoilerClose(src: string, from: number, max: number): number {
+  for (let index = from; index + 2 <= max; index += 1) {
+    if (src[index] === '\\') index += 1;
+    else if (src.startsWith('||', index)) return index;
+  }
+  return -1;
+}
+
 tokenizer.inline.ruler.before('text', 'spoiler', (state, silent) => {
   const start = state.pos;
   if (!state.src.startsWith('||', start)) return false;
-  const close = state.src.indexOf('||', start + 2);
-  if (close < 0 || close + 2 > state.posMax) return false;
+  const close = spoilerClose(state.src, start + 2, state.posMax);
+  if (close < 0) return false;
   const inner = state.src.slice(start + 2, close);
   if (inner === '' || /^\s|\s$/.test(inner)) return false;
 
@@ -617,6 +629,13 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   };
 }
 
+export function plainEditSource(body: string, html: string): string {
+  const sent = serializePlain(textDoc(body)).formatted;
+  const target = parseMatrixHtml(html);
+  if (sent !== null && parseMatrixHtml(sent).eq(target)) return body;
+  return composerMarkdown(target);
+}
+
 export function richFromPlain(doc: ProseMirrorNode): ProseMirrorNode {
   const { source, atoms } = markdownSourceOf(doc);
   return spliceAtoms(markdownParser.parse(source.trim()), atoms);
@@ -630,14 +649,17 @@ export function markdownSlice(text: string): Slice {
 }
 
 function textBlocks(text: string): ProseMirrorNode[] {
-  return text.split(/(?:\r\n?|\n){2,}/).map((block) => {
-    const content: ProseMirrorNode[] = [];
-    for (const [index, line] of block.split(/\r\n?|\n/).entries()) {
-      if (index > 0) content.push(composerSchema.nodes.hard_break.create());
-      if (line !== '') content.push(composerSchema.text(line));
-    }
-    return composerSchema.nodes.paragraph.create(null, content);
-  });
+  return text
+    .replaceAll(/\r\n?/g, '\n')
+    .split('\n\n')
+    .map((block) => {
+      const content: ProseMirrorNode[] = [];
+      for (const [index, line] of block.split('\n').entries()) {
+        if (index > 0) content.push(composerSchema.nodes.hard_break.create());
+        if (line !== '') content.push(composerSchema.text(line));
+      }
+      return composerSchema.nodes.paragraph.create(null, content);
+    });
 }
 
 export function textDoc(text: string): ProseMirrorNode {
@@ -659,5 +681,5 @@ export function markdownFromSlice(slice: Slice): string {
     : slice.content;
 
   const doc = flattenRoomPings(composerSchema.topNodeType.create(null, content));
-  return isPlain(doc) ? plainTextOf(doc) : markdown.serialize(doc);
+  return isPlain(doc) ? plainTextOf(doc) : docToMarkdown(doc);
 }
