@@ -66,6 +66,7 @@ import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 import { playNotificationSound } from '#lib/features/notifications/sound.js';
 import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
+import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
@@ -1242,6 +1243,15 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.voiceIsolationHint',
         type: 'boolean',
         gatedBy: 'noiseSuppression',
+      },
+      {
+        key: 'incomingVoiceIsolation',
+        section: 'microphone',
+        icon: SpeakerHighIcon,
+        name: 'settings.incomingVoiceIsolation',
+        description: 'settings.incomingVoiceIsolationHint',
+        type: 'boolean',
+        supported: () => !hasNativeCalls(),
       },
       {
         key: 'echoCancellation',

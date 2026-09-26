@@ -217,6 +217,9 @@ importers:
       blurhash:
         specifier: 2.0.5
         version: 2.0.5
+      deepfilternet3-noise-filter:
+        specifier: 1.3.0
+        version: 1.3.0(livekit-client@2.22.3(@types/dom-mediacapture-record@1.0.22))
       diff:
         specifier: 9.0.0
         version: 9.0.0
@@ -3298,6 +3301,12 @@ packages:
 
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
+
+  deepfilternet3-noise-filter@1.3.0:
+    resolution: {integrity: sha512-yYFUlPuvPguqcd/R6/OSsr0noGqlqOE50JkCWYHogk+PjLj9qrNgwTt5zKraVkKnw0l4+eXJagkz2SUWtUl4sQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      livekit-client: ^2.0.0
 
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
@@ -7540,6 +7549,10 @@ snapshots:
   deep-eql@5.0.2: {}
 
   deep-is@0.1.4: {}
+
+  deepfilternet3-noise-filter@1.3.0(livekit-client@2.22.3(@types/dom-mediacapture-record@1.0.22)):
+    dependencies:
+      livekit-client: 2.22.3(@types/dom-mediacapture-record@1.0.22)
 
   deepmerge@4.3.1: {}
 

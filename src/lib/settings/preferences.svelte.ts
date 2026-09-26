@@ -163,6 +163,7 @@ export interface Preferences {
   callRingtoneVolume: CallRingtoneVolume;
   noiseSuppression: boolean;
   voiceIsolation: boolean;
+  incomingVoiceIsolation: boolean;
   echoCancellation: boolean;
   autoGainControl: boolean;
   audioInputDevice: string;
@@ -381,6 +382,7 @@ const DEFAULTS: Preferences = {
   callRingtoneVolume: 'normal',
   noiseSuppression: true,
   voiceIsolation: false,
+  incomingVoiceIsolation: false,
   echoCancellation: true,
   autoGainControl: true,
   audioInputDevice: '',

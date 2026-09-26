@@ -9,6 +9,9 @@ devAssets
 src/generated/wasm/
 src/generated/wasm-e2e/
 
+# Fetched by scripts/fetch-deepfilternet.mjs
+static/deepfilternet3/
+
 .DS_Store
 Thumbs.db
 .idea

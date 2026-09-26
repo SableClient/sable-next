@@ -4,6 +4,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { isAbsolute, relative, resolve } from 'node:path';
 
+import { fetchDeepFilterNet } from './scripts/fetch-deepfilternet.mjs';
+
 const wasmOutput = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 
 export default defineConfig({
@@ -38,6 +40,12 @@ export default defineConfig({
     },
   },
   plugins: [
+    {
+      name: 'deepfilternet-assets',
+      buildStart: async () => {
+        if (!process.env.VITEST) await fetchDeepFilterNet();
+      },
+    },
     sentrySvelteKit({
       // The plugin detects the adapter from `svelte.config.js`, which this
       // project does not have, and does not know `adapter-static` either.

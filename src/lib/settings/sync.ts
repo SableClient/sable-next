@@ -27,6 +27,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'echoCancellation',
   'autoGainControl',
   'voiceIsolation',
+  'incomingVoiceIsolation',
   'systemNotifications',
   'notificationContent',
   'notificationEncryptedContent',

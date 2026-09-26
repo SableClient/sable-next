@@ -1,6 +1,7 @@
 import {
   ConnectionQuality,
   ConnectionState,
+  LocalAudioTrack,
   Room as LivekitRoom,
   type LocalParticipant,
   type RemoteParticipant,
@@ -22,6 +23,7 @@ import type {
 } from './call-transport';
 import { idleTransportState, ignoreError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
+import { createMicrophoneFilter, supportsVoiceFilter } from './voice-filter';
 import type { CallTelemetry } from './call-telemetry';
 
 const qualityOf = (quality: ConnectionQuality): CallConnectionQuality => {
@@ -86,15 +88,17 @@ const defaultWorker = (): Worker =>
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
+  const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
+  const filterMicrophone = voiceIsolation && supportsVoiceFilter();
 
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({
     adaptiveStream: true,
     dynacast: false,
     audioCaptureDefaults: {
       echoCancellation: preferences.echoCancellation,
-      noiseSuppression: preferences.noiseSuppression,
+      noiseSuppression: preferences.noiseSuppression && !filterMicrophone,
       autoGainControl: preferences.autoGainControl,
-      ...(preferences.voiceIsolation ? { voiceIsolation: true } : {}),
+      ...(voiceIsolation && !filterMicrophone ? { voiceIsolation: true } : {}),
       ...(preferences.audioInputDevice ? { deviceId: preferences.audioInputDevice } : {}),
     },
     ...(preferences.videoInputDevice
@@ -328,6 +332,16 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     })
     .on(RoomEvent.TrackSubscriptionFailed, (_trackSid, _participant, reason) => {
       fail('call.media.track_subscription', reason ?? new Error('OperationError'));
+    })
+    .on(RoomEvent.LocalTrackPublished, (publication) => {
+      const track = publication.track;
+      if (!filterMicrophone || !(track instanceof LocalAudioTrack)) return;
+      if (publication.source !== Track.Source.Microphone) return;
+      const filter = createMicrophoneFilter();
+      void step('call.microphone.filter', () => track.setProcessor(filter)).catch(() => {
+        void filter.destroy().catch(ignoreError);
+        return track.applyConstraints({ noiseSuppression: true }).catch(ignoreError);
+      });
     })
     .on(RoomEvent.LocalAudioSilenceDetected, () => {
       event('call.media.local_audio_silence');
