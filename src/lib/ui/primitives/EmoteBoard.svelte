@@ -7,16 +7,15 @@
   import { shouldReduceMotion } from '#lib/ui/motion.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
-  import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
-  import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import { emojiGroupIcons, type BoardTab } from '#lib/ui/primitives/emote-board.js';
+  import ClockCounterClockwiseIcon from 'phosphor-svelte/lib/ClockCounterClockwiseIcon';
   import {
     writeBoardSize,
     readBoardSize,
     trackBoardSize,
   } from '#lib/ui/primitives/board-size.svelte.js';
-  import { toInitials } from '#lib/ui/primitives/initials.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import { SvelteSet } from 'svelte/reactivity';
   import { on } from 'svelte/events';
@@ -55,6 +54,8 @@
     onPickGif,
   }: Props = $props();
   const core = useCoreClient();
+
+  type Cell = { emoji: string } | { image: PackImageView };
 
   let narrowSheet = $state(false);
 
@@ -154,32 +155,46 @@
       .slice(0, 16);
   });
 
-  let unicodeSections = $derived.by(() => {
-    if (!unicode || tab !== 'emoticon') return [];
-    const needle = query.trim();
-    if (needle !== '') {
-      const matches = searchReactionEmoji(needle, 96).map((entry) => entry.emoji);
-      return matches.length === 0
-        ? []
-        : [{ id: 'search', glyph: '🔎', label: $i18n.t('timeline.emojiResults'), emojis: matches }];
-    }
+  let emojiTab = $derived(unicode && tab === 'emoticon');
+
+  let searchEmojis = $derived(
+    emojiTab && searching ? searchReactionEmoji(query.trim(), 96).map((entry) => entry.emoji) : []
+  );
+
+  let frequentCells = $derived.by((): Cell[] => {
+    if (!emojiTab || searching) return [];
     return [
-      {
-        id: 'recent',
-        glyph: '🕘',
-        label: $i18n.t('timeline.frequentlyUsed'),
-        emojis: recentReactions,
-      },
-      ...emojiGroups
-        .filter((group) => group.emojis.length > 0)
-        .map((group) => ({
-          id: group.id,
-          glyph: group.emojis[0].emoji,
-          label: $i18n.t(`emoji.${group.id}`),
-          emojis: group.emojis.map((entry) => entry.emoji),
-        })),
+      ...recentReactions.map((emoji) => ({ emoji })),
+      ...recentImages
+        .filter((image) => !recentReactions.includes(image.url))
+        .map((image) => ({ image })),
     ];
   });
+
+  let groupSections = $derived(
+    emojiTab && !searching
+      ? emojiGroups
+          .filter((group) => group.emojis.length > 0)
+          .map((group) => ({
+            id: group.id,
+            icon: emojiGroupIcons[group.id],
+            label: $i18n.t(`emoji.${group.id}`),
+            cells: group.emojis.map((entry): Cell => ({ emoji: entry.emoji })),
+          }))
+      : []
+  );
+
+  let unicodeSections = $derived(
+    searchEmojis.length > 0
+      ? [
+          {
+            id: 'search',
+            label: $i18n.t('timeline.emojiResults'),
+            cells: searchEmojis.map((emoji): Cell => ({ emoji })),
+          },
+        ]
+      : groupSections
+  );
 
   let originLabels: Record<ImagePackView['origin'], string> = $derived({
     account: $i18n.t('composer.packMine'),
@@ -207,12 +222,25 @@
     return [...new Set(readRecentReactions())];
   }
 
-  function emojiRows(emojis: string[]): string[][] {
-    const rows: string[][] = [];
-    for (let start = 0; start < emojis.length; start += emojiColumns) {
-      rows.push(emojis.slice(start, start + emojiColumns));
+  function emojiRows(cells: Cell[]): Cell[][] {
+    const rows: Cell[][] = [];
+    for (let start = 0; start < cells.length; start += emojiColumns) {
+      rows.push(cells.slice(start, start + emojiColumns));
     }
     return rows;
+  }
+
+  function cellLabel(cell: Cell): string {
+    return 'image' in cell ? `:${cell.image.shortcode}:` : (shortcodeFor(cell.emoji) ?? cell.emoji);
+  }
+
+  function pickCell(cell: Cell): void {
+    if ('image' in cell) {
+      pick(cell.image);
+      return;
+    }
+    rememberReaction(cell.emoji);
+    onPickUnicode?.(cell.emoji);
   }
 
   function targetCell(key: string, from: number, last: number): number | null {
@@ -253,7 +281,7 @@
     const text = query.trim();
     if (text === '') return;
     event.preventDefault();
-    const best = unicodeSections.at(0)?.emojis.at(0);
+    const best = searchEmojis.at(0);
     if (best !== undefined) rememberReaction(best);
     onPickUnicode(best ?? text);
   }
@@ -401,8 +429,10 @@
             {$i18n.t('composer.reactWithText', { text })}
           </button>
         {/if}
-        {#if recentImages.length > 0}
-          <section>
+        {#if emojiTab && !searching}
+          {@render cellGrid('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells)}
+        {:else if recentImages.length > 0}
+          <section id="emoji-recent">
             <h3>{$i18n.t('composer.recent')}</h3>
             <ul>
               {#each recentImages as image (image.shortcode)}
@@ -504,67 +534,28 @@
           </section>
         {/each}
         {#each unicodeSections as section (section.id)}
-          {@const cursor = activeCell.section === section.id ? activeCell.index : 0}
-          <section class="unicode" id={`emoji-${section.id}`}>
-            <h3 id={`emoji-head-${section.id}`}>{section.label}</h3>
-            <div
-              class="grid"
-              role="grid"
-              tabindex={-1}
-              aria-labelledby={`emoji-head-${section.id}`}
-              onkeydown={(event) => {
-                moveCell(event, section.id, section.emojis.length);
-              }}
-              onfocusin={(event) => {
-                trackCell(event, section.id);
-              }}
-            >
-              {#each emojiRows(section.emojis) as row, rowIndex (rowIndex)}
-                <div
-                  class="row"
-                  role="row"
-                  style={`grid-template-columns: repeat(${emojiColumns}, minmax(0, 1fr))`}
-                >
-                  {#each row as emoji, columnIndex (columnIndex)}
-                    {@const index = rowIndex * emojiColumns + columnIndex}
-                    <button
-                      type="button"
-                      role="gridcell"
-                      data-cell={index}
-                      tabindex={index === cursor ? 0 : -1}
-                      title={shortcodeFor(emoji) ?? emoji}
-                      aria-label={shortcodeFor(emoji) ?? emoji}
-                      onclick={() => {
-                        rememberReaction(emoji);
-                        onPickUnicode?.(emoji);
-                      }}
-                    >
-                      {#if emoji.startsWith('mxc://')}
-                        <MediaImage
-                          class="unicode-image"
-                          source={emoji}
-                          alt=""
-                          width={64}
-                          height={64}
-                          original
-                        />
-                      {:else}
-                        <span class="unicode-text">{emoji}</span>
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-              {/each}
-            </div>
-          </section>
+          {@render cellGrid(section.id, section.label, section.cells)}
         {/each}
       </div>
 
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
+        {#if emojiTab || recentImages.length > 0}
+          <button
+            type="button"
+            class="rail-pack rail-glyph"
+            title={$i18n.t('timeline.frequentlyUsed')}
+            aria-label={$i18n.t('timeline.frequentlyUsed')}
+            onclick={() => {
+              jumpTo('emoji-recent');
+            }}
+          >
+            <ClockCounterClockwiseIcon />
+          </button>
+        {/if}
         {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
-            <span class="rail-label">{originLabels[origin]}</span>
+            <hr class="rail-divider" />
             {#each group as section (sectionId(section.pack))}
               <button
                 type="button"
@@ -575,29 +566,21 @@
                   jumpTo(sectionId(section.pack));
                 }}
               >
-                {#if section.pack.avatar_url}
-                  <Avatar
-                    size="small"
-                    src={section.pack.avatar_url}
-                    initials={toInitials(packName(section.pack), 2)}
-                  />
-                {:else}
-                  <MediaImage
-                    class="rail-emote"
-                    source={section.images[0].url}
-                    alt={packName(section.pack)}
-                    width={32}
-                    height={32}
-                    original
-                  />
-                {/if}
+                <MediaImage
+                  class="rail-emote"
+                  source={section.pack.avatar_url ?? section.images[0].url}
+                  alt={packName(section.pack)}
+                  width={24}
+                  height={24}
+                  original
+                />
               </button>
             {/each}
           {/if}
         {/each}
-        {#if unicodeSections.length > 0}
-          <span class="rail-label">{$i18n.t('emoji.unicode')}</span>
-          {#each unicodeSections as section (section.id)}
+        {#if groupSections.length > 0}
+          <hr class="rail-divider" />
+          {#each groupSections as section (section.id)}
             <button
               type="button"
               class="rail-pack rail-glyph"
@@ -605,8 +588,10 @@
               aria-label={section.label}
               onclick={() => {
                 jumpTo(`emoji-${section.id}`);
-              }}>{section.glyph}</button
+              }}
             >
+              <section.icon />
+            </button>
           {/each}
         {/if}
       </nav>
@@ -630,6 +615,55 @@
     </div>
   {/if}
 </div>
+
+{#snippet cellGrid(id: string, label: string, cells: Cell[])}
+  {@const cursor = activeCell.section === id ? activeCell.index : 0}
+  <section class="unicode" id={`emoji-${id}`}>
+    <h3 id={`emoji-head-${id}`}>{label}</h3>
+    <div
+      class="grid"
+      role="grid"
+      tabindex={-1}
+      aria-labelledby={`emoji-head-${id}`}
+      onkeydown={(event) => {
+        moveCell(event, id, cells.length);
+      }}
+      onfocusin={(event) => {
+        trackCell(event, id);
+      }}
+    >
+      {#each emojiRows(cells) as row, rowIndex (rowIndex)}
+        <div
+          class="row"
+          role="row"
+          style={`grid-template-columns: repeat(${emojiColumns}, minmax(0, 1fr))`}
+        >
+          {#each row as cell, columnIndex (columnIndex)}
+            {@const index = rowIndex * emojiColumns + columnIndex}
+            {@const source = 'image' in cell ? cell.image.url : cell.emoji}
+            <button
+              type="button"
+              role="gridcell"
+              data-cell={index}
+              tabindex={index === cursor ? 0 : -1}
+              title={cellLabel(cell)}
+              aria-label={cellLabel(cell)}
+              onclick={() => {
+                pickCell(cell);
+              }}
+            >
+              {#if source.startsWith('mxc://')}
+                <MediaImage class="unicode-image" {source} alt="" width={64} height={64} original />
+              {:else}
+                <span class="unicode-text">{source}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/each}
+    </div>
+  </section>
+{/snippet}
 
 <style>
   .pack {
@@ -703,23 +737,27 @@
     scrollbar-width: none;
   }
 
-  .rail-label {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: lowercase;
-    white-space: nowrap;
+  .rail-divider {
+    border: 0;
+    border-top: var(--border-width) solid var(--surface-container-line);
+    flex: 0 0 auto;
+    margin: var(--space-100) 0;
+    width: var(--size-x100);
   }
 
   .rail-pack {
+    align-items: center;
     background: transparent;
     border: 0;
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
-    padding: var(--space-050);
+    flex: 0 0 auto;
+    height: var(--avatar-size-small);
+    justify-content: center;
+    padding: 0;
+    width: var(--avatar-size-small);
   }
 
   .rail-pack:hover {
@@ -869,21 +907,17 @@
     gap: var(--space-100);
   }
 
-  /* Matches the pack avatars beside it, so the rail reads as one column. */
   .rail-glyph {
-    align-items: center;
-    box-sizing: content-box;
-    font-size: calc(var(--avatar-size-small) * 0.8);
-    height: var(--avatar-size-small);
-    justify-content: center;
-    line-height: 1;
-    width: var(--avatar-size-small);
+    font-size: var(--icon-size-small);
   }
 
   .rail :global(.rail-emote) {
-    height: var(--avatar-size-small);
+    height: var(--avatar-size-200);
+    width: var(--avatar-size-200);
+  }
+
+  .rail :global(.rail-emote .media-image-content) {
     object-fit: contain;
-    width: var(--avatar-size-small);
   }
 
   .preview {
