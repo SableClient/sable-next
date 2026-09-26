@@ -30,6 +30,7 @@
   <ul {id} role="listbox" aria-labelledby="{id}-heading" {@attach keepActiveInView}>
     {#if suggestions.length > 0}
       {#each suggestions as suggestion, index (suggestion.id)}
+        {@const isUnicodeEmoji = suggestion.id.startsWith('emoji:')}
         <li role="presentation">
           <button
             type="button"
@@ -46,7 +47,9 @@
               onSelect(suggestion);
             }}
           >
-            {#if suggestion.imageUrl}
+            {#if isUnicodeEmoji}
+              <span class="unicode-emoji" aria-hidden="true">{suggestion.label}</span>
+            {:else if suggestion.imageUrl}
               <MediaImage
                 class="emote"
                 source={suggestion.imageUrl}
@@ -58,8 +61,10 @@
             {:else}
               <Avatar size="small" src={suggestion.avatarUrl} name={suggestion.label} />
             {/if}
-            <span class="label">{suggestion.label}</span>
-            {#if suggestion.detail}<span class="detail">{suggestion.detail}</span>{/if}
+            <span class="label">{isUnicodeEmoji ? suggestion.detail : suggestion.label}</span>
+            {#if !isUnicodeEmoji && suggestion.detail}
+              <span class="detail">{suggestion.detail}</span>
+            {/if}
           </button>
         </li>
       {/each}
@@ -137,6 +142,15 @@
 
   .option :global(.emote .media-image-content) {
     object-fit: contain;
+  }
+
+  .unicode-emoji {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 var(--avatar-size-300);
+    font-size: var(--font-size-heading);
+    height: var(--avatar-size-300);
+    justify-content: center;
   }
 
   .label {
