@@ -92,6 +92,8 @@ export interface Preferences {
   readReceiptPlacement: ReadReceiptPlacement;
   replyPreviewStyle: ReplyPreviewStyle;
   captionPosition: CaptionPosition;
+  doubleTapReact: boolean;
+  doubleTapReaction: string;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
   groupMembersByPresence: boolean;
@@ -248,6 +250,7 @@ const FREE_TEXT = [
   'videoInputDevice',
   'presenceStatusMessage',
   'loadingAnimal',
+  'doubleTapReaction',
   'pushGatewayUrl',
   'pushVapidKey',
   'pushAppId',
@@ -305,6 +308,8 @@ const DEFAULTS: Preferences = {
   readReceiptPlacement: 'message',
   replyPreviewStyle: 'connected',
   captionPosition: 'below',
+  doubleTapReact: true,
+  doubleTapReaction: '❤️',
   hideTypingIndicators: false,
   memberSort: 'name-asc',
   groupMembersByPresence: true,

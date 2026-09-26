@@ -13,6 +13,8 @@
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { DoubleTap } from '#lib/ui/double-tap.js';
+  import { hapticFeedback } from '#lib/platform/haptics.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import {
     findMember,
@@ -570,6 +572,27 @@
     },
   });
 
+  const rowDoubleTap = new DoubleTap(() => {
+    if (!actionable || !preferences.doubleTapReact || !actions.onReact) return;
+    hapticFeedback();
+    actions.onReact(preferences.doubleTapReaction);
+  });
+
+  function rowPointerDown(event: PointerEvent): void {
+    rowPress.start(event);
+    rowDoubleTap.down(event);
+  }
+
+  function rowPointerUp(event: PointerEvent): void {
+    rowPress.end(event);
+    rowDoubleTap.up(event);
+  }
+
+  function rowPointerCancel(event: PointerEvent): void {
+    rowPress.end(event);
+    rowDoubleTap.cancel();
+  }
+
   let engaged = $state(false);
   let actionsPinned = $state(false);
 
@@ -714,10 +737,10 @@
     style:--timeline-emote-align={defaultEmoteSize ? 'bottom' : undefined}
     style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
     style:transition={swipe.dragging ? 'none' : undefined}
-    onpointerdown={rowPress.start}
+    onpointerdown={rowPointerDown}
     onpointermove={rowPress.move}
-    onpointerup={rowPress.end}
-    onpointercancel={rowPress.end}
+    onpointerup={rowPointerUp}
+    onpointercancel={rowPointerCancel}
     onpointerenter={engage}
     onpointerleave={disengage}
     onfocusin={engage}
@@ -1098,10 +1121,10 @@
     data-selected={selected ? 'true' : undefined}
     style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
     style:transition={swipe.dragging ? 'none' : undefined}
-    onpointerdown={rowPress.start}
+    onpointerdown={rowPointerDown}
     onpointermove={rowPress.move}
-    onpointerup={rowPress.end}
-    onpointercancel={rowPress.end}
+    onpointerup={rowPointerUp}
+    onpointercancel={rowPointerCancel}
     onpointerenter={engage}
     onpointerleave={disengage}
     onfocusin={engage}
@@ -1230,6 +1253,7 @@
 
   @media (pointer: coarse) {
     .message {
+      touch-action: manipulation;
       -webkit-touch-callout: none;
       user-select: none;
     }

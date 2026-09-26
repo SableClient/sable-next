@@ -23,6 +23,7 @@ import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
 import FilmStripIcon from 'phosphor-svelte/lib/FilmStripIcon';
 import GifIcon from 'phosphor-svelte/lib/GifIcon';
 import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
+import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
 import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
 import KeyReturnIcon from 'phosphor-svelte/lib/KeyReturnIcon';
 import KeyboardIcon from 'phosphor-svelte/lib/KeyboardIcon';
@@ -653,6 +654,14 @@ export const settingsCategories: SettingsCategory[] = [
           { value: 'inline', label: 'settings.captionPositionInline' },
           { value: 'hidden', label: 'settings.captionPositionHidden' },
         ],
+      },
+      {
+        key: 'doubleTapReact',
+        section: 'messages',
+        icon: HeartIcon,
+        name: 'settings.doubleTapReact',
+        description: 'settings.doubleTapReactHint',
+        type: 'boolean',
       },
       {
         key: 'hour24Clock',

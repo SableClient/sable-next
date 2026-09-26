@@ -8,6 +8,7 @@ import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
 import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
+import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationTroubleshooter from '#lib/features/notifications/NotificationTroubleshooter.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
@@ -41,6 +42,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
+  timeline: [{ component: DoubleTapReaction, section: 'messages' }],
   notifications: [
     { component: NotificationPermission, section: 'alerts', start: true },
     { component: NotificationDefaults },
