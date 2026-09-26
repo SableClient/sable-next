@@ -128,7 +128,7 @@ test('an ordinary portrait keeps its shape on mobile', async ({
   expect(box.sideways).toBe(0);
 });
 
-test('a gallery in a bubble keeps its columns on mobile', async ({
+test('a gallery in a bubble stacks its items on mobile', async ({
   page,
   app,
   timeline,
@@ -183,6 +183,53 @@ test('a gallery in a bubble keeps its columns on mobile', async ({
   expect(box.width).toBeGreaterThan(MEDIA_MIN_PX);
   expect(box.width).toBeLessThanOrEqual(box.row);
   expect(box.sideways).toBe(0);
+
+  const cells = await page
+    .locator('.timeline-viewport .gallery .cell')
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().left));
+  expect(cells).toHaveLength(2);
+  expect(cells[1]).toBeCloseTo(cells[0] ?? 0, 0);
+});
+
+test('a gallery keeps two columns on desktop', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('delayed_media');
+  await app.openRooms();
+  await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await core.setTimelineItemById(await core.subscription(), 'general-19', {
+    ...picture(800, 600),
+    content: {
+      kind: 'gallery',
+      body: '',
+      html: '',
+      items: ['one', 'two'].map((filename) => ({
+        kind: 'image',
+        filename,
+        caption: null,
+        source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+        mime: 'image/png',
+        width: 800,
+        height: 600,
+        size: null,
+        blurhash: null,
+        thumbnail: null,
+        spoiler: null,
+      })),
+    },
+  });
+  await expect(timeline.image.first().locator('img')).toBeVisible();
+
+  const cells = await page
+    .locator('.timeline-viewport .gallery .cell')
+    .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
+  expect(cells).toHaveLength(2);
+  expect(cells[1]).toBeCloseTo(cells[0] ?? 0, 0);
 });
 
 test('a pdf in a gallery opens in the viewer', async ({

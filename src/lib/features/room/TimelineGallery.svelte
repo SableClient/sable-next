@@ -21,7 +21,6 @@
   }
 
   let { items, body, html, senderTimezone = null, onMatrixLink, onOpen }: Props = $props();
-  let columns = $derived(items.length > 1 ? 2 : 1);
   const revealed = new SvelteSet<string>();
 </script>
 
@@ -30,7 +29,7 @@
     <FormattedBody {html} {senderTimezone} {onMatrixLink} />
   </div>
 {/if}
-<div class="gallery" style:--gallery-columns={columns}>
+<div class="gallery">
   {#each items as item, index (index)}
     {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
     <div class="cell">
@@ -88,7 +87,10 @@
   .gallery {
     display: grid;
     gap: var(--space-100);
-    grid-template-columns: repeat(var(--gallery-columns), minmax(0, 1fr));
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, calc((var(--timeline-media-max) - var(--space-100)) / 2)), 1fr)
+    );
     max-width: 100%;
     width: min(var(--timeline-media-fill), var(--timeline-media-max));
   }
