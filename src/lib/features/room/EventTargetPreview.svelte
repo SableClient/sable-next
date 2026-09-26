@@ -6,6 +6,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
 
   import { readEventSource } from './event-source-cache';
@@ -40,6 +41,7 @@
     body,
   }: Props = $props();
   const core = useCoreClient();
+  const roomCosmetics = useRoomCosmetics();
 
   interface Preview {
     sender: string | null;
@@ -55,6 +57,9 @@
       : $i18n.t('timeline.unknownSender')
   );
 
+  let cosmetics = $derived(roomCosmetics?.for(preview?.sender) ?? null);
+  let tintOnLight = $derived(cosmetics?.colorOnLight ?? cosmetics?.colorOnDark ?? null);
+  let tintOnDark = $derived(cosmetics?.colorOnDark ?? cosmetics?.colorOnLight ?? null);
   let replyStyle = $derived(reply ? preferences.replyPreviewStyle : null);
   let nameColor = $derived(
     currentUserId !== null && preview?.sender === currentUserId
@@ -92,9 +97,11 @@
 </script>
 
 <button
-  class={['target-preview', replyStyle && `target-${replyStyle}`]}
+  class={['target-preview', replyStyle && `target-${replyStyle}`, { tinted: tintOnLight }]}
   type="button"
   style:--target-name-color={nameColor}
+  style:--target-on-light={tintOnLight}
+  style:--target-on-dark={tintOnDark}
   disabled={!onJump}
   onclick={() => {
     onJump?.(eventId);
@@ -102,7 +109,7 @@
 >
   {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
-    <span class="target-name">{name}</span>
+    <span class="target-name" style:font-family={cosmetics?.font ?? undefined}>{name}</span>
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
   </span>
 </button>
@@ -158,6 +165,42 @@
   .target-name {
     color: var(--target-name-color);
     font-weight: var(--font-weight-medium);
+  }
+
+  .tinted {
+    --target-name-color: var(--target-on-light);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) .tinted {
+      --target-name-color: var(--target-on-dark);
+    }
+  }
+
+  :root.dark .tinted {
+    --target-name-color: var(--target-on-dark);
+  }
+
+  @supports (color: oklch(from red l c h)) {
+    .tinted {
+      --target-name-color: oklch(
+        from var(--target-on-light) clamp(0.25, l, 0.52) clamp(0, c, 0.19) h
+      );
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not(.light) .tinted {
+        --target-name-color: oklch(
+          from var(--target-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
+        );
+      }
+    }
+
+    :root.dark .tinted {
+      --target-name-color: oklch(
+        from var(--target-on-dark) clamp(0.72, l, 0.92) clamp(0, c, 0.16) h
+      );
+    }
   }
 
   .target-compact {
