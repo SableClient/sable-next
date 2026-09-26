@@ -804,23 +804,34 @@ fn nests_too_deeply(formatted: &str) -> bool {
     const VOID_TAGS: [&str; 3] = ["br", "hr", "img"];
     const LIMIT: usize = 512;
 
-    let mut depth = 0usize;
+    let mut open: Vec<&str> = Vec::new();
     let mut rest = formatted;
     while let Some(offset) = rest.find('<') {
         let Some(after) = rest.get(offset + 1..) else {
             break;
         };
         rest = after;
+        if let Some(closing) = rest.strip_prefix('/') {
+            let name = closing
+                .split(['>', ' ', '\t', '\n'])
+                .next()
+                .unwrap_or_default();
+            if open
+                .last()
+                .is_some_and(|top| top.eq_ignore_ascii_case(name))
+            {
+                open.pop();
+            }
+            continue;
+        }
         let Some(name) = rest.split(['>', ' ', '/', '\t', '\n']).next() else {
             continue;
         };
-        if rest.starts_with('/') {
-            depth = depth.saturating_sub(1);
-        } else if name.starts_with(|c: char| c.is_ascii_alphabetic())
+        if name.starts_with(|c: char| c.is_ascii_alphabetic())
             && !VOID_TAGS.iter().any(|void| name.eq_ignore_ascii_case(void))
         {
-            depth += 1;
-            if depth > LIMIT {
+            open.push(name);
+            if open.len() > LIMIT {
                 return true;
             }
         }
@@ -1249,6 +1260,25 @@ mod tests {
         assert_eq!(
             display_html("plain", Some(&absurd)),
             "<span data-plain-body>plain</span>"
+        );
+    }
+
+    #[test]
+    fn end_tags_that_close_nothing_do_not_hide_nesting() {
+        for markup in ["<b></i>".repeat(20_000), "<b><div></b>".repeat(20_000)] {
+            assert_eq!(
+                display_html("plain", Some(&markup)),
+                "<span data-plain-body>plain</span>"
+            );
+        }
+    }
+
+    #[test]
+    fn many_closed_siblings_are_not_mistaken_for_nesting() {
+        let markup = "<p><b>x</b></p>".repeat(2_000);
+        assert_eq!(
+            display_html("", Some(&markup)).matches("<b>").count(),
+            2_000
         );
     }
 

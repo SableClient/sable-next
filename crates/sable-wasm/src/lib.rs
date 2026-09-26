@@ -440,4 +440,13 @@ mod tests {
 
         assert!(core.subscribe_events(noop).is_err());
     }
+
+    #[wasm_bindgen_test]
+    fn unmatched_end_tags_cannot_nest_markup_past_the_stack() {
+        let formatted = "<b></i>".repeat(20_000);
+
+        let html = sable_core::matrix_html::display_html("body", Some(&formatted));
+
+        assert!(html.contains("data-plain-body"), "{html}");
+    }
 }
