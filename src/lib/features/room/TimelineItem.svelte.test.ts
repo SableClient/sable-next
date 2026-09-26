@@ -53,7 +53,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
   return { ...actual, usePresenceStore: () => ({ get: () => null }) };
 });
 
-import { setPreference } from '#lib/settings/preferences.svelte.js';
+import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
@@ -557,6 +557,27 @@ test('clicking the sender name mentions the account behind it', async () => {
   document.querySelector<HTMLButtonElement>('header button.sender')?.click();
 
   expect(onMentionUser).toHaveBeenCalledWith('@alice:example.org', 'Alice');
+  await unmount(instance);
+});
+
+test('with profile on name click, the sender name opens the profile instead', async () => {
+  preferences.usernameClick = 'profile';
+  const onMentionUser = vi.fn();
+  const onSenderProfile = vi.fn();
+  const instance = mount(TimelineItemHarness, {
+    target: document.body,
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, onMentionUser, onSenderProfile },
+    },
+  });
+  await tick();
+
+  document.querySelector<HTMLButtonElement>('header button.sender')?.click();
+
+  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement));
+  expect(onMentionUser).not.toHaveBeenCalled();
+  preferences.usernameClick = 'mention';
   await unmount(instance);
 });
 

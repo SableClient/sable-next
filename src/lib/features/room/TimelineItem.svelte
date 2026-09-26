@@ -644,6 +644,13 @@
     openSenderProfileAt(event.currentTarget);
   }
 
+  let nameOpensProfile = $derived(
+    preferences.usernameClick === 'profile' && onSenderProfile !== undefined && item.sender !== null
+  );
+  let nameMentions = $derived(
+    !nameOpensProfile && onMentionUser !== undefined && item.sender !== null
+  );
+
   function mentionSender(): void {
     if (item.sender) onMentionUser?.(item.sender, accountName);
   }
@@ -772,23 +779,15 @@
         <time datetime={new Date(item.timestamp).toISOString()}
           >{formatMessageTimestamp(item.timestamp)}</time
         >
-        {#if onMentionUser && item.sender && !collapsed}
+        {#if !collapsed}
           <SenderName
             displayName={senderName}
             colors={senderColors}
             font={senderFont}
             {pronouns}
             nameClass="compact-name"
-            onMention={mentionSender}
-            compact={layout === 'compact'}
-          />
-        {:else if !collapsed}
-          <SenderName
-            displayName={senderName}
-            colors={senderColors}
-            font={senderFont}
-            {pronouns}
-            nameClass="compact-name"
+            onMention={nameMentions ? mentionSender : undefined}
+            onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
             compact={layout === 'compact'}
           />
         {/if}
@@ -875,7 +874,8 @@
               colors={senderColors}
               font={senderFont}
               {pronouns}
-              onMention={onMentionUser && item.sender ? mentionSender : undefined}
+              onMention={nameMentions ? mentionSender : undefined}
+              onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
               onViaProfile={persona ? openSenderProfileAt : undefined}
             />
           {/if}

@@ -656,6 +656,18 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'usernameClick',
+        section: 'messages',
+        icon: UserCircleIcon,
+        name: 'settings.usernameClick',
+        description: 'settings.usernameClickHint',
+        type: 'select',
+        options: [
+          { value: 'mention', label: 'settings.usernameClickMention' },
+          { value: 'profile', label: 'settings.usernameClickProfile' },
+        ],
+      },
+      {
         key: 'doubleTapReact',
         section: 'messages',
         icon: HeartIcon,

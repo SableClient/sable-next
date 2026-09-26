@@ -41,6 +41,7 @@ export type ReadReceiptPlacement = 'message' | 'room';
 export type LatchScope = 'off' | 'room' | 'account';
 export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
+export type UsernameClick = 'mention' | 'profile';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
 export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
@@ -92,6 +93,7 @@ export interface Preferences {
   readReceiptPlacement: ReadReceiptPlacement;
   replyPreviewStyle: ReplyPreviewStyle;
   captionPosition: CaptionPosition;
+  usernameClick: UsernameClick;
   doubleTapReact: boolean;
   doubleTapReaction: string;
   hideTypingIndicators: boolean;
@@ -235,6 +237,7 @@ const ENUMS = {
   readReceiptPlacement: ['message', 'room'],
   replyPreviewStyle: ['connected', 'compact', 'expanded'],
   captionPosition: ['above', 'below', 'inline', 'hidden'],
+  usernameClick: ['mention', 'profile'],
   callRingtoneVolume: ['quiet', 'normal', 'loud'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
@@ -308,6 +311,7 @@ const DEFAULTS: Preferences = {
   readReceiptPlacement: 'message',
   replyPreviewStyle: 'connected',
   captionPosition: 'below',
+  usernameClick: 'mention',
   doubleTapReact: true,
   doubleTapReaction: '❤️',
   hideTypingIndicators: false,

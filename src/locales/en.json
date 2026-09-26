@@ -2267,7 +2267,11 @@
     "serverSearch": "Search on the server",
     "serverSearchHint": "Lets your homeserver answer searches in a single unencrypted room. Off keeps every query on this device.",
     "searchIndexLimit": "Search index size",
-    "searchIndexLimitHint": "How much storage this device may use to index messages for search. Past it, the oldest indexed history is dropped."
+    "searchIndexLimitHint": "How much storage this device may use to index messages for search. Past it, the oldest indexed history is dropped.",
+    "usernameClick": "Clicking a name",
+    "usernameClickHint": "What happens when you click the name above someone's message.",
+    "usernameClickMention": "Mention them",
+    "usernameClickProfile": "Open their profile"
   },
   "errors": {
     "pageTitle": "Something went wrong",
