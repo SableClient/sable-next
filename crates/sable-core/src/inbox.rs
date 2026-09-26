@@ -141,10 +141,16 @@ pub(crate) async fn receipt_ts(room: &Room) -> u64 {
     latest
 }
 
+fn notified(room: &Room) -> u64 {
+    room.unread_notification_counts()
+        .notification_count
+        .max(room.num_unread_notifications())
+}
+
 async fn read_state(room: &Room) -> RoomReadState {
     RoomReadState {
         receipt_ts: receipt_ts(room).await,
-        remaining: room.unread_notification_counts().notification_count,
+        remaining: notified(room),
     }
 }
 
@@ -305,7 +311,7 @@ impl Core {
             if room.is_space() {
                 continue;
             }
-            let counts = room.unread_notification_counts();
+            let notified = notified(&room);
             let cursor = stored.cursors.get(room.room_id()).cloned();
             if include_read {
                 if matches!(cursor, Some(None)) {
@@ -314,7 +320,7 @@ impl Core {
                 candidates.push((room, u64::MAX, 0, cursor.flatten()));
                 continue;
             }
-            if counts.notification_count == 0 {
+            if notified == 0 {
                 continue;
             }
             let receipt = receipt_ts(&room).await;
@@ -323,7 +329,7 @@ impl Core {
                 .iter()
                 .filter(|entry| entry.room_id == room.room_id() && entry.ts > receipt)
                 .count() as u64;
-            let missing = counts.notification_count.saturating_sub(known);
+            let missing = notified.saturating_sub(known);
             if missing > 0 {
                 candidates.push((room, missing, receipt, None));
             }
