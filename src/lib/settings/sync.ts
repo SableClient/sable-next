@@ -15,6 +15,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'pageZoom',
   'textScale',
   'roomBannerHeight',
+  'searchIndexLimit',
   'audioInputDevice',
   'audioOutputDevice',
   'videoInputDevice',

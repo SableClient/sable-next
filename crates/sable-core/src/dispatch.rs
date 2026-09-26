@@ -2024,6 +2024,20 @@ impl Core {
                 Ok(CommandOk::SetNotificationsEnabled)
             }
 
+            Command::SetSearchOptions {
+                disk_budget_mb,
+                server_search,
+            } => {
+                self.server_search_enabled
+                    .store(server_search, Ordering::Relaxed);
+                self.search_index
+                    .lock()
+                    .await
+                    .set_disk_budget(usize::try_from(disk_budget_mb).unwrap_or(usize::MAX) << 20);
+
+                Ok(CommandOk::SetSearchOptions)
+            }
+
             Command::SetReadRoom { room_id } => {
                 self.set_read_room(room_id);
 

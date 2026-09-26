@@ -382,6 +382,15 @@
     void core.accountRevision;
     if (core.status !== 'ready') return;
 
+    void core.commands
+      .setSearchOptions(Number(preferences.searchIndexLimit), preferences.serverSearch)
+      .catch(() => {});
+  });
+
+  $effect(() => {
+    void core.accountRevision;
+    if (core.status !== 'ready') return;
+
     const message = preferences.presenceStatusMessage.trim();
     void core.commands
       .setPresence(

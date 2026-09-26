@@ -30,6 +30,7 @@ import LayoutIcon from 'phosphor-svelte/lib/LayoutIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
 import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 import LockIcon from 'phosphor-svelte/lib/LockIcon';
+import DatabaseIcon from 'phosphor-svelte/lib/DatabaseIcon';
 import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
 import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlusIcon';
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
@@ -69,7 +70,7 @@ import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsAutoUpdate } from '#lib/platform/updates.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
-import { setPreference, SUBSPACE_DEPTHS } from './preferences.svelte';
+import { SEARCH_INDEX_LIMITS, setPreference, SUBSPACE_DEPTHS } from './preferences.svelte';
 import type { FreeTextPreference, Preferences, RangePreference } from './preferences.svelte';
 
 export type BooleanPreference = {
@@ -910,6 +911,7 @@ export const settingsCategories: SettingsCategory[] = [
     sections: [
       { id: 'activity', name: 'settings.groups.activity' },
       { id: 'blurring', name: 'settings.groups.blurring' },
+      { id: 'message-search', name: 'settings.groups.messageSearch' },
       { id: 'diagnostics', name: 'settings.groups.diagnostics' },
     ],
     items: [
@@ -960,6 +962,27 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.blurEmotes',
         description: 'settings.blurEmotesHint',
         type: 'boolean',
+      },
+      {
+        key: 'serverSearch',
+        section: 'message-search',
+        icon: MagnifyingGlassIcon,
+        name: 'settings.serverSearch',
+        description: 'settings.serverSearchHint',
+        type: 'boolean',
+      },
+      {
+        key: 'searchIndexLimit',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchIndexLimit',
+        description: 'settings.searchIndexLimitHint',
+        type: 'select',
+        options: SEARCH_INDEX_LIMITS.map((limit) => ({
+          value: limit,
+          label: Number(limit) >= 1024 ? `${String(Number(limit) / 1024)} GB` : `${limit} MB`,
+          literal: true,
+        })),
       },
       ...telemetrySettings,
     ],

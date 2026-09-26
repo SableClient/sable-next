@@ -13,6 +13,15 @@ export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
+export type SearchIndexLimit = '128' | '256' | '512' | '1024' | '2048' | '4096';
+export const SEARCH_INDEX_LIMITS: readonly SearchIndexLimit[] = [
+  '128',
+  '256',
+  '512',
+  '1024',
+  '2048',
+  '4096',
+];
 export type SubspaceDepth = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
 export const SUBSPACE_DEPTHS = [
   '2',
@@ -63,6 +72,8 @@ export interface Preferences {
   showRoomBanners: boolean;
   roomBannerHeight: number;
   subspaceHierarchyLimit: SubspaceDepth;
+  searchIndexLimit: SearchIndexLimit;
+  serverSearch: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
@@ -215,6 +226,7 @@ const ENUMS = {
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   subspaceHierarchyLimit: SUBSPACE_DEPTHS,
+  searchIndexLimit: SEARCH_INDEX_LIMITS,
   pixelatedImages: ['always', 'smart', 'never'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],
@@ -273,6 +285,8 @@ const DEFAULTS: Preferences = {
   showRoomBanners: true,
   roomBannerHeight: 190,
   subspaceHierarchyLimit: '3',
+  searchIndexLimit: '512',
+  serverSearch: true,
   showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,

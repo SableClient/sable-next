@@ -1472,6 +1472,14 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_notifications_enabled', enabled });
     },
 
+    async setSearchOptions(diskBudgetMb: number, serverSearch: boolean): Promise<void> {
+      await transport().send({
+        type: 'set_search_options',
+        disk_budget_mb: diskBudgetMb,
+        server_search: serverSearch,
+      });
+    },
+
     async setReadRoom(roomId: string | null): Promise<void> {
       await transport().send({ type: 'set_read_room', room_id: roomId });
     },

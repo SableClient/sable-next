@@ -9,6 +9,7 @@ pub(crate) use server::ServerSearch;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use futures_util::{StreamExt, stream};
@@ -923,6 +924,10 @@ impl<'index> Ranked<'index> {
 impl MessageIndex {
     pub(crate) fn new() -> Self {
         Self::with_budgets(MEMORY_BUDGET, DISK_BUDGET)
+    }
+
+    pub(crate) const fn set_disk_budget(&mut self, disk_budget: usize) {
+        self.disk_budget = disk_budget;
     }
 
     pub(crate) fn with_budgets(memory_budget: usize, disk_budget: usize) -> Self {
@@ -2312,6 +2317,7 @@ impl Core {
         context: usize,
     ) -> Vec<Hit> {
         if order != SearchOrder::Oldest
+            && self.server_search_enabled.load(Ordering::Relaxed)
             && let Ok(client) = self.client().await
             && let Some(room_id) = server::target(&client, query, filter).await
         {
@@ -2353,7 +2359,7 @@ impl Core {
         filter: &SearchFilter,
         order: SearchOrder,
     ) -> bool {
-        if order == SearchOrder::Oldest {
+        if order == SearchOrder::Oldest || !self.server_search_enabled.load(Ordering::Relaxed) {
             return true;
         }
         let Ok(client) = self.client().await else {

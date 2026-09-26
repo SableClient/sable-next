@@ -881,6 +881,10 @@ pub enum Command {
     SetNotificationsEnabled {
         enabled: bool,
     },
+    SetSearchOptions {
+        disk_budget_mb: u32,
+        server_search: bool,
+    },
     SetReadRoom {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         room_id: Option<OwnedRoomId>,
@@ -1498,6 +1502,7 @@ pub enum CommandOk {
     SetNotificationSounds,
     SetNotifyOnce,
     SetNotificationsEnabled,
+    SetSearchOptions,
     SetReadRoom,
     SetPresence,
     FetchPresence,
