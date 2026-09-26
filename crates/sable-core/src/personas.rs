@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use matrix_sdk::Room;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContentWithoutRelation;
@@ -151,10 +151,15 @@ fn personas_from_catalog(content: &Value) -> Vec<PersonaView> {
             .and_then(|inner| inner.get("profiles"))
     });
 
+    let mut seen = BTreeSet::new();
     profiles
         .and_then(Value::as_array)
         .map_or_else(Vec::new, |entries| {
-            entries.iter().filter_map(persona_from_json).collect()
+            entries
+                .iter()
+                .filter_map(persona_from_json)
+                .filter(|persona| seen.insert(persona.id.clone()))
+                .collect()
         })
 }
 
@@ -943,6 +948,22 @@ mod tests {
             "content": { "profiles": [{ "id": "kris", "displayname": "Kris" }] },
         });
         assert_eq!(personas_from_catalog(&nested).len(), 1);
+    }
+
+    #[test]
+    fn a_repeated_id_keeps_its_first_entry() {
+        let catalog = json!({
+            "profiles": [
+                { "id": "kris", "displayname": "Kris" },
+                { "id": "sam", "displayname": "Sam" },
+                { "id": "kris", "displayname": "Other Kris" },
+            ],
+        });
+        let names: Vec<_> = personas_from_catalog(&catalog)
+            .into_iter()
+            .map(|persona| persona.display_name)
+            .collect();
+        assert_eq!(names, vec!["Kris", "Sam"]);
     }
 
     #[test]
