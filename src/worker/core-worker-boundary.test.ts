@@ -427,6 +427,23 @@ test('a panic reaches every port and later commands fail instead of hanging', as
   ]);
 });
 
+test('a worker failure carries its own stack to the page', () => {
+  const boundary = createCoreWorkerBoundary(Promise.resolve(fakeCore(() => new Promise(() => {}))));
+  const port = new FakePort();
+  boundary.connect(port);
+
+  boundary.handlePanic('worker error: Uncaught RangeError', 'RangeError\n    at loop (w.js:1:2)');
+
+  expect(port.messages).toEqual([
+    {
+      panic: {
+        message: 'worker error: Uncaught RangeError',
+        stack: 'RangeError\n    at loop (w.js:1:2)',
+      },
+    },
+  ]);
+});
+
 test('WASM logs are batched to every connected port', () => {
   const setLogCapture = vi.fn();
   vi.useFakeTimers();

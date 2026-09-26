@@ -128,10 +128,12 @@ export function createWebTransport(): Transport {
     }
   }
 
-  function handleCrash(message: string): void {
-    // The failure crosses as a string, so every one of them carries this file's
-    // stack. The fingerprint groups on the Rust `panicked at <path>:<line>`.
-    Sentry.captureException(new Error(message), {
+  function handleCrash(message: string, stack?: string): void {
+    // A Rust panic crosses as a string and carries this file's stack; a worker
+    // JS failure brings its own. The fingerprint groups on the message.
+    const error = new Error(message);
+    if (stack) error.stack = stack;
+    Sentry.captureException(error, {
       fingerprint: ['wasm-core-crash', message],
       tags: { source: 'wasm-core' },
     });
@@ -191,7 +193,7 @@ export function createWebTransport(): Transport {
 
       if ('panic' in data) {
         console.error('[sable transport] core panicked', data.panic.message);
-        handleCrash(data.panic.message);
+        handleCrash(data.panic.message, data.panic.stack);
         return;
       }
 

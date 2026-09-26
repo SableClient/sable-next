@@ -3,6 +3,14 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 
+const { captureException } = vi.hoisted(() => ({
+  captureException: vi.fn<(error: unknown, context?: unknown) => void>(),
+}));
+vi.mock('@sentry/sveltekit', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sentry/sveltekit')>()),
+  captureException,
+}));
+
 class FakePort {
   onmessage: ((message: MessageEvent) => void) | null = null;
   onmessageerror: (() => void) | null = null;
@@ -249,4 +257,23 @@ test('the page answers the requests the worker hands it', async () => {
   expect(await reply).toEqual({ reachable: true });
   expect(probe).toHaveBeenCalledOnce();
   channel.port1.close();
+});
+
+test('a worker crash reports the stack the worker sent, grouped on its message', async () => {
+  const transport = await load();
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never).catch(() => {});
+
+  FakeSharedWorker.last?.port.receive({
+    panic: {
+      message: 'worker error: Uncaught RangeError',
+      stack: 'RangeError\n    at loop (w.js:1:2)',
+    },
+  });
+
+  const [error, context] = captureException.mock.lastCall ?? [];
+  expect((error as Error).message).toBe('worker error: Uncaught RangeError');
+  expect((error as Error).stack).toBe('RangeError\n    at loop (w.js:1:2)');
+  expect(context).toMatchObject({
+    fingerprint: ['wasm-core-crash', 'worker error: Uncaught RangeError'],
+  });
 });

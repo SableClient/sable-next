@@ -112,9 +112,9 @@ export function createCoreWorkerBoundary(
     return reply;
   };
 
-  function handlePanic(message: string): void {
+  function handlePanic(message: string, stack?: string): void {
     panic ??= message;
-    broadcast({ panic: { message } });
+    broadcast({ panic: stack === undefined ? { message } : { message, stack } });
   }
 
   function flushLogs(): void {

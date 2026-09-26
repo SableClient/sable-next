@@ -31,5 +31,5 @@ export type WorkerMessage =
   | { id: number; uri: string | null }
   | { events: CoreEvent[] }
   | { logs: string[] }
-  | { panic: { message: string } }
+  | { panic: { message: string; stack?: string } }
   | { pageFetch: PageFetchRequest };

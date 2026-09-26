@@ -46,8 +46,8 @@ self.fetch = withPageFetchFallback(self.fetch.bind(self), boundary.pageFetch, se
 // timers keep re-entering a module whose allocator and borrows were left
 // mid-flight. Closing is what stops the derived failures that follow; the next
 // page connect builds a fresh worker.
-function crash(message: string): void {
-  boundary.handlePanic(message);
+function crash(message: string, stack?: string): void {
+  boundary.handlePanic(message, stack);
   setTimeout(() => {
     self.close();
   }, 0);
@@ -56,11 +56,19 @@ function crash(message: string): void {
 // A SharedWorker's runtime failures never reach the pages that opened it, so
 // they ride the same channel as a Rust panic. A failed `init()` lands here too.
 self.addEventListener('error', (event) => {
-  crash(`worker error: ${event.message}`);
+  crash(
+    `worker error: ${event.message}`,
+    errorStack(event.error) ??
+      (event.filename ? `    at ${event.filename}:${event.lineno}:${event.colno}` : undefined)
+  );
 });
 self.addEventListener('unhandledrejection', (event) => {
-  crash(`unhandled rejection in worker: ${String(event.reason)}`);
+  crash(`unhandled rejection in worker: ${String(event.reason)}`, errorStack(event.reason));
 });
+
+function errorStack(error: unknown): string | undefined {
+  return error instanceof Error ? error.stack : undefined;
+}
 
 void core.then((instance) => {
   setLogHandler(boundary.handleLog);
