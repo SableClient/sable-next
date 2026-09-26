@@ -371,6 +371,38 @@ test('is not settled on a painted snapshot or while notification modes load', as
   roomList.stop();
 });
 
+test('a diff after an empty first answer replaces the painted snapshot rather than joining it', async () => {
+  const first = { room_id: '!first:example.org' } as RoomSummary;
+  const second = { room_id: '!second:example.org' } as RoomSummary;
+  stubLocalStorage().set('sable.room-list.acct', JSON.stringify([first, second]));
+  const eventListeners: ((event: unknown) => void)[] = [];
+  const core = {
+    session: { account_id: 'acct' },
+    subscribeEvents: vi.fn((listener: (event: unknown) => void) => {
+      eventListeners.push(listener);
+      return () => {};
+    }),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [] })),
+      roomNotificationModes: vi.fn(() => Promise.resolve([])),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  expect(roomList.rooms.map((room) => room.room_id)).toEqual([first.room_id, second.room_id]);
+
+  eventListeners[0]?.({
+    type: 'room_list_diff',
+    subscription: 1,
+    diffs: [{ op: 'append', values: [first, second] }],
+  });
+
+  expect(roomList.rooms.map((room) => room.room_id)).toEqual([first.room_id, second.room_id]);
+  roomList.stop();
+});
+
 test('persists the live room list for the next launch', async () => {
   vi.useFakeTimers();
   const stored = stubLocalStorage();

@@ -180,7 +180,7 @@ export class RoomList {
       (event) => (event.type === 'room_list_diff' ? event : null),
       applyDiffs,
       (diffs) => {
-        this.setRooms(applyDiffs(this.rooms, diffs));
+        this.setRooms(applyDiffs(this.live ? this.rooms : [], diffs));
       }
     );
 
