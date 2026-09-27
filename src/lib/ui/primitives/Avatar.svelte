@@ -1,6 +1,11 @@
+<script lang="ts" module>
+  const HOVER_SCOPE = 'article, li, [role="option"], [role="row"]';
+</script>
+
 <script lang="ts">
   import { Avatar } from 'bits-ui';
   import type { Snippet } from 'svelte';
+  import { on } from 'svelte/events';
   import type { ClassValue } from 'svelte/elements';
 
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -50,9 +55,25 @@
   );
   let plate = $derived(color ?? (id === null ? undefined : identityColor(id)));
   let tint = $derived(paintedSrc === src ? undefined : plate);
+  let hovered = $state(false);
+
+  function playOnHover(node: HTMLElement): () => void {
+    const scope = node.closest<HTMLElement>(HOVER_SCOPE) ?? node;
+    const stopEnter = on(scope, 'pointerenter', (event) => {
+      if (event.pointerType === 'mouse') hovered = true;
+    });
+    const stopLeave = on(scope, 'pointerleave', () => {
+      hovered = false;
+    });
+    return () => {
+      stopEnter();
+      stopLeave();
+    };
+  }
 </script>
 
 <Avatar.Root
+  {@attach isMxc && !original ? playOnHover : undefined}
   bind:loadingStatus={() => loadingStatus, (value) => (imageStatus = value)}
   class={['avatar-root', `avatar-${size}`, className]}
   aria-hidden={decorative ? 'true' : undefined}
@@ -75,6 +96,9 @@
       }}
       onfailed={() => (failedSrc = src)}
     />
+    {#if hovered && !original}
+      <MediaImage class="avatar-image" source={src} alt="" width={96} height={96} original />
+    {/if}
   {:else if src}
     <Avatar.Image {src} alt="" class="avatar-image" />
   {/if}

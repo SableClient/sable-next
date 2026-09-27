@@ -2,7 +2,7 @@
 
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, expect, onTestFinished, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
@@ -123,4 +123,49 @@ test('removes the old picture when its reactive source is cleared', async () => 
 
   expect(picture()).not.toBeInTheDocument();
   expect(fallback()).toBeInTheDocument();
+});
+
+function hoverRow(pointerType: string, type = 'pointerenter'): HTMLElement {
+  const row = document.querySelector('article');
+  if (!row) throw new Error('row not rendered');
+  row.dispatchEvent(new PointerEvent(type, { pointerType }));
+  return row;
+}
+
+test('hovering the row plays the original over the still thumbnail', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const article = document.body.appendChild(document.createElement('article'));
+  onTestFinished(() => {
+    article.remove();
+  });
+  render(Avatar, { target: article, props: { src: 'mxc://example.org/animated', name: 'Sable' } });
+  await tick();
+
+  expect(root().querySelectorAll('.avatar-image')).toHaveLength(1);
+  expect(core.fetchMedia).not.toHaveBeenCalledWith('mxc://example.org/animated', 0, 0);
+
+  hoverRow('mouse');
+  await tick();
+
+  expect(root().querySelectorAll('.avatar-image')).toHaveLength(2);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/animated', 0, 0);
+
+  hoverRow('mouse', 'pointerleave');
+  await tick();
+
+  expect(root().querySelectorAll('.avatar-image')).toHaveLength(1);
+});
+
+test('a touch on the row does not fetch the original', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const article = document.body.appendChild(document.createElement('article'));
+  onTestFinished(() => {
+    article.remove();
+  });
+  render(Avatar, { target: article, props: { src: 'mxc://example.org/touched', name: 'Sable' } });
+
+  hoverRow('touch');
+  await tick();
+
+  expect(root().querySelectorAll('.avatar-image')).toHaveLength(1);
 });
