@@ -170,3 +170,22 @@ test('a code block reads its language from either the pre or the code class', ()
   );
   expect(parse('<pre><code>x</code></pre>').firstChild?.attrs.language).toBe('');
 });
+
+test('a b that sets its weight back to normal is not bold', () => {
+  const doc = parse(
+    '<b style="font-weight:normal;" id="docs-internal-guid-x"><span>a</span></b><b>b</b>'
+  );
+
+  expect(doc.firstChild?.child(0).marks).toEqual([]);
+  expect(doc.firstChild?.child(1).marks.map((mark) => mark.type.name)).toEqual(['strong']);
+});
+
+test('a Google Docs paste keeps the bold its spans set by weight', () => {
+  const doc = parse(
+    '<b style="font-weight:normal;" id="docs-internal-guid-x"><span style="font-weight:700;">bold</span><span style="font-weight:400;"> plain</span></b>'
+  );
+
+  expect(doc.firstChild?.child(0).text).toBe('bold');
+  expect(doc.firstChild?.child(0).marks.map((mark) => mark.type.name)).toEqual(['strong']);
+  expect(doc.firstChild?.child(1).marks).toEqual([]);
+});
