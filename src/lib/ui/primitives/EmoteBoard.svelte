@@ -859,6 +859,7 @@
   }
 
   .unicode-text {
+    line-height: normal;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;

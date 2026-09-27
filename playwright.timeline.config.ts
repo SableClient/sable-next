@@ -14,6 +14,7 @@ export default defineConfig({
     'composer-alignment.spec.ts',
     'composer-autocomplete.spec.ts',
     'composer-paste.spec.ts',
+    'emote-board-glyphs.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',
