@@ -121,6 +121,10 @@
 
 <style>
   :global(.responsive-popover.composer-color-popover) {
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
+    color: var(--surface-on-container);
     width: auto;
   }
 
