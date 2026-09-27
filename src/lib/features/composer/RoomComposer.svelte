@@ -77,7 +77,7 @@
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
-  import { ScheduledOriginalKept, sendFailure } from './send-failure';
+  import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import { adminScope, loadAdminCommands, type AdminCommand } from './admin-commands';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
@@ -744,7 +744,11 @@
       }
       if (doc && editor.isEmpty()) editor.setDoc(doc);
       staged = [...attachments, ...staged];
-      error = $i18n.t('composer.scheduleFailed');
+      error = $i18n.t(
+        attachments.length > 0 && isServerScheduleUnsupported(cause)
+          ? 'composer.scheduleAttachmentUnsupported'
+          : 'composer.scheduleFailed'
+      );
     }
   }
 
@@ -1296,6 +1300,7 @@
   <ScheduleComposer
     bind:open={scheduleOpen}
     empty={!hasContent || readOnly}
+    attachmentsBlocked={staged.length > 0 && encrypted !== false}
     {encrypted}
     dueTs={context?.scheduled?.dueTs ?? null}
     onSchedule={(dueTs: number) => {

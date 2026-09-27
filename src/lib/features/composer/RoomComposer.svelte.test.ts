@@ -1139,7 +1139,11 @@ for (const encrypted of [true, null]) {
     await pick(new File(['image'], 'later.png', { type: 'image/png' }));
 
     await fireEvent.contextMenu(sendButton());
-    await press(screen.getByRole('button', { name: 'In an hour' }));
+
+    expect(screen.getByRole('button', { name: 'In an hour' })).toBeDisabled();
+    const scheduleForm = screen.getByRole('button', { name: 'Schedule' }).closest('form');
+    if (!scheduleForm) throw new Error('schedule form not found');
+    await fireEvent.submit(scheduleForm);
     await tick();
 
     expect(scheduleAttachment).not.toHaveBeenCalled();

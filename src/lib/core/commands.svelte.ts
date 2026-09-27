@@ -74,7 +74,7 @@ import type {
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
 import { maxAttachmentBytes } from './limits';
-import type { Transport } from '../../transport';
+import { CoreError, type Transport } from '../../transport';
 
 export type CallGrant = {
   session: number;
@@ -1177,6 +1177,8 @@ export function createCommands(transport: () => Transport) {
       spoiler = false
     ): Promise<string> {
       if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      const support = await transport().send({ type: 'delayed_events_supported' });
+      if (!support.supported) throw new CoreError({ code: 'delayed_events_unsupported' });
       const [info, bytes] = await Promise.all([
         measureAttachment(file),
         file.arrayBuffer().then((buffer) => new Uint8Array(buffer)),

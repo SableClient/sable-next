@@ -12,6 +12,7 @@
   interface Props {
     open?: boolean;
     empty: boolean;
+    attachmentsBlocked?: boolean;
     encrypted?: boolean | null;
     dueTs?: number | null;
     onSchedule: (dueTs: number) => void;
@@ -20,6 +21,7 @@
   let {
     open = $bindable(false),
     empty,
+    attachmentsBlocked = false,
     encrypted = null,
     dueTs = null,
     onSchedule,
@@ -29,7 +31,7 @@
 
   let chosen = $derived(scheduleAt(moment.slice(0, 10), moment.slice(11, 16), Date.now()));
   let blocked = $derived(encrypted === true && !preferences.scheduleInEncryptedRooms);
-  let unavailable = $derived(empty || blocked);
+  let unavailable = $derived(empty || blocked || attachmentsBlocked);
 
   function momentOf(ts: number | null): string {
     const { date, time } = scheduleInputs(ts);
@@ -72,7 +74,9 @@
       <Alert variant="warning">{$i18n.t('composer.scheduleEmpty')}</Alert>
     {/if}
 
-    {#if blocked}
+    {#if attachmentsBlocked}
+      <Alert variant="warning">{$i18n.t('composer.scheduleAttachmentEncrypted')}</Alert>
+    {:else if blocked}
       <Alert variant="warning">{$i18n.t('composer.scheduleEncryptedBlocked')}</Alert>
     {:else if encrypted === true}
       <Alert>{$i18n.t('composer.scheduleEncryptedNote')}</Alert>

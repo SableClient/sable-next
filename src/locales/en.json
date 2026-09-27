@@ -2769,6 +2769,7 @@
     "scheduleCancel": "Cancel",
     "scheduleFailed": "That message could not be scheduled.",
     "scheduleAttachmentEncrypted": "Attachments cannot be scheduled in an encrypted room yet.",
+    "scheduleAttachmentUnsupported": "This homeserver cannot schedule attachments.",
     "scheduledCount_one": "{{count, number}} message scheduled",
     "scheduledCount_other": "{{count, number}} messages scheduled",
     "scheduledEdit": "Edit",

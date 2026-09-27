@@ -268,7 +268,10 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
 });
 
 test('scheduling an attachment uploads it before creating its delayed event', async () => {
-  const fake = fakeTransport({ schedule_attachment: { delay_id: 'delayed-image' } });
+  const fake = fakeTransport({
+    delayed_events_supported: { supported: true },
+    schedule_attachment: { delay_id: 'delayed-image' },
+  });
   const uploadMedia = vi.fn(() => {
     vi.setSystemTime(12_000);
     return Promise.resolve('mxc://example.org/later');
@@ -296,6 +299,21 @@ test('scheduling an attachment uploads it before creating its delayed event', as
     spoiler: false,
     delay_ms: 28_000,
   });
+});
+
+test('an attachment is not uploaded when the homeserver cannot schedule it', async () => {
+  const fake = fakeTransport({ delayed_events_supported: { supported: false } });
+  const uploadMedia = vi.fn(() => Promise.resolve('mxc://example.org/never'));
+  fake.transport.uploadMedia = uploadMedia;
+  const core = createCoreClient(() => fake.transport);
+  const file = new File(['image'], 'later.png', { type: 'image/png' });
+
+  await expect(
+    core.commands.scheduleAttachment('!room:example.org', file, Date.now() + 30_000)
+  ).rejects.toMatchObject({ detail: { code: 'delayed_events_unsupported' } });
+
+  expect(uploadMedia).not.toHaveBeenCalled();
+  expect(fake.sent.map((command) => command.type)).not.toContain('schedule_attachment');
 });
 
 test('sending a gallery forwards shared metadata and every attachment', async () => {
