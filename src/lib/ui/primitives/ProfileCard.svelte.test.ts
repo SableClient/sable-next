@@ -40,6 +40,34 @@ test('keeps a real banner unblurred', () => {
   expect(cover(container)).not.toHaveClass('profile-card-banner-fallback');
 });
 
+test('opens the banner in the viewer, as the avatar does', async () => {
+  const onAvatarClick = vi.fn();
+  render(ProfileCard, {
+    displayName: 'Ana',
+    userId: '@ana:example.org',
+    color: '#abcdef',
+    avatarUrl: 'mxc://example.org/ana',
+    bannerUrl: 'mxc://example.org/banner',
+    onAvatarClick,
+  });
+
+  await userEvent.setup().click(screen.getByRole('button', { name: "View Ana's banner" }));
+
+  expect(onAvatarClick).toHaveBeenCalledWith('mxc://example.org/banner', 'Ana');
+});
+
+test('leaves the avatar fallback cover inert', () => {
+  render(ProfileCard, {
+    displayName: 'Ana',
+    userId: '@ana:example.org',
+    color: '#abcdef',
+    avatarUrl: 'mxc://example.org/ana',
+    onAvatarClick: vi.fn(),
+  });
+
+  expect(screen.queryByRole('button', { name: /banner/ })).not.toBeInTheDocument();
+});
+
 test('paints the flat colour when there is no avatar either', () => {
   const { container } = render(ProfileCard, {
     displayName: 'Ana',

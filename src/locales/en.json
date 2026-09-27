@@ -1122,7 +1122,8 @@
     "profileOverrideColor": "Name colour",
     "profileOverrideSave": "Save",
     "profileOverrideCancel": "Cancel",
-    "profileOverrideRemove": "Show their own profile"
+    "profileOverrideRemove": "Show their own profile",
+    "profileBanner": "View {{name}}'s banner"
   },
   "viewer": {
     "title": "Media viewer",

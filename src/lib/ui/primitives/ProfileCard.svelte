@@ -93,6 +93,9 @@
   function openAvatar(): void {
     if (avatarUrl) onAvatarClick?.(avatarUrl, displayName);
   }
+  function openBanner(): void {
+    if (banner) onAvatarClick?.(banner, displayName);
+  }
 
   let copied = $state(false);
   async function copyUserId(): Promise<void> {
@@ -118,7 +121,16 @@
   data-inset-owner={variant === 'sheet' ? 'bottom' : undefined}
 >
   <div class="profile-card-cover" class:has-banner={banner} style:background={color}>
-    {#if cover}
+    {#if banner && onAvatarClick}
+      <button
+        class="profile-card-banner-button"
+        type="button"
+        aria-label={$i18n.t('timeline.profileBanner', { name: displayName })}
+        onclick={openBanner}
+      >
+        <MediaImage class="profile-card-banner" source={banner} alt="" width={720} height={240} />
+      </button>
+    {:else if cover}
       <MediaImage
         class={banner ? 'profile-card-banner' : 'profile-card-banner profile-card-banner-fallback'}
         source={cover}
@@ -293,6 +305,21 @@
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
+  }
+
+  .profile-card-banner-button {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    display: block;
+    height: 100%;
+    padding: 0;
+    width: 100%;
+  }
+
+  .profile-card-banner-button:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   .profile-card-avatar-button {

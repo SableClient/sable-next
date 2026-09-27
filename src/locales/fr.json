@@ -1025,7 +1025,8 @@
     "utdRecoverAction": "Configurer la récupération",
     "utdWaiting": "En attente de la clé de ce message…",
     "videoConverting": "Conversion de la video…",
-    "playVideo": "Lire {{name}}"
+    "playVideo": "Lire {{name}}",
+    "profileBanner": "Voir la bannière de {{name}}"
   },
   "viewer": {
     "title": "Visionneuse de médias",
