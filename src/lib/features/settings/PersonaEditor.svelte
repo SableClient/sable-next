@@ -16,6 +16,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import ColorSetting from './ColorSetting.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
   interface Props {
@@ -168,14 +169,18 @@
     </label>
 
     <div class="colors">
-      <label class="field">
-        <span>{$i18n.t('personas.colorLight')}</span>
-        <TextInput name="persona-color-light" bind:value={colorLight} type="color" />
-      </label>
-      <label class="field">
-        <span>{$i18n.t('personas.colorDark')}</span>
-        <TextInput name="persona-color-dark" bind:value={colorDark} type="color" />
-      </label>
+      <ColorSetting
+        label={$i18n.t('personas.colorLight')}
+        bind:value={colorLight}
+        onCommit={() => {}}
+        onReset={() => (colorLight = '')}
+      />
+      <ColorSetting
+        label={$i18n.t('personas.colorDark')}
+        bind:value={colorDark}
+        onCommit={() => {}}
+        onReset={() => (colorDark = '')}
+      />
     </div>
 
     <fieldset class="triggers">
@@ -331,10 +336,6 @@
   }
 
   @media (width >= 34rem) {
-    .colors {
-      grid-template-columns: 1fr 1fr;
-    }
-
     .trigger-row {
       grid-template-columns: 1fr 1fr auto auto;
     }
