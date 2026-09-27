@@ -293,6 +293,7 @@
   .profile-grid {
     display: grid;
     gap: var(--space-400);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .profile-preview {
