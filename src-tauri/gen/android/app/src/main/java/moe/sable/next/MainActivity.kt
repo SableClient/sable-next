@@ -13,6 +13,8 @@ import java.io.FileOutputStream
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
+import io.sentry.Sentry
+import io.sentry.android.core.SentryAndroid
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
@@ -155,6 +157,24 @@ class MainActivity : TauriActivity() {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightNavigationBars = light
+      }
+    }
+
+    @JvmStatic
+    fun setSentryEnabledNative(enabled: Boolean) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        if (!enabled) {
+          Sentry.close()
+          return@runOnUiThread
+        }
+        if (Sentry.isEnabled() || BuildConfig.SENTRY_DSN.isBlank()) return@runOnUiThread
+        SentryAndroid.init(activity.applicationContext) { options ->
+          options.dsn = BuildConfig.SENTRY_DSN
+          options.environment = BuildConfig.SENTRY_ENVIRONMENT.ifBlank { null }
+          options.release = BuildConfig.SENTRY_RELEASE.ifBlank { null }
+          options.isSendDefaultPii = false
+        }
       }
     }
   }

@@ -59,6 +59,10 @@ pub fn set_window_background(color: i32) -> Result<(), String> {
     )
 }
 
+pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
+    call_activity_bool("setSentryEnabledNative", enabled)
+}
+
 fn call_activity_bool(method: &str, value: bool) -> Result<(), String> {
     call_activity(method, jni_sig!("(Z)V"), JValue::Bool(value))
 }

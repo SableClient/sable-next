@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     iOS: {{apple.ios-version}}
 fileGroups: [{{join file-groups}}]
+packages:
+  Sentry:
+    url: https://github.com/getsentry/sentry-cocoa.git
+    exactVersion: 9.29.2
 configs:
   debug: debug
   release: release
@@ -20,6 +24,7 @@ targetTemplates:
     type: application
     sources:
       - path: Sources
+      - path: ../../ios/Sentry
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -158,6 +163,8 @@ targets:
     dependencies:
       - target: SableNotificationService
         embed: true
+      - package: Sentry
+        product: Sentry
       - framework: {{ lib-output-file-name }}
         embed: false
       {{~#each ios-libraries}}

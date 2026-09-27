@@ -18,6 +18,23 @@ use objc2_photos::{
     PHPhotoLibrary,
 };
 
+/// Synchronizes the native SDK with the webview's telemetry preference.
+pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
+    let class = AnyClass::get(c"SableSentry").ok_or("Sentry Cocoa bridge is unavailable")?;
+    let dsn = NSString::from_str(option_env!("SENTRY_DSN").unwrap_or_default());
+    let environment = NSString::from_str(option_env!("SENTRY_ENVIRONMENT").unwrap_or_default());
+    let release = NSString::from_str(option_env!("SENTRY_APP_VERSION").unwrap_or_default());
+    unsafe {
+        let _: () = msg_send![class,
+            setEnabled: enabled
+            dsn: &*dsn
+            environment: &*environment
+            release: &*release
+        ];
+    }
+    Ok(())
+}
+
 /// # Errors
 /// When the signed app has no accessible App Group container.
 pub fn shared_store_dir() -> Result<std::path::PathBuf, String> {

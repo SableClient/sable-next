@@ -56,6 +56,7 @@ sentry = { version = "0.49", default-features = false, features = [
   "debug-images",
   "ureq",
 ] }
+tauri-plugin-sentry = "0.6.0"
 
 # Desktop only: a second launch carrying the OIDC redirect must hand the URL to
 # the running instance instead of starting a rival process.

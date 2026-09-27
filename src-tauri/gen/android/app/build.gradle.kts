@@ -14,6 +14,9 @@ val tauriProperties = Properties().apply {
     }
 }
 
+fun sentryBuildConfigValue(name: String): String =
+    System.getenv(name).orEmpty().replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     compileSdk = 36
     namespace = "moe.sable.next"
@@ -81,6 +84,19 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    defaultConfig {
+        buildConfigField("String", "SENTRY_DSN", "\"${sentryBuildConfigValue("VITE_SENTRY_DSN")}\"")
+        buildConfigField(
+            "String",
+            "SENTRY_ENVIRONMENT",
+            "\"${sentryBuildConfigValue("VITE_SENTRY_ENVIRONMENT")}\""
+        )
+        buildConfigField(
+            "String",
+            "SENTRY_RELEASE",
+            "\"${sentryBuildConfigValue("VITE_APP_VERSION")}\""
+        )
+    }
 }
 
 rust {
@@ -97,6 +113,7 @@ configurations.all {
 }
 
 dependencies {
+    implementation("io.sentry:sentry-android:8.58.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")

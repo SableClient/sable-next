@@ -12,6 +12,7 @@
     "geolocation:allow-request-permissions",
     "geolocation:allow-get-current-position",
     "livekit-mobile:default",
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "sentry:default"
   ]
 }

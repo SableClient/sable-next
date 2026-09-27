@@ -9,6 +9,7 @@
     "deep-link:default",
     "os:allow-platform",
     "os:allow-os-type",
-    "notifications:default"
+    "notifications:default",
+    "sentry:default"
   ]
 }

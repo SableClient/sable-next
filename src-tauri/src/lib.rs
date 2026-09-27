@@ -704,13 +704,25 @@ fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Build
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[expect(clippy::too_many_lines, reason = "the platform-specific builder remains together")]
 pub fn run() {
     install_logging();
 
     // Before the threads Tauri spawns, so they inherit the panic handler.
-    let _sentry_guard = sentry::init();
+    let sentry_guard = sentry::init();
+    #[cfg(not(target_os = "ios"))]
+    let sentry_minidump_guard = sentry_guard
+        .as_ref()
+        .map(|guard| tauri_plugin_sentry::minidump::init(guard));
+    #[cfg(not(target_os = "ios"))]
+    let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
+    let builder = if let Some(client) = sentry_guard.as_ref() {
+        builder.plugin(tauri_plugin_sentry::init_with_no_injection(client))
+    } else {
+        builder
+    };
 
     // Before every other plugin, as its docs require: it has to win the race
     // with a second process carrying the OIDC redirect.
