@@ -127,6 +127,7 @@ function imageItem(body = 'photo.png'): TimelineItemView {
       blurhash: null,
       thumbnail: null,
       spoiler: null,
+      animated: null,
     },
   };
 }

@@ -1723,6 +1723,7 @@ fn message_content(
                 blurhash: image.info.as_ref().and_then(|info| info.blurhash.clone()),
                 thumbnail: image.info.as_deref().and_then(image_thumbnail),
                 spoiler: spoiler_reason(raw.content.as_ref()),
+                animated: image.info.as_ref().and_then(|info| info.is_animated),
             }
         }
         MessageType::Video(video) => {

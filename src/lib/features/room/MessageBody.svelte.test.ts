@@ -77,6 +77,7 @@ function attachment(kind: 'image' | 'video' | 'audio' | 'file'): TimelineItemCon
         blurhash: null,
         thumbnail: null,
         spoiler: null,
+        animated: null,
       };
     case 'video':
       return {
@@ -308,6 +309,7 @@ test('keeps an image filename hidden without the alt-text preference', async () 
         blurhash: null,
         thumbnail: null,
         spoiler: null,
+        animated: null,
       }),
       canRedactOthers: false,
     },

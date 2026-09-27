@@ -2897,6 +2897,8 @@ pub enum TimelineItemContentView {
         blurhash: Option<String>,
         thumbnail: Option<String>,
         spoiler: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(optional))]
+        animated: Option<bool>,
     },
     Video {
         filename: String,

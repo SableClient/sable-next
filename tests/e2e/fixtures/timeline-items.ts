@@ -63,6 +63,7 @@ export function timelineImage(id: string): TimelineItemView {
       width: 800,
       height: 600,
       spoiler: null,
+      animated: null,
     },
   };
 }
@@ -102,6 +103,7 @@ export function timelineWideImageWithoutDimensions(id: string): TimelineItemView
       width: null,
       height: null,
       spoiler: null,
+      animated: null,
     },
   };
 }

@@ -30,6 +30,7 @@ const imageItem: MediaItem = {
   blurhash: null,
   thumbnail: null,
   spoiler: null,
+  animated: null,
   eventId: '$image',
   sender: 'Alice',
 };

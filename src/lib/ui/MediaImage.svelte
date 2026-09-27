@@ -40,6 +40,7 @@
     intrinsicWidth?: number | null;
     intrinsicHeight?: number | null;
     mime?: string | null;
+    animatedHint?: boolean | null;
     size?: number | null;
     blurhash?: string | null;
     class?: string;
@@ -63,6 +64,7 @@
     intrinsicWidth = null,
     intrinsicHeight = null,
     mime = null,
+    animatedHint = null,
     size = null,
     blurhash = null,
     class: className = '',
@@ -106,7 +108,9 @@
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
   let animated = $derived(
-    ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
+    animatedHint ??
+      (ANIMATED_MIMES.includes(mime ?? '') ||
+        ANIMATED_EXTENSIONS.some((extension) => named(extension)))
   );
   let servedSideways = $derived(
     sidewaysSource === source || sideways(mediaAspectRatio(core, source, width, height))
@@ -164,7 +168,7 @@
     if (!image?.complete) return null;
     return dominantColor(image);
   });
-  let animatedGif = $derived(mime === 'image/gif' || named('.gif'));
+  let animatedGif = $derived(animatedHint !== false && (mime === 'image/gif' || named('.gif')));
   let manualGif = $derived(animatedGif && !(autoplay ?? preferences.autoplayGifs));
   let paused = $derived((animated || original) && animationsPaused());
   let heldFrame = $derived(paused && imageLoaded && imageElement ? stillFrame(imageElement) : null);

@@ -811,6 +811,7 @@
       blurhash: null,
       thumbnail: null,
       spoiler: null,
+      animated: null,
       eventId,
       sender: displayName,
     };

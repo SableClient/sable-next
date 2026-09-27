@@ -103,6 +103,7 @@
       intrinsicWidth={item.content.width}
       intrinsicHeight={item.content.height}
       mime={item.content.mime}
+      animatedHint={item.content.animated}
       size={item.content.size}
       blurhash={item.content.blurhash}
       retryable

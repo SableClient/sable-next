@@ -43,6 +43,7 @@
           blurhash: null,
           thumbnail: null,
           spoiler: null,
+          animated: null,
           eventId: 'profile-avatar',
           sender: name,
         }

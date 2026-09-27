@@ -207,6 +207,7 @@
             blurhash: content.blurhash,
             thumbnail: content.thumbnail,
             spoiler: content.spoiler,
+            animated: null,
           },
         ];
       case 'video':

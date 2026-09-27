@@ -45,6 +45,7 @@ function image(eventId: string, filename: string): TimelineItemView {
       blurhash: null,
       thumbnail: null,
       spoiler: null,
+      animated: null,
     },
     in_reply_to: null,
     thread_root: '$root',

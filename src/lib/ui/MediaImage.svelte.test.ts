@@ -223,6 +223,43 @@ test('loads GIFs from the original so they animate', async () => {
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/autoplayed', 0, 0);
 });
 
+test('a GIF its sender flagged as still loads the thumbnail (MSC4230)', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  render(MediaImage, {
+    props: {
+      source: 'mxc://example.org/still',
+      alt: 'Still image',
+      width: 800,
+      height: 600,
+      mime: 'image/gif',
+      animatedHint: false,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  expect(core.fetchMedia).not.toHaveBeenCalledWith('mxc://example.org/still', 0, 0);
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/still', 800, 600);
+});
+
+test('a PNG its sender flagged as animated loads the original (MSC4230)', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  render(MediaImage, {
+    props: {
+      source: 'mxc://example.org/apng',
+      alt: 'Animated PNG',
+      width: 800,
+      height: 600,
+      mime: 'image/png',
+      animatedHint: true,
+    },
+  });
+
+  await tick();
+  await Promise.resolve();
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/apng', 0, 0);
+});
+
 test('shows a static GIF preview until its play button is pressed', async () => {
   preferences.autoplayGifs = false;
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
