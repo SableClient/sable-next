@@ -617,6 +617,25 @@
     }
   }
 
+  @container (max-width: 4rem) {
+    .media-image-placeholder {
+      border-radius: var(--radius);
+      filter: none;
+    }
+
+    .media-image-placeholder :global(svg) {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    @container (max-width: 4rem) {
+      :global(html:not([data-reduced-motion='on'])) .media-image-placeholder:not(.loaded) {
+        animation: skeleton-pulse 1.8s ease-in-out infinite;
+      }
+    }
+  }
+
   .gif-preview,
   .gif-preview-source.ready {
     display: none;
