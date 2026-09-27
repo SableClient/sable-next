@@ -1,11 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import {
-  ConnectionState,
-  CryptorError,
-  CryptorErrorReason,
-  RoomEvent,
-  type Room,
-} from 'livekit-client';
+import { ConnectionState, RoomEvent, type Room } from 'livekit-client';
 
 import { createLivekitTransport } from './livekit-transport';
 import type { CallTelemetry } from './call-telemetry';
@@ -190,7 +184,7 @@ test('an existing key import failure rejects immediately without leaving a timer
   vi.useFakeTimers();
   vi.spyOn(crypto.subtle, 'importKey').mockRejectedValue(new Error('import failed'));
   const provider = new MatrixKeyProvider();
-  provider.setKey({ identity: 'publisher', keyIndex: 0, key: new Uint8Array(16) }, true);
+  void provider.setKey({ identity: 'publisher', keyIndex: 0, key: new Uint8Array(16) }, true);
   await vi.waitFor(() => {
     expect(provider.state.lastFailure).toBe('import-failed');
   });
@@ -198,24 +192,39 @@ test('an existing key import failure rejects immediately without leaving a timer
   expect(vi.getTimerCount()).toBe(0);
 });
 
-test('records a missing remote encryption key as a call event instead of a call failure', () => {
+test('imports every initial encryption key before connecting', async () => {
   const fixture = roomFixture();
-  const event = vi.fn();
-  const failure = vi.fn();
-  createLivekitTransport({
+  const material = await crypto.subtle.importKey('raw', new Uint8Array(16), 'HKDF', false, [
+    'deriveBits',
+    'deriveKey',
+  ]);
+  const remoteImport = Promise.withResolvers<CryptoKey>();
+  const importKey = vi.spyOn(crypto.subtle, 'importKey');
+  importKey.mockImplementationOnce(() => Promise.resolve(material));
+  importKey.mockImplementationOnce(() => remoteImport.promise);
+  const transport = createLivekitTransport({
     encryptMedia: true,
+    ownIdentity: 'publisher',
     createRoom: () => fixture.room,
     createWorker: () => ({ terminate: vi.fn() }) as unknown as Worker,
-    telemetry: { step: (_stage, action) => action(), event, failure },
   });
 
-  fixture.room.emit(
-    RoomEvent.EncryptionError,
-    new CryptorError('missing key at index 0', CryptorErrorReason.MissingKey)
-  );
+  const connecting = transport.connect({
+    ...connectOptions,
+    encryptionKeys: [
+      { identity: 'publisher', keyIndex: 0, key: new Uint8Array(16) },
+      { identity: 'remote', keyIndex: 0, key: new Uint8Array(16) },
+    ],
+  });
+  await vi.waitFor(() => {
+    expect(importKey).toHaveBeenCalledTimes(2);
+  });
+  expect(fixture.room.connect).not.toHaveBeenCalled();
 
-  expect(event).toHaveBeenCalledWith('call.encryption.key_missing', {});
-  expect(failure).not.toHaveBeenCalled();
+  remoteImport.resolve(material);
+  await connecting;
+  expect(fixture.room.connect).toHaveBeenCalledOnce();
+  await transport.disconnect();
 });
 
 test('does not publish connected when the room disconnects during media setup', async () => {

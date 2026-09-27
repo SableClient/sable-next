@@ -2,8 +2,6 @@ import {
   AudioPresets,
   ConnectionQuality,
   ConnectionState,
-  CryptorError,
-  CryptorErrorReason,
   LocalAudioTrack,
   Room as LivekitRoom,
   type LocalParticipant,
@@ -95,9 +93,6 @@ export type LivekitTransportOptions = {
 
 const defaultWorker = (): Worker =>
   new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
-
-const isMissingEncryptionKey = (error: Error): boolean =>
-  error instanceof CryptorError && error.reason === CryptorErrorReason.MissingKey;
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
@@ -343,10 +338,6 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       event('call.connection.state', { 'call.connection_state': connectionState });
     })
     .on(RoomEvent.EncryptionError, (error) => {
-      if (isMissingEncryptionKey(error)) {
-        event('call.encryption.key_missing');
-        return;
-      }
       fail('call.encryption.error', error);
     })
     .on(RoomEvent.MediaDevicesError, (error) => {
@@ -385,8 +376,9 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
 
     connected = (async () => {
       for (const key of connectOptions.encryptionKeys) {
-        keyProvider?.setKey(key, key.identity === options.ownIdentity);
+        void keyProvider?.setKey(key, key.identity === options.ownIdentity);
       }
+      await keyProvider?.flush();
 
       const ownIdentity = options.ownIdentity;
       if (keyProvider && ownIdentity) {
@@ -506,10 +498,10 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       await step('call.camera.set', () => room.localParticipant.setCameraEnabled(enabled));
       syncLocal();
     },
-    setEncryptionKey: (key: CallEncryptionKey) => {
-      if (!disposed) keyProvider?.setKey(key, key.identity === options.ownIdentity);
-      return Promise.resolve();
-    },
+    setEncryptionKey: (key: CallEncryptionKey) =>
+      disposed
+        ? Promise.resolve()
+        : (keyProvider?.setKey(key, key.identity === options.ownIdentity) ?? Promise.resolve()),
     subscribe: (listener) => {
       listeners.add(listener);
       listener(state);

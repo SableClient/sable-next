@@ -50,9 +50,14 @@ export class MatrixKeyProvider extends BaseKeyProvider {
     return () => this.#listeners.delete(listener);
   }
 
-  setKey(key: CallEncryptionKey, own: boolean): void {
+  setKey(key: CallEncryptionKey, own: boolean): Promise<void> {
     const generation = this.#generation;
     this.#queue = this.#queue.then(() => this.#apply(generation, key, own));
+    return this.#queue;
+  }
+
+  flush(): Promise<void> {
+    return this.#queue;
   }
 
   waitForOwnKey(identity: string, timeoutMs = 10_000): Promise<void> {
