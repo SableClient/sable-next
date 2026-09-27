@@ -1,5 +1,11 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { ConnectionState, RoomEvent, type Room } from 'livekit-client';
+import {
+  ConnectionState,
+  CryptorError,
+  CryptorErrorReason,
+  RoomEvent,
+  type Room,
+} from 'livekit-client';
 
 import { createLivekitTransport } from './livekit-transport';
 import type { CallTelemetry } from './call-telemetry';
@@ -190,6 +196,26 @@ test('an existing key import failure rejects immediately without leaving a timer
   });
   await expect(provider.waitForOwnKey('publisher')).rejects.toThrow('own-key-failed');
   expect(vi.getTimerCount()).toBe(0);
+});
+
+test('records a missing remote encryption key as a call event instead of a call failure', () => {
+  const fixture = roomFixture();
+  const event = vi.fn();
+  const failure = vi.fn();
+  createLivekitTransport({
+    encryptMedia: true,
+    createRoom: () => fixture.room,
+    createWorker: () => ({ terminate: vi.fn() }) as unknown as Worker,
+    telemetry: { step: (_stage, action) => action(), event, failure },
+  });
+
+  fixture.room.emit(
+    RoomEvent.EncryptionError,
+    new CryptorError('missing key at index 0', CryptorErrorReason.MissingKey)
+  );
+
+  expect(event).toHaveBeenCalledWith('call.encryption.key_missing', {});
+  expect(failure).not.toHaveBeenCalled();
 });
 
 test('does not publish connected when the room disconnects during media setup', async () => {

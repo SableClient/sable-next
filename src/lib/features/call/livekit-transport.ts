@@ -2,6 +2,8 @@ import {
   AudioPresets,
   ConnectionQuality,
   ConnectionState,
+  CryptorError,
+  CryptorErrorReason,
   LocalAudioTrack,
   Room as LivekitRoom,
   type LocalParticipant,
@@ -93,6 +95,9 @@ export type LivekitTransportOptions = {
 
 const defaultWorker = (): Worker =>
   new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
+
+const isMissingEncryptionKey = (error: Error): boolean =>
+  error instanceof CryptorError && error.reason === CryptorErrorReason.MissingKey;
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
@@ -338,6 +343,10 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       event('call.connection.state', { 'call.connection_state': connectionState });
     })
     .on(RoomEvent.EncryptionError, (error) => {
+      if (isMissingEncryptionKey(error)) {
+        event('call.encryption.key_missing');
+        return;
+      }
       fail('call.encryption.error', error);
     })
     .on(RoomEvent.MediaDevicesError, (error) => {
