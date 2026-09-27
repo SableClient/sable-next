@@ -50,7 +50,12 @@ function isBareUrl(mark: Mark, parent: ProseMirrorNode, index: number): boolean 
 
 function cellLine(row: ProseMirrorNode): string {
   const cells: string[] = [];
-  row.forEach((cell) => cells.push(cell.textContent.replaceAll('|', '\\|').trim()));
+  row.forEach((cell) => {
+    const text = cell.textBetween(0, cell.content.size, ' ', (node) =>
+      node.type === composerSchema.nodes.hard_break ? ' ' : atomText(node)
+    );
+    cells.push(text.replaceAll('|', '\\|').trim());
+  });
   return `| ${cells.join(' | ')} |`;
 }
 

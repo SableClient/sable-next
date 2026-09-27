@@ -876,3 +876,11 @@ describe('MSC references', () => {
     expect(serializeComposer(parseMatrixHtml(sent)).body).toBe('MSC4144 lands');
   });
 });
+
+test('a table cell keeps its line breaks and pills in the body', () => {
+  const doc = parseMatrixHtml(
+    '<table><tr><th>h</th></tr><tr><td>a<br>b <a href="https://matrix.to/#/@alice:example.org">Alice</a></td></tr></table>'
+  );
+
+  expect(serializeComposer(doc).body).toBe('| h |\n| --- |\n| a b Alice |');
+});
