@@ -32,6 +32,7 @@
     class={['action-card', { 'action-card-disabled': inactive }, className]}
     href={inactive ? undefined : href}
     aria-disabled={inactive ? 'true' : undefined}
+    draggable="false"
   >
     <span class="action-card-icon" aria-hidden="true"><Icon /></span>
     <span class="action-card-copy">
