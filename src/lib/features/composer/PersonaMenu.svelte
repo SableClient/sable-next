@@ -6,6 +6,9 @@
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
+
+  import '#lib/features/room/sender-identity.css';
 
   interface Props {
     personas: readonly PersonaView[];
@@ -102,6 +105,8 @@
       </li>
     {/if}
     {#each filteredPersonas as persona (persona.id)}
+      {@const light = persona.color_on_light ?? persona.color_on_dark}
+      {@const dark = persona.color_on_dark ?? persona.color_on_light}
       <li>
         <button
           type="button"
@@ -116,7 +121,13 @@
             name={persona.display_name}
             size="small"
           />
-          <span class="persona-option-name">{persona.display_name}</span>
+          <span
+            class="persona-option-name sender-identity-name"
+            class:tinted={light !== null}
+            style:--name-color-on-light={nameColorOnLight(light) ?? undefined}
+            style:--name-color-on-dark={nameColorOnDark(dark) ?? undefined}
+            >{persona.display_name}</span
+          >
           {#if selected?.persona_id === persona.id}<CheckIcon />{/if}
         </button>
       </li>
@@ -188,6 +199,7 @@
 
   .persona-option-name {
     flex: 1;
+    max-width: none;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
