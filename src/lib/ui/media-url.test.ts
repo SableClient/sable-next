@@ -138,10 +138,39 @@ test('enforces the byte budget when the last media consumer releases its hold', 
   const url = await loadMediaUrl(core, source, 0, 0);
 
   first();
+  await Promise.resolve();
   expect(revoke).not.toHaveBeenCalledWith(url);
   last();
+  await Promise.resolve();
   expect(revoke).toHaveBeenCalledWith(url);
   expect(cachedMediaUrl(core, source, 0, 0)).toBeUndefined();
+});
+
+test('a hold released and taken back in one update keeps its url past the cap', async () => {
+  let nextUrl = 0;
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:rehold-${nextUrl++}`);
+  const core = {
+    session: session('account-rehold', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(8))) },
+  };
+  const holds = Array.from({ length: 70 }, (_, index) =>
+    holdMediaUrl(core, `mxc://example.org/emote-${String(index)}`, 0, 0)
+  );
+  await Promise.all(
+    holds.map((_, index) => loadMediaUrl(core, `mxc://example.org/emote-${String(index)}`, 0, 0))
+  );
+  const source = 'mxc://example.org/emote-69';
+  const url = cachedMediaUrl(core, source, 0, 0);
+
+  holds[69]();
+  holds[69] = holdMediaUrl(core, source, 0, 0);
+  await Promise.resolve();
+
+  expect(revoke).not.toHaveBeenCalledWith(url);
+  expect(cachedMediaUrl(core, source, 0, 0)).toBe(url);
+  for (const release of holds) release();
 });
 
 test('keeps the shape of a held URL however much media is measured after it', async () => {

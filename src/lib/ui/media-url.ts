@@ -28,6 +28,7 @@ const unavailable = new QuickLRU<string, true>({
 const refused = new QuickLRU<string, true>({ maxSize: MAX_MEDIA_METADATA });
 const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
+let evictQueued = false;
 let inflight = 0;
 const waiting: (() => void)[] = [];
 
@@ -100,6 +101,15 @@ function evict(published?: string): void {
   }
 }
 
+function evictSoon(): void {
+  if (evictQueued) return;
+  evictQueued = true;
+  queueMicrotask(() => {
+    evictQueued = false;
+    evict();
+  });
+}
+
 export function holdMediaUrl(
   core: Pick<CoreClient, 'session'>,
   source: string,
@@ -123,7 +133,7 @@ export function holdMediaUrl(
     holds.delete(key);
     for (const url of displaced.get(key) ?? []) URL.revokeObjectURL(url);
     displaced.delete(key);
-    evict();
+    evictSoon();
   };
 }
 
