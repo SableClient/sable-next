@@ -37,6 +37,7 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 const core = Object.assign(baseCore, {
   roomPowerLevels: vi.fn<(roomId: string) => Promise<RoomPowerLevelsView>>(),
   roomStateEvent: vi.fn<(roomId: string, eventType: string) => Promise<unknown>>(),
+  roomPermissions: vi.fn<(roomId: string) => Promise<RoomPermissionsView>>(),
   sendStateEvent:
     vi.fn<
       (roomId: string, eventType: string, stateKey: string, content: unknown) => Promise<void>
@@ -196,8 +197,9 @@ test('a space applies its levels to the rooms below it that you can edit', async
   extraRooms.push({ room_id: '!room:example.org', state: 'joined', space_children: [] });
   const spaceLevels = { ...base, invite: 50 };
   core.roomPowerLevels.mockImplementation((roomId: string) =>
-    Promise.resolve(roomId === space.room_id ? spaceLevels : base)
+    Promise.resolve(roomId === space.room_id ? spaceLevels : { ...base, users: {} })
   );
+  core.roomPermissions.mockResolvedValue(permissions);
   core.roomStateEvent.mockResolvedValue(null);
   core.sendStateEvent.mockClear();
 

@@ -232,9 +232,12 @@
     let skipped = 0;
     for (const childId of childIds) {
       try {
-        const current = await core.commands.roomPowerLevels(childId);
-        const own = current.users[userId] ?? current.users_default;
-        if (!canSendState(current, own, 'm.room.power_levels')) {
+        const [current, childPermissions] = await Promise.all([
+          core.commands.roomPowerLevels(childId),
+          core.commands.roomPermissions(childId),
+        ]);
+        const own = childPermissions.own_power_level;
+        if (!childPermissions.can_change_power_levels) {
           skipped += 1;
           continue;
         }
