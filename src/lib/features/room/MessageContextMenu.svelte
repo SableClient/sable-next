@@ -36,6 +36,7 @@
         loop
         collisionPadding={8}
         customAnchor={anchor}
+        preventScroll={false}
       >
         <IconContext values={{ 'aria-hidden': 'true' }}>
           {#if actions.onReact}
