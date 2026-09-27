@@ -152,11 +152,15 @@
   }
 
   async function copyUserId(): Promise<void> {
-    await navigator.clipboard.writeText(userId);
-    copied = true;
-    setTimeout(() => {
-      copied = false;
-    }, 2000);
+    try {
+      await navigator.clipboard.writeText(userId);
+      copied = true;
+      setTimeout(() => {
+        copied = false;
+      }, 2000);
+    } catch {
+      toasts.error(t('errors.copyFailed'));
+    }
   }
 
   function refreshProfile(): void {
