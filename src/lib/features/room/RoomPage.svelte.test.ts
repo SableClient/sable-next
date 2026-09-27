@@ -92,3 +92,21 @@ test('a space opened as a room is sent to its lobby', async () => {
   });
   expect(rendered.at(-1)?.kind).not.toBe('view');
 });
+
+test('on the mobile layout the room mounts a frame after the route, behind the drawer slide', async () => {
+  const { happyDOM } = window as unknown as {
+    happyDOM: { setViewport: (viewport: { width: number }) => void };
+  };
+  happyDOM.setViewport({ width: 400 });
+  const room = { room_id: '!old:example.org', state: 'joined' } as RoomSummary;
+  Object.assign(core, { roomSummary: vi.fn(() => Promise.resolve(room)) });
+  render(RoomPage);
+  await settle();
+
+  expect(rendered.filter((entry) => entry.kind === 'view')).toEqual([]);
+
+  await vi.waitFor(() => {
+    expect(rendered.at(-1)).toEqual({ kind: 'view', roomId: '!old:example.org', extra: room });
+  });
+  happyDOM.setViewport({ width: 1024 });
+});
