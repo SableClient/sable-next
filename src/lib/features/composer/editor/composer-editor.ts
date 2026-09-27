@@ -51,7 +51,7 @@ import {
 import { markdownFormatCommands, markdownLink } from './markdown-format';
 import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
-import { hasAndroidCompositionQuirk } from '#lib/platform/input.js';
+import { hasAndroidCompositionQuirk, hasIosKeyboardContextQuirk } from '#lib/platform/input.js';
 
 import { filesFromSources, pastedImageSources } from './pasted-images';
 import { mfmTimeInputRule } from './mfm';
@@ -509,6 +509,8 @@ export class ComposerEditor {
   private source = false;
   private pillSpace: number | null = null;
   private androidDelete: { pos: number; at: number } | null = null;
+  private keyboardReset: HTMLTextAreaElement | undefined;
+  private keyboardResetFrame: number | undefined;
 
   constructor(private options: ComposerEditorOptions) {}
 
@@ -746,7 +748,20 @@ export class ComposerEditor {
 
     this.view = view;
 
+    if (hasIosKeyboardContextQuirk()) {
+      const proxy = document.createElement('textarea');
+      proxy.className = 'keyboard-reset';
+      proxy.tabIndex = -1;
+      proxy.setAttribute('aria-hidden', 'true');
+      node.append(proxy);
+      this.keyboardReset = proxy;
+    }
+
     return () => {
+      if (this.keyboardResetFrame !== undefined) cancelAnimationFrame(this.keyboardResetFrame);
+      this.keyboardResetFrame = undefined;
+      this.keyboardReset?.remove();
+      this.keyboardReset = undefined;
       view.destroy();
       if (this.view === view) {
         this.detachedDoc = view.state.doc;
@@ -817,6 +832,22 @@ export class ComposerEditor {
     const view = this.view;
     if (!view) return;
     view.dispatch(view.state.tr.delete(0, view.state.doc.content.size));
+    if (this.keyboardReset && view.hasFocus()) this.resetKeyboard(view, this.keyboardReset);
+  }
+
+  private resetKeyboard(view: EditorView, proxy: HTMLTextAreaElement): void {
+    proxy.focus({ preventScroll: true });
+    if (this.keyboardResetFrame !== undefined) cancelAnimationFrame(this.keyboardResetFrame);
+    this.keyboardResetFrame = requestAnimationFrame(() => {
+      this.keyboardResetFrame = requestAnimationFrame(() => {
+        this.keyboardResetFrame = undefined;
+        if (this.view !== view || document.activeElement !== proxy) return;
+        const typed = proxy.value;
+        proxy.value = '';
+        view.focus();
+        if (typed) view.dispatch(view.state.tr.insertText(typed));
+      });
+    });
   }
 
   clearHistory(): void {

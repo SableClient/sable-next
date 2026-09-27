@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
 import { Fragment, Slice } from 'prosemirror-model';
 import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
@@ -470,6 +470,74 @@ describe('Android enter', () => {
 
     expect(submit).not.toHaveBeenCalled();
     expect(event.defaultPrevented).toBe(false);
+  });
+});
+
+describe('iOS keyboard context', () => {
+  const iosUserAgent = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)';
+  let frames: FrameRequestCallback[] = [];
+
+  beforeEach(() => {
+    frames = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+  });
+
+  function nextFrame(): void {
+    const pending = frames;
+    frames = [];
+    for (const callback of pending) callback(0);
+  }
+
+  function proxy(): HTMLTextAreaElement {
+    const element = document.querySelector<HTMLTextAreaElement>('.keyboard-reset');
+    if (!element) throw new Error('keyboard reset proxy not found');
+    return element;
+  }
+
+  test('clearing a focused composer hands focus to another element for a frame', () => {
+    setUserAgent(iosUserAgent);
+    const editor = open();
+    editor.setText('hello');
+    editor.focus();
+
+    editor.clear();
+    expect(document.activeElement).toBe(proxy());
+
+    nextFrame();
+    expect(document.activeElement).toBe(proxy());
+
+    nextFrame();
+    expect(document.activeElement).toBe(surface());
+  });
+
+  test('keeps what was typed while focus was away', () => {
+    setUserAgent(iosUserAgent);
+    const editor = open();
+    editor.setText('hello');
+    editor.focus();
+
+    editor.clear();
+    proxy().value = 'h';
+    nextFrame();
+    nextFrame();
+
+    expect(editor.text()).toBe('h');
+    expect(proxy().value).toBe('');
+  });
+
+  test('leaves focus alone off iOS', () => {
+    setUserAgent(defaultUserAgent);
+    const editor = open();
+    editor.setText('hello');
+    editor.focus();
+
+    editor.clear();
+
+    expect(document.querySelector('.keyboard-reset')).toBeNull();
+    expect(document.activeElement).toBe(surface());
   });
 });
 

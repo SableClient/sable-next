@@ -49,6 +49,17 @@
     overflow-wrap: anywhere;
   }
 
+  .editor :global(.keyboard-reset) {
+    border: 0;
+    font-size: max(var(--font-size-editor), var(--font-size-input-min));
+    inset: 0;
+    opacity: 0;
+    padding: 0;
+    pointer-events: none;
+    position: absolute;
+    resize: none;
+  }
+
   .editor :global([contenteditable='true'] p) {
     margin: 0;
   }
