@@ -39,7 +39,9 @@ vi.mock('#lib/features/room/message-scope.svelte.js', async () => {
     pinnedEvents: () => Promise.resolve([]),
     setPinned: () => Promise.resolve([]),
   });
-  return { useRoomScopes: () => ({ for: () => ({ cosmetics: null, pinned }) }) };
+  return {
+    useRoomScopes: () => ({ acquire: () => ({ cosmetics: null, pinned, release: vi.fn() }) }),
+  };
 });
 
 import ForumThreadItemHarness from './ForumThreadItemHarness.test.svelte';

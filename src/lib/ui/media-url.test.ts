@@ -123,6 +123,27 @@ test('does not revoke an object URL a caller is still displaying', async () => {
   expect(revoke).toHaveBeenCalledWith(held);
 });
 
+test('enforces the byte budget when the last media consumer releases its hold', async () => {
+  let nextUrl = 0;
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:release-${nextUrl++}`);
+  const core = {
+    session: session('account-release', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(40 * 1024 * 1024))) },
+  };
+  const source = 'mxc://example.org/large-video';
+  const first = holdMediaUrl(core, source, 0, 0);
+  const last = holdMediaUrl(core, source, 0, 0);
+  const url = await loadMediaUrl(core, source, 0, 0);
+
+  first();
+  expect(revoke).not.toHaveBeenCalledWith(url);
+  last();
+  expect(revoke).toHaveBeenCalledWith(url);
+  expect(cachedMediaUrl(core, source, 0, 0)).toBeUndefined();
+});
+
 test('keeps the shape of a held URL however much media is measured after it', async () => {
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:shaped');
   vi.stubGlobal('createImageBitmap', (blob: Blob) =>

@@ -90,7 +90,7 @@ export function mediaAspectRatio(
   return objectUrls.get(key)?.ratio ?? aspectRatios.get(key) ?? null;
 }
 
-function evict(published: string): void {
+function evict(published?: string): void {
   for (const [oldestKey, oldest] of objectUrls) {
     if (objectUrls.size <= MAX_OBJECT_URLS && objectUrlBytes <= MAX_OBJECT_URL_BYTES) break;
     if (oldestKey === published || holds.has(oldestKey)) continue;
@@ -123,6 +123,7 @@ export function holdMediaUrl(
     holds.delete(key);
     for (const url of displaced.get(key) ?? []) URL.revokeObjectURL(url);
     displaced.delete(key);
+    evict();
   };
 }
 

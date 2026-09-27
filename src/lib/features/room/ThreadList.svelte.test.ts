@@ -39,7 +39,9 @@ vi.mock('./message-scope.svelte.js', async () => {
     pinnedEvents: () => Promise.resolve([]),
     setPinned: () => Promise.resolve([]),
   });
-  return { useRoomScopes: () => ({ for: () => ({ cosmetics: null, pinned }) }) };
+  return {
+    useRoomScopes: () => ({ acquire: () => ({ cosmetics: null, pinned, release: vi.fn() }) }),
+  };
 });
 
 import { core } from '#lib/core/__mocks__/context.js';

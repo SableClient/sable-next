@@ -130,7 +130,9 @@
   const bookmarks = new Bookmarks(core.commands);
   provideBookmarks(bookmarks);
   provideEventItems(new EventItems(core.commands, () => core.session?.user_id ?? null));
-  provideRoomScopes(new RoomScopes(core));
+  const roomScopes = new RoomScopes(core);
+  provideRoomScopes(roomScopes);
+  onDestroy(() => roomScopes.dispose());
   const presence = new PresenceStore();
   providePresenceStore(presence);
   const notifications = new NotificationCenter();

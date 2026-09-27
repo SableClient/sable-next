@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack, type Snippet } from 'svelte';
+  import { onDestroy, untrack, type Snippet } from 'svelte';
 
   import { provideRoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
 
@@ -15,7 +15,8 @@
 
   let { roomId, children }: Props = $props();
 
-  const scope = useRoomScopes().for(untrack(() => roomId));
+  const scope = useRoomScopes().acquire(untrack(() => roomId));
+  onDestroy(scope.release);
   provideRoomCosmetics(scope.cosmetics);
   providePinnedEvents(scope.pinned);
   provideMessageDialogs(new MessageDialogs());

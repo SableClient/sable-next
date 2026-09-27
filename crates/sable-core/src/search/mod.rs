@@ -6,7 +6,6 @@ mod tokenize;
 pub(crate) use crawl::CrawlProgress;
 pub(crate) use server::ServerSearch;
 
-use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -2734,21 +2733,7 @@ impl Core {
 
     pub(crate) async fn prime_persisted_rooms(self: &Arc<Self>, client: &matrix_sdk::Client) {
         for room in client.joined_rooms() {
-            let room_id = room.room_id().to_owned();
-
-            let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await else {
-                continue;
-            };
-            let Ok(events) = cache.events().await else {
-                continue;
-            };
-
-            let rules = room.clone_info().room_version_rules_or_default().redaction;
-            self.search_index
-                .lock()
-                .await
-                .ingest(&room_id, events, &cache, &rules)
-                .await;
+            self.index_room_search(client, &room).await;
         }
     }
 
@@ -2798,23 +2783,12 @@ impl Core {
                 core.watch_search_crawl(&client);
                 core.watch_search_persist(&client);
 
-                let mut subscribed: HashMap<OwnedRoomId, crate::Task> = HashMap::new();
-
                 loop {
                     let room_id = match updates.recv().await {
                         Ok(update) => update.room_id,
                         Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => {
-                            warn!(
-                                missed,
-                                "missed room updates, resweeping for unwatched rooms"
-                            );
-                            for room in client.joined_rooms() {
-                                if let Entry::Vacant(entry) =
-                                    subscribed.entry(room.room_id().to_owned())
-                                {
-                                    entry.insert(core.watch_room_search_index(&client, room));
-                                }
-                            }
+                            warn!(missed, "missed room updates, resweeping the search index");
+                            core.prime_persisted_rooms(&client).await;
                             continue;
                         }
                         Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
@@ -2824,87 +2798,59 @@ impl Core {
                         .get_room(&room_id)
                         .filter(|room| room.state() == RoomState::Joined)
                     else {
-                        subscribed.remove(&room_id);
                         core.search_index.lock().await.forget_room(&room_id);
                         core.search_crawl.lock().await.forget(&room_id);
                         let _ = persist::forget(&client, &room_id).await;
                         continue;
                     };
 
-                    if let Entry::Vacant(entry) = subscribed.entry(room_id) {
-                        entry.insert(core.watch_room_search_index(&client, room));
-                    }
+                    core.index_room_search(&client, &room).await;
                 }
             })
             .abort_on_drop(),
         );
     }
 
-    fn watch_room_search_index(
-        self: &Arc<Self>,
-        client: &matrix_sdk::Client,
-        room: matrix_sdk::Room,
-    ) -> crate::Task {
-        let core = self.clone();
-        let client = client.clone();
+    async fn index_room_search(&self, client: &matrix_sdk::Client, room: &matrix_sdk::Room) {
+        use tokio::sync::broadcast::error::TryRecvError;
 
-        spawn(async move {
-            let room_id = room.room_id().to_owned();
-            let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await else {
-                return;
-            };
-            let Ok((initial, mut updates)) = cache.subscribe().await else {
-                return;
-            };
-            let rules = room.clone_info().room_version_rules_or_default().redaction;
+        let room_id = room.room_id().to_owned();
+        if self.search_crawl.lock().await.is_ingesting(&room_id) {
+            return;
+        }
+        let Ok((cache, _drop_handles)) = client.event_cache().room(&room_id).await else {
+            return;
+        };
+        // Pin only while indexing: a permanent subscriber disables SDK cache shrinking.
+        let Ok((mut events, mut updates)) = cache.subscribe().await else {
+            return;
+        };
+        let rules = room.clone_info().room_version_rules_or_default().redaction;
 
-            core.search_index
-                .lock()
-                .await
-                .ingest(&room_id, initial, &cache, &rules)
-                .await;
+        loop {
+            let mut index = self.search_index.lock().await;
+            let fresh = index.unclassified(&room_id, events);
+            index.ingest(&room_id, fresh, &cache, &rules).await;
+            drop(index);
 
-            loop {
-                let events = match updates.recv().await {
+            // Include updates that arrived during ingestion before releasing the cache.
+            events = loop {
+                match updates.try_recv() {
                     Ok(RoomEventCacheUpdate::UpdateTimelineEvents(timeline)) => {
-                        ingestable_events(timeline.diffs)
+                        break ingestable_events(timeline.diffs);
                     }
-                    Ok(_) => continue,
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(missed)) => {
-                        warn!(
-                            %room_id,
-                            missed,
-                            "the search index missed room updates, rebuilding from the cache"
-                        );
-                        match cache.events().await {
-                            Ok(events) => events,
-                            Err(error) => {
-                                warn!(%room_id, "could not reread the event cache: {error}");
-                                continue;
-                            }
+                    Ok(_) => {}
+                    Err(TryRecvError::Lagged(_)) => match cache.events().await {
+                        Ok(events) => break events,
+                        Err(error) => {
+                            warn!(%room_id, "could not reread the event cache: {error}");
+                            return;
                         }
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                };
-
-                let events = core
-                    .search_index
-                    .lock()
-                    .await
-                    .unclassified(&room_id, events);
-
-                if events.is_empty() || core.search_crawl.lock().await.is_ingesting(&room_id) {
-                    continue;
+                    },
+                    Err(TryRecvError::Empty | TryRecvError::Closed) => return,
                 }
-
-                core.search_index
-                    .lock()
-                    .await
-                    .ingest(&room_id, events, &cache, &rules)
-                    .await;
-            }
-        })
-        .abort_on_drop()
+            };
+        }
     }
 }
 
@@ -2954,6 +2900,30 @@ mod tests {
         index
             .ingest(room_id, events, cache, &RedactionRules::V11)
             .await;
+    }
+
+    async fn wait_for_hits(
+        core: &crate::Core,
+        room_id: &matrix_sdk::ruma::OwnedRoomId,
+        query: &str,
+        count: usize,
+    ) {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while in_room(
+                &*core.search_index.lock().await,
+                room_id,
+                query,
+                count + 1,
+                0,
+            )
+            .len()
+                != count
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("search index caught up");
     }
 
     fn document(
@@ -3541,6 +3511,86 @@ mod tests {
         );
         drop(index);
         drop(room);
+    }
+
+    #[async_test]
+    async fn test_search_watcher_releases_paginated_room_cache() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+        let room_id = room_id!("!retention:localhost").to_owned();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous")
+                    .add_timeline_event(factory.text_msg("latest").event_id(event_id!("$latest"))),
+            )
+            .await;
+        let (cache, _handles) = client.event_cache().room(&room_id).await.unwrap();
+        let (_, foreground) = cache.subscribe().await.unwrap();
+        let (core, _events) = crate::Core::new(
+            "search-retention",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.foreground_paginations
+            .store(1, std::sync::atomic::Ordering::Relaxed);
+        core.watch_search_index(&client);
+        wait_for_hits(&core, &room_id, "latest", 1).await;
+
+        let history = (0..300)
+            .map(|index| {
+                factory
+                    .text_msg("archaeology")
+                    .event_id(&EventId::parse(format!("$history{index}")).unwrap())
+            })
+            .collect();
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().events(history))
+            .mock_once()
+            .mount()
+            .await;
+        cache.pagination().run_backwards_once(300).await.unwrap();
+        wait_for_hits(&core, &room_id, "archaeology", 300).await;
+        let loaded = cache.events().await.unwrap().len();
+        assert_eq!(loaded, 301);
+        drop(foreground);
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while cache.events().await.unwrap().len() >= loaded {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("search must not pin the paginated SDK cache");
+        assert_eq!(
+            in_room(
+                &*core.search_index.lock().await,
+                &room_id,
+                "archaeology",
+                400,
+                0
+            )
+            .len(),
+            300
+        );
+
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id).add_timeline_event(
+                    factory
+                        .text_msg("subsequent")
+                        .event_id(event_id!("$subsequent")),
+                ),
+            )
+            .await;
+        wait_for_hits(&core, &room_id, "subsequent", 1).await;
+        core.session_tasks.lock().unwrap().clear();
     }
 
     #[async_test]

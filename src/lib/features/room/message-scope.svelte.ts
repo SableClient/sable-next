@@ -10,24 +10,50 @@ export interface RoomScope {
   pinned: PinnedEvents;
 }
 
+type ScopeCore = Pick<CoreClient, 'session' | 'subscribeEvents'> & {
+  commands: Pick<CoreClient['commands'], 'roomCosmetics' | 'pinnedEvents' | 'setPinned'>;
+};
+
+type Entry = { scope: RoomScope; consumers: number; stop: () => void };
+
 export class RoomScopes {
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- a cache nothing renders from
-  readonly #rooms = new Map<string, RoomScope>();
+  readonly #rooms = new Map<string, Entry>();
 
-  constructor(private readonly core: CoreClient) {}
+  constructor(private readonly core: ScopeCore) {}
 
-  for(roomId: string): RoomScope {
-    const key = `${this.core.session?.user_id ?? ''}\n${roomId}`;
-    const found = this.#rooms.get(key);
-    if (found) return found;
-    const scope = {
-      cosmetics: new RoomCosmetics(this.core),
-      pinned: new PinnedEvents(this.core.commands),
+  acquire(roomId: string): RoomScope & { release: () => void } {
+    const key = `${this.core.session?.account_id ?? ''}\n${roomId}`;
+    let entry = this.#rooms.get(key);
+    if (!entry) {
+      const scope = {
+        cosmetics: new RoomCosmetics(this.core),
+        pinned: new PinnedEvents(this.core.commands),
+      };
+      entry = { scope, consumers: 0, stop: scope.cosmetics.watch() };
+      this.#rooms.set(key, entry);
+      void scope.cosmetics.load(roomId, null);
+    }
+    const held = entry;
+    held.consumers += 1;
+    let released = false;
+    return {
+      ...held.scope,
+      release: () => {
+        if (released || this.#rooms.get(key) !== held) return;
+        released = true;
+        held.consumers -= 1;
+        if (held.consumers === 0) {
+          held.stop();
+          this.#rooms.delete(key);
+        }
+      },
     };
-    this.#rooms.set(key, scope);
-    scope.cosmetics.watch();
-    void scope.cosmetics.load(roomId, null);
-    return scope;
+  }
+
+  dispose(): void {
+    for (const entry of this.#rooms.values()) entry.stop();
+    this.#rooms.clear();
   }
 }
 
