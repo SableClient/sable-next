@@ -307,7 +307,12 @@
     gap: var(--space-300);
     margin-top: calc(var(--profile-avatar-size) / -2);
     padding: 0 var(--space-400);
+    pointer-events: none;
     position: relative;
+  }
+
+  .profile-card-crest > :global(*) {
+    pointer-events: auto;
   }
 
   .profile-card-crest :global(.avatar-root.profile-card-avatar) {
