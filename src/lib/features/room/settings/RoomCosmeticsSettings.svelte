@@ -24,8 +24,8 @@
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { uprightJpeg } from '#lib/ui/upright-jpeg.js';
 
-  import { senderDisplayColors } from '../members';
-  import SenderName from '../SenderName.svelte';
+  import { senderDisplayColors } from '../members/members';
+  import SenderName from '../members/SenderName.svelte';
   import { canSendState, toEventContent } from './permission-groups';
 
   import '#lib/ui/primitives/settings-row.css';

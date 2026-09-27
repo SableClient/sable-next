@@ -1,6 +1,6 @@
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { localHierarchyRooms } from '../room/space-hierarchy';
+import { localHierarchyRooms } from '../room/spaces/space-hierarchy';
 
 export function resolveRoomTarget(
   rooms: readonly RoomSummary[],

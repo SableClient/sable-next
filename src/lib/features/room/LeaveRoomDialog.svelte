@@ -9,7 +9,10 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
-  import { joinedSpaceChildrenLeaveOrder, recursiveSpaceLeaveOrder } from './space-leave-order.js';
+  import {
+    joinedSpaceChildrenLeaveOrder,
+    recursiveSpaceLeaveOrder,
+  } from './spaces/space-leave-order.js';
 
   interface Props {
     open: boolean;

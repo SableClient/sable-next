@@ -1,6 +1,6 @@
 import { DOMParser, Schema, type ParseRule } from 'prosemirror-model';
 
-import { splitVia } from '#lib/features/room/join-address.js';
+import { splitVia } from '#lib/rooms/join-address.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 

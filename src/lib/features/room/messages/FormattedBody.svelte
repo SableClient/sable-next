@@ -1,0 +1,804 @@
+<script lang="ts">
+  import { mount, unmount, untrack, type Component } from 'svelte';
+  import { on } from 'svelte/events';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
+  import GearSixIcon from 'phosphor-svelte/lib/GearSixIcon';
+
+  import { useCoreClient } from '#lib/core/context.js';
+  import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { pixelatedImage } from '#lib/ui/pixelated.js';
+  import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
+
+  import {
+    formatTimeInZone,
+    formatUtcTime,
+    parseZonedDatetime,
+  } from '#lib/features/composer/time-markup.js';
+  import { markAbbreviations } from '../abbreviations';
+  import { formatMessageTimestamp, formatTime } from '#lib/ui/date-time.js';
+  import { hasRoomAbbreviations, useRoomAbbreviations } from '../room-abbreviations.svelte.js';
+  import {
+    hasRoomMemberNames,
+    mentionLabel,
+    useRoomMemberNames,
+  } from '../members/room-member-names.js';
+  import {
+    hasRoomMediaPreviews,
+    useRoomMediaPreviews,
+  } from '../media/room-media-previews.svelte.js';
+
+  import type { MatrixLink } from '#lib/rooms/matrix-link.js';
+  import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
+  import { splitVia } from '#lib/rooms/join-address.js';
+  import { settingsLinkLabel } from '../settings/settings-link-label';
+  import { parseSettingsLink } from '../settings/settings-link';
+  import { replyPreviewBody } from './reply-preview';
+  import { FormattedBodyImages } from './formatted-body-images';
+
+  interface Props {
+    html: string;
+    senderTimezone?: string | null;
+    onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
+  }
+
+  let { html, senderTimezone = null, onMatrixLink }: Props = $props();
+  const core = useCoreClient();
+  const roomList = useRoomList();
+  const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
+  const memberNames = hasRoomMemberNames() ? useRoomMemberNames() : null;
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
+  const bodyImages = new FormattedBodyImages(core, fallbackLabel, paint);
+  let definitionAnchor = $state.raw<HTMLElement | null>(null);
+  let definitionPinned = $state(false);
+  let definition = $derived(
+    definitionAnchor?.dataset.abbrDefinition ??
+      (definitionAnchor ? timeDetail(definitionAnchor) : null) ??
+      ''
+  );
+  let renderedHtml = $derived(bodyImages.defer(html));
+  let hasImages = $derived(/<img\b/i.test(html));
+  let revealedImages = $state(false);
+  let imagesConcealed = $derived(hasImages && (roomMedia?.hidden ?? false) && !revealedImages);
+
+  function images(html: string, concealed: boolean) {
+    return (node: HTMLElement) => {
+      void html;
+      return untrack(() => bodyImages.attach(node, concealed));
+    };
+  }
+
+  function pixelateEmote(image: HTMLImageElement): void {
+    if (image.dataset.mxEmoticon === undefined || !image.complete) return;
+    image.classList.toggle(
+      'pixelated',
+      pixelatedImage(preferences.pixelatedImages, image.naturalWidth, image.naturalHeight)
+    );
+  }
+
+  function paint(image: HTMLImageElement, url: string): void {
+    image.onload = () => {
+      pixelateEmote(image);
+      holdStillFrame(image, animationsPaused());
+    };
+    image.src = url;
+    delete image.dataset.mediaPending;
+  }
+
+  function holdAnimations(node: HTMLElement): void {
+    const paused = animationsPaused();
+    for (const image of node.querySelectorAll('img')) holdStillFrame(image, paused);
+  }
+
+  function fallbackLabel(image: HTMLImageElement, emoticon: boolean): string {
+    const label = image.alt || image.title;
+    if (!label) return '';
+    return emoticon ? `:${label}:` : label;
+  }
+
+  async function renderMaths(elements: NodeListOf<HTMLElement>): Promise<void> {
+    const [{ default: katex }] = await Promise.all([
+      import('katex'),
+      import('katex/dist/katex.min.css'),
+    ]);
+    for (const element of elements) {
+      const maths = element.dataset.mxMaths;
+      if (maths === undefined || !element.isConnected) continue;
+      element.innerHTML = katex.renderToString(maths, {
+        displayMode: element.tagName === 'DIV',
+        throwOnError: false,
+      });
+    }
+  }
+
+  function decorate(html: string) {
+    return (node: HTMLElement) => {
+      void html;
+      return untrack(() => {
+        const icons: ReturnType<typeof mount>[] = [];
+        const withIcon = (anchor: HTMLAnchorElement, icon: Component): HTMLSpanElement => {
+          const holder = document.createElement('span');
+          holder.className = 'link-chip-icon';
+          holder.ariaHidden = 'true';
+          const label = document.createElement('span');
+          label.textContent = anchor.textContent;
+          anchor.replaceChildren(holder, label);
+          icons.push(mount(icon, { target: holder }));
+          return label;
+        };
+        for (const anchor of node.querySelectorAll('a')) {
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+
+          const link = parseMatrixLink(anchor.href);
+          if (link) {
+            anchor.dataset.matrixLink = link.kind;
+            if (link.kind === 'user') continue;
+            const bare = anchor.textContent.trim() === anchor.getAttribute('href')?.trim();
+            if (bare) anchor.textContent = link.roomId;
+            const label = link.kind === 'event' ? withIcon(anchor, ChatCircleIcon) : anchor;
+            if (bare) void resolveLinkLabel(link, anchor, label);
+            continue;
+          }
+
+          const settings = parseSettingsLink(anchor.href, location.origin);
+          if (settings) {
+            anchor.dataset.settingsLink = settings.section;
+            if (settings.focus !== undefined) anchor.dataset.settingsLinkFocus = settings.focus;
+            anchor.textContent = settingsLinkLabel(settings);
+            withIcon(anchor, GearSixIcon);
+          }
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-color]')) {
+          element.style.color = element.dataset.mxColor ?? '';
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
+          element.style.backgroundColor = element.dataset.mxBgColor ?? '';
+        }
+        for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
+          if (element.parentElement?.classList.contains('time-chip')) continue;
+          const zoned = parseZonedDatetime(element.dateTime);
+          if (!zoned) continue;
+
+          const chip = document.createElement(element.closest('a') ? 'span' : 'button');
+          if (chip instanceof HTMLButtonElement) chip.type = 'button';
+          chip.className = 'time-chip';
+          element.dateTime = zoned.datetime;
+          element.replaceWith(chip);
+          chip.append(element);
+        }
+        for (const element of node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')) {
+          element.tabIndex = 0;
+          element.role = 'button';
+          element.ariaPressed = 'true';
+          if (!element.textContent?.trim()) {
+            const image = element.querySelector('img');
+            element.ariaLabel = image?.alt || $i18n.t('timeline.spoilerMedia');
+          }
+        }
+
+        decorateCodeBlocks(node);
+        const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
+        if (maths.length > 0) void renderMaths(maths);
+
+        const offClick = on(node, 'click', handleClick);
+        const offKeydown = on(node, 'keydown', handleKeydown);
+        const offPointerOver = on(node, 'pointerover', handleDefinitionOver);
+        const offPointerOut = on(node, 'pointerout', handleDefinitionOut);
+        const offFocusIn = on(node, 'focusin', handleDefinitionOver);
+        const offFocusOut = on(node, 'focusout', handleDefinitionOut);
+        return () => {
+          offClick();
+          offKeydown();
+          offPointerOver();
+          offPointerOut();
+          offFocusIn();
+          offFocusOut();
+          closeDefinition();
+          for (const icon of icons) void unmount(icon);
+        };
+      });
+    };
+  }
+
+  function relabel(html: string) {
+    return (node: HTMLElement) => {
+      void html;
+      for (const anchor of node.querySelectorAll<HTMLAnchorElement>('a[data-matrix-link="user"]')) {
+        const link = parseMatrixLink(anchor.href);
+        if (link?.kind === 'user') anchor.textContent = mentionLabel(link.userId, memberNames);
+      }
+      for (const chip of node.querySelectorAll<HTMLElement>('.time-chip')) {
+        const time = chip.querySelector('time');
+        const zoned = time ? parseZonedDatetime(time.dateTime) : null;
+        if (!time || !zoned) continue;
+        time.textContent = formatMessageTimestamp(zoned.instant);
+        if (chip instanceof HTMLButtonElement) chip.ariaLabel = timeDetail(chip);
+      }
+
+      for (const image of node.querySelectorAll<HTMLImageElement>('img[data-mx-emoticon]')) {
+        pixelateEmote(image);
+      }
+
+      const pattern = abbreviations?.pattern;
+      if (pattern) markAbbreviations(node, abbreviations.map, pattern);
+    };
+  }
+
+  function timeDetail(chip: HTMLElement): string | null {
+    const time = chip.classList.contains('time-chip') ? chip.querySelector('time') : null;
+    const zoned = time ? parseZonedDatetime(time.dateTime) : null;
+    if (!zoned) return null;
+    const local = formatTime(zoned.instant);
+    const utc = formatUtcTime(zoned.instant, preferences.hour24Clock);
+    const sender = senderTimezone
+      ? formatTimeInZone(zoned.instant, senderTimezone, preferences.hour24Clock)
+      : null;
+    return sender
+      ? $i18n.t('timeline.timeMarkupDetailWithSender', {
+          local,
+          sender,
+          timezone: senderTimezone,
+          utc,
+        })
+      : $i18n.t('timeline.timeMarkupDetail', { local, utc });
+  }
+
+  const EVENT_SNIPPET_LENGTH = 72;
+
+  async function resolveLinkLabel(
+    link: Exclude<MatrixLink, { kind: 'user' }>,
+    anchor: HTMLAnchorElement,
+    label: HTMLElement
+  ) {
+    const known = roomList.rooms.find(
+      (room) => room.room_id === link.roomId || room.canonical_alias === link.roomId
+    );
+    const name =
+      known?.name ??
+      (await core.commands.roomPreview(link.roomId, splitVia(anchor.href).via).then(
+        (preview) => preview.name,
+        () => null
+      ));
+    const room = name ? (name.startsWith('#') ? name : `#${name}`) : null;
+    const snippet =
+      link.kind === 'event' && known
+        ? await core.commands.eventItems(known.room_id, [link.eventId]).then(
+            ([item]) => (item ? replyPreviewBody(item.content).replace(/\s+/g, ' ').trim() : ''),
+            () => ''
+          )
+        : '';
+    if (!anchor.isConnected || room === null) return;
+    const short =
+      snippet.length > EVENT_SNIPPET_LENGTH
+        ? `${snippet.slice(0, EVENT_SNIPPET_LENGTH - 1)}…`
+        : snippet;
+    label.textContent = short ? `${room}: ${short}` : room;
+  }
+
+  /** Past this many lines a block collapses behind a toggle. */
+  const CODE_LINE_LIMIT = 14;
+
+  function classLanguage(element: Element | null): string | null {
+    const named = [...(element?.classList ?? [])].find((name) => name.startsWith('language-'));
+    return named?.slice('language-'.length) || null;
+  }
+
+  function trimTrailingNewline(block: HTMLElement): void {
+    const last = block.querySelector('code')?.lastChild ?? block.lastChild;
+    if (last?.nodeType === Node.TEXT_NODE && last.nodeValue?.endsWith('\n')) {
+      last.nodeValue = last.nodeValue.slice(0, -1);
+    }
+  }
+
+  function codeLanguage(block: HTMLElement): string | null {
+    return classLanguage(block.querySelector('code')) ?? classLanguage(block);
+  }
+
+  function decorateCodeBlocks(node: HTMLElement): void {
+    for (const block of node.querySelectorAll<HTMLPreElement>('pre')) {
+      if (block.dataset.codeHandled !== undefined) continue;
+      block.dataset.codeHandled = '';
+
+      const language = codeLanguage(block);
+      trimTrailingNewline(block);
+      const long = block.textContent.split('\n').length > CODE_LINE_LIMIT;
+
+      const figure = document.createElement('div');
+      figure.className = 'code-block';
+      if (long) figure.dataset.collapsed = '';
+
+      const header = document.createElement('div');
+      header.className = 'code-head';
+
+      const label = document.createElement('span');
+      label.className = 'code-language';
+      label.textContent = language ?? $i18n.t('timeline.codeLabel');
+      header.append(label);
+
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'code-action';
+      copy.dataset.codeCopy = '';
+      copy.textContent = $i18n.t('timeline.copyCode');
+      header.append(copy);
+
+      if (long) {
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'code-action';
+        toggle.dataset.codeToggle = '';
+        toggle.textContent = $i18n.t('timeline.expandCode');
+        header.append(toggle);
+      }
+
+      block.replaceWith(figure);
+      figure.append(header, block);
+      void paintHighlight(block, language);
+    }
+  }
+
+  async function paintHighlight(block: HTMLPreElement, language: string | null): Promise<void> {
+    const code = block.querySelector('code');
+    const source = code?.textContent;
+    if (!code || !source) return;
+
+    const { highlightCode } = await import('./code-highlight');
+    const html = await highlightCode(source, language);
+    // The row may have scrolled out of the virtualiser while the grammar loaded.
+    if (html === null || !code.isConnected) return;
+    code.innerHTML = html;
+  }
+
+  function handleCodeAction(target: Element): boolean {
+    const button = target.closest<HTMLButtonElement>('.code-action');
+    const figure = button?.closest<HTMLElement>('.code-block');
+    const block = figure?.querySelector('pre');
+    if (!button || !figure || !block) return false;
+
+    if (button.dataset.codeToggle !== undefined) {
+      const collapsed = figure.dataset.collapsed !== undefined;
+      if (collapsed) delete figure.dataset.collapsed;
+      else figure.dataset.collapsed = '';
+      button.textContent = collapsed
+        ? $i18n.t('timeline.collapseCode')
+        : $i18n.t('timeline.expandCode');
+      return true;
+    }
+
+    if (button.dataset.codeCopy === undefined) return false;
+    const label = button;
+    void navigator.clipboard
+      .writeText(block.textContent)
+      .then(() => {
+        label.textContent = $i18n.t('timeline.copiedCode');
+        setTimeout(() => {
+          if (label.isConnected) label.textContent = $i18n.t('timeline.copyCode');
+        }, 1500);
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable code] clipboard unavailable', error);
+      });
+    return true;
+  }
+
+  function reveal(target: Element): boolean {
+    const spoiler = target.closest<HTMLElement>('[data-mx-spoiler]');
+    if (!spoiler || spoiler.ariaPressed === 'false') return false;
+    spoiler.ariaPressed = 'false';
+    return true;
+  }
+
+  function definitionOf(target: EventTarget | null): HTMLElement | null {
+    const found =
+      target instanceof Element
+        ? target.closest<HTMLElement>('abbr[data-abbr-definition], .time-chip')
+        : null;
+    const spoiler = found?.closest<HTMLElement>('[data-mx-spoiler]');
+    return spoiler && spoiler.ariaPressed !== 'false' ? null : found;
+  }
+
+  function closeDefinition(): void {
+    definitionAnchor = null;
+    definitionPinned = false;
+  }
+
+  function handleDefinitionOver(event: PointerEvent | FocusEvent): void {
+    const abbr = definitionOf(event.target);
+    if (abbr) definitionAnchor = abbr;
+  }
+
+  function handleDefinitionOut(event: PointerEvent | FocusEvent): void {
+    if (definitionPinned) return;
+    const abbr = definitionOf(event.target);
+    if (abbr && abbr === definitionAnchor) definitionAnchor = null;
+  }
+
+  function handleClick(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const abbr = definitionOf(target);
+    if (abbr && !abbr.closest('a')) {
+      event.preventDefault();
+      if (definitionPinned && abbr === definitionAnchor) closeDefinition();
+      else {
+        definitionAnchor = abbr;
+        definitionPinned = true;
+      }
+      return;
+    }
+    if (definitionPinned) closeDefinition();
+
+    if (handleCodeAction(target)) {
+      event.preventDefault();
+      return;
+    }
+    if (reveal(target)) {
+      event.preventDefault();
+      return;
+    }
+
+    const anchor = target.closest<HTMLAnchorElement>('a');
+    if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    if (anchor.href.toLowerCase().startsWith('matrix:')) event.preventDefault();
+    const link = parseMatrixLink(anchor.href);
+    if (!link || !onMatrixLink) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onMatrixLink(link, anchor);
+  }
+
+  function handleKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && definitionPinned) {
+      closeDefinition();
+      event.preventDefault();
+      return;
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target;
+    if (!(target instanceof Element) || !target.matches('[data-mx-spoiler]')) return;
+    if (reveal(target)) event.preventDefault();
+  }
+</script>
+
+<div
+  class="formatted-body"
+  {@attach decorate(renderedHtml)}
+  {@attach images(renderedHtml, imagesConcealed)}
+  {@attach relabel(renderedHtml)}
+  {@attach holdAnimations}
+>
+  <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+  {@html renderedHtml}
+</div>
+
+{#if imagesConcealed}
+  <Button
+    size="small"
+    class="reveal-images"
+    onclick={() => {
+      revealedImages = true;
+    }}
+  >
+    {$i18n.t('timeline.showImages')}
+  </Button>
+{/if}
+
+{#if definitionAnchor && definition}
+  <Tooltip
+    label={definition}
+    multiline={definitionAnchor.classList.contains('time-chip')}
+    open
+    customAnchor={definitionAnchor}
+    side="top"
+  />
+{/if}
+
+<style>
+  .formatted-body + :global(.reveal-images) {
+    margin-top: var(--space-100);
+  }
+
+  .formatted-body {
+    /* Relative so inline code keeps its ratio inside a heading too. */
+    --inline-code-scale: 0.9em;
+  }
+
+  .formatted-body,
+  .formatted-body :global(p) {
+    line-height: var(--line-height-body);
+    margin: 0;
+  }
+
+  .formatted-body :global(p + p) {
+    margin-block-start: 1lh;
+  }
+
+  .formatted-body :global(.time-chip) {
+    align-items: center;
+    cursor: pointer;
+    display: inline-flex;
+    font: inherit;
+    gap: var(--space-100);
+    line-height: inherit;
+    min-height: 1.5em;
+    vertical-align: baseline;
+    white-space: nowrap;
+  }
+
+  .formatted-body :global(.time-chip)::before {
+    background:
+      linear-gradient(currentcolor, currentcolor) 50% 27% / var(--border-width) 34% no-repeat,
+      linear-gradient(currentcolor, currentcolor) 67% 55% / 28% var(--border-width) no-repeat;
+    border: var(--border-width) solid currentcolor;
+    border-radius: 50%;
+    box-sizing: border-box;
+    content: '';
+    flex: 0 0 auto;
+    height: 0.9em;
+    width: 0.9em;
+  }
+
+  .formatted-body :global(.time-chip:hover) {
+    background: var(--sec-container-hover);
+  }
+
+  .formatted-body :global(.time-chip:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .formatted-body :global(abbr[data-abbr-definition]) {
+    cursor: help;
+    text-decoration: underline dotted;
+    text-underline-offset: 0.15em;
+  }
+
+  .formatted-body :global(abbr[data-abbr-definition]:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .formatted-body :global([data-plain-body]) {
+    white-space: pre-wrap;
+  }
+
+  .formatted-body :global(h1),
+  .formatted-body :global(h2),
+  .formatted-body :global(h3),
+  .formatted-body :global(h4),
+  .formatted-body :global(h5),
+  .formatted-body :global(h6) {
+    font-weight: var(--font-weight-bold);
+    line-height: var(--line-height-body);
+    margin: var(--space-100) 0 0;
+  }
+
+  .formatted-body :global(h1),
+  .formatted-body :global(h2) {
+    font-size: var(--font-size-heading);
+  }
+
+  .formatted-body :global(h3),
+  .formatted-body :global(h4),
+  .formatted-body :global(h5),
+  .formatted-body :global(h6) {
+    font-size: inherit;
+  }
+
+  .formatted-body :global(sub[data-md='-#']) {
+    color: var(--surface-var-on-container);
+    display: block;
+    font-size: var(--font-size-small);
+  }
+
+  .formatted-body :global(:first-child) {
+    margin-top: 0;
+  }
+
+  .formatted-body :global(:last-child) {
+    margin-bottom: 0;
+  }
+
+  .formatted-body :global(ul),
+  .formatted-body :global(ol) {
+    margin: var(--space-200) 0;
+    padding-inline-start: var(--space-600);
+  }
+
+  .formatted-body :global(ol) {
+    list-style-position: inside;
+    padding-inline-start: var(--space-200);
+  }
+
+  .formatted-body :global(a) {
+    color: var(--primary-main);
+    text-decoration: var(--link-decoration);
+  }
+
+  .formatted-body :global(a:hover) {
+    text-decoration: underline;
+  }
+
+  .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global(a[data-settings-link]) {
+    display: inline-block;
+  }
+
+  .formatted-body :global(.link-chip-icon) {
+    display: inline-flex;
+    margin-inline-end: var(--space-100);
+    vertical-align: -0.125em;
+  }
+
+  .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global(a[data-settings-link]),
+  .formatted-body :global(.time-chip) {
+    background: var(--sec-container);
+    border: var(--border-width) solid var(--sec-container-line);
+    border-radius: var(--radius);
+    color: var(--sec-on-container);
+    font-weight: var(--font-weight-medium);
+    padding: 0 var(--space-150);
+    text-decoration: none;
+  }
+
+  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false'])) {
+    background: var(--surface-var-on-container);
+    border-radius: var(--radius);
+    color: transparent;
+    cursor: pointer;
+  }
+
+  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) *) {
+    visibility: hidden;
+  }
+
+  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) img) {
+    filter: blur(0.75rem);
+    visibility: visible;
+  }
+
+  .formatted-body :global(blockquote) {
+    border-left: calc(var(--border-width) * 2) solid var(--surface-var-container-line);
+    margin: var(--space-100) 0;
+    padding-left: var(--space-200);
+  }
+
+  /* Inline code had no rule at all, so it read as prose. */
+  .formatted-body :global(code:not(pre code)) {
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
+    border-radius: var(--radii-300);
+    font-family: var(--font-family-mono);
+    font-size: var(--inline-code-scale);
+    padding: 0 var(--space-100);
+  }
+
+  .formatted-body :global(.code-block) {
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
+    border-radius: var(--radius);
+    margin: var(--space-100) 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .formatted-body :global(.code-head) {
+    align-items: center;
+    background: var(--surface-container);
+    border-bottom: var(--border-width) solid var(--surface-container-line);
+    display: flex;
+    gap: var(--space-200);
+    min-height: var(--control-height-small);
+    padding: 0 var(--space-200);
+  }
+
+  .formatted-body :global(.code-language) {
+    color: var(--surface-var-on-container);
+    flex: 1;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .formatted-body :global(.code-action) {
+    background: none;
+    border: 0;
+    border-radius: var(--radius-pill);
+    color: var(--primary-main);
+    cursor: pointer;
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: var(--font-size-small);
+    padding: 0 var(--space-200);
+  }
+
+  .formatted-body :global(.code-action:hover) {
+    background: var(--surface-container-hover);
+  }
+
+  /* An expanded block never scrolls vertically: a scroller there would swallow
+     the wheel whenever the pointer crossed it, stalling the timeline. */
+  .formatted-body :global(pre) {
+    line-height: var(--code-line-height);
+    margin: 0;
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
+    padding: var(--space-200);
+  }
+
+  .formatted-body :global(pre code) {
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-small);
+  }
+
+  /* Bounded so a long paste cannot own the viewport, and so the virtualiser's
+     estimate for the row stays close. */
+  .formatted-body :global(.code-block[data-collapsed] pre) {
+    max-height: 18.75rem;
+    overflow-y: auto;
+    overscroll-behavior-y: auto;
+  }
+
+  .formatted-body :global(.code-block[data-collapsed])::after {
+    background: linear-gradient(transparent, var(--surface-container));
+    bottom: 0;
+    content: '';
+    height: 2rem;
+    inset-inline: 0;
+    pointer-events: none;
+    position: absolute;
+  }
+
+  .formatted-body :global(img[data-media-pending]) {
+    display: none;
+  }
+
+  .formatted-body :global(img) {
+    max-height: 4rem;
+    max-width: 100%;
+    vertical-align: middle;
+    width: auto;
+  }
+
+  .formatted-body :global(img[data-mx-emoticon]) {
+    height: var(--timeline-emote-size, 1em);
+    vertical-align: var(--timeline-emote-align, middle);
+  }
+
+  .formatted-body :global(img[data-mx-emoticon].pixelated) {
+    image-rendering: pixelated;
+  }
+
+  .formatted-body :global(table) {
+    border-collapse: collapse;
+    margin: var(--space-100) 0;
+  }
+
+  .formatted-body :global(th),
+  .formatted-body :global(td) {
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-on-container);
+    padding: var(--space-050) var(--space-150);
+    text-align: left;
+  }
+
+  .formatted-body :global(th) {
+    background: var(--surface-var-container);
+    border-color: var(--surface-var-container-line);
+    color: var(--surface-var-on-container);
+  }
+
+  .formatted-body :global(summary) {
+    cursor: pointer;
+  }
+</style>

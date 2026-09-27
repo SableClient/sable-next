@@ -4,8 +4,8 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
 
-  import FormattedBody from './FormattedBody.svelte';
-  import type { MatrixLink } from './matrix-link';
+  import FormattedBody from './messages/FormattedBody.svelte';
+  import type { MatrixLink } from '../../rooms/matrix-link';
   import { topicHtml } from './topic-html';
 
   interface Props {

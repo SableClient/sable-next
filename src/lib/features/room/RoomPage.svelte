@@ -10,7 +10,7 @@
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
 
-  import JoinBeforeNavigate from './JoinBeforeNavigate.svelte';
+  import JoinBeforeNavigate from './discovery/JoinBeforeNavigate.svelte';
   import RoomView from './RoomView.svelte';
 
   const core = useCoreClient();

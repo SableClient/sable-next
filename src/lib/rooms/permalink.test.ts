@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { parseMatrixLink } from '#lib/features/room/matrix-link.js';
+import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { copyRoomLink, matrixToUrl, permalinkTarget, roomSectionPath, viaFor } from './permalink';
 

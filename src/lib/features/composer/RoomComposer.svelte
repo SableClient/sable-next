@@ -19,9 +19,9 @@
   import type { SendGalleryOptions } from '#lib/core/commands.svelte.js';
   import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
-  import type { ConversationSendResult } from '#lib/features/room/conversation.svelte.js';
-  import type { ReplyDirection } from '#lib/features/room/timeline-format.js';
-  import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
+  import type { ConversationSendResult } from '#lib/features/room/conversation/conversation.svelte.js';
+  import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
+  import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { loadPacks } from '#lib/emoji/load-packs.js';

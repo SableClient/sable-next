@@ -18,7 +18,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
-  import MemberIdentityRow from '../MemberIdentityRow.svelte';
+  import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
   import {
     MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_LABELS,
@@ -28,10 +28,10 @@
     matchesFilter,
     membershipFor,
     type MembershipFilter,
-  } from '../member-listing';
-  import MentionProfile from '../MentionProfile.svelte';
-  import { powerTag } from '../power-tags';
-  import RoleTagIcon from '../RoleTagIcon.svelte';
+  } from '../members/member-listing';
+  import MentionProfile from '../members/MentionProfile.svelte';
+  import { powerTag } from '../members/power-tags';
+  import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import RoomInviteDialog from '../RoomInviteDialog.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';

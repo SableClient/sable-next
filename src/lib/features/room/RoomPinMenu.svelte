@@ -20,11 +20,11 @@
     pinsHash,
     unreadPinCount,
     type PinReadMarker,
-  } from './pin-marker';
-  import { useEventItems } from './event-items.svelte.js';
-  import { pinErrorMessage } from './pinned-events.svelte.js';
-  import MessagePreview from './MessagePreview.svelte';
-  import { opensFrom } from './message-preview';
+  } from './timeline/pin-marker';
+  import { useEventItems } from './messages/event-items.svelte.js';
+  import { pinErrorMessage } from './timeline/pinned-events.svelte.js';
+  import MessagePreview from './messages/MessagePreview.svelte';
+  import { opensFrom } from './messages/message-preview';
 
   interface Props {
     roomId: string;

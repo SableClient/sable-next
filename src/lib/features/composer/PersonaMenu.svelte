@@ -8,7 +8,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
-  import '#lib/features/room/sender-identity.css';
+  import '#lib/features/room/members/sender-identity.css';
 
   interface Props {
     personas: readonly PersonaView[];

@@ -1,15 +1,15 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
 
-  import DeleteMessageDialog from '#lib/features/room/DeleteMessageDialog.svelte';
-  import MessageActions from '#lib/features/room/MessageActions.svelte';
-  import MessageActionSheet from '#lib/features/room/MessageActionSheet.svelte';
-  import { useMessageMenu } from '#lib/features/room/message-menu-open.svelte.js';
-  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
+  import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
+  import MessageActions from '#lib/features/room/messages/MessageActions.svelte';
+  import MessageActionSheet from '#lib/features/room/messages/MessageActionSheet.svelte';
+  import { useMessageMenu } from '#lib/features/room/messages/message-menu-open.svelte.js';
+  import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
-  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
-  import { opensFrom } from '#lib/features/room/message-preview.js';
+  import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
+  import { opensFrom } from '#lib/features/room/messages/message-preview.js';
 
   import type { ForumThread } from './forum-threads';
 

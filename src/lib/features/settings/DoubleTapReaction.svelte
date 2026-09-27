@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ReactionSheet from '#lib/features/room/ReactionSheet.svelte';
-  import { isCustomReaction } from '#lib/features/room/reaction-emote-label.js';
+  import ReactionSheet from '#lib/features/room/messages/ReactionSheet.svelte';
+  import { isCustomReaction } from '#lib/features/room/messages/reaction-emote-label.js';
   import { i18n } from '#lib/i18n.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { settingFocusId } from '#lib/settings/registry.js';

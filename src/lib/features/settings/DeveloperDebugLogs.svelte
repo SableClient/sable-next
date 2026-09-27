@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatTime } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
-  import { formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatTime } from '#lib/ui/date-time.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
 

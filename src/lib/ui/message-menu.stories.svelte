@@ -2,8 +2,8 @@
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
-  import MessageQuickReactions from '#lib/features/room/MessageQuickReactions.svelte';
-  import { messageMenuRows } from '#lib/features/room/message-menu-items.js';
+  import MessageQuickReactions from '#lib/features/room/messages/MessageQuickReactions.svelte';
+  import { messageMenuRows } from '#lib/features/room/messages/message-menu-items.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import '#lib/ui/primitives/menu.css';
 

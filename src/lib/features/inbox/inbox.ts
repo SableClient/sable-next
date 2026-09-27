@@ -1,6 +1,6 @@
 import type { BookmarkView, NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
-import { formatTime } from '#lib/features/room/timeline-format.js';
+import { formatTime } from '#lib/ui/date-time.js';
 import { currentLocale } from '#lib/i18n.js';
 import {
   hasUnread,

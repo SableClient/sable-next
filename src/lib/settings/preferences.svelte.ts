@@ -2,7 +2,7 @@ import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import type { PresenceView, ProfilePropagationView } from '#src/generated/protocol';
 import type { GifProviderSetting } from '#lib/features/gif/providers.js';
-import type { MemberSort } from '#lib/features/room/member-listing.js';
+import type { MemberSort } from '#lib/features/room/members/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';

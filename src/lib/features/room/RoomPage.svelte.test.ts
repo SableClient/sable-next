@@ -22,7 +22,7 @@ vi.mock('./RoomView.svelte', () => ({
     rendered.push({ kind: 'view', roomId: props.roomId, extra: props.room });
   },
 }));
-vi.mock('./JoinBeforeNavigate.svelte', () => ({
+vi.mock('./discovery/JoinBeforeNavigate.svelte', () => ({
   default: (_anchor: unknown, props: { roomId: string; via: string[] }) => {
     rendered.push({ kind: 'join', roomId: props.roomId, extra: props.via });
   },

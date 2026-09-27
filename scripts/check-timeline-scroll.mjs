@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-const source = 'src/lib/features/room/TimelineList.svelte';
+const source = 'src/lib/features/room/timeline/TimelineList.svelte';
 const text = readFileSync(source, 'utf8');
 const forbidden = [
   {

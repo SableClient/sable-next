@@ -50,7 +50,7 @@
     loadingMap = true;
     mapFailed = false;
     try {
-      const module = await import('#lib/features/room/LocationMap.svelte');
+      const module = await import('#lib/features/room/media/LocationMap.svelte');
       map = module.default;
     } catch (error) {
       console.warn('[sable composer] loading the map failed', error);

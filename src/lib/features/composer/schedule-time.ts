@@ -1,5 +1,5 @@
 import { currentLocale } from '#lib/i18n.js';
-import { formatTime } from '#lib/features/room/timeline-format.js';
+import { formatTime } from '#lib/ui/date-time.js';
 
 export type SchedulePresetKey = 'In30Minutes' | 'In1Hour' | 'Tomorrow9am';
 

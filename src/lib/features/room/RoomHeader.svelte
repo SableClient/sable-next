@@ -15,7 +15,7 @@
 
   import { participantKeys } from '#lib/features/call/participant-keys.js';
 
-  import { memberIdentity } from './members.js';
+  import { memberIdentity } from './members/members.js';
 
   const MAX_FACES = 3;
 

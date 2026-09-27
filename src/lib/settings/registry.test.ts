@@ -90,7 +90,7 @@ describe('select settings', () => {
 
   it('survive sanitization for the member sort set outside the registry', async () => {
     const [{ MEMBER_SORTS }, { preferences, sanitize }] = await Promise.all([
-      import('#lib/features/room/member-listing.js'),
+      import('#lib/features/room/members/member-listing.js'),
       import('./preferences.svelte'),
     ]);
     const base = { ...preferences };

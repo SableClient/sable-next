@@ -5,8 +5,8 @@
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
-  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
-  import { useBookmarks } from '#lib/features/room/bookmarks.svelte.js';
+  import { formatMessageTimestamp } from '#lib/ui/date-time.js';
+  import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { roomLabel, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -15,7 +15,7 @@
   import { DisplayNames } from './display-names.svelte';
   import { filteredBookmarks, focusRowAt, formatCompactTimestamp } from './inbox';
   import InboxFeedRow from './InboxFeedRow.svelte';
-  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
+  import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
 
   let { standalone = false }: { standalone?: boolean } = $props();

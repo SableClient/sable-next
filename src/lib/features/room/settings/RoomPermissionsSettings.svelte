@@ -1,9 +1,6 @@
 <script lang="ts">
-  import type {
-    RoomPermissionsView,
-    RoomPowerLevelsView,
-    RoomSummary,
-  } from '#src/generated/protocol';
+  import { onDestroy } from 'svelte';
+  import type { RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ListChecksIcon from 'phosphor-svelte/lib/ListChecksIcon';
   import PencilIcon from 'phosphor-svelte/lib/PencilIcon';
@@ -27,17 +24,13 @@
   import '#lib/ui/primitives/settings-row.css';
 
   import { ancestorSpaceIds, descendantRoomIds } from '../abbreviations.js';
-  import MemberIdentityRow from '../MemberIdentityRow.svelte';
-  import ReactionPicker from '../ReactionPicker.svelte';
-  import RoleTagIcon from '../RoleTagIcon.svelte';
-  import { readFounders } from './room-upgrade';
+  import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
+  import ReactionPicker from '../messages/ReactionPicker.svelte';
+  import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import {
     canSendState,
     levelAt,
     permissionGroups,
-    syncedFromSpace,
-    toEventContent,
-    withLevel,
     type PermissionLocation,
   } from './permission-groups';
   import {
@@ -46,14 +39,11 @@
     POWER_LEVEL_TAGS_EVENT_TYPE,
     tagForLevel,
     withPowerLevelTag,
-    withPowerLevelTagsFrom,
     type PowerLevelTagMap,
   } from './power-level-tags';
-  import {
-    MEMBER_LIST_EVENT_TYPE,
-    memberListChanged,
-    readAlwaysListedFrom,
-  } from './member-list.svelte.js';
+  import { MEMBER_LIST_EVENT_TYPE, memberListChanged } from './member-list.svelte.js';
+  import { RoomPermissionsData } from './room-permissions-data.svelte';
+  import { RoomPermissionActions } from './room-permission-actions';
 
   interface Props {
     room: RoomSummary | null;
@@ -63,6 +53,8 @@
   let { room, permissions }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
+  const data = new RoomPermissionsData(core);
+  const permissionActions = new RoomPermissionActions(core);
 
   const namedLevels: readonly { level: number; label: string }[] = [
     { level: 100, label: 'timeline.powerLevelAdmin' },
@@ -70,15 +62,13 @@
     { level: 0, label: 'timeline.powerLevelMember' },
   ];
 
-  let levels = $state.raw<RoomPowerLevelsView | null>(null);
-  let loading = $state(false);
-  let failed = $state(false);
+  let levels = $derived(data.levels);
+  let loading = $derived(data.loading);
+  let failed = $derived(data.failed);
   let saving = $state(false);
-  let run = 0;
-
-  let rawRoleTags = $state.raw<unknown>(null);
+  let rawRoleTags = $derived(data.rawRoleTags);
   let roleTags = $derived<PowerLevelTagMap>(parsePowerLevelTags(rawRoleTags));
-  let founders = $state.raw<string[]>([]);
+  let founders = $derived(data.founders);
   let peekLevel = $state<number | null>(null);
   let iconUploading = $state(false);
   let iconInput = $state<HTMLInputElement | null>(null);
@@ -91,7 +81,7 @@
     ].sort((left, right) => right - left)
   );
 
-  let alwaysListedFrom = $state<number | null>(null);
+  let alwaysListedFrom = $derived(data.alwaysListedFrom);
   let memberListSaving = $state(false);
   let memberListFailed = $state(false);
   let memberListChoices = $derived([
@@ -150,63 +140,23 @@
   let childResult = $state<{ updated: number; skipped: number } | null>(null);
 
   $effect(() => {
-    void roomId;
-    void load();
+    data.sync(roomId);
   });
 
-  async function load(): Promise<void> {
-    const target = roomId;
-    if (!target) return;
-
-    const current = ++run;
-    loading = true;
-    failed = false;
-    try {
-      void loadFounders(target, current);
-      const [loaded, tagsContent, memberList] = await Promise.all([
-        core.commands.roomPowerLevels(target),
-        core.commands.roomStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE),
-        core.commands.roomStateEvent(target, MEMBER_LIST_EVENT_TYPE).catch((error: unknown) => {
-          console.debug('[sable room] member list settings unavailable', error);
-          return null;
-        }),
-      ]);
-      if (current !== run) return;
-      levels = loaded;
-      rawRoleTags = tagsContent ?? null;
-      alwaysListedFrom = readAlwaysListedFrom(memberList);
-    } catch (error) {
-      console.warn('[sable room] power levels unavailable', error);
-      if (current === run) failed = true;
-    } finally {
-      if (current === run) loading = false;
-    }
-  }
-
-  async function loadFounders(target: string, current: number): Promise<void> {
-    try {
-      const events = await core.commands.roomStateEventsRaw(target, 'm.room.create', '');
-      if (current === run) founders = readFounders(events[0]);
-    } catch (error) {
-      console.debug('[sable room] founders unavailable', error);
-      if (current === run) founders = [];
-    }
-  }
+  onDestroy(() => data.dispose());
 
   async function setLevel(location: PermissionLocation, level: number): Promise<void> {
     const target = roomId;
     const current = levels;
     if (!target || !current || saving) return;
 
-    const next = withLevel(current, location, level);
     saving = true;
-    failed = false;
+    data.failed = false;
     try {
-      await core.commands.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
-      levels = next;
+      data.levels = await permissionActions.setLevel(target, current, location, level);
     } catch (error) {
       console.warn('[sable room] permission change failed', error);
-      failed = true;
+      data.failed = true;
     } finally {
       saving = false;
     }
@@ -226,18 +176,16 @@
     syncing = true;
     syncFailed = false;
     try {
-      const [spaceLevels, spaceTags] = await Promise.all([
-        core.commands.roomPowerLevels(spaceId),
-        core.commands.roomStateEvent(spaceId, POWER_LEVEL_TAGS_EVENT_TYPE),
-      ]);
-      const next = syncedFromSpace(current, spaceLevels, userId, ownLevel);
-      await core.commands.sendStateEvent(target, 'm.room.power_levels', '', toEventContent(next));
-      levels = next;
-      if (spaceTags && canSendState(next, ownLevel, POWER_LEVEL_TAGS_EVENT_TYPE)) {
-        const nextTags = withPowerLevelTagsFrom(rawRoleTags, spaceTags);
-        await core.commands.sendStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE, '', nextTags);
-        rawRoleTags = nextTags;
-      }
+      const next = await permissionActions.syncFromSpace(
+        target,
+        spaceId,
+        current,
+        userId,
+        ownLevel,
+        rawRoleTags
+      );
+      data.levels = next.levels;
+      data.rawRoleTags = next.rawRoleTags;
       syncConfirm = false;
     } catch (error) {
       console.warn('[sable room] permission sync failed', error);
@@ -253,40 +201,7 @@
     if (!space || !userId || childSyncing) return;
 
     childSyncing = true;
-    let updated = 0;
-    let skipped = 0;
-    for (const childId of childIds) {
-      try {
-        const [current, childPermissions] = await Promise.all([
-          core.commands.roomPowerLevels(childId),
-          core.commands.roomPermissions(childId),
-        ]);
-        const own = childPermissions.own_power_level;
-        if (!childPermissions.can_change_power_levels) {
-          skipped += 1;
-          continue;
-        }
-        const next = syncedFromSpace(current, space, userId, own);
-        const content = toEventContent(next);
-        if (JSON.stringify(content) !== JSON.stringify(toEventContent(current))) {
-          await core.commands.sendStateEvent(childId, 'm.room.power_levels', '', content);
-        }
-        if (rawRoleTags && canSendState(next, own, POWER_LEVEL_TAGS_EVENT_TYPE)) {
-          const tags = await core.commands.roomStateEvent(childId, POWER_LEVEL_TAGS_EVENT_TYPE);
-          await core.commands.sendStateEvent(
-            childId,
-            POWER_LEVEL_TAGS_EVENT_TYPE,
-            '',
-            withPowerLevelTagsFrom(tags, rawRoleTags)
-          );
-        }
-        updated += 1;
-      } catch (error) {
-        console.warn('[sable room] child permission sync failed', error);
-        skipped += 1;
-      }
-    }
-    childResult = { updated, skipped };
+    childResult = await permissionActions.syncChildren(childIds, space, userId, rawRoleTags);
     childSyncing = false;
     childConfirm = false;
   }
@@ -296,20 +211,15 @@
     if (!target) return;
     const next = value === 'default' ? null : Number(value);
     const previous = alwaysListedFrom;
-    alwaysListedFrom = next;
+    data.alwaysListedFrom = next;
     memberListSaving = true;
     memberListFailed = false;
     try {
-      await core.commands.sendStateEvent(
-        target,
-        MEMBER_LIST_EVENT_TYPE,
-        '',
-        next === null ? {} : { always_listed_from: next }
-      );
+      await permissionActions.saveMemberList(target, next);
       memberListChanged();
     } catch (error) {
       console.warn('[sable room] member list settings not saved', error);
-      alwaysListedFrom = previous;
+      data.alwaysListedFrom = previous;
       memberListFailed = true;
     } finally {
       memberListSaving = false;
@@ -442,7 +352,7 @@
         icon: roleIconDraft.trim() || null,
       });
       await core.commands.sendStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE, '', nextContent);
-      rawRoleTags = nextContent;
+      data.rawRoleTags = nextContent;
       editingLevel = null;
       editingNewRole = false;
     } catch (error) {
@@ -463,7 +373,7 @@
     try {
       const nextContent = withPowerLevelTag(rawRoleTags, level, null);
       await core.commands.sendStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE, '', nextContent);
-      rawRoleTags = nextContent;
+      data.rawRoleTags = nextContent;
       editingLevel = null;
     } catch (error) {
       console.warn('[sable room] role tag remove failed', error);

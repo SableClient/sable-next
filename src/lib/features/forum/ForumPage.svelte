@@ -2,21 +2,24 @@
   import type { RoomPermissionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import ConversationComposer from '#lib/features/room/ConversationComposer.svelte';
-  import ThreadPanel from '#lib/features/room/ThreadPanel.svelte';
-  import { Conversation } from '#lib/features/room/conversation.svelte.js';
-  import { PinnedEvents, providePinnedEvents } from '#lib/features/room/pinned-events.svelte.js';
+  import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
+  import ThreadPanel from '#lib/features/room/conversation/ThreadPanel.svelte';
+  import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
+  import {
+    PinnedEvents,
+    providePinnedEvents,
+  } from '#lib/features/room/timeline/pinned-events.svelte.js';
   import {
     backToRoomList,
     searchInRoom,
     trackRoomEntry,
   } from '#lib/features/room/room-navigation.js';
-  import TimelineReadReceipt from '#lib/features/room/TimelineReadReceipt.svelte';
-  import MessageContextMenu from '#lib/features/room/MessageContextMenu.svelte';
+  import TimelineReadReceipt from '#lib/features/room/timeline/TimelineReadReceipt.svelte';
+  import MessageContextMenu from '#lib/features/room/messages/MessageContextMenu.svelte';
   import {
     OpenMessageMenu,
     provideMessageMenu,
-  } from '#lib/features/room/message-menu-open.svelte.js';
+  } from '#lib/features/room/messages/message-menu-open.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';

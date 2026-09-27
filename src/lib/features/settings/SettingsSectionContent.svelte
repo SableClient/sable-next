@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { buildSettingsLink } from '#lib/features/room/settings-link.js';
+  import { buildSettingsLink } from '#lib/features/room/settings/settings-link.js';
   import {
     canonicalSection,
     findCategory,

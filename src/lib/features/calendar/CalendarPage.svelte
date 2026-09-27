@@ -5,9 +5,9 @@
   import type { CalendarView, MemberView, RoomPermissionsView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { memberName } from '#lib/features/room/members.js';
+  import { memberName } from '#lib/features/room/members/members.js';
   import { backToRoomList, trackRoomEntry } from '#lib/features/room/room-navigation.js';
-  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import CreateRoomForm from '#lib/features/room/CreateRoomForm.svelte';
+  import CreateRoomForm from '#lib/features/room/discovery/CreateRoomForm.svelte';
   import { i18n } from '#lib/i18n.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
 </script>

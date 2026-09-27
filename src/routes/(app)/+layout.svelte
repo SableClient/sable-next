@@ -15,9 +15,12 @@
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { provideSpaceSidebar, SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
-  import { Bookmarks, provideBookmarks } from '#lib/features/room/bookmarks.svelte.js';
-  import { EventItems, provideEventItems } from '#lib/features/room/event-items.svelte.js';
-  import { provideRoomScopes, RoomScopes } from '#lib/features/room/message-scope.svelte.js';
+  import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
+  import { EventItems, provideEventItems } from '#lib/features/room/messages/event-items.svelte.js';
+  import {
+    provideRoomScopes,
+    RoomScopes,
+  } from '#lib/features/room/messages/message-scope.svelte.js';
   import { contextSearchPath } from '#lib/features/room/room-navigation.js';
   import { MESSAGE_SEARCH_FIELD_ID } from '#lib/features/search/message-search.svelte.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -30,7 +33,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { clearDrafts } from '#lib/features/composer/composer-drafts.svelte.js';
-  import { resetUrlPreviews } from '#lib/features/room/link-preview-cache.js';
+  import { resetUrlPreviews } from '#lib/features/room/media/link-preview-cache.js';
   import { rememberAfterLogin } from '#lib/auth/after-login.js';
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';

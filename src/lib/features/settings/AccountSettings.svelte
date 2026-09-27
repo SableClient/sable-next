@@ -17,7 +17,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
-  import MentionProfileCard from '#lib/features/room/MentionProfileCard.svelte';
+  import MentionProfileCard from '#lib/features/room/members/MentionProfileCard.svelte';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
 

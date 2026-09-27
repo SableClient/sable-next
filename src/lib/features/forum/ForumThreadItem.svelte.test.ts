@@ -23,18 +23,18 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => ({
   usePresenceStore: () => ({ get: () => null }),
 }));
 
-vi.mock('#lib/features/room/bookmarks.svelte.js', () => ({
+vi.mock('#lib/rooms/bookmarks.svelte.js', () => ({
   useBookmarks: () => ({ has: () => false }),
 }));
 
-vi.mock('#lib/features/room/event-items.svelte.js', () => ({
+vi.mock('#lib/features/room/messages/event-items.svelte.js', () => ({
   useEventItems: () => ({ get: () => undefined }),
 }));
 
-vi.mock('#lib/features/room/message-scope.svelte.js', async () => {
+vi.mock('#lib/features/room/messages/message-scope.svelte.js', async () => {
   const { PinnedEvents } = await vi.importActual<
-    typeof import('#lib/features/room/pinned-events.svelte.js')
-  >('#lib/features/room/pinned-events.svelte.js');
+    typeof import('#lib/features/room/timeline/pinned-events.svelte.js')
+  >('#lib/features/room/timeline/pinned-events.svelte.js');
   const pinned = new PinnedEvents({
     pinnedEvents: () => Promise.resolve([]),
     setPinned: () => Promise.resolve([]),

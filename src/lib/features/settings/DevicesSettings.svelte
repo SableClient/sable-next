@@ -12,7 +12,7 @@
   import type { DeviceView, EncryptionStatusView } from '#src/generated/protocol';
   import { CoreError } from '#src/transport';
   import { useCoreClient } from '#lib/core/context.js';
-  import { formatDate, formatTime } from '#lib/features/room/timeline-format.js';
+  import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import {
     openExternalAuthUrl,
     openExternalAuthWindow,

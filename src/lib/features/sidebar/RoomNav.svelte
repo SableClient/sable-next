@@ -67,14 +67,14 @@
     roomIconOverride,
     showsRoomAvatar,
   } from '#lib/features/room/settings/room-appearance.svelte.js';
-  import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
+  import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
-  import MentionProfile from '#lib/features/room/MentionProfile.svelte';
+  import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { participantKeys } from '#lib/features/call/participant-keys.js';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';

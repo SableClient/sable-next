@@ -5,7 +5,7 @@
   import { SvelteSet } from 'svelte/reactivity';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { formatDate } from '#lib/features/room/timeline-format.js';
+  import { formatDate } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
   import { InviteActions, isDeclining } from '#lib/rooms/invites.svelte.js';

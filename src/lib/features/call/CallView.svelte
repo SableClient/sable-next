@@ -15,7 +15,7 @@
   import { onDestroy } from 'svelte';
   import type { MemberView } from '#src/generated/protocol';
 
-  import { memberIdentity, type MemberIdentity } from '#lib/features/room/members.js';
+  import { memberIdentity, type MemberIdentity } from '#lib/features/room/members/members.js';
   import { formatClockDuration } from '#lib/ui/clock-duration.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';

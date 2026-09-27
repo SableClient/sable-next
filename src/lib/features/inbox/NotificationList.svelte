@@ -8,11 +8,11 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { formatMessageTimestamp } from '#lib/features/room/timeline-format.js';
+  import { formatMessageTimestamp } from '#lib/ui/date-time.js';
   import { focusRowAt, formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
   import InboxFeedRow from './InboxFeedRow.svelte';
-  import MessagePreview from '#lib/features/room/MessagePreview.svelte';
+  import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
   import InboxSectionHeader from './InboxSectionHeader.svelte';
   import { markRoomUnread } from '#lib/features/sidebar/nav-rooms.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';

@@ -17,7 +17,7 @@
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
-  import { formatDate, formatTime } from '../room/timeline-format';
+  import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MESSAGE_SEARCH_FIELD_ID, MessageSearch } from './message-search.svelte.js';
   import { clearRecentSearches, recentSearches, rememberSearch } from './recent-searches.svelte.js';
@@ -31,8 +31,8 @@
   import { coverageMessage } from './coverage';
   import { snippetAround } from './highlight';
   import { markTerms } from './mark-terms';
-  import MessagePreview from '../room/MessagePreview.svelte';
-  import { opensFrom } from '../room/message-preview';
+  import MessagePreview from '../room/messages/MessagePreview.svelte';
+  import { opensFrom } from '../room/messages/message-preview';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
   import type { Suggestion } from '../composer/autocomplete';
   import { applySuggestion, enterAccepts, suggestionsFor } from './search-suggestions';

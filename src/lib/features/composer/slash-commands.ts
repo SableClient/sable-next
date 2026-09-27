@@ -1,7 +1,7 @@
 import type { MemberView, MessageKind } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
-import { parseJoinAddress } from '#lib/features/room/join-address.js';
+import { parseJoinAddress } from '#lib/rooms/join-address.js';
 import { currentFix } from '#lib/platform/geolocation.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 

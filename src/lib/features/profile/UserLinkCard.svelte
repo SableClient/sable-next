@@ -7,7 +7,7 @@
   import { i18n } from '#lib/i18n.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import MediaViewer, { type MediaItem } from '#lib/features/room/MediaViewer.svelte';
+  import MediaViewer, { type MediaItem } from '#lib/features/room/media/MediaViewer.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';

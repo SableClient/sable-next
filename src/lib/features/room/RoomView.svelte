@@ -4,11 +4,6 @@
   import type {
     MemberView,
     MembershipView,
-    PredecessorRoomView,
-    ProfileView,
-    RoomPowerLevelsView,
-    RoomPermissionsView,
-    RoomStateEventView,
     RoomSummary,
     CallSupportView,
   } from '#src/generated/protocol';
@@ -29,16 +24,15 @@
     provideRoomAbbreviations,
     RoomAbbreviations,
   } from './room-abbreviations.svelte.js';
-  import { provideRoomMemberNames } from './room-member-names.js';
-  import { notifiedRelation } from './notified-relation.js';
-  import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
-  import { useBookmarks } from './bookmarks.svelte.js';
-  import ConversationComposer from './ConversationComposer.svelte';
-  import { Conversation } from './conversation.svelte.js';
+  import { provideRoomMemberNames } from './members/room-member-names.js';
+  import { notifiedRelation } from './messages/notified-relation.js';
+  import { PinnedEvents, providePinnedEvents } from './timeline/pinned-events.svelte.js';
+  import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
+  import ConversationComposer from './conversation/ConversationComposer.svelte';
+  import { Conversation } from './conversation/conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
-  import { parseRoomWidget, type RoomWidget } from '#lib/features/widgets/widget-content.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
@@ -70,18 +64,21 @@
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import VoiceLobby from '#lib/features/call/VoiceLobby.svelte';
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
-  import JumpToTimeDialog from './JumpToTimeDialog.svelte';
+  import JumpToTimeDialog from './timeline/JumpToTimeDialog.svelte';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
-  import MessageReportDialog from './MessageReportDialog.svelte';
-  import { sendReport } from './report';
-  import { provideRoomMediaPreviews, RoomMediaPreviews } from './room-media-previews.svelte.js';
-  import MembersDrawer from './MembersDrawer.svelte';
+  import MessageReportDialog from './messages/MessageReportDialog.svelte';
+  import { sendReport } from './messages/report';
+  import {
+    provideRoomMediaPreviews,
+    RoomMediaPreviews,
+  } from './media/room-media-previews.svelte.js';
+  import MembersDrawer from './members/MembersDrawer.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
-  import ThreadList from './ThreadList.svelte';
-  import RoomAttachments from './RoomAttachments.svelte';
+  import ThreadList from './conversation/ThreadList.svelte';
+  import RoomAttachments from './media/RoomAttachments.svelte';
   import RoomSearchPanel from './RoomSearchPanel.svelte';
-  import ThreadPanel from './ThreadPanel.svelte';
-  import MentionProfile from './MentionProfile.svelte';
+  import ThreadPanel from './conversation/ThreadPanel.svelte';
+  import MentionProfile from './members/MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';
   import RoomHeaderMenu from './RoomHeaderMenu.svelte';
@@ -91,27 +88,21 @@
   import RoomPredecessorNotice from './RoomPredecessorNotice.svelte';
   import RoomTombstoneBanner from './RoomTombstoneBanner.svelte';
   import RoomTopicViewer from './RoomTopicViewer.svelte';
-  import RoomReadReceipts from './RoomReadReceipts.svelte';
-  import RoomSettingsDialog from './RoomSettingsDialog.svelte';
-  import TimelineList from './TimelineList.svelte';
-  import MediaViewer, { type MediaItem } from './MediaViewer.svelte';
-  import { galleryEventId, timelineMediaItems } from './media-items.js';
-  import {
-    parsePowerLevelTags,
-    tagForLevel,
-    type PowerLevelTagMap,
-  } from './settings/power-level-tags.js';
-  import {
-    MEMBER_LIST_EVENT_TYPE,
-    memberListChanges,
-    readAlwaysListedFrom,
-  } from './settings/member-list.svelte.js';
-  import { provideSenderRoles, type SenderRole } from './sender-roles.js';
-  import { powerTag } from './power-tags';
-  import { readTombstone } from './settings/room-upgrade.js';
-  import { splitVia } from './join-address';
-  import type { MatrixLink } from './matrix-link';
-  import { eventBefore } from './timeline-format';
+  import RoomReadReceipts from './timeline/RoomReadReceipts.svelte';
+  import RoomSettingsDialog from './settings/RoomSettingsDialog.svelte';
+  import TimelineList from './timeline/TimelineList.svelte';
+  import MediaViewer, { type MediaItem } from './media/MediaViewer.svelte';
+  import { galleryEventId, timelineMediaItems } from './media/media-items.js';
+  import { tagForLevel } from './settings/power-level-tags.js';
+  import { memberListChanges } from './settings/member-list.svelte.js';
+  import { provideSenderRoles, type SenderRole } from './members/sender-roles.js';
+  import { powerTag } from './members/power-tags';
+  import { splitVia } from '#lib/rooms/join-address.js';
+  import type { MatrixLink } from '#lib/rooms/matrix-link.js';
+  import { eventBefore } from './timeline/timeline-format';
+  import { RoomSession } from './room-session.svelte.js';
+  import { MemberProfile } from './members/member-profile.svelte.js';
+  import { RoomPanels } from './room-panels.svelte.js';
 
   interface Props {
     roomId: string;
@@ -122,6 +113,9 @@
 
   let { roomId, eventId = null, notifiedEventId = null, room }: Props = $props();
   const core = useCoreClient();
+  const panels = new RoomPanels();
+  const memberProfile = new MemberProfile(core);
+  onDestroy(() => memberProfile.close());
   trackRoomEntry();
   const personas = usePersonaStore();
   const roomList = useRoomList();
@@ -131,16 +125,9 @@
   const memberLoader = new RoomMemberLoader();
   const call = useCallSession();
   let prescreenMedia = $state<CallMedia>({ microphone: true, camera: false });
-  let membersOpen = $state(false);
-  let desktopMembersOpen = $state(true);
   let composer = $state<ConversationComposer>();
   let timelineList = $state<TimelineList>();
-  let profileOpen = $state(false);
   let receiptsOpen = $state(false);
-  let profileUserId = $state<string | null>(null);
-  let profileAnchor = $state<HTMLElement | null>(null);
-  let profile = $state<ProfileView | null>(null);
-  let profileFailed = $state(false);
   const conversation = new Conversation({
     core,
     personas,
@@ -148,11 +135,6 @@
     roomId: () => resolvedRoomId,
     encrypted: () => resolvedRoom?.encrypted ?? null,
   });
-  let profileRequestId = 0;
-  let permissions = $state<RoomPermissionsView | null>(null);
-  let powerLevels = $state<RoomPowerLevelsView | null>(null);
-  let powerTags = $state.raw<PowerLevelTagMap | null>(null);
-  let alwaysListedFrom = $state<number | null>(null);
   let settingsOpen = $state(false);
   let topicOpen = $state(false);
   let inviteOpen = $state(false);
@@ -167,14 +149,8 @@
   let profileAvatarSequence = 0;
   let callSupport = $state<CallSupportView | null>(null);
   let callFallbackUrl = $state<string | null>(null);
-  let widgetsOpen = $state(false);
-  let widgets = $state.raw<RoomWidget[]>([]);
-  let tombstoneReplacementId = $state<string | null>(null);
-  let tombstoneBody = $state<string | null>(null);
-  let tombstoneChecked = $state(false);
   let tombstoneJoining = $state(false);
   let tombstoneJoinFailed = $state(false);
-  let predecessor = $state.raw<PredecessorRoomView | null>(null);
 
   let ownMember = $derived(
     memberLoader.members.find((member) => member.user_id === core.session?.user_id) ?? null
@@ -225,7 +201,9 @@
   );
 
   const pinnedEvents = new PinnedEvents(core.commands);
+  const roomSession = new RoomSession(core.commands, pinnedEvents);
   providePinnedEvents(pinnedEvents);
+  onDestroy(() => roomSession.dispose());
 
   $effect(() => {
     if (pinRevision === 0) return;
@@ -234,17 +212,9 @@
   });
 
   const bookmarks = useBookmarks();
-  let threadRootId = $state<string | null>(null);
-  let threadsOpen = $state(false);
-  let attachmentsOpen = $state(false);
-  let searchOpen = $state(false);
 
   function openThread(rootEventId: string): void {
-    threadRootId = rootEventId;
-    threadsOpen = false;
-    attachmentsOpen = false;
-    searchOpen = false;
-    desktopMembersOpen = false;
+    panels.openThread(rootEventId);
   }
 
   function trackTimelineHeight(node: HTMLElement): () => void {
@@ -272,7 +242,7 @@
   }
 
   function closeThread(): void {
-    threadRootId = null;
+    panels.threadRootId = null;
   }
 
   let notifiedTarget = $state<{ eventId: string; target: string } | null>(null);
@@ -378,7 +348,9 @@
   let roomTopic = $derived(resolvedRoom?.topic ?? null);
   let isTombstoned = $derived(resolvedRoom?.is_tombstoned ?? false);
   let tombstoneSuccessor = $derived(
-    tombstoneReplacementId ? findRoomByPathId(roomList.rooms, tombstoneReplacementId) : null
+    roomSession.tombstoneReplacementId
+      ? findRoomByPathId(roomList.rooms, roomSession.tombstoneReplacementId)
+      : null
   );
   let tombstoneSuccessorJoined = $derived(tombstoneSuccessor?.state === 'joined');
 
@@ -391,7 +363,7 @@
   });
   provideRoomMemberNames({ displayName: memberDisplayName });
   let senderRoles = $derived.by((): Record<string, SenderRole> => {
-    const tags = powerTags;
+    const tags = roomSession.powerTags;
     if (!tags || !Object.values(tags).some((tag) => tag.icon || tag.color)) return {};
     return Object.fromEntries(
       memberLoader.members.flatMap((member) => {
@@ -464,101 +436,30 @@
     memberLoader.reset();
     conversation.forgetRequestedDetails();
     receiptsOpen = false;
-    threadRootId = null;
-    threadsOpen = false;
-    attachmentsOpen = false;
-    searchOpen = false;
+    panels.reset();
     closeProfile();
   });
 
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    permissions = null;
-    powerLevels = null;
-    powerTags = null;
-    widgets = [];
-    predecessor = null;
-    let current = true;
-    void core.commands
-      .roomOpen(activeRoomId)
-      .then((opened) => {
-        if (!current) return;
-        permissions = opened.permissions;
-        predecessor = opened.predecessor;
-        powerTags = parsePowerLevelTags(opened.power_level_tags);
-        widgets = parseRoomWidgets(opened.widgets);
-        pinnedEvents.set(activeRoomId, opened.pinned_event_ids);
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] room details unavailable', error);
-        if (current) powerTags = {};
-      });
-    void core.commands
-      .roomPowerLevels(activeRoomId)
-      .then((next) => {
-        if (current) powerLevels = next;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] power levels unavailable', error);
-      });
-    return () => {
-      current = false;
-    };
+    roomSession.sync(resolvedRoomId, isTombstoned, memberListChanges.version);
   });
 
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    void memberListChanges.version;
-    let current = true;
-    void core.commands
-      .roomStateEvent(activeRoomId, MEMBER_LIST_EVENT_TYPE)
-      .then((content) => {
-        if (current) alwaysListedFrom = readAlwaysListedFrom(content);
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] member list settings unavailable', error);
-        if (current) alwaysListedFrom = null;
-      });
-    return () => {
-      current = false;
-    };
+    void resolvedRoomId;
+    void isTombstoned;
+    tombstoneJoinFailed = false;
   });
 
   let canManageWidgets = $derived(
-    canSendState(powerLevels, permissions?.own_power_level ?? 0, 'im.vector.modular.widgets')
+    canSendState(
+      roomSession.powerLevels,
+      roomSession.permissions?.own_power_level ?? 0,
+      'im.vector.modular.widgets'
+    )
   );
 
   $effect(() => {
-    const activeRoomId = resolvedRoomId;
-    const tombstoned = isTombstoned;
-    tombstoneReplacementId = null;
-    tombstoneBody = null;
-    tombstoneChecked = false;
-    tombstoneJoinFailed = false;
-    if (!tombstoned) return;
-
-    let current = true;
-    void core.commands
-      .roomStateEvent(activeRoomId, 'm.room.tombstone')
-      .then((content) => {
-        if (!current) return;
-        const grave = readTombstone(content);
-        tombstoneReplacementId = grave.replacement;
-        tombstoneBody = grave.body;
-      })
-      .catch((error: unknown) => {
-        console.debug('[sable room] tombstone unavailable', error);
-      })
-      .finally(() => {
-        if (current) tombstoneChecked = true;
-      });
-    return () => {
-      current = false;
-    };
-  });
-
-  $effect(() => {
-    if (desktop && desktopMembersOpen) void loadMembers();
+    if (desktop && panels.desktopMembersOpen) void loadMembers();
   });
 
   // The SDK loads a replied-to event lazily, so a reply preview stays blank
@@ -617,43 +518,24 @@
   }
 
   function toggleMembers(): void {
-    const opening = desktop ? !desktopMembersOpen : !membersOpen;
-    if (desktop) desktopMembersOpen = opening;
-    else membersOpen = opening;
-    if (opening) void loadMembers();
+    if (panels.toggleMembers(desktop)) void loadMembers();
   }
 
   function closeMembers(): void {
-    if (desktop) desktopMembersOpen = false;
-    else membersOpen = false;
-  }
-
-  function parseRoomWidgets(events: readonly RoomStateEventView[]): RoomWidget[] {
-    return events.flatMap((event) => {
-      const widget = parseRoomWidget(event.state_key, event.content);
-      return widget ? [widget] : [];
-    });
-  }
-
-  async function loadWidgets(activeRoomId: string): Promise<RoomWidget[]> {
-    return parseRoomWidgets(
-      await core.commands.roomStateEvents(activeRoomId, 'im.vector.modular.widgets')
-    );
+    panels.closeMembers(desktop);
   }
 
   function toggleWidgets(): void {
-    widgetsOpen = !widgetsOpen;
+    panels.widgetsOpen = !panels.widgetsOpen;
   }
 
   function closeWidgets(): void {
-    widgetsOpen = false;
+    panels.widgetsOpen = false;
   }
 
   async function removeWidget(widgetId: string): Promise<void> {
-    const activeRoomId = resolvedRoomId;
     try {
-      await core.commands.sendStateEvent(activeRoomId, 'im.vector.modular.widgets', widgetId, {});
-      widgets = await loadWidgets(activeRoomId);
+      await roomSession.details.removeWidget(widgetId);
     } catch (error) {
       console.warn('[sable room] remove widget failed', error);
       toasts.error($i18n.t('errors.actionFailed'));
@@ -661,12 +543,7 @@
   }
 
   function closeProfile(): void {
-    profileRequestId += 1;
-    profileOpen = false;
-    profileUserId = null;
-    profileAnchor = null;
-    profile = null;
-    profileFailed = false;
+    memberProfile.close();
   }
 
   function mentionUser(userId: string, name: string): void {
@@ -674,21 +551,8 @@
   }
 
   function openProfile(userId: string, anchor: HTMLElement): void {
-    const requestId = ++profileRequestId;
-    profileUserId = userId;
-    profileAnchor = anchor;
-    profileOpen = true;
-    profile = null;
-    profileFailed = false;
     void loadMembers();
-    void core
-      .userProfile(userId)
-      .then((nextProfile) => {
-        if (profileRequestId === requestId) profile = nextProfile;
-      })
-      .catch(() => {
-        if (profileRequestId === requestId) profileFailed = true;
-      });
+    void memberProfile.show(userId, anchor);
   }
 
   function handleMatrixLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
@@ -804,22 +668,18 @@
 
   function jumpFromViewer(eventId: string): void {
     closeMedia();
-    if (!desktop) attachmentsOpen = false;
+    if (!desktop) panels.attachmentsOpen = false;
     void afterOverlayPops().then(() => {
       jumpToEvent(galleryEventId(eventId));
     });
   }
 
   function toggleThreads(): void {
-    threadsOpen = !threadsOpen;
-    attachmentsOpen = false;
-    searchOpen = false;
+    panels.toggleThreads();
   }
 
   function toggleAttachments(): void {
-    attachmentsOpen = !attachmentsOpen;
-    threadsOpen = false;
-    searchOpen = false;
+    panels.toggleAttachments();
   }
 
   function openSearch(): void {
@@ -827,10 +687,7 @@
       searchInRoom(resolvedRoom, resolvedRoomId);
       return;
     }
-    searchOpen = !searchOpen;
-    threadsOpen = false;
-    attachmentsOpen = false;
-    if (searchOpen) desktopMembersOpen = false;
+    panels.toggleSearch();
   }
 
   function openProfileAvatar(source: string, displayName: string): void {
@@ -870,13 +727,13 @@
   }
 
   function openTombstoneSuccessor(): void {
-    if (!tombstoneReplacementId) return;
+    if (!roomSession.tombstoneReplacementId) return;
     const isSpace = tombstoneSuccessor?.is_space ?? resolvedRoom?.is_space ?? false;
-    void goto(tombstoneSuccessorPath(tombstoneReplacementId, isSpace));
+    void goto(tombstoneSuccessorPath(roomSession.tombstoneReplacementId, isSpace));
   }
 
   async function joinTombstoneSuccessor(): Promise<void> {
-    const target = tombstoneReplacementId;
+    const target = roomSession.tombstoneReplacementId;
     if (!target || tombstoneJoining) return;
 
     tombstoneJoining = true;
@@ -895,8 +752,15 @@
   }
 
   function openPredecessor(): void {
-    if (!predecessor) return;
-    void goto(roomSectionPath(roomList.rooms, predecessor.room_id, null, predecessor.via));
+    if (!roomSession.predecessor) return;
+    void goto(
+      roomSectionPath(
+        roomList.rooms,
+        roomSession.predecessor.room_id,
+        null,
+        roomSession.predecessor.via
+      )
+    );
   }
 
   function startCall(): void {
@@ -936,11 +800,13 @@
       onMentionUser={mentionUser}
       onRetrySend={conversation.retrySend}
       onCancelSend={conversation.cancelSend}
-      onToggleReaction={permissions?.can_react === false ? undefined : conversation.toggleReaction}
+      onToggleReaction={roomSession.permissions?.can_react === false
+        ? undefined
+        : conversation.toggleReaction}
       onDelete={conversation.redact}
-      onReply={permissions?.can_post === false ? undefined : conversation.reply}
+      onReply={roomSession.permissions?.can_post === false ? undefined : conversation.reply}
       onOpenThread={openThread}
-      onEdit={permissions?.can_post === false ? undefined : conversation.edit}
+      onEdit={roomSession.permissions?.can_post === false ? undefined : conversation.edit}
       roomId={resolvedRoomId}
       members={memberLoader.members}
       onJumpToEvent={jumpToEvent}
@@ -949,18 +815,18 @@
       onPersonaAvatarClick={openProfileAvatar}
       onVotePoll={conversation.votePoll}
       onEndPoll={conversation.endPoll}
-      readOnly={permissions ? !permissions.can_post : false}
-      canRedactOwn={permissions?.can_redact_own ?? true}
-      canRedactOthers={permissions?.can_redact_others ?? false}
-      canPin={permissions?.can_pin ?? false}
+      readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+      canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+      canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+      canPin={roomSession.permissions?.can_pin ?? false}
       encrypted={resolvedRoom?.encrypted ?? null}
       currentUserId={core.session?.user_id ?? null}
-      scrollLocked={profileOpen || receiptsOpen}
+      scrollLocked={memberProfile.open || receiptsOpen}
       {typingLabel}
       footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
       bind:nearLatest={timelineAtBottom}
       bind:followingLive={timelineFollowingLive}
-      timelineStart={predecessor ? predecessorNotice : undefined}
+      timelineStart={roomSession.predecessor ? predecessorNotice : undefined}
     >
       {#snippet footTrailing()}
         {#if showReceiptFooter}
@@ -983,9 +849,9 @@
     {#if isTombstoned}
       <RoomTombstoneBanner
         isSpace={resolvedRoom?.is_space ?? false}
-        body={tombstoneBody}
-        resolved={tombstoneChecked}
-        successorId={tombstoneReplacementId}
+        body={roomSession.tombstoneBody}
+        resolved={roomSession.tombstoneChecked}
+        successorId={roomSession.tombstoneReplacementId}
         joined={tombstoneSuccessorJoined}
         joining={tombstoneJoining}
         failed={tombstoneJoinFailed}
@@ -1006,7 +872,7 @@
           roomId={resolvedRoomId}
           onSchedule={conversation.schedule}
           {roomName}
-          readOnly={permissions ? !permissions.can_post : false}
+          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
           encrypted={resolvedRoom?.encrypted ?? null}
           onDeleteEdited={conversation.redact}
           onEditLast={conversation.editLast}
@@ -1029,28 +895,28 @@
       {#if !voiceView}
         <PanelHeaderButton
           label={$i18n.t('timeline.threadsOpen')}
-          aria-pressed={threadsOpen}
+          aria-pressed={panels.threadsOpen}
           onclick={toggleThreads}
         >
-          <ChatsIcon weight={threadsOpen ? 'fill' : 'regular'} />
+          <ChatsIcon weight={panels.threadsOpen ? 'fill' : 'regular'} />
         </PanelHeaderButton>
         {#if desktop}
           <PanelHeaderButton
             label={$i18n.t('timeline.attachmentsOpen')}
-            aria-pressed={attachmentsOpen}
+            aria-pressed={panels.attachmentsOpen}
             onclick={toggleAttachments}
           >
-            <ImagesIcon weight={attachmentsOpen ? 'fill' : 'regular'} />
+            <ImagesIcon weight={panels.attachmentsOpen ? 'fill' : 'regular'} />
           </PanelHeaderButton>
         {/if}
       {/if}
-      {#if widgets.length > 0}
+      {#if roomSession.widgets.length > 0}
         <PanelHeaderButton
           label={$i18n.t('widgets.label')}
-          aria-pressed={widgetsOpen}
+          aria-pressed={panels.widgetsOpen}
           onclick={toggleWidgets}
         >
-          <GridFourIcon weight={widgetsOpen ? 'fill' : 'regular'} />
+          <GridFourIcon weight={panels.widgetsOpen ? 'fill' : 'regular'} />
         </PanelHeaderButton>
       {/if}
     {/snippet}
@@ -1062,8 +928,8 @@
       isVoice={resolvedRoom?.is_voice ?? false}
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
-      membersOpen={desktop ? desktopMembersOpen : membersOpen}
-      {searchOpen}
+      membersOpen={desktop ? panels.desktopMembersOpen : panels.membersOpen}
+      searchOpen={panels.searchOpen}
       onCall={callOffered && !isVoiceRoom ? startCall : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
@@ -1083,14 +949,14 @@
           roomId={resolvedRoomId}
           revision={pinRevision}
           members={memberLoader.members}
-          canPin={permissions?.can_pin ?? false}
+          canPin={roomSession.permissions?.can_pin ?? false}
           onJump={jumpToEvent}
         />
       {/snippet}
       {#snippet menu()}
         <RoomHeaderMenu
           room={resolvedRoom ?? null}
-          canInvite={permissions?.can_invite ?? false}
+          canInvite={roomSession.permissions?.can_invite ?? false}
           compact={!desktop}
           onMarkRead={markRoomRead}
           onMarkUnread={markRoomUnread}
@@ -1102,7 +968,7 @@
           onThreads={phone && !voiceView ? toggleThreads : undefined}
           onPins={phone ? () => (pinsOpen = true) : undefined}
           {pinsUnread}
-          onWidgets={phone && widgets.length > 0 ? toggleWidgets : undefined}
+          onWidgets={phone && roomSession.widgets.length > 0 ? toggleWidgets : undefined}
           onReport={() => (reportOpen = true)}
           onLeave={() => (leaveOpen = true)}
         />
@@ -1118,7 +984,7 @@
           <CallView
             session={call}
             members={memberLoader.members}
-            onInvite={permissions?.can_invite ? () => (inviteOpen = true) : undefined}
+            onInvite={roomSession.permissions?.can_invite ? () => (inviteOpen = true) : undefined}
             onOpenSettings={(event: MouseEvent) => openSettingsOver(event, 'calls')}
           />
         {/await}
@@ -1188,26 +1054,26 @@
     </aside>
   {/if}
 
-  {#if threadsOpen}
+  {#if panels.threadsOpen}
     <ThreadList
       roomId={resolvedRoomId}
       members={memberLoader.members}
       modal={!desktop}
       onOpenThread={openThread}
-      onClose={() => (threadsOpen = false)}
+      onClose={() => (panels.threadsOpen = false)}
     />
   {/if}
 
-  {#if searchOpen}
+  {#if panels.searchOpen}
     {#key resolvedRoomId}
       <RoomSearchPanel
         query={scopedSearchQuery('in', resolvedRoom, resolvedRoomId)}
-        onClose={() => (searchOpen = false)}
+        onClose={() => (panels.searchOpen = false)}
       />
     {/key}
   {/if}
 
-  {#if attachmentsOpen}
+  {#if panels.attachmentsOpen}
     <RoomAttachments
       roomId={resolvedRoomId}
       members={memberLoader.members}
@@ -1215,23 +1081,23 @@
       onJump={jumpToEvent}
       onOpenMedia={openPanelMedia}
       onMatrixLink={handleMatrixLink}
-      onClose={() => (attachmentsOpen = false)}
+      onClose={() => (panels.attachmentsOpen = false)}
     />
   {/if}
 
   {#if desktop}
-    {#if threadRootId !== null}
-      {#key threadRootId}
+    {#if panels.threadRootId !== null}
+      {#key panels.threadRootId}
         <ThreadPanel
           roomId={resolvedRoomId}
-          rootEventId={threadRootId}
+          rootEventId={panels.threadRootId}
           {roomName}
           members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOwn={permissions?.can_redact_own ?? true}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          canReact={permissions?.can_react ?? true}
-          canPin={permissions?.can_pin ?? false}
+          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+          canReact={roomSession.permissions?.can_react ?? true}
+          canPin={roomSession.permissions?.can_pin ?? false}
           encrypted={resolvedRoom?.encrypted ?? null}
           onClose={closeThread}
           onSenderProfile={openProfile}
@@ -1240,21 +1106,21 @@
         />
       {/key}
     {/if}
-    {#if desktopMembersOpen}
+    {#if panels.desktopMembersOpen}
       <MembersDrawer
         members={memberLoader.members}
         loading={memberLoader.loading}
-        {powerTags}
-        {alwaysListedFrom}
+        powerTags={roomSession.powerTags}
+        alwaysListedFrom={roomSession.alwaysListedFrom}
         {loadMembership}
         onClose={closeMembers}
         onMemberProfile={openProfile}
       />
     {/if}
-    {#if widgetsOpen}
+    {#if panels.widgetsOpen}
       <WidgetsPanel
         roomId={resolvedRoomId}
-        {widgets}
+        widgets={roomSession.widgets}
         userId={core.session?.user_id ?? ''}
         displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
         avatarUrl={ownMember?.avatar_url ?? ''}
@@ -1264,13 +1130,13 @@
       />
     {/if}
   {:else}
-    <DialogFrame bind:open={membersOpen} variant="drawer">
+    <DialogFrame bind:open={panels.membersOpen} variant="drawer">
       <MembersDrawer
         members={memberLoader.members}
         loading={memberLoader.loading}
         modal
-        {powerTags}
-        {alwaysListedFrom}
+        powerTags={roomSession.powerTags}
+        alwaysListedFrom={roomSession.alwaysListedFrom}
         {loadMembership}
         onClose={closeMembers}
         onMemberProfile={openProfile}
@@ -1279,18 +1145,18 @@
   {/if}
 
   {#if !desktop}
-    {#if threadRootId !== null}
-      {#key threadRootId}
+    {#if panels.threadRootId !== null}
+      {#key panels.threadRootId}
         <ThreadPanel
           roomId={resolvedRoomId}
-          rootEventId={threadRootId}
+          rootEventId={panels.threadRootId}
           {roomName}
           members={memberLoader.members}
-          readOnly={permissions ? !permissions.can_post : false}
-          canRedactOwn={permissions?.can_redact_own ?? true}
-          canRedactOthers={permissions?.can_redact_others ?? false}
-          canReact={permissions?.can_react ?? true}
-          canPin={permissions?.can_pin ?? false}
+          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+          canReact={roomSession.permissions?.can_react ?? true}
+          canPin={roomSession.permissions?.can_pin ?? false}
           encrypted={resolvedRoom?.encrypted ?? null}
           modal
           onClose={closeThread}
@@ -1304,7 +1170,7 @@
 
   {#if !desktop}
     <DialogFrame
-      open={widgetsOpen}
+      open={panels.widgetsOpen}
       onOpenChange={(open: boolean) => {
         if (!open) closeWidgets();
       }}
@@ -1312,7 +1178,7 @@
     >
       <WidgetsPanel
         roomId={resolvedRoomId}
-        {widgets}
+        widgets={roomSession.widgets}
         userId={core.session?.user_id ?? ''}
         displayName={ownMember?.display_name ?? core.session?.user_id ?? ''}
         avatarUrl={ownMember?.avatar_url ?? ''}
@@ -1382,21 +1248,21 @@
   />
 
   <MentionProfile
-    open={profileOpen}
+    open={memberProfile.open}
     onOpenChange={(open: boolean) => {
-      if (open) profileOpen = true;
+      if (open) memberProfile.open = true;
       else closeProfile();
     }}
-    userId={profileUserId}
-    anchor={profileAnchor}
-    member={memberLoader.members.find((member) => member.user_id === profileUserId) ?? null}
+    userId={memberProfile.userId}
+    anchor={memberProfile.anchor}
+    member={memberLoader.members.find((member) => member.user_id === memberProfile.userId) ?? null}
     {roomId}
     ownPowerLevel={memberLoader.members.find((member) => member.user_id === core.session?.user_id)
       ?.power_level ?? 0}
-    {permissions}
-    {powerTags}
-    {profile}
-    failed={profileFailed}
+    permissions={roomSession.permissions}
+    powerTags={roomSession.powerTags}
+    profile={memberProfile.profile}
+    failed={memberProfile.failed}
     onAvatarClick={openProfileAvatar}
     onMatrixLink={handleMatrixLink}
     onPowerLevelChange={(target, userId, level) => {

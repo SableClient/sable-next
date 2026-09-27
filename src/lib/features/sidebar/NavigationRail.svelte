@@ -1,6 +1,6 @@
 <script lang="ts">
   import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
-  import RoomSettingsDialog from '#lib/features/room/RoomSettingsDialog.svelte';
+  import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
 
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import type { Component } from 'svelte';
