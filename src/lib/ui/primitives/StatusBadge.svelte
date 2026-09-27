@@ -31,6 +31,7 @@
     font-weight: var(--font-weight-600);
     justify-content: center;
     line-height: var(--line-height-small);
+    max-width: 100%;
     min-height: 1.25rem;
     min-width: 1.25rem;
     padding: 0 var(--space-200);

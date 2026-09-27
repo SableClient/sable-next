@@ -274,6 +274,7 @@
     border-radius: var(--radius);
     display: grid;
     gap: var(--space-300);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   h3 {
@@ -285,6 +286,7 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     margin: 0;
+    overflow-wrap: anywhere;
   }
 
   .rows {
@@ -303,6 +305,7 @@
 
   .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-300);
   }
 </style>

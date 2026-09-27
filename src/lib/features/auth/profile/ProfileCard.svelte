@@ -334,6 +334,7 @@
   .banner-setting {
     display: grid;
     gap: var(--space-150);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .banner-setting :global(.banner-preview) {

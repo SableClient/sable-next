@@ -16,6 +16,7 @@ export default defineConfig({
     'composer-paste.spec.ts',
     'emote-board-glyphs.spec.ts',
     'account-mobile.spec.ts',
+    'settings-size.spec.ts',
     'settings-range.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
