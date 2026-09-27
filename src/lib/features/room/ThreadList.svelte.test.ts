@@ -114,3 +114,25 @@ test('says so when a room has no threads', async () => {
 
   expect(await screen.findByText('No threads in this room yet.')).toBeInTheDocument();
 });
+
+test('a root shows its reply count and latest reply instead of an open button', async () => {
+  const user = userEvent.setup();
+  listThreads.mockResolvedValueOnce({
+    roots: [
+      {
+        ...root('$a', 'First topic'),
+        thread_summary: { num_replies: 3, latest_event_id: '$z', latest_body: 'Last word' },
+      },
+    ],
+    next_batch: null,
+  });
+  const onOpenThread = vi.fn();
+  render(ThreadList, { roomId: '!room:example.org', members: [], onOpenThread, onClose: vi.fn() });
+
+  const summary = await screen.findByRole('button', { name: /3 replies/ });
+  expect(summary).toHaveTextContent('Last word');
+  expect(screen.queryByRole('button', { name: 'Open thread' })).not.toBeInTheDocument();
+
+  await user.click(summary);
+  expect(onOpenThread).toHaveBeenCalledWith('$a');
+});

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -14,6 +15,7 @@
   import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
+  import { stripReplyFallback } from './members.js';
   import MessagePreview from './MessagePreview.svelte';
   import { opensFrom } from './message-preview';
 
@@ -109,16 +111,25 @@
                   {#snippet fallback()}{/snippet}
                 </MessagePreview>
               </div>
-              <Button
-                size="small"
-                variant="ghost"
-                class="thread-open"
+              <button
+                type="button"
+                class="thread-summary"
                 onclick={() => {
                   onOpenThread(rootId);
                 }}
               >
-                {$i18n.t('timeline.threadsOpenRoot')}
-              </Button>
+                <ThreadIcon size={14} aria-hidden="true" />
+                <span class="thread-count">
+                  {root.thread_summary
+                    ? $i18n.t('timeline.threadReplies', { count: root.thread_summary.num_replies })
+                    : $i18n.t('timeline.thread')}
+                </span>
+                {#if root.thread_summary?.latest_body}
+                  <span class="thread-latest"
+                    >{stripReplyFallback(root.thread_summary.latest_body, null)}</span
+                  >
+                {/if}
+              </button>
             </li>
           {/each}
         </ul>
@@ -201,6 +212,52 @@
     display: grid;
     justify-items: start;
     padding: 0 var(--space-300) var(--space-200) var(--space-400);
+    position: relative;
+  }
+
+  li + li::before {
+    border-top: var(--border-width) solid var(--bg-container-line);
+    content: '';
+    inset: 0 var(--space-300) auto;
+    position: absolute;
+  }
+
+  .thread-summary {
+    align-items: center;
+    background: none;
+    border: none;
+    border-radius: var(--radius);
+    color: var(--primary-main);
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    font-size: var(--font-size-small);
+    gap: var(--space-200);
+    max-width: 100%;
+    padding: 0;
+    text-align: left;
+  }
+
+  .thread-summary:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .thread-count {
+    flex: none;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .thread-summary:hover .thread-count {
+    text-decoration: underline;
+  }
+
+  .thread-latest {
+    color: var(--surface-var-on-container);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   li:hover {
