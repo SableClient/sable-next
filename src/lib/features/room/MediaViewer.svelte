@@ -656,8 +656,13 @@
       <Dialog.Content
         class="viewer"
         {...overlayLayer()}
-        style={`height: 100dvh; inset: 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
+        style={`height: calc(100dvh - var(--titlebar-height)); inset: var(--titlebar-height) 0 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
         aria-label={$i18n.t('viewer.title')}
+        onInteractOutside={(event: PointerEvent) => {
+          if (event.target instanceof Element && event.target.closest('.titlebar')) {
+            event.preventDefault();
+          }
+        }}
       >
         <header class="toolbar">
           <div class="heading">

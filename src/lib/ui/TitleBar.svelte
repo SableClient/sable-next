@@ -159,6 +159,7 @@
     display: flex;
     height: var(--titlebar-height);
     inset: 0 0 auto;
+    pointer-events: auto;
     position: fixed;
     user-select: none;
     z-index: var(--layer-chrome);
@@ -225,6 +226,7 @@
   }
 
   .handle {
+    pointer-events: auto;
     position: fixed;
     z-index: calc(var(--layer-chrome) + 1);
   }
