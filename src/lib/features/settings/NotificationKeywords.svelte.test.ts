@@ -89,6 +89,17 @@ test('does not add a keyword already in the list', async () => {
   expect(core.addNotificationKeyword).not.toHaveBeenCalled();
 });
 
+test('deduplicates an inconsistent keyword response before rendering', async () => {
+  core.notificationKeywords.mockResolvedValue([
+    { keyword: 'sable', mode: 'notify' },
+    { keyword: 'sable', mode: 'loud' },
+  ]);
+
+  render(NotificationKeywords);
+
+  expect(await screen.findAllByText('sable')).toHaveLength(1);
+});
+
 test('does not leave the list showing an add the server rejected', async () => {
   const user = userEvent.setup();
   core.notificationKeywords.mockResolvedValue(listed('sable'));

@@ -5,6 +5,7 @@
   } from '#src/generated/protocol';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
+  import { SvelteSet } from 'svelte/reactivity';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -43,9 +44,18 @@
     trimmedDraft !== '' && !keywords.some((entry) => entry.keyword === trimmedDraft)
   );
 
+  function uniqueKeywords(next: KeywordNotificationView[]): KeywordNotificationView[] {
+    const seen = new SvelteSet<string>();
+    return next.filter((entry) => {
+      if (seen.has(entry.keyword)) return false;
+      seen.add(entry.keyword);
+      return true;
+    });
+  }
+
   function commit(next: KeywordNotificationView[]): void {
     version += 1;
-    keywords = next;
+    keywords = uniqueKeywords(next);
   }
 
   async function reload(): Promise<void> {
@@ -53,7 +63,7 @@
     try {
       const result = await core.commands.notificationKeywords();
       if (!alive || token !== version) return;
-      keywords = result;
+      keywords = uniqueKeywords(result);
       error = null;
     } catch (cause) {
       console.warn('[sable notifications] loading keywords failed', cause);
