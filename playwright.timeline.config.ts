@@ -17,6 +17,7 @@ export default defineConfig({
     'emote-board-glyphs.spec.ts',
     'account-mobile.spec.ts',
     'settings-size.spec.ts',
+    'avatar-frame.spec.ts',
     'settings-range.spec.ts',
     'reaction-sheet.spec.ts',
     'overlay-stacking.spec.ts',
