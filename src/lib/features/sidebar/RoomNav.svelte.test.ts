@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen, within } from '@testing-library/svelte';
+import { cleanup, render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
@@ -586,6 +586,22 @@ test('message search from a space is scoped to that space', async () => {
   expect(search?.getAttribute('href')).toBe(
     `/search?q=${encodeURIComponent('space:#design:example.org ')}`
   );
+});
+
+test('a space you cannot add rooms to offers a join instead of a create', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
+  ];
+  visit('/space/!space:example.org', { spaceId: '!space:example.org' });
+
+  await mountNav();
+  expect(screen.queryByRole('button', { name: 'nav.createRoomInSpace' })).not.toBeInTheDocument();
+  expect(screen.getByRole('link', { name: 'nav.joinWithAddress' })).toBeInTheDocument();
+
+  core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: true });
+  cleanup();
+  await mountNav();
+  expect(await screen.findByRole('button', { name: 'nav.createRoomInSpace' })).toBeInTheDocument();
 });
 
 test('a space list header shows the space banner above it', async () => {

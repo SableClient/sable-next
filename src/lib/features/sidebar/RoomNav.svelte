@@ -1006,18 +1006,14 @@
                 >{/if}
             </button>
           {/snippet}
-          {#if canCreateHere}
-            <ActionMenuItem onSelect={() => navigateTo(createRoomHref)}>
-              <PlusIcon />
-              {createRoomLabel}
-            </ActionMenuItem>
-          {/if}
-          {#if canCreateHere}
-            <ActionMenuItem onSelect={() => navigateTo(createSpaceHref)}>
-              <HouseIcon />
-              {createSpaceLabel}
-            </ActionMenuItem>
-          {/if}
+          <ActionMenuItem onSelect={() => navigateTo(createRoomHref)}>
+            <PlusIcon />
+            {createRoomLabel}
+          </ActionMenuItem>
+          <ActionMenuItem onSelect={() => navigateTo(createSpaceHref)}>
+            <HouseIcon />
+            {createSpaceLabel}
+          </ActionMenuItem>
           <ActionMenuItem onSelect={() => navigateTo(joinHref)}>
             <LinkIcon />
             {$i18n.t('nav.joinWithAddress')}
@@ -1032,7 +1028,11 @@
         {@render action(newChatHref, $i18n.t('nav.newChat'), PlusIcon)}
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
       {:else}
-        {@render createMenu()}
+        {#if canCreateHere}
+          {@render createMenu()}
+        {:else}
+          {@render action(joinHref, $i18n.t('nav.joinWithAddress'), LinkIcon)}
+        {/if}
         {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
       {/if}
