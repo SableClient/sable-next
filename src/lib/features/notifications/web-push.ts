@@ -3,7 +3,7 @@ import { base64ToUint8Array, uint8ArrayToBase64 } from 'uint8array-extras';
 import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { deliversWebPush } from '#lib/platform/notifications.js';
-import { activeServiceWorker, hostsServiceWorker } from '#lib/platform/service-worker.js';
+import { activeServiceWorker } from '#lib/platform/service-worker.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { unregisterNativePush } from './native-push';
@@ -197,7 +197,7 @@ export async function syncPushSubscription(
 /** The p256dh of this browser's live subscription, which is the pushkey its
     own pushers carry; `null` where no service worker hosts a subscription. */
 export async function currentPushKey(): Promise<string | null> {
-  if (!hostsServiceWorker()) return null;
+  if (!deliversWebPush()) return null;
   const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
   const subscription = (await registration?.pushManager.getSubscription()) ?? null;
   return subscription?.toJSON().keys?.p256dh ?? null;

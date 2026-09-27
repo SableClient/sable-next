@@ -61,6 +61,7 @@ const unnamed: RegisteredPusherView = {
 
 afterEach(() => {
   Reflect.deleteProperty(navigator, 'serviceWorker');
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 
@@ -86,6 +87,7 @@ test('lists registered pushers and marks the Sable ones', async () => {
 });
 
 test('marks this browser own pusher as this device', async () => {
+  vi.stubGlobal('PushManager', function PushManager() {});
   Object.defineProperty(navigator, 'serviceWorker', {
     configurable: true,
     value: {

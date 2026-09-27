@@ -25,6 +25,7 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({
 
 import {
   applicationServerKeyMatches,
+  currentPushKey,
   needsRegistering,
   registrationMarker,
   syncPushSubscription,
@@ -255,4 +256,17 @@ test('a missing server pusher is recreated even when the local marker matches', 
   await syncPushSubscription(client, NONE);
 
   expect(commandsOf.setWebPusher).toHaveBeenCalledOnce();
+});
+
+test('a browser without push has no push key, whatever its service worker holds', async () => {
+  mocks.deliversWebPush.mockReturnValue(false);
+  const getRegistration = vi.fn(() => Promise.resolve({}));
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: { getRegistration },
+  });
+
+  await expect(currentPushKey()).resolves.toBeNull();
+  expect(getRegistration).not.toHaveBeenCalled();
+  Reflect.deleteProperty(navigator, 'serviceWorker');
 });
