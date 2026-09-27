@@ -7,7 +7,10 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
+  import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
+  import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
+  import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import type { RoomSummary } from '#src/generated/protocol';
@@ -34,6 +37,10 @@
     onSettings: () => void;
     onJumpToTime: () => void;
     onAttachments?: () => void;
+    onThreads?: () => void;
+    onPins?: () => void;
+    pinsUnread?: number;
+    onWidgets?: () => void;
     onLeave: () => void;
   }
 
@@ -48,6 +55,10 @@
     onSettings,
     onJumpToTime,
     onAttachments,
+    onThreads,
+    onPins,
+    pinsUnread = 0,
+    onWidgets,
     onLeave,
   }: Props = $props();
   const core = useCoreClient();
@@ -105,16 +116,39 @@
       {$i18n.t('room.menuInvite')}
     </ActionMenuItem>
     {#if compact}
+      <ActionMenuSeparator />
       <ActionMenuItem onSelect={onMembers}>
         <UserCircleIcon />
         {$i18n.t('timeline.members')}
       </ActionMenuItem>
+      {#if onThreads}
+        <ActionMenuItem onSelect={onThreads}>
+          <ChatsIcon />
+          {$i18n.t('timeline.threadsOpen')}
+        </ActionMenuItem>
+      {/if}
+      {#if onPins}
+        <ActionMenuItem onSelect={onPins}>
+          <PushPinIcon />
+          {$i18n.t('room.pinsTitle')}
+          {#if pinsUnread > 0}
+            <span class="menu-count">{pinsUnread}</span>
+          {/if}
+        </ActionMenuItem>
+      {/if}
+      {#if onWidgets}
+        <ActionMenuItem onSelect={onWidgets}>
+          <GridFourIcon />
+          {$i18n.t('widgets.label')}
+        </ActionMenuItem>
+      {/if}
       {#if onAttachments}
         <ActionMenuItem onSelect={onAttachments}>
           <ImagesIcon />
           {$i18n.t('timeline.attachmentsOpen')}
         </ActionMenuItem>
       {/if}
+      <ActionMenuSeparator />
     {/if}
     <ActionMenuItem onSelect={copyLink}>
       <LinkIcon />
@@ -137,3 +171,18 @@
     </ActionMenuItem>
   </IconContext>
 </ActionMenu>
+
+<style>
+  .menu-count {
+    background: var(--primary-main);
+    border-radius: var(--radius-pill);
+    color: var(--primary-on-main);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-600);
+    line-height: var(--line-height-small);
+    margin-inline-start: auto;
+    min-width: var(--size-x400);
+    padding: 0 var(--space-150);
+    text-align: center;
+  }
+</style>

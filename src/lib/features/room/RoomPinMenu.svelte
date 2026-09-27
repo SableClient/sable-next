@@ -31,14 +31,25 @@
     members: readonly MemberView[];
     canPin: boolean;
     revision?: number;
+    open?: boolean;
+    onUnread?: (count: number) => void;
+    triggerHidden?: boolean;
     onJump: (eventId: string) => void;
   }
 
-  let { roomId, members, canPin, revision = 0, onJump }: Props = $props();
+  let {
+    roomId,
+    members,
+    canPin,
+    revision = 0,
+    open = $bindable(false),
+    onUnread,
+    triggerHidden = false,
+    onJump,
+  }: Props = $props();
   const core = useCoreClient();
   const eventItems = useEventItems();
 
-  let open = $state(false);
   let loading = $state(false);
   let pinnedIds = $state.raw<string[]>([]);
   let shownIds = $state.raw<string[]>([]);
@@ -49,6 +60,9 @@
 
   let ordered = $derived([...shownIds].reverse());
   let unreadCount = $derived(unreadPinCount(pinnedIds, marker, currentHash));
+  $effect(() => {
+    onUnread?.(unreadCount);
+  });
 
   $effect(() => {
     void roomId;
@@ -164,7 +178,7 @@
   align="center"
   sideOffset={4}
   preventScroll={false}
-  trigger={pinTrigger}
+  trigger={triggerHidden ? undefined : pinTrigger}
   onOpenChange={(next) => {
     if (next) void load();
     else void refreshCount();

@@ -37,6 +37,7 @@
     onMembers: () => void;
     onSearch: () => void;
     onTopic?: (() => void) | null;
+    phone?: boolean;
     pins?: Snippet;
     actions?: Snippet;
     menu?: Snippet;
@@ -60,6 +61,7 @@
     onMembers,
     onSearch,
     onTopic = null,
+    phone = false,
     pins,
     actions,
     menu,
@@ -158,15 +160,17 @@
         <PhoneIcon />
       </PanelHeaderButton>
     {/if}
-    {@render actions?.()}
-    <PanelHeaderButton
-      class="members-button"
-      label={$i18n.t('timeline.members')}
-      aria-pressed={membersOpen}
-      onclick={onMembers}
-    >
-      <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
-    </PanelHeaderButton>
+    {#if !phone}
+      {@render actions?.()}
+      <PanelHeaderButton
+        class="members-button"
+        label={$i18n.t('timeline.members')}
+        aria-pressed={membersOpen}
+        onclick={onMembers}
+      >
+        <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />
+      </PanelHeaderButton>
+    {/if}
     {@render menu?.()}
   {/snippet}
 </PanelHeader>

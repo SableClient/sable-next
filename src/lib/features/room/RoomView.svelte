@@ -411,6 +411,10 @@
     mentionCount > 0 ? `(${mentionCount}) ${roomName} - Sable` : `${roomName} - Sable`
   );
   const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
+  const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  let phone = $derived(!appLayout.matches);
+  let pinsOpen = $state(false);
+  let pinsUnread = $state(0);
   let desktop = $derived(sidePanels.matches);
   let voiceView = $derived(isVoiceRoom && (!voiceChatOpen || desktop));
   let voiceChatBeside = $derived(isVoiceRoom && voiceChatOpen && desktop);
@@ -765,6 +769,12 @@
     });
   }
 
+  function toggleThreads(): void {
+    threadsOpen = !threadsOpen;
+    attachmentsOpen = false;
+    searchOpen = false;
+  }
+
   function toggleAttachments(): void {
     attachmentsOpen = !attachmentsOpen;
     threadsOpen = false;
@@ -978,11 +988,7 @@
         <PanelHeaderButton
           label={$i18n.t('timeline.threadsOpen')}
           aria-pressed={threadsOpen}
-          onclick={() => {
-            threadsOpen = !threadsOpen;
-            attachmentsOpen = false;
-            searchOpen = false;
-          }}
+          onclick={toggleThreads}
         >
           <ChatsIcon weight={threadsOpen ? 'fill' : 'regular'} />
         </PanelHeaderButton>
@@ -1024,10 +1030,14 @@
       onMembers={toggleMembers}
       onSearch={openSearch}
       onTopic={() => (topicOpen = true)}
+      {phone}
       actions={headerActions}
     >
       {#snippet pins()}
         <RoomPinMenu
+          bind:open={pinsOpen}
+          onUnread={(count) => (pinsUnread = count)}
+          triggerHidden={phone}
           roomId={resolvedRoomId}
           revision={pinRevision}
           members={memberLoader.members}
@@ -1047,6 +1057,10 @@
           onSettings={() => (settingsOpen = true)}
           onJumpToTime={() => (jumpOpen = true)}
           onAttachments={voiceView ? undefined : toggleAttachments}
+          onThreads={phone && !voiceView ? toggleThreads : undefined}
+          onPins={phone ? () => (pinsOpen = true) : undefined}
+          {pinsUnread}
+          onWidgets={phone && widgets.length > 0 ? toggleWidgets : undefined}
           onLeave={() => (leaveOpen = true)}
         />
       {/snippet}
