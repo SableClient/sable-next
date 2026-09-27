@@ -5,6 +5,7 @@
   import CopySimpleIcon from 'phosphor-svelte/lib/CopySimpleIcon';
 
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import Avatar from './Avatar.svelte';
@@ -128,7 +129,14 @@
         aria-label={$i18n.t('timeline.profileBanner', { name: displayName })}
         onclick={openBanner}
       >
-        <MediaImage class="profile-card-banner" source={banner} alt="" width={720} height={240} />
+        <MediaImage
+          class="profile-card-banner"
+          source={banner}
+          alt=""
+          width={720}
+          height={240}
+          original={preferences.autoplayGifs}
+        />
       </button>
     {:else if cover}
       <MediaImage
@@ -137,6 +145,7 @@
         alt=""
         width={720}
         height={240}
+        original={banner !== null && preferences.autoplayGifs}
       />
     {/if}
   </div>

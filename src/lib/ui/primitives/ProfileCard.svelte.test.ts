@@ -6,6 +6,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
+import { core } from '#lib/core/__mocks__/context.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import ProfileCard from './ProfileCard.svelte';
 
 afterEach(() => {
@@ -88,3 +91,29 @@ test('copies the user id when it is clicked', async () => {
 
   expect(writeText).toHaveBeenCalledWith('@ana:example.org');
 });
+
+test.each([
+  [true, 0, 0],
+  [false, 720, 240],
+])(
+  'loads the banner file itself so an animated one plays, only when GIFs autoplay (%s) (#511)',
+  async (autoplay, width, height) => {
+    preferences.autoplayGifs = autoplay;
+    core.fetchMedia.mockClear();
+    render(ProfileCard, {
+      displayName: 'Ana',
+      userId: '@ana:example.org',
+      color: '#abcdef',
+      bannerUrl: `mxc://example.org/banner-${String(autoplay)}`,
+    });
+
+    await vi.waitFor(() => {
+      expect(core.fetchMedia).toHaveBeenCalledWith(
+        `mxc://example.org/banner-${String(autoplay)}`,
+        width,
+        height
+      );
+    });
+    preferences.autoplayGifs = true;
+  }
+);
