@@ -64,9 +64,22 @@
     { action: 'table', label: 'composer.table', icon: TableIcon },
     { action: 'details', label: 'composer.details', icon: CaretCircleDownIcon },
   ];
+
+  function scrollSideways(event: WheelEvent & { currentTarget: HTMLDivElement }): void {
+    const bar = event.currentTarget;
+    if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+    if (bar.scrollWidth <= bar.clientWidth) return;
+    event.preventDefault();
+    bar.scrollLeft += event.deltaY;
+  }
 </script>
 
-<div class="formatting" role="group" aria-label={$i18n.t('composer.formatting')}>
+<div
+  class="formatting"
+  role="group"
+  aria-label={$i18n.t('composer.formatting')}
+  onwheel={scrollSideways}
+>
   {#each markdown ? buttons.filter( (button) => MARKDOWN_FORMATS.includes(button.action) ) : buttons as button (button.action)}
     <IconButton
       variant="ghost"
