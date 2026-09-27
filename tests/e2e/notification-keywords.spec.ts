@@ -129,3 +129,30 @@ test.describe('when the server refuses', () => {
     await expect(keyword(page, word)).toBeVisible();
   });
 });
+
+test.describe('with the fake core', () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test('a keyword keeps its width beside the mode select', async ({
+    page,
+    browserName,
+    installRoomCore,
+  }) => {
+    test.skip(browserName !== 'chromium', 'PushersSettings throws without a push service');
+    await installRoomCore('ready');
+    await page.goto('/settings/notifications');
+    const { input, add } = fields(page);
+    const word = 'averylongkeyword';
+
+    await input.fill(word);
+    await add.click();
+
+    await expect(keyword(page, word)).toBeVisible();
+    const text = keyword(page, word).locator('.keyword-text');
+    const box = await text.evaluate((node) => ({
+      height: node.getBoundingClientRect().height,
+      lineHeight: parseFloat(getComputedStyle(node).lineHeight),
+    }));
+    expect(box.height).toBeLessThan(box.lineHeight * 1.5);
+  });
+});

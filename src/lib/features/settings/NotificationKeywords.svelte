@@ -156,6 +156,7 @@
         <li>
           <span class="keyword-text">{keyword}</span>
           <Select
+            class="keyword-mode"
             aria-label={$i18n.t('settings.notificationKeywordsMode', { keyword })}
             value={mode}
             items={modes.map((option) => ({ value: option, label: $i18n.t(modeLabels[option]) }))}
@@ -262,6 +263,11 @@
     flex: 1;
     min-width: 0;
     overflow-wrap: anywhere;
+  }
+
+  .keyword-list li :global(.keyword-mode) {
+    flex: none;
+    width: auto;
   }
 
   .field {
