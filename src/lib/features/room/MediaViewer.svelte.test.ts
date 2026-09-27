@@ -165,6 +165,18 @@ test('right-clicking the image offers to copy it and confirms the copy', async (
   expect(write).toHaveBeenCalledOnce();
 });
 
+test('escape in the image menu closes the menu, not the viewer', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const img = await openImage([imageItem], onClose);
+
+  await user.pointer({ keys: '[MouseRight]', target: img });
+  await screen.findByRole('menuitem', { name: 'viewer.copyImage' });
+  await user.keyboard('{Escape}');
+
+  expect(onClose).not.toHaveBeenCalled();
+});
+
 test('clamps pointer drag panning to the zoomed overflow', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));

@@ -1015,7 +1015,7 @@
       callParticipants={resolvedRoom?.call_participants ?? []}
       members={memberLoader.members}
       membersOpen={desktop ? desktopMembersOpen : membersOpen}
-      searchOpen={desktop && searchOpen}
+      {searchOpen}
       onCall={callOffered && !isVoiceRoom ? startCall : null}
       onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
       chatOpen={voiceChatOpen}
@@ -1430,11 +1430,12 @@
     }
 
     .timeline {
-      min-width: var(--room-column-min-width);
+      min-width: min(var(--room-column-min-width), 100% - var(--side-panel-min-width));
     }
 
     .room-view.room-view > :global(aside) {
       flex-shrink: 1;
+      max-width: calc(100% - var(--room-column-min-width));
       min-width: var(--side-panel-min-width);
     }
 

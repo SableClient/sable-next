@@ -353,6 +353,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent): void {
+    if (event.defaultPrevented || imageMenuOpen) return;
     if (event.key === 'Escape') onClose();
     if (isImage && pannable) {
       if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
@@ -596,9 +597,9 @@
   async function copyImage(): Promise<void> {
     if (!url) return;
     try {
-      const response = await fetch(url);
-      const blob = await pngBlob(await response.blob());
-      await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+      const source = url;
+      const png = (async () => pngBlob(await (await fetch(source)).blob()))();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
       toasts.info($i18n.t('viewer.imageCopied'));
     } catch (error) {
       console.debug('[sable viewer] copy failed', error);

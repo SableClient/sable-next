@@ -2739,6 +2739,7 @@
   },
   "search": {
     "title": "Search messages",
+    "resize": "Resize search",
     "open": "Search messages",
     "close": "Close search",
     "clear": "Clear search",

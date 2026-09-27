@@ -93,7 +93,7 @@
 
   const WIDTH_STORAGE_KEY = 'sable-members-drawer-width';
   const DEFAULT_WIDTH = 266;
-  const MIN_WIDTH = 192;
+  const MIN_WIDTH = 224;
   const MAX_WIDTH = 640;
   let currentWidth = $derived(width ?? DEFAULT_WIDTH);
   let maxWidth = $derived(
@@ -438,7 +438,6 @@
       flex: 0 0 auto;
       inset: auto;
       max-width: min(40rem, 50vw);
-      min-width: 12rem;
       position: relative;
       width: 16.625rem;
     }

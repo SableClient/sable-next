@@ -1,10 +1,13 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
+  import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
 
   import SearchView from '../search/SearchView.svelte';
 
@@ -14,9 +17,27 @@
   }
 
   let { query, onClose }: Props = $props();
+
+  const panelWidth = new PanelWidth('sable-room-search-width', 26, 16, 40);
+  onMount(() => panelWidth.restore());
 </script>
 
-<aside class="room-search" aria-label={$i18n.t('search.title')}>
+<aside
+  class="room-search"
+  aria-label={$i18n.t('search.title')}
+  style:width={`${panelWidth.width}rem`}
+>
+  <ResizeHandle
+    value={panelWidth.width}
+    min={panelWidth.min}
+    max={panelWidth.max}
+    label={$i18n.t('search.resize')}
+    grow="left"
+    step={1}
+    fromPixels={remFromPixels}
+    onResize={(next) => panelWidth.resize(next)}
+    onCommit={() => panelWidth.commit()}
+  />
   <PanelHeader title={$i18n.t('search.title')}>
     {#snippet prefix()}
       <MagnifyingGlassIcon aria-hidden="true" />
@@ -43,7 +64,13 @@
     flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
+    position: relative;
     width: 26rem;
+  }
+
+  .room-search :global(.resize-handle) {
+    left: -0.25rem;
+    z-index: 1;
   }
 
   .room-search-body {
