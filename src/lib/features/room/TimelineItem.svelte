@@ -1941,8 +1941,8 @@
   }
 
   .message.layout-compact .reply-connected::before {
-    left: calc(-1 * var(--space-400));
-    width: calc(var(--space-400) - var(--space-100));
+    left: calc(var(--space-050) - var(--space-300));
+    width: calc(var(--space-300) - var(--space-150));
   }
 
   .message.layout-bubble .message-main {

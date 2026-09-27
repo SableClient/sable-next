@@ -45,3 +45,52 @@ for (const scheme of ['light', 'dark'] as const) {
     expect(await colour(reply)).toBe(await colour(header));
   });
 }
+
+test('a compact connected reply keeps its connector clear of the name gutter', async ({
+  app,
+  core,
+  page,
+  installRoomCore,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      'sable-preferences',
+      JSON.stringify({ layout: 'compact', replyPreviewStyle: 'connected' })
+    );
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await core.emitTimelineDiff(await core.subscription(), [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('compact-reply', 'Replying to Alice'),
+        sender: '@bob:example.test',
+        sender_name: 'Bob',
+        in_reply_to: {
+          event_id: '$general-1:example.test',
+          sender: '@alice:example.test',
+          sender_mentioned: false,
+          sender_name: 'Alice',
+          body: 'General message 1',
+        },
+      },
+    },
+  ]);
+
+  const row = page
+    .locator('.message')
+    .filter({ has: page.locator('.reply-connected') })
+    .last();
+  const { gutterRight, connectorLeft } = await row.evaluate((node) => {
+    const gutter = node.querySelector('.compact-gutter');
+    const reply = node.querySelector('.reply-connected');
+    if (!gutter || !reply) throw new Error('missing compact reply parts');
+    return {
+      gutterRight: gutter.getBoundingClientRect().right,
+      connectorLeft:
+        reply.getBoundingClientRect().left + parseFloat(getComputedStyle(reply, '::before').left),
+    };
+  });
+  expect(connectorLeft).toBeGreaterThanOrEqual(gutterRight);
+});
