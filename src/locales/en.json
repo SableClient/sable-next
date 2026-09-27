@@ -1617,7 +1617,7 @@
     "settingsSync": "Sync settings across devices",
     "settingsSyncHint": "Stores your preferences, custom themes, recent emoji, favourite GIFs and sidebar layout in your account as unencrypted account data your homeserver can read. Notification permissions, telemetry consent and developer switches stay on this device.",
     "syncDrafts": "Include unsent drafts",
-    "syncDraftsHint": "Carries messages you started but did not send to your other devices. The text is stored unencrypted, so your homeserver can read it.",
+    "syncDraftsHint": "Carries messages you started but did not send to your other devices. Turn it on on each device. The text is stored unencrypted, so your homeserver can read it.",
     "syncStatusTitle": "Sync status",
     "syncStatusNever": "Not synced yet",
     "syncStatusIdle": "Last synced at {{time}}",
