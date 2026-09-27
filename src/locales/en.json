@@ -257,6 +257,8 @@
     "settingsDirectResetName": "Reset name",
     "settingsSave": "Save",
     "settingsSaved": "Saved.",
+    "settingsUnsaved": "You have unsaved changes.",
+    "settingsReset": "Reset",
     "settingsFailed": "That change could not be saved.",
     "menuLabel": "Room options",
     "menuFavourite": "Favourite",

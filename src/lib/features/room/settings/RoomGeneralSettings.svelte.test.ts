@@ -104,3 +104,20 @@ test('saves an access change with join-rule permission alone', async () => {
     expect(core.setRoomJoinRule).toHaveBeenCalledWith('!room:example.org', 'public');
   });
 });
+
+test('an unsaved change raises the save bar, and reset discards it', async () => {
+  core.roomHasSpaceParent.mockResolvedValue(false);
+  core.roomAliases.mockResolvedValue([]);
+  core.roomDirectoryVisibility.mockResolvedValue(false);
+  const user = userEvent.setup();
+  render(RoomGeneralSettings, { room, permissions, levels, onClose: () => {} });
+
+  expect(screen.queryByText('room.settingsUnsaved')).not.toBeInTheDocument();
+  await user.click(await screen.findByRole('radio', { name: /room\.settingsJoinRulePublic/ }));
+  expect(screen.getByText('room.settingsUnsaved').closest('.save-bar')).toHaveClass('pending');
+
+  await user.click(screen.getByRole('button', { name: 'room.settingsReset' }));
+  expect(screen.queryByText('room.settingsUnsaved')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'room.settingsSave' })).toBeDisabled();
+  expect(core.setRoomJoinRule).not.toHaveBeenCalled();
+});

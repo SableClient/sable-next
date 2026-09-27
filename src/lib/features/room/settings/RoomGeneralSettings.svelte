@@ -152,6 +152,13 @@
     });
   }
 
+  function resetDraft(): void {
+    name = room?.name ?? '';
+    topicDraft = topic;
+    pendingRule = null;
+    failed = false;
+  }
+
   function selectJoinRule(rule: JoinRuleView): void {
     pendingRule = rule;
     saved = false;
@@ -419,11 +426,18 @@
   <RoomUpgradeSettings {room} {levels} {ownPowerLevel} {onClose} />
 
   {#if canEditGeneral || canEditAccess}
-    <div class="save-bar">
+    <div class="save-bar" class:pending={dirty}>
       {#if failed}
         <p class="save-status error" role="alert">{$i18n.t('room.settingsFailed')}</p>
+      {:else if dirty}
+        <p class="save-status" role="status">{$i18n.t('room.settingsUnsaved')}</p>
       {:else if saved}
         <p class="save-status" role="status">{$i18n.t('room.settingsSaved')}</p>
+      {/if}
+      {#if dirty}
+        <Button variant="ghost" disabled={saving} onclick={resetDraft}>
+          {$i18n.t('room.settingsReset')}
+        </Button>
       {/if}
       <Button variant="primary" disabled={!dirty || saving} loading={saving} onclick={save}>
         {$i18n.t('room.settingsSave')}
@@ -463,9 +477,21 @@
 
   .save-bar {
     align-items: center;
+    border: var(--border-width) solid transparent;
+    border-radius: var(--radius);
     display: flex;
-    gap: var(--space-400);
+    gap: var(--space-300);
     justify-content: flex-end;
+    padding: var(--space-200) var(--space-300);
+  }
+
+  .save-bar.pending {
+    background: var(--bg-container);
+    border-color: var(--bg-container-line);
+    bottom: var(--space-300);
+    box-shadow: var(--shadow-e200);
+    position: sticky;
+    z-index: 1;
   }
 
   .save-status {
@@ -473,6 +499,11 @@
     font-size: var(--font-size-small);
     margin: 0;
     margin-right: auto;
+  }
+
+  .save-bar.pending .save-status:not(.error) {
+    color: var(--bg-on-container);
+    font-weight: var(--font-weight-medium);
   }
 
   .save-status.error {
