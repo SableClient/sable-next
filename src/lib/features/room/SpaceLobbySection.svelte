@@ -34,7 +34,7 @@
     HierarchySection,
     LobbyDragItem,
   } from './space-hierarchy';
-  import { lobbyAction, placeholderRows } from './space-hierarchy';
+  import { inAllowList, lobbyAction, placeholderRows } from './space-hierarchy';
   import LobbyRoomPlaceholder from './LobbyRoomPlaceholder.svelte';
 
   interface Props {
@@ -181,7 +181,7 @@
           : lobbyAction(
               sectionSpace.join_rule,
               invitedIds.has(sectionSpace.room_id),
-              joinedIds.has(ownerId)
+              inAllowList(sectionSpace, joinedIds, ownerId)
             )}
       {#if spaceAction && ownerId !== null}
         <Button
@@ -311,7 +311,7 @@
           {@const action = lobbyAction(
             child.join_rule,
             invitedIds.has(child.room_id),
-            joinedIds.has(section.parentId)
+            inAllowList(child, joinedIds, section.parentId)
           )}
           <li
             class="room"

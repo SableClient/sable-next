@@ -238,6 +238,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_voice: false,
       num_joined_members: 3,
       join_rule: 'public',
+      allowed_room_ids: [],
       guest_can_join: false,
       children: [],
       ...overrides,

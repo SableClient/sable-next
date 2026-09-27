@@ -9,6 +9,7 @@ import {
   childEdges,
   edgeSignature,
   levelTargets,
+  inAllowList,
   lobbyAction,
   lobbyPhase,
   localHierarchyRooms,
@@ -42,6 +43,7 @@ function room(
     is_voice: false,
     num_joined_members: 1,
     join_rule: 'public',
+    allowed_room_ids: [],
     guest_can_join: false,
     children: [],
     ...overrides,
@@ -66,6 +68,18 @@ test.each([
     expect(lobbyAction(joinRule, invited, inParent)).toBe(action);
   }
 );
+
+test('the allow list decides membership, and the parent stands in when it is unknown', () => {
+  const joined = new Set(['!other-space']);
+
+  expect(inAllowList(room('!a', { allowed_room_ids: ['!other-space'] }), joined, '!parent')).toBe(
+    true
+  );
+  expect(
+    inAllowList(room('!a', { allowed_room_ids: ['!elsewhere'] }), joined, '!other-space')
+  ).toBe(false);
+  expect(inAllowList(room('!a'), joined, '!other-space')).toBe(true);
+});
 
 test('rooms follow the order of the parent edges, not the response order', () => {
   const rooms = [

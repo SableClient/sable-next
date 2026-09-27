@@ -694,6 +694,10 @@
     "knocking": "Sending…",
     "knockSent": "Your request to join has been sent. You will be let in once someone approves it.",
     "knockFailed": "The request to join could not be sent.",
+    "knockReason": "Message for the moderators (optional)",
+    "withdraw": "Withdraw request",
+    "withdrawing": "Withdrawing…",
+    "withdrawFailed": "The request could not be withdrawn.",
     "unavailable": "Nothing is known about {{room}}. It may be private, or the server may not have it.",
     "members_one": "{{count, number}} member",
     "members_other": "{{count, number}} members"

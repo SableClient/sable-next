@@ -48,6 +48,16 @@ export function lobbyAction(
   return null;
 }
 
+export function inAllowList(
+  room: Pick<HierarchyRoomView, 'allowed_room_ids'>,
+  joinedIds: ReadonlySet<string>,
+  parentId: string
+): boolean {
+  return room.allowed_room_ids.length > 0
+    ? room.allowed_room_ids.some((id) => joinedIds.has(id))
+    : joinedIds.has(parentId);
+}
+
 export function localHierarchyRooms(
   rooms: readonly RoomSummary[],
   rootId: string
@@ -77,6 +87,7 @@ export function localHierarchyRooms(
       is_voice: summary.is_voice,
       num_joined_members: null,
       join_rule: summary.join_rule,
+      allowed_room_ids: [],
       guest_can_join: false,
       children,
     });

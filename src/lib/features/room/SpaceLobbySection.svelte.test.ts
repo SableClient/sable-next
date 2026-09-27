@@ -20,6 +20,7 @@ function subspace(joinRule: RoomJoinRuleView): HierarchyRoomView {
     is_voice: false,
     num_joined_members: 3,
     join_rule: joinRule,
+    allowed_room_ids: [],
     guest_can_join: false,
     children: [],
   };

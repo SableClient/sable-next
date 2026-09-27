@@ -489,6 +489,12 @@ pub fn space_hierarchy_room(
         is_voice: summary.room_type == Some(RoomType::Call),
         num_joined_members: u32::try_from(summary.num_joined_members).unwrap_or(u32::MAX),
         join_rule: join_rule_summary_view(&summary.join_rule),
+        allowed_room_ids: match &summary.join_rule {
+            JoinRuleSummary::Restricted(rule) | JoinRuleSummary::KnockRestricted(rule) => {
+                rule.allowed_room_ids.clone()
+            }
+            _ => Vec::new(),
+        },
         guest_can_join: summary.guest_can_join,
         children,
     }

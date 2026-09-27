@@ -11,6 +11,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import FormattedBody from './FormattedBody.svelte';
   import { topicHtml } from './topic-html';
 
@@ -29,7 +30,10 @@
   let failed = $state(false);
   let busy = $state(false);
   let sentKnock = $state(false);
-  let failedAction = $state<'join' | 'knock' | null>(null);
+  let withdrew = $state(false);
+  let reason = $state('');
+  let failedAction = $state<'join' | 'knock' | 'withdraw' | null>(null);
+  const reasonId = $props.id();
 
   let title = $derived(preview?.name ?? roomId);
 
@@ -59,7 +63,8 @@
      so it tries joining first and offers to knock only once that is refused. */
   let mustKnock = $derived(preview?.join_rule === 'knock');
   let canKnock = $derived(mustKnock || preview?.join_rule === 'knock_restricted');
-  let knocked = $derived(preview?.state === 'knocked' || sentKnock);
+  let knocked = $derived((preview?.state === 'knocked' && !withdrew) || sentKnock);
+  let offerKnock = $derived(mustKnock || (canKnock && failedAction === 'join'));
 
   let parent = $derived(childRouting(roomList.rooms, roomId));
   let listed = $derived(via.length > 0 ? via : parent.via);
@@ -94,11 +99,27 @@
     busy = true;
     failedAction = null;
     try {
-      await core.commands.knockRoom(address, await routingFor());
+      await core.commands.knockRoom(address, await routingFor(), reason.trim() || undefined);
       sentKnock = true;
     } catch (error) {
       console.warn('[sable room] knock failed', error);
       failedAction = 'knock';
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function withdraw(): Promise<void> {
+    if (busy || !preview) return;
+    busy = true;
+    failedAction = null;
+    try {
+      await core.commands.leaveRoom(preview.room_id);
+      sentKnock = false;
+      withdrew = true;
+    } catch (error) {
+      console.warn('[sable room] withdrawing the knock failed', error);
+      failedAction = 'withdraw';
     } finally {
       busy = false;
     }
@@ -124,24 +145,41 @@
     {/if}
     {#if failedAction}
       <p role="alert">
-        {failedAction === 'knock' ? $i18n.t('join.knockFailed') : $i18n.t('join.failed')}
+        {$i18n.t(
+          failedAction === 'knock'
+            ? 'join.knockFailed'
+            : failedAction === 'withdraw'
+              ? 'join.withdrawFailed'
+              : 'join.failed'
+        )}
       </p>
     {/if}
 
     {#if knocked}
       <p role="status">{$i18n.t('join.knockSent')}</p>
-    {:else if mustKnock}
-      <Button onclick={() => void knock()} disabled={busy}>
-        {busy ? $i18n.t('join.knocking') : $i18n.t('join.knockAction')}
+      <Button variant="ghost" onclick={() => void withdraw()} disabled={busy}>
+        {busy ? $i18n.t('join.withdrawing') : $i18n.t('join.withdraw')}
       </Button>
     {:else}
-      <Button onclick={() => void join()} disabled={busy}>
-        {busy ? $i18n.t('join.joining') : $i18n.t('join.action')}
-      </Button>
-      {#if canKnock && failedAction === 'join'}
-        <Button variant="ghost" onclick={() => void knock()} disabled={busy}>
-          {$i18n.t('join.knockAction')}
+      {#if !mustKnock}
+        <Button onclick={() => void join()} disabled={busy}>
+          {busy && !offerKnock ? $i18n.t('join.joining') : $i18n.t('join.action')}
         </Button>
+      {/if}
+      {#if offerKnock}
+        <form
+          class="knock"
+          onsubmit={(event) => {
+            event.preventDefault();
+            void knock();
+          }}
+        >
+          <label for={reasonId}>{$i18n.t('join.knockReason')}</label>
+          <TextInput id={reasonId} bind:value={reason} maxlength={500} autocomplete="off" />
+          <Button type="submit" variant={mustKnock ? 'secondary' : 'ghost'} disabled={busy}>
+            {busy ? $i18n.t('join.knocking') : $i18n.t('join.knockAction')}
+          </Button>
+        </form>
       {/if}
     {/if}
   {/if}
@@ -172,6 +210,20 @@
     color: var(--surface-var-on-container);
     margin: 0;
     max-width: 32rem;
+  }
+
+  .knock {
+    display: grid;
+    gap: var(--space-200);
+    justify-items: center;
+    text-align: start;
+    width: min(100%, 24rem);
+  }
+
+  .knock label {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-label);
+    justify-self: start;
   }
 
   .join-topic {

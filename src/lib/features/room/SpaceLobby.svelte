@@ -45,6 +45,7 @@
     childEdges,
     edgeSignature,
     levelTargets,
+    inAllowList,
     lobbyAction,
     lobbyPhase,
     localHierarchyRooms,
@@ -387,7 +388,7 @@
       const action = lobbyAction(
         child.join_rule,
         invitedIds.has(child.room_id),
-        joinedIds.has(parentId)
+        inAllowList(child, joinedIds, parentId)
       );
       if (action === 'knock') {
         await core.commands.knockRoom(address, routing);

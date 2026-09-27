@@ -2453,6 +2453,9 @@ pub struct SpaceHierarchyRoomView {
     pub is_voice: bool,
     pub num_joined_members: u32,
     pub join_rule: RoomJoinRuleView,
+    /// The rooms a `restricted` or `knock_restricted` join rule admits members of.
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub allowed_room_ids: Vec<OwnedRoomId>,
     pub guest_can_join: bool,
     /// This room's own `m.space.child` edges, already sorted. Empty unless it is
     /// a space.

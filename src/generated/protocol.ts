@@ -1116,6 +1116,8 @@ export type SpaceHierarchyRoomView = {
 	is_voice: boolean,
 	num_joined_members: number,
 	join_rule: RoomJoinRuleView,
+	/**  The rooms a `restricted` or `knock_restricted` join rule admits members of. */
+	allowed_room_ids: string[],
 	guest_can_join: boolean,
 	/**
 	 *  This room's own `m.space.child` edges, already sorted. Empty unless it is
