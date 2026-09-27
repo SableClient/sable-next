@@ -1139,6 +1139,7 @@
     "profileReportTitle": "Report {{name}}",
     "profileReportHint": "Tell your homeserver administrators what this person did.",
     "hiddenMedia": "Show media",
+    "showImages": "Show images",
     "sendAnyway": "Send anyway",
     "sendBlockedIdentity": "{{names}} reset their encryption identity since you verified them. Sending anyway withdraws your verification.",
     "sendBlockedVerify": "Verify this device before sending encrypted messages."

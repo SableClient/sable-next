@@ -11,6 +11,7 @@
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { formatTimeInZone, formatUtcTime, parseZonedDatetime } from '../composer/time-markup';
@@ -18,6 +19,7 @@
   import { formatMessageTimestamp, formatTime } from './timeline-format';
   import { hasRoomAbbreviations, useRoomAbbreviations } from './room-abbreviations.svelte.js';
   import { hasRoomMemberNames, mentionLabel, useRoomMemberNames } from './room-member-names.js';
+  import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
 
   import type { MatrixLink } from './matrix-link';
   import { parseMatrixLink } from './matrix-link';
@@ -39,6 +41,7 @@
   const roomList = useRoomList();
   const abbreviations = hasRoomAbbreviations() ? useRoomAbbreviations() : null;
   const memberNames = hasRoomMemberNames() ? useRoomMemberNames() : null;
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
   let definition = $derived(
@@ -46,12 +49,60 @@
       (definitionAnchor ? timeDetail(definitionAnchor) : null) ??
       ''
   );
-  let renderedHtml = $derived(deferMxcImageSources(html));
+  let renderedHtml = $derived(deferImageSources(html));
+  let hasImages = $derived(/<img\b/i.test(html));
+  let revealedImages = $state(false);
+  let imagesConcealed = $derived(hasImages && (roomMedia?.hidden ?? false) && !revealedImages);
 
-  function deferMxcImageSources(value: string): string {
-    return value.replace(
-      /(<img\b[^>]*?)\s+src=(["'])(mxc:[^"']+)\2/gi,
-      '$1 data-sable-mxc-src=$2$3$2'
+  function deferImageSources(value: string): string {
+    return value.replace(/(<img\b[^>]*?)\s+src=(["'])([^"']*)\2/gi, '$1 data-sable-src=$2$3$2');
+  }
+
+  function images(html: string, concealed: boolean) {
+    return (node: HTMLElement) => {
+      void html;
+      return untrack(() => (concealed ? concealImages(node) : releaseAll(resolveImages(node))));
+    };
+  }
+
+  function releaseAll(releases: (() => void)[]): () => void {
+    return () => {
+      for (const release of releases) release();
+    };
+  }
+
+  function concealImages(node: HTMLElement): () => void {
+    const labels: HTMLElement[] = [];
+    const concealed: HTMLImageElement[] = [];
+    for (const image of node.querySelectorAll('img')) {
+      if (image.hidden) continue;
+      image.hidden = true;
+      concealed.push(image);
+      const text = fallbackLabel(image, isEmoticon(image));
+      if (!text) continue;
+      const label = document.createElement('span');
+      label.className = 'concealed-image';
+      label.textContent = text;
+      image.after(label);
+      labels.push(label);
+    }
+    return () => {
+      for (const label of labels) label.remove();
+      for (const image of concealed) image.hidden = false;
+    };
+  }
+
+  function imageSource(image: HTMLImageElement): string {
+    return image.dataset.sableSrc ?? image.getAttribute('src') ?? '';
+  }
+
+  function isEmoticon(image: HTMLImageElement): boolean {
+    return (
+      image.dataset.mxEmoticon !== undefined ||
+      (imageSource(image).startsWith('mxc:') &&
+        (image.getAttribute('alt')?.startsWith(':') === true ||
+          image.getAttribute('title')?.startsWith(':') === true ||
+          (image.hasAttribute('height') && image.hasAttribute('title'))))
     );
   }
 
@@ -61,13 +112,8 @@
       if (image.dataset.mediaHandled !== undefined) continue;
       image.dataset.mediaHandled = '';
 
-      const source = image.dataset.sableMxcSrc ?? image.getAttribute('src') ?? '';
-      const emoticon =
-        image.dataset.mxEmoticon !== undefined ||
-        (source.startsWith('mxc:') &&
-          (image.getAttribute('alt')?.startsWith(':') === true ||
-            image.getAttribute('title')?.startsWith(':') === true ||
-            (image.hasAttribute('height') && image.hasAttribute('title'))));
+      const source = imageSource(image);
+      const emoticon = isEmoticon(image);
       if (emoticon) image.dataset.mxEmoticon = '';
       const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
       if (scheme === 'http:' || scheme === 'https:') {
@@ -226,7 +272,6 @@
           }
         }
 
-        const releases = resolveImages(node);
         decorateCodeBlocks(node);
         const maths = node.querySelectorAll<HTMLElement>('[data-mx-maths]');
         if (maths.length > 0) void renderMaths(maths);
@@ -245,7 +290,6 @@
           offFocusIn();
           offFocusOut();
           closeDefinition();
-          for (const release of releases) release();
           for (const icon of icons) void unmount(icon);
         };
       });
@@ -516,12 +560,25 @@
 <div
   class="formatted-body"
   {@attach decorate(renderedHtml)}
+  {@attach images(renderedHtml, imagesConcealed)}
   {@attach relabel(renderedHtml)}
   {@attach holdAnimations}
 >
   <!-- eslint-disable-next-line svelte/no-at-html-tags -->
   {@html renderedHtml}
 </div>
+
+{#if imagesConcealed}
+  <Button
+    size="small"
+    class="reveal-images"
+    onclick={() => {
+      revealedImages = true;
+    }}
+  >
+    {$i18n.t('timeline.showImages')}
+  </Button>
+{/if}
 
 {#if definitionAnchor && definition}
   <Tooltip
@@ -534,6 +591,10 @@
 {/if}
 
 <style>
+  .formatted-body + :global(.reveal-images) {
+    margin-top: var(--space-100);
+  }
+
   .formatted-body {
     /* Relative so inline code keeps its ratio inside a heading too. */
     --inline-code-scale: 0.9em;

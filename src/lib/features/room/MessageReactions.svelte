@@ -14,6 +14,7 @@
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import ReactionSheet from './ReactionSheet.svelte';
   import { reactionSummary } from './reaction-summary.js';
+  import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
   import {
     isCustomReaction,
     loadReactionEmotePacks,
@@ -110,6 +111,8 @@
       current = false;
     };
   });
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
+  let mediaHidden = $derived(roomMedia?.hidden ?? false);
 </script>
 
 <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
@@ -152,7 +155,9 @@
         onpointercancel={press.end}
       >
         <span class={['reaction-key', failedImages.has(reaction.key) && 'failed']}>
-          {#if isCustomReaction(reaction.key)}
+          {#if isCustomReaction(reaction.key) && mediaHidden}
+            <span class="reaction-shortcode">{shortcode ?? label}</span>
+          {:else if isCustomReaction(reaction.key)}
             <MediaImage
               class="reaction-image"
               source={reaction.key}

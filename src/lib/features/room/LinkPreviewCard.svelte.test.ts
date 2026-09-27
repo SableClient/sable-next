@@ -13,6 +13,8 @@ import { core as baseCore } from '#lib/core/__mocks__/context.js';
 const core = Object.assign(baseCore, { urlPreview: vi.fn<() => Promise<UrlPreviewView | null>>() });
 
 import LinkPreviewCard from './LinkPreviewCard.svelte';
+import LinkPreviewCardMediaHarness from './LinkPreviewCardMediaHarness.test.svelte';
+import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 function preview(overrides: Partial<UrlPreviewView> = {}): UrlPreviewView {
@@ -160,4 +162,21 @@ test('a preview carrying a title stays a card even with an image', async () => {
   const link = screen.getByRole('link', { name: /Example/ });
   expect(link).toHaveClass('link-preview');
   expect(link).not.toHaveClass('link-preview-link');
+});
+
+test('a preview keeps its text but drops its picture where media previews are off (MSC4278)', async () => {
+  preferences.urlPreviews = true;
+  mediaPreviewSettings.global = { media_previews: 'off' };
+  core.urlPreview.mockResolvedValue(
+    preview({ url: 'https://example.org/pictured', image: 'mxc://example.org/thumb' })
+  );
+  render(LinkPreviewCardMediaHarness, { url: 'https://example.org/pictured', joinRule: 'invite' });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(screen.getByRole('link', { name: /Example/ })).toHaveClass('link-preview');
+  expect(document.querySelector('.link-preview-image')).toBeNull();
+  mediaPreviewSettings.global = {};
 });

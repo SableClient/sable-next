@@ -7,6 +7,7 @@
 
   import { imageMimeFromUrl } from './link-preview.js';
   import { loadUrlPreview } from './link-preview-cache';
+  import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
 
   interface Props {
     url: string;
@@ -42,9 +43,11 @@
   });
 
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
+  let mediaHidden = $derived(roomMedia?.hidden ?? false);
 </script>
 
-{#if preview?.image && preview.title === null && preview.site_name === null}
+{#if preview?.image && !mediaHidden && preview.title === null && preview.site_name === null}
   <a class="link-preview-link" href={url} target="_blank" rel="noopener noreferrer">
     <MediaImage
       class="link-preview-inline"
@@ -59,7 +62,7 @@
   </a>
 {:else if preview}
   <a class="link-preview" href={url} target="_blank" rel="noopener noreferrer" aria-label={title}>
-    {#if preview.image}
+    {#if preview.image && !mediaHidden}
       <MediaImage
         class="link-preview-image"
         source={preview.image}

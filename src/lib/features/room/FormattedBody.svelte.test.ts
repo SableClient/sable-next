@@ -22,10 +22,12 @@ const core = Object.assign(baseCore, {
   eventItems: vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([])),
 });
 
+import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import FormattedBody from './FormattedBody.svelte';
 import FormattedBodyHarness from './FormattedBodyHarness.test.svelte';
+import FormattedBodyMediaHarness from './FormattedBodyMediaHarness.test.svelte';
 
 const user = userEvent.setup();
 const link = () => screen.getByRole('link');
@@ -222,7 +224,7 @@ test('defers an mxc emoticon source until its Blob URL is ready', async () => {
 
   const image = screen.getByRole('img', { name: ':party:' });
   expect(image).not.toHaveAttribute('src');
-  expect(image).toHaveAttribute('data-sable-mxc-src', 'mxc://example.org/delayed');
+  expect(image).toHaveAttribute('data-sable-src', 'mxc://example.org/delayed');
 });
 
 async function paintedEmote(
@@ -537,4 +539,45 @@ test('a bare event link names the room and quotes the message, with an icon', as
   expect(anchor.textContent).toHaveLength('#Design: '.length + 72);
   expect(anchor.querySelector('.link-chip-icon svg')).toBeInTheDocument();
   expect(core.eventItems).toHaveBeenCalledWith('!room:example.org', ['$event']);
+});
+
+test('inline images wait behind a prompt where the media preview setting says so (MSC4278)', async () => {
+  mediaPreviewSettings.global = { media_previews: 'off' };
+  render(FormattedBodyMediaHarness, {
+    props: {
+      html:
+        '<img src="https://example.org/cat.png" alt="cat">' +
+        '<img data-mx-emoticon="" src="mxc://example.org/party" alt="party">',
+      joinRule: 'invite',
+    },
+  });
+  await tick();
+
+  const cat = document.querySelector<HTMLImageElement>('img[alt="cat"]');
+  expect(cat).not.toHaveAttribute('src');
+  expect(cat).not.toBeVisible();
+  expect(screen.getByText(':party:')).toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Show images' }));
+
+  expect(cat).toHaveAttribute('src', 'https://example.org/cat.png');
+  expect(cat).toBeVisible();
+  expect(screen.queryByText(':party:')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Show images' })).not.toBeInTheDocument();
+  mediaPreviewSettings.global = {};
+});
+
+test('inline images load at once where media previews are on', async () => {
+  mediaPreviewSettings.global = { media_previews: 'private' };
+  render(FormattedBodyMediaHarness, {
+    props: { html: '<img src="https://example.org/cat.png" alt="cat">', joinRule: 'invite' },
+  });
+  await tick();
+
+  expect(screen.getByRole('img', { name: 'cat' })).toHaveAttribute(
+    'src',
+    'https://example.org/cat.png'
+  );
+  expect(screen.queryByRole('button', { name: 'Show images' })).not.toBeInTheDocument();
+  mediaPreviewSettings.global = {};
 });

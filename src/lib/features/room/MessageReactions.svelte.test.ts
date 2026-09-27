@@ -9,6 +9,8 @@ vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
 
+import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
+
 import MessageReactionsHarness from './MessageReactionsHarness.test.svelte';
 
 const packs = [
@@ -101,4 +103,23 @@ test('shows the shortcode in place of an image that cannot load', async () => {
   });
 
   expect(await screen.findByText(':partyparrot:')).toHaveClass('reaction-shortcode');
+});
+
+test('a custom emote reaction shows its shortcode where media previews are off (MSC4278)', async () => {
+  Object.assign(core.commands, { imagePacks: vi.fn(() => Promise.resolve(packs)) });
+  mediaPreviewSettings.global = { media_previews: 'off' };
+
+  render(MessageReactionsHarness, {
+    reactions: [{ key: 'mxc://example.org/neocat', senders: ['@alice:example.org'] }],
+    eventId: '$event',
+    currentUserId: null,
+    members: [],
+    roomId: '!room:example.org',
+    actionable: false,
+    joinRule: 'invite',
+  });
+
+  expect(await screen.findByText(':neocat:')).toHaveClass('reaction-shortcode');
+  expect(document.querySelector('.reaction-image')).toBeNull();
+  mediaPreviewSettings.global = {};
 });
