@@ -13,6 +13,7 @@ export type PushDetails = {
   webPushAppID: string;
   nativePushAppID: string | null;
   iosPushAppID?: string | null;
+  iosVoipPushAppID?: string | null;
   unifiedPushEmbeddedServerUrl?: string | null;
   unifiedPushGatewayUrl?: string | null;
 };
@@ -86,6 +87,7 @@ function parsePush(raw: unknown): PushDetails | null {
     webPushAppID,
     nativePushAppID: text(source.nativePushAppID),
     ...(text(source.iosPushAppID) ? { iosPushAppID: text(source.iosPushAppID) } : {}),
+    ...(text(source.iosVoipPushAppID) ? { iosVoipPushAppID: text(source.iosVoipPushAppID) } : {}),
     ...(text(source.unifiedPushEmbeddedServerUrl)
       ? { unifiedPushEmbeddedServerUrl: text(source.unifiedPushEmbeddedServerUrl) }
       : {}),

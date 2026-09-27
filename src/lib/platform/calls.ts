@@ -3,7 +3,7 @@ import type {
   SystemCallAction,
 } from '@sableclient/tauri-plugin-livekit-mobile';
 
-import { isTauri } from '@tauri-apps/api/core';
+import { addPluginListener, invoke, isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 
 import { isNativeMobile } from './os';
@@ -81,4 +81,33 @@ export async function listenSystemCallActions(
 export async function fulfillSystemAnswer(uuid: string): Promise<void> {
   const plugin = await loadNativeCalls();
   await plugin?.fulfillAnswerCall(uuid).catch(() => {});
+}
+
+function hasVoipPush(): boolean {
+  return isTauri() && osType() === 'ios';
+}
+
+export async function nativeVoipToken(): Promise<string | null> {
+  if (!hasVoipPush()) return null;
+  try {
+    return await invoke<string | null>('plugin:livekit-mobile|get_voip_token');
+  } catch {
+    return null;
+  }
+}
+
+export async function watchVoipToken(handler: (token: string) => void): Promise<() => void> {
+  if (!hasVoipPush()) return () => {};
+  try {
+    const listener = await addPluginListener<{ token: string }>(
+      'livekit-mobile',
+      'voipTokenUpdated',
+      (event) => {
+        handler(event.token);
+      }
+    );
+    return () => void listener.unregister();
+  } catch {
+    return () => {};
+  }
 }
