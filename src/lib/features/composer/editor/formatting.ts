@@ -94,6 +94,16 @@ function lineWrappingRule(
       tr.split($start.before());
       return true;
     }
+    if (
+      $start.depth > 2 &&
+      $start.node(-1).type === nodes.list_item &&
+      $start.node(-2).type === type &&
+      $start.index(-1) === 0 &&
+      $start.index(-2) > 0 &&
+      $start.parent.content.size === 0
+    ) {
+      return true;
+    }
     const range = $start.blockRange();
     const wrapping = range && findWrapping(range, type, getAttrs?.(match));
     if (!range || !wrapping) return false;

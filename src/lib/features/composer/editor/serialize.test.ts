@@ -318,7 +318,7 @@ test('a bullet list survives both ways', () => {
   );
 
   expect(message.body).toBe('* one\n\n* two');
-  expect(message.formatted).toBe('<ul><li><p>one</p></li><li><p>two</p></li></ul>');
+  expect(message.formatted).toBe('<ul><li>one</li><li>two</li></ul>');
 });
 
 test('a quote survives both ways', () => {
@@ -582,7 +582,7 @@ describe('markup the renderer accepts survives an edit', () => {
       roundTrip('<blockquote><table><tbody><tr><td>a</td></tr></tbody></table></blockquote>')
     ).toBe('<blockquote><table><tbody><tr><td>a</td></tr></tbody></table></blockquote>');
     expect(roundTrip('<details><summary>s</summary><ul><li><p>a</p></li></ul></details>')).toBe(
-      '<details><summary>s</summary><ul><li><p>a</p></li></ul></details>'
+      '<details><summary>s</summary><ul><li>a</li></ul></details>'
     );
   });
 

@@ -319,11 +319,16 @@ const exitQuoteOnSoftBreak: Command = (state, dispatch) => {
   return true;
 };
 
+const nextListItemOnSoftBreak: Command = (state, dispatch, view) =>
+  insideListItem(state) &&
+  (splitListEntry(state, dispatch, view) || liftEmptyBlock(state, dispatch, view));
+
 /** Shift+Enter: stay in the paragraph so the marks survive serialization. */
 const softBreak: Command = chainCommands(
   newlineInCode,
   exitHeadingOnSoftBreak,
   exitQuoteOnSoftBreak,
+  nextListItemOnSoftBreak,
   insertHardBreak
 );
 

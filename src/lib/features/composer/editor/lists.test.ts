@@ -13,6 +13,7 @@ import {
   replaceText,
   resetModel,
   sent,
+  softBreak,
   tx,
   unindent,
   unorderedList,
@@ -283,4 +284,19 @@ test('backspacing in an empty list then creating a new list', () => {
   expect(tx(model)).toBe('<p>|</p>');
   unorderedList(model);
   expect(tx(model)).toBe('<ul><li><p>|</p></li></ul>');
+});
+
+test('a line break at the end of an item starts the next item', () => {
+  const model = cm('<ul><li><p>one|</p></li></ul>');
+  softBreak(model);
+  expect(tx(model)).toBe('<ul><li><p>one</p></li><li><p>|</p></li></ul>');
+  replaceText(model, 'two');
+  expect(tx(model)).toBe('<ul><li><p>one</p></li><li><p>two|</p></li></ul>');
+});
+
+test('a line break on an empty last item leaves the list', () => {
+  const model = cm('<ol><li><p>one</p></li><li><p>|</p></li></ol>');
+  softBreak(model);
+  expect(tx(model)).toBe('<ol><li><p>one</p></li></ol><p>|</p>');
+  expect(sent()).toBe(0);
 });

@@ -279,6 +279,9 @@ function expandMfm(node: ProseMirrorNode): ProseMirrorNode {
 function html(doc: ProseMirrorNode): string {
   const holder = document.createElement('div');
   holder.append(DOMSerializer.fromSchema(composerSchema).serializeFragment(doc.content));
+  for (const paragraph of holder.querySelectorAll('li > p:only-child')) {
+    paragraph.replaceWith(...paragraph.childNodes);
+  }
 
   const blocks = Array.from(holder.children);
   if (blocks.length === 1 && blocks[0]?.tagName === 'P') return blocks[0].innerHTML;

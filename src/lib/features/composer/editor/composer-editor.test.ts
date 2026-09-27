@@ -1233,9 +1233,7 @@ describe('block markup on a soft line', () => {
     type(editor, '- one');
 
     const doc = editor.doc();
-    expect(doc && serializeComposer(doc).formatted).toBe(
-      '<p>list:</p><ul><li><p>one</p></li></ul>'
-    );
+    expect(doc && serializeComposer(doc).formatted).toBe('<p>list:</p><ul><li>one</li></ul>');
   });
 
   test('a heading marker below a soft break becomes a heading', () => {
@@ -1268,9 +1266,7 @@ describe('enter inside a list', () => {
 
     expect(sent).toBe(0);
     const doc = editor.doc();
-    expect(doc && serializeComposer(doc).formatted).toBe(
-      '<ul><li><p>one</p></li><li><p>two</p></li></ul>'
-    );
+    expect(doc && serializeComposer(doc).formatted).toBe('<ul><li>one</li><li>two</li></ul>');
   });
 
   test('on an empty item leaves the list, and the next enter sends', () => {
@@ -1399,9 +1395,7 @@ describe('markers on a soft line inside a container', () => {
     type(editor, '- b');
 
     const doc = editor.doc();
-    expect(doc && serializeComposer(doc).formatted).toBe(
-      '<ul><li><p>a</p></li><li><p>b</p></li></ul>'
-    );
+    expect(doc && serializeComposer(doc).formatted).toBe('<ul><li>a</li><li>b</li></ul>');
   });
 
   test('a number marker makes a sibling item too', () => {
@@ -1411,9 +1405,7 @@ describe('markers on a soft line inside a container', () => {
     type(editor, '2. b');
 
     const doc = editor.doc();
-    expect(doc && serializeComposer(doc).formatted).toBe(
-      '<ol><li><p>a</p></li><li><p>b</p></li></ol>'
-    );
+    expect(doc && serializeComposer(doc).formatted).toBe('<ol><li>a</li><li>b</li></ol>');
   });
 });
 
