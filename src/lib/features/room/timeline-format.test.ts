@@ -212,6 +212,17 @@ test('hides profile changes and raw state events by default, keeping joins', () 
   expect(visible.map((entry) => entry.content.kind)).toEqual(['membership', 'message']);
 });
 
+test('shows an event the SDK left in the timeline twice only once, where it first appears', () => {
+  const first = { ...withEvent(message, '$dup'), read_by: ['@bob:example.org'] };
+  const later = { ...withEvent(message, '$dup'), id: 'second-copy', read_by: [] };
+  const next = withEvent(message, '$next');
+
+  const visible = visibleTimelineItems([first, next, later], defaults);
+
+  expect(visible.map((entry) => entry.id)).toEqual(['$dup', '$next']);
+  expect(visible[0].read_by).toEqual(['@bob:example.org']);
+});
+
 test('honours each toggle independently', () => {
   const shown = visibleTimelineItems([joined, renamed, topic], {
     ...defaults,
