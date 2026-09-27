@@ -825,6 +825,12 @@ impl Core {
                 event_ids: self.pinned_events(&room_id).await?,
             }),
 
+            Command::ReactionShortcodes { room_id, event_id } => {
+                Ok(CommandOk::ReactionShortcodes {
+                    shortcodes: self.reaction_shortcodes(&room_id, &event_id).await?,
+                })
+            }
+
             Command::SetPinned {
                 room_id,
                 event_id,
@@ -1384,9 +1390,20 @@ impl Core {
                 event_id,
                 key,
                 source_pack,
+                shortcode,
                 thread_root,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                let shortcode = match shortcode
+                    .or_else(|| source_pack.as_ref().map(|source| source.shortcode.clone()))
+                {
+                    Some(shortcode) => Some(shortcode),
+                    None => {
+                        self.known_reaction_shortcode(&room_id, &event_id, &key)
+                            .await
+                    }
+                };
+                let shortcode = reaction_shortcode(&key, shortcode.as_deref());
                 if let Some(source) = image_source_pack_extra(&key, source_pack) {
                     timeline
                         .send_with_extra_content(
@@ -1395,6 +1412,7 @@ impl Core {
                                 None,
                                 [
                                     (IMAGE_SOURCE_PACKS, Some(source)),
+                                    (REACTION_SHORTCODE, shortcode),
                                     ("m.mentions", Some(serde_json::json!({}))),
                                 ],
                             ),
@@ -1406,7 +1424,10 @@ impl Core {
                         .toggle_reaction_with_extra_content(
                             &TimelineEventItemId::EventId(event_id),
                             &key,
-                            empty_mentions_extra(),
+                            extra_content(
+                                empty_mentions_extra(),
+                                [(REACTION_SHORTCODE, shortcode)],
+                            ),
                         )
                         .await
                         .map_err(|error| self.failed("react", error))?;
@@ -3029,6 +3050,27 @@ fn ensure_empty_mentions(content: &mut serde_json::Value) {
     }
 }
 
+const REACTION_SHORTCODE: &str = "shortcode";
+const MAX_REACTION_SHORTCODE_BYTES: usize = 100;
+
+fn reaction_shortcode(key: &str, shortcode: Option<&str>) -> Option<serde_json::Value> {
+    if !key.starts_with("mxc://") {
+        return None;
+    }
+    let name = shortcode?.trim().trim_matches(':');
+    if name.is_empty() {
+        return None;
+    }
+    let budget = MAX_REACTION_SHORTCODE_BYTES - 2;
+    let end = name
+        .char_indices()
+        .map(|(start, character)| start + character.len_utf8())
+        .take_while(|end| *end <= budget)
+        .last()?;
+    name.get(..end)
+        .map(|name| serde_json::json!(format!(":{name}:")))
+}
+
 fn image_source_pack_extra(
     url: &str,
     source: Option<ImageSourcePackView>,
@@ -3282,6 +3324,42 @@ async fn room_state_events_from_server(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_a_custom_reaction_carries_its_shortcode_wrapped_in_colons() {
+        assert_eq!(
+            super::reaction_shortcode("mxc://example.org/parrot", Some("partyparrot")),
+            Some(serde_json::json!(":partyparrot:"))
+        );
+        assert_eq!(
+            super::reaction_shortcode("mxc://example.org/parrot", Some(":partyparrot:")),
+            Some(serde_json::json!(":partyparrot:"))
+        );
+    }
+
+    #[test]
+    fn test_an_emoji_reaction_or_a_blank_name_carries_no_shortcode() {
+        assert_eq!(super::reaction_shortcode("👍", Some("thumbsup")), None);
+        assert_eq!(
+            super::reaction_shortcode("mxc://example.org/a", Some("  ")),
+            None
+        );
+        assert_eq!(super::reaction_shortcode("mxc://example.org/a", None), None);
+    }
+
+    #[test]
+    fn test_a_long_shortcode_is_cut_to_100_bytes_on_a_character_boundary() {
+        let long = "é".repeat(80);
+        let Some(serde_json::Value::String(shortcode)) =
+            super::reaction_shortcode("mxc://example.org/a", Some(&long))
+        else {
+            panic!("a shortcode was expected");
+        };
+
+        assert!(shortcode.len() <= 100);
+        assert!(shortcode.starts_with(':') && shortcode.ends_with(':'));
+        assert_eq!(shortcode.len(), 2 + 49 * 2);
+    }
+
     use super::{
         edit_content, empty_mentions_extra, ensure_empty_mentions, gif_content, location_content,
         message_content, state_event_content,

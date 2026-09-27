@@ -17,7 +17,9 @@
   import {
     isCustomReaction,
     loadReactionEmotePacks,
+    loadReactionShortcodes,
     reactionEmoteLabel,
+    reactionShortcode,
   } from './reaction-emote-label.js';
 
   interface Props {
@@ -54,6 +56,14 @@
   let pressIndex = 0;
   const core = useCoreClient();
   let imagePacks = $state.raw<ImagePackView[]>([]);
+  let sentShortcodes = $state.raw<ReadonlyMap<string, string>>(new Map());
+  let customKeys = $derived(
+    reactions
+      .map((reaction) => reaction.key)
+      .filter(isCustomReaction)
+      .sort()
+      .join('\n')
+  );
   let addReactionButton = $state<HTMLElement | null>(null);
   let addReactionOpen = $state(false);
   const failedImages = new SvelteSet<string>();
@@ -73,6 +83,23 @@
   });
 
   $effect(() => {
+    const keys = customKeys;
+    const target = eventId;
+    if (target === null || keys === '') return;
+    let current = true;
+    void loadReactionShortcodes(roomId, target, keys.split('\n'), () =>
+      core.commands.reactionShortcodes(roomId, target)
+    )
+      .then((shortcodes) => {
+        if (current) sentShortcodes = shortcodes;
+      })
+      .catch(() => {});
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
     let current = true;
     void loadReactionEmotePacks(roomId, core.commands.imagePacks)
       .then((packs) => {
@@ -88,7 +115,13 @@
 <div class="reactions" aria-label={$i18n.t('timeline.reactions')}>
   {#each reactions as reaction, index (reaction.key)}
     {@const mine = currentUserId !== null && reaction.senders.includes(currentUserId)}
-    {@const label = reactionEmoteLabel(reaction.key, imagePacks, $i18n.t('timeline.customEmote'))}
+    {@const label = reactionEmoteLabel(
+      reaction.key,
+      imagePacks,
+      $i18n.t('timeline.customEmote'),
+      sentShortcodes
+    )}
+    {@const shortcode = reactionShortcode(reaction.key, imagePacks, sentShortcodes)}
     {#snippet reactionTrigger({ props }: { props: Record<string, unknown> })}
       <button
         {...props}
@@ -131,7 +164,11 @@
               onfailed={() => failedImages.add(reaction.key)}
             />
             {#if failedImages.has(reaction.key)}
-              <WarningIcon class="reaction-image-failed" aria-hidden="true" />
+              {#if shortcode === null}
+                <WarningIcon class="reaction-image-failed" aria-hidden="true" />
+              {:else}
+                <span class="reaction-shortcode" aria-hidden="true">{shortcode}</span>
+              {/if}
             {/if}
           {:else}
             <em>{reaction.key}</em>
@@ -252,6 +289,15 @@
     height: 1.125rem;
     opacity: 0.6;
     width: 1.125rem;
+  }
+
+  .reaction-shortcode {
+    display: block;
+    font-size: var(--font-size-label);
+    line-height: 1.125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .reaction-key em {

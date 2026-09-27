@@ -57,3 +57,48 @@ test('uses a custom emote shortcode rather than its Matrix media URI', async () 
   expect(await screen.findByLabelText(/:neocat:/)).toHaveClass('reaction');
   expect(document.body).not.toHaveTextContent('mxc://example.org/neocat');
 });
+
+test('names an image from a pack we cannot see by the shortcode it was sent with', async () => {
+  Object.assign(core.commands, {
+    imagePacks: vi.fn(() => Promise.resolve([])),
+    reactionShortcodes: vi.fn(() =>
+      Promise.resolve([{ key: 'mxc://remote.example/parrot', shortcode: 'partyparrot' }])
+    ),
+  });
+
+  render(MessageReactionsHarness, {
+    reactions: [
+      { key: 'mxc://remote.example/parrot', senders: ['@alice:example.org'] },
+    ] satisfies TimelineItemView['reactions'],
+    eventId: '$named',
+    currentUserId: null,
+    members: [] as MemberView[],
+    roomId: '!room:example.org',
+    actionable: false,
+  });
+
+  expect(await screen.findByLabelText(/:partyparrot:/)).toHaveClass('reaction');
+});
+
+test('shows the shortcode in place of an image that cannot load', async () => {
+  Object.assign(core.commands, {
+    imagePacks: vi.fn(() => Promise.resolve([])),
+    reactionShortcodes: vi.fn(() =>
+      Promise.resolve([{ key: 'mxc://dead.example/parrot', shortcode: 'partyparrot' }])
+    ),
+  });
+  core.fetchMedia.mockRejectedValueOnce(new Error('unavailable'));
+
+  render(MessageReactionsHarness, {
+    reactions: [
+      { key: 'mxc://dead.example/parrot', senders: ['@alice:example.org'] },
+    ] satisfies TimelineItemView['reactions'],
+    eventId: '$fallback',
+    currentUserId: null,
+    members: [] as MemberView[],
+    roomId: '!room:example.org',
+    actionable: false,
+  });
+
+  expect(await screen.findByText(':partyparrot:')).toHaveClass('reaction-shortcode');
+});

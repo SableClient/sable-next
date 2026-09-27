@@ -41,6 +41,7 @@ import type {
   PublicRoomView,
   PusherView,
   PushFetchView,
+  ReactionShortcodeView,
   RegisteredPusherView,
   RegistrationResultView,
   RoomAttachmentKind,
@@ -1204,7 +1205,17 @@ export function createCommands(transport: () => Transport) {
         thread_root: threadRoot,
         key,
         source_pack: $state.snapshot(sourcePack),
+        shortcode: null,
       });
+    },
+
+    async reactionShortcodes(roomId: string, eventId: string): Promise<ReactionShortcodeView[]> {
+      const response = await transport().send({
+        type: 'reaction_shortcodes',
+        room_id: roomId,
+        event_id: eventId,
+      });
+      return response.shortcodes;
     },
 
     async createPoll(

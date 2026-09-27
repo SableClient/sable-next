@@ -300,6 +300,12 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    ReactionShortcodes {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     SetPinned {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -525,6 +531,8 @@ pub enum Command {
         key: String,
         #[serde(default)]
         source_pack: Option<ImageSourcePackView>,
+        #[serde(default)]
+        shortcode: Option<String>,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
@@ -1271,6 +1279,9 @@ pub enum CommandOk {
     PinnedEvents {
         #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
         event_ids: Vec<OwnedEventId>,
+    },
+    ReactionShortcodes {
+        shortcodes: Vec<ReactionShortcodeView>,
     },
     SetPinned {
         #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
@@ -3524,6 +3535,13 @@ pub struct PackImageView {
     pub usage: Vec<ImageUsageView>,
     pub info: Option<PackImageInfoView>,
     pub source_pack: Option<ImageSourcePackView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct ReactionShortcodeView {
+    pub key: String,
+    pub shortcode: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

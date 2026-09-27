@@ -27,6 +27,7 @@ pub mod profiles;
 pub mod protocol;
 pub mod push_check;
 pub mod push_rules;
+mod reactions;
 mod registration;
 mod room_keys;
 mod rooms;
