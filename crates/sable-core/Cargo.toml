@@ -50,6 +50,7 @@ sha2 = "0.11"
 getrandom = "0.4"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["socks"] }
 matrix-sdk-common.workspace = true
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = "3"

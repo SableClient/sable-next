@@ -117,64 +117,6 @@ fn install_permission_policy() {
 }
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
-fn cef_proxy_from_args(
-    args: impl IntoIterator<Item = std::ffi::OsString>,
-) -> Result<Option<String>, String> {
-    let mut args = args.into_iter();
-    let mut proxy = None;
-
-    while let Some(argument) = args.next() {
-        let Some(argument) = argument.to_str() else {
-            continue;
-        };
-        let value = match argument.strip_prefix("--proxy=") {
-            Some(value) => value.to_owned(),
-            None if argument == "--proxy" => args
-                .next()
-                .and_then(|value| value.into_string().ok())
-                .ok_or_else(|| "--proxy requires an HTTP or SOCKS proxy URL".to_owned())?,
-            None => continue,
-        };
-
-        if proxy.is_some() {
-            return Err("--proxy may only be specified once".to_owned());
-        }
-        proxy = Some(normalize_cef_proxy(&value)?);
-    }
-
-    Ok(proxy)
-}
-
-#[cfg(all(feature = "cef", target_os = "linux"))]
-fn normalize_cef_proxy(value: &str) -> Result<String, String> {
-    let proxy = tauri::Url::parse(value)
-        .map_err(|_| "--proxy must be an HTTP or SOCKS proxy URL".to_owned())?;
-    if !matches!(proxy.scheme(), "http" | "socks" | "socks4" | "socks5") {
-        return Err("--proxy must use http, socks, socks4, or socks5".to_owned());
-    }
-    if !proxy.username().is_empty() || proxy.password().is_some() {
-        return Err("--proxy does not support credentials".to_owned());
-    }
-    if proxy.path() != "/" || proxy.query().is_some() || proxy.fragment().is_some() {
-        return Err("--proxy must not include a path, query, or fragment".to_owned());
-    }
-
-    let host = proxy
-        .host_str()
-        .ok_or_else(|| "--proxy requires a host".to_owned())?;
-    let host = if host.contains(':') {
-        format!("[{host}]")
-    } else {
-        host.to_owned()
-    };
-    let port = proxy
-        .port()
-        .map_or_else(String::new, |port| format!(":{port}"));
-
-    Ok(format!("{}://{host}{port}", proxy.scheme()))
-}
-
-#[cfg(all(feature = "cef", target_os = "linux"))]
 fn cef_command_line_args(proxy: Option<&str>) -> Vec<(String, Option<String>)> {
     let mut args: Vec<(String, Option<String>)> = vec![
         ("--disable-gpu-sandbox".into(), None),
@@ -311,13 +253,7 @@ fn webkit_env_defaults() -> Vec<(&'static str, std::ffi::OsString)> {
 
 fn main() {
     #[cfg(all(feature = "cef", target_os = "linux"))]
-    let proxy = match cef_proxy_from_args(std::env::args_os().skip(1)) {
-        Ok(proxy) => proxy,
-        Err(error) => {
-            eprintln!("{error}");
-            std::process::exit(2);
-        }
-    };
+    let proxy = app_lib::proxy::launch_proxy().clone().ok().flatten();
 
     // The CEF runtime's Wayland path is unstable; the crate is verified on X11.
     // https://github.com/tauri-apps/tauri/issues/14251
@@ -386,9 +322,7 @@ fn main() {
 
 #[cfg(all(test, feature = "cef", target_os = "linux"))]
 mod tests {
-    use std::ffi::OsString;
-
-    use super::{cef_command_line_args, cef_proxy_from_args};
+    use super::cef_command_line_args;
 
     #[test]
     fn cef_keeps_background_throttling_enabled() {
@@ -416,36 +350,6 @@ mod tests {
                     features.split(',').any(|f| f == "WebRtcPipeWireCamera")
                 })
         }));
-    }
-
-    #[test]
-    fn cef_accepts_a_socks_proxy() {
-        let args = ["--proxy", "socks5://[::1]:9050"].map(OsString::from);
-
-        assert_eq!(
-            cef_proxy_from_args(args),
-            Ok(Some("socks5://[::1]:9050".into()))
-        );
-    }
-
-    #[test]
-    fn cef_accepts_an_equals_proxy() {
-        let args = ["--proxy=socks5://127.0.0.1:9050"].map(OsString::from);
-
-        assert_eq!(
-            cef_proxy_from_args(args),
-            Ok(Some("socks5://127.0.0.1:9050".into()))
-        );
-    }
-
-    #[test]
-    fn cef_rejects_an_invalid_proxy() {
-        let args = ["--proxy=https://proxy.example"].map(OsString::from);
-
-        assert_eq!(
-            cef_proxy_from_args(args),
-            Err("--proxy must use http, socks, socks4, or socks5".into())
-        );
     }
 
     #[test]

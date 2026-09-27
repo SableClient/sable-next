@@ -23,6 +23,8 @@ mod mobile;
 mod notifications;
 #[cfg(all(feature = "cef", target_os = "linux"))]
 mod portal_theme;
+#[cfg(desktop)]
+pub mod proxy;
 #[cfg(mobile)]
 use tauri_plugin_notifications::NotificationsExt;
 mod sentry;
@@ -393,10 +395,28 @@ async fn set_notification_encrypted_content(
 }
 
 fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(desktop)]
+    proxy::apply_to_core();
+    #[cfg(desktop)]
+    if let Some(error) = proxy::launch_error() {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+        app.dialog()
+            .message(error)
+            .title("Sable")
+            .kind(MessageDialogKind::Error)
+            .show(|_| std::process::exit(2));
+        return Ok(());
+    }
+
     for config in &app.config().app.windows {
         let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
         #[cfg(desktop)]
         let builder = window_geometry::restore(app.handle(), builder, &config.label);
+        #[cfg(all(desktop, not(all(feature = "cef", target_os = "linux"))))]
+        let builder = match proxy::launch_proxy() {
+            Ok(Some(url)) => builder.proxy_url(tauri::Url::parse(url)?),
+            _ => builder,
+        };
         #[cfg(target_os = "android")]
         let builder = builder.on_navigation(|url| url.as_str().parse::<tauri::http::Uri>().is_ok());
         builder.build()?;
