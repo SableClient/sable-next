@@ -73,6 +73,8 @@ runs:
           curl \
           file \
           libayatana-appindicator3-dev \
+          libclang-dev \
+          libpipewire-0.3-dev \
           libssl-dev \
           libwebkit2gtk-4.1-dev \
           libxdo-dev \

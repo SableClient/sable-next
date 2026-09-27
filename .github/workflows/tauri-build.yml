@@ -337,7 +337,9 @@ jobs:
             build-essential \
             file \
             libayatana-appindicator3-1 \
+            libclang-dev \
             libgtk-3-dev \
+            libpipewire-0.3-dev \
             libsoup-3.0-dev \
             libwebkit2gtk-4.1-dev \
             pkg-config

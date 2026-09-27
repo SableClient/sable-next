@@ -1,4 +1,5 @@
 import {
+  AudioPresets,
   ConnectionQuality,
   ConnectionState,
   LocalAudioTrack,
@@ -10,6 +11,11 @@ import {
   type TrackPublication,
 } from 'livekit-client';
 
+import {
+  captureScreenAudio,
+  screenAudioSupported,
+  stopScreenAudio,
+} from '#lib/platform/screen-audio.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import type {
@@ -301,6 +307,9 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     .on(RoomEvent.ActiveSpeakersChanged, syncLocal)
     .on(RoomEvent.LocalTrackPublished, syncLocal)
     .on(RoomEvent.LocalTrackUnpublished, syncLocal)
+    .on(RoomEvent.LocalTrackUnpublished, (publication) => {
+      if (publication.source === Track.Source.ScreenShare) void stopSharingAudio();
+    })
     .on(RoomEvent.TrackMuted, syncLocal)
     .on(RoomEvent.TrackUnmuted, syncLocal)
     .on(RoomEvent.Reconnecting, () => {
@@ -315,6 +324,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       event('call.connection.reconnected');
     })
     .on(RoomEvent.Disconnected, (reason) => {
+      void stopSharingAudio();
       publish({ connection: 'disconnected', participants: [] });
       event('call.connection.disconnected', { 'call.disconnect_reason': reason ?? -1 });
       healthGeneration += 1;
@@ -409,6 +419,36 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     }
   };
 
+  let screenAudio: LocalAudioTrack | null = null;
+
+  const stopSharingAudio = async (): Promise<void> => {
+    const track = screenAudio;
+    screenAudio = null;
+    if (!track) return;
+    await room.localParticipant.unpublishTrack(track, true).catch(ignoreError);
+    await stopScreenAudio().catch((error: unknown) => {
+      fail('call.screen_share.audio_stop', error);
+    });
+  };
+
+  const shareAudio = async (): Promise<void> => {
+    if (!screenAudioSupported() || screenAudio) return;
+    try {
+      const track = new LocalAudioTrack(await captureScreenAudio(), undefined, false);
+      screenAudio = track;
+      await room.localParticipant.publishTrack(track, {
+        source: Track.Source.ScreenShareAudio,
+        audioPreset: AudioPresets.musicHighQualityStereo,
+        forceStereo: true,
+        dtx: false,
+        red: false,
+      });
+    } catch (error) {
+      fail('call.screen_share.audio', error);
+      await stopSharingAudio();
+    }
+  };
+
   const publishTrack = async (stage: string, enable: () => Promise<unknown>): Promise<void> => {
     try {
       await step(stage, enable);
@@ -436,6 +476,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       if (healthTimer) clearTimeout(healthTimer);
       healthTimer = undefined;
       try {
+        await stopSharingAudio();
         await room.disconnect();
       } finally {
         worker?.terminate();
@@ -470,6 +511,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
           await step('call.screen_share.set', () =>
             room.localParticipant.setScreenShareEnabled(enabled)
           );
+          if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio();
+          else if (!enabled) await stopSharingAudio();
           syncLocal();
         },
       },

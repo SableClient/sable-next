@@ -25,6 +25,8 @@ mod notifications;
 mod portal_theme;
 #[cfg(desktop)]
 pub mod proxy;
+#[cfg(target_os = "linux")]
+pub mod screen_audio;
 #[cfg(mobile)]
 use tauri_plugin_notifications::NotificationsExt;
 mod sentry;
@@ -577,6 +579,20 @@ fn toggle_devtools(window: tauri::WebviewWindow<BrowserEngine>) {
     }
 }
 
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn start_screen_audio() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(screen_audio::start)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn stop_screen_audio() {
+    let _ = tauri::async_runtime::spawn_blocking(screen_audio::stop).await;
+}
+
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
 fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
@@ -656,6 +672,29 @@ fn install_logging() {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
+fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Builder<BrowserEngine> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let builder = builder
+        .plugin(tauri_plugin_app_icon::init())
+        .plugin(tauri_plugin_edge_to_edge::init())
+        .plugin(tauri_plugin_geolocation::init())
+        .plugin(tauri_plugin_livekit_mobile::init());
+
+    #[cfg(any(
+        target_os = "android",
+        target_os = "ios",
+        target_os = "macos",
+        target_os = "windows"
+    ))]
+    let builder = builder.plugin(tauri_plugin_sharekit::init());
+
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_android_fs::init());
+
+    builder
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     install_logging();
@@ -682,23 +721,8 @@ pub fn run() {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = with_updates(builder);
 
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    let builder = builder
-        .plugin(tauri_plugin_app_icon::init())
-        .plugin(tauri_plugin_edge_to_edge::init())
-        .plugin(tauri_plugin_geolocation::init())
-        .plugin(tauri_plugin_livekit_mobile::init());
-
-    #[cfg(any(
-        target_os = "android",
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "windows"
-    ))]
-    let builder = builder.plugin(tauri_plugin_sharekit::init());
-
-    #[cfg(target_os = "android")]
-    let builder = builder.plugin(tauri_plugin_android_fs::init());
+    #[cfg(not(target_os = "linux"))]
+    let builder = with_platform_plugins(builder);
 
     if let Err(error) = builder
         .plugin(tauri_plugin_deep_link::init())
@@ -725,6 +749,10 @@ pub fn run() {
             upload_media,
             upload_media_base64,
             open_external_url,
+            #[cfg(target_os = "linux")]
+            start_screen_audio,
+            #[cfg(target_os = "linux")]
+            stop_screen_audio,
             #[cfg(desktop)]
             toggle_devtools,
             #[cfg(all(feature = "cef", target_os = "linux"))]

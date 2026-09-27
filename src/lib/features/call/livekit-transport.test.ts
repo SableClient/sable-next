@@ -6,6 +6,13 @@ import type { CallTelemetry } from './call-telemetry';
 import { MatrixKeyProvider } from './key-provider';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+const screenAudio = vi.hoisted(() => ({
+  screenAudioSupported: vi.fn(() => false),
+  captureScreenAudio: vi.fn<() => Promise<MediaStreamTrack>>(),
+  stopScreenAudio: vi.fn(() => Promise.resolve()),
+}));
+vi.mock('#lib/platform/screen-audio.js', () => screenAudio);
+
 function roomFixture() {
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
   let state = ConnectionState.Disconnected;
@@ -91,6 +98,7 @@ const connectOptions = {
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 test('imports the publisher key before connecting or capturing audio', async () => {
@@ -220,6 +228,77 @@ test('runs without telemetry and performs media toggles once', async () => {
   expect(fixture.mic).toHaveBeenCalledTimes(2);
   expect(fixture.localParticipant.setCameraEnabled).toHaveBeenCalledTimes(2);
   expect(fixture.localParticipant.setScreenShareEnabled).toHaveBeenCalledOnce();
+});
+
+function audioTrackStub(): MediaStreamTrack {
+  return {
+    kind: 'audio',
+    id: 'screen-audio',
+    enabled: true,
+    muted: false,
+    readyState: 'live',
+    getSettings: () => ({ deviceId: 'screen-audio' }),
+    getConstraints: () => ({}),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    stop: vi.fn(),
+  } as unknown as MediaStreamTrack;
+}
+
+function withPublishing(fixture: ReturnType<typeof roomFixture>) {
+  vi.stubGlobal(
+    'MediaStream',
+    class {
+      constructor(private readonly tracks: MediaStreamTrack[] = []) {}
+      getTracks() {
+        return this.tracks;
+      }
+      getAudioTracks() {
+        return this.tracks;
+      }
+    }
+  );
+  return Object.assign(fixture.localParticipant, {
+    publishTrack: vi.fn(() => Promise.resolve()),
+    unpublishTrack: vi.fn(() => Promise.resolve()),
+  });
+}
+
+test('publishes the screen audio beside the share, and tears it down with it', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockResolvedValue(audioTrackStub());
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+
+  await transport.connect(connectOptions);
+  await transport.capabilities.screenShare?.setEnabled(true);
+
+  expect(participant.publishTrack).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ source: 'screen_share_audio', forceStereo: true })
+  );
+
+  await transport.capabilities.screenShare?.setEnabled(false);
+
+  expect(participant.unpublishTrack).toHaveBeenCalledOnce();
+  expect(screenAudio.stopScreenAudio).toHaveBeenCalledOnce();
+  screenAudio.screenAudioSupported.mockReturnValue(false);
+});
+
+test('keeps sharing the screen when its audio cannot be captured', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockRejectedValue(new Error('no pipewire'));
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+
+  await transport.connect(connectOptions);
+  await transport.capabilities.screenShare?.setEnabled(true);
+
+  expect(fixture.localParticipant.isScreenShareEnabled).toBe(true);
+  expect(participant.publishTrack).not.toHaveBeenCalled();
+  screenAudio.screenAudioSupported.mockReturnValue(false);
 });
 
 test('stops health snapshots and suppresses an in-flight result after disconnect', async () => {

@@ -196,6 +196,21 @@ fn apply_env_defaults(defaults: &[(&str, std::ffi::OsString)]) {
 }
 
 #[cfg(target_os = "linux")]
+fn mark_own_audio() {
+    let marker = app_lib::screen_audio::SELF_MARKER;
+    let value = match std::env::var("PULSE_PROP") {
+        Ok(existing) if existing.contains(marker) => return,
+        Ok(existing) if !existing.trim().is_empty() => format!("{existing} {marker}"),
+        _ => marker.to_owned(),
+    };
+    // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
+    #[allow(unsafe_code)]
+    unsafe {
+        std::env::set_var("PULSE_PROP", value);
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn linux_env_defaults() -> Vec<(&'static str, std::ffi::OsString)> {
     let nvidia = [("__NV_DISABLE_EXPLICIT_SYNC", std::ffi::OsString::from("1"))];
     #[cfg(feature = "cef")]
@@ -268,6 +283,8 @@ fn main() {
 
     #[cfg(target_os = "linux")]
     apply_env_defaults(&linux_env_defaults());
+    #[cfg(target_os = "linux")]
+    mark_own_audio();
 
     // Before everything else: CEF re-execs this binary for its subprocesses.
     #[cfg(all(feature = "cef", target_os = "linux"))]

@@ -117,6 +117,7 @@ ffmpeg-sidecar = { version = "2.5", optional = true }
 # CHECKs into a SIGILL past 2 GiB. See .claude/rules/native.md.
 tikv-jemallocator = { version = "0.7.0", optional = true }
 libloading = "0.9"
+pipewire = "0.10.1"
 zbus = "5"
 
 [target."cfg(target_os = \"ios\")".dependencies]
