@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
   import { on } from 'svelte/events';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { checkForWebUpdate, webUpdateState } from '#lib/platform/web-updates.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Banner from '#lib/ui/primitives/Banner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
 
@@ -26,8 +26,8 @@
     waiting.postMessage({ type: 'sable:skip-waiting' });
   }
 
-  onMount(() => {
-    if (!('serviceWorker' in navigator)) return;
+  $effect(() => {
+    if (!preferences.autoUpdateCheck || !('serviceWorker' in navigator)) return undefined;
 
     const check = (): void => {
       checkForWebUpdate().catch((error: unknown) => {
@@ -37,9 +37,7 @@
     check();
     const timer = setInterval(check, POLL_INTERVAL_MS);
 
-    return () => {
-      clearInterval(timer);
-    };
+    return () => clearInterval(timer);
   });
 
   $effect(() => {

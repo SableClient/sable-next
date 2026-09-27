@@ -1,5 +1,4 @@
 import type { Component } from 'svelte';
-import ArrowCircleUpIcon from 'phosphor-svelte/lib/ArrowCircleUpIcon';
 import ArrowsOutLineVerticalIcon from 'phosphor-svelte/lib/ArrowsOutLineVerticalIcon';
 import AtIcon from 'phosphor-svelte/lib/AtIcon';
 import BellIcon from 'phosphor-svelte/lib/BellIcon';
@@ -69,7 +68,6 @@ import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js'
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
-import { supportsAutoUpdate } from '#lib/platform/updates.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import { SEARCH_INDEX_LIMITS, setPreference, SUBSPACE_DEPTHS } from './preferences.svelte';
@@ -160,7 +158,7 @@ const MERGED_SECTIONS: Record<string, string> = {
   accessibility: 'appearance',
   sync: SETTINGS_ACCOUNT_SECTION,
   time: 'timeline',
-  updates: 'desktop',
+  updates: 'about',
 };
 
 export function canonicalSection(id: string): string {
@@ -228,60 +226,47 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
     ]
   : [];
 
-const desktopCategories: SettingsCategory[] =
-  supportsDesktopWindow() || supportsAutoUpdate()
-    ? [
-        {
-          id: 'desktop',
-          name: 'settings.desktopTitle',
-          description: 'settings.desktopDescription',
-          icon: DesktopIcon,
-          sections: [
-            { id: 'window', name: 'settings.groups.window' },
-            { id: 'updates', name: 'settings.updatesTitle' },
-          ],
-          items: [
-            {
-              key: 'useCustomTitleBar',
-              section: 'window',
-              icon: DesktopIcon,
-              name: 'settings.useCustomTitleBar',
-              description: 'settings.useCustomTitleBarHint',
-              type: 'boolean',
-              supported: supportsDesktopWindow,
-            },
-            {
-              key: 'showSystemTrayIcon',
-              section: 'window',
-              icon: DesktopIcon,
-              name: 'settings.showSystemTrayIcon',
-              description: 'settings.showSystemTrayIconHint',
-              type: 'boolean',
-              supported: () => supportsDesktopWindow() && supportsTray(),
-            },
-            {
-              key: 'closeToTray',
-              section: 'window',
-              icon: DesktopIcon,
-              name: 'settings.closeToTray',
-              description: 'settings.closeToTrayHint',
-              type: 'boolean',
-              gatedBy: 'showSystemTrayIcon',
-              supported: () => supportsDesktopWindow() && supportsTray(),
-            },
-            {
-              key: 'autoUpdateCheck',
-              section: 'updates',
-              icon: ArrowCircleUpIcon,
-              name: 'settings.autoUpdateCheck',
-              description: 'settings.autoUpdateCheckHint',
-              type: 'boolean',
-              supported: supportsAutoUpdate,
-            },
-          ],
-        },
-      ]
-    : [];
+const desktopCategories: SettingsCategory[] = supportsDesktopWindow()
+  ? [
+      {
+        id: 'desktop',
+        name: 'settings.desktopTitle',
+        description: 'settings.desktopDescription',
+        icon: DesktopIcon,
+        sections: [{ id: 'window', name: 'settings.groups.window' }],
+        items: [
+          {
+            key: 'useCustomTitleBar',
+            section: 'window',
+            icon: DesktopIcon,
+            name: 'settings.useCustomTitleBar',
+            description: 'settings.useCustomTitleBarHint',
+            type: 'boolean',
+            supported: supportsDesktopWindow,
+          },
+          {
+            key: 'showSystemTrayIcon',
+            section: 'window',
+            icon: DesktopIcon,
+            name: 'settings.showSystemTrayIcon',
+            description: 'settings.showSystemTrayIconHint',
+            type: 'boolean',
+            supported: () => supportsDesktopWindow() && supportsTray(),
+          },
+          {
+            key: 'closeToTray',
+            section: 'window',
+            icon: DesktopIcon,
+            name: 'settings.closeToTray',
+            description: 'settings.closeToTrayHint',
+            type: 'boolean',
+            gatedBy: 'showSystemTrayIcon',
+            supported: () => supportsDesktopWindow() && supportsTray(),
+          },
+        ],
+      },
+    ]
+  : [];
 
 export const settingsCategories: SettingsCategory[] = [
   {

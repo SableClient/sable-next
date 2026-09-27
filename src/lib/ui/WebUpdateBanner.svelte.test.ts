@@ -6,6 +6,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
 import WebUpdateBanner from './WebUpdateBanner.svelte';
 
 vi.mock('$app/env', () => ({ version: 'build-two' }));
@@ -26,6 +27,7 @@ async function settle(): Promise<void> {
 }
 
 afterEach(() => {
+  preferences.autoUpdateCheck = true;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -75,6 +77,22 @@ test('keeps checking for a new worker while the tab stays open', async () => {
   await vi.advanceTimersByTimeAsync(300_000);
   expect(update).toHaveBeenCalledTimes(3);
   vi.useRealTimers();
+});
+
+test('does not check for web updates automatically when disabled', async () => {
+  preferences.autoUpdateCheck = false;
+  const update = vi.fn(() => Promise.resolve());
+  const registration = Object.assign(new EventTarget(), {
+    update,
+  }) as unknown as ServiceWorkerRegistration;
+  const serviceWorker = Object.assign(new EventTarget(), { ready: Promise.resolve(registration) });
+  vi.stubGlobal('navigator', { serviceWorker });
+  vi.stubGlobal('location', { reload: vi.fn() });
+
+  render(WebUpdateBanner);
+  await settle();
+
+  expect(update).not.toHaveBeenCalled();
 });
 
 test('activates a worker built from the same version without prompting', async () => {

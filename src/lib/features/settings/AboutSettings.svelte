@@ -7,19 +7,28 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { restartSetup } from '#lib/features/auth/setup/setup-record.js';
   import { i18n } from '#lib/i18n.js';
-  import { checkForMobileUpdate, checkForUpdate, updatePlatform } from '#lib/platform/updates.js';
+  import {
+    checkForMobileUpdate,
+    checkForUpdate,
+    supportsAutoUpdate,
+    updatePlatform,
+  } from '#lib/platform/updates.js';
+  import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { checkForWebUpdate } from '#lib/platform/web-updates.svelte.js';
+  import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
   import '#lib/ui/primitives/settings-row.css';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
 
   const core = useCoreClient();
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
+  const automaticUpdateChecksSupported = supportsAutoUpdate() || hostsServiceWorker();
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
   let resetting = $state(false);
   let resetFailed = $state(false);
@@ -159,6 +168,21 @@
           {$i18n.t('settings.aboutReport')}
         </LinkButton>
       </SettingsRow>
+      {#if automaticUpdateChecksSupported}
+        <SettingsRow
+          id="auto-update-check"
+          title={$i18n.t('settings.autoUpdateCheck')}
+          description={$i18n.t('settings.autoUpdateCheckHint')}
+          control="auto-update-check-switch"
+        >
+          <Switch
+            id="auto-update-check-switch"
+            checked={preferences.autoUpdateCheck}
+            label={$i18n.t('settings.autoUpdateCheck')}
+            onCheckedChange={(checked) => setPreference('autoUpdateCheck', checked)}
+          />
+        </SettingsRow>
+      {/if}
       <SettingsRow
         id="check-for-updates"
         title={$i18n.t('settings.aboutCheckForUpdates')}
