@@ -111,6 +111,25 @@ test('mobile: swiping a page right goes back to the list', async ({
   await expect(sections).toBeVisible();
 });
 
+test('mobile: swiping the section list right closes settings', async ({
+  page,
+  installRoomCore,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'touch is driven over CDP');
+  await installRoomCore('ready');
+  await page.goto('/rooms');
+  await page.goto('/settings');
+  const sections = page.getByRole('navigation', { name: 'Settings sections' });
+  await expect(sections).toBeVisible();
+
+  await swipeRight(page, 400, 40, 80);
+  await expect(sections).toBeVisible();
+
+  await swipeRight(page, 400, 40, 340);
+  await expect(sections).toBeHidden();
+});
+
 test('mobile: dragging a slider does not swipe the page away', async ({
   page,
   installRoomCore,

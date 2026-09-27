@@ -101,6 +101,40 @@
     }
     if (offset === 0 || shouldReduceMotion()) revealed = false;
   }
+
+  let listSwipe: SwipeGesture | undefined;
+  let listOffset = $state(0);
+  let listSwiping = $state(false);
+  let list = $state<HTMLElement | null>(null);
+  let listSwipeable = $derived(!pages.desktop && !(pages.showContent && pages.openSection));
+
+  function startListSwipe(event: TouchEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    listSwipe = target?.closest(SWIPE_IGNORE) ? undefined : startSwipeGesture(event, 0);
+  }
+
+  function moveListSwipe(event: TouchEvent): void {
+    if (!listSwipe) return;
+    const update = updateSwipeGesture(listSwipe, event);
+    if (!update || update.mode !== 'horizontal') return;
+    listSwiping = true;
+    listOffset = Math.max(0, update.distanceX);
+  }
+
+  function finishListSwipe(cancelled: boolean): void {
+    const active = listSwipe;
+    listSwipe = undefined;
+    listSwiping = false;
+    if (!active) return;
+    const offset = listOffset;
+    listOffset = 0;
+    const result = finishSwipeGesture(active, offset, cancelled);
+    if (!result.handled) return;
+    const width = list?.clientWidth ?? 0;
+    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
+      onClose();
+    }
+  }
 </script>
 
 {#snippet currentOutline(entry: { label: string })}
@@ -113,7 +147,18 @@
   <Dialog.Description class="screen-reader-only">{description}</Dialog.Description>
 
   {#if pages.showList || revealed}
-    <aside class="settings-nav" class:settings-nav-paged={!pages.desktop} aria-label={label}>
+    <aside
+      class="settings-nav"
+      class:settings-nav-paged={!pages.desktop}
+      class:swiping={listSwiping}
+      aria-label={label}
+      style:transform={listOffset > 0 ? `translateX(${String(listOffset)}px)` : undefined}
+      bind:this={list}
+      ontouchstart={listSwipeable ? startListSwipe : undefined}
+      ontouchmove={listSwipeable ? moveListSwipe : undefined}
+      ontouchend={listSwipeable ? () => finishListSwipe(false) : undefined}
+      ontouchcancel={listSwipeable ? () => finishListSwipe(true) : undefined}
+    >
       <div class="settings-title settings-nav-header">
         <Dialog.Title class="settings-heading">{@render heading()}</Dialog.Title>
         <IconButton variant="ghost" size="small" label={closeLabel} onclick={onClose}
@@ -215,7 +260,8 @@
     position: absolute;
   }
 
-  .paged .settings-content:not(.swiping) {
+  .paged .settings-content:not(.swiping),
+  .settings-nav-paged:not(.swiping) {
     transition: transform var(--duration-fast) var(--ease-smooth-out);
   }
 
