@@ -1,6 +1,5 @@
 import type { Command, CommandErr, CommandOk, CoreEvent } from '#src/generated/protocol';
 import type { Attachment, Gallery, GalleryAttachment } from '#src/transport';
-import type { PageFetchRequest } from './page-fetch';
 
 export type AttachmentRequest = Required<Attachment>;
 export type GalleryRequest = Required<Omit<Gallery, 'attachments'>> & {
@@ -17,8 +16,7 @@ export type WorkerRequest =
   | { id: number; forget: { source: string } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; gallery: GalleryRequest }
-  | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } }
-  | { pageFetchHost: boolean };
+  | { id: number; upload: { mime: string; bytes: Uint8Array<ArrayBuffer> } };
 
 /** Worker → page. Events carry no id because they answer nothing. */
 export type WorkerMessage =
@@ -31,5 +29,4 @@ export type WorkerMessage =
   | { id: number; uri: string | null }
   | { events: CoreEvent[] }
   | { logs: string[] }
-  | { panic: { message: string; stack?: string } }
-  | { pageFetch: PageFetchRequest };
+  | { panic: { message: string; stack?: string } };

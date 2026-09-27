@@ -2,11 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { isTauri } from '@tauri-apps/api/core';
 
-import {
-  browserGatesCoreNetwork,
-  localNetworkDenied,
-  mayHoldLocalNetworkGrant,
-} from './local-network';
+import { browserGatesCoreNetwork, localNetworkDenied } from './local-network';
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: vi.fn(() => false) }));
 
@@ -39,28 +35,4 @@ test('a browser without the permission reports nothing denied', async () => {
 
   vi.stubGlobal('navigator', {});
   expect(await localNetworkDenied()).toBe(false);
-});
-
-test('only a denial rules out a local network grant', async () => {
-  const states = (local: string, loopback: string) =>
-    vi.stubGlobal('navigator', {
-      permissions: {
-        query: ({ name }: { name: string }) =>
-          name === 'local-network'
-            ? Promise.resolve({ state: local })
-            : name === 'loopback-network'
-              ? Promise.resolve({ state: loopback })
-              : Promise.reject(new TypeError(`unknown permission ${name}`)),
-      },
-    });
-
-  states('prompt', 'prompt');
-  expect(await mayHoldLocalNetworkGrant()).toBe(true);
-  states('granted', 'denied');
-  expect(await mayHoldLocalNetworkGrant()).toBe(true);
-  states('prompt', 'denied');
-  expect(await mayHoldLocalNetworkGrant()).toBe(false);
-
-  vi.stubGlobal('navigator', {});
-  expect(await mayHoldLocalNetworkGrant()).toBe(true);
 });

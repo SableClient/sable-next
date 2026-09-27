@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent, SessionInfo } from '#src/generated/protocol';
-import type { Transport } from '#src/transport';
+import { CoreError, type Transport } from '#src/transport';
 
 import { recentSearches, rememberSearch } from '#lib/features/search/recent-searches.svelte.js';
 
@@ -9,7 +9,8 @@ import { createCoreClient } from './client.svelte.js';
 
 const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
 
-vi.mock('#lib/platform/local-network.js', () => ({
+vi.mock('#lib/platform/local-network.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/platform/local-network.js')>()),
   browserGatesCoreNetwork: () => localNetwork.gated,
   localNetworkDenied: () => Promise.resolve(localNetwork.denied),
 }));
@@ -363,12 +364,15 @@ test('a restored session asks for local network access from the page', async () 
   });
 });
 
-test('an offline core with local network access allowed is just offline', async () => {
+test('an offline core with a homeserver the page reaches reports the browser blocking it', async () => {
   const { core, fake } = await startGated(() => Promise.resolve(new Response('{}')));
 
   fake.emit({ type: 'sync_status', state: 'offline' });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await vi.waitFor(() => {
+    expect(core.localNetworkBlocked).toBe('example.org');
+  });
 
+  fake.emit({ type: 'sync_status', state: 'live' });
   expect(core.localNetworkBlocked).toBeNull();
 });
 
@@ -381,17 +385,17 @@ test('an offline core reports the browser blocking it when the permission was de
   await vi.waitFor(() => {
     expect(core.localNetworkBlocked).toBe('example.org');
   });
-
-  fake.emit({ type: 'sync_status', state: 'live' });
-  expect(core.localNetworkBlocked).toBeNull();
 });
 
-test('an offline core is not blamed on the browser while the device is offline', async () => {
-  localNetwork.denied = true;
-  const { core, fake } = await startGated(() => Promise.reject(new TypeError('offline')));
-  vi.stubGlobal('navigator', { onLine: false });
+test('an offline core the page cannot reach either is just offline', async () => {
+  const { core, fake, fetchMock } = await startGated(() =>
+    Promise.reject(new TypeError('offline'))
+  );
 
   fake.emit({ type: 'sync_status', state: 'offline' });
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   expect(core.localNetworkBlocked).toBeNull();
@@ -530,4 +534,37 @@ test('failed profile lookups cool down across repeated timeline mounts and retry
     now.mockRestore();
     core.stop();
   }
+});
+
+test('a sign-in the core cannot reach but the page can blames the local network', async () => {
+  localNetwork.gated = true;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.resolve(new Response('{}')))
+  );
+  const fake = fakeTransport();
+  fake.send.mockImplementation((command: { type: string }) =>
+    command.type === 'login_flows'
+      ? Promise.reject(new CoreError({ code: 'unavailable' }))
+      : Promise.resolve({})
+  );
+  const core = createCoreClient(() => fake.transport);
+
+  await expect(core.loginFlows('https://matrix.lan:8448')).rejects.toMatchObject({
+    name: 'LocalNetworkBlockedError',
+    host: 'matrix.lan',
+  });
+});
+
+test('a sign-in the page cannot reach either stays unavailable', async () => {
+  localNetwork.gated = true;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => Promise.reject(new TypeError('offline')))
+  );
+  const fake = fakeTransport();
+  fake.send.mockImplementation(() => Promise.reject(new CoreError({ code: 'unavailable' })));
+  const core = createCoreClient(() => fake.transport);
+
+  await expect(core.loginFlows('https://matrix.lan')).rejects.toBeInstanceOf(CoreError);
 });

@@ -1,6 +1,5 @@
 import type { CommandErr, CommandOk, CoreEvent } from '#src/generated/protocol';
 import type { WorkerMessage, WorkerRequest } from './protocol';
-import { requestThroughPage, type PageFetcher } from './page-fetch';
 import { TimelineEventRouter } from './timeline-event-router';
 
 const logFlushMs = 250;
@@ -52,8 +51,6 @@ export function createCoreWorkerBoundary(
   terminate: () => void = () => {}
 ) {
   const ports = new Set<WorkerPort>();
-  const hosts = new Map<WorkerPort, { available: boolean; gone: AbortController }>();
-  let preferredHost: WorkerPort | null = null;
   const timelineEvents = new TimelineEventRouter<WorkerPort>();
   let panic: string | null = null;
   let logs: string[] = [];
@@ -62,9 +59,6 @@ export function createCoreWorkerBoundary(
 
   function closePort(port: WorkerPort): void {
     ports.delete(port);
-    hosts.get(port)?.gone.abort(new TypeError('the page that made this request closed'));
-    hosts.delete(port);
-    if (preferredHost === port) preferredHost = null;
     const subscriptions = timelineEvents.removeOwner(port);
     if (subscriptions.length === 0) return;
 
@@ -88,29 +82,6 @@ export function createCoreWorkerBoundary(
       }
     }
   }
-
-  function pickHost(): WorkerPort | null {
-    if (preferredHost !== null && hosts.get(preferredHost)?.available) return preferredHost;
-    let latest: WorkerPort | null = null;
-    for (const [port, { available }] of hosts) if (available) latest = port;
-    return latest;
-  }
-
-  const pageFetch: PageFetcher = async (request, transfer, signal) => {
-    const port = pickHost();
-    const host = port === null ? undefined : hosts.get(port);
-    if (port === null || !host) return null;
-    const reply = await requestThroughPage(
-      (message, ports) => {
-        port.postMessage({ pageFetch: message }, ports);
-      },
-      request,
-      transfer,
-      AbortSignal.any([signal, host.gone.signal])
-    );
-    if (('reachable' in reply && reply.reachable) || 'response' in reply) preferredHost = port;
-    return reply;
-  };
 
   function handlePanic(message: string, stack?: string): void {
     panic ??= message;
@@ -171,7 +142,6 @@ export function createCoreWorkerBoundary(
 
   function connect(port: WorkerPort): void {
     ports.add(port);
-    hosts.set(port, { available: true, gone: new AbortController() });
     port.onmessageerror = () => {
       closePort(port);
     };
@@ -191,11 +161,6 @@ export function createCoreWorkerBoundary(
         closePort(port);
         port.postMessage({ id: request.id, uri: null });
         terminate();
-        return;
-      }
-      if ('pageFetchHost' in request) {
-        const host = hosts.get(port);
-        if (host) host.available = request.pageFetchHost;
         return;
       }
       if ('debugLogs' in request) {
@@ -368,5 +333,5 @@ export function createCoreWorkerBoundary(
     port.start();
   }
 
-  return { connect, handleEvent, handleLog, handlePanic, pageFetch };
+  return { connect, handleEvent, handleLog, handlePanic };
 }

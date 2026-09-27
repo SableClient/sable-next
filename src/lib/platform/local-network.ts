@@ -2,30 +2,28 @@ import { isTauri } from '@tauri-apps/api/core';
 
 const permissionNames = ['local-network', 'loopback-network', 'local-network-access'];
 
+export class LocalNetworkBlockedError extends Error {
+  override readonly name = 'LocalNetworkBlockedError';
+
+  constructor(readonly host: string) {
+    super(host);
+  }
+}
+
 export function browserGatesCoreNetwork(): boolean {
   return !isTauri();
 }
 
-async function localNetworkStates(): Promise<PermissionState[]> {
+export async function localNetworkDenied(): Promise<boolean> {
   const permissions = globalThis.navigator.permissions as Permissions | undefined;
-  if (permissions === undefined) return [];
-  const states: PermissionState[] = [];
+  if (permissions === undefined) return false;
   for (const name of permissionNames) {
     try {
       const status = await permissions.query({ name } as unknown as PermissionDescriptor);
-      states.push(status.state);
+      if (status.state === 'denied') return true;
     } catch {
       continue;
     }
   }
-  return states;
-}
-
-export async function localNetworkDenied(): Promise<boolean> {
-  return (await localNetworkStates()).includes('denied');
-}
-
-export async function mayHoldLocalNetworkGrant(): Promise<boolean> {
-  const states = await localNetworkStates();
-  return states.includes('granted') || !states.includes('denied');
+  return false;
 }

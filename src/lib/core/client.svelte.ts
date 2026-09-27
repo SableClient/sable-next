@@ -26,7 +26,11 @@ import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/features/search/recent-searches.svelte.js';
-import { browserGatesCoreNetwork, localNetworkDenied } from '#lib/platform/local-network.js';
+import {
+  browserGatesCoreNetwork,
+  localNetworkDenied,
+  LocalNetworkBlockedError,
+} from '#lib/platform/local-network.js';
 
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
@@ -57,14 +61,28 @@ function homeserverUrl(homeserver: string): URL {
   return new URL(homeserver.includes('://') ? homeserver : `https://${homeserver}`);
 }
 
-async function grantLocalNetworkAccess(baseUrl: string): Promise<void> {
+async function grantLocalNetworkAccess(baseUrl: string): Promise<boolean> {
   try {
     await fetch(new URL('_matrix/client/versions', homeserverUrl(baseUrl)), { mode: 'cors' });
+    return true;
   } catch (error) {
     console.warn('[sable auth] homeserver unreachable from the page', {
       error: error instanceof Error ? error.name : 'unknown',
     });
+    return false;
   }
+}
+
+async function blameLocalNetwork(error: unknown, homeserver: string): Promise<never> {
+  if (
+    browserGatesCoreNetwork() &&
+    error instanceof CoreError &&
+    error.detail.code === 'unavailable' &&
+    (await grantLocalNetworkAccess(homeserver))
+  ) {
+    throw new LocalNetworkBlockedError(homeserverUrl(homeserver).hostname);
+  }
+  throw error;
 }
 
 async function resolveHomeserverInPage(
@@ -194,13 +212,15 @@ export class CoreClient {
         homeserver,
         this.resolvedHomeservers
       );
-      const response = await transport.send({
-        type: 'login',
-        reauth_account_id: reauthAccountId ?? null,
-        homeserver: resolvedHomeserver,
-        identifier,
-        password,
-      });
+      const response = await transport
+        .send({
+          type: 'login',
+          reauth_account_id: reauthAccountId ?? null,
+          homeserver: resolvedHomeserver,
+          identifier,
+          password,
+        })
+        .catch((error: unknown) => blameLocalNetwork(error, resolvedHomeserver));
 
       if (generation !== this.generation || transport !== this.transport) return;
 
@@ -221,10 +241,9 @@ export class CoreClient {
   async loginFlows(homeserver: string): Promise<LoginFlowsView> {
     const transport = this.ensureTransport();
     const resolvedHomeserver = await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
-    const response = await transport.send({
-      type: 'login_flows',
-      homeserver: resolvedHomeserver,
-    });
+    const response = await transport
+      .send({ type: 'login_flows', homeserver: resolvedHomeserver })
+      .catch((error: unknown) => blameLocalNetwork(error, resolvedHomeserver));
     return response.flows;
   }
 
@@ -827,9 +846,11 @@ export class CoreClient {
     const session = this.session;
     if (!session) return;
     const revision = this.accountRevision;
-    const blocked = navigator.onLine && (await localNetworkDenied());
+    const blocked =
+      (await grantLocalNetworkAccess(session.homeserver)) ||
+      (navigator.onLine && (await localNetworkDenied()));
     if (revision !== this.accountRevision || this.sync?.state !== 'offline') return;
-    this.localNetworkBlocked = blocked ? homeserverUrl(session.homeserver).host : null;
+    this.localNetworkBlocked = blocked ? homeserverUrl(session.homeserver).hostname : null;
   }
 
   private readonly handleEvent = (event: CoreEvent): void => {

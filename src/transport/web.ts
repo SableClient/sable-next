@@ -2,7 +2,6 @@ import * as Sentry from '@sentry/sveltekit';
 
 import type { Command, CommandOk, CoreEvent } from '#src/generated/protocol';
 import type { WorkerMessage, WorkerRequest } from '#src/worker/protocol';
-import { servePageFetch } from '#src/worker/page-fetch';
 import wasmVersion from '#src/generated/wasm/sable_wasm_version.js';
 import coreWorkerUrl from '../worker/core.worker.ts?sharedworker&url';
 import { CoreError, type ResponseFor, type Transport } from './index';
@@ -199,12 +198,6 @@ export function createWebTransport(): Transport {
 
       if ('pong' in data) return;
 
-      if ('pageFetch' in data) {
-        const reply = message.ports.at(0);
-        if (reply) servePageFetch(data.pageFetch, reply);
-        return;
-      }
-
       const waiting = pending.get(data.id);
       if (!waiting) return;
       pending.delete(data.id);
@@ -233,25 +226,13 @@ export function createWebTransport(): Transport {
     typeof window === 'undefined'
       ? undefined
       : on(window, 'pagehide', (event) => {
-          if (event.persisted) {
-            worker?.port.postMessage({ pageFetchHost: false } satisfies WorkerRequest);
-            return;
-          }
+          if (event.persisted) return;
           worker?.port.postMessage({ disconnect: true } satisfies WorkerRequest);
-        });
-  const releasePageShow =
-    typeof window === 'undefined'
-      ? undefined
-      : on(window, 'pageshow', (event) => {
-          if (event.persisted) {
-            worker?.port.postMessage({ pageFetchHost: true } satisfies WorkerRequest);
-          }
         });
 
   function detach(reason: string, farewell: WorkerRequest): void {
     closed = true;
     releasePageHide?.();
-    releasePageShow?.();
     listeners.clear();
     crashListeners.clear();
     stallListeners.clear();

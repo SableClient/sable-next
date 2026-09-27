@@ -1,5 +1,6 @@
 import { CoreError } from '#src/transport';
 import { t } from '#lib/i18n.js';
+import { LocalNetworkBlockedError } from '#lib/platform/local-network.js';
 
 export function logAuthenticationFailure(operation: string, value: unknown): void {
   const error = value instanceof CoreError ? value.detail : { code: 'unexpected' };
@@ -51,6 +52,9 @@ export function registrationHomeserverError(value: unknown): string {
 }
 
 export function authenticationError(value: unknown): string {
+  if (value instanceof LocalNetworkBlockedError) {
+    return t('errors.localNetworkBlocked', { host: value.host });
+  }
   if (!(value instanceof CoreError)) return t('errors.connectionError');
 
   switch (value.detail.code) {
