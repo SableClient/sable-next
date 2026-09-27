@@ -64,7 +64,9 @@
   import { useMessageDialogs } from './message-dialogs.svelte.js';
   import './sender-identity.css';
   import {
+    formatFullTimestamp,
     formatMessageTimestamp,
+    formatTime,
     canForward,
     canRedact,
     isAnnotation,
@@ -821,8 +823,9 @@
     {/if}
     {#if layout === 'compact'}
       <div class="compact-gutter">
-        <time datetime={new Date(item.timestamp).toISOString()}
-          >{formatMessageTimestamp(item.timestamp)}</time
+        <time
+          datetime={new Date(item.timestamp).toISOString()}
+          title={formatFullTimestamp(item.timestamp)}>{formatTime(item.timestamp)}</time
         >
         {#if !collapsed}
           <SenderName
@@ -940,7 +943,9 @@
                 onclick={openSenderProfile}>{item.sender}</button
               >
             {/if}
-            <time datetime={new Date(item.timestamp).toISOString()}
+            <time
+              datetime={new Date(item.timestamp).toISOString()}
+              title={formatFullTimestamp(item.timestamp)}
               >{formatMessageTimestamp(item.timestamp)}</time
             >
           </div>

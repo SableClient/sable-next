@@ -419,6 +419,14 @@ export function formatMessageTimestamp(timestamp: number): string {
   return t('timeline.messageTimestamp', { date: datePart, time });
 }
 
+export function formatFullTimestamp(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(currentLocale(), {
+    dateStyle: 'full',
+    timeStyle: 'medium',
+    ...(preferences.hour24Clock ? { hour12: false } : {}),
+  });
+}
+
 export function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
   const today = new Date();

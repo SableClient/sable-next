@@ -1410,3 +1410,15 @@ test('renders a link preview for every link in a message', async () => {
   instance.unmount();
   setPreference('urlPreviews', false);
 });
+
+test('compact layout shows the time alone and keeps the full date in the title (#514)', async () => {
+  const lastWeek = { ...item(false), timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000 };
+  render(TimelineItemHarness, {
+    props: { core, item: { item: lastWeek, collapsed: false, layout: 'compact' } },
+  });
+  await tick();
+
+  const time = document.querySelector('.compact-gutter time');
+  expect(time).toHaveTextContent(/^\d{1,2}:\d{2}/);
+  expect(time?.getAttribute('title')).toContain(String(new Date(lastWeek.timestamp).getFullYear()));
+});
