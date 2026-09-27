@@ -16,10 +16,13 @@ const safeErrorNames = new Set([
 ]);
 
 const safeCodes = new Set([
+  'failed',
   'no_call_focus',
+  'not_logged_in',
   'own-key-failed',
   'own-key-timeout',
   'transport-not-connected',
+  'unavailable',
 ]);
 
 const safeMessages = new Map([

@@ -74,6 +74,26 @@ test('records a bounded sanitized failure with the attempt correlation', async (
   expect(telemetryMock.spans[1].end).toHaveBeenCalledOnce();
 });
 
+test('records a safe native command code without its private detail', () => {
+  const telemetry = new CallTelemetry();
+  const privateDetail = 'https://sfu.example.org/provision?token=super-secret';
+  const error = Object.assign(new Error(privateDetail), {
+    detail: { code: 'unavailable' },
+  });
+
+  telemetry.failure('call.signaling.join', error);
+
+  const [, context] = telemetryMock.captureException.mock.calls[0] as [
+    Error,
+    { contexts: { call: Record<string, unknown> } },
+  ];
+  expect(context.contexts.call).toMatchObject({
+    'call.stage': 'call.signaling.join',
+    'call.error_category': 'code.unavailable',
+  });
+  expect(JSON.stringify(telemetryMock.captureException.mock.calls)).not.toContain(privateDetail);
+});
+
 test('keeps matching failures from separate backends distinct', () => {
   const telemetry = new CallTelemetry();
 
