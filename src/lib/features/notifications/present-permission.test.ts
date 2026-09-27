@@ -14,7 +14,7 @@ vi.mock('#lib/platform/native-notifications.js', () => ({
   requestNativeNotificationPermission: mocks.request,
 }));
 
-import { grantPermission, permissionGranted } from './present';
+import { grantPermission, onPermissionGranted, permissionGranted } from './present';
 
 test('a native shell reports the platform permission, not the webview one', async () => {
   await expect(permissionGranted()).resolves.toBe(false);
@@ -24,4 +24,20 @@ test('a native shell reports the platform permission, not the webview one', asyn
 test('a native shell asks the platform to grant it', async () => {
   await expect(grantPermission()).resolves.toBe(true);
   expect(mocks.request).toHaveBeenCalled();
+});
+
+test('a grant tells its listeners, and a refusal does not', async () => {
+  const listener = vi.fn();
+  const stop = onPermissionGranted(listener);
+
+  mocks.request.mockResolvedValueOnce('denied');
+  await grantPermission();
+  expect(listener).not.toHaveBeenCalled();
+
+  await grantPermission();
+  expect(listener).toHaveBeenCalledOnce();
+
+  stop();
+  await grantPermission();
+  expect(listener).toHaveBeenCalledOnce();
 });

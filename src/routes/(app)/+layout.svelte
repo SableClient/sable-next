@@ -107,6 +107,7 @@
     syncPushSubscription,
   } from '#lib/features/notifications/web-push.js';
   import { answerPushEvent, sharePushSession } from '#lib/features/notifications/push-session.js';
+  import { onPermissionGranted } from '#lib/features/notifications/present.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
   import ToastRegion from '#lib/ui/ToastRegion.svelte';
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
@@ -551,7 +552,8 @@
     };
     resync();
 
-    return on(navigator.serviceWorker, 'message', (event) => {
+    const stopGranted = onPermissionGranted(resync);
+    const stopMessages = on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
         | { type?: string; appId?: string; ackToken?: string }
         | undefined;
@@ -563,6 +565,10 @@
         }
       }
     });
+    return () => {
+      stopGranted();
+      stopMessages();
+    };
   });
 
   let pushedRoom = $state<{
