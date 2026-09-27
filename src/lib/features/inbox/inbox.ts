@@ -73,6 +73,20 @@ export function hasMarkedUnread(
   return notifications(rooms, 'all', mode).some((room) => room.marked_unread);
 }
 
+export function backfillSignal(rooms: readonly RoomSummary[]): string {
+  return JSON.stringify(
+    rooms
+      .filter((room) => room.unread > 0 || room.notifying > 0 || room.highlight > 0)
+      .map((room) => [
+        room.room_id,
+        room.unread,
+        room.notifying,
+        room.highlight,
+        room.latest_event?.event_id,
+      ])
+  );
+}
+
 export function pendingInvites(rooms: readonly RoomSummary[]): RoomSummary[] {
   return rooms.filter((room) => room.state === 'invited').sort(byRecency);
 }

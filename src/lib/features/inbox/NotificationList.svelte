@@ -9,7 +9,13 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { formatMessageTimestamp } from '#lib/ui/date-time.js';
-  import { focusRowAt, formatCompactTimestamp, type NotificationFilter, senderName } from './inbox';
+  import {
+    backfillSignal,
+    focusRowAt,
+    formatCompactTimestamp,
+    type NotificationFilter,
+    senderName,
+  } from './inbox';
   import { InboxFeed } from './inbox-feed.svelte';
   import InboxFeedRow from './InboxFeedRow.svelte';
   import MessagePreview from '#lib/features/room/messages/MessagePreview.svelte';
@@ -66,17 +72,7 @@
     })
   );
 
-  let waiting = $derived(
-    JSON.stringify(
-      roomList.rooms.map((room) => [
-        room.room_id,
-        room.unread,
-        room.notifying,
-        room.highlight,
-        room.latest_event?.event_id,
-      ])
-    )
-  );
+  let waiting = $derived(backfillSignal(roomList.rooms));
 
   $effect(() => {
     void waiting;

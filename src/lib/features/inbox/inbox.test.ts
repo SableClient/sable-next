@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import type { BookmarkView, RoomSummary } from '#src/generated/protocol';
 
 import {
+  backfillSignal,
   countInvites,
   countNotifications,
   filteredBookmarks,
@@ -243,4 +244,21 @@ test('compact timestamps shrink with age', () => {
   expect(formatCompactTimestamp(new Date(2026, 8, 20, 9, 5).getTime(), now)).not.toMatch(/\d/);
   expect(formatCompactTimestamp(new Date(2026, 3, 2).getTime(), now)).not.toMatch(/2026/);
   expect(formatCompactTimestamp(new Date(2023, 10, 14).getTime(), now)).toMatch(/2023/);
+});
+
+test('only a room with notifications moves the backfill signal', () => {
+  const latest = (eventId: string) => ({ event_id: eventId }) as RoomSummary['latest_event'];
+  const quiet = (eventId: string) =>
+    room({ room_id: '!quiet:example.org', latest_event: latest(eventId) });
+  const pinged = (eventId: string) =>
+    room({
+      room_id: '!pinged:example.org',
+      unread: 1,
+      notifying: 1,
+      latest_event: latest(eventId),
+    });
+  const before = backfillSignal([quiet('$a'), pinged('$b')]);
+
+  expect(backfillSignal([quiet('$chatter'), pinged('$b')])).toBe(before);
+  expect(backfillSignal([quiet('$a'), pinged('$ping')])).not.toBe(before);
 });
