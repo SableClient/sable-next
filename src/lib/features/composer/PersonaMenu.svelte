@@ -64,20 +64,35 @@
   />
 
   <ul class="persona-options">
-    <li>
-      <button
-        type="button"
-        class="persona-option"
-        onclick={() => {
-          onChoose(null);
-        }}
-      >
-        <Avatar initials="?" size="small" />
-        <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
-        {#if !selected && !off}<CheckIcon />{/if}
-      </button>
-    </li>
+    {#if scope === 'account'}
+      <li>
+        <button
+          type="button"
+          class="persona-option"
+          onclick={() => {
+            onChoose(null);
+          }}
+        >
+          <Avatar size="small"><ProhibitIcon /></Avatar>
+          <span class="persona-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
+          {#if !selected && !off}<CheckIcon />{/if}
+        </button>
+      </li>
+    {/if}
     {#if scope === 'room'}
+      <li>
+        <button
+          type="button"
+          class="persona-option"
+          onclick={() => {
+            onChoose(null);
+          }}
+        >
+          <Avatar initials="?" size="small" />
+          <span class="persona-option-name">{$i18n.t('personas.pickerNone')}</span>
+          {#if !selected && !off}<CheckIcon />{/if}
+        </button>
+      </li>
       <li>
         <button type="button" class="persona-option" onclick={onDisable}>
           <Avatar size="small"><ProhibitIcon /></Avatar>

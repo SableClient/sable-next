@@ -1,5 +1,6 @@
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
 
   import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
@@ -38,8 +39,8 @@
           choose(null);
         }}
       >
-        <Avatar initials="?" size="small" />
-        <span class="reproxy-option-name">{$i18n.t('personas.pickerNone')}</span>
+        <Avatar size="small"><ProhibitIcon /></Avatar>
+        <span class="reproxy-option-name">{$i18n.t('personas.pickerOffGlobal')}</span>
         {#if !current}<CheckIcon aria-hidden="true" />{/if}
       </button>
     </li>
