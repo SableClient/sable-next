@@ -27,6 +27,7 @@ pub mod profiles;
 pub mod protocol;
 pub mod push_check;
 pub mod push_rules;
+mod qr_login;
 mod reactions;
 mod registration;
 mod room_keys;
@@ -101,6 +102,7 @@ pub struct Core {
     session: RwLock<Option<Session>>,
     pending_login: Mutex<Option<PendingLogin>>,
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
+    qr_flow: Mutex<Option<qr_login::QrFlow>>,
     pending_identity_reset: Mutex<Option<verification::PendingIdentityReset>>,
     session_tasks: std::sync::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
@@ -231,6 +233,7 @@ impl Core {
             session: RwLock::new(None),
             pending_login: Mutex::new(None),
             pending_registration: Mutex::new(None),
+            qr_flow: Mutex::new(None),
             pending_identity_reset: Mutex::new(None),
             session_tasks: std::sync::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),

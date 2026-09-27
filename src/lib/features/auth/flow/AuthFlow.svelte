@@ -1,4 +1,5 @@
 <script lang="ts">
+  import QrLinkDialog from '#lib/features/qr-login/QrLinkDialog.svelte';
   import '#lib/features/auth/shared/auth-card.css';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -86,6 +87,8 @@
   function openSetup(): Promise<void> {
     return goto(resolve('setup'));
   }
+
+  let qrLoginOpen = $state(false);
 
   const redirect = new RedirectController({
     core,
@@ -343,6 +346,11 @@
       await redirect.launch(type, id, 'login');
     }}
     onLogin={signInWithPassword}
+    onQrLogin={reauthAccountId()
+      ? undefined
+      : () => {
+          qrLoginOpen = true;
+        }}
     onCreateAccount={showCreateAccount ? showRegistrationStage : undefined}
     followUserServer={!reauthAccountId()}
   />
@@ -481,6 +489,20 @@
 </main>
 
 <DeviceVerificationDialog />
+
+<QrLinkDialog
+  bind:open={qrLoginOpen}
+  mode="login"
+  target={{
+    homeserver: () => flow.homeserver.trim() || null,
+    redirectUri: () => redirect.qrRedirectUri(),
+  }}
+  onSignedIn={() => {
+    qrLoginOpen = false;
+    markLoggedIn();
+    void openSetup();
+  }}
+/>
 
 <style>
   .auth-page {

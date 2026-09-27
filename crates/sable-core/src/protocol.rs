@@ -1021,6 +1021,24 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
     },
+    /// Signs this device in from another one (MSC4108). `scanned` is the
+    /// other device's code, base64 encoded; without it this device shows one.
+    StartQrLogin {
+        homeserver: Option<String>,
+        redirect_uri: String,
+        scanned: Option<String>,
+    },
+    /// Lets another device sign in to this account (MSC4108).
+    StartQrGrant {
+        scanned: Option<String>,
+    },
+    QrCheckCode {
+        code: u8,
+    },
+    QrGrantContinue {
+        confirm: bool,
+    },
+    CancelQr,
     /// Also transitions into SAS, so the emoji need no further round trip.
     AcceptVerification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1501,6 +1519,8 @@ pub enum CommandOk {
     Devices {
         devices: Vec<DeviceView>,
         account_management: bool,
+        /// Signed in with OAuth, which is what linking a device by QR code needs.
+        oauth: bool,
     },
     RecoverIdentity,
     /// Unrecoverable once discarded.
@@ -1570,6 +1590,11 @@ pub enum CommandOk {
         flow_id: String,
     },
     WithdrawVerification,
+    StartQrLogin,
+    StartQrGrant,
+    QrCheckCode,
+    QrGrantContinue,
+    CancelQr,
     AcceptVerification,
     ScanVerificationQr,
     StartSasVerification,
@@ -1809,6 +1834,11 @@ pub enum CoreEvent {
         user_id: OwnedUserId,
         flow_id: String,
         state: VerificationView,
+    },
+
+    QrLogin {
+        grant: bool,
+        progress: QrLoginProgressView,
     },
 
     CallEncryptionKey {
@@ -2292,7 +2322,7 @@ pub enum VerificationView {
 }
 
 /// A square of `width` rows, `modules` holding `1` for a dark module.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct QrCodeView {
     pub width: u32,
@@ -2876,6 +2906,53 @@ pub enum SendStateView {
     },
     /// Accepted, still waiting to arrive through sync.
     Sent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "stage", rename_all = "snake_case")]
+pub enum QrLoginProgressView {
+    Starting,
+    ShowCode { code: QrCodeView },
+    EnterCheckCode,
+    ShowCheckCode { check_code: u8 },
+    WaitingForToken { user_code: String },
+    WaitingForAuth { verification_uri: String },
+    SyncingSecrets,
+    Done,
+    SignedIn { user_id: String },
+    Failed { reason: QrLoginFailureView },
+}
+
+impl QrLoginProgressView {
+    #[must_use]
+    pub const fn stage(&self) -> &'static str {
+        match self {
+            Self::Starting => "starting",
+            Self::ShowCode { .. } => "show_code",
+            Self::EnterCheckCode => "enter_check_code",
+            Self::ShowCheckCode { .. } => "show_check_code",
+            Self::WaitingForToken { .. } => "waiting_for_token",
+            Self::WaitingForAuth { .. } => "waiting_for_auth",
+            Self::SyncingSecrets => "syncing_secrets",
+            Self::Done => "done",
+            Self::SignedIn { .. } => "signed_in",
+            Self::Failed { .. } => "failed",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum QrLoginFailureView {
+    Unsupported,
+    Expired,
+    CheckCode,
+    Declined,
+    NoRecovery,
+    DeviceInUse,
+    Other,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

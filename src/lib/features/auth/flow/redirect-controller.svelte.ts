@@ -225,6 +225,10 @@ export class RedirectController {
     this.removeFallbackListener = null;
   }
 
+  qrRedirectUri(): string {
+    return this.redirectUri('oidc');
+  }
+
   private redirectUri(type: RedirectType): string {
     const baseUrl = deliversDeepLinks()
       ? tauriRedirectUri(type)

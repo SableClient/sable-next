@@ -1,4 +1,5 @@
 <script lang="ts">
+  import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
   import { fade } from 'svelte/transition';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -37,6 +38,7 @@
       identityProviderId?: string
     ) => Promise<void>;
     onLogin: () => Promise<void>;
+    onQrLogin?: () => void;
     onCreateAccount?: () => void;
     followUserServer?: boolean;
   }
@@ -55,6 +57,7 @@
     onValidateHomeserver,
     onClearFieldError,
     onLaunchRedirectLogin,
+    onQrLogin,
     onLogin,
     onCreateAccount,
     followUserServer = true,
@@ -208,7 +211,7 @@
 
       {#if loginFlows?.oidc && (showAllLoginMethods || preferredLoginMethod === 'oidc')}
         <LoginMethod>
-          <div class="actions">
+          <div class="actions sso-actions">
             <LoginProviderButton
               label={$i18n.t('auth.signInWithProvider', {
                 name: displayedHomeserver || 'matrix.org',
@@ -217,6 +220,15 @@
               disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
               onclick={() => void onLaunchRedirectLogin('oidc')}
             />
+            {#if onQrLogin}
+              <Button
+                variant="ghost"
+                disabled={isAuthenticating || isLoginControlsDisabled || isLaunchingLogin}
+                onclick={onQrLogin}
+              >
+                <QrCodeIcon size={18} aria-hidden="true" />{$i18n.t('qrLogin.signInWithQr')}
+              </Button>
+            {/if}
           </div>
         </LoginMethod>
       {/if}

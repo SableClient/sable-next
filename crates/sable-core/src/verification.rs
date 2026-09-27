@@ -483,7 +483,7 @@ fn qr_code_view(qr: &QrVerification) -> Option<QrCodeView> {
     level_h_code(&qr.to_bytes().ok()?)
 }
 
-fn level_h_code(data: &[u8]) -> Option<QrCodeView> {
+pub(crate) fn level_h_code(data: &[u8]) -> Option<QrCodeView> {
     let code = (7..=40).find_map(|version| {
         let mut bits = Bits::new(Version::Normal(version));
         bits.push_byte_data(data).ok()?;

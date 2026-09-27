@@ -1631,7 +1631,8 @@ impl Core {
 
             Command::Devices => {
                 let client = self.client().await?;
-                let account_management = client.oauth().full_session().is_some()
+                let oauth = client.oauth().full_session().is_some();
+                let account_management = oauth
                     && client
                         .oauth()
                         .server_metadata()
@@ -1643,6 +1644,7 @@ impl Core {
                 Ok(CommandOk::Devices {
                     devices: crate::verification::own_devices(&client).await,
                     account_management,
+                    oauth,
                 })
             }
 
@@ -2456,6 +2458,36 @@ impl Core {
                     .await
                     .map_err(|error| self.failed("withdraw_verification", error))?;
                 Ok(CommandOk::WithdrawVerification)
+            }
+
+            Command::StartQrLogin {
+                homeserver,
+                redirect_uri,
+                scanned,
+            } => {
+                self.start_qr_login(homeserver, redirect_uri, scanned)
+                    .await?;
+                Ok(CommandOk::StartQrLogin)
+            }
+
+            Command::StartQrGrant { scanned } => {
+                self.start_qr_grant(scanned).await?;
+                Ok(CommandOk::StartQrGrant)
+            }
+
+            Command::QrCheckCode { code } => {
+                self.qr_check_code(code).await?;
+                Ok(CommandOk::QrCheckCode)
+            }
+
+            Command::QrGrantContinue { confirm } => {
+                self.qr_grant_continue(confirm).await?;
+                Ok(CommandOk::QrGrantContinue)
+            }
+
+            Command::CancelQr => {
+                self.cancel_qr().await;
+                Ok(CommandOk::CancelQr)
             }
 
             Command::AcceptVerification { user_id, flow_id } => {

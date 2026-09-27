@@ -1182,6 +1182,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       devices: () => ({
         type: 'devices',
         account_management: false,
+        oauth: false,
         devices: [
           {
             device_id: session.device_id,

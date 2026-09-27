@@ -1594,11 +1594,13 @@ export function createCommands(transport: () => Transport) {
     async devices(): Promise<{
       devices: DeviceView[];
       accountManagement: boolean;
+      oauth: boolean;
     }> {
       const response = await transport().send({ type: 'devices' });
       return {
         devices: response.devices,
         accountManagement: response.account_management,
+        oauth: response.oauth,
       };
     },
 

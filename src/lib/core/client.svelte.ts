@@ -408,6 +408,46 @@ export class CoreClient {
     }
   }
 
+  async startQrLogin(
+    homeserver: string | null,
+    redirectUri: string,
+    scanned: string | null
+  ): Promise<void> {
+    const transport = this.ensureTransport();
+    const resolved =
+      homeserver === null
+        ? null
+        : await resolveHomeserverInPage(homeserver, this.resolvedHomeservers);
+    await transport.send({
+      type: 'start_qr_login',
+      homeserver: resolved,
+      redirect_uri: redirectUri,
+      scanned,
+    });
+  }
+
+  async finishQrLogin(userId: string): Promise<void> {
+    await this.refreshAccounts();
+    this.replaceSession(this.accounts.find((account) => account.user_id === userId) ?? null);
+    this.status = 'ready';
+  }
+
+  async startQrGrant(scanned: string | null): Promise<void> {
+    await this.ensureTransport().send({ type: 'start_qr_grant', scanned });
+  }
+
+  async qrCheckCode(code: number): Promise<void> {
+    await this.ensureTransport().send({ type: 'qr_check_code', code });
+  }
+
+  async qrGrantContinue(confirm: boolean): Promise<void> {
+    await this.ensureTransport().send({ type: 'qr_grant_continue', confirm });
+  }
+
+  async cancelQr(): Promise<void> {
+    await this.ensureTransport().send({ type: 'cancel_qr' });
+  }
+
   async startSsoLogin(
     homeserver: string,
     redirectUri: string,

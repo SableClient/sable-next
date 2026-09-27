@@ -385,6 +385,19 @@ pub(crate) fn base_client(store_id: &str) -> Option<std::rc::Rc<matrix_sdk_base:
 #[allow(clippy::expect_used)] // metadata serialization is an invariant of this typed value
 #[must_use]
 pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
+    metadata_with(redirect_uri, false)
+}
+
+/// The device authorization grant is what a QR login signs in with. It is
+/// registered only for that flow, so an ordinary login never asks a server
+/// for a grant type it may not support.
+#[must_use]
+pub fn qr_client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
+    metadata_with(redirect_uri, true)
+}
+
+#[allow(clippy::expect_used)] // metadata serialization is an invariant of this typed value
+fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
     let loopback = matches!(
         redirect_uri.host_str(),
         Some("localhost" | "127.0.0.1" | "[::1]")
@@ -409,11 +422,15 @@ pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
         tracing::warn!("loopback redirect URI kept its port: {error:?}");
     }
 
+    let mut grant_types = vec![OAuthGrantType::AuthorizationCode {
+        redirect_uris: vec![registered_uri],
+    }];
+    if device_code {
+        grant_types.push(OAuthGrantType::DeviceCode);
+    }
     let mut metadata = ClientMetadata::new(
         application_type,
-        vec![OAuthGrantType::AuthorizationCode {
-            redirect_uris: vec![registered_uri],
-        }],
+        grant_types,
         Localized::new(client_uri, []),
     );
     metadata.client_name = Some(Localized::new("Sable".to_owned(), []));
