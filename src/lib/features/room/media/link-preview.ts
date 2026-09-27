@@ -28,12 +28,23 @@ export function imageMimeFromUrl(href: string): string | null {
   return IMAGE_MIMES[extension] ?? null;
 }
 
+function bracketed(anchor: Element): boolean {
+  const before = anchor.previousSibling;
+  const after = anchor.nextSibling;
+  return (
+    before?.nodeType === Node.TEXT_NODE &&
+    after?.nodeType === Node.TEXT_NODE &&
+    (before.textContent ?? '').endsWith('<') &&
+    (after.textContent ?? '').startsWith('>')
+  );
+}
+
 export function previewableLinks(html: string): string[] {
   if (!html.includes('<a')) return [];
   const links = new Set<string>();
   const document = new DOMParser().parseFromString(html, 'text/html');
   for (const anchor of document.querySelectorAll('a[href]')) {
-    if (anchor.closest('pre, code, span[data-mx-spoiler]')) continue;
+    if (anchor.closest('pre, code, span[data-mx-spoiler]') || bracketed(anchor)) continue;
     const href = anchor.getAttribute('href') ?? '';
     if (isPreviewable(href)) links.add(href);
   }

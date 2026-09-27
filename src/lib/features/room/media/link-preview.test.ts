@@ -5,6 +5,13 @@ import { describe, expect, it } from 'vitest';
 import { previewableLinks, imageMimeFromUrl } from './link-preview';
 
 describe('previewableLinks', () => {
+  it('skips a link wrapped in angle brackets, as Discord does', () => {
+    const html =
+      '<span data-plain-body>&lt;<a href="https://example.org/quiet">https://example.org/quiet</a>&gt; and <a href="https://example.org/loud">https://example.org/loud</a></span>';
+
+    expect(previewableLinks(html)).toEqual(['https://example.org/loud']);
+  });
+
   it('finds the only link', () => {
     expect(
       previewableLinks('<span data-plain-body>see <a href="https://example.org/a">a</a></span>')
