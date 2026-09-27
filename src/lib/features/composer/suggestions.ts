@@ -5,6 +5,7 @@ import { t } from '#lib/i18n.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
 import type { AutocompleteQuery, Suggestion } from './autocomplete';
+import { botCommandId, botCommandNames, type BotCommand } from './bot-commands';
 import { descriptionKey, SLASH_COMMANDS } from './slash-commands';
 
 const limit = 8;
@@ -130,19 +131,51 @@ function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggest
     .slice(0, limit);
 }
 
-function commandSuggestions(needle: string, translate: Translate): Suggestion[] {
-  return SLASH_COMMANDS.filter((command) => command.name.includes(needle))
-    .sort((left, right) => {
-      const byPrefix = rank(left.name.startsWith(needle), right.name.startsWith(needle));
-      return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
-    })
-    .slice(0, limit)
-    .map((command) => ({
+const builtIn = new Set(SLASH_COMMANDS.map((command) => command.name));
+
+function commandSuggestions(
+  needle: string,
+  translate: Translate,
+  botCommands: readonly BotCommand[]
+): Suggestion[] {
+  const local = SLASH_COMMANDS.map((command) => ({
+    name: command.name,
+    names: [command.name],
+    suggestion: {
       id: command.name,
       insert: `/${command.name}`,
       label: `/${command.name}`,
       detail: translate(descriptionKey(command)),
-    }));
+    },
+  }));
+  const bots = botCommands
+    .filter((command) => !builtIn.has(command.command.toLowerCase()))
+    .map((command) => {
+      const bot = command.senderName ?? command.sender;
+      return {
+        name: command.command.toLowerCase(),
+        names: botCommandNames(command).map((name) => name.toLowerCase()),
+        suggestion: {
+          id: botCommandId(command),
+          insert: `/${command.command}`,
+          label: `/${command.command}`,
+          detail: command.description ? `${bot} · ${command.description}` : bot,
+          avatarUrl: command.senderAvatar,
+        },
+      };
+    });
+
+  return [...local, ...bots]
+    .filter(({ names }) => names.some((name) => name.includes(needle)))
+    .sort((left, right) => {
+      const byPrefix = rank(
+        left.names.some((name) => name.startsWith(needle)),
+        right.names.some((name) => name.startsWith(needle))
+      );
+      return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
+    })
+    .slice(0, limit)
+    .map(({ suggestion }) => suggestion);
 }
 
 export type Translate = (key: string) => string;
@@ -154,13 +187,14 @@ export function suggestionsFor(
   rooms: readonly RoomSummary[],
   translate: Translate = t,
   admin: AdminScope = null,
-  adminCommands: readonly AdminCommand[] | null = null
+  adminCommands: readonly AdminCommand[] | null = null,
+  botCommands: readonly BotCommand[] = []
 ): Suggestion[] {
   if (!query) return [];
   if (query.sigil === '!') return adminSuggestions(query.query, admin, adminCommands);
   const needle = query.query.toLowerCase();
 
-  if (query.sigil === '/') return commandSuggestions(needle, translate);
+  if (query.sigil === '/') return commandSuggestions(needle, translate, botCommands);
   if (query.sigil === '@') {
     return [...roomMention(needle, translate), ...memberSuggestions(needle, members)].slice(
       0,

@@ -10,6 +10,7 @@
   type Props = Omit<
     ComposerProps,
     | 'onSend'
+    | 'onSendBotCommand'
     | 'onSendAttachment'
     | 'onSendGallery'
     | 'onSendSticker'
@@ -38,6 +39,7 @@
   bind:this={composer}
   {...rest}
   {onSend}
+  onSendBotCommand={conversation.sendBotCommand}
   onSendAttachment={conversation.sendAttachment}
   onSendGallery={conversation.sendGallery}
   onSendSticker={conversation.sendSticker}

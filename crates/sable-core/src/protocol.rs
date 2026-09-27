@@ -175,6 +175,9 @@ pub enum Command {
         link_previews: Vec<UrlPreviewView>,
         #[serde(default)]
         image_source_packs: Vec<ImageSourcePackReferenceView>,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
+        bot_command: Option<serde_json::Value>,
     },
     SendRawEvent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -371,6 +374,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
         event_type: String,
+    },
+    BotCommands {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
     },
     RoomHasSpaceParent {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1359,6 +1366,9 @@ pub enum CommandOk {
     RoomStateEvents {
         events: Vec<RoomStateEventView>,
     },
+    BotCommands {
+        commands: Vec<BotCommandDescriptionView>,
+    },
     RoomHasSpaceParent {
         has_space_parent: bool,
     },
@@ -1853,6 +1863,11 @@ pub enum CoreEvent {
     },
 
     RoomCosmeticsChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+
+    BotCommandsChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
@@ -2664,6 +2679,16 @@ pub struct UrlPreviewView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomStateEventView {
     pub state_key: String,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+    pub content: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct BotCommandDescriptionView {
+    pub sender: String,
+    pub sender_name: Option<String>,
+    pub sender_avatar: Option<String>,
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
     pub content: serde_json::Value,
 }

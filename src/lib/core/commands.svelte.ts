@@ -1,5 +1,6 @@
 import type {
   BookmarkView,
+  BotCommandDescriptionView,
   CalendarView,
   CallIntent,
   CallMode,
@@ -120,6 +121,7 @@ export type SendMessageOptions = {
   kind?: MessageKind;
   linkPreviews?: UrlPreviewView[];
   imageSourcePacks?: ImageSourcePackReferenceView[];
+  botCommand?: unknown;
 };
 
 export type SendAttachmentOptions = {
@@ -353,6 +355,11 @@ export function createCommands(transport: () => Transport) {
         event_type: eventType,
       });
       return response.events;
+    },
+
+    async botCommands(roomId: string): Promise<BotCommandDescriptionView[]> {
+      const response = await transport().send({ type: 'bot_commands', room_id: roomId });
+      return response.commands;
     },
 
     async roomHasSpaceParent(roomId: string): Promise<boolean> {
@@ -754,6 +761,7 @@ export function createCommands(transport: () => Transport) {
         persona: $state.snapshot(options.persona ?? null),
         link_previews: $state.snapshot(options.linkPreviews ?? []),
         image_source_packs: $state.snapshot(options.imageSourcePacks ?? []),
+        bot_command: $state.snapshot(options.botCommand ?? null),
       });
     },
 

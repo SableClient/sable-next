@@ -626,6 +626,7 @@ impl Core {
         self.watch_space_sidebar(&client, generation);
         self.watch_calendars(&client, generation);
         self.watch_cosmetics(&client, generation);
+        self.watch_bot_commands(&client, generation);
         self.watch_joined_invites(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);

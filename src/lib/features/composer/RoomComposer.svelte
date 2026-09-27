@@ -44,6 +44,7 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
+  import BotCommandForm from './BotCommandForm.svelte';
   import ComposerAttachments from './ComposerAttachments.svelte';
   import ComposerAutocomplete from './ComposerAutocomplete.svelte';
   import type { GifResult } from '#lib/features/gif/providers.js';
@@ -79,7 +80,26 @@
   import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
   import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
-  import { adminScope, loadAdminCommands, type AdminCommand } from './admin-commands';
+  import {
+    ADMIN_PREFIX,
+    adminBot,
+    adminBotCommands,
+    adminCommandTree,
+    adminScope,
+    loadAdminCommands,
+    type AdminCommand,
+  } from './admin-commands';
+  import {
+    botCommandId,
+    buildInvocation,
+    draftsFromText,
+    matchBotCommand,
+    parseBotCommands,
+    type ArgumentDrafts,
+    type BotCommand,
+    type BotCommandInvocation,
+  } from './bot-commands';
+  import { parseSlash } from './slash-commands';
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
   import VoiceRecorder from './VoiceRecorder.svelte';
   import { isVoiceRecordingSupported } from './voice-recorder-support';
@@ -93,6 +113,12 @@
       mentions: OutgoingMentions,
       imageSourcePacks?: import('#src/generated/protocol').ImageSourcePackReferenceView[]
     ) => Promise<unknown>;
+    onSendBotCommand?: (
+      roomId: string,
+      bot: string,
+      body: string,
+      invocation: BotCommandInvocation
+    ) => Promise<void>;
     onSendAttachment: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
     onSendGallery?: (
       roomId: string,
@@ -139,6 +165,7 @@
   let {
     roomId,
     onSend,
+    onSendBotCommand,
     onSendAttachment,
     onSendGallery,
     onSendSticker,
@@ -235,6 +262,14 @@
   let members = $state.raw<MemberView[]>([]);
   let emotes = $state.raw<PackImageView[]>([]);
   let emotesFor: string | null = null;
+  let botCommands = $state.raw<BotCommand[]>([]);
+  let loadedBotCommandsFor = $state<string | null>(null);
+  let botCommandsFor: string | null = null;
+  let activeBotCommand = $state.raw<{
+    command: BotCommand;
+    drafts: ArgumentDrafts;
+    prefix: string;
+  } | null>(null);
 
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
@@ -276,19 +311,66 @@
   let panelOpen = $derived(query !== null && dismissedAt !== query.start);
   let admin = $derived(adminScope(roomId, roomList.rooms, core.session?.user_id));
   let adminCommands = $state.raw<readonly AdminCommand[] | null>(null);
+  let botCommandsEnabled = $derived(
+    onSendBotCommand !== undefined && context?.kind !== 'edit' && !editingScheduled
+  );
+  let offeredBotCommands = $derived(botCommandsEnabled ? botCommands : []);
+  let serverBot = $derived(
+    admin === 'adminRoom' && core.session ? adminBot(core.session.user_id) : null
+  );
+  let adminPrefix = $derived(admin === 'escaped' ? `\\${ADMIN_PREFIX} ` : `${ADMIN_PREFIX} `);
+  let advertisedAdminCommands = $derived(
+    offeredBotCommands.filter((command) => command.sender === serverBot)
+  );
+  let serverCommands = $derived.by(() => {
+    if (advertisedAdminCommands.length > 0) return advertisedAdminCommands;
+    if (!botCommandsEnabled || !admin || !adminCommands || !core.session) return [];
+    return adminBotCommands(adminCommands, adminBot(core.session.user_id), admin);
+  });
+  let slashBotCommands = $derived(
+    offeredBotCommands.filter((command) => command.sender !== serverBot)
+  );
   let suggestions = $derived(
-    suggestionsFor(query, members, emotes, roomList.rooms, $i18n.t, admin, adminCommands)
+    suggestionsFor(
+      query,
+      members,
+      emotes,
+      roomList.rooms,
+      $i18n.t,
+      admin,
+      advertisedAdminCommands.length > 0
+        ? adminCommandTree(advertisedAdminCommands)
+        : adminCommands,
+      slashBotCommands
+    )
   );
 
   $effect(() => {
-    if (query?.sigil !== '!' || !admin || adminCommands) return;
-    loadAdminCommands()
-      .then((commands) => {
-        adminCommands = commands;
-      })
-      .catch((error) => {
-        console.warn('[sable composer] loading admin commands failed', error);
-      });
+    if (!onSendBotCommand) return;
+    const target = roomId;
+    return core.subscribeEvents((event) => {
+      if (event.type === 'bot_commands_changed' && event.room_id === target) {
+        loadedBotCommandsFor = null;
+      }
+    });
+  });
+
+  $effect(() => {
+    void roomId;
+    activeBotCommand = null;
+  });
+
+  async function loadAdminCatalog(): Promise<void> {
+    if (adminCommands) return;
+    try {
+      adminCommands = await loadAdminCommands();
+    } catch (error) {
+      console.warn('[sable composer] loading admin commands failed', error);
+    }
+  }
+
+  $effect(() => {
+    if (query?.sigil === '!' && admin && !adminCommands) void loadAdminCatalog();
   });
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let placeholder = $derived(
@@ -335,6 +417,9 @@
       query = next;
       if (next?.sigil === '@') void loadMembers();
       if (next?.sigil === ':') void loadEmotes();
+      if (next?.sigil === '/' || (next?.sigil === '!' && admin === 'adminRoom')) {
+        void loadBotCommands();
+      }
     },
     onNavigate: navigate,
     onFiles: stage,
@@ -546,6 +631,82 @@
     }
   }
 
+  async function loadBotCommands(): Promise<void> {
+    if (!onSendBotCommand || loadedBotCommandsFor === roomId) return;
+    const target = roomId;
+    loadedBotCommandsFor = target;
+    if (botCommandsFor !== target) botCommands = [];
+    try {
+      const commands = parseBotCommands(await core.commands.botCommands(target));
+      if (roomId !== target) return;
+      botCommandsFor = target;
+      botCommands = commands;
+    } catch (error) {
+      console.debug('[sable composer] bot commands unavailable', error);
+      if (loadedBotCommandsFor === target) loadedBotCommandsFor = null;
+    }
+  }
+
+  function openBotCommand(command: BotCommand, args: string, prefix: string): void {
+    activeBotCommand = { command, drafts: draftsFromText(command, args), prefix };
+    error = null;
+    void loadMembers();
+  }
+
+  function closeBotCommand(): void {
+    activeBotCommand = null;
+    editor.focus();
+  }
+
+  async function sendBotCommand(
+    command: BotCommand,
+    body: string,
+    invocation: BotCommandInvocation
+  ): Promise<boolean> {
+    if (!onSendBotCommand) return false;
+    inFlight += 1;
+    error = null;
+    try {
+      await queue.enqueue(() => onSendBotCommand(roomId, command.sender, body, invocation));
+      if (activeBotCommand?.command === command) closeBotCommand();
+      return true;
+    } catch (cause) {
+      console.debug('[sable composer] bot command failed', cause);
+      error = failureText(cause);
+      return false;
+    } finally {
+      inFlight -= 1;
+    }
+  }
+
+  function commandLine(): string | null {
+    if (!onSendBotCommand || staged.length > 0 || context?.kind === 'edit') return null;
+    const text = editor.text().trim();
+    if (admin && text.startsWith(adminPrefix)) return text;
+    return parseSlash(text).kind === 'unknown' ? text : null;
+  }
+
+  async function typedBotCommand(text: string): Promise<boolean> {
+    await Promise.all([loadBotCommands(), admin ? loadAdminCatalog() : undefined]);
+    const typed = text.startsWith('/')
+      ? { line: text.slice(1), prefix: '/', commands: slashBotCommands }
+      : { line: text.slice(adminPrefix.length), prefix: adminPrefix, commands: serverCommands };
+    const matched = matchBotCommand(typed.line, typed.commands);
+    if (!matched) return false;
+
+    editor.clear();
+    const drafts = draftsFromText(matched.command, matched.args);
+    const result = buildInvocation(matched.command, drafts, typed.prefix);
+    if (result.ok) {
+      if (!(await sendBotCommand(matched.command, result.body, result.invocation))) {
+        editor.setText(text);
+      }
+    } else {
+      openBotCommand(matched.command, matched.args, typed.prefix);
+    }
+    return true;
+  }
+
   function blurEditor(): void {
     editor.blur();
     const activeElement = document.activeElement;
@@ -606,6 +767,8 @@
       }
       return;
     }
+    const typedLine = commandLine();
+    if (typedLine !== null && (await typedBotCommand(typedLine))) return;
 
     const doc = editor.doc();
     const rich = richSend;
@@ -939,6 +1102,26 @@
     const current = query;
     if (!current) return;
 
+    const slashBot =
+      current.sigil === '/'
+        ? slashBotCommands.find((command) => botCommandId(command) === suggestion.id)
+        : undefined;
+    if (slashBot && slashBot.parameters.length > 0) {
+      const args = editor.text().replace(/^\/\S*/, '');
+      editor.clear();
+      openBotCommand(slashBot, args, '/');
+      return;
+    }
+    const serverCommand =
+      current.sigil === '!'
+        ? serverCommands.find((command) => `${adminPrefix}${command.command}` === suggestion.id)
+        : undefined;
+    if (serverCommand && serverCommand.parameters.length > 0) {
+      editor.clear();
+      openBotCommand(serverCommand, '', adminPrefix);
+      return;
+    }
+
     editor.replaceQuery(current, nodeFor(current.sigil, suggestion));
     if (current.sigil === '#') void attachVia(suggestion.id);
     updateTyping();
@@ -1066,6 +1249,23 @@
         {#if context}
           <ComposerContextBanner {context} onCancel={cancelContext} {onToggleSilentReply} />
         {/if}
+        {#if activeBotCommand}
+          {#key activeBotCommand}
+            <BotCommandForm
+              command={activeBotCommand.command}
+              drafts={activeBotCommand.drafts}
+              {members}
+              rooms={roomList.rooms}
+              {sending}
+              onCancel={closeBotCommand}
+              prefix={activeBotCommand.prefix}
+              onSubmit={(body: string, invocation: BotCommandInvocation) => {
+                if (activeBotCommand)
+                  void sendBotCommand(activeBotCommand.command, body, invocation);
+              }}
+            />
+          {/key}
+        {/if}
         {#if staged.length > 0}
           <ComposerAttachments
             files={staged}
@@ -1108,6 +1308,7 @@
         <form
           class="composer-row"
           class:multiline={multiline && !recording}
+          hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
           onkeydown={stepReply}
@@ -1432,6 +1633,10 @@
     grid-template-columns: auto 1fr auto;
     padding: var(--space-100);
     width: 100%;
+  }
+
+  .composer-row[hidden] {
+    display: none;
   }
 
   .composer-row.multiline {

@@ -3,11 +3,15 @@ import { expect, test } from 'vitest';
 
 import catalog from './admin-commands.json';
 import {
+  adminBot,
+  adminBotCommands,
+  adminCommandTree,
   adminScope,
   adminSuggestions,
   loadAdminCommands,
   type AdminCommand,
 } from './admin-commands';
+import { buildInvocation, draftsFromText, parseBotCommands } from './bot-commands';
 
 const commands: AdminCommand[] = [
   {
@@ -88,17 +92,57 @@ test('outside the admin room restricted commands are not offered', () => {
   expect(labels('\\!admin ', 'adminRoom')).toEqual([]);
 });
 
-test('the shipped catalog describes every command', () => {
-  const walk = (level: readonly AdminCommand[]): AdminCommand[] =>
-    level.flatMap((command) => [command, ...walk(command.children ?? [])]);
-  const all = walk(catalog.commands);
+test('every command in the shipped catalog becomes a bot command', () => {
+  const leaves = (level: readonly AdminCommand[]): AdminCommand[] =>
+    level.flatMap((command) => (command.children ? leaves(command.children) : [command]));
+  const bot = '@conduit:example.org';
 
-  expect(all.length).toBeGreaterThan(100);
-  expect(all.filter((command) => command.description === '')).toEqual([]);
+  expect(adminBotCommands(catalog.commands, bot, 'adminRoom')).toHaveLength(
+    leaves(catalog.commands).length
+  );
+  expect(adminBotCommands(catalog.commands, bot, 'escaped')).toHaveLength(
+    leaves(catalog.commands).filter((command) => !command.restricted).length
+  );
+});
+
+test('a catalog command is written back as the text continuwuity parses', () => {
+  const reset = adminBotCommands(catalog.commands, '@conduit:example.org', 'adminRoom').find(
+    (command) => command.command === 'users reset-password'
+  );
+  if (!reset) throw new Error('users reset-password is missing from the catalog');
+
+  const result = buildInvocation(reset, draftsFromText(reset, '--logout bob'), '!admin ');
+  expect(result.ok && result.body).toBe('!admin users reset-password --logout bob');
 });
 
 test('until the catalog loads only the prefix completes', async () => {
   expect(adminSuggestions('!ad', 'adminRoom', null).map((item) => item.label)).toEqual(['!admin']);
   expect(adminSuggestions('!admin ', 'adminRoom', null)).toEqual([]);
   expect(await loadAdminCommands()).toBe(catalog.commands);
+});
+
+test('commands the server advertises complete like the catalog', () => {
+  const advertised = parseBotCommands(
+    ['users reset-password', 'users create', 'rooms list'].map((command) => ({
+      sender: adminBot('@alice:example.org'),
+      sender_name: null,
+      sender_avatar: null,
+      content: { command, description: { 'm.text': [{ body: `${command} help` }] } },
+    }))
+  );
+  const tree = adminCommandTree(advertised);
+
+  expect(adminBot('@alice:example.org')).toBe('@conduit:example.org');
+  expect(adminSuggestions('!admin us', 'adminRoom', tree).map((item) => item.id)).toEqual([
+    '!admin users',
+  ]);
+  expect(adminSuggestions('!admin users ', 'adminRoom', tree)).toEqual([
+    { id: '!admin users create', insert: 'create', label: 'create', detail: 'users create help' },
+    {
+      id: '!admin users reset-password',
+      insert: 'reset-password',
+      label: 'reset-password',
+      detail: 'users reset-password help',
+    },
+  ]);
 });

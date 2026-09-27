@@ -5,6 +5,7 @@ mod accounts;
 mod attachments;
 mod auth;
 mod bookmarks;
+mod bot_commands;
 mod calendar;
 mod calls;
 mod cosmetics;

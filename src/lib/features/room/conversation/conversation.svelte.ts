@@ -14,6 +14,7 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import { t } from '#lib/i18n.js';
 import type { CoreClient, OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
+import type { BotCommandInvocation } from '#lib/features/composer/bot-commands.js';
 import type { ComposerContext, ScheduledTarget } from '#lib/features/composer/composer-context.js';
 import { dequeue, enqueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import {
@@ -175,6 +176,23 @@ export class Conversation {
       imageSourcePacks,
     });
     this.context = null;
+  };
+
+  readonly sendBotCommand = async (
+    targetRoomId: string,
+    bot: string,
+    body: string,
+    invocation: BotCommandInvocation
+  ): Promise<void> => {
+    const pending = this.context?.kind === 'reply' ? this.context : null;
+    await this.#core.commands.sendMessage(targetRoomId, body, {
+      inReplyTo: pending?.eventId ?? null,
+      threadRoot: this.#threadRoot,
+      mentions: { userIds: [bot], room: false },
+      silentReply: pending?.silentReply ?? false,
+      botCommand: invocation,
+    });
+    if (pending) this.context = null;
   };
 
   readonly sendAttachment = async (

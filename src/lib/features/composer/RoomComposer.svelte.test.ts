@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import type { ImagePackView, MemberView } from '#src/generated/protocol';
+import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
@@ -9,6 +9,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { BotCommandInvocation } from './bot-commands';
 import type { ComposerContext } from './composer-context';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
@@ -71,10 +72,27 @@ const packs: ImagePackView[] = [
 
 const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
 
+const botCommands: BotCommandDescriptionView[] = [
+  {
+    sender: '@bot:example.org',
+    sender_name: 'Bot',
+    sender_avatar: null,
+    content: {
+      command: 'warn',
+      parameters: [
+        { key: 'user', schema: { schema_type: 'primitive', type: 'user_id' } },
+        { key: 'days', schema: { schema_type: 'primitive', type: 'integer' } },
+      ],
+    },
+  },
+];
+
 function core(): CoreClient {
   return {
+    subscribeEvents: () => () => {},
     commands: {
       scheduleAttachment,
+      botCommands: () => Promise.resolve(botCommands),
       personas: () => Promise.resolve({ personas: [], selections: [] }),
       roomMembers: () => Promise.resolve(members),
       imagePackListing: () => Promise.resolve({ packs, complete: true }),
@@ -90,6 +108,12 @@ interface ComposerProps {
     body: string,
     formatted: string | null,
     mentions: { userIds: string[]; room: boolean }
+  ) => Promise<void>;
+  onSendBotCommand?: (
+    roomId: string,
+    bot: string,
+    body: string,
+    invocation: BotCommandInvocation
   ) => Promise<void>;
   onSendAttachment?: (roomId: string, file: File, options: SendAttachmentOptions) => Promise<void>;
   onSendGallery?: (
@@ -1350,4 +1374,80 @@ test('switching accounts in the same room restores only that account draft', asy
   session.account_id = 'a';
   await tick();
   expect(editorText()).toBe('A private draft');
+});
+
+function draftText(text: string): void {
+  const doc = composerSchema.node('doc', null, [
+    composerSchema.nodes.paragraph.create(null, [composerSchema.text(text)]),
+  ]);
+  writeDraft('!room:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 });
+}
+
+test('a complete bot command typed in the composer is sent as a structured command', async () => {
+  const onSend = vi.fn(async () => {});
+  const onSendBotCommand = vi.fn(async () => {});
+  draftText('/warn @spam:example.org 7');
+  setup({ roomId: '!room:example.org', onSend, onSendBotCommand });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/warn @spam:example.org 7',
+      { command: 'warn', arguments: { user: '@spam:example.org', days: 7 } }
+    );
+  });
+  expect(onSend).not.toHaveBeenCalled();
+  expect(editorText()).toBe('');
+});
+
+test('an incomplete bot command opens its form, which sends once it is filled in', async () => {
+  const onSend = vi.fn(async () => {});
+  const onSendBotCommand = vi.fn(async () => {});
+  draftText('/warn @spam:example.org');
+  setup({ roomId: '!room:example.org', onSend, onSendBotCommand });
+  await tick();
+
+  submit();
+
+  const form = await screen.findByRole('form', { name: 'Arguments for /warn' });
+  expect(screen.getByLabelText('user')).toHaveProperty('value', '@spam:example.org');
+  await user.click(screen.getByRole('button', { name: 'Send command' }));
+  expect(await screen.findByText('Required')).toBeTruthy();
+  expect(onSendBotCommand).not.toHaveBeenCalled();
+
+  await user.type(screen.getByLabelText('days'), '3');
+  await user.click(screen.getByRole('button', { name: 'Send command' }));
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/warn @spam:example.org 3',
+      { command: 'warn', arguments: { user: '@spam:example.org', days: 3 } }
+    );
+  });
+  await vi.waitFor(() => {
+    expect(form.isConnected).toBe(false);
+  });
+  expect(onSend).not.toHaveBeenCalled();
+});
+
+test('without bot command support an unknown command still goes to the slash handler', async () => {
+  const onSend = vi.fn(async () => {});
+  draftText('/warn @spam:example.org 7');
+  setup({ roomId: '!room:example.org', onSend });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSend).toHaveBeenCalledWith('!room:example.org', '/warn @spam:example.org 7', null, {
+      userIds: [],
+      room: false,
+    });
+  });
 });

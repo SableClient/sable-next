@@ -9,235 +9,933 @@
         {
           "name": "register",
           "description": "Register an appservice using its registration YAML",
-          "restricted": true
+          "restricted": true,
+          "parameters": []
         },
         {
           "name": "unregister",
           "description": "Unregister an appservice using its ID",
-          "restricted": true
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The appservice to unregister"
+                  }
+                ]
+              },
+              "key": "appservice_identifier",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
         },
         {
           "name": "show-appservice-config",
           "description": "Show an appservice's config using its ID",
-          "restricted": true
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The appservice to show"
+                  }
+                ]
+              },
+              "key": "appservice_identifier",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
         },
         {
           "name": "list-registered",
           "description": "List all the currently registered appservices",
-          "restricted": true
-        },
-        {
-          "name": "ensure-puppets-active",
-          "description": "Ensure no appservice puppets are marked as deactivated. This is a debug command to fix issues caused by a faulty database migration in Continuwuity 26.6.0",
-          "restricted": true
+          "restricted": true,
+          "parameters": []
         }
       ]
     },
     {
-      "name": "check",
-      "description": "Commands for checking integrity",
+      "name": "users",
+      "description": "Commands for managing local users",
+      "restricted": true,
       "children": [
         {
-          "name": "check-all-users",
-          "description": "Uses the iterator in `src/database/key_value/users.rs` to iterator over every user in our database (remote and local). Reports total count, any errors if there were any, etc"
+          "name": "create",
+          "description": "Create a new user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the new user"
+                  }
+                ]
+              },
+              "key": "username",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Password of the new user, if unspecified one is generated"
+                  }
+                ]
+              },
+              "key": "password",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "issue-token",
+          "description": "Issue an access token for a user. This command will not work on shadow users, such as appservice puppets or accounts imported from an identity provider",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "username",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "password",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "reset-password",
+          "description": "Reset user password",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Log out existing sessions"
+                  }
+                ]
+              },
+              "key": "logout",
+              "moe.sable.flag": "--logout",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user for whom the password should be reset"
+                  }
+                ]
+              },
+              "key": "username",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "New password for the user, if unspecified one is generated"
+                  }
+                ]
+              },
+              "key": "password",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "convert_to_local_account",
+              "moe.sable.flag": "--convert-to-local-account",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-email",
+          "description": "Get a user's associated email address",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-user-by-email",
+          "description": "Get the user with the given email address",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "email",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "change-email",
+          "description": "Update or remove a user's email address",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "email",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "deactivate",
+          "description": "Deactivate a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "no_leave_rooms",
+              "moe.sable.flag": "--no-leave-rooms",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "deactivate-all",
+          "description": "Deactivate a list of users",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Does not leave any rooms the user is in on deactivation"
+                  }
+                ]
+              },
+              "key": "no_leave_rooms",
+              "moe.sable.flag": "--no-leave-rooms",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Also deactivate admin accounts and will assume leave all rooms too"
+                  }
+                ]
+              },
+              "key": "force",
+              "moe.sable.flag": "--force",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "logout",
+          "description": "Forcefully log a user out of all of their devices",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to log out"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "suspend",
+          "description": "Suspend a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to suspend"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "unsuspend",
+          "description": "Unsuspend a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to unsuspend"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "lock",
+          "description": "Lock a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to lock"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "unlock",
+          "description": "Unlock a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to unlock"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "enable-login",
+          "description": "Enable login for a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to enable login for"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "disable-login",
+          "description": "Disable login for a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Username of the user to disable login for"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "list",
+          "description": "List local users in the database",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "list-invited-rooms",
+          "description": "Lists all the rooms (local and remote) that the specified user is invited to",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "reject-all-invites",
+          "description": "Manually make a user reject all current invites",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "list-joined-rooms",
+          "description": "Lists all the rooms (local and remote) that the specified user is joined in",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-join-room",
+          "description": "Manually join a local user to a room",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The user to join"
+                  }
+                ]
+              },
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The room to join"
+                  }
+                ]
+              },
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The server name to join via.\n\nThis server will always be tried first, however if more are available, they may be tried after."
+                  }
+                ]
+              },
+              "key": "via",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-leave-room",
+          "description": "Manually leave a local user from a room",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-leave-remote-room",
+          "description": "Manually leave a remote room for a local user",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            },
+            {
+              "key": "via",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-demote",
+          "description": "Forces the specified user to drop their power levels to the room default, if their permissions allow and the auth check permits",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "make-user-admin",
+          "description": "Grant server-admin privileges to a user",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "put-room-tag",
+          "description": "Puts a room tag for the specified user and room ID",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            },
+            {
+              "key": "tag",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete-room-tag",
+          "description": "Deletes the room tag for the specified user and room ID",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            },
+            {
+              "key": "tag",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-room-tags",
+          "description": "Gets all the room tags for the specified user and room ID",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "redact-event",
+          "description": "Attempts to forcefully redact the specified event ID from the sender user",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-join-list-of-local-users",
+          "description": "Force joins a specified list of local users to join the specified room",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            },
+            {
+              "key": "yes_i_want_to_do_this",
+              "moe.sable.flag": "--yes-i-want-to-do-this",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-join-all-local-users",
+          "description": "Force joins all local users to the specified room",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            },
+            {
+              "key": "yes_i_want_to_do_this",
+              "moe.sable.flag": "--yes-i-want-to-do-this",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "reset-push-rules",
+          "description": "Resets the push-rules (notification settings) of the target user to the server defaults",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
         }
       ]
     },
     {
-      "name": "debug",
-      "description": "Commands for debugging things",
+      "name": "token",
+      "description": "Commands for managing registration tokens",
+      "restricted": true,
       "children": [
         {
-          "name": "echo",
-          "description": "Echo input of admin command"
+          "name": "issue",
+          "description": "Issue a new registration token",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The maximum number of times this token is allowed to be used before it expires"
+                  }
+                ]
+              },
+              "key": "max_uses",
+              "moe.sable.flag": "--max-uses",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The maximum age of this token (e.g. 30s, 5m, 7d). It will expire after this much time has passed"
+                  }
+                ]
+              },
+              "key": "max_age",
+              "moe.sable.flag": "--max-age",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "This token will never expire"
+                  }
+                ]
+              },
+              "key": "immortal",
+              "moe.sable.flag": "--immortal",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "A shortcut for `--max-uses 1`"
+                  }
+                ]
+              },
+              "key": "once",
+              "moe.sable.flag": "--once",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
         },
         {
-          "name": "get-auth-chain",
-          "description": "Loads the auth_chain of a PDU, reporting how long it took"
+          "name": "revoke",
+          "description": "Revoke a registration token",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The token to revoke"
+                  }
+                ]
+              },
+              "key": "token",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
         },
         {
-          "name": "show-auth-chain",
-          "description": "Walks & displays the auth_chain of a PDU in a mermaid graph format."
-        },
-        {
-          "name": "parse-pdu",
-          "description": "Parse and print a PDU from a JSON"
-        },
-        {
-          "name": "get-pdu",
-          "description": "Retrieve and print a PDU by EventID from the Continuwuity database"
-        },
-        {
-          "name": "get-short-pdu",
-          "description": "Retrieve and print a PDU by PduId from the Continuwuity database"
-        },
-        {
-          "name": "get-remote-pdu",
-          "description": "Attempts to retrieve a PDU from a remote server. **Does not** insert it into the database or persist it anywhere"
-        },
-        {
-          "name": "get-remote-pdu-list",
-          "description": "Same as `get-remote-pdu` but accepts a codeblock newline delimited list of PDUs and a single server to fetch from"
-        },
-        {
-          "name": "get-room-state",
-          "description": "Gets all the room state events for the specified room.",
-          "restricted": true
-        },
-        {
-          "name": "get-state-at",
-          "description": "Gets all the room state events at the specified event.",
-          "restricted": true
-        },
-        {
-          "name": "get-signing-keys",
-          "description": "Get and display signing keys from local cache or remote server"
-        },
-        {
-          "name": "get-verify-keys",
-          "description": "Get and display signing keys from local cache or remote server"
-        },
-        {
-          "name": "ping",
-          "description": "Sends a federation request to the remote server's `/_matrix/federation/v1/version` endpoint and measures the latency it took for the server to respond"
-        },
-        {
-          "name": "force-device-list-updates",
-          "description": "Forces device lists for all local and remote users to be updated (as having new keys available)"
-        },
-        {
-          "name": "change-log-level",
-          "description": "Change tracing log level/filter on the fly"
-        },
-        {
-          "name": "verify-json",
-          "description": "Verify JSON signatures"
-        },
-        {
-          "name": "verify-pdu",
-          "description": "Verify PDU"
-        },
-        {
-          "name": "first-pdu-in-room",
-          "description": "Prints the very first PDU in the specified room (typically m.room.create)",
-          "restricted": true
-        },
-        {
-          "name": "latest-pdu-in-room",
-          "description": "Prints the latest (\"last\") PDU in the specified room (typically a message)",
-          "restricted": true
-        },
-        {
-          "name": "force-set-room-state-from-server",
-          "description": "Forcefully replaces the room state of our local copy of the specified room, with the copy (auth chain and room state events) the specified remote server says.",
-          "restricted": true
-        },
-        {
-          "name": "resolve-true-destination",
-          "description": "Runs a server name through Continuwuity's true destination resolution process"
-        },
-        {
-          "name": "memory-stats",
-          "description": "Print extended memory usage"
-        },
-        {
-          "name": "runtime-metrics",
-          "description": "Print general tokio runtime metric totals"
-        },
-        {
-          "name": "runtime-interval",
-          "description": "Print detailed tokio runtime metrics accumulated since last command invocation"
-        },
-        {
-          "name": "time",
-          "description": "Print the current time"
-        },
-        {
-          "name": "database-stats",
-          "description": "Get database statistics"
-        },
-        {
-          "name": "trim-memory",
-          "description": "Trim memory usage"
-        },
-        {
-          "name": "database-files",
-          "description": "List database files"
-        },
-        {
-          "name": "send-test-email",
-          "description": "Send a test email to the invoking admin's email address",
-          "restricted": true
-        },
-        {
-          "name": "rooms-by-extremity-count",
-          "description": "Lists room IDs by forward extremity count in descending order"
-        },
-        {
-          "name": "tester",
-          "description": "Developer test stubs"
-        }
-      ]
-    },
-    {
-      "name": "federation",
-      "description": "Commands for managing federation",
-      "children": [
-        {
-          "name": "incoming-federation",
-          "description": "List all rooms we are currently handling an incoming pdu from"
-        },
-        {
-          "name": "disable-room",
-          "description": "Disables incoming federation handling for a room",
-          "restricted": true
-        },
-        {
-          "name": "enable-room",
-          "description": "Enables incoming federation handling for a room again",
-          "restricted": true
-        },
-        {
-          "name": "fetch-support-well-known",
-          "description": "Fetch `/.well-known/matrix/support` from the specified server"
-        },
-        {
-          "name": "remote-user-in-rooms",
-          "description": "Lists all the rooms we share/track with the specified *remote* user"
-        }
-      ]
-    },
-    {
-      "name": "media",
-      "description": "Commands for managing media",
-      "children": [
-        {
-          "name": "delete",
-          "description": "Deletes a single media file from our database and on the filesystem via a single MXC URL or event ID (not redacted)",
-          "restricted": true
-        },
-        {
-          "name": "delete-list",
-          "description": "Deletes a codeblock list of MXC URLs from our database and on the filesystem. This will always ignore errors",
-          "restricted": true
-        },
-        {
-          "name": "delete-past-remote-media",
-          "description": "Deletes all remote (and optionally local) media created before/after [duration] ago, using filesystem metadata first created at date, or fallback to last modified date. This will always ignore errors by default.",
-          "restricted": true
-        },
-        {
-          "name": "delete-all-from-user",
-          "description": "Deletes all the local media from a local user on our server. This will always ignore errors by default"
-        },
-        {
-          "name": "delete-all-from-server",
-          "description": "Deletes all remote media from the specified remote server. This will always ignore errors by default",
-          "restricted": true
-        },
-        {
-          "name": "delete-url-preview",
-          "description": "Deletes a cached URL preview, forcing it to be re-fetched. Use --all to purge all cached URL previews"
+          "name": "list",
+          "description": "List all registration tokens",
+          "restricted": true,
+          "parameters": []
         }
       ]
     },
@@ -249,12 +947,1542 @@
         {
           "name": "link",
           "description": "Link a user ID to the given subject claim",
-          "restricted": true
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "subject",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
         },
         {
           "name": "unlink",
           "description": "Unlink the given subject claim from its associated user ID",
-          "restricted": true
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "subject",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rooms",
+      "description": "Commands for managing rooms",
+      "children": [
+        {
+          "name": "list",
+          "description": "List all rooms the server knows about",
+          "parameters": [
+            {
+              "key": "page",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Excludes rooms that we have federation disabled with"
+                  }
+                ]
+              },
+              "key": "exclude_disabled",
+              "moe.sable.flag": "--exclude-disabled",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Excludes rooms that we have banned"
+                  }
+                ]
+              },
+              "key": "exclude_banned",
+              "moe.sable.flag": "--exclude-banned",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Includes disconnected/empty rooms (rooms with zero members)"
+                  }
+                ]
+              },
+              "key": "include_empty",
+              "moe.sable.flag": "--include-empty",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Whether to only output room IDs without supplementary room information"
+                  }
+                ]
+              },
+              "key": "no_details",
+              "moe.sable.flag": "--no-details",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "info",
+          "description": "View information about a room we know about",
+          "children": [
+            {
+              "name": "list-joined-members",
+              "description": "List joined members in a room",
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Lists only our local users in the specified room"
+                      }
+                    ]
+                  },
+                  "key": "local_only",
+                  "moe.sable.flag": "--local-only",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "boolean"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "view-room-topic",
+              "description": "Displays room topic",
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "moderation",
+          "description": "Manage moderation of remote or local rooms",
+          "children": [
+            {
+              "name": "ban-room",
+              "description": "Bans a room from local users joining and evicts all our local users (including server admins) from the room. Also blocks any invites (local and remote) for the banned room, and disables federation entirely with it",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The room in the format of `!roomid:example.com` or a room alias in the format of `#roomalias:example.com`"
+                      }
+                    ]
+                  },
+                  "key": "room",
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_id"
+                      },
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_alias"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "ban-list-of-rooms",
+              "description": "Bans a list of rooms (room IDs and room aliases) from a newline delimited codeblock similar to `user deactivate-all`. Applies the same steps as ban-room",
+              "parameters": []
+            },
+            {
+              "name": "unban-room",
+              "description": "Unbans a room to allow local users to join again",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The room in the format of `!roomid:example.com` or a room alias in the format of `#roomalias:example.com`"
+                      }
+                    ]
+                  },
+                  "key": "room",
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_id"
+                      },
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_alias"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "list-banned-rooms",
+              "description": "List of all rooms we have banned",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Whether to only output room IDs without supplementary room information"
+                      }
+                    ]
+                  },
+                  "key": "no_details",
+                  "moe.sable.flag": "--no-details",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "boolean"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "alias",
+          "description": "Manage rooms' aliases",
+          "children": [
+            {
+              "name": "set",
+              "description": "Make an alias point to a room",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Set the alias even if a room is already using it"
+                      }
+                    ]
+                  },
+                  "key": "force",
+                  "moe.sable.flag": "--force",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "boolean"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The room id to set the alias on"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The alias localpart to use (`alias`, not `#alias:servername.tld`)"
+                      }
+                    ]
+                  },
+                  "key": "room_alias_localpart",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "remove",
+              "description": "Remove a local alias",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The alias localpart to remove (`alias`, not `#alias:servername.tld`)"
+                      }
+                    ]
+                  },
+                  "key": "room_alias_localpart",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "which",
+              "description": "Show which room is using an alias",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The alias localpart to look up (`alias`, not `#alias:servername.tld`)"
+                      }
+                    ]
+                  },
+                  "key": "room_alias_localpart",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "list",
+              "description": "List aliases currently being used",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "If set, only list the aliases for this room"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "directory",
+          "description": "Manage the room directory",
+          "children": [
+            {
+              "name": "publish",
+              "description": "Publish a room to the room directory",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The room id of the room to publish"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "unpublish",
+              "description": "Unpublish a room to the room directory",
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "The room id of the room to unpublish"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "list",
+              "description": "List rooms that are published",
+              "parameters": [
+                {
+                  "key": "page",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "exists",
+          "description": "Check if we know about a room",
+          "parameters": [
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "federation",
+      "description": "Commands for managing federation",
+      "children": [
+        {
+          "name": "incoming-federation",
+          "description": "List all rooms we are currently handling an incoming pdu from",
+          "parameters": []
+        },
+        {
+          "name": "disable-room",
+          "description": "Disables incoming federation handling for a room",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "enable-room",
+          "description": "Enables incoming federation handling for a room again",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "fetch-support-well-known",
+          "description": "Fetch `/.well-known/matrix/support` from the specified server",
+          "parameters": [
+            {
+              "key": "server_name",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            }
+          ]
+        },
+        {
+          "name": "remote-user-in-rooms",
+          "description": "Lists all the rooms we share/track with the specified *remote* user",
+          "parameters": [
+            {
+              "key": "user_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "user_id"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "server",
+      "description": "Commands for managing the server",
+      "children": [
+        {
+          "name": "uptime",
+          "description": "Time elapsed since startup",
+          "parameters": []
+        },
+        {
+          "name": "show-config",
+          "description": "Show configuration values",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "reload-config",
+          "description": "Reload configuration values",
+          "parameters": [
+            {
+              "key": "path",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "memory-usage",
+          "description": "Print database memory usage statistics",
+          "parameters": []
+        },
+        {
+          "name": "clear-caches",
+          "description": "Clears all of Continuwuity's caches",
+          "parameters": []
+        },
+        {
+          "name": "backup-database",
+          "description": "Performs an online backup of the database (only available for RocksDB at the moment)",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "list-backups",
+          "description": "List database backups",
+          "parameters": []
+        },
+        {
+          "name": "admin-notice",
+          "description": "Send a message to the admin room",
+          "parameters": [
+            {
+              "key": "message",
+              "optional": true,
+              "schema": {
+                "items": {
+                  "schema_type": "primitive",
+                  "type": "string"
+                },
+                "schema_type": "array"
+              }
+            }
+          ]
+        },
+        {
+          "name": "reload",
+          "description": "Hot-reload the server",
+          "parameters": []
+        },
+        {
+          "name": "restart",
+          "description": "Restart the server",
+          "parameters": [
+            {
+              "key": "force",
+              "moe.sable.flag": "--force",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "shutdown",
+          "description": "Shutdown the server",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "list-features",
+          "description": "List features built into the server",
+          "parameters": []
+        },
+        {
+          "name": "build-info",
+          "description": "Build information",
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "media",
+      "description": "Commands for managing media",
+      "children": [
+        {
+          "name": "delete",
+          "description": "Deletes a single media file from our database and on the filesystem via a single MXC URL or event ID (not redacted)",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The MXC URL to delete"
+                  }
+                ]
+              },
+              "key": "mxc",
+              "moe.sable.flag": "--mxc",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The message event ID which contains the media and thumbnail MXC URLs"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "moe.sable.flag": "--event-id",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete-list",
+          "description": "Deletes a codeblock list of MXC URLs from our database and on the filesystem. This will always ignore errors",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "delete-past-remote-media",
+          "description": "Deletes all remote (and optionally local) media created before/after\n[duration] ago, using filesystem metadata first created at date, or\nfallback to last modified date. This will always ignore errors by\ndefault.",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The relative time (e.g. 30s, 5m, 7d) from now within which to search"
+                  }
+                ]
+              },
+              "key": "duration",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Only delete media created before [duration] ago"
+                  }
+                ]
+              },
+              "key": "before",
+              "moe.sable.flag": "--before",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Only delete media created after [duration] ago"
+                  }
+                ]
+              },
+              "key": "after",
+              "moe.sable.flag": "--after",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Long argument to additionally delete local media"
+                  }
+                ]
+              },
+              "key": "yes_i_want_to_delete_local_media",
+              "moe.sable.flag": "--yes-i-want-to-delete-local-media",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete-all-from-user",
+          "description": "Deletes all the local media from a local user on our server. This will always ignore errors by default",
+          "parameters": [
+            {
+              "key": "username",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete-all-from-server",
+          "description": "Deletes all remote media from the specified remote server. This will always ignore errors by default",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "server_name",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Long argument to delete local media"
+                  }
+                ]
+              },
+              "key": "yes_i_want_to_delete_local_media",
+              "moe.sable.flag": "--yes-i-want-to-delete-local-media",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-file-info",
+          "description": "",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The MXC URL to lookup info for"
+                  }
+                ]
+              },
+              "key": "mxc",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-remote-file",
+          "description": "",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The MXC URL to fetch"
+                  }
+                ]
+              },
+              "key": "mxc",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "server",
+              "moe.sable.flag": "--server",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "fi.mau.default_value": 10000,
+              "key": "timeout",
+              "moe.sable.flag": "--timeout",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-remote-thumbnail",
+          "description": "",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The MXC URL to fetch"
+                  }
+                ]
+              },
+              "key": "mxc",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "server",
+              "moe.sable.flag": "--server",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "fi.mau.default_value": 10000,
+              "key": "timeout",
+              "moe.sable.flag": "--timeout",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            },
+            {
+              "fi.mau.default_value": 800,
+              "key": "width",
+              "moe.sable.flag": "--width",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            },
+            {
+              "fi.mau.default_value": 800,
+              "key": "height",
+              "moe.sable.flag": "--height",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "delete-url-preview",
+          "description": "Deletes a cached URL preview, forcing it to be re-fetched. Use --all to purge all cached URL previews",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The URL to clear from the saved preview data"
+                  }
+                ]
+              },
+              "key": "url",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Purge all cached URL previews"
+                  }
+                ]
+              },
+              "key": "all",
+              "moe.sable.flag": "--all",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "check",
+      "description": "Commands for checking integrity",
+      "children": [
+        {
+          "name": "check-all-users",
+          "description": "Uses the iterator in `src/database/key_value/users.rs` to iterator over every user in our database (remote and local). Reports total count, any errors if there were any, etc",
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "debug",
+      "description": "Commands for debugging things",
+      "children": [
+        {
+          "name": "echo",
+          "description": "Echo input of admin command",
+          "parameters": [
+            {
+              "key": "message",
+              "optional": true,
+              "schema": {
+                "items": {
+                  "schema_type": "primitive",
+                  "type": "string"
+                },
+                "schema_type": "array"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-auth-chain",
+          "description": "Loads the auth_chain of a PDU, reporting how long it took",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "An event ID (the $ character followed by the base64 reference hash)"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "show-auth-chain",
+          "description": "Walks & displays the auth_chain of a PDU in a mermaid graph format",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The root event ID to start walking back from"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "parse-pdu",
+          "description": "Parse and print a PDU from a JSON",
+          "parameters": []
+        },
+        {
+          "name": "get-pdu",
+          "description": "Retrieve and print a PDU by EventID from the Continuwuity database",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "An event ID (a $ followed by the base64 reference hash)"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-short-pdu",
+          "description": "Retrieve and print a PDU by PduId from the Continuwuity database",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Shortroomid integer"
+                  }
+                ]
+              },
+              "key": "shortroomid",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Shorteventid integer"
+                  }
+                ]
+              },
+              "key": "shorteventid",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-remote-pdu",
+          "description": "Attempts to retrieve a PDU from a remote server. **Does not** insert it into the database or persist it anywhere",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "An event ID (a $ followed by the base64 reference hash)"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Argument for us to attempt to fetch the event from the specified remote server"
+                  }
+                ]
+              },
+              "key": "server",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-remote-pdu-list",
+          "description": "Same as `get-remote-pdu` but accepts a codeblock newline delimited list of PDUs and a single server to fetch from",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Argument for us to attempt to fetch all the events from the specified remote server"
+                  }
+                ]
+              },
+              "key": "server",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "If set, ignores errors, else stops at the first error/failure"
+                  }
+                ]
+              },
+              "key": "force",
+              "moe.sable.flag": "--force",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-room-state",
+          "description": "Gets all the room state events for the specified room",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Room ID"
+                  }
+                ]
+              },
+              "key": "room_id",
+              "schema": {
+                "schema_type": "union",
+                "variants": [
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  },
+                  {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-state-at",
+          "description": "Gets all the room state events at the specified event",
+          "restricted": true,
+          "parameters": [
+            {
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-signing-keys",
+          "description": "Get and display signing keys from local cache or remote server",
+          "parameters": [
+            {
+              "key": "server_name",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "key": "notary",
+              "moe.sable.flag": "--notary",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "key": "query",
+              "moe.sable.flag": "--query",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "get-verify-keys",
+          "description": "Get and display signing keys from local cache or remote server",
+          "parameters": [
+            {
+              "key": "server_name",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            }
+          ]
+        },
+        {
+          "name": "ping",
+          "description": "Sends a federation request to the remote server's `/_matrix/federation/v1/version` endpoint and measures the latency it took for the server to respond",
+          "parameters": [
+            {
+              "key": "server",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-device-list-updates",
+          "description": "Forces device lists for all local and remote users to be updated (as having new keys available)",
+          "parameters": []
+        },
+        {
+          "name": "change-log-level",
+          "description": "Change tracing log level/filter on the fly",
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Log level/filter"
+                  }
+                ]
+              },
+              "key": "filter",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "Resets the log level/filter to the one in your config"
+                  }
+                ]
+              },
+              "key": "reset",
+              "moe.sable.flag": "--reset",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "verify-json",
+          "description": "Verify JSON signatures",
+          "parameters": []
+        },
+        {
+          "name": "verify-pdu",
+          "description": "Verify PDU",
+          "parameters": [
+            {
+              "key": "event_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "first-pdu-in-room",
+          "description": "Prints the very first PDU in the specified room (typically m.room.create)",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The room ID"
+                  }
+                ]
+              },
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "latest-pdu-in-room",
+          "description": "Prints the latest (\"last\") PDU in the specified room (typically a message)",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The room ID"
+                  }
+                ]
+              },
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "force-set-room-state-from-server",
+          "description": "Forcefully replaces the room state of our local copy of the specified room, with the copy (auth chain and room state events) the specified remote server says",
+          "restricted": true,
+          "parameters": [
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The impacted room ID"
+                  }
+                ]
+              },
+              "key": "room_id",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The server we will use to query the room state for"
+                  }
+                ]
+              },
+              "key": "server_name",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "description": {
+                "m.text": [
+                  {
+                    "body": "The event ID of the latest known PDU in the room. Will be found automatically if not provided"
+                  }
+                ]
+              },
+              "key": "event_id",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "event_id"
+              }
+            }
+          ]
+        },
+        {
+          "name": "resolve-true-destination",
+          "description": "Runs a server name through Continuwuity's true destination resolution process",
+          "parameters": [
+            {
+              "key": "server_name",
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            },
+            {
+              "key": "no_cache",
+              "moe.sable.flag": "--no-cache",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "boolean"
+              }
+            }
+          ]
+        },
+        {
+          "name": "memory-stats",
+          "description": "Print extended memory usage",
+          "parameters": [
+            {
+              "key": "opts",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "runtime-metrics",
+          "description": "Print general tokio runtime metric totals",
+          "parameters": []
+        },
+        {
+          "name": "runtime-interval",
+          "description": "Print detailed tokio runtime metrics accumulated since last command invocation",
+          "parameters": []
+        },
+        {
+          "name": "time",
+          "description": "Print the current time",
+          "parameters": []
+        },
+        {
+          "name": "database-stats",
+          "description": "Get database statistics",
+          "parameters": [
+            {
+              "key": "property",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "map",
+              "moe.sable.flag": "--map",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            }
+          ]
+        },
+        {
+          "name": "trim-memory",
+          "description": "Trim memory usage",
+          "parameters": []
+        },
+        {
+          "name": "database-files",
+          "description": "List database files",
+          "parameters": [
+            {
+              "key": "map",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "string"
+              }
+            },
+            {
+              "key": "level",
+              "moe.sable.flag": "--level",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "send-test-email",
+          "description": "Send a test email to the invoking admin's email address",
+          "restricted": true,
+          "parameters": []
+        },
+        {
+          "name": "rooms-by-extremity-count",
+          "description": "Lists room IDs by forward extremity count in descending order",
+          "parameters": [
+            {
+              "key": "page",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "integer"
+              }
+            }
+          ]
+        },
+        {
+          "name": "servers-in-backoff",
+          "description": "Lists remote servers that are currently in a \"backoff\" state",
+          "parameters": [
+            {
+              "key": "room_id",
+              "moe.sable.flag": "--room-id",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "room_id"
+              }
+            },
+            {
+              "key": "name",
+              "moe.sable.flag": "--name",
+              "optional": true,
+              "schema": {
+                "schema_type": "primitive",
+                "type": "server_name"
+              }
+            }
+          ]
         }
       ]
     },
@@ -271,12 +2499,102 @@
             {
               "name": "changes-since",
               "description": "Returns all changes to the account data that happened after `since`",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full user ID"
+                      }
+                    ]
+                  },
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "UNIX timestamp since (u64)"
+                      }
+                    ]
+                  },
+                  "key": "since",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Optional room ID of the account data"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
             },
             {
               "name": "account-data-get",
               "description": "Searches the account data for a specific kind",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full user ID"
+                      }
+                    ]
+                  },
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Account data event type"
+                      }
+                    ]
+                  },
+                  "key": "kind",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Optional room ID of the account data"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -288,12 +2606,29 @@
             {
               "name": "get-registration",
               "description": "Gets the appservice registration info/details from the ID as a string",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Appservice registration ID"
+                      }
+                    ]
+                  },
+                  "key": "appservice_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "all",
               "description": "Gets all appservice registrations with their ID and registration info",
-              "restricted": true
+              "restricted": true,
+              "parameters": []
             }
           ]
         },
@@ -305,12 +2640,44 @@
             {
               "name": "get-presence",
               "description": "Returns the latest presence event for the given user",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full user ID"
+                      }
+                    ]
+                  },
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
             },
             {
               "name": "presence-since",
               "description": "Iterator of the most recent presence updates that happened after the event with id `since`",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "UNIX timestamp since (u64)"
+                      }
+                    ]
+                  },
+                  "key": "since",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -320,26 +2687,383 @@
           "restricted": true,
           "children": [
             {
+              "name": "resolve-local-alias",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full room alias"
+                      }
+                    ]
+                  },
+                  "key": "alias",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_alias"
+                  }
+                }
+              ]
+            },
+            {
               "name": "local-aliases-for-room",
               "description": "Iterator of all our local room aliases for the room ID",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full room ID"
+                      }
+                    ]
+                  },
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
             },
             {
               "name": "all-local-aliases",
               "description": "Iterator of all our local aliases in our database with their room IDs",
-              "restricted": true
+              "restricted": true,
+              "parameters": []
             }
           ]
         },
         {
           "name": "room-state-cache",
           "description": "rooms/state_cache iterators and getters",
-          "restricted": true
+          "restricted": true,
+          "children": [
+            {
+              "name": "server-in-room",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "server",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                },
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-servers",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "server-rooms",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "server",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-members",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "local-users-in-room",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "active-local-users-in-room",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-joined-count",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-invited-count",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-user-once-joined",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "room-members-invited",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-invite-count",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                },
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-left-count",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                },
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rooms-joined",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rooms-left",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "rooms-invited",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "invite-state",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "room-timeline",
           "description": "rooms/timeline iterators and getters",
-          "restricted": true
+          "restricted": true,
+          "children": [
+            {
+              "name": "pdus",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_id"
+                      },
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_alias"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": "from",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "limit",
+                  "moe.sable.flag": "--limit",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "last",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_id"
+                      },
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_alias"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "globals",
@@ -347,9 +3071,36 @@
           "restricted": true,
           "children": [
             {
+              "name": "database-version",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
+              "name": "current-count",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
+              "name": "last-check-for-announcements-id",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
               "name": "signing-keys-for",
               "description": "This returns an empty `Ok(BTreeMap<..>)` when there are no keys found for the server",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "origin",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -361,24 +3112,443 @@
             {
               "name": "active-requests",
               "description": "Queries database for all `servercurrentevent_data`",
-              "restricted": true
+              "restricted": true,
+              "parameters": []
             },
             {
               "name": "active-requests-for",
               "description": "Queries database for `servercurrentevent_data` but for a specific destination",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "appservice_id",
+                  "moe.sable.flag": "--appservice-id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "server_name",
+                  "moe.sable.flag": "--server-name",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                },
+                {
+                  "key": "user_id",
+                  "moe.sable.flag": "--user-id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "push_key",
+                  "moe.sable.flag": "--push-key",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "queued-requests",
               "description": "Queries database for `servernameevent_data` which are the queued up requests that will eventually be sent",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "appservice_id",
+                  "moe.sable.flag": "--appservice-id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "server_name",
+                  "moe.sable.flag": "--server-name",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                },
+                {
+                  "key": "user_id",
+                  "moe.sable.flag": "--user-id",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "push_key",
+                  "moe.sable.flag": "--push-key",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-latest-edu-count",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "server_name",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                }
+              ]
             }
           ]
         },
         {
           "name": "users",
           "description": "users.rs iterators and getters",
-          "restricted": true
+          "restricted": true,
+          "children": [
+            {
+              "name": "count-users",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
+              "name": "iter-users",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
+              "name": "iter-users2",
+              "description": "",
+              "restricted": true,
+              "parameters": []
+            },
+            {
+              "name": "list-devices",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "list-devices-metadata",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-device-metadata",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "device_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-devices-version",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "count-one-time-keys",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "device_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-device-keys",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "device_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-user-signing-key",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-master-key",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-to-device-events",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "device_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-latest-backup",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-latest-backup-version",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-backup-algorithm",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "version",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-all-backups",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "version",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-room-backups",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "version",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-backup-session",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "version",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "room_id"
+                  }
+                },
+                {
+                  "key": "session_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "get-shared-rooms",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_a",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "user_b",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "resolver",
@@ -388,12 +3558,59 @@
             {
               "name": "cache",
               "description": "Query the destinations or overrides cache, depending on the value of the `overrides` flag (default false)",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "server_name",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                },
+                {
+                  "key": "overrides",
+                  "moe.sable.flag": "--overrides",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "literal",
+                        "value": "true"
+                      },
+                      {
+                        "schema_type": "literal",
+                        "value": "false"
+                      }
+                    ]
+                  }
+                }
+              ]
             },
             {
               "name": "flush-cache",
               "description": "Flush a given server from the resolver caches or flush them completely",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "name",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "server_name"
+                  }
+                },
+                {
+                  "key": "all",
+                  "moe.sable.flag": "--all",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "boolean"
+                  }
+                }
+              ]
             }
           ]
         },
@@ -405,29 +3622,125 @@
             {
               "name": "get-pushers",
               "description": "Returns all the pushers for the user",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Full user ID"
+                      }
+                    ]
+                  },
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
             },
             {
               "name": "delete-pusher",
               "description": "Deletes a specific pusher by ID",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "pusher_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "delete-all-user",
               "description": "Deletes all pushers for a user",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                }
+              ]
             },
             {
               "name": "delete-all-device",
               "description": "Deletes all pushers associated with a device ID",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "user_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "user_id"
+                  }
+                },
+                {
+                  "key": "device_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             }
           ]
         },
         {
           "name": "short",
           "description": "short service",
-          "restricted": true
+          "restricted": true,
+          "children": [
+            {
+              "name": "short-event-id",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "event_id",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "event_id"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "short-room-id",
+              "description": "",
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "room_id",
+                  "schema": {
+                    "schema_type": "union",
+                    "variants": [
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_id"
+                      },
+                      {
+                        "schema_type": "primitive",
+                        "type": "room_alias"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
         },
         {
           "name": "raw",
@@ -437,404 +3750,519 @@
             {
               "name": "raw-maps",
               "description": "List database maps",
-              "restricted": true
+              "restricted": true,
+              "parameters": []
             },
             {
               "name": "raw-get",
               "description": "Raw database query",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key"
+                      }
+                    ]
+                  },
+                  "key": "key",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-del",
               "description": "Raw database delete (for string keys)",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key"
+                      }
+                    ]
+                  },
+                  "key": "key",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-keys",
               "description": "Raw database keys iteration",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-keys-sizes",
               "description": "Raw database key size breakdown",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-keys-total",
               "description": "Raw database keys total bytes",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-vals-sizes",
               "description": "Raw database values size breakdown",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-vals-total",
               "description": "Raw database values total bytes",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-iter",
               "description": "Raw database items iteration",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-keys-from",
               "description": "Raw database keys iteration",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Lower-bound"
+                      }
+                    ]
+                  },
+                  "key": "start",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Limit"
+                      }
+                    ]
+                  },
+                  "key": "limit",
+                  "moe.sable.flag": "--limit",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-iter-from",
               "description": "Raw database items iteration",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Lower-bound"
+                      }
+                    ]
+                  },
+                  "key": "start",
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Limit"
+                      }
+                    ]
+                  },
+                  "key": "limit",
+                  "moe.sable.flag": "--limit",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                }
+              ]
             },
             {
               "name": "raw-count",
               "description": "Raw database record count",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Map name"
+                      }
+                    ]
+                  },
+                  "key": "map",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "Key prefix"
+                      }
+                    ]
+                  },
+                  "key": "prefix",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                }
+              ]
             },
             {
               "name": "compact",
               "description": "Compact database",
-              "restricted": true
+              "restricted": true,
+              "parameters": [
+                {
+                  "key": "map",
+                  "moe.sable.flag": "--map",
+                  "optional": true,
+                  "schema": {
+                    "items": {
+                      "schema_type": "primitive",
+                      "type": "string"
+                    },
+                    "schema_type": "array"
+                  }
+                },
+                {
+                  "key": "start",
+                  "moe.sable.flag": "--start",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "stop",
+                  "moe.sable.flag": "--stop",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "string"
+                  }
+                },
+                {
+                  "key": "from",
+                  "moe.sable.flag": "--from",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                },
+                {
+                  "key": "into",
+                  "moe.sable.flag": "--into",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                },
+                {
+                  "description": {
+                    "m.text": [
+                      {
+                        "body": "There is one compaction job per column; then this controls how many columns are compacted in parallel. If zero, one compaction job is still run at a time here, but in exclusive-mode blocking any other automatic compaction jobs until complete"
+                      }
+                    ]
+                  },
+                  "key": "parallelism",
+                  "moe.sable.flag": "--parallelism",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "integer"
+                  }
+                },
+                {
+                  "key": "exhaustive",
+                  "moe.sable.flag": "--exhaustive",
+                  "optional": true,
+                  "schema": {
+                    "schema_type": "primitive",
+                    "type": "boolean"
+                  }
+                }
+              ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "name": "rooms",
-      "description": "Commands for managing rooms",
-      "children": [
-        {
-          "name": "list",
-          "description": "List all rooms the server knows about"
-        },
-        {
-          "name": "info",
-          "description": "View information about a room we know about",
-          "children": [
-            {
-              "name": "list-joined-members",
-              "description": "List joined members in a room"
-            },
-            {
-              "name": "view-room-topic",
-              "description": "Displays room topic"
-            }
-          ]
-        },
-        {
-          "name": "moderation",
-          "description": "Manage moderation of remote or local rooms",
-          "children": [
-            {
-              "name": "ban-room",
-              "description": "Bans a room from local users joining and evicts all our local users (including server admins) from the room. Also blocks any invites (local and remote) for the banned room, and disables federation entirely with it"
-            },
-            {
-              "name": "ban-list-of-rooms",
-              "description": "Bans a list of rooms (room IDs and room aliases) from a newline delimited codeblock similar to `user deactivate-all`. Applies the same steps as ban-room"
-            },
-            {
-              "name": "unban-room",
-              "description": "Unbans a room to allow local users to join again"
-            },
-            {
-              "name": "list-banned-rooms",
-              "description": "List of all rooms we have banned"
-            }
-          ]
-        },
-        {
-          "name": "alias",
-          "description": "Manage rooms' aliases",
-          "children": [
-            {
-              "name": "set",
-              "description": "Make an alias point to a room"
-            },
-            {
-              "name": "remove",
-              "description": "Remove a local alias"
-            },
-            {
-              "name": "which",
-              "description": "Show which room is using an alias"
-            },
-            {
-              "name": "list",
-              "description": "List aliases currently being used"
-            }
-          ]
-        },
-        {
-          "name": "directory",
-          "description": "Manage the room directory",
-          "children": [
-            {
-              "name": "publish",
-              "description": "Publish a room to the room directory"
-            },
-            {
-              "name": "unpublish",
-              "description": "Unpublish a room to the room directory"
-            },
-            {
-              "name": "list",
-              "description": "List rooms that are published"
-            }
-          ]
-        },
-        {
-          "name": "exists",
-          "description": "Check if we know about a room"
-        }
-      ]
-    },
-    {
-      "name": "server",
-      "description": "Commands for managing the server",
-      "children": [
-        {
-          "name": "uptime",
-          "description": "Time elapsed since startup"
-        },
-        {
-          "name": "show-config",
-          "description": "Show configuration values",
-          "restricted": true
-        },
-        {
-          "name": "reload-config",
-          "description": "Reload configuration values"
-        },
-        {
-          "name": "memory-usage",
-          "description": "Print database memory usage statistics"
-        },
-        {
-          "name": "clear-caches",
-          "description": "Clears all of Continuwuity's caches"
-        },
-        {
-          "name": "backup-database",
-          "description": "Performs an online backup of the database (only available for RocksDB at the moment)",
-          "restricted": true
-        },
-        {
-          "name": "list-backups",
-          "description": "List database backups"
-        },
-        {
-          "name": "admin-notice",
-          "description": "Send a message to the admin room"
-        },
-        {
-          "name": "reload",
-          "description": "Hot-reload the server"
-        },
-        {
-          "name": "restart",
-          "description": "Restart the server"
-        },
-        {
-          "name": "shutdown",
-          "description": "Shutdown the server",
-          "restricted": true
-        },
-        {
-          "name": "list-features",
-          "description": "List features built into the server"
-        },
-        {
-          "name": "build-info",
-          "description": "Build information"
-        }
-      ]
-    },
-    {
-      "name": "token",
-      "description": "Commands for managing registration tokens",
-      "restricted": true,
-      "children": [
-        {
-          "name": "issue",
-          "description": "Issue a new registration token",
-          "restricted": true
-        },
-        {
-          "name": "revoke",
-          "description": "Revoke a registration token",
-          "restricted": true
-        },
-        {
-          "name": "list",
-          "description": "List all registration tokens",
-          "restricted": true
-        }
-      ]
-    },
-    {
-      "name": "users",
-      "description": "Commands for managing local users",
-      "restricted": true,
-      "children": [
-        {
-          "name": "create",
-          "description": "Create a new user",
-          "restricted": true
-        },
-        {
-          "name": "issue-token",
-          "description": "Issue an access token for a user. This command will not work on shadow users, such as appservice puppets or accounts imported from an identity provider",
-          "restricted": true
-        },
-        {
-          "name": "reset-password",
-          "description": "Reset user password",
-          "restricted": true
-        },
-        {
-          "name": "get-email",
-          "description": "Get a user's associated email address",
-          "restricted": true
-        },
-        {
-          "name": "get-user-by-email",
-          "description": "Get the user with the given email address",
-          "restricted": true
-        },
-        {
-          "name": "change-email",
-          "description": "Update or remove a user's email address.",
-          "restricted": true
-        },
-        {
-          "name": "deactivate",
-          "description": "Deactivate a user",
-          "restricted": true
-        },
-        {
-          "name": "deactivate-all",
-          "description": "Deactivate a list of users",
-          "restricted": true
-        },
-        {
-          "name": "logout",
-          "description": "Forcefully log a user out of all of their devices.",
-          "restricted": true
-        },
-        {
-          "name": "suspend",
-          "description": "Suspend a user",
-          "restricted": true
-        },
-        {
-          "name": "unsuspend",
-          "description": "Unsuspend a user",
-          "restricted": true
-        },
-        {
-          "name": "lock",
-          "description": "Lock a user",
-          "restricted": true
-        },
-        {
-          "name": "unlock",
-          "description": "Unlock a user",
-          "restricted": true
-        },
-        {
-          "name": "enable-login",
-          "description": "Enable login for a user",
-          "restricted": true
-        },
-        {
-          "name": "disable-login",
-          "description": "Disable login for a user",
-          "restricted": true
-        },
-        {
-          "name": "list",
-          "description": "List local users in the database",
-          "restricted": true
-        },
-        {
-          "name": "list-invited-rooms",
-          "description": "Lists all the rooms (local and remote) that the specified user is invited to",
-          "restricted": true
-        },
-        {
-          "name": "reject-all-invites",
-          "description": "Manually make a user reject all current invites",
-          "restricted": true
-        },
-        {
-          "name": "list-joined-rooms",
-          "description": "Lists all the rooms (local and remote) that the specified user is joined in",
-          "restricted": true
-        },
-        {
-          "name": "force-join-room",
-          "description": "Manually join a local user to a room",
-          "restricted": true
-        },
-        {
-          "name": "force-leave-room",
-          "description": "Manually leave a local user from a room",
-          "restricted": true
-        },
-        {
-          "name": "force-leave-remote-room",
-          "description": "Manually leave a remote room for a local user",
-          "restricted": true
-        },
-        {
-          "name": "force-demote",
-          "description": "Forces the specified user to drop their power levels to the room default, if their permissions allow and the auth check permits",
-          "restricted": true
-        },
-        {
-          "name": "make-user-admin",
-          "description": "Grant server-admin privileges to a user",
-          "restricted": true
-        },
-        {
-          "name": "put-room-tag",
-          "description": "Puts a room tag for the specified user and room ID.",
-          "restricted": true
-        },
-        {
-          "name": "delete-room-tag",
-          "description": "Deletes the room tag for the specified user and room ID",
-          "restricted": true
-        },
-        {
-          "name": "get-room-tags",
-          "description": "Gets all the room tags for the specified user and room ID",
-          "restricted": true
-        },
-        {
-          "name": "redact-event",
-          "description": "Attempts to forcefully redact the specified event ID from the sender user",
-          "restricted": true
-        },
-        {
-          "name": "force-join-list-of-local-users",
-          "description": "Force joins a specified list of local users to join the specified room.",
-          "restricted": true
-        },
-        {
-          "name": "force-join-all-local-users",
-          "description": "Force joins all local users to the specified room.",
-          "restricted": true
-        },
-        {
-          "name": "reset-push-rules",
-          "description": "Resets the push-rules (notification settings) of the target user to the server defaults",
-          "restricted": true
         }
       ]
     }

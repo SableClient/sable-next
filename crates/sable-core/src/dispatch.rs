@@ -385,6 +385,7 @@ impl Core {
                 persona,
                 link_previews,
                 image_source_packs,
+                bot_command,
             } => {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let (body, formatted, persona) = match persona {
@@ -426,6 +427,7 @@ impl Core {
                             IMAGE_SOURCE_PACKS,
                             image_source_pack_references(&image_source_packs),
                         ),
+                        (crate::bot_commands::COMMAND_FIELD, bot_command),
                     ],
                 );
                 timeline
@@ -1104,6 +1106,17 @@ impl Core {
             } => Ok(CommandOk::RoomStateEvents {
                 events: self.room_state_events(&room_id, &event_type).await?,
             }),
+
+            Command::BotCommands { room_id } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                Ok(CommandOk::BotCommands {
+                    commands: self
+                        .bot_commands_for(&client, &room)
+                        .await
+                        .map_err(|error| self.room_error("bot_commands", error))?,
+                })
+            }
 
             Command::RoomStateEvent {
                 room_id,

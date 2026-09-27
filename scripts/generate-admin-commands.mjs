@@ -1,51 +1,52 @@
-import { writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { copyFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const tag = process.argv[2] ?? 'v26.9.0';
-const api = 'https://forgejo.ellis.link/api/v1/repos/continuwuation/continuwuity';
+const repository = 'https://forgejo.ellis.link/continuwuation/continuwuity.git';
 const output = fileURLToPath(
   new URL('../src/lib/features/composer/admin-commands.json', import.meta.url)
 );
+const dump = fileURLToPath(new URL('./admin-commands-dump.rs', import.meta.url));
+const checkout = join(
+  process.env.XDG_CACHE_HOME ?? join(homedir(), '.cache'),
+  'sable',
+  `continuwuity-${tag}`
+);
 
-async function fetchText(path) {
-  const response = await fetch(`${api}/raw/${path}?ref=${tag}`);
-  if (!response.ok) throw new Error(`${path}@${tag}: ${response.status}`);
-  return response.text();
+if (!existsSync(checkout)) {
+  execFileSync('git', ['clone', '--quiet', '--depth', '1', '--branch', tag, repository, checkout], {
+    stdio: 'inherit',
+  });
+  const manifest = join(checkout, 'xtask/Cargo.toml');
+  const xtask = await readFile(manifest, 'utf8');
+  await writeFile(
+    manifest,
+    xtask.replace(
+      '[dependencies]\n',
+      ['[dependencies]', 'ruma.workspace = true', 'serde_json.workspace = true', ''].join('\n')
+    )
+  );
 }
+await mkdir(join(checkout, 'xtask/examples'), { recursive: true });
+await copyFile(dump, join(checkout, 'xtask/examples/sable_admin_commands.rs'));
 
-async function listDir(path) {
-  const response = await fetch(`${api}/contents/${path}?ref=${tag}`);
-  if (!response.ok) throw new Error(`${path}@${tag}: ${response.status}`);
-  return response.json();
-}
+execFileSync(
+  'cargo',
+  ['build', '--quiet', '-p', 'conduwuit', '-p', 'xtask', '--example', 'sable_admin_commands'],
+  { cwd: checkout, stdio: 'inherit' }
+);
+const tree = JSON.parse(
+  execFileSync(join(checkout, 'target/debug/examples/sable_admin_commands'), {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+);
 
-function parseReference(markdown, root) {
-  const lines = markdown.split('\n');
-  for (let index = 0; index < lines.length; index += 1) {
-    const heading = /^#+ `!admin ([a-z0-9 -]+)`$/.exec(lines[index]);
-    if (!heading) continue;
-
-    const paragraph = [];
-    let cursor = index + 1;
-    while (cursor < lines.length && lines[cursor].trim() === '') cursor += 1;
-    while (cursor < lines.length && lines[cursor].trim() !== '' && !lines[cursor].startsWith('#')) {
-      paragraph.push(lines[cursor].trim());
-      cursor += 1;
-    }
-
-    let node = root;
-    for (const name of heading[1].split(' ')) {
-      node.children ??= [];
-      let child = node.children.find((candidate) => candidate.name === name);
-      if (!child) {
-        child = { name, description: '' };
-        node.children.push(child);
-      }
-      node = child;
-    }
-    node.description = paragraph.join(' ');
-  }
-}
+const source = (path) => readFile(join(checkout, path), 'utf8');
 
 function restrictedGroups(adminRs) {
   const groups = new Map();
@@ -60,10 +61,10 @@ function restrictedGroups(adminRs) {
   return groups;
 }
 
-function restrictedHandlers(source) {
+function restrictedHandlers(text) {
   const names = [];
   let current = null;
-  for (const line of source.split('\n')) {
+  for (const line of text.split('\n')) {
     const handler = /async fn (\w+)/.exec(line);
     if (handler) current = handler[1];
     if (current && /self\.bail_restricted\(\)/.test(line)) names.push(current);
@@ -85,30 +86,27 @@ function markRestricted(node) {
   for (const child of node.children ?? []) markRestricted(child);
 }
 
-const root = { name: 'admin', description: '' };
-for (const entry of await listDir('docs/reference/admin')) {
-  if (entry.name === 'index.md') continue;
-  parseReference(await fetchText(entry.path), root);
-}
-
-const groups = restrictedGroups(await fetchText('src/admin/admin.rs'));
-for (const [module, group] of groups) {
+const root = { name: 'admin', children: tree };
+for (const [module, group] of restrictedGroups(await source('src/admin/admin.rs'))) {
   const node = root.children.find((child) => child.name === group.name);
-  if (!node) throw new Error(`no reference for group ${group.name}`);
+  if (!node) throw new Error(`no command group ${group.name}`);
   if (group.restricted) {
     markRestricted(node);
     continue;
   }
 
-  const files = (await listDir(`src/admin/${module}`)).filter((file) => file.name.endsWith('.rs'));
+  const files = (await readdir(join(checkout, 'src/admin', module))).filter((file) =>
+    file.endsWith('.rs')
+  );
   for (const file of files) {
-    for (const handler of restrictedHandlers(await fetchText(file.path))) {
+    const path = `src/admin/${module}/${file}`;
+    for (const handler of restrictedHandlers(await source(path))) {
       const matches = findAll(node, handler.replaceAll('_', '-'));
       if (matches.length > 1) {
-        throw new Error(`${file.path}: ${handler} matches ${matches.length} commands`);
+        throw new Error(`${path}: ${handler} matches ${matches.length} commands`);
       }
       if (matches.length === 0) {
-        console.warn(`${file.path}: ${handler} is not in the reference, skipped`);
+        console.warn(`${path}: ${handler} is not a visible command, skipped`);
         continue;
       }
       matches[0].restricted = true;
@@ -121,6 +119,8 @@ function serialize(node) {
     name: node.name,
     description: node.description,
     ...(node.restricted ? { restricted: true } : {}),
+    ...(node.aliases?.length ? { aliases: node.aliases } : {}),
+    ...(node.parameters ? { parameters: node.parameters } : {}),
     ...(node.children ? { children: node.children.map(serialize) } : {}),
   };
 }

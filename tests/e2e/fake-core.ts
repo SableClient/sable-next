@@ -954,6 +954,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           events: content ? [{ state_key: WIDGET_STATE_KEY, content }] : [],
         };
       },
+      bot_commands: () => ({ type: 'bot_commands', commands: [] }),
       url_preview: (command) => ({
         type: 'url_preview',
         preview:

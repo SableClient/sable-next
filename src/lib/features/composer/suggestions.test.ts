@@ -2,6 +2,7 @@ import type { MemberView, PackImageView, RoomSummary } from '#src/generated/prot
 import { expect, test } from 'vitest';
 
 import type { AutocompleteQuery } from './autocomplete';
+import { parseBotCommands } from './bot-commands';
 import { suggestionsFor } from './suggestions';
 
 function member(userId: string, displayName: string | null): MemberView {
@@ -208,4 +209,40 @@ test('two rooms claiming one alias are suggested once', () => {
   expect(suggestionsFor(roomQuery('gen'), [], [], rooms).map((item) => item.id)).toEqual([
     '#general:example.org',
   ]);
+});
+
+test('a bot command is offered under its bot, and never over a built-in of the same name', () => {
+  const bots = parseBotCommands([
+    {
+      sender: '@bot:example.org',
+      sender_name: 'Moderation',
+      sender_avatar: 'mxc://example.org/bot',
+      content: {
+        command: 'warn',
+        aliases: ['caution'],
+        description: { 'm.text': [{ body: 'Warn a user' }] },
+      },
+    },
+    {
+      sender: '@bot:example.org',
+      sender_name: 'Moderation',
+      sender_avatar: null,
+      content: { command: 'me' },
+    },
+  ]);
+
+  expect(suggestionsFor(commandQuery('cau'), [], [], [], undefined, null, null, bots)).toEqual([
+    {
+      id: 'bot:@bot:example.org warn',
+      insert: '/warn',
+      label: '/warn',
+      detail: 'Moderation · Warn a user',
+      avatarUrl: 'mxc://example.org/bot',
+    },
+  ]);
+  expect(
+    suggestionsFor(commandQuery('me'), [], [], [], undefined, null, null, bots).filter((item) =>
+      item.id.startsWith('bot:')
+    )
+  ).toEqual([]);
 });
