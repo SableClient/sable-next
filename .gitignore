@@ -75,6 +75,7 @@ src-tauri/gen/apple/*
 
 # Local mise overrides
 mise.local.toml
+mise.local.lock
 
 # Nix things
 ## nix build output

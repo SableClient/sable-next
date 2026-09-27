@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+//MISE description="Render the nightly Flatpak manifest for a release"
 /* oxlint-disable no-console */
 
 // Usage: render-flatpak-nightly.mjs <version> <tag> <x86_64-sha256:size> <aarch64-sha256:size> [date]

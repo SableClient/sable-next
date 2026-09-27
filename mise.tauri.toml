@@ -1,10 +1,6 @@
 # Tauri-specific dev tools and system dependencies.
 # Loaded via `MISE_ENV=tauri` (set by `mise run tauri:setup` or CI).
 
-[settings]
-idiomatic_version_file_enable_tools = ["pnpm", "node", "rust"]
-experimental = true
-
 [tools]
 # Android
 java = "temurin-21"

@@ -2,13 +2,14 @@ min_version = '2026.7.11'
 
 [env]
 _.path = ["{{config_root}}/node_modules/.bin"]
-NODE_OPTIONS = "--max-old-space-size=4192"
+NODE_OPTIONS = "--max-old-space-size=4096"
 # Here rather than in mise.tauri.toml: the setup task's own MISE_ENV reaches the
 # commands it spawns, not the template that renders them.
 ANDROID_NDK_VERSION = "29.0.14206865"
 
 [settings]
-idiomatic_version_file_enable_tools = ["pnpm", "node", "rust"]
+idiomatic_version_file_enable_tools = ["pnpm", "rust"]
+lockfile = true
 minimum_release_age = "1d"
 experimental = true
 
@@ -16,13 +17,14 @@ experimental = true
 includes = ["scripts"]
 
 [tools]
-"ubi:rustwasm/wasm-bindgen" = { version = "0.2.128", extract_all = true }
+node = "24.21.0"
+"github:wasm-bindgen/wasm-bindgen" = { version = "0.2.128", extract_all = true }
 "aqua:WebAssembly/binaryen" = "132"
 "aqua:watchexec/watchexec" = "2.7.2"
 "aqua:evilmartians/lefthook" = "2.1.14"
 
 [tasks.setup]
-description = "Install mise tools, pnpm dependencies, and git hooks"
+description = "Install mise tools and pnpm dependencies (pnpm installs the git hooks)"
 run = ["mise install", "pnpm install"]
 sources = ['mise.toml', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']
 outputs = ['node_modules/.pnpm/lock.yaml']
@@ -45,7 +47,6 @@ run = "vite preview"
 
 [tasks.format]
 description = "Format frontend and project config with Oxfmt"
-alias = "fmt"
 run = "pnpm fmt"
 
 [tasks.check]
@@ -63,9 +64,10 @@ run = [
   "cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings",
   "cargo clippy --locked -p app --all-targets -- -D warnings",
   "cargo clippy --locked -p sable-wasm --target wasm32-unknown-unknown --all-targets --all-features -- -D warnings",
-  "cargo run --locked -p sable-core --example generate-types --features typegen -- --check",
+  { task = "check:types" },
   "cargo deny check",
 ]
+tools = { "github:bnjbvr/cargo-machete" = "0.9.2", "aqua:EmbarkStudios/cargo-deny" = "0.20.2" }
 
 [tasks.test]
 description = "Run all frontend and Rust tests"
