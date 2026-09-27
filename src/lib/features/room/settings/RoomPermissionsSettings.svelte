@@ -49,6 +49,11 @@
     withPowerLevelTagsFrom,
     type PowerLevelTagMap,
   } from './power-level-tags';
+  import {
+    MEMBER_LIST_EVENT_TYPE,
+    memberListChanged,
+    readAlwaysListedFrom,
+  } from './member-list.svelte.js';
 
   interface Props {
     room: RoomSummary | null;
@@ -86,6 +91,20 @@
     ].sort((left, right) => right - left)
   );
 
+  let alwaysListedFrom = $state<number | null>(null);
+  let memberListSaving = $state(false);
+  let memberListFailed = $state(false);
+  let memberListChoices = $derived([
+    { value: 'default', label: $i18n.t('room.memberListDefault') },
+    ...[...new Set([...roleLevels, ...(alwaysListedFrom === null ? [] : [alwaysListedFrom])])]
+      .filter((level) => level >= 0)
+      .sort((left, right) => right - left)
+      .map((level) => ({
+        value: String(level),
+        label: $i18n.t('room.memberListFrom', { role: levelLabel(level) }),
+      })),
+  ]);
+
   let numberDrafts = $state.raw<Record<string, string>>({});
   let numberErrors = $state.raw<Record<string, string>>({});
 
@@ -108,6 +127,7 @@
   let groups = $derived(permissionGroups(room?.is_space ?? false));
   let canEdit = $derived(permissions?.can_change_power_levels ?? false);
   let ownLevel = $derived(permissions?.own_power_level ?? 0);
+  let canEditMemberList = $derived(canSendState(levels, ownLevel, MEMBER_LIST_EVENT_TYPE));
 
   let syncChoice = $state<string | null>(null);
   let syncConfirm = $state(false);
@@ -143,13 +163,18 @@
     failed = false;
     try {
       void loadFounders(target, current);
-      const [loaded, tagsContent] = await Promise.all([
+      const [loaded, tagsContent, memberList] = await Promise.all([
         core.commands.roomPowerLevels(target),
         core.commands.roomStateEvent(target, POWER_LEVEL_TAGS_EVENT_TYPE),
+        core.commands.roomStateEvent(target, MEMBER_LIST_EVENT_TYPE).catch((error: unknown) => {
+          console.debug('[sable room] member list settings unavailable', error);
+          return null;
+        }),
       ]);
       if (current !== run) return;
       levels = loaded;
       rawRoleTags = tagsContent ?? null;
+      alwaysListedFrom = readAlwaysListedFrom(memberList);
     } catch (error) {
       console.warn('[sable room] power levels unavailable', error);
       if (current === run) failed = true;
@@ -264,6 +289,31 @@
     childResult = { updated, skipped };
     childSyncing = false;
     childConfirm = false;
+  }
+
+  async function saveMemberList(value: string): Promise<void> {
+    const target = roomId;
+    if (!target) return;
+    const next = value === 'default' ? null : Number(value);
+    const previous = alwaysListedFrom;
+    alwaysListedFrom = next;
+    memberListSaving = true;
+    memberListFailed = false;
+    try {
+      await core.commands.sendStateEvent(
+        target,
+        MEMBER_LIST_EVENT_TYPE,
+        '',
+        next === null ? {} : { always_listed_from: next }
+      );
+      memberListChanged();
+    } catch (error) {
+      console.warn('[sable room] member list settings not saved', error);
+      alwaysListedFrom = previous;
+      memberListFailed = true;
+    } finally {
+      memberListSaving = false;
+    }
   }
 
   function levelLabel(level: number): string {
@@ -540,6 +590,26 @@
           </li>
         {/if}
       </ul>
+    </SettingsSection>
+
+    <SettingsSection headingId="room-perm-member-list" title={$i18n.t('room.memberListTitle')}>
+      <ul class="settings-rows">
+        <SettingsRow
+          title={$i18n.t('room.memberListRow')}
+          description={$i18n.t('room.memberListHint')}
+        >
+          <Select
+            value={alwaysListedFrom === null ? 'default' : String(alwaysListedFrom)}
+            aria-label={$i18n.t('room.memberListRow')}
+            disabled={!canEditMemberList || memberListSaving}
+            items={memberListChoices}
+            onValueChange={(next: string) => void saveMemberList(next)}
+          />
+        </SettingsRow>
+      </ul>
+      {#if memberListFailed}
+        <Alert variant="critical" role="alert">{$i18n.t('room.memberListFailed')}</Alert>
+      {/if}
     </SettingsSection>
 
     {#if canEdit && syncSpaceId}

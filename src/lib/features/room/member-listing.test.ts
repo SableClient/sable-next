@@ -60,6 +60,18 @@ describe('groupMembers', () => {
       { key: 'offline', level: null, members: [amy, bob] },
     ]);
   });
+
+  it('lists from the level the room sets, whatever their presence', () => {
+    const offline = (): boolean => false;
+
+    expect(groupMembers([amy, bob, cid], 'name-asc', offline, 101)).toEqual([
+      { key: 'offline', level: null, members: [amy, bob, cid] },
+    ]);
+    expect(groupMembers([amy, bob, cid], 'name-asc', offline, 0)).toEqual([
+      { key: '100', level: 100, members: [cid] },
+      { key: '0', level: 0, members: [amy, bob] },
+    ]);
+  });
 });
 
 describe('matchesFilter', () => {

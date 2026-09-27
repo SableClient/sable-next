@@ -13,6 +13,7 @@ export const MEMBERSHIP_FILTERS: readonly MembershipFilter[] = [
 ];
 
 export const INITIAL_MEMBER_ROWS = 30;
+export const DEFAULT_ALWAYS_LISTED_FROM = 1;
 export const MEMBER_ROWS_STEP = 50;
 
 export const MEMBER_SORT_LABELS: Record<MemberSort, string> = {
@@ -71,11 +72,12 @@ export interface MemberGroup {
 export function groupMembers(
   members: readonly MemberView[],
   sort: MemberSort,
-  isOnline: (userId: string) => boolean
+  isOnline: (userId: string) => boolean,
+  alwaysListedFrom = DEFAULT_ALWAYS_LISTED_FROM
 ): MemberGroup[] {
   const ordered = [...members].sort(compare(sort));
   const listed = (member: MemberView): boolean =>
-    member.power_level > 0 || isOnline(member.user_id);
+    member.power_level >= alwaysListedFrom || isOnline(member.user_id);
   const offline = ordered.filter((member) => !listed(member));
   const online = ordered.filter(listed).sort((left, right) => right.power_level - left.power_level);
 

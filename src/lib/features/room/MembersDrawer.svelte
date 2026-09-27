@@ -20,6 +20,7 @@
   import MemberIdentityRow from './MemberIdentityRow.svelte';
   import RoleTagIcon from './RoleTagIcon.svelte';
   import {
+    DEFAULT_ALWAYS_LISTED_FROM,
     INITIAL_MEMBER_ROWS,
     MEMBERSHIP_FILTERS,
     MEMBERSHIP_FILTER_LABELS,
@@ -44,6 +45,7 @@
     searchable?: boolean;
     title?: string;
     powerTags?: PowerLevelTagMap | null;
+    alwaysListedFrom?: number | null;
     loadMembership?: ((membership: MemberView['membership']) => Promise<MemberView[]>) | null;
     onClose: () => void;
     onMemberProfile: (userId: string, anchor: HTMLElement) => void;
@@ -57,6 +59,7 @@
     searchable = true,
     title = $i18n.t('timeline.members'),
     powerTags = {},
+    alwaysListedFrom = null,
     loadMembership = null,
     onClose,
     onMemberProfile,
@@ -85,7 +88,9 @@
     if (!query) return matching;
     return matching.filter((member) => memberName(member).toLocaleLowerCase().includes(query));
   });
-  let groups = $derived(groupMembers(searched, sort, connected));
+  let groups = $derived(
+    groupMembers(searched, sort, connected, alwaysListedFrom ?? DEFAULT_ALWAYS_LISTED_FROM)
+  );
   let shown = $derived(limitGroups(groups, limit));
   let hidden = $derived(Math.max(0, searched.length - limit));
   let busy = $derived(powerTags === null || (filter === 'join' ? loading : fetching));

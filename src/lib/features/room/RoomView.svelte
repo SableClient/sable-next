@@ -100,6 +100,11 @@
     tagForLevel,
     type PowerLevelTagMap,
   } from './settings/power-level-tags.js';
+  import {
+    MEMBER_LIST_EVENT_TYPE,
+    memberListChanges,
+    readAlwaysListedFrom,
+  } from './settings/member-list.svelte.js';
   import { provideSenderRoles, type SenderRole } from './sender-roles.js';
   import { powerTag } from './power-tags';
   import { readTombstone } from './settings/room-upgrade.js';
@@ -146,6 +151,7 @@
   let permissions = $state<RoomPermissionsView | null>(null);
   let powerLevels = $state<RoomPowerLevelsView | null>(null);
   let powerTags = $state.raw<PowerLevelTagMap | null>(null);
+  let alwaysListedFrom = $state<number | null>(null);
   let settingsOpen = $state(false);
   let topicOpen = $state(false);
   let inviteOpen = $state(false);
@@ -486,6 +492,24 @@
       })
       .catch((error: unknown) => {
         console.debug('[sable room] power levels unavailable', error);
+      });
+    return () => {
+      current = false;
+    };
+  });
+
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    void memberListChanges.version;
+    let current = true;
+    void core.commands
+      .roomStateEvent(activeRoomId, MEMBER_LIST_EVENT_TYPE)
+      .then((content) => {
+        if (current) alwaysListedFrom = readAlwaysListedFrom(content);
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] member list settings unavailable', error);
+        if (current) alwaysListedFrom = null;
       });
     return () => {
       current = false;
@@ -1213,6 +1237,7 @@
         members={memberLoader.members}
         loading={memberLoader.loading}
         {powerTags}
+        {alwaysListedFrom}
         {loadMembership}
         onClose={closeMembers}
         onMemberProfile={openProfile}
@@ -1237,6 +1262,7 @@
         loading={memberLoader.loading}
         modal
         {powerTags}
+        {alwaysListedFrom}
         {loadMembership}
         onClose={closeMembers}
         onMemberProfile={openProfile}

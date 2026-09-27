@@ -220,3 +220,26 @@ test('a space applies its levels to the rooms below it that you can edit', async
     expect.objectContaining({ invite: 50 })
   );
 });
+
+test('sets the level from which members stay listed whatever their presence (#497)', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.roomStateEvent.mockResolvedValue(null);
+  core.sendStateEvent.mockResolvedValue(undefined);
+
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, { room, permissions });
+  const select = await screen.findByRole('button', { name: 'Always list' });
+  expect(select).toHaveTextContent('Anyone above Member');
+
+  await user.click(select);
+  await user.click(await screen.findByRole('option', { name: 'Moderator and above' }));
+
+  expect(core.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'moe.sable.room.member_list',
+    '',
+    { always_listed_from: 50 }
+  );
+  expect(select).toHaveTextContent('Moderator and above');
+});
