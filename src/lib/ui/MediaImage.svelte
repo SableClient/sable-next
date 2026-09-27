@@ -144,6 +144,12 @@
   );
   let failed = $derived(outcome?.key === requestKey && outcome.url === null);
   let undecodable = $derived(failed && outcome?.undecodable === true);
+  let retryingFailure = $derived(
+    outcome !== null &&
+      outcome.url === null &&
+      outcome.key.slice(outcome.key.indexOf(':')) === requestKey.slice(requestKey.indexOf(':'))
+  );
+  let showUnavailable = $derived(failed || retryingFailure);
   let fileRatio = $derived(
     url === null && !failed
       ? null
@@ -378,6 +384,7 @@
     if (retryWait > 0) return;
     if (undecodable) await core.commands.forgetMedia(requested).catch(() => undefined);
     undecodableThumbnail = null;
+    outcome = null;
     backoff = { ...backoff, attempt: backoff.attempt + 1, manual: backoff.manual + 1, at: 0 };
   }
 
@@ -429,13 +436,13 @@
 </script>
 
 {#snippet content()}
-  {#if blurhashPixels && !failed}
+  {#if blurhashPixels && !showUnavailable}
     <canvas
       bind:this={blurhashCanvas}
       class={['media-image-blurhash', { loaded: painted }]}
       aria-hidden="true"
     ></canvas>
-  {:else if !failed}
+  {:else if !showUnavailable}
     <span class={['media-image-placeholder', { loaded: painted }]} aria-hidden="true">
       <ImageIcon />
     </span>
@@ -478,7 +485,7 @@
         if (node instanceof HTMLImageElement && node.complete) loadedUrl = url;
       }}
     />
-  {:else if failed}
+  {:else if showUnavailable}
     <span class="media-image-unavailable">
       <ImageBrokenIcon />
       <span>{unavailableLabel}</span>
@@ -497,7 +504,7 @@
       {/if}
     </span>
   {/if}
-  {#if !failed && !url}
+  {#if !showUnavailable && !url}
     <span class="media-image-progress"><Spinner small /></span>
     {#if loading.percent !== null}
       <span class="media-image-size">
@@ -507,7 +514,7 @@
   {/if}
 {/snippet}
 
-{#if !failed && (manualGif || onclick)}
+{#if !showUnavailable && (manualGif || onclick)}
   <button
     class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
     {style}

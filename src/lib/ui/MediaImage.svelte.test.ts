@@ -143,6 +143,66 @@ test('counts the retry backoff down while it waits', async () => {
   vi.useRealTimers();
 });
 
+test('keeps the unavailable state while an automatic retry is in flight', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('media unavailable'))
+    .mockImplementation(() => new Promise(() => {}));
+  const instance = render(MediaImage, {
+    props: {
+      source: 'mxc://example.org/retry-flicker',
+      alt: 'Holiday photo',
+      width: 800,
+      height: 600,
+      blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+    },
+  });
+
+  await vi.advanceTimersByTimeAsync(0);
+  await tick();
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+
+  await vi.advanceTimersByTimeAsync(2_000);
+  await tick();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2);
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+  expect(document.querySelector('.media-image-blurhash')).toBeNull();
+  expect(document.querySelector('.media-image-progress')).toBeNull();
+
+  instance.unmount();
+  vi.useRealTimers();
+});
+
+test('a manual retry shows its progress instead of the unavailable state', async () => {
+  vi.useFakeTimers();
+  core.fetchMedia
+    .mockRejectedValueOnce(new Error('media unavailable'))
+    .mockImplementation(() => new Promise(() => {}));
+  const instance = render(MediaImage, {
+    props: {
+      source: 'mxc://example.org/manual-retry',
+      alt: 'Holiday photo',
+      width: 800,
+      height: 600,
+      retryable: true,
+    },
+  });
+
+  await vi.advanceTimersByTimeAsync(0);
+  await tick();
+  expect(document.querySelector('.media-image-unavailable')).not.toBeNull();
+
+  await fireEvent.click(retryButton());
+  await tick();
+
+  expect(document.querySelector('.media-image-unavailable')).toBeNull();
+  expect(document.querySelector('.media-image-progress')).not.toBeNull();
+
+  instance.unmount();
+  vi.useRealTimers();
+});
+
 test('renders clickable media as a button', async () => {
   const onclick = vi.fn();
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
