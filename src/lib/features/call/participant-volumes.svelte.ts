@@ -20,7 +20,8 @@ function parse(parsed: unknown): Record<string, number> {
 
 function loadOutput(): number {
   if (typeof localStorage === 'undefined') return 1;
-  const stored = Number(localStorage.getItem(OUTPUT_KEY));
+  const raw = localStorage.getItem(OUTPUT_KEY);
+  const stored = raw === null || raw.trim() === '' ? Number.NaN : Number(raw);
   return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 1;
 }
 
