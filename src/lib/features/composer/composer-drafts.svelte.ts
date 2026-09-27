@@ -16,6 +16,8 @@ const drafts = new Map<string, ComposerDraft>();
 const synced = new Map<string, string>();
 // eslint-disable-next-line svelte/prefer-svelte-reactivity -- read through remoteRevision
 const adopted = new Map<string, number>();
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- not a render source
+const discarded = new Map<string, string>();
 const revision = $state({ value: 0 });
 const remote = $state({ value: 0 });
 
@@ -26,11 +28,14 @@ export function readDraft(roomId: string): ComposerDraft | undefined {
 export function writeDraft(roomId: string, draft: ComposerDraft): void {
   drafts.delete(roomId);
   drafts.set(roomId, draft);
+  discarded.delete(roomId);
   revision.value += 1;
 }
 
 export function clearDraft(roomId: string): void {
+  const doc = drafts.get(roomId)?.doc;
   if (!drafts.delete(roomId)) return;
+  if (doc !== null && doc !== undefined) discarded.set(roomId, fingerprint(doc));
   revision.value += 1;
 }
 
@@ -38,6 +43,7 @@ export function clearDrafts(): void {
   drafts.clear();
   synced.clear();
   adopted.clear();
+  discarded.clear();
   revision.value += 1;
 }
 
@@ -68,7 +74,8 @@ export function adoptDraftDocuments(documents: Record<string, unknown>): void {
 
     if (next === null) synced.delete(roomId);
     else synced.set(roomId, next);
-    if (!untouched || local === next) continue;
+    if (next !== discarded.get(roomId)) discarded.delete(roomId);
+    if (!untouched || local === next || discarded.has(roomId)) continue;
 
     if (doc === null && (existing?.staged.length ?? 0) === 0) drafts.delete(roomId);
     else

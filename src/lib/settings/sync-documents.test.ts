@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  clearDraft,
   clearDrafts,
   readDraft,
   writeDraft,
@@ -147,6 +148,31 @@ describe('the drafts document', () => {
     draftsDocument.adopt({ v: 1, drafts: {} });
 
     expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'local' });
+  });
+
+  it('does not resurrect a sent draft from the echo of its own upload', () => {
+    writeDraft('!room:example.org', { doc: { type: 'sent' }, staged: [], nextStagedId: 0 });
+    clearDraft('!room:example.org');
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'sent' } } });
+
+    expect(readDraft('!room:example.org')).toBeUndefined();
+  });
+
+  it('does not resurrect a sent draft the remote still holds', () => {
+    writeDraft('!room:example.org', { doc: { type: 'sent' }, staged: [], nextStagedId: 0 });
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'sent' } } });
+    clearDraft('!room:example.org');
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'sent' } } });
+
+    expect(readDraft('!room:example.org')).toBeUndefined();
+  });
+
+  it('adopts a new remote draft for a room whose draft was sent', () => {
+    writeDraft('!room:example.org', { doc: { type: 'sent' }, staged: [], nextStagedId: 0 });
+    clearDraft('!room:example.org');
+    draftsDocument.adopt({ v: 1, drafts: { '!room:example.org': { type: 'next' } } });
+
+    expect(readDraft('!room:example.org')?.doc).toEqual({ type: 'next' });
   });
 });
 
