@@ -22,7 +22,7 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(20);
 const MAX_CONCURRENT_REQUESTS: usize = 6;
 const MAX_ZOOM: u32 = 19;
 
-static CLIENT: OnceLock<Client> = OnceLock::new();
+static CLIENT: OnceLock<Option<Client>> = OnceLock::new();
 static LANE: Semaphore = Semaphore::const_new(MAX_CONCURRENT_REQUESTS);
 
 #[allow(clippy::needless_pass_by_value)] // Tauri hands the handler both by value.
@@ -100,6 +100,7 @@ async fn handle_request<R: Runtime>(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let response = client(app)
+        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
         .get(tile.url())
         .send()
         .await
@@ -125,24 +126,26 @@ async fn handle_request<R: Runtime>(
     Ok(tile_response(bytes))
 }
 
-fn client<R: Runtime>(app: &AppHandle<R>) -> &'static Client {
-    CLIENT.get_or_init(|| {
-        let user_agent = format!(
-            "Sable/{} (+https://app.sable.moe)",
-            app.package_info().version
-        );
-        sable_core::tls::apply(
-            Client::builder()
-                .user_agent(user_agent)
-                .connect_timeout(CONNECT_TIMEOUT)
-                .timeout(REQUEST_TIMEOUT),
-        )
-        .build()
-        .unwrap_or_else(|err| {
-            log::error!("tile client build failed, tiles will be blocked: {err}");
-            Client::default()
+fn client<R: Runtime>(app: &AppHandle<R>) -> Option<&'static Client> {
+    CLIENT
+        .get_or_init(|| {
+            let user_agent = format!(
+                "Sable/{} (+https://app.sable.moe)",
+                app.package_info().version
+            );
+            sable_core::tls::apply(
+                Client::builder()
+                    .user_agent(user_agent)
+                    .connect_timeout(CONNECT_TIMEOUT)
+                    .timeout(REQUEST_TIMEOUT),
+            )
+            .build()
+            .inspect_err(|err| {
+                log::error!("tile client build failed, tiles will be blocked: {err}");
+            })
+            .ok()
         })
-    })
+        .as_ref()
 }
 
 fn tile_response(bytes: Vec<u8>) -> Response<Vec<u8>> {

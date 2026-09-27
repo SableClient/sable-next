@@ -51,6 +51,14 @@ The web build ships with every release as `sable-next-<version>-web.tar.gz`.
 Extract it into your web root to serve the app yourself; see
 [`Caddyfile`](Caddyfile) for an example configuration.
 
+### Proxy
+
+Start a desktop app with `--proxy` to send all of its traffic through an HTTP
+or SOCKS5 proxy, for example `--proxy=socks5://127.0.0.1:9050`. On Windows, add
+it to the end of the shortcut's Target, after the quoted path.
+A SOCKS5 proxy also resolves host names, so lookups do not leave the proxy. An
+invalid value shows an error and quits rather than starting without the proxy.
+
 ## Linux (Flatpak)
 
 Nightly builds have their own Flatpak remote, rebuilt from `main` on every push:
