@@ -357,7 +357,7 @@
 </script>
 
 {#snippet contextLine(line: SearchContextView)}
-  <span class="hit-context">
+  <span class="hit-context" hidden={line.body.startsWith('mxc://')}>
     <span class="hit-context-sender">{senders.identity(line.sender).displayName}</span>
     {line.body}
   </span>
@@ -800,11 +800,12 @@
   .search-bar {
     align-items: flex-start;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
   }
 
   .search-bar .field {
-    flex: 1;
+    flex: 1 1 18rem;
     min-width: 0;
   }
 
@@ -846,7 +847,6 @@
   .hit-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-100);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -858,6 +858,14 @@
     display: flex;
     gap: var(--space-200);
     padding: 0 var(--space-200) 0 var(--space-400);
+    position: relative;
+  }
+
+  .hit + .hit::before {
+    border-top: var(--border-width) solid var(--surface-container-line);
+    content: '';
+    inset: 0 var(--space-200) auto var(--space-400);
+    position: absolute;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -913,10 +921,18 @@
 
   .hit-context {
     color: var(--surface-var-on-container);
+    display: none;
     font-size: var(--font-size-small);
     overflow: hidden;
+    padding-inline-start: calc(var(--avatar-size-small) + var(--space-300));
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  @media (width >= 48rem) {
+    .hit-context:not([hidden]) {
+      display: block;
+    }
   }
 
   .hit-context-sender {
