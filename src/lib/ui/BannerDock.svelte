@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
+  import { composerClearance } from './composer-clearance.svelte.js';
+
   interface Props {
     children: Snippet;
   }
@@ -8,7 +10,7 @@
   let { children }: Props = $props();
 </script>
 
-<div class="dock">
+<div class="dock" style:--composer-clearance={`${String(composerClearance.px)}px`}>
   {@render children()}
 </div>
 
@@ -16,7 +18,7 @@
   .dock {
     bottom: max(
       calc(var(--space-400) + var(--safe-bottom)),
-      calc(var(--composer-clearance, 0px) + var(--space-200))
+      calc(var(--composer-clearance) + var(--space-200))
     );
     display: grid;
     gap: var(--space-300);

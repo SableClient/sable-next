@@ -60,6 +60,7 @@
   import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { composerClearance } from '#lib/ui/composer-clearance.svelte.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
@@ -246,20 +247,27 @@
     desktopMembersOpen = false;
   }
 
+  function trackTimelineHeight(node: HTMLElement): () => void {
+    const observer = new ResizeObserver(() => {
+      timelineHeight = node.clientHeight;
+    });
+    observer.observe(node);
+    return () => {
+      observer.disconnect();
+    };
+  }
+
   function publishComposerClearance(node: HTMLElement): () => void {
-    const root = document.documentElement;
     const update = (): void => {
-      const clearance = Math.max(0, window.innerHeight - node.getBoundingClientRect().top);
-      root.style.setProperty('--composer-clearance', `${String(clearance)}px`);
+      composerClearance.px = Math.max(0, window.innerHeight - node.getBoundingClientRect().top);
     };
     const observer = new ResizeObserver(update);
     observer.observe(node);
     const stopResize = on(window, 'resize', update);
-    update();
     return () => {
       observer.disconnect();
       stopResize();
-      root.style.removeProperty('--composer-clearance');
+      composerClearance.px = 0;
     };
   }
 
@@ -1016,7 +1024,7 @@
   aria-label={$i18n.t('timeline.label')}
   data-inset-owner={voiceView ? 'top' : 'top bottom'}
 >
-  <div class="timeline" bind:clientHeight={timelineHeight}>
+  <div class="timeline" {@attach trackTimelineHeight}>
     {#snippet headerActions()}
       {#if !voiceView}
         <PanelHeaderButton
