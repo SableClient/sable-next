@@ -1495,6 +1495,23 @@ impl Core {
                 let delay_id = self.schedule_message(&room_id, content, delay_ms).await?;
                 Ok(CommandOk::ScheduleMessage { delay_id })
             }
+            Command::ScheduleAttachment {
+                room_id,
+                filename,
+                mime,
+                url,
+                size,
+                info,
+                spoiler,
+                delay_ms,
+            } => {
+                let delay_id = self
+                    .schedule_attachment(
+                        &room_id, filename, mime, url, size, info, spoiler, delay_ms,
+                    )
+                    .await?;
+                Ok(CommandOk::ScheduleAttachment { delay_id })
+            }
             Command::ScheduledMessages { room_id } => Ok(CommandOk::ScheduledMessages {
                 messages: self.scheduled_messages(room_id.as_ref()).await?,
             }),

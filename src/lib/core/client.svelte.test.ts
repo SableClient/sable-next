@@ -267,6 +267,37 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
   });
 });
 
+test('scheduling an attachment uploads it before creating its delayed event', async () => {
+  const fake = fakeTransport({ schedule_attachment: { delay_id: 'delayed-image' } });
+  const uploadMedia = vi.fn(() => {
+    vi.setSystemTime(12_000);
+    return Promise.resolve('mxc://example.org/later');
+  });
+  fake.transport.uploadMedia = uploadMedia;
+  const core = createCoreClient(() => fake.transport);
+  const file = new File(['image'], 'later.png', { type: 'image/png' });
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(10_000);
+
+  await expect(core.commands.scheduleAttachment('!room:example.org', file, 40_000)).resolves.toBe(
+    'delayed-image'
+  );
+  vi.useRealTimers();
+
+  expect(uploadMedia).toHaveBeenCalledWith('image/png', new TextEncoder().encode('image'));
+  expect(fake.sent).toContainEqual({
+    type: 'schedule_attachment',
+    room_id: '!room:example.org',
+    filename: 'later.png',
+    mime: 'image/png',
+    url: 'mxc://example.org/later',
+    size: 5,
+    info: null,
+    spoiler: false,
+    delay_ms: 28_000,
+  });
+});
+
 test('sending a gallery forwards shared metadata and every attachment', async () => {
   const fake = fakeTransport();
   const sendGallery = vi.fn<Transport['sendGallery']>();

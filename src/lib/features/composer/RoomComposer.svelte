@@ -701,26 +701,49 @@
     if (!onSchedule || !hasContent || readOnly) return;
 
     const doc = editor.doc();
-    if (!doc) return;
-    const message = richSend ? serializeComposer(doc) : serializePlain(doc);
-    if (message.body === '') return;
+    const message = doc
+      ? richSend
+        ? serializeComposer(doc)
+        : serializePlain(doc)
+      : { body: '', formatted: null };
+    if (message.body === '' && staged.length === 0) return;
+    if (dueTs <= Date.now()) return;
+    if (staged.length > 0 && encrypted !== false) {
+      error = $i18n.t('composer.scheduleAttachmentEncrypted');
+      return;
+    }
+
+    const attachments = staged;
+    const delayIds: string[] = [];
 
     editor.clear();
+    staged = [];
     if (typingTimeout) clearTimeout(typingTimeout);
     stopTyping();
 
     try {
-      await onSchedule(roomId, message.body, message.formatted, dueTs);
+      for (const attachment of attachments) {
+        delayIds.push(
+          await core.commands.scheduleAttachment(roomId, attachment.file, dueTs, attachment.spoiler)
+        );
+      }
+      if (message.body !== '') {
+        await onSchedule(roomId, message.body, message.formatted, dueTs);
+      }
       editor.clearHistory();
       error = null;
     } catch (cause) {
       console.debug('[sable composer] schedule failed', cause);
+      await Promise.allSettled(
+        delayIds.map((delayId) => core.commands.cancelScheduledMessage(delayId))
+      );
       if (cause instanceof ScheduledOriginalKept) {
         editor.clearHistory();
         error = $i18n.t('composer.scheduledOriginalKept');
         return;
       }
-      if (editor.isEmpty()) editor.setDoc(doc);
+      if (doc && editor.isEmpty()) editor.setDoc(doc);
+      staged = [...attachments, ...staged];
       error = $i18n.t('composer.scheduleFailed');
     }
   }

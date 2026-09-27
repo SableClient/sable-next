@@ -6,10 +6,12 @@ use matrix_sdk::ruma::api::client::delayed_events::{
 };
 use matrix_sdk::ruma::events::AnyMessageLikeEventContent;
 use matrix_sdk::ruma::events::room::message::RoomMessageEventContent;
-use matrix_sdk::ruma::{OwnedRoomId, TransactionId};
+use matrix_sdk::ruma::{OwnedMxcUri, OwnedRoomId, TransactionId};
+use mime::Mime;
+use serde_json::{Map, Value, json};
 
 use crate::Core;
-use crate::protocol::{CommandErr, ScheduledMessageView};
+use crate::protocol::{AttachmentInfoView, CommandErr, ScheduledMessageView};
 
 const MSC4140: &str = "org.matrix.msc4140";
 
@@ -54,6 +56,65 @@ impl Core {
             .await
             .map_err(|error| self.failed("schedule_message", error))?;
         Ok(response.delay_id)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn schedule_attachment(
+        &self,
+        room_id: &OwnedRoomId,
+        filename: String,
+        mime: String,
+        url: String,
+        size: u64,
+        info: Option<AttachmentInfoView>,
+        spoiler: bool,
+        delay_ms: u64,
+    ) -> Result<String, CommandErr> {
+        let mime: Mime = mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
+        let url = OwnedMxcUri::from(url);
+        if url.parts().is_err() {
+            return Err(CommandErr::InvalidMedia);
+        }
+
+        let mut media_info = Map::from_iter([
+            ("mimetype".to_owned(), json!(mime.essence_str())),
+            ("size".to_owned(), json!(size)),
+        ]);
+        let info = info.unwrap_or_default();
+        if let Some(width) = info.width {
+            media_info.insert("w".to_owned(), json!(width));
+        }
+        if let Some(height) = info.height {
+            media_info.insert("h".to_owned(), json!(height));
+        }
+        if let Some(duration) = info.duration_ms {
+            media_info.insert("duration".to_owned(), json!(duration));
+        }
+        if let Some(blurhash) = info.blurhash {
+            media_info.insert("xyz.amorgan.blurhash".to_owned(), json!(blurhash));
+        }
+
+        let msgtype = match mime.type_() {
+            mime::IMAGE => "m.image",
+            mime::VIDEO => "m.video",
+            mime::AUDIO => "m.audio",
+            _ => "m.file",
+        };
+        let mut value = Map::from_iter([
+            ("msgtype".to_owned(), json!(msgtype)),
+            ("body".to_owned(), json!(filename)),
+            ("url".to_owned(), json!(url.as_str())),
+            ("info".to_owned(), Value::Object(media_info)),
+        ]);
+        if spoiler {
+            value.insert(
+                "org.matrix.msc4230.is_spoiler".to_owned(),
+                Value::Bool(true),
+            );
+        }
+        let content = serde_json::from_value::<RoomMessageEventContent>(Value::Object(value))
+            .map_err(|error| self.failed("schedule_attachment", error))?;
+        self.schedule_message(room_id, content, delay_ms).await
     }
 
     pub(crate) async fn cancel_scheduled_message(

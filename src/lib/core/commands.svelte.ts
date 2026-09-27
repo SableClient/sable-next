@@ -1170,6 +1170,32 @@ export function createCommands(transport: () => Transport) {
       return response.delay_id;
     },
 
+    async scheduleAttachment(
+      roomId: string,
+      file: File,
+      dueTs: number,
+      spoiler = false
+    ): Promise<string> {
+      if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      const [info, bytes] = await Promise.all([
+        measureAttachment(file),
+        file.arrayBuffer().then((buffer) => new Uint8Array(buffer)),
+      ]);
+      const url = await transport().uploadMedia(file.type || 'application/octet-stream', bytes);
+      const response = await transport().send({
+        type: 'schedule_attachment',
+        room_id: roomId,
+        filename: file.name,
+        mime: file.type || 'application/octet-stream',
+        url,
+        size: file.size,
+        info,
+        spoiler,
+        delay_ms: Math.max(0, dueTs - Date.now()),
+      });
+      return response.delay_id;
+    },
+
     async scheduledMessages(roomId: string | null): Promise<ScheduledMessageView[]> {
       const response = await transport().send({
         type: 'scheduled_messages',

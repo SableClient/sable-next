@@ -588,6 +588,21 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
         delay_ms: u64,
     },
+    ScheduleAttachment {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        filename: String,
+        mime: String,
+        url: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        size: u64,
+        #[serde(default)]
+        info: Option<AttachmentInfoView>,
+        #[serde(default)]
+        spoiler: bool,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        delay_ms: u64,
+    },
     ScheduledMessages {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
@@ -1441,6 +1456,9 @@ pub enum CommandOk {
         token: OpenIdTokenView,
     },
     ScheduleMessage {
+        delay_id: String,
+    },
+    ScheduleAttachment {
         delay_id: String,
     },
     ScheduledMessages {

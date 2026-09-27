@@ -4,7 +4,7 @@ import type { ImagePackView, MemberView } from '#src/generated/protocol';
 import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
-import { cleanup, fireEvent, render, type RenderResult } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -69,9 +69,12 @@ const packs: ImagePackView[] = [
   },
 ];
 
+const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
+
 function core(): CoreClient {
   return {
     commands: {
+      scheduleAttachment,
       personas: () => Promise.resolve({ personas: [], selections: [] }),
       roomMembers: () => Promise.resolve(members),
       imagePackListing: () => Promise.resolve({ packs, complete: true }),
@@ -109,6 +112,7 @@ interface ComposerProps {
   onEditNext?: (after: string) => void;
   threadRoot?: string | null;
   readOnly?: boolean;
+  encrypted?: boolean | null;
   roomName?: string;
   registerReply?: (reply: () => void) => void;
   registerContext?: (set: (next: ComposerContext | null) => void) => void;
@@ -1073,6 +1077,8 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   expect(document.body.textContent).toContain('Schedule this message');
   expect(send).not.toHaveBeenCalled();
 
+  await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+  await vi.advanceTimersByTimeAsync(500);
   instance.unmount();
   vi.useRealTimers();
 });
@@ -1117,6 +1123,45 @@ test('right-clicking the send button opens the schedule dialog', async () => {
   expect(await fireEvent.contextMenu(button)).toBe(false);
   expect(document.body).toHaveTextContent('Schedule this message');
   expect(send).not.toHaveBeenCalled();
+});
+
+function sendButton(): HTMLButtonElement {
+  const button = document.querySelector('.composer-send');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+  return button;
+}
+
+for (const encrypted of [true, null]) {
+  test(`an attachment is not scheduled, or uploaded, when the room is encrypted (${String(encrypted)})`, async () => {
+    scheduleAttachment.mockClear();
+    const schedule = vi.fn(async () => {});
+    setup({ roomId: '!room:example.org', onSchedule: schedule, encrypted });
+    await pick(new File(['image'], 'later.png', { type: 'image/png' }));
+
+    await fireEvent.contextMenu(sendButton());
+    await press(screen.getByRole('button', { name: 'In an hour' }));
+    await tick();
+
+    expect(scheduleAttachment).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
+    expect(stagedNames()).toEqual(['later.png']);
+    expect(document.body).toHaveTextContent(
+      'Attachments cannot be scheduled in an encrypted room yet.'
+    );
+  });
+}
+
+test('an attachment is scheduled in an unencrypted room', async () => {
+  scheduleAttachment.mockClear();
+  setup({ roomId: '!room:example.org', onSchedule: async () => {}, encrypted: false });
+  await pick(new File(['image'], 'later.png', { type: 'image/png' }));
+
+  await fireEvent.contextMenu(sendButton());
+  await press(screen.getByRole('button', { name: 'In an hour' }));
+  await tick();
+
+  expect(scheduleAttachment).toHaveBeenCalledOnce();
+  expect(stagedNames()).toEqual([]);
 });
 
 test('an edited scheduled message loads its text and saves through its own time', async () => {
