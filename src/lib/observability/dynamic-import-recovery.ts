@@ -4,7 +4,9 @@ const RELOAD_WINDOW_MS = 30_000;
 export function recoverStaleDynamicImport(error: unknown): boolean {
   if (
     !(error instanceof Error) ||
-    !/(?:failed to fetch|error loading) dynamically imported module/i.test(error.message)
+    !/(?:failed to fetch|error loading) dynamically imported module|unable to preload CSS for/i.test(
+      error.message
+    )
   ) {
     return false;
   }

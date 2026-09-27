@@ -16,6 +16,7 @@ afterEach(() => {
 test.each([
   'Failed to fetch dynamically imported module',
   'Error loading dynamically imported module',
+  'Unable to preload CSS for https://next.sable.moe/_app/immutable/assets/TextArea.css',
 ])('reloads once for %s rejected outside SvelteKit handleError', (message) => {
   const reload = vi.fn();
   vi.stubGlobal('location', { reload });
