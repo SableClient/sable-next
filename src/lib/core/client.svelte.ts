@@ -99,6 +99,8 @@ async function resolveHomeserverInPage(
     return homeserver;
   }
 
+  if (origin.hostname.toLowerCase().endsWith('.onion')) return homeserver;
+
   const resolved = await discoverBaseUrl(origin);
   await grantLocalNetworkAccess(resolved ?? origin.toString());
   if (resolved === null) return homeserver;

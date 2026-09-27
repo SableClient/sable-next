@@ -21,6 +21,7 @@ use url::Url;
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
 
 const SESSION_TIMEOUT: Duration = Duration::from_mins(2);
+const PROXIED_SESSION_TIMEOUT: Duration = Duration::from_mins(20);
 
 pub(crate) const THREADING_SUPPORT: ThreadingSupport = ThreadingSupport::Enabled {
     with_subscriptions: false,
@@ -321,7 +322,9 @@ async fn build_account_client(
         builder
     };
     let builder = builder
-        .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
+        .request_config(
+            RequestConfig::new().timeout(session_timeout(crate::tls::proxy_configured())),
+        )
         .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
@@ -386,6 +389,14 @@ async fn build_account_client(
             },
         );
         Ok(client)
+    }
+}
+
+const fn session_timeout(proxied: bool) -> Duration {
+    if proxied {
+        PROXIED_SESSION_TIMEOUT
+    } else {
+        SESSION_TIMEOUT
     }
 }
 
@@ -544,7 +555,16 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::{AccountRegistry, account_store_id, removable_account_store};
+    use super::{
+        AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
+        removable_account_store, session_timeout,
+    };
+
+    #[test]
+    fn a_proxy_allows_slow_session_requests() {
+        assert_eq!(session_timeout(false), SESSION_TIMEOUT);
+        assert_eq!(session_timeout(true), PROXIED_SESSION_TIMEOUT);
+    }
 
     fn registry_json(store_id: &str) -> Vec<u8> {
         serde_json::to_vec(&serde_json::json!({

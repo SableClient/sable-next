@@ -22,6 +22,16 @@ fn with_proxy(builder: ClientBuilder) -> ClientBuilder {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn proxy_configured() -> bool {
+    PROXY.get().is_some()
+}
+
+#[cfg(target_family = "wasm")]
+pub(crate) const fn proxy_configured() -> bool {
+    false
+}
+
 #[cfg(all(not(target_os = "android"), not(target_family = "wasm")))]
 #[must_use = "returns the configured builder"]
 pub fn apply(builder: ClientBuilder) -> ClientBuilder {

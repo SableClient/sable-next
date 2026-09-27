@@ -568,3 +568,27 @@ test('a sign-in the page cannot reach either stays unavailable', async () => {
 
   await expect(core.loginFlows('https://matrix.lan')).rejects.toBeInstanceOf(CoreError);
 });
+
+test('an onion homeserver leaves discovery to the Matrix core without a browser fetch', async () => {
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
+  const fake = fakeTransport({
+    login_flows: {
+      flows: {
+        password: true,
+        oidc: false,
+        oidc_registration: false,
+        sso: false,
+        oauth_aware_preferred: false,
+        sso_identity_providers: [],
+      },
+    },
+  });
+  const core = createCoreClient(() => fake.transport);
+  const homeserver = 'http://exampleonionaddress.onion';
+
+  await core.loginFlows(homeserver);
+
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(fake.sent).toContainEqual({ type: 'login_flows', homeserver });
+});
