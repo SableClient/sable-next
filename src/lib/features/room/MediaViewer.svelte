@@ -18,6 +18,8 @@
   import { videoStreamingSupported, videoStreamUrl } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
+  import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
+  import { mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { pixelatedImage } from '#lib/ui/pixelated.js';
   import {
     AXIS_LOCK_THRESHOLD,
@@ -118,6 +120,8 @@
   let dragging = $state(false);
   let instant = $state(false);
   let imageReady = $state(false);
+  let imageMenuOpen = $state(false);
+  let imageMenuAnchor = $state.raw<CursorAnchor | null>(null);
   let editingZoom = $state(false);
   let zoomInput = $state('100');
   let swipeX = $state(0);
@@ -421,6 +425,7 @@
 
   function startPan(event: PointerEvent): void {
     if (!isImage) return;
+    if (event.button !== 0) return;
     if (handleDoubleTap(event)) return;
     if (event.pointerType === 'touch') {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -572,15 +577,39 @@
     }
   }
 
+  async function pngBlob(blob: Blob): Promise<Blob> {
+    if (blob.type === 'image/png') return blob;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (png) => (png ? resolve(png) : reject(new Error('encode failed'))),
+        'image/png'
+      );
+    });
+  }
+
   async function copyImage(): Promise<void> {
     if (!url) return;
     try {
       const response = await fetch(url);
-      const blob = await response.blob();
+      const blob = await pngBlob(await response.blob());
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-    } catch {
-      // Clipboard support varies across webviews; download remains available.
+      toasts.info($i18n.t('viewer.imageCopied'));
+    } catch (error) {
+      console.debug('[sable viewer] copy failed', error);
+      toasts.error($i18n.t('viewer.copyFailed'));
     }
+  }
+
+  function openImageMenu(event: MouseEvent): void {
+    event.preventDefault();
+    imageMenuAnchor = cursorAnchor(event);
+    imageMenuOpen = true;
   }
 
   async function download(): Promise<void> {
@@ -776,7 +805,24 @@
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
                 onload={onImageLoad}
+                oncontextmenu={mouseContextMenu(openImageMenu)}
               />
+              <ActionMenu
+                bind:open={imageMenuOpen}
+                label={$i18n.t('viewer.imageMenu')}
+                anchor={imageMenuAnchor}
+                side="bottom"
+                align="start"
+              >
+                <ActionMenuItem onSelect={() => void copyImage()}>
+                  <CopyIcon />
+                  {$i18n.t('viewer.copyImage')}
+                </ActionMenuItem>
+                <ActionMenuItem onSelect={() => void download()}>
+                  <DownloadSimpleIcon />
+                  {downloadLabel}
+                </ActionMenuItem>
+              </ActionMenu>
             {/if}
           {:else if failed}
             <div class="error">

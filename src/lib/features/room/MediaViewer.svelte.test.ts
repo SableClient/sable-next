@@ -15,6 +15,7 @@ vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 import MediaViewer from './MediaViewer.svelte';
 import { resetVideoStreaming } from '#lib/ui/video-stream.svelte.js';
 import { resetVideoSupport } from '#lib/ui/video-support.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 const imageItem: MediaItem = {
   kind: 'image',
@@ -144,6 +145,24 @@ test('renders an audio attachment with a player', async () => {
   });
 
   expect(screen.getByRole('button', { name: 'viewer.downloadAudio' })).toBeInTheDocument();
+});
+
+test('right-clicking the image offers to copy it and confirms the copy', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(new Blob(['x'], { type: 'image/png' }))
+  );
+  const write = vi.spyOn(navigator.clipboard, 'write').mockResolvedValue();
+  const info = vi.spyOn(toasts, 'info');
+  const img = await openImage();
+
+  await user.pointer({ keys: '[MouseRight]', target: img });
+  await user.click(await screen.findByRole('menuitem', { name: 'viewer.copyImage' }));
+
+  await vi.waitFor(() => {
+    expect(info).toHaveBeenCalledWith('viewer.imageCopied');
+  });
+  expect(write).toHaveBeenCalledOnce();
 });
 
 test('clamps pointer drag panning to the zoomed overflow', async () => {
