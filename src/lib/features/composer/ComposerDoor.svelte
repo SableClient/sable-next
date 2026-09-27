@@ -11,6 +11,7 @@
   import { i18n } from '#lib/i18n.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   interface Props {
@@ -40,13 +41,18 @@
 
 {#if desktop}
   <DropdownMenu.Root>
-    <DropdownMenu.Trigger
-      class="composer-door selection-open"
-      {disabled}
-      aria-label={$i18n.t('composer.insert')}
-    >
-      <PlusIcon />
-    </DropdownMenu.Trigger>
+    <Tooltip label={$i18n.t('composer.insert')}>
+      {#snippet trigger({ props })}
+        <DropdownMenu.Trigger
+          {...props}
+          class="composer-door selection-open"
+          {disabled}
+          aria-label={$i18n.t('composer.insert')}
+        >
+          <PlusIcon />
+        </DropdownMenu.Trigger>
+      {/snippet}
+    </Tooltip>
     <DropdownMenu.Portal>
       <DropdownMenu.Content
         class="menu-surface composer-menu"

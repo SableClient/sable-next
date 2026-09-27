@@ -2,6 +2,8 @@
   import type { ComponentProps } from 'svelte';
 
   import { Bookmarks, provideBookmarks } from './bookmarks.svelte.js';
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+
   import { PinnedEvents, providePinnedEvents } from './pinned-events.svelte.js';
   import ThreadPanel from './ThreadPanel.svelte';
 
@@ -25,4 +27,6 @@
   );
 </script>
 
-<ThreadPanel {...panel} />
+<TooltipProvider>
+  <ThreadPanel {...panel} />
+</TooltipProvider>

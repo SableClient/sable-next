@@ -6,12 +6,14 @@ import { expect, test, vi } from 'vitest';
 
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
+import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
+
 import ComposerDoor from './ComposerDoor.svelte';
 
 test('offers a voice message only when the composer hands it a recorder', async () => {
   const user = userEvent.setup();
   const onVoice = vi.fn();
-  render(ComposerDoor, { desktop: true, onPick: vi.fn(), onVoice });
+  render(ComposerDoor, { desktop: true, onPick: vi.fn(), onVoice }, { wrapper: TooltipProvider });
 
   await user.click(screen.getByRole('button', { name: 'composer.insert' }));
   await user.click(await screen.findByRole('menuitem', { name: 'composer.voiceMessage' }));
@@ -21,7 +23,7 @@ test('offers a voice message only when the composer hands it a recorder', async 
 
 test('leaves the voice message out without a recorder', async () => {
   const user = userEvent.setup();
-  render(ComposerDoor, { desktop: true, onPick: vi.fn() });
+  render(ComposerDoor, { desktop: true, onPick: vi.fn() }, { wrapper: TooltipProvider });
 
   await user.click(screen.getByRole('button', { name: 'composer.insert' }));
   await screen.findByRole('menuitem', { name: 'composer.photoOrVideo' });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mergeProps } from 'bits-ui';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import type { Component } from 'svelte';
 
@@ -7,6 +8,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import ResponsivePopover from '#lib/ui/primitives/ResponsivePopover.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import { COLOR_PRESETS } from './color-presets';
   import { normalizeMfmHex } from './time-markup';
@@ -47,22 +49,26 @@
   }}
 >
   {#snippet trigger({ props })}
-    <IconButton
-      {...props}
-      variant="ghost"
-      size="small"
-      class="format-button choice color-trigger"
-      {label}
-      aria-pressed={value !== null}
-    >
-      <Icon />
-      <span
-        class="color-bar"
-        class:set={value !== null}
-        style:background={value ?? undefined}
-        aria-hidden="true"
-      ></span>
-    </IconButton>
+    <Tooltip {label}>
+      {#snippet trigger({ props: tip })}
+        <IconButton
+          {...mergeProps(tip, props)}
+          variant="ghost"
+          size="small"
+          class="format-button choice color-trigger"
+          {label}
+          aria-pressed={value !== null}
+        >
+          <Icon />
+          <span
+            class="color-bar"
+            class:set={value !== null}
+            style:background={value ?? undefined}
+            aria-hidden="true"
+          ></span>
+        </IconButton>
+      {/snippet}
+    </Tooltip>
   {/snippet}
 
   {#snippet children(sheet: boolean)}

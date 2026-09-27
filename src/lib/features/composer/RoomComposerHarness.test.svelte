@@ -3,6 +3,7 @@
   import { provideCoreClient } from '#lib/core/context.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
+  import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import { untrack, type ComponentProps } from 'svelte';
 
   import type { ComposerContext } from './composer-context';
@@ -44,4 +45,6 @@
   );
 </script>
 
-<RoomComposer {...composer} {context} />
+<TooltipProvider>
+  <RoomComposer {...composer} {context} />
+</TooltipProvider>

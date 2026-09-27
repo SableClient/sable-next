@@ -11,6 +11,7 @@
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
   import PersonaMenu from './PersonaMenu.svelte';
@@ -83,28 +84,32 @@
 
 {#if desktop}
   <Popover.Root {open} onOpenChange={handleOpenChange}>
-    <Popover.Trigger>
-      {#snippet child({ props })}
-        <IconButton
-          {...props}
-          variant="ghost"
-          size="small"
-          class="persona-button-format selection-open"
-          {label}
-        >
-          {#if active}
-            <Avatar
-              id={active.id}
-              src={active.avatar_url}
-              name={active.display_name}
+    <Tooltip {label}>
+      {#snippet trigger({ props: tip })}
+        <Popover.Trigger {...tip}>
+          {#snippet child({ props })}
+            <IconButton
+              {...props}
+              variant="ghost"
               size="small"
-            />
-          {:else}
-            <UserSwitchIcon />
-          {/if}
-        </IconButton>
+              class="persona-button-format selection-open"
+              {label}
+            >
+              {#if active}
+                <Avatar
+                  id={active.id}
+                  src={active.avatar_url}
+                  name={active.display_name}
+                  size="small"
+                />
+              {:else}
+                <UserSwitchIcon />
+              {/if}
+            </IconButton>
+          {/snippet}
+        </Popover.Trigger>
       {/snippet}
-    </Popover.Trigger>
+    </Tooltip>
     <Popover.Portal>
       <Popover.Content
         class="persona-picker-popover"

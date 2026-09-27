@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ImageUsageView, PackImageView } from '#src/generated/protocol';
-  import { Popover } from 'bits-ui';
+  import { mergeProps, Popover } from 'bits-ui';
   import type { Snippet } from 'svelte';
   import GifIcon from 'phosphor-svelte/lib/GifIcon';
   import SmileyIcon from 'phosphor-svelte/lib/SmileyIcon';
@@ -17,6 +17,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
   import EmoteBoard from '#lib/ui/primitives/EmoteBoard.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
@@ -130,19 +131,25 @@
         {@render extras[id]?.()}
       {:else}
         {@const Icon = triggerIcons[id]}
-        <button
-          bind:this={triggerElements[id]}
-          type="button"
-          class="composer-board-trigger selection-open"
-          {disabled}
-          data-state={open && tab === id ? 'open' : 'closed'}
-          aria-label={triggerLabel(id)}
-          onclick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
-            openOn(id, event.currentTarget);
-          }}
-        >
-          <Icon />
-        </button>
+        <Tooltip label={triggerLabel(id)}>
+          {#snippet trigger({ props })}
+            <button
+              {...mergeProps(props, {
+                onclick: (event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+                  openOn(id, event.currentTarget);
+                },
+              })}
+              bind:this={triggerElements[id]}
+              type="button"
+              class="composer-board-trigger selection-open"
+              {disabled}
+              data-state={open && tab === id ? 'open' : 'closed'}
+              aria-label={triggerLabel(id)}
+            >
+              <Icon />
+            </button>
+          {/snippet}
+        </Tooltip>
       {/if}
     {/each}
     <Popover.Portal>

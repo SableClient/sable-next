@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mergeProps } from 'bits-ui';
   import ArticleNyTimesIcon from 'phosphor-svelte/lib/ArticleNyTimesIcon';
   import HighlighterIcon from 'phosphor-svelte/lib/HighlighterIcon';
   import TextTIcon from 'phosphor-svelte/lib/TextTIcon';
@@ -26,6 +27,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
   import ComposerColorButton from './ComposerColorButton.svelte';
   import type { ActiveColors, ColorKind, FormatAction } from './editor/formatting';
@@ -81,18 +83,24 @@
   onwheel={scrollSideways}
 >
   {#each markdown ? buttons.filter( (button) => MARKDOWN_FORMATS.includes(button.action) ) : buttons as button (button.action)}
-    <IconButton
-      variant="ghost"
-      size="small"
-      class="format-button choice"
-      label={$i18n.t(button.label)}
-      aria-pressed={active.includes(button.action)}
-      onclick={() => {
-        onFormat(button.action);
-      }}
-    >
-      <button.icon />
-    </IconButton>
+    <Tooltip label={$i18n.t(button.label)}>
+      {#snippet trigger({ props })}
+        <IconButton
+          {...mergeProps(props, {
+            onclick: () => {
+              onFormat(button.action);
+            },
+          })}
+          variant="ghost"
+          size="small"
+          class="format-button choice"
+          label={$i18n.t(button.label)}
+          aria-pressed={active.includes(button.action)}
+        >
+          <button.icon />
+        </IconButton>
+      {/snippet}
+    </Tooltip>
   {/each}
   <ComposerColorButton
     label={$i18n.t('composer.textColor')}
@@ -113,20 +121,24 @@
     }}
   />
   {#if source || !markdown}
-    <IconButton
-      variant="ghost"
-      size="small"
-      class="format-button choice"
-      label={$i18n.t('composer.markdownSource')}
-      aria-pressed={source}
-      onclick={onToggleSource}
-    >
-      {#if source}
-        <ArticleNyTimesIcon />
-      {:else}
-        <MarkdownLogoIcon />
-      {/if}
-    </IconButton>
+    <Tooltip label={$i18n.t('composer.markdownSource')}>
+      {#snippet trigger({ props })}
+        <IconButton
+          {...mergeProps(props, { onclick: onToggleSource })}
+          variant="ghost"
+          size="small"
+          class="format-button choice"
+          label={$i18n.t('composer.markdownSource')}
+          aria-pressed={source}
+        >
+          {#if source}
+            <ArticleNyTimesIcon />
+          {:else}
+            <MarkdownLogoIcon />
+          {/if}
+        </IconButton>
+      {/snippet}
+    </Tooltip>
   {/if}
 </div>
 

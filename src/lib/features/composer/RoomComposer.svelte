@@ -6,7 +6,7 @@
     ImageSourcePackView,
     PackImageView,
   } from '#src/generated/protocol';
-  import { Portal } from 'bits-ui';
+  import { mergeProps, Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
   import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
@@ -41,6 +41,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import ComposerAttachments from './ComposerAttachments.svelte';
@@ -248,6 +249,13 @@
       !micDenied
       ? 'record'
       : 'send'
+  );
+  let sendLabel = $derived(
+    primaryAction === 'record'
+      ? $i18n.t('composer.voiceRecord')
+      : editingScheduled
+        ? $i18n.t('composer.scheduledSave')
+        : $i18n.t('timeline.sendMessage')
   );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
@@ -1134,19 +1142,25 @@
               <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
             {/snippet}
             {#snippet formatButton()}
-              <IconButton
-                variant="ghost"
-                size="small"
-                class="composer-format selection-open"
-                aria-pressed={formattingOpen}
-                data-state={formattingOpen ? 'open' : 'closed'}
-                label={$i18n.t('composer.formatting')}
-                onclick={() => {
-                  setPreference('formattingToolbar', !formattingOpen);
-                }}
-              >
-                <TextAaIcon />
-              </IconButton>
+              <Tooltip label={$i18n.t('composer.formatting')}>
+                {#snippet trigger({ props })}
+                  <IconButton
+                    {...mergeProps(props, {
+                      onclick: () => {
+                        setPreference('formattingToolbar', !formattingOpen);
+                      },
+                    })}
+                    variant="ghost"
+                    size="small"
+                    class="composer-format selection-open"
+                    aria-pressed={formattingOpen}
+                    data-state={formattingOpen ? 'open' : 'closed'}
+                    label={$i18n.t('composer.formatting')}
+                  >
+                    <TextAaIcon />
+                  </IconButton>
+                {/snippet}
+              </Tooltip>
             {/snippet}
             <div class="composer-after" bind:this={afterEl}>
               <ComposerBoard
@@ -1164,46 +1178,49 @@
                   ...(preferences.composerFormatButton && { format: formatButton }),
                 }}
               />
-              <IconButton
-                type={primaryAction === 'record' ? 'button' : 'submit'}
-                variant="ghost"
-                size="small"
-                class="composer-send"
-                disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
-                label={primaryAction === 'record'
-                  ? $i18n.t('composer.voiceRecord')
-                  : editingScheduled
-                    ? $i18n.t('composer.scheduledSave')
-                    : $i18n.t('timeline.sendMessage')}
-                onclick={primaryAction === 'record'
-                  ? () => {
-                      recording = true;
-                    }
-                  : undefined}
-                onpointerdown={(event: PointerEvent) => {
-                  if (hasContent) event.preventDefault();
-                  sendPress.start(event);
-                }}
-                onpointermove={sendPress.move}
-                onpointerup={sendPress.end}
-                onpointercancel={sendPress.end}
-                oncontextmenu={mouseContextMenu((event: MouseEvent) => {
-                  if (!canSchedule) return;
-                  event.preventDefault();
-                  scheduleOpen = true;
-                })}
-                onmousedown={(event: MouseEvent) => {
-                  if (hasContent) event.preventDefault();
-                }}
-              >
-                {#if primaryAction === 'record'}
-                  <MicrophoneIcon />
-                {:else if sending}
-                  <Spinner small />
-                {:else}
-                  <PaperPlaneIcon weight="fill" />
-                {/if}
-              </IconButton>
+              <Tooltip label={sendLabel}>
+                {#snippet trigger({ props })}
+                  <IconButton
+                    {...mergeProps(props, {
+                      onclick:
+                        primaryAction === 'record'
+                          ? () => {
+                              recording = true;
+                            }
+                          : undefined,
+                      onpointerdown: (event: PointerEvent) => {
+                        if (hasContent) event.preventDefault();
+                        sendPress.start(event);
+                      },
+                      onpointermove: sendPress.move,
+                      onpointerup: sendPress.end,
+                    })}
+                    type={primaryAction === 'record' ? 'button' : 'submit'}
+                    variant="ghost"
+                    size="small"
+                    class="composer-send"
+                    disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
+                    label={sendLabel}
+                    onpointercancel={sendPress.end}
+                    oncontextmenu={mouseContextMenu((event: MouseEvent) => {
+                      if (!canSchedule) return;
+                      event.preventDefault();
+                      scheduleOpen = true;
+                    })}
+                    onmousedown={(event: MouseEvent) => {
+                      if (hasContent) event.preventDefault();
+                    }}
+                  >
+                    {#if primaryAction === 'record'}
+                      <MicrophoneIcon />
+                    {:else if sending}
+                      <Spinner small />
+                    {:else}
+                      <PaperPlaneIcon weight="fill" />
+                    {/if}
+                  </IconButton>
+                {/snippet}
+              </Tooltip>
             </div>
           {/if}
         </form>
