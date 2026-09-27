@@ -2,7 +2,7 @@
 
 import { expect, test, vi } from 'vitest';
 
-import { composerNodeViews, type EmoteMedia } from './node-views';
+import { composerMarkViews, composerNodeViews, type EmoteMedia } from './node-views';
 import { composerSchema } from './schema';
 
 const { mention, emoticon } = composerSchema.nodes;
@@ -135,4 +135,16 @@ test('an image whose bytes never arrive keeps its label and does not throw', asy
   await Promise.resolve();
   await Promise.resolve();
   expect(view.dom.textContent).toBe('lost');
+});
+
+test('a colour mark paints its colour in the editor', () => {
+  const { color, bg_color } = composerSchema.marks;
+
+  const fg = composerMarkViews.color(color.create({ value: '#ff0000' }), null as never, true);
+  const bg = composerMarkViews.bg_color(bg_color.create({ value: '#00ff00' }), null as never, true);
+
+  expect(fg.dom).toHaveAttribute('data-mx-color', '#ff0000');
+  expect(fg.dom.style.color).not.toBe('');
+  expect(bg.dom).toHaveAttribute('data-mx-bg-color', '#00ff00');
+  expect(bg.dom.style.backgroundColor).not.toBe('');
 });

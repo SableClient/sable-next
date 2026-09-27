@@ -1,5 +1,10 @@
-import type { Node as ProseMirrorNode } from 'prosemirror-model';
-import type { NodeView, NodeViewConstructor } from 'prosemirror-view';
+import type { Mark, Node as ProseMirrorNode } from 'prosemirror-model';
+import type {
+  MarkView,
+  MarkViewConstructor,
+  NodeView,
+  NodeViewConstructor,
+} from 'prosemirror-view';
 
 export interface EmoteMedia {
   cached: (url: string) => string | undefined;
@@ -132,3 +137,20 @@ export function composerNodeViews(media: EmoteMedia): Record<string, NodeViewCon
     image: (node) => new ImageNodeView(node, media),
   };
 }
+
+function colorMarkView(
+  mark: Mark,
+  attribute: string,
+  property: 'color' | 'backgroundColor'
+): MarkView {
+  const dom = document.createElement('span');
+  const value = mark.attrs.value as string;
+  dom.setAttribute(attribute, value);
+  dom.style[property] = value;
+  return { dom };
+}
+
+export const composerMarkViews: Record<string, MarkViewConstructor> = {
+  color: (mark) => colorMarkView(mark, 'data-mx-color', 'color'),
+  bg_color: (mark) => colorMarkView(mark, 'data-mx-bg-color', 'backgroundColor'),
+};
