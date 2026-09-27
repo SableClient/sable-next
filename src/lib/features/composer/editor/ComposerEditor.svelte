@@ -215,6 +215,25 @@
     padding: 0 var(--space-150);
   }
 
+  .editor :global(.composer-mention) {
+    align-items: center;
+    display: inline-flex;
+    gap: var(--space-050);
+  }
+
+  .editor :global(.composer-mention-remove) {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    display: inline;
+    font: inherit;
+    line-height: 1;
+    margin: 0;
+    padding: 0;
+  }
+
   /* ProseMirror's own class; the themed `.selected` below paints instead. */
   /* stylelint-disable-next-line selector-class-pattern */
   .editor :global(.ProseMirror-selectednode) {
@@ -224,6 +243,11 @@
   .editor :global(.composer-mention.selected),
   .editor :global(.composer-time[class~='ProseMirror-selectednode']) {
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+
+  .editor :global(.composer-mention-remove:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--space-050);
   }
 
   .editor :global(.composer-emoticon img) {

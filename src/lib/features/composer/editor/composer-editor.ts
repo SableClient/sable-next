@@ -676,7 +676,9 @@ export class ComposerEditor {
         new EditorView(node, {
           state,
           editable: () => this.options.editable(),
-          nodeViews: composerNodeViews(this.options.media),
+          nodeViews: composerNodeViews(this.options.media, (position) => {
+            this.unlinkMention(position);
+          }),
           markViews: composerMarkViews,
           attributes: () => this.domAttributes(),
           handlePaste: (pasteView, event, slice) =>
@@ -1004,6 +1006,22 @@ export class ComposerEditor {
     });
 
     if (tr.docChanged) view.dispatch(tr.setMeta('addToHistory', false));
+  }
+
+  private unlinkMention(position: number): void {
+    const view = this.view;
+    const mention = view?.state.doc.nodeAt(position);
+    if (!view || mention?.type !== composerSchema.nodes.mention) return;
+
+    const userId = mention.attrs.userId as string;
+    const tr = view.state.tr.replaceWith(
+      position,
+      position + mention.nodeSize,
+      composerSchema.text(userId)
+    );
+    tr.setSelection(TextSelection.create(tr.doc, position + userId.length));
+    view.dispatch(tr);
+    view.focus();
   }
 
   private replaceRange(from: number, to: number, node: ProseMirrorNode): void {

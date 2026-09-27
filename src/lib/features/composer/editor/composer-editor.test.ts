@@ -113,6 +113,34 @@ test('committing a mention keeps the text that came before it', () => {
   expect(serializeComposer(doc).body).toBe('hi Me');
 });
 
+test('unlinking a mention makes its Matrix ID literal for a bot command', () => {
+  const editor = open();
+  editor.setDoc(
+    composerSchema.node('doc', null, [
+      composerSchema.nodes.paragraph.create(null, [
+        composerSchema.text('!ban sable-coc '),
+        composerSchema.nodes.mention.create({
+          userId: '@doesnm:doesnmlab.xyz',
+          name: 'doesnm',
+        }),
+        composerSchema.text(' russian troll'),
+      ]),
+    ])
+  );
+
+  const remove = document.querySelector<HTMLButtonElement>('.composer-mention-remove');
+  if (!remove) throw new Error('no mention unlink button');
+  remove.click();
+
+  const doc = editor.doc();
+  if (!doc) throw new Error('no document after unlinking mention');
+  expect(serializeComposer(doc)).toEqual({
+    body: '!ban sable-coc @doesnm:doesnmlab.xyz russian troll',
+    formatted: null,
+    mentions: { userIds: [], room: false },
+  });
+});
+
 describe('attachVia', () => {
   const roomMention = () =>
     composerSchema.nodes.mention.create({ userId: '!abc:example.org', name: '#Sable' });

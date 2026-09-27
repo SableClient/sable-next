@@ -34,10 +34,32 @@ abstract class AtomNodeView implements NodeView {
 }
 
 class MentionNodeView extends AtomNodeView {
-  constructor(node: ProseMirrorNode) {
+  constructor(node: ProseMirrorNode, unlink: () => void) {
     super('span', 'composer-mention');
-    this.dom.textContent = node.attrs.name as string;
+    const label = document.createElement('span');
+    label.textContent = node.attrs.name as string;
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'composer-mention-remove';
+    remove.textContent = '×';
+    remove.title = 'Remove mention link';
+    remove.setAttribute('aria-label', 'Remove mention link');
+    remove.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+    });
+    remove.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      unlink();
+    });
+
+    this.dom.append(label, remove);
     this.dom.title = node.attrs.userId as string;
+  }
+
+  stopEvent(event: Event): boolean {
+    return event.target instanceof HTMLButtonElement;
   }
 }
 
@@ -130,9 +152,16 @@ class EmoticonNodeView extends AtomNodeView {
   }
 }
 
-export function composerNodeViews(media: EmoteMedia): Record<string, NodeViewConstructor> {
+export function composerNodeViews(
+  media: EmoteMedia,
+  unlinkMention: (position: number) => void = () => {}
+): Record<string, NodeViewConstructor> {
   return {
-    mention: (node) => new MentionNodeView(node),
+    mention: (node, _view, getPos) =>
+      new MentionNodeView(node, () => {
+        const position = getPos();
+        if (typeof position === 'number') unlinkMention(position);
+      }),
     emoticon: (node) => new EmoticonNodeView(node, media),
     image: (node) => new ImageNodeView(node, media),
   };

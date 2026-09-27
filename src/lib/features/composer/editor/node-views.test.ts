@@ -27,9 +27,27 @@ function build(
 test('a mention renders its name and keeps the caret out of the atom', () => {
   const view = build('mention', mention.create({ userId: '@one:example.org', name: 'Member One' }));
 
-  expect(view.dom.textContent).toBe('Member One');
+  expect(view.dom.textContent).toBe('Member One×');
   expect(view.dom.contentEditable).toBe('false');
   expect(view.dom.title).toBe('@one:example.org');
+  expect(view.dom.querySelector('button')).toHaveAttribute('aria-label', 'Remove mention link');
+});
+
+test('a mention can be unlinked', () => {
+  const unlink = vi.fn();
+  const node = mention.create({ userId: '@one:example.org', name: 'Member One' });
+  const view = composerNodeViews(
+    {
+      cached: () => undefined,
+      load: () => Promise.resolve('blob:emote'),
+      hold: () => () => {},
+    },
+    unlink
+  )['mention'](node, null as never, () => 4, [], null as never);
+
+  view.dom.querySelector('button')?.click();
+
+  expect(unlink).toHaveBeenCalledWith(4);
 });
 
 test('selecting a mention marks it, and deselecting clears the mark', () => {
