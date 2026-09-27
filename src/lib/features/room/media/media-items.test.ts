@@ -23,6 +23,7 @@ function gallery(items: Extract<TimelineItemView['content'], { kind: 'gallery' }
     read_by: [],
     per_message_profile: null,
     bundled_link_previews: [],
+    link_previews_removed: null,
     mention: 'none',
     forwarded: null,
   } satisfies TimelineItemView;

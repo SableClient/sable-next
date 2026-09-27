@@ -334,6 +334,7 @@
       canRedactOthers,
       senderTimezone,
       anchor: emoteAnchor ?? messageRow,
+      hasLinkPreviews: bundledPreviews.length > 0 || previewUrls.length > 0,
       onToggleReaction,
       onMarkUnread,
       onReply,
@@ -357,8 +358,10 @@
       receiptReaders.length > 0
   );
   let nonTextContent = $derived(item.content.kind !== 'message');
+  let previewsRemoved = $derived(item.link_previews_removed === true);
+  let bundledPreviews = $derived(previewsRemoved ? [] : item.bundled_link_previews);
   let previewUrls = $derived(
-    item.content.kind === 'message' ? previewableLinks(item.content.html) : []
+    item.content.kind === 'message' && !previewsRemoved ? previewableLinks(item.content.html) : []
   );
   let receiptWidth = $state(0);
   let receiptsInline = $derived(
@@ -366,7 +369,7 @@
       item.reactions.length === 0 &&
       !threadSummary &&
       !item.thread_root &&
-      item.bundled_link_previews.length === 0 &&
+      bundledPreviews.length === 0 &&
       previewUrls.length === 0 &&
       upload === null &&
       stalled === null
@@ -778,8 +781,8 @@
               {@render receiptSlot()}
             {/if}
           </div>
-          {#if item.bundled_link_previews.length > 0}
-            {#each item.bundled_link_previews as preview (preview.url)}
+          {#if bundledPreviews.length > 0}
+            {#each bundledPreviews as preview (preview.url)}
               <LinkEmbed url={preview.url} bundled={preview} {encrypted} />
             {/each}
           {:else}

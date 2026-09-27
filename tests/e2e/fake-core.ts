@@ -383,6 +383,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         read_by: [],
         per_message_profile: null,
         bundled_link_previews: [],
+        link_previews_removed: null,
         mention: 'none',
         forwarded: null,
       }));

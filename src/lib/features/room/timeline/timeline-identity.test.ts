@@ -24,6 +24,7 @@ function item(id: string, options: Partial<TimelineItemView> = {}): TimelineItem
     ...options,
     per_message_profile: options.per_message_profile ?? null,
     bundled_link_previews: options.bundled_link_previews ?? [],
+    link_previews_removed: null,
     mention: options.mention ?? 'none',
     forwarded: options.forwarded ?? null,
   };

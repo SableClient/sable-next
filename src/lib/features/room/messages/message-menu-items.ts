@@ -14,6 +14,7 @@ import EditIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
 import EmojiIcon from 'phosphor-svelte/lib/SmileyIcon';
 import MarkUnreadIcon from 'phosphor-svelte/lib/CircleDashedIcon';
 import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+import LinkBreakIcon from 'phosphor-svelte/lib/LinkBreakIcon';
 import ReceiptIcon from 'phosphor-svelte/lib/EyeIcon';
 import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
 import StealIcon from 'phosphor-svelte/lib/StickerIcon';
@@ -40,6 +41,7 @@ export type MessageActions = {
   onPin?: () => void;
   onBookmark?: () => void;
   onForward?: () => void;
+  onRemoveLinkPreviews?: () => void;
   onDownload?: () => void;
   onStealEmotes?: () => void;
   onDownloadEmotes?: () => void;
@@ -130,6 +132,14 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
       label: 'timeline.forwardMessage',
       icon: ForwardIcon,
       run: actions.onForward,
+    });
+  }
+  if (actions.onRemoveLinkPreviews) {
+    rows.push({
+      key: 'remove-link-previews',
+      label: 'timeline.removeLinkPreviews',
+      icon: LinkBreakIcon,
+      run: actions.onRemoveLinkPreviews,
     });
   }
   if (actions.onDownload) {

@@ -809,6 +809,7 @@ pub fn aggregation_item(
         read_by: Vec::new(),
         per_message_profile: None,
         bundled_link_previews: Vec::new(),
+        link_previews_removed: None,
         mention: MentionView::None,
         forwarded: None,
     }
@@ -883,7 +884,8 @@ pub async fn standalone_item(
         sender: Some(sender),
         reactions: Vec::new(),
         read_by: Vec::new(),
-        bundled_link_previews: bundled_link_previews(raw.content.as_ref()),
+        bundled_link_previews: bundled_link_previews(raw.message()),
+        link_previews_removed: link_previews_removed(raw.message()),
         per_message_profile: message_profile,
         forwarded: original.content.as_ref().and_then(forward_meta),
     })
@@ -921,7 +923,8 @@ pub fn timeline_item(
                 });
 
             let mention = mention(event, own_user_id, highlights.holds(&id, event));
-            let bundled_link_previews = bundled_link_previews(raw.content.as_ref());
+            let bundled_link_previews = bundled_link_previews(raw.message());
+            let link_previews_removed = link_previews_removed(raw.message());
             let forwarded = forwarded(event, &raw);
 
             TimelineItemView {
@@ -944,6 +947,7 @@ pub fn timeline_item(
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,
                 bundled_link_previews,
+                link_previews_removed,
                 mention,
                 forwarded,
             }
@@ -979,6 +983,7 @@ pub fn timeline_item(
                 read_by: Vec::new(),
                 per_message_profile: None,
                 bundled_link_previews: Vec::new(),
+                link_previews_removed: None,
                 mention: MentionView::None,
                 forwarded: None,
             }
@@ -1140,19 +1145,22 @@ impl RawFields {
             .is_some_and(serde_json::Map::is_empty)
     }
 
-    fn formatted_body(&self) -> Option<&str> {
+    fn message(&self) -> Option<&serde_json::Value> {
         let content = self.content.as_ref();
         let replacement = content
             .and_then(|content| content.get("m.relates_to"))
             .and_then(|relation| relation.get("rel_type"))
             .and_then(serde_json::Value::as_str)
             == Some("m.replace");
-        let message = if replacement {
+        if replacement {
             content.and_then(|content| content.get("m.new_content"))
         } else {
             content
-        };
-        raw_formatted_body(message).or(self.echo_formatted_body.as_deref())
+        }
+    }
+
+    fn formatted_body(&self) -> Option<&str> {
+        raw_formatted_body(self.message()).or(self.echo_formatted_body.as_deref())
     }
 
     fn redaction_reason(&self) -> Option<String> {
@@ -1658,12 +1666,18 @@ fn forward_meta(content: &serde_json::Value) -> Option<ForwardedView> {
     })
 }
 
-fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
-    const KEY: &str = "com.beeper.linkpreviews";
+fn link_previews_removed(content: Option<&serde_json::Value>) -> Option<bool> {
+    content?
+        .get(crate::dispatch::BUNDLED_LINK_PREVIEWS)?
+        .as_array()?
+        .is_empty()
+        .then_some(true)
+}
 
+fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewView> {
     let mut seen = BTreeSet::new();
     content
-        .and_then(|content| content.get(KEY))
+        .and_then(|content| content.get(crate::dispatch::BUNDLED_LINK_PREVIEWS))
         .and_then(serde_json::Value::as_array)
         .map_or_else(Vec::new, |bundles| {
             bundles
@@ -2373,6 +2387,24 @@ mod tests {
             Some("mxc://example.org/image")
         );
         assert_eq!(previews[1].image_width, Some(640));
+    }
+
+    #[test]
+    fn an_empty_bundle_removes_previews_and_an_edit_carries_its_own() {
+        let removed = super::RawFields {
+            content: Some(json!({
+                "body": "* see https://example.org",
+                "com.beeper.linkpreviews": [{ "matched_url": "https://example.org" }],
+                "m.new_content": { "body": "see https://example.org", "com.beeper.linkpreviews": [] },
+                "m.relates_to": { "rel_type": "m.replace", "event_id": "$event" },
+            })),
+            ..Default::default()
+        };
+        assert_eq!(super::link_previews_removed(removed.message()), Some(true));
+        assert!(bundled_link_previews(removed.message()).is_empty());
+
+        let absent = json!({ "body": "see https://example.org" });
+        assert_eq!(super::link_previews_removed(Some(&absent)), None);
     }
 
     #[test]

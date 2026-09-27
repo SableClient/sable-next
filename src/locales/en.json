@@ -1082,6 +1082,7 @@
     "bookmarkMessage": "Bookmark",
     "unbookmarkMessage": "Remove bookmark",
     "forwardMessage": "Forward",
+    "removeLinkPreviews": "Remove embeds",
     "reportMessage": "Report",
     "viewSource": "View source",
     "sourceTitle": "Message source",

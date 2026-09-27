@@ -20,6 +20,7 @@ export type MessageActionPolicyInput = {
   canDelete: boolean;
   canOpenThread: boolean;
   canCopyLink: boolean;
+  hasLinkPreviews: boolean;
   pinned: boolean;
   bookmarked: boolean;
   stealCount: number;
@@ -47,6 +48,7 @@ export type MessageActionPolicy = {
   copyText: boolean;
   openThread: boolean;
   copyLink: boolean;
+  removeLinkPreviews: boolean;
   pin: boolean;
   bookmark: boolean;
   forward: boolean;
@@ -70,6 +72,7 @@ export function messageActionPolicy({
   canDelete,
   canOpenThread,
   canCopyLink,
+  hasLinkPreviews,
   pinned,
   bookmarked,
   stealCount,
@@ -115,6 +118,12 @@ export function messageActionPolicy({
     copyText: body !== null,
     openThread: canOpenThread && threadTarget !== null,
     copyLink: canCopyLink && item.event_id !== null,
+    removeLinkPreviews:
+      hasRoomEvent &&
+      item.is_own &&
+      item.content.kind === 'message' &&
+      hasLinkPreviews &&
+      item.link_previews_removed !== true,
     pin: canPin && hasRoomEvent,
     bookmark: hasRoomEvent,
     forward: hasRoomEvent && canForward(item.content),

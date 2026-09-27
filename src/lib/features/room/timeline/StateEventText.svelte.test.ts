@@ -28,6 +28,7 @@ function membership(change: 'left' | 'joined', userId: string, name: string): Ti
     sender_avatar: null,
     per_message_profile: null,
     bundled_link_previews: [],
+    link_previews_removed: null,
     timestamp: 0,
     is_own: false,
     mention: 'none',

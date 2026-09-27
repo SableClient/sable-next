@@ -53,7 +53,9 @@
     onSenderProfile,
   }: Props = $props();
   let previewLinks = $derived(
-    item.content.kind === 'gallery' ? previewableLinks(item.content.html) : []
+    item.content.kind === 'gallery' && item.link_previews_removed !== true
+      ? previewableLinks(item.content.html)
+      : []
   );
   let spoiler = $derived(
     item.content.kind === 'image' || item.content.kind === 'video' ? item.content.spoiler : null

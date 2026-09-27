@@ -900,6 +900,19 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async removeLinkPreviews(
+      roomId: string,
+      eventId: string,
+      threadRoot: string | null = null
+    ): Promise<void> {
+      await transport().send({
+        type: 'remove_link_previews',
+        room_id: roomId,
+        event_id: eventId,
+        thread_root: threadRoot,
+      });
+    },
+
     async deleteThread(
       roomId: string,
       rootEventId: string,

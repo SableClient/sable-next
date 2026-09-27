@@ -235,6 +235,15 @@ pub enum Command {
         #[serde(default)]
         persona: Option<PerMessageProfileView>,
     },
+    RemoveLinkPreviews {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        thread_root: Option<OwnedEventId>,
+    },
     /// `edited` on the view flips once the server has the replacement.
     EditMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1303,6 +1312,7 @@ pub enum CommandOk {
     SendGif,
     SendLocation,
     EditMessage,
+    RemoveLinkPreviews,
     FetchEventDetails,
     Redact,
     DeleteThread,
@@ -2545,6 +2555,8 @@ pub struct TimelineItemView {
     /// stays the account that actually sent it and must remain reachable.
     pub per_message_profile: Option<PerMessageProfileView>,
     pub bundled_link_previews: Vec<UrlPreviewView>,
+    #[cfg_attr(feature = "typegen", specta(optional))]
+    pub link_previews_removed: Option<bool>,
     pub mention: MentionView,
     pub forwarded: Option<ForwardedView>,
 }

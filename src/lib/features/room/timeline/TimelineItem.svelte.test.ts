@@ -106,6 +106,7 @@ function item(emote: boolean): TimelineItemView {
     read_by: [],
     per_message_profile: null,
     bundled_link_previews: [],
+    link_previews_removed: null,
     mention: 'none',
     forwarded: null,
   };
@@ -1407,6 +1408,42 @@ test('renders a link preview for every link in a message', async () => {
       [...document.querySelectorAll<HTMLAnchorElement>('a.link-preview')].map((link) => link.href)
     ).toEqual(['https://example.org/one', 'https://example.org/two']);
   });
+  instance.unmount();
+  setPreference('urlPreviews', false);
+});
+
+test('a message whose embeds were removed renders none, bundled or found', async () => {
+  setPreference('urlPreviews', true);
+  const message: TimelineItemView = {
+    ...item(false),
+    content: {
+      kind: 'message',
+      body: 'https://example.org/one',
+      html: '<a href="https://example.org/one">one</a>',
+      emote: false,
+      notice: false,
+      edited: true,
+    },
+    bundled_link_previews: [
+      {
+        url: 'https://example.org/one',
+        title: 'One',
+        description: null,
+        site_name: null,
+        image: null,
+        image_mime: null,
+        image_width: null,
+        image_height: null,
+      },
+    ],
+    link_previews_removed: true,
+  };
+  const instance = render(TimelineItemHarness, {
+    props: { core, item: { item: message, collapsed: false, encrypted: false } },
+  });
+  await tick();
+
+  expect(document.querySelector('a.link-preview')).toBeNull();
   instance.unmount();
   setPreference('urlPreviews', false);
 });

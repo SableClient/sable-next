@@ -34,6 +34,7 @@ interface MessageActionContext extends MessageCallbacks {
   canRedactOthers: boolean;
   senderTimezone: string | null;
   anchor: HTMLElement | CursorAnchor | null;
+  hasLinkPreviews: boolean;
 }
 
 interface MessageActionDeps {
@@ -64,6 +65,7 @@ export class MessageActionExecutor {
       canRedactOthers,
       senderTimezone,
       anchor,
+      hasLinkPreviews,
       onToggleReaction,
       onMarkUnread,
       onReply,
@@ -89,6 +91,7 @@ export class MessageActionExecutor {
       canDelete: onDelete !== undefined,
       canOpenThread: onOpenThread !== undefined,
       canCopyLink: onCopyLink !== undefined,
+      hasLinkPreviews,
       pinned,
       bookmarked,
       stealCount: stealable.length,
@@ -171,6 +174,15 @@ export class MessageActionExecutor {
       }
     }
 
+    async function removeLinkPreviews(eventId: string): Promise<void> {
+      try {
+        await core.commands.removeLinkPreviews(roomId, eventId, item.thread_root);
+      } catch (error) {
+        console.warn('[sable timeline] removing link previews failed', error);
+        toasts.error(t('errors.actionFailed'));
+      }
+    }
+
     async function copyText(): Promise<void> {
       if (item.content.kind === 'message') await navigator.clipboard.writeText(item.content.body);
     }
@@ -246,6 +258,9 @@ export class MessageActionExecutor {
       bookmarked: policy.bookmarked,
       onPin: policy.pin ? () => void togglePin(policy.eventId) : undefined,
       onBookmark: policy.bookmark ? () => void toggleBookmark(policy.eventId) : undefined,
+      onRemoveLinkPreviews: policy.removeLinkPreviews
+        ? () => void removeLinkPreviews(policy.eventId)
+        : undefined,
       onForward: policy.forward
         ? () => {
             dialogs.open(item, { kind: 'forward' });

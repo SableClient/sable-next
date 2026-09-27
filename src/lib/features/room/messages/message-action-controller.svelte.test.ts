@@ -30,6 +30,7 @@ function message(): TimelineItemView {
     read_by: [],
     per_message_profile: null,
     bundled_link_previews: [],
+    link_previews_removed: null,
     mention: 'none',
     forwarded: null,
   };
@@ -44,22 +45,34 @@ function fixture() {
     canRedactOthers: false,
     senderTimezone: null,
     anchor: null,
+    hasLinkPreviews: false,
     onEdit: vi.fn(),
     onDelete: vi.fn(),
     onOpenThread: vi.fn(),
     onReply: vi.fn(),
   };
   const source = Promise.withResolvers<string>();
+  const removeLinkPreviews = vi.fn(() => Promise.resolve());
   const deps = {
     core: {
-      commands: { imagePacks: vi.fn(), eventSource: vi.fn(() => source.promise) },
+      commands: {
+        imagePacks: vi.fn(),
+        eventSource: vi.fn(() => source.promise),
+        removeLinkPreviews,
+      },
     } as unknown as CoreClient,
     personaStore: { load: vi.fn(async () => {}) },
     pinnedEvents: { has: vi.fn(() => false), toggle: vi.fn(async () => {}) },
     bookmarks: { has: vi.fn(() => false), toggle: vi.fn(async () => {}) },
     dialogs: { open: vi.fn() },
   };
-  return { context, deps, source, executor: new MessageActionExecutor(() => context, deps) };
+  return {
+    context,
+    deps,
+    source,
+    removeLinkPreviews,
+    executor: new MessageActionExecutor(() => context, deps),
+  };
 }
 
 test('editing an unsent message uses its transaction id and does not offer server actions', () => {
@@ -105,4 +118,14 @@ test('source lookup keeps the event selected when the action began', async () =>
     kind: 'source',
     source: '{"event_id":"$item"}',
   });
+});
+
+test('removing embeds edits the message in its own thread', () => {
+  const { context, removeLinkPreviews, executor } = fixture();
+  context.hasLinkPreviews = true;
+  context.item.thread_root = '$root';
+
+  executor.actions.onRemoveLinkPreviews?.();
+
+  expect(removeLinkPreviews).toHaveBeenCalledWith('!room', '$item', '$root');
 });

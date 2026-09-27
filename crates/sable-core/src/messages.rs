@@ -10,11 +10,13 @@ use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent, Mentions};
 use matrix_sdk::ruma::room::JoinRule;
+use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, UInt,
 };
 
 use crate::Core;
+use crate::dispatch::BUNDLED_LINK_PREVIEWS;
 use crate::matrix_html::{
     display_html, has_profile_fallback_html, strip_profile_fallback_body,
     strip_profile_fallback_html,
@@ -37,7 +39,83 @@ fn unique_pins(events: Vec<OwnedEventId>) -> Vec<OwnedEventId> {
         .collect()
 }
 
+fn latest_message(event: &serde_json::Value) -> Option<&serde_json::Value> {
+    let content = event.get("content")?;
+    let replaces = content
+        .get("m.relates_to")
+        .and_then(|relation| relation.get("rel_type"))
+        .and_then(serde_json::Value::as_str)
+        == Some("m.replace");
+    if replaces {
+        content.get("m.new_content")
+    } else {
+        Some(content)
+    }
+}
+
+pub(crate) fn previews_removed_edit(
+    event_id: &EventId,
+    event: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    if event.get("type").and_then(serde_json::Value::as_str) != Some("m.room.message") {
+        return None;
+    }
+    let mut new_content = latest_message(event)?.as_object()?.clone();
+    new_content.remove("m.relates_to");
+    new_content.insert(BUNDLED_LINK_PREVIEWS.to_owned(), serde_json::json!([]));
+
+    let mut edit = new_content.clone();
+    for field in ["body", "formatted_body"] {
+        if let Some(text) = edit.get(field).and_then(serde_json::Value::as_str) {
+            let fallback = format!("* {text}");
+            edit.insert(field.to_owned(), serde_json::Value::String(fallback));
+        }
+    }
+    edit.insert("m.mentions".to_owned(), serde_json::json!({}));
+    edit.insert(
+        "m.new_content".to_owned(),
+        serde_json::Value::Object(new_content),
+    );
+    edit.insert(
+        "m.relates_to".to_owned(),
+        serde_json::json!({ "rel_type": "m.replace", "event_id": event_id }),
+    );
+    Some(serde_json::Value::Object(edit))
+}
+
 impl Core {
+    pub(crate) async fn remove_link_previews(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: &OwnedEventId,
+        thread_root: Option<&OwnedEventId>,
+    ) -> Result<(), CommandErr> {
+        let item = self
+            .timeline_for(room_id, thread_root)
+            .await?
+            .item_by_event_id(event_id)
+            .await
+            .ok_or(CommandErr::Unsupported)?;
+        if !item.is_own() {
+            return Err(CommandErr::Denied);
+        }
+        let event = item
+            .latest_json()
+            .or_else(|| item.original_json())
+            .and_then(|raw| raw.deserialize_as_unchecked::<serde_json::Value>().ok())
+            .ok_or(CommandErr::Unsupported)?;
+        let edit = previews_removed_edit(event_id, &event).ok_or(CommandErr::Unsupported)?;
+        let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(edit.to_string())
+            .map_err(|error| self.failed("remove_link_previews", error))?;
+        self.room(room_id)
+            .await?
+            .send_queue()
+            .send_raw(raw, "m.room.message".to_owned())
+            .await
+            .map_err(|error| self.failed("remove_link_previews", error))?;
+        Ok(())
+    }
+
     pub(crate) async fn delete_thread(
         &self,
         room_id: &OwnedRoomId,
@@ -520,6 +598,50 @@ mod tests {
     };
 
     use crate::{Core, session::Session, store::MemorySessionStore};
+
+    #[test]
+    fn removing_previews_edits_the_latest_version_with_an_empty_list() {
+        let original = json!({
+            "type": "m.room.message",
+            "content": {
+                "msgtype": "m.text",
+                "body": "see https://example.org",
+                "m.relates_to": { "m.in_reply_to": { "event_id": "$parent" } },
+                "com.beeper.linkpreviews": [{ "matched_url": "https://example.org" }],
+                "com.beeper.per_message_profile": { "id": "p" },
+            },
+        });
+        let edit = super::previews_removed_edit(event_id!("$event"), &original).unwrap();
+
+        assert_eq!(edit["body"], "* see https://example.org");
+        assert_eq!(edit["m.mentions"], json!({}));
+        assert_eq!(
+            edit["m.relates_to"],
+            json!({ "rel_type": "m.replace", "event_id": "$event" })
+        );
+        let new_content = &edit["m.new_content"];
+        assert_eq!(new_content["body"], "see https://example.org");
+        assert_eq!(new_content["com.beeper.linkpreviews"], json!([]));
+        assert_eq!(
+            new_content["com.beeper.per_message_profile"],
+            json!({ "id": "p" })
+        );
+        assert!(new_content.get("m.relates_to").is_none());
+
+        let edited = json!({
+            "type": "m.room.message",
+            "content": {
+                "body": "* fixed https://example.org",
+                "m.new_content": { "msgtype": "m.text", "body": "fixed https://example.org" },
+                "m.relates_to": { "rel_type": "m.replace", "event_id": "$event" },
+            },
+        });
+        let edit = super::previews_removed_edit(event_id!("$event"), &edited).unwrap();
+        assert_eq!(edit["m.new_content"]["body"], "fixed https://example.org");
+
+        let sticker = json!({ "type": "m.sticker", "content": { "body": "hi" } });
+        assert!(super::previews_removed_edit(event_id!("$event"), &sticker).is_none());
+    }
 
     #[test]
     fn a_pin_listed_twice_is_kept_once_in_order() {

@@ -29,13 +29,14 @@ function item(overrides: Partial<TimelineItemView> = {}): TimelineItemView {
     read_by: [],
     per_message_profile: null,
     bundled_link_previews: [],
+    link_previews_removed: null,
     mention: 'none',
     forwarded: null,
     ...overrides,
   };
 }
 
-function policy(overrides: Partial<TimelineItemView> = {}) {
+function policy(overrides: Partial<TimelineItemView> = {}, hasLinkPreviews = false) {
   return messageActionPolicy({
     item: item(overrides),
     roomId: '!room:example.org',
@@ -49,6 +50,7 @@ function policy(overrides: Partial<TimelineItemView> = {}) {
     canDelete: true,
     canOpenThread: true,
     canCopyLink: true,
+    hasLinkPreviews,
     pinned: false,
     bookmarked: false,
     stealCount: 0,
@@ -98,4 +100,12 @@ test('media and threaded events expose their respective actions', () => {
   expect(media.openThread).toBe(true);
   expect(media.threadTarget).toBe('$root');
   expect(media.copyText).toBe(true);
+});
+
+test('only the sender can remove embeds, and only while there are some', () => {
+  expect(policy({}, true).removeLinkPreviews).toBe(true);
+  expect(policy({}, false).removeLinkPreviews).toBe(false);
+  expect(policy({ is_own: false }, true).removeLinkPreviews).toBe(false);
+  expect(policy({ link_previews_removed: true }, true).removeLinkPreviews).toBe(false);
+  expect(policy({ event_id: null, transaction_id: 'local' }, true).removeLinkPreviews).toBe(false);
 });

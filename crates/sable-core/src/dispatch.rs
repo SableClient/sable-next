@@ -607,6 +607,16 @@ impl Core {
                 Ok(CommandOk::SendGif)
             }
 
+            Command::RemoveLinkPreviews {
+                room_id,
+                event_id,
+                thread_root,
+            } => {
+                Box::pin(self.remove_link_previews(&room_id, &event_id, thread_root.as_ref()))
+                    .await?;
+                Ok(CommandOk::RemoveLinkPreviews)
+            }
+
             Command::EditMessage {
                 room_id,
                 event_id,
@@ -3072,7 +3082,7 @@ fn location_content(body: String, geo_uri: String) -> RoomMessageEventContent {
         .add_mentions(outgoing_mentions(Vec::new(), false))
 }
 
-const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
+pub(crate) const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
 const IMAGE_SOURCE_PACKS: &str = "com.beeper.msc4459.image_source_packs";
 
 fn extra_content<const N: usize>(
