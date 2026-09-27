@@ -73,8 +73,8 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-400);
-    min-height: calc(var(--control-height-medium) + var(--space-300));
-    padding: var(--space-300) var(--space-400);
+    min-height: calc(var(--control-height-medium) + var(--space-200));
+    padding: var(--space-250) var(--space-400);
 
     :global(img),
     :global(.media-image) {
@@ -124,7 +124,7 @@
   .row-copy p {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: var(--space-100) 0 0;
+    margin: var(--space-050) 0 0;
     max-width: 60ch;
     overflow-wrap: anywhere;
   }

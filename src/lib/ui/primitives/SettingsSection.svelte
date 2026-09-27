@@ -48,7 +48,7 @@
     display: flex;
     gap: var(--space-400);
     justify-content: space-between;
-    padding: var(--space-300) var(--space-400);
+    padding: var(--space-300) var(--space-400) var(--space-150);
   }
 
   .settings-section-heading {
@@ -80,7 +80,7 @@
   }
 
   h2 {
-    font-size: var(--font-size-heading);
+    font-size: var(--font-size-subheading);
     line-height: var(--line-height-heading);
     margin: 0;
   }
@@ -88,7 +88,7 @@
   p {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: var(--space-100) 0 0;
+    margin: var(--space-050) 0 0;
   }
 
   .settings-section-actions {
@@ -99,6 +99,12 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
+  }
+
+  @media (pointer: coarse) {
+    .settings-section-content :global(.btn-small:not(.icon-button)) {
+      --button-height: var(--control-height-400);
+    }
   }
 
   @media (width >= 42rem) {

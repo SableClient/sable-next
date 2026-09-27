@@ -6,7 +6,7 @@
 
 .settings-form {
   display: grid;
-  gap: var(--space-400);
+  gap: var(--space-300);
   padding: var(--space-400);
 }
 
