@@ -22,15 +22,16 @@ fn with_proxy(builder: ClientBuilder) -> ClientBuilder {
     }
 }
 
-#[cfg(target_family = "wasm")]
-const fn with_proxy(builder: ClientBuilder) -> ClientBuilder {
-    builder
-}
-
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(target_family = "wasm")))]
 #[must_use = "returns the configured builder"]
 pub fn apply(builder: ClientBuilder) -> ClientBuilder {
     with_proxy(builder)
+}
+
+#[cfg(target_family = "wasm")]
+#[must_use = "returns the configured builder"]
+pub const fn apply(builder: ClientBuilder) -> ClientBuilder {
+    builder
 }
 
 #[cfg(target_os = "android")]
