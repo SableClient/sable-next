@@ -9,6 +9,7 @@ import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svel
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
+import MediaPreviewPrivacy from '#lib/features/settings/MediaPreviewPrivacy.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
 import NotificationTroubleshooter from '#lib/features/notifications/NotificationTroubleshooter.svelte';
 import NotificationDefaults from '#lib/features/notifications/NotificationDefaults.svelte';
@@ -53,6 +54,7 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: NotificationTroubleshooter },
   ],
   calls: [{ component: CallDeviceSettings, section: 'call-devices' }],
+  privacy: [{ component: MediaPreviewPrivacy, section: 'blurring', start: true }],
   personas: [{ component: PersonaSettings }],
   [SETTINGS_ACCOUNT_SECTION]: [
     { component: SettingsSyncStatus, section: 'sync', when: () => preferences.settingsSync },

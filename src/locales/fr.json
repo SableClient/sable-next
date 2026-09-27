@@ -1040,7 +1040,8 @@
     "reportUnsupported": "Votre serveur n’accepte pas ce type de signalement.",
     "profileReport": "Signaler l’utilisateur",
     "profileReportTitle": "Signaler {{name}}",
-    "profileReportHint": "Expliquez aux administrateurs de votre serveur ce que cette personne a fait."
+    "profileReportHint": "Expliquez aux administrateurs de votre serveur ce que cette personne a fait.",
+    "hiddenMedia": "Afficher le média"
   },
   "viewer": {
     "title": "Visionneuse de médias",
@@ -1888,7 +1889,14 @@
       "mlm": "MLM",
       "pride": "Fiertés"
     },
-    "notificationKeywordsConfirm": "Retirer le mot-clé {{keyword}} ?"
+    "notificationKeywordsConfirm": "Retirer le mot-clé {{keyword}} ?",
+    "mediaPreviews": "Afficher les aperçus des médias",
+    "mediaPreviewsHint": "Images, vidéos et autocollants que vous n’avez pas ouverts. Partagé avec vos autres clients.",
+    "mediaPreviewsOn": "Dans tous les salons",
+    "mediaPreviewsPrivate": "Seulement dans les salons privés",
+    "mediaPreviewsOff": "Jamais, demander à chaque fois",
+    "inviteAvatars": "Afficher les avatars des invitations",
+    "inviteAvatarsHint": "L’image du salon ou de la personne qui vous invite. Partagé avec vos autres clients."
   },
   "errors": {
     "pageTitle": "Un problème est survenu",

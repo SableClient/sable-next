@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -33,7 +34,12 @@
         {@const from = inviter(invite)}
         {@const busy = answers.isAnswering(invite.room_id)}
         <li>
-          <Avatar class="invite-icon" id={invite.room_id} src={invite.avatar_url} {name} />
+          <Avatar
+            class="invite-icon"
+            id={invite.room_id}
+            src={mediaPreviewSettings.inviteAvatars === 'on' ? invite.avatar_url : null}
+            {name}
+          />
           <span class="invite-text">
             <span class="invite-name" title={name}>{name}</span>
             {#if from}

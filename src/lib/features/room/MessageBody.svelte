@@ -19,6 +19,10 @@
   import TimelineLocation from './TimelineLocation.svelte';
   import TimelineLiveLocation from './TimelineLiveLocation.svelte';
   import TimelinePoll from './TimelinePoll.svelte';
+  import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
+
+  const HIDEABLE_MEDIA = ['image', 'video', 'sticker', 'gallery'];
+  const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
 
   interface Props {
     item: TimelineItemView;
@@ -51,6 +55,9 @@
   let spoiler = $derived(
     item.content.kind === 'image' || item.content.kind === 'video' ? item.content.spoiler : null
   );
+  let hiddenByPolicy = $derived(
+    (roomMedia?.hidden ?? false) && HIDEABLE_MEDIA.includes(item.content.kind)
+  );
   let spoilerKey = $derived(
     JSON.stringify([item.id, 'source' in item.content ? item.content.source : null, spoiler])
   );
@@ -58,14 +65,16 @@
   let showCaption = $derived(preferences.captionPosition !== 'hidden');
 </script>
 
-{#if spoiler !== null && revealedSpoiler !== spoilerKey}
+{#if (spoiler !== null || hiddenByPolicy) && revealedSpoiler !== spoilerKey}
   <Button
     class="spoiler-reveal"
     onclick={() => {
       revealedSpoiler = spoilerKey;
     }}
   >
-    {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
+    {spoiler ? `${spoiler} — ` : ''}{$i18n.t(
+      spoiler === null ? 'timeline.hiddenMedia' : 'timeline.spoilerMedia'
+    )}
   </Button>
 {:else if item.content.kind === 'redacted'}
   <p class="redacted">

@@ -1137,7 +1137,8 @@
     "reportUnsupported": "Your homeserver can't take this kind of report.",
     "profileReport": "Report user",
     "profileReportTitle": "Report {{name}}",
-    "profileReportHint": "Tell your homeserver administrators what this person did."
+    "profileReportHint": "Tell your homeserver administrators what this person did.",
+    "hiddenMedia": "Show media"
   },
   "viewer": {
     "title": "Media viewer",
@@ -2305,7 +2306,14 @@
     "usernameClick": "Clicking a name",
     "usernameClickHint": "What happens when you click the name above someone's message.",
     "usernameClickMention": "Mention them",
-    "usernameClickProfile": "Open their profile"
+    "usernameClickProfile": "Open their profile",
+    "mediaPreviews": "Show media previews",
+    "mediaPreviewsHint": "Pictures, videos and stickers you have not opened. Shared with your other clients.",
+    "mediaPreviewsOn": "In every room",
+    "mediaPreviewsPrivate": "In private rooms only",
+    "mediaPreviewsOff": "Never, ask each time",
+    "inviteAvatars": "Show avatars on invites",
+    "inviteAvatarsHint": "The picture of a room or person inviting you. Shared with your other clients."
   },
   "errors": {
     "pageTitle": "Something went wrong",

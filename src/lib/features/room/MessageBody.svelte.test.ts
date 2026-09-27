@@ -24,6 +24,8 @@ vi.mock('pdfjs-dist', () => ({
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import MessageBody from './MessageBody.svelte';
+import MessageBodyMediaHarness from './MessageBodyMediaHarness.test.svelte';
+import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 
 afterEach(() => {
   setPreference('captionPosition', 'below');
@@ -446,4 +448,27 @@ test.each(['image', 'file'] as const)('a hidden caption is not rendered for %s',
 
   expect(screen.queryByText('caption')).not.toBeInTheDocument();
   expect(screen.queryByRole('link', { name: '@ana' })).not.toBeInTheDocument();
+});
+
+test('media is held behind a prompt where the media preview setting says so (MSC4278)', async () => {
+  mediaPreviewSettings.global = { media_previews: 'private' };
+  const user = userEvent.setup();
+  render(MessageBodyMediaHarness, {
+    props: { item: item(attachment('image')), joinRule: 'public' },
+  });
+
+  await user.click(screen.getByRole('button', { name: 'Show media' }));
+
+  expect(screen.queryByRole('button', { name: 'Show media' })).not.toBeInTheDocument();
+  mediaPreviewSettings.global = {};
+});
+
+test('media shows at once in a private room under the private setting', () => {
+  mediaPreviewSettings.global = { media_previews: 'private' };
+  render(MessageBodyMediaHarness, {
+    props: { item: item(attachment('image')), joinRule: 'invite' },
+  });
+
+  expect(screen.queryByRole('button', { name: 'Show media' })).not.toBeInTheDocument();
+  mediaPreviewSettings.global = {};
 });

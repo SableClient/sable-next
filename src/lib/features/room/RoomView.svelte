@@ -73,6 +73,7 @@
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
   import MessageReportDialog from './MessageReportDialog.svelte';
   import { sendReport } from './report';
+  import { provideRoomMediaPreviews, RoomMediaPreviews } from './room-media-previews.svelte.js';
   import MembersDrawer from './MembersDrawer.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import ThreadList from './ThreadList.svelte';
@@ -369,6 +370,11 @@
 
   const abbreviations = new RoomAbbreviations(core.commands);
   provideRoomAbbreviations(abbreviations);
+  const mediaPreviews = new RoomMediaPreviews(() => resolvedRoom?.join_rule ?? null);
+  provideRoomMediaPreviews(mediaPreviews);
+  $effect(() => {
+    void mediaPreviews.load(resolvedRoomId);
+  });
   provideRoomMemberNames({ displayName: memberDisplayName });
   let senderRoles = $derived.by((): Record<string, SenderRole> => {
     const tags = powerTags;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import { SvelteSet } from 'svelte/reactivity';
@@ -235,7 +236,12 @@
   {@const busy = answers.isAnswering(room.room_id)}
   <li class="card">
     <div class="head">
-      <Avatar id={room.room_id} src={room.avatar_url} {name} size="large" />
+      <Avatar
+        id={room.room_id}
+        src={mediaPreviewSettings.inviteAvatars === 'on' ? room.avatar_url : null}
+        {name}
+        size="large"
+      />
       <div class="identity">
         <p class="name">
           <span class="name-text">{name}</span>

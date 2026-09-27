@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
   import { onMount } from 'svelte';
   import { onDestroy, tick, type Snippet, untrack } from 'svelte';
   import { on } from 'svelte/events';
@@ -686,6 +687,7 @@
     notifications.start(core, openNotification);
     presence.start(core);
     dismissedInvites.start(core);
+    mediaPreviewSettings.start(core);
     profileOverrides.start(core);
     return () => {
       roomList.stop();
@@ -693,6 +695,7 @@
       notifications.stop();
       presence.stop();
       dismissedInvites.stop();
+      mediaPreviewSettings.stop();
       profileOverrides.stop();
     };
   });
