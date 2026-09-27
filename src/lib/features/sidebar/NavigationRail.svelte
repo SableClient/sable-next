@@ -612,6 +612,7 @@
         src={space?.avatar_url}
         name={spaceName(space?.name ?? null, roomId)}
         size="small"
+        uniform
       />
     {/each}
   </span>
