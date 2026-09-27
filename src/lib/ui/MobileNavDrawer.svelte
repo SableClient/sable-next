@@ -228,6 +228,7 @@
     height: 100%;
     transform: translateX(-50%);
     width: 200%;
+    will-change: transform;
   }
 
   .drawer-track.open {
@@ -281,7 +282,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     :global(html:not([data-reduced-motion='on'])) .drawer-track:not(.dragging, .route-changing) {
-      transition: transform var(--duration-fast) var(--ease-smooth-out);
+      transition: transform var(--duration-medium) var(--ease-slide);
     }
   }
 
