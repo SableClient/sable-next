@@ -382,6 +382,8 @@ html {
   --text-scale: 1;
   --titlebar-height: 0px;
   --header-height: 3.5rem;
+  --room-column-min-width: 24rem;
+  --side-panel-min-width: 14rem;
   --resize-handle: 4px;
   --mac-traffic-lights: 4.5rem;
 

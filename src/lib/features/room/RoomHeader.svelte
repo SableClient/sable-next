@@ -28,6 +28,7 @@
     callParticipants: readonly string[];
     members: readonly MemberView[];
     membersOpen?: boolean;
+    searchOpen?: boolean;
     onCall?: (() => void) | null;
     onToggleChat?: (() => void) | null;
     chatOpen?: boolean;
@@ -50,6 +51,7 @@
     callParticipants,
     members,
     membersOpen = false,
+    searchOpen = false,
     onCall = null,
     onToggleChat = null,
     chatOpen = false,
@@ -118,8 +120,13 @@
   {/snippet}
 
   {#snippet suffix()}
-    <PanelHeaderButton class="search-button" label={$i18n.t('search.open')} onclick={onSearch}>
-      <MagnifyingGlassIcon />
+    <PanelHeaderButton
+      class="search-button"
+      label={$i18n.t('search.open')}
+      aria-pressed={searchOpen}
+      onclick={onSearch}
+    >
+      <MagnifyingGlassIcon weight={searchOpen ? 'fill' : 'regular'} />
     </PanelHeaderButton>
     {@render pins?.()}
     {#if onToggleChat}
@@ -153,10 +160,9 @@
     {/if}
     {@render actions?.()}
     <PanelHeaderButton
-      class="members-button selection-open"
+      class="members-button"
       label={$i18n.t('timeline.members')}
       aria-pressed={membersOpen}
-      data-state={membersOpen ? 'open' : 'closed'}
       onclick={onMembers}
     >
       <UserCircleIcon weight={membersOpen ? 'fill' : 'regular'} />

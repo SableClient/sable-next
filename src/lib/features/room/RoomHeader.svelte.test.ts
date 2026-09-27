@@ -34,6 +34,8 @@ function mountHeader(props: {
   callParticipants: readonly string[];
   onToggleChat?: (() => void) | null;
   chatOpen?: boolean;
+  searchOpen?: boolean;
+  membersOpen?: boolean;
 }): RenderResult<typeof RoomHeader> {
   return render(RoomHeader, {
     props: {
@@ -94,4 +96,15 @@ test('a text room has no chat toggle', () => {
   mountHeader({ isVoice: false, callParticipants: [] });
 
   expect(screen.queryByRole('button', { name: /chat$/ })).not.toBeInTheDocument();
+});
+
+test('every header toggle exposes its open state for themes', () => {
+  mountHeader({ isVoice: false, callParticipants: [], searchOpen: true, membersOpen: false });
+
+  expect(screen.getByRole('button', { name: 'Search messages' })).toHaveAttribute(
+    'data-state',
+    'open'
+  );
+  expect(screen.getByRole('button', { name: 'Members' })).toHaveAttribute('data-state', 'closed');
+  expect(screen.getByRole('button', { name: 'Back to rooms' })).not.toHaveAttribute('data-state');
 });

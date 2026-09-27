@@ -435,7 +435,7 @@
     .members-drawer:not(.compact) {
       border-left: var(--border-width) solid var(--surface-container-line);
       box-shadow: none;
-      flex: 0 0 16.625rem;
+      flex: 0 0 auto;
       inset: auto;
       max-width: min(40rem, 50vw);
       min-width: 12rem;

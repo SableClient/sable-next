@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack, type Component } from 'svelte';
+  import { onMount, untrack, type Component } from 'svelte';
   import type {
     MemberView,
     RoomAttachmentContentView,
@@ -29,6 +29,8 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
+  import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
@@ -345,6 +347,9 @@
       return { host: url, rest: '' };
     }
   }
+
+  const panelWidth = new PanelWidth('sable-attachments-width', 22, 16, 40);
+  onMount(() => panelWidth.restore());
 </script>
 
 {#snippet skeleton()}
@@ -498,7 +503,24 @@
 {/snippet}
 
 {#snippet body()}
-  <aside class={['attachments', { modal }]} aria-label={$i18n.t('timeline.attachmentsTitle')}>
+  <aside
+    class={['attachments', { modal }]}
+    aria-label={$i18n.t('timeline.attachmentsTitle')}
+    style:width={modal ? null : `${panelWidth.width}rem`}
+  >
+    {#if !modal}
+      <ResizeHandle
+        value={panelWidth.width}
+        min={panelWidth.min}
+        max={panelWidth.max}
+        label={$i18n.t('timeline.attachmentsResize')}
+        grow="left"
+        step={1}
+        fromPixels={remFromPixels}
+        onResize={(next) => panelWidth.resize(next)}
+        onCommit={() => panelWidth.commit()}
+      />
+    {/if}
     <PanelHeader class="attachments-header" title={$i18n.t('timeline.attachmentsTitle')}>
       {#snippet prefix()}
         <ImagesIcon aria-hidden="true" />
@@ -615,7 +637,13 @@
     flex: 0 0 auto;
     grid-template-rows: auto auto auto minmax(0, 1fr);
     min-height: 0;
+    position: relative;
     width: 22rem;
+  }
+
+  .attachments :global(.resize-handle) {
+    left: -0.25rem;
+    z-index: 1;
   }
 
   .attachments.modal {

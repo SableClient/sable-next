@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import type { MemberView, TimelineItemView } from '#src/generated/protocol';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -9,6 +10,8 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
+  import { PanelWidth, remFromPixels } from '#lib/ui/panel-width.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
 
   import MessagePreview from './MessagePreview.svelte';
@@ -54,10 +57,30 @@
     nextBatch = null;
     void load(null);
   });
+
+  const panelWidth = new PanelWidth('sable-thread-list-width', 22, 16, 40);
+  onMount(() => panelWidth.restore());
 </script>
 
 {#snippet body()}
-  <aside class={['thread-list', { modal }]} aria-label={$i18n.t('timeline.threadsTitle')}>
+  <aside
+    class={['thread-list', { modal }]}
+    aria-label={$i18n.t('timeline.threadsTitle')}
+    style:width={modal ? null : `${panelWidth.width}rem`}
+  >
+    {#if !modal}
+      <ResizeHandle
+        value={panelWidth.width}
+        min={panelWidth.min}
+        max={panelWidth.max}
+        label={$i18n.t('timeline.threadsResize')}
+        grow="left"
+        step={1}
+        fromPixels={remFromPixels}
+        onResize={(next) => panelWidth.resize(next)}
+        onCommit={() => panelWidth.commit()}
+      />
+    {/if}
     <PanelHeader class="thread-list-header" title={$i18n.t('timeline.threadsTitle')}>
       {#snippet prefix()}
         <ChatsIcon aria-hidden="true" />
@@ -145,7 +168,13 @@
     flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr);
     min-height: 0;
+    position: relative;
     width: 22rem;
+  }
+
+  .thread-list :global(.resize-handle) {
+    left: -0.25rem;
+    z-index: 1;
   }
 
   .thread-list.modal {
