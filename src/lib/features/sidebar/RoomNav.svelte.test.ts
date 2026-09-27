@@ -3,7 +3,7 @@
 import { cleanup, render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from 'vitest';
 
 import type {
   NotificationModeView,
@@ -911,6 +911,10 @@ test('a muted room marked unread by hand keeps its dot and no count', async () =
 });
 
 test('a room set to all messages badges its unread messages in green', async () => {
+  setPreference('showUnreadCounts', true);
+  onTestFinished(() => {
+    setPreference('showUnreadCounts', false);
+  });
   roomsFixture.rooms = [
     makeRoom({ room_id: '!loud:example.org', name: 'Loud', unread: 6, notifying: 6 }),
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', unread: 6 }),

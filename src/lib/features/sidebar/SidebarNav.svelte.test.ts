@@ -32,6 +32,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async (importOriginal) => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 
@@ -286,6 +287,10 @@ test('a muted room marked unread by hand still marks its section as unread', asy
 });
 
 test('a section totals its notifying rooms in green', async () => {
+  setPreference('showUnreadCounts', true);
+  onTestFinished(() => {
+    setPreference('showUnreadCounts', false);
+  });
   const room: RoomSummary = {
     ...space('!loud:example.org', 'Loud'),
     is_space: false,

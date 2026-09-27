@@ -58,10 +58,28 @@ test('counts stop spelling themselves out past a thousand', () => {
   expect(formatUnreadCount(1001)).toBe('1k+');
 });
 
-test('a room whose ordinary messages notify counts them, and counts them loudly', () => {
+test('a room whose ordinary messages notify counts them loudly once room counts are on', () => {
   const counts = { unread: 6, highlight: 0, notifying: 6 };
 
-  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 6, highlight: true });
+  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'dot', count: 6, highlight: true });
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
+    mode: 'count',
+    count: 6,
+    highlight: true,
+  });
+});
+
+test('a direct chat is numbered by the direct-message setting alone', () => {
+  const counts = { unread: 3, highlight: 0, notifying: 3 };
+
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true }, true)?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('count');
+});
+
+test('room counts do not number a mention', () => {
+  const counts = { unread: 5, highlight: 1, notifying: 5 };
+
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })?.mode).toBe('dot');
 });
 
 test('a notifying room still counts a mention as the mention', () => {
@@ -89,7 +107,6 @@ test('notifying does not resurrect a room with nothing unread', () => {
 test('an aggregate counts what notified, not every unread message under it', () => {
   const counts = { unread: 32, highlight: 0, notifying: 2 };
 
-  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 2, highlight: true });
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
     mode: 'count',
     count: 2,
