@@ -598,6 +598,7 @@
   .profile-stack {
     display: grid;
     gap: var(--space-400);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .banner-row,
@@ -631,6 +632,7 @@
   .banner-setting :global(.banner) {
     border-radius: var(--radius);
     height: 6rem;
+    min-width: 0;
     object-fit: cover;
     width: 100%;
   }
