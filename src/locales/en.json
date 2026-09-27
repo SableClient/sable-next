@@ -1785,6 +1785,7 @@
     "accessibilityTitle": "Accessibility",
     "fontScale": "Text size",
     "fontScaleHint": "Scales text only. Spacing, icons and pictures keep their size.",
+    "rangePercent": "{{name}} in percent",
     "pageZoom": "Page size",
     "pageZoomHint": "Scales the whole interface: text, spacing, icons and pictures.",
     "highContrast": "Increase contrast",

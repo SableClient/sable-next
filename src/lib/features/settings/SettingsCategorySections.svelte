@@ -2,6 +2,7 @@
   import { i18n } from '#lib/i18n.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import '#lib/ui/primitives/form-control.css';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -110,7 +111,29 @@
                 setting.onChange?.(value);
               }}
             />
-            <span class="range-reading">{Math.round(preferences[key] * 100)}%</span>
+            <label class="range-reading">
+              <input
+                class="form-control range-input"
+                type="number"
+                inputmode="numeric"
+                {disabled}
+                min={Math.round(PREFERENCE_RANGES[key].min * 100)}
+                max={Math.round(PREFERENCE_RANGES[key].max * 100)}
+                step={Math.round(setting.step * 100)}
+                value={Math.round(preferences[key] * 100)}
+                aria-label={$i18n.t('settings.rangePercent', { name: $i18n.t(setting.name) })}
+                onchange={(event) => {
+                  const typed = Number(event.currentTarget.value) / 100;
+                  if (event.currentTarget.value !== '' && Number.isFinite(typed)) {
+                    const { min, max } = PREFERENCE_RANGES[key];
+                    const next = Math.min(max, Math.max(min, typed));
+                    setPreference(key, next);
+                    setting.onChange?.(next);
+                  }
+                  event.currentTarget.value = String(Math.round(preferences[key] * 100));
+                }}
+              />%
+            </label>
           </div>
         {:else}
           {@const key = setting.key}
@@ -173,11 +196,25 @@
   }
 
   .range-reading {
+    align-items: center;
+    display: flex;
     flex: none;
     font-size: var(--font-size-small);
+    gap: var(--space-050);
+  }
+
+  .range-input {
+    appearance: textfield;
     font-variant-numeric: tabular-nums;
-    inline-size: 2.5rem;
+    inline-size: 3.5rem;
+    padding-inline: var(--space-150);
     text-align: end;
+  }
+
+  .range-input::-webkit-inner-spin-button,
+  .range-input::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
   }
 
   .settings-stack {
