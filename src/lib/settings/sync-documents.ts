@@ -15,6 +15,11 @@ import {
   roomIconOverrides,
 } from '#lib/features/room/settings/room-appearance.svelte.js';
 import {
+  adoptUngroupedFavourites,
+  parseUngroupedFavourites,
+  ungroupedFavourites,
+} from '#lib/features/sidebar/favourite-grouping.svelte.js';
+import {
   adoptQueue,
   parseQueue,
   scheduledQueue,
@@ -73,6 +78,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         recentGifs: recentGifs(),
         roomIcons: roomIconOverrides(),
         openFolders: [...sidebar.openFolders],
+        ungroupedFavourites: ungroupedFavourites(),
       },
     }),
 
@@ -84,7 +90,8 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
           favoriteGifs().length === 0 &&
           recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
-          sidebar.openFolders.size === 0
+          sidebar.openFolders.size === 0 &&
+          ungroupedFavourites().length === 0
         );
       }
 
@@ -93,6 +100,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       adoptRecentGifs(parseFavorites(body.recentGifs));
       adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));
       sidebar.adoptOpenFolders(stringList(body.openFolders));
+      adoptUngroupedFavourites(parseUngroupedFavourites(body.ungroupedFavourites));
       return true;
     },
   };

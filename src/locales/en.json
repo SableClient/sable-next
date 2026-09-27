@@ -32,6 +32,7 @@
     "accountSignInAgain": "Sign in again",
     "currentAccount": "Current",
     "favourites": "Favourites",
+    "groupFavourites": "Group favourites",
     "rooms": "Rooms",
     "roomsUnavailable": "Your rooms will appear here once room-list data is available.",
     "unspaced": "Rooms outside spaces",

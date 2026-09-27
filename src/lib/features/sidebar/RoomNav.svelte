@@ -79,6 +79,7 @@
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
+  import { groupsFavourites, setGroupsFavourites } from './favourite-grouping.svelte.js';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -297,7 +298,9 @@
     );
     return buildSpaceTree(space, roomsById, Number(preferences.subspaceHierarchyLimit));
   });
-  let spaceRootItems = $derived(withoutFavourites(spaceTree));
+  let favouriteView = $derived(activeSpaceId ?? section);
+  let groupFavourites = $derived(groupsFavourites(favouriteView));
+  let spaceRootItems = $derived(groupFavourites ? withoutFavourites(spaceTree) : spaceTree);
   let listedRooms = $derived.by<RoomNavRow[]>(() => {
     if (directSection) {
       return roomList.rooms
@@ -326,6 +329,7 @@
       .sort(byRecency);
   });
   let favourites = $derived.by<RoomNavRow[]>(() => {
+    if (!groupFavourites) return [];
     const rows = page.url.pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
     return rows
       .filter(
@@ -335,7 +339,9 @@
       .map((row) => ({ ...row, depth: 0, key: row.roomId }))
       .sort(byRecency);
   });
-  let rooms = $derived(listedRooms.filter((row) => !isFavourite(row)));
+  let rooms = $derived(
+    groupFavourites ? listedRooms.filter((row) => !isFavourite(row)) : listedRooms
+  );
   let sectionRooms = $derived([...favourites, ...rooms]);
   let invites = $derived.by<RoomSummary[]>(() => {
     const pending = roomList.rooms.filter(
@@ -643,6 +649,16 @@
     <ActionMenuItem disabled={!sectionUnread} onSelect={markSectionRead}>
       <ChecksIcon />
       {$i18n.t('nav.markSectionRead')}
+    </ActionMenuItem>
+    <ActionMenuItem
+      closeOnSelect={false}
+      checked={groupFavourites}
+      onSelect={() => {
+        setGroupsFavourites(favouriteView, !groupFavourites);
+      }}
+    >
+      <span class="menu-check" aria-hidden="true">{groupFavourites ? '✓' : ''}</span>
+      {$i18n.t('nav.groupFavourites')}
     </ActionMenuItem>
     {#if activeSpace}
       <ActionMenuItem

@@ -73,6 +73,7 @@ vi.mock('#lib/rooms/presence.svelte.js', () => ({
   usePresenceStore: () => ({ get: () => presenceFixture.entry }),
 }));
 
+import { setGroupsFavourites } from './favourite-grouping.svelte.js';
 import RoomNavHarness from './RoomNavHarness.test.svelte';
 
 const realObserver = globalThis.IntersectionObserver;
@@ -355,6 +356,25 @@ test('favourites sit in their own section above the rest of the list', async () 
   expect(
     Array.from(document.querySelectorAll('.rooms-heading-label')).map((node) => node.textContent)
   ).toEqual(['nav.favourites', 'nav.rooms']);
+});
+
+test('a view that stops grouping favourites keeps them in recency order', async () => {
+  roomsFixture.rooms = [
+    makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
+    makeRoom({
+      room_id: '!starred:example.org',
+      name: 'Starred',
+      tags: ['favourite'],
+      latest_event: latestAt(10),
+    }),
+    makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(20) }),
+  ];
+  setGroupsFavourites('unspaced', false);
+
+  await mountNav();
+  expect(document.querySelector('.room-list.favourites')).not.toBeInTheDocument();
+  expect(roomNames()).toEqual(['Busy', 'Quiet', 'Starred']);
+  setGroupsFavourites('unspaced', true);
 });
 
 test('a space lifts a favourite out of its subspace', async () => {
