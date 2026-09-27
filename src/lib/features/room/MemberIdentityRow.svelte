@@ -99,7 +99,10 @@
         compact={pronouns.length === 0}
       />
       {#if userStatus}
-        <span class="member-identity-status">
+        <span
+          class="member-identity-status"
+          title={[userStatus.emoji, userStatus.text].filter(Boolean).join(' ')}
+        >
           {#if userStatus.emoji}<span class="member-identity-status-emoji">{userStatus.emoji}</span
             >{/if}{userStatus.text}
         </span>

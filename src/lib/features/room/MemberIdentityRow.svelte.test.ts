@@ -115,6 +115,17 @@ test('shows the profile status, emoji first', async () => {
   expect(await screen.findByText('Shipping')).toHaveTextContent('\u{1F680}Shipping');
 });
 
+test('offers the whole status on hover, since the row truncates it', async () => {
+  const text = 'Shipping the release candidate before the weekend, back on Monday';
+  core.userProfile.mockResolvedValue({
+    ...profileFor('@bob:example.org'),
+    status: { text, emoji: '\u{1F680}' },
+  });
+  await mountRow({ showStatus: true });
+
+  expect(await screen.findByText(text)).toHaveAttribute('title', `\u{1F680} ${text}`);
+});
+
 test('renders a medium presence marker', async () => {
   presence.entry = { presence: 'online', statusMessage: null };
   await mountRow({});

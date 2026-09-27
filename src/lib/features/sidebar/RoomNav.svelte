@@ -782,7 +782,9 @@
               {#if room?.is_direct && room.topic}
                 <span class="room-topic">{room.topic}</span>
               {:else if peerStatus}
-                <span class="room-topic"
+                <span
+                  class="room-topic"
+                  title={[peerStatus.emoji, peerStatus.text].filter(Boolean).join(' ')}
                   >{#if peerStatus.emoji}<span class="room-status-emoji">{peerStatus.emoji}</span
                     >{/if}{peerStatus.text}</span
                 >
