@@ -144,6 +144,7 @@
   }
 
   :global(.avatar-image),
+  :global(.avatar-root .media-image.avatar-image),
   :global(.avatar-fallback) {
     border-radius: inherit;
     height: 100%;
