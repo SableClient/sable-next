@@ -1,9 +1,11 @@
 <script lang="ts">
   import type { RoomSummary } from '#src/generated/protocol';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
   import { useCoreClient } from '#lib/core/context.js';
-  import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { findRoomByPathId, roomPathParam, useRoomList } from '#lib/rooms/room-list.svelte.js';
 
   import JoinBeforeNavigate from './JoinBeforeNavigate.svelte';
   import RoomView from './RoomView.svelte';
@@ -14,7 +16,8 @@
   let roomId = $derived(page.params.roomId ?? '');
   let eventId = $derived(page.url.searchParams.get('event'));
   let notifiedEventId = $derived(page.state.notified ?? null);
-  let joined = $derived(findRoomByPathId(roomList.rooms, roomId) !== undefined);
+  let listedRoom = $derived(findRoomByPathId(roomList.rooms, roomId));
+  let joined = $derived(listedRoom !== undefined);
 
   /* An empty room list means "not loaded yet" as much as "not a member", and
      only the first justifies withholding the timeline. */
@@ -46,10 +49,21 @@
       current = false;
     };
   });
+
+  let resolvedRoom = $derived(listedRoom ?? unlistedRoom);
+  let space = $derived(resolvedRoom?.is_space ? resolvedRoom : null);
+  $effect(() => {
+    if (!space) return;
+    void goto(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space) }), {
+      replace: true,
+    });
+  });
 </script>
 
-{#if joined || !listed || unlistedRoom}
-  <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
-{:else}
-  <JoinBeforeNavigate {roomId} {eventId} via={page.url.searchParams.getAll('via')} />
+{#if space === null}
+  {#if joined || !listed || unlistedRoom}
+    <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
+  {:else}
+    <JoinBeforeNavigate {roomId} {eventId} via={page.url.searchParams.getAll('via')} />
+  {/if}
 {/if}

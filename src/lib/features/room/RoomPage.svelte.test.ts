@@ -9,6 +9,7 @@ import type { RoomSummary } from '#src/generated/protocol';
 const rendered = vi.hoisted(() => [] as { kind: string; roomId: string; extra: unknown }[]);
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 
 import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
@@ -28,6 +29,7 @@ vi.mock('./JoinBeforeNavigate.svelte', () => ({
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { goto, resetNavigation } from '#lib/test-support/app-navigation.js';
 
 import RoomPage from './RoomPage.svelte';
 
@@ -37,6 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rendered.length = 0;
+  resetNavigation();
 });
 
 async function settle(): Promise<void> {
@@ -76,4 +79,16 @@ test('a room we left goes through the join', async () => {
   await settle();
 
   expect(rendered.at(-1)?.kind).toBe('join');
+});
+
+test('a space opened as a room is sent to its lobby', async () => {
+  const space = { room_id: '!old:example.org', state: 'joined', is_space: true } as RoomSummary;
+  Object.assign(core, { roomSummary: vi.fn(() => Promise.resolve(space)) });
+  render(RoomPage);
+  await settle();
+
+  expect(goto).toHaveBeenCalledWith(expect.stringMatching(/\/space\/.+\/lobby$/), {
+    replace: true,
+  });
+  expect(rendered.at(-1)?.kind).not.toBe('view');
 });
