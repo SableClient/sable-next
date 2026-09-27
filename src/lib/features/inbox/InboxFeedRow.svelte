@@ -24,7 +24,7 @@
 
 <li class={className}>
   <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- roomSectionPath resolves the route itself -->
-  <a class="row" href={roomSectionPath(roomList.rooms, roomId, eventId)}>
+  <a class="row" href={roomSectionPath(roomList.rooms, roomId, eventId)} draggable="false">
     <Avatar id={roomId} src={avatarUrl} {name} />
     <span class="body">
       {@render children()}

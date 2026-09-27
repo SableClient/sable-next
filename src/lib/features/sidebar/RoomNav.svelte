@@ -719,6 +719,7 @@
       {#snippet roomTrigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
+          draggable="false"
           oncontextmenu={mouseContextMenu((event) => {
             if (room) openContextMenu(event, room, item.parentSpaceId ?? null);
           })}
@@ -935,6 +936,7 @@
       {#snippet linkTrigger({ props }: { props: Record<string, unknown> })}
         <a
           {...props}
+          draggable="false"
           oncontextmenu={mouseContextMenu((event) => {
             openContextMenu(event, room, null);
           })}
@@ -998,6 +1000,7 @@
         <a
           class="nav-action selection-current selection-layer"
           {href}
+          draggable="false"
           onclick={() => onNavigate?.(href)}
           aria-label={collapsed ? label : undefined}
           aria-current={active ? 'page' : undefined}

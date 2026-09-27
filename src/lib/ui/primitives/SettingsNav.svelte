@@ -77,6 +77,7 @@
       href={href(entry)}
       aria-current={active ? 'page' : undefined}
       data-current={active ? 'true' : undefined}
+      draggable="false"
       onclick={(event) => onSelect(event, entry.id)}
     >
       <span class="icon" aria-hidden="true"><Icon weight={active ? 'fill' : 'regular'} /></span>
