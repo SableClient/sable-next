@@ -41,6 +41,41 @@ struct Stored {
     version: u32,
     entries: Vec<Entry>,
     cursors: BTreeMap<OwnedRoomId, Option<String>>,
+    #[serde(default)]
+    unread_scans: BTreeMap<OwnedRoomId, UnreadScan>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct UnreadScan {
+    receipt_ts: u64,
+    notified: u64,
+    head: Option<OwnedEventId>,
+    from: Option<String>,
+    found: u64,
+    complete: bool,
+}
+
+impl UnreadScan {
+    fn for_room(
+        previous: Option<&Self>,
+        receipt_ts: u64,
+        notified: u64,
+        head: Option<OwnedEventId>,
+    ) -> Self {
+        previous
+            .filter(|scan| {
+                scan.receipt_ts == receipt_ts && scan.notified == notified && scan.head == head
+            })
+            .cloned()
+            .unwrap_or(Self {
+                receipt_ts,
+                notified,
+                head,
+                from: None,
+                found: 0,
+                complete: false,
+            })
+    }
 }
 
 fn merge(entries: &mut Vec<Entry>, fresh: Vec<Entry>) -> usize {
@@ -87,32 +122,32 @@ const fn matches(entry: &Entry, filter: InboxFilter) -> bool {
     }
 }
 
-async fn load(client: &matrix_sdk::Client) -> Stored {
+async fn load(client: &matrix_sdk::Client) -> Result<Stored, CommandErr> {
     let bytes = match client.state_store().get_custom_value(KEY).await {
         Ok(Some(bytes)) => bytes,
-        Ok(None) => return Stored::default(),
+        Ok(None) => return Ok(Stored::default()),
         Err(error) => {
             warn!("reading the inbox store failed: {error}");
-            return Stored::default();
+            return Err(CommandErr::Unavailable);
         }
     };
     match serde_json::from_slice::<Stored>(&bytes) {
-        Ok(stored) if stored.version == SCHEMA => stored,
-        Ok(_) => Stored::default(),
+        Ok(stored) if stored.version == SCHEMA => Ok(stored),
+        Ok(_) => Ok(Stored::default()),
         Err(error) => {
             warn!("discarding an inbox store that did not parse: {error}");
-            Stored::default()
+            Ok(Stored::default())
         }
     }
 }
 
-async fn save(client: &matrix_sdk::Client, stored: &mut Stored) {
+async fn save(client: &matrix_sdk::Client, stored: &mut Stored) -> Result<(), CommandErr> {
     stored.version = SCHEMA;
     let bytes = match serde_json::to_vec(stored) {
         Ok(bytes) => bytes,
         Err(error) => {
             warn!("serialising the inbox store failed: {error}");
-            return;
+            return Err(CommandErr::Unavailable);
         }
     };
     if let Err(error) = client
@@ -121,24 +156,61 @@ async fn save(client: &matrix_sdk::Client, stored: &mut Stored) {
         .await
     {
         warn!("persisting the inbox store failed: {error}");
+        return Err(CommandErr::Unavailable);
     }
+    Ok(())
 }
 
-pub(crate) async fn receipt_ts(room: &Room) -> u64 {
+pub(crate) async fn receipt_ts(room: &Room) -> matrix_sdk::Result<u64> {
     let user_id = room.own_user_id();
-    let mut latest = 0;
+    let mut receipts = BTreeMap::new();
     for receipt_type in [ReceiptType::Read, ReceiptType::ReadPrivate] {
         for thread in [ReceiptThread::Unthreaded, ReceiptThread::Main] {
-            if let Ok(Some((_, receipt))) = room
+            if let Some((event_id, receipt)) = room
                 .load_user_receipt(receipt_type.clone(), &thread, user_id)
-                .await
-                && let Some(ts) = receipt.ts
+                .await?
             {
-                latest = latest.max(u64::from(ts.get()));
+                let ts = receipt.ts.map(|ts| u64::from(ts.get()));
+                receipts
+                    .entry(event_id)
+                    .and_modify(|known: &mut Option<u64>| *known = (*known).max(ts))
+                    .or_insert(ts);
             }
         }
     }
-    latest
+    if receipts.is_empty() {
+        return Ok(0);
+    }
+    let targets: std::collections::BTreeSet<OwnedEventId> = receipts.keys().cloned().collect();
+    let key = format!("sable.inbox.receipt.{}", room.room_id());
+    let client = room.client();
+    let store = client.state_store();
+    if let Some(bytes) = store.get_custom_value(key.as_bytes()).await?
+        && let Ok((known, ts)) =
+            serde_json::from_slice::<(std::collections::BTreeSet<OwnedEventId>, u64)>(&bytes)
+        && known == targets
+    {
+        return Ok(ts);
+    }
+    let mut latest = 0;
+    let mut resolved = true;
+    for (event_id, receipt_ts) in &receipts {
+        match room.load_or_fetch_event(event_id, None).await {
+            Ok(event) => latest = latest.max(event_ts(&event).unwrap_or(0)),
+            Err(error) => {
+                warn!(room_id = %room.room_id(), %event_id, "read receipt event unavailable: {error}");
+                resolved = false;
+                latest = latest.max(receipt_ts.unwrap_or(0));
+            }
+        }
+    }
+    if resolved {
+        let bytes = serde_json::to_vec(&(targets, latest))?;
+        store
+            .set_custom_value_no_read(key.as_bytes(), bytes)
+            .await?;
+    }
+    Ok(latest)
 }
 
 fn notified(room: &Room) -> u64 {
@@ -147,11 +219,72 @@ fn notified(room: &Room) -> u64 {
         .max(room.num_unread_notifications())
 }
 
-async fn read_state(room: &Room) -> RoomReadState {
-    RoomReadState {
-        receipt_ts: receipt_ts(room).await,
-        remaining: notified(room),
+async fn read_state(room: &Room) -> Result<RoomReadState, CommandErr> {
+    let remaining = notified(room);
+    if remaining == 0 {
+        return Ok(RoomReadState {
+            receipt_ts: 0,
+            remaining,
+        });
     }
+    Ok(RoomReadState {
+        receipt_ts: receipt_ts(room).await.map_err(|error| {
+            warn!("resolving the inbox read receipt failed: {error}");
+            CommandErr::Unavailable
+        })?,
+        remaining,
+    })
+}
+
+async fn backfill_candidates(
+    client: &matrix_sdk::Client,
+    stored: &Stored,
+    include_read: bool,
+) -> Result<Vec<(Room, UnreadScan)>, CommandErr> {
+    let mut candidates = Vec::new();
+    for room in client.joined_rooms() {
+        if room.is_space() {
+            continue;
+        }
+        if include_read {
+            let cursor = stored.cursors.get(room.room_id()).cloned();
+            if matches!(cursor, Some(None)) {
+                continue;
+            }
+            candidates.push((
+                room,
+                UnreadScan {
+                    receipt_ts: 0,
+                    notified: u64::MAX,
+                    head: None,
+                    from: cursor.flatten(),
+                    found: 0,
+                    complete: false,
+                },
+            ));
+            continue;
+        }
+        if notified(&room) == 0 {
+            continue;
+        }
+        let read = read_state(&room).await?;
+        let scan = UnreadScan::for_room(
+            stored.unread_scans.get(room.room_id()),
+            read.receipt_ts,
+            read.remaining,
+            room.latest_event().event_id(),
+        );
+        if !scan.complete {
+            candidates.push((room, scan));
+        }
+    }
+    candidates.sort_by_key(|(room, _)| {
+        (
+            std::cmp::Reverse(room.unread_notification_counts().highlight_count),
+            std::cmp::Reverse(room.recency_stamp()),
+        )
+    });
+    Ok(candidates)
 }
 
 impl Core {
@@ -208,16 +341,18 @@ impl Core {
         client: &matrix_sdk::Client,
         fresh: Vec<Entry>,
         cursors: BTreeMap<OwnedRoomId, Option<String>>,
-    ) -> usize {
-        if fresh.is_empty() && cursors.is_empty() {
-            return 0;
+        unread_scans: BTreeMap<OwnedRoomId, UnreadScan>,
+    ) -> Result<usize, CommandErr> {
+        if fresh.is_empty() && cursors.is_empty() && unread_scans.is_empty() {
+            return Ok(0);
         }
         let _guard = self.inbox_lock.lock().await;
-        let mut stored = load(client).await;
+        let mut stored = load(client).await?;
         let added = merge(&mut stored.entries, fresh);
         stored.cursors.extend(cursors);
-        save(client, &mut stored).await;
-        added
+        stored.unread_scans.extend(unread_scans);
+        save(client, &mut stored).await?;
+        Ok(added)
     }
 
     pub(crate) async fn record_live_inbox(
@@ -230,12 +365,18 @@ impl Core {
         let Some(entry) = self.inbox_entry(room, raw, actions).await else {
             return;
         };
-        if self
-            .record_inbox(&room.client(), vec![entry], BTreeMap::new())
+        match self
+            .record_inbox(
+                &room.client(),
+                vec![entry],
+                BTreeMap::new(),
+                BTreeMap::new(),
+            )
             .await
-            > 0
         {
-            self.emit_if_current(generation, CoreEvent::InboxChanged);
+            Ok(added) if added > 0 => self.emit_if_current(generation, CoreEvent::InboxChanged),
+            Err(error) => warn!(?error, "recording an inbox notification failed"),
+            _ => {}
         }
     }
 
@@ -247,7 +388,7 @@ impl Core {
         before_ts: Option<u64>,
     ) -> Result<(Vec<InboxItemView>, bool), CommandErr> {
         let client = self.client().await?;
-        let stored = load(&client).await;
+        let stored = load(&client).await?;
         let mut rooms: HashMap<OwnedRoomId, Option<(Room, RoomReadState)>> = HashMap::new();
         let limit = usize::try_from(limit).unwrap_or(usize::MAX);
         let mut items = Vec::new();
@@ -260,7 +401,7 @@ impl Core {
                     .filter(|room| room.state() == matrix_sdk::RoomState::Joined);
                 let state = match joined {
                     Some(room) => {
-                        let read = read_state(&room).await;
+                        let read = read_state(&room).await?;
                         Some((room, read))
                     }
                     None => None,
@@ -298,73 +439,46 @@ impl Core {
         Ok((items, has_more))
     }
 
-    pub(crate) async fn backfill_inbox(&self, include_read: bool) -> Result<u32, CommandErr> {
+    pub(crate) async fn backfill_inbox(
+        &self,
+        include_read: bool,
+    ) -> Result<(u32, bool), CommandErr> {
         let client = self.client().await?;
-        if let Err(error) = crate::rooms::fill_own_members(&client).await {
-            warn!("could not fill in our own room memberships: {error}");
-        }
-        let stored = load(&client).await;
+        crate::rooms::fill_own_members(&client)
+            .await
+            .map_err(|error| self.failed("inbox_memberships", error))?;
+        let stored = load(&client).await?;
         let every_encrypted = notifications::every_encrypted_event_pushed(&client).await;
-        let mut candidates = Vec::new();
-
-        for room in client.joined_rooms() {
-            if room.is_space() {
-                continue;
-            }
-            let notified = notified(&room);
-            let cursor = stored.cursors.get(room.room_id()).cloned();
-            if include_read {
-                if matches!(cursor, Some(None)) {
-                    continue;
-                }
-                candidates.push((room, u64::MAX, 0, cursor.flatten()));
-                continue;
-            }
-            if notified == 0 {
-                continue;
-            }
-            let receipt = receipt_ts(&room).await;
-            let known = stored
-                .entries
-                .iter()
-                .filter(|entry| entry.room_id == room.room_id() && entry.ts > receipt)
-                .count() as u64;
-            let missing = notified.saturating_sub(known);
-            if missing > 0 {
-                candidates.push((room, missing, receipt, None));
-            }
-        }
+        let candidates = backfill_candidates(&client, &stored, include_read).await?;
         drop(stored);
-
-        candidates.sort_by_key(|(room, _, _, _)| {
-            (
-                std::cmp::Reverse(room.unread_notification_counts().highlight_count),
-                std::cmp::Reverse(room.recency_stamp()),
-            )
-        });
 
         let mut fresh = Vec::new();
         let mut cursors = BTreeMap::new();
+        let mut unread_scans = BTreeMap::new();
         let mut pages = 0;
+        let mut has_more = false;
+        let mut failure = None;
 
-        'rooms: for (room, mut missing, receipt, mut from) in candidates {
+        'rooms: for (room, mut scan) in candidates {
             loop {
                 if pages == MAX_PAGES {
+                    has_more = true;
                     break 'rooms;
                 }
                 pages += 1;
-                let mut options = MessagesOptions::backward().from(from.as_deref());
+                let mut options = MessagesOptions::backward().from(scan.from.as_deref());
                 options.limit = UInt::from(PAGE_SIZE);
                 let messages = match room.messages(options).await {
                     Ok(messages) => messages,
                     Err(error) => {
                         warn!(room_id = %room.room_id(), "inbox backfill failed: {error}");
+                        failure = Some(self.failed("inbox_backfill", error));
                         continue 'rooms;
                     }
                 };
                 let mut reached_read = false;
                 for event in &messages.chunk {
-                    if event_ts(event).is_some_and(|ts| ts <= receipt) && !include_read {
+                    if event_ts(event).is_some_and(|ts| ts <= scan.receipt_ts) && !include_read {
                         reached_read = true;
                         break;
                     }
@@ -376,28 +490,40 @@ impl Core {
                     }
                     if let Some(entry) = self.inbox_entry(&room, event.raw(), actions).await {
                         fresh.push(entry);
-                        missing = missing.saturating_sub(1);
+                        scan.found = scan.found.saturating_add(1);
                     }
                 }
                 let exhausted = messages.end.is_none() || messages.chunk.is_empty();
+                if !exhausted && messages.end == scan.from {
+                    failure = Some(CommandErr::Unavailable);
+                    continue 'rooms;
+                }
+                scan.from = messages.end.clone();
+                scan.complete = exhausted || reached_read || scan.found >= scan.notified;
                 if include_read {
                     cursors.insert(
                         room.room_id().to_owned(),
                         (!exhausted).then(|| messages.end.clone()).flatten(),
                     );
+                } else {
+                    unread_scans.insert(room.room_id().to_owned(), scan.clone());
                 }
-                if exhausted || reached_read || missing == 0 {
+                if scan.complete {
                     break;
                 }
-                from = messages.end;
             }
         }
 
-        let added = self.record_inbox(&client, fresh, cursors).await;
+        let added = self
+            .record_inbox(&client, fresh, cursors, unread_scans)
+            .await?;
         if added > 0 {
             self.emit(CoreEvent::InboxChanged);
         }
-        Ok(u32::try_from(added).unwrap_or(u32::MAX))
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok((u32::try_from(added).unwrap_or(u32::MAX), has_more))
     }
 }
 
@@ -407,9 +533,348 @@ fn event_ts(event: &TimelineEvent) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
-    use matrix_sdk::ruma::{OwnedEventId, owned_room_id, owned_user_id};
+    use std::{collections::BTreeMap, sync::Arc};
 
-    use super::{Entry, MAX_ENTRIES, RoomReadState, is_unread, merge, preview};
+    use matrix_sdk::ruma::{OwnedEventId, owned_room_id, owned_user_id};
+    use matrix_sdk::{
+        Client, Room,
+        ruma::{
+            event_id,
+            events::receipt::{ReceiptThread, ReceiptType},
+            room_id,
+        },
+        test_utils::mocks::MatrixMockServer,
+    };
+    use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+    use matrix_sdk_ui::sync_service::SyncService;
+    use serde_json::json;
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path_regex, query_param, query_param_is_missing},
+    };
+
+    use super::{Entry, MAX_ENTRIES, RoomReadState, UnreadScan, is_unread, merge, preview};
+    use crate::{Core, protocol::InboxFilter, session::Session, store::MemorySessionStore};
+
+    async fn setup(server: &MatrixMockServer, notified: u64) -> (Arc<Core>, Client, Room) {
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!room:example.org");
+        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        server.mock_room_state_encryption().plain().mount().await;
+        let room = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_event(factory.member(client.user_id().unwrap()))
+                    .add_state_event(factory.member(*ALICE))
+                    .add_state_event(factory.default_power_levels())
+                    .set_unread_notifications_count(
+                        json!({"notification_count": notified, "highlight_count": notified}),
+                    ),
+            )
+            .await;
+        let (core, _) = Core::new("inbox", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "inbox".to_owned(),
+            client: client.clone(),
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        (core, client, room)
+    }
+
+    fn message(
+        event_id: &str,
+        ts: u64,
+        user: Option<&matrix_sdk::ruma::UserId>,
+    ) -> serde_json::Value {
+        json!({"type": "m.room.message", "event_id": event_id, "room_id": "!room:example.org",
+            "sender": *ALICE, "origin_server_ts": ts,
+            "content": {"msgtype": "m.text", "body": "hello", "m.mentions": {"user_ids": user.into_iter().collect::<Vec<_>>()}}})
+    }
+
+    #[tokio::test]
+    async fn delayed_receipt_does_not_hide_a_newer_unread_message() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room.room_id())
+                    .add_receipt(
+                        factory
+                            .read_receipts()
+                            .add_with_timestamp(
+                                event_id!("$read"),
+                                client.user_id().unwrap(),
+                                ReceiptType::Read,
+                                ReceiptThread::Unthreaded,
+                                Some(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(300u32.into())),
+                            )
+                            .into_event(),
+                    )
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 1}),
+                    ),
+            )
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/event/.*read$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(message("$read", 100, None)))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        core.record_inbox(
+            &client,
+            vec![entry("unread", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        for _ in 0..2 {
+            let (items, _) = core
+                .inbox_notifications(InboxFilter::All, false, 30, None)
+                .await
+                .unwrap();
+            assert_eq!(items.len(), 1);
+            assert_eq!(items[0].event_id, "$unread");
+            assert!(!items[0].read);
+        }
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room.room_id())
+                    .add_receipt(
+                        factory
+                            .read_receipts()
+                            .add(
+                                event_id!("$unavailable"),
+                                client.user_id().unwrap(),
+                                ReceiptType::Read,
+                                ReceiptThread::Unthreaded,
+                            )
+                            .into_event(),
+                    )
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 0, "highlight_count": 0}),
+                    ),
+            )
+            .await;
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, true, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].read);
+    }
+
+    #[tokio::test]
+    async fn an_unfetchable_receipt_event_falls_back_to_the_receipt_time() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room.room_id())
+                    .add_receipt(
+                        factory
+                            .read_receipts()
+                            .add_with_timestamp(
+                                event_id!("$gone"),
+                                client.user_id().unwrap(),
+                                ReceiptType::Read,
+                                ReceiptThread::Unthreaded,
+                                Some(matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(150u32.into())),
+                            )
+                            .into_event(),
+                    )
+                    .set_unread_notifications_count(
+                        json!({"notification_count": 1, "highlight_count": 1}),
+                    ),
+            )
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/event/.*gone$"))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "gone"})),
+            )
+            .mount(server.server())
+            .await;
+        core.record_inbox(
+            &client,
+            vec![entry("old", 100), entry("new", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            items
+                .iter()
+                .map(|item| item.event_id.as_str())
+                .collect::<Vec<_>>(),
+            ["$new"]
+        );
+    }
+
+    #[tokio::test]
+    async fn unread_backfill_resumes_after_five_empty_pages() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _) = setup(&server, 1).await;
+        for page in 0..6 {
+            let mock = Mock::given(method("GET")).and(path_regex("/messages$"));
+            let mock = if page == 0 {
+                mock.and(query_param_is_missing("from"))
+            } else {
+                mock.and(query_param("from", format!("p{page}")))
+            };
+            let mut event = message(
+                &format!("$p{page}"),
+                1000 - page,
+                if page == 5 { client.user_id() } else { None },
+            );
+            if page < 5 {
+                event["sender"] = json!(client.user_id().unwrap());
+            }
+            mock.respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "start": format!("p{page}"), "end": format!("p{}", page + 1), "chunk": [event], "state": []
+            }))).expect(1).mount(server.server()).await;
+        }
+
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (0, true));
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (0, false));
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].event_id, "$p5");
+    }
+
+    #[tokio::test]
+    async fn backfill_fetch_errors_are_reported_and_can_be_retried() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _) = setup(&server, 1).await;
+        let failure = Mock::given(method("GET"))
+            .and(path_regex("/messages$"))
+            .respond_with(
+                ResponseTemplate::new(403)
+                    .set_body_json(json!({"errcode": "M_FORBIDDEN", "error": "denied"})),
+            )
+            .mount_as_scoped(server.server())
+            .await;
+        core.backfill_inbox(false).await.unwrap_err();
+        drop(failure);
+        Mock::given(method("GET")).and(path_regex("/messages$"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message("$retry", 100, client.user_id())], "state": []})))
+            .mount(server.server()).await;
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+    }
+
+    #[tokio::test]
+    async fn unread_backfill_reaches_rooms_beyond_the_first_batch() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _) = setup(&server, 1).await;
+        for index in 0..6 {
+            let name = if index == 0 {
+                "room".to_owned()
+            } else {
+                format!("extra{index}")
+            };
+            if index > 0 {
+                let room_id =
+                    matrix_sdk::ruma::RoomId::parse(format!("!{name}:example.org")).unwrap();
+                let factory = EventFactory::new().room(&room_id).sender(*ALICE);
+                server
+                    .sync_room(
+                        &client,
+                        JoinedRoomBuilder::new(&room_id)
+                            .add_state_event(factory.member(client.user_id().unwrap()))
+                            .add_state_event(factory.member(*ALICE))
+                            .add_state_event(factory.default_power_levels())
+                            .set_unread_notifications_count(
+                                json!({"notification_count": 1, "highlight_count": 1}),
+                            ),
+                    )
+                    .await;
+            }
+            Mock::given(method("GET")).and(path_regex(format!("/rooms/.*{name}.*?/messages$")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "chunk": [message(&format!("${name}"), 100, client.user_id())], "state": []})))
+                .expect(1).mount(server.server()).await;
+        }
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (5, true));
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(
+            core.inbox_notifications(InboxFilter::All, false, 30, None)
+                .await
+                .unwrap()
+                .0
+                .len(),
+            6
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cached_notification_does_not_stop_backfill_before_a_missing_one() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, _) = setup(&server, 2).await;
+        core.record_inbox(
+            &client,
+            vec![entry("known", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+        for (from, end, id, ts) in [
+            (None, Some("older"), "$known", 200),
+            (Some("older"), None, "$missing", 100),
+        ] {
+            let mock = Mock::given(method("GET")).and(path_regex("/messages$"));
+            let mock = if let Some(from) = from {
+                mock.and(query_param("from", from))
+            } else {
+                mock.and(query_param_is_missing("from"))
+            };
+            mock.respond_with(ResponseTemplate::new(200).set_body_json(json!({"start": "p0", "end": end, "chunk": [message(id, ts, client.user_id())], "state": []})))
+                .expect(1).mount(server.server()).await;
+        }
+        assert_eq!(core.backfill_inbox(false).await.unwrap(), (1, false));
+        assert_eq!(
+            core.inbox_notifications(InboxFilter::All, false, 30, None)
+                .await
+                .unwrap()
+                .0
+                .len(),
+            2
+        );
+    }
+
+    #[test]
+    fn a_new_head_or_read_boundary_restarts_a_completed_scan() {
+        let mut scan = UnreadScan::for_room(None, 100, 1, Some(event_id!("$old").to_owned()));
+        scan.complete = true;
+        scan.from = Some("old-page".to_owned());
+        let fresh = UnreadScan::for_room(Some(&scan), 100, 1, Some(event_id!("$new").to_owned()));
+        assert!(!fresh.complete);
+        assert!(fresh.from.is_none());
+        let fresh = UnreadScan::for_room(Some(&scan), 200, 1, scan.head.clone());
+        assert!(!fresh.complete);
+        assert!(fresh.from.is_none());
+    }
 
     fn entry(event: &str, ts: u64) -> Entry {
         Entry {

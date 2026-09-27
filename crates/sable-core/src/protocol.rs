@@ -1415,6 +1415,7 @@ pub enum CommandOk {
     },
     BackfillInbox {
         recorded: u32,
+        has_more: bool,
     },
     SetBookmark {
         bookmarked: bool,

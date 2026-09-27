@@ -1313,9 +1313,10 @@ impl Core {
                 Ok(CommandOk::InboxNotifications { items, has_more })
             }
 
-            Command::BackfillInbox { include_read } => Ok(CommandOk::BackfillInbox {
-                recorded: self.backfill_inbox(include_read).await?,
-            }),
+            Command::BackfillInbox { include_read } => {
+                let (recorded, has_more) = self.backfill_inbox(include_read).await?;
+                Ok(CommandOk::BackfillInbox { recorded, has_more })
+            }
 
             Command::SetBookmark {
                 room_id,

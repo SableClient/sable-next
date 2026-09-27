@@ -630,7 +630,7 @@ pub fn is_backfill(
 
 pub async fn is_read(room: &matrix_sdk::Room, sent: MilliSecondsSinceUnixEpoch) -> bool {
     room.unread_notification_counts().notification_count == 0
-        && crate::inbox::receipt_ts(room).await >= u64::from(sent.get())
+        && crate::inbox::receipt_ts(room).await.unwrap_or(0) >= u64::from(sent.get())
 }
 
 fn view(

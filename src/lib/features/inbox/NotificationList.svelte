@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { InboxItemView } from '#src/generated/protocol';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import AtIcon from 'phosphor-svelte/lib/AtIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -33,6 +33,7 @@
   const roomList = useRoomList();
   const headingId = $props.id();
   const feed = new InboxFeed(core.commands);
+  onDestroy(() => feed.dispose());
   const marking = new SvelteSet<string>();
   const readNow = new SvelteSet<string>();
   const filters: readonly NotificationFilter[] = ['all', 'mentions', 'direct'];
@@ -65,11 +66,21 @@
     })
   );
 
-  let waiting = $derived(roomList.rooms.reduce((total, room) => total + room.unread, 0));
+  let waiting = $derived(
+    JSON.stringify(
+      roomList.rooms.map((room) => [
+        room.room_id,
+        room.unread,
+        room.notifying,
+        room.highlight,
+        room.latest_event?.event_id,
+      ])
+    )
+  );
 
   $effect(() => {
     void waiting;
-    void feed.backfill(false);
+    void feed.backfill(false).then(() => feed.load(filter, includeRead, size));
   });
 
   let rows = $derived(
@@ -106,6 +117,7 @@
   function toggleRead(): void {
     includeRead = !includeRead;
     pageSize = PAGE_SIZE;
+    if (includeRead) void feed.backfill(true).then(() => feed.load(filter, includeRead, size));
   }
 
   async function loadOlder(): Promise<void> {
@@ -175,22 +187,25 @@
 
   <p class="screen-reader-only" role="status">{announcement}</p>
 
+  {#if feed.failed}
+    <div class="notice">
+      <p>{$i18n.t('inbox.loadFailed')}</p>
+      <Button
+        variant="secondary"
+        size="small"
+        onclick={() => {
+          void feed.backfill(includeRead).then(() => feed.load(filter, includeRead, size));
+        }}>{$i18n.t('inbox.retry')}</Button
+      >
+    </div>
+  {/if}
   {#if rows.length === 0}
-    {#if feed.failed}
-      <div class="notice">
-        <p>{$i18n.t('inbox.loadFailed')}</p>
-        <Button
-          variant="secondary"
-          size="small"
-          onclick={() => {
-            void feed.backfill(includeRead).then(() => feed.load(filter, includeRead, size));
-          }}>{$i18n.t('inbox.retry')}</Button
-        >
-      </div>
-    {:else if !feed.loaded || !feed.checked}
-      <p class="empty">{$i18n.t('inbox.checking')}</p>
-    {:else}
-      <p class="empty">{emptyLabel()}</p>
+    {#if !feed.failed}
+      {#if !feed.loaded || !feed.checked || feed.backfilling}
+        <p class="empty">{$i18n.t('inbox.checking')}</p>
+      {:else}
+        <p class="empty">{emptyLabel()}</p>
+      {/if}
     {/if}
   {:else}
     <ul class="feed">
@@ -248,19 +263,19 @@
         </InboxFeedRow>
       {/each}
     </ul>
-    {#if !compact && (feed.hasMore || includeRead)}
-      <Button
-        class="load-older"
-        variant="ghost"
-        size="small"
-        disabled={feed.backfilling}
-        onclick={() => {
-          void loadOlder();
-        }}
-      >
-        {$i18n.t(feed.backfilling ? 'inbox.checking' : 'inbox.loadOlder')}
-      </Button>
-    {/if}
+  {/if}
+  {#if !compact && (feed.hasMore || includeRead)}
+    <Button
+      class="load-older"
+      variant="ghost"
+      size="small"
+      disabled={feed.backfilling}
+      onclick={() => {
+        void loadOlder();
+      }}
+    >
+      {$i18n.t(feed.backfilling ? 'inbox.checking' : 'inbox.loadOlder')}
+    </Button>
   {/if}
 </section>
 

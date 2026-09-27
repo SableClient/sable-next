@@ -1054,7 +1054,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         );
         return { type: 'inbox_notifications', items, has_more: false };
       },
-      backfill_inbox: () => ({ type: 'backfill_inbox', recorded: 0 }),
+      backfill_inbox: () => ({ type: 'backfill_inbox', recorded: 0, has_more: false }),
       bookmarks: () => ({ type: 'bookmarks', bookmarks: readBookmarks() }),
       set_bookmark: (command) => {
         const entries = readBookmarks().filter(

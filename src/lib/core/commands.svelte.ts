@@ -1072,12 +1072,12 @@ export function createCommands(transport: () => Transport) {
       return { items: response.items, hasMore: response.has_more };
     },
 
-    async backfillInbox(includeRead: boolean): Promise<number> {
+    async backfillInbox(includeRead: boolean): Promise<{ recorded: number; hasMore: boolean }> {
       const response = await transport().send({
         type: 'backfill_inbox',
         include_read: includeRead,
       });
-      return response.recorded;
+      return { recorded: response.recorded, hasMore: response.has_more };
     },
 
     async setBookmark(roomId: string, eventId: string, bookmarked: boolean): Promise<boolean> {
