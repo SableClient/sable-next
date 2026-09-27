@@ -50,10 +50,7 @@ const EVENTS_PER_INGEST_YIELD: usize = 16;
 const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
-#[cfg(target_family = "wasm")]
 const MEMORY_BUDGET: usize = 64 * 1024 * 1024;
-#[cfg(not(target_family = "wasm"))]
-const MEMORY_BUDGET: usize = 256 * 1024 * 1024;
 const DISK_BUDGET: usize = 512 * 1024 * 1024;
 const COLD_CHUNKS_PER_PAGE: usize = 32;
 const OLDER_PAGE_BUDGET_MS: u64 = 50;
