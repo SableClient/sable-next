@@ -928,6 +928,17 @@
     }
   }
 
+  :global(.profile-action.selection-open.selection-open[aria-expanded='true']),
+  :global(.profile-action.selection-open.selection-open[data-state='open']) {
+    background: color-mix(in oklab, var(--profile-ink, var(--bg-on-container)) 14%, transparent);
+    color: var(--profile-ink, var(--bg-on-container));
+  }
+
+  :global(.profile-action.selection-open[aria-expanded='true'] svg),
+  :global(.profile-action.selection-open[data-state='open'] svg) {
+    color: currentcolor;
+  }
+
   :global(.profile-action:focus-visible) {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);

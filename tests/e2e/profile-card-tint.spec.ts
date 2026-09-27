@@ -72,3 +72,31 @@ for (const { scheme, hero, brightness } of CASES) {
     expect(illegible).toEqual([]);
   });
 }
+
+test('an open action on a tinted card keeps its icon in the card ink', async ({
+  app,
+  page,
+  installRoomCore,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(
+    (patch) => {
+      (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = patch;
+    },
+    { hero_color: '#7a2e0e', hero_brightness: 'dark' }
+  );
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await page.getByRole('button', { name: "Open Alice's profile" }).last().click();
+  const share = page.locator('.profile-card .profile-action[aria-haspopup]').first();
+  await share.click();
+  await expect(share).toHaveAttribute('aria-expanded', 'true');
+
+  const colors = await share.evaluate((button) => ({
+    text: getComputedStyle(button).color,
+    icon: getComputedStyle(button.querySelector('svg') as Element).color,
+    ink: getComputedStyle(button.closest('.profile-card') as Element).color,
+  }));
+  expect(colors.icon).toBe(colors.text);
+  expect(colors.text).toBe(colors.ink);
+});
