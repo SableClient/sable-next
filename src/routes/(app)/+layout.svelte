@@ -895,6 +895,16 @@
         {/each}
       {/await}
     {/if}
+    {#if callSession.choosingScreenAudio}
+      {#await import('#lib/features/call/ScreenShareAudioDialog.svelte') then { default: ScreenShareAudioDialog }}
+        <ScreenShareAudioDialog
+          onShare={(choice) => void callSession.shareScreenWith(choice)}
+          onCancel={() => {
+            callSession.choosingScreenAudio = false;
+          }}
+        />
+      {/await}
+    {/if}
     <IncomingCallDialog
       call={incoming}
       senderName={incomingProfile?.name ?? incoming?.sender ?? ''}

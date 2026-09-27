@@ -1,5 +1,7 @@
 import { base64ToUint8Array } from 'uint8array-extras';
 
+import type { ScreenAudioChoice } from '#lib/platform/screen-audio.js';
+
 export type CallEncryptionKey = {
   backendId?: string;
   identity: string;
@@ -78,7 +80,9 @@ export type CallTransportCapabilities = {
     list: () => Promise<CallAudioRoute[]>;
     select: (routeId: string) => Promise<void>;
   };
-  screenShare?: { setEnabled: (enabled: boolean) => Promise<void> };
+  screenShare?: {
+    setEnabled: (enabled: boolean, audio?: ScreenAudioChoice) => Promise<void>;
+  };
 };
 
 export type CallTransport = {

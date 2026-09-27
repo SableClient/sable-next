@@ -272,8 +272,9 @@ test('publishes the screen audio beside the share, and tears it down with it', a
   const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
 
   await transport.connect(connectOptions);
-  await transport.capabilities.screenShare?.setEnabled(true);
+  await transport.capabilities.screenShare?.setEnabled(true, { kind: 'apps', include: ['mpv'] });
 
+  expect(screenAudio.captureScreenAudio).toHaveBeenCalledWith({ kind: 'apps', include: ['mpv'] });
   expect(participant.publishTrack).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ source: 'screen_share_audio', forceStereo: true })
@@ -294,9 +295,24 @@ test('keeps sharing the screen when its audio cannot be captured', async () => {
   const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
 
   await transport.connect(connectOptions);
-  await transport.capabilities.screenShare?.setEnabled(true);
+  await transport.capabilities.screenShare?.setEnabled(true, { kind: 'system', exclude: [] });
 
   expect(fixture.localParticipant.isScreenShareEnabled).toBe(true);
+  expect(participant.publishTrack).not.toHaveBeenCalled();
+  screenAudio.screenAudioSupported.mockReturnValue(false);
+});
+
+test('shares no audio when the reader chose none', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockClear();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+
+  await transport.connect(connectOptions);
+  await transport.capabilities.screenShare?.setEnabled(true, { kind: 'none' });
+
+  expect(screenAudio.captureScreenAudio).not.toHaveBeenCalled();
   expect(participant.publishTrack).not.toHaveBeenCalled();
   screenAudio.screenAudioSupported.mockReturnValue(false);
 });

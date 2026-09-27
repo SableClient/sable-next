@@ -581,8 +581,16 @@ fn toggle_devtools(window: tauri::WebviewWindow<BrowserEngine>) {
 
 #[cfg(target_os = "linux")]
 #[tauri::command]
-async fn start_screen_audio() -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(screen_audio::start)
+async fn start_screen_audio(selection: screen_audio::Selection) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || screen_audio::start(selection))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn screen_audio_apps() -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(screen_audio::list_apps)
         .await
         .map_err(|error| error.to_string())?
 }
@@ -753,6 +761,8 @@ pub fn run() {
             start_screen_audio,
             #[cfg(target_os = "linux")]
             stop_screen_audio,
+            #[cfg(target_os = "linux")]
+            screen_audio_apps,
             #[cfg(desktop)]
             toggle_devtools,
             #[cfg(all(feature = "cef", target_os = "linux"))]

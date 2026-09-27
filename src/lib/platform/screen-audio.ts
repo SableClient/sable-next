@@ -1,8 +1,41 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { type as osType } from '@tauri-apps/plugin-os';
 
+import { readJson, writeJson } from './local-json';
+
+export type ScreenAudioChoice =
+  | { kind: 'none' }
+  | { kind: 'system'; exclude: string[] }
+  | { kind: 'apps'; include: string[] };
+
+export const SCREEN_AUDIO_LABEL = 'Sable screen audio';
+
+const CHOICE_KEY = 'sable-screen-audio-choice';
 const DEVICE_ATTEMPTS = 20;
 const DEVICE_POLL_MS = 100;
+
+const names = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((name): name is string => typeof name === 'string') : [];
+
+function parseChoice(value: unknown): ScreenAudioChoice {
+  if (typeof value !== 'object' || value === null) return { kind: 'none' };
+  const choice = value as Record<string, unknown>;
+  if (choice.kind === 'system') return { kind: 'system', exclude: names(choice.exclude) };
+  if (choice.kind === 'apps') return { kind: 'apps', include: names(choice.include) };
+  return { kind: 'none' };
+}
+
+export function lastScreenAudioChoice(): ScreenAudioChoice {
+  return readJson(CHOICE_KEY, parseChoice, { kind: 'none' });
+}
+
+export function rememberScreenAudioChoice(choice: ScreenAudioChoice): void {
+  writeJson(CHOICE_KEY, choice, '[sable call] screen audio choice not persisted');
+}
+
+export function listScreenAudioApps(): Promise<string[]> {
+  return invoke<string[]>('screen_audio_apps');
+}
 
 export function screenAudioSupported(): boolean {
   return isTauri() && osType() === 'linux';
@@ -20,8 +53,10 @@ async function findInput(label: string): Promise<MediaDeviceInfo | null> {
   return null;
 }
 
-export async function captureScreenAudio(): Promise<MediaStreamTrack> {
-  const label = await invoke<string>('start_screen_audio');
+export async function captureScreenAudio(
+  selection: Exclude<ScreenAudioChoice, { kind: 'none' }>
+): Promise<MediaStreamTrack> {
+  const label = await invoke<string>('start_screen_audio', { selection });
   try {
     const device = await findInput(label);
     if (!device) throw new Error('screen audio source did not appear');

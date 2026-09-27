@@ -1,3 +1,8 @@
+import {
+  rememberScreenAudioChoice,
+  type ScreenAudioChoice,
+  screenAudioSupported,
+} from '#lib/platform/screen-audio.js';
 import { createContext } from 'svelte';
 
 import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
@@ -101,6 +106,7 @@ export class CallSession {
   deafened = $state(false);
   connectedAt = $state<number | null>(null);
   deviceError = $state<CallDeviceError | null>(null);
+  choosingScreenAudio = $state(false);
 
   readonly #client: CoreClient;
   readonly #deps: CallSessionDeps;
@@ -440,8 +446,26 @@ export class CallSession {
     await this.#device('camera', () => this.#media?.setCameraEnabled(enabled));
   }
 
-  async setScreenShareEnabled(enabled: boolean): Promise<void> {
-    await this.#device('screen', () => this.#media?.capabilities.screenShare?.setEnabled(enabled));
+  async toggleScreenShare(): Promise<void> {
+    if (this.transport.screenShareEnabled) {
+      await this.setScreenShareEnabled(false);
+    } else if (screenAudioSupported()) {
+      this.choosingScreenAudio = true;
+    } else {
+      await this.setScreenShareEnabled(true);
+    }
+  }
+
+  async shareScreenWith(audio: ScreenAudioChoice): Promise<void> {
+    this.choosingScreenAudio = false;
+    rememberScreenAudioChoice(audio);
+    await this.setScreenShareEnabled(true, audio);
+  }
+
+  async setScreenShareEnabled(enabled: boolean, audio?: ScreenAudioChoice): Promise<void> {
+    await this.#device('screen', () =>
+      this.#media?.capabilities.screenShare?.setEnabled(enabled, audio)
+    );
   }
 
   #classify(error: unknown): CallFailure {

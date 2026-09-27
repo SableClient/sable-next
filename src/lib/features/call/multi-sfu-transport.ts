@@ -243,8 +243,8 @@ export function createMultiSfuTransport(
     getState: () => ({ ...state, participants: [...state.participants] }),
     capabilities: {
       screenShare: {
-        setEnabled: async (enabled) =>
-          transports.get(publisherId ?? '')?.capabilities.screenShare?.setEnabled(enabled),
+        setEnabled: async (enabled, audio) =>
+          transports.get(publisherId ?? '')?.capabilities.screenShare?.setEnabled(enabled, audio),
       },
     },
     reconcileBackends: async (backends, nextPublisherId) => {

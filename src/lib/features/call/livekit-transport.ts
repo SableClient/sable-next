@@ -13,6 +13,7 @@ import {
 
 import {
   captureScreenAudio,
+  type ScreenAudioChoice,
   screenAudioSupported,
   stopScreenAudio,
 } from '#lib/platform/screen-audio.js';
@@ -431,10 +432,10 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     });
   };
 
-  const shareAudio = async (): Promise<void> => {
-    if (!screenAudioSupported() || screenAudio) return;
+  const shareAudio = async (choice: ScreenAudioChoice | undefined): Promise<void> => {
+    if (!choice || choice.kind === 'none' || !screenAudioSupported() || screenAudio) return;
     try {
-      const track = new LocalAudioTrack(await captureScreenAudio(), undefined, false);
+      const track = new LocalAudioTrack(await captureScreenAudio(choice), undefined, false);
       screenAudio = track;
       await room.localParticipant.publishTrack(track, {
         source: Track.Source.ScreenShareAudio,
@@ -506,12 +507,12 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     getState: () => ({ ...state, participants: [...state.participants] }),
     capabilities: {
       screenShare: {
-        setEnabled: async (enabled) => {
+        setEnabled: async (enabled, audio) => {
           if (disposed || options.publishMedia === false) return;
           await step('call.screen_share.set', () =>
             room.localParticipant.setScreenShareEnabled(enabled)
           );
-          if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio();
+          if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio(audio);
           else if (!enabled) await stopSharingAudio();
           syncLocal();
         },
