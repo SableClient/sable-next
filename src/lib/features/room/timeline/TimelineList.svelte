@@ -236,7 +236,9 @@
   let emptyFailure = $derived(visibleItems.length === 0 && timeline.error !== null);
   let readEventId = $derived.by(() => {
     if (!revealed || !viewport) return null;
-    if (windowState.pinned) return latestEventId(rows.map((row) => row.value.item));
+    if (windowState.pinned) {
+      return latestEventId(timeline.items) ?? latestEventId(rows.map((row) => row.value.item));
+    }
     const bottom = viewport.getBoundingClientRect().bottom;
     let seen: string | null = null;
     for (const row of viewport.querySelectorAll<HTMLElement>('.item[data-event-id]')) {

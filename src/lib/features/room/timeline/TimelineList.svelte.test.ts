@@ -10,6 +10,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import { TimelineWindow } from '#lib/timeline/timeline-window.js';
+import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { TIMELINE_LAYOUT } from './timeline-layout';
 
 vi.mock('#lib/core/context.js');
@@ -1810,4 +1811,44 @@ test('stops rendering the read marker once the reader is following live', async 
 
   expect(document.querySelector('.unread')).toBeNull();
   expect(document.querySelector('[data-item-id="arrival"]')).not.toBeNull();
+});
+
+test('a reader at the latest message also reads the hidden events after it', async () => {
+  setPreference('hideMembershipEvents', true);
+  const roomTimeline = timeline();
+  const join: TimelineItemView = {
+    ...item('join'),
+    content: {
+      kind: 'membership',
+      change: 'joined',
+      user_id: '@bob:example.org',
+      display_name: 'Bob',
+      reason: null,
+    },
+  };
+  roomTimeline.items = [
+    ...Array.from({ length: 5 }, (_, index) => item(`old-${String(index)}`)),
+    join,
+  ];
+  const read = vi.fn((_eventId: string) => Promise.resolve());
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: read,
+      },
+    },
+  });
+
+  viewport();
+  await tick();
+  await runAnimationFrames();
+
+  expect(document.querySelector('[data-item-id="join"]')).toBeNull();
+  await vi.waitFor(() => {
+    expect(read).toHaveBeenLastCalledWith('$join');
+  });
+  setPreference('hideMembershipEvents', false);
 });
