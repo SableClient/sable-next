@@ -66,19 +66,19 @@ test('counts stop spelling themselves out past a thousand', () => {
   expect(formatUnreadCount(1001)).toBe('1k+');
 });
 
-test('a room whose ordinary messages notify counts them loudly once room counts are on', () => {
+test('a room whose ordinary messages notify is always counted, and counted loudly', () => {
   const counts = { unread: 6, highlight: 0, notifying: 6 };
 
-  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'dot', count: 6, highlight: true });
-  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
+  expect(resolveUnreadBadge(counts, off)).toEqual({ mode: 'count', count: 6, highlight: true });
+  expect(resolveUnreadBadge(counts, off, true)).toEqual({
     mode: 'count',
     count: 6,
     highlight: true,
   });
 });
 
-test('a direct chat is numbered by the direct-message setting alone', () => {
-  const counts = { unread: 3, highlight: 0, notifying: 3 };
+test('a direct chat that did not notify is numbered by the direct-message setting alone', () => {
+  const counts = { unread: 3, highlight: 0, notifying: 0 };
 
   expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true }, true)?.mode).toBe('dot');
   expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('count');

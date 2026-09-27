@@ -36,9 +36,7 @@ export function resolveUnreadBadge(
   const highlight = mention || notified;
   const numeric = mention
     ? settings.showPingCounts
-    : dm
-      ? settings.badgeCountDMsOnly
-      : settings.showUnreadCounts;
+    : notified || (dm ? settings.badgeCountDMsOnly : settings.showUnreadCounts);
   if (!numeric) return { mode: 'dot', count, highlight };
 
   return {
