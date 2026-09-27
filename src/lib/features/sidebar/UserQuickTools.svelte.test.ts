@@ -54,6 +54,15 @@ test('the mobile bar keeps a slot per tool', () => {
   expect(bar.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
 });
 
+test('the mobile bar marks the profile tab as selected on the profile page', () => {
+  visit('/profile');
+  setup();
+
+  const bar = screen.getByRole('navigation');
+  expect(bar).toHaveClass('selection-active');
+  expect(bar.style.getPropertyValue('--mobile-selected-index')).toBe('3');
+});
+
 test('the collapsed sidebar leaves message search to the rail', () => {
   setup({ compact: true });
 

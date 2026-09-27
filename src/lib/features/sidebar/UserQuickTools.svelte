@@ -110,7 +110,11 @@
     return page.url.pathname.startsWith(href);
   }
 
-  let mobileSelectedIndex = $derived(mobileTools.findIndex((item) => isToolActive(item.href)));
+  let mobileSelectedIndex = $derived(
+    page.url.pathname === '/profile'
+      ? mobileTools.length
+      : mobileTools.findIndex((item) => isToolActive(item.href))
+  );
 </script>
 
 {#snippet roomSwitcher(toolClass: string, side: 'top' | 'right')}
