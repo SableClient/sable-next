@@ -2423,6 +2423,20 @@ impl Core {
                 Ok(CommandOk::RequestVerification { flow_id })
             }
 
+            Command::WithdrawVerification { user_id } => {
+                self.client()
+                    .await?
+                    .encryption()
+                    .get_user_identity(&user_id)
+                    .await
+                    .map_err(|error| self.failed("withdraw_verification: identity", error))?
+                    .ok_or(CommandErr::Unavailable)?
+                    .withdraw_verification()
+                    .await
+                    .map_err(|error| self.failed("withdraw_verification", error))?;
+                Ok(CommandOk::WithdrawVerification)
+            }
+
             Command::AcceptVerification { user_id, flow_id } => {
                 let request = self.verification_request(&user_id, &flow_id).await?;
 

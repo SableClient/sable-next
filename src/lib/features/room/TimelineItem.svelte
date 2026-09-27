@@ -9,6 +9,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { memberIdentity } from './members.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -286,6 +287,22 @@
       : null
   );
   let stalled = $derived(item.send_state?.status === 'failed' ? item.send_state : null);
+  let blocked = $derived(stalled?.blocked ?? null);
+  let changedNames = $derived(
+    blocked?.kind === 'identity_changed'
+      ? blocked.user_ids.map((userId) => memberIdentity(members, userId).name).join(', ')
+      : ''
+  );
+
+  async function sendAnyway(transactionId: string, userIds: readonly string[]): Promise<void> {
+    try {
+      for (const userId of userIds) await core.commands.withdrawVerification(userId);
+      onRetrySend?.(transactionId);
+    } catch (error) {
+      console.warn('[sable timeline] could not withdraw the verification', error);
+      toasts.error($i18n.t('errors.actionFailed'));
+    }
+  }
   let pending = $derived(item.send_state?.status === 'sending');
   let upload = $derived(
     item.send_state?.status === 'sending' ? (item.send_state.progress ?? null) : null
@@ -1114,6 +1131,18 @@
         {#if stalled}
           <p class="send-failure">
             <span title={stalled.error}>{$i18n.t('timeline.sendFailed')}</span>
+            {#if item.transaction_id && blocked?.kind === 'identity_changed'}
+              {@const transactionId = item.transaction_id}
+              {@const userIds = blocked.user_ids}
+              <button
+                type="button"
+                onclick={() => {
+                  void sendAnyway(transactionId, userIds);
+                }}
+              >
+                {$i18n.t('timeline.sendAnyway')}
+              </button>
+            {/if}
             {#if item.transaction_id}
               {@const transactionId = item.transaction_id}
               <button
@@ -1133,7 +1162,15 @@
                 {$i18n.t('timeline.cancelSend')}
               </button>
             {/if}
-            <span class="send-failure-reason">{stalled.error}</span>
+            <span class="send-failure-reason">
+              {#if blocked?.kind === 'identity_changed'}
+                {$i18n.t('timeline.sendBlockedIdentity', { names: changedNames })}
+              {:else if blocked?.kind === 'verify_this_device'}
+                {$i18n.t('timeline.sendBlockedVerify')}
+              {:else}
+                {stalled.error}
+              {/if}
+            </span>
           </p>
         {/if}
       </div>

@@ -13,6 +13,7 @@ use matrix_sdk::{
     encryption::{BackupDownloadStrategy, EncryptionSettings},
     ruma::serde::Raw,
 };
+use matrix_sdk_base::crypto::{CollectStrategy, DecryptionSettings, TrustRequirement};
 use matrix_sdk_ui::sync_service::SyncService;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -300,6 +301,10 @@ async fn build_account_client(
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
             auto_enable_cross_signing: true,
             auto_enable_backups: true,
+        })
+        .with_room_key_recipient_strategy(CollectStrategy::IdentityBasedStrategy)
+        .with_decryption_settings(DecryptionSettings {
+            sender_device_trust_requirement: TrustRequirement::CrossSignedOrLegacy,
         });
 
     #[cfg(not(target_family = "wasm"))]

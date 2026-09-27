@@ -961,6 +961,10 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async withdrawVerification(userId: string): Promise<void> {
+      await transport().send({ type: 'withdraw_verification', user_id: userId });
+    },
+
     async reportRoom(roomId: string, reason: string): Promise<void> {
       await transport().send({ type: 'report_room', room_id: roomId, reason });
     },

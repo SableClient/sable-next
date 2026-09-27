@@ -1041,7 +1041,10 @@
     "profileReport": "Signaler l’utilisateur",
     "profileReportTitle": "Signaler {{name}}",
     "profileReportHint": "Expliquez aux administrateurs de votre serveur ce que cette personne a fait.",
-    "hiddenMedia": "Afficher le média"
+    "hiddenMedia": "Afficher le média",
+    "sendAnyway": "Envoyer quand même",
+    "sendBlockedIdentity": "{{names}} a réinitialisé son identité de chiffrement depuis que vous l’avez vérifié. Envoyer quand même retire votre vérification.",
+    "sendBlockedVerify": "Vérifiez cet appareil avant d’envoyer des messages chiffrés."
   },
   "viewer": {
     "title": "Visionneuse de médias",

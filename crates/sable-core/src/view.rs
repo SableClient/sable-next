@@ -35,6 +35,7 @@ use matrix_sdk::ruma::{Int, UInt};
 use matrix_sdk::send_queue::{LocalEcho, LocalEchoContent, RoomSendQueueUpdate};
 use matrix_sdk::{Client, EncryptionState, RoomState};
 use matrix_sdk_base::crypto::types::events::UtdCause;
+use matrix_sdk_base::store::QueueWedgeError;
 use matrix_sdk_base::store::SerializableEventContent;
 use matrix_sdk_ui::{
     eyeball_im,
@@ -63,9 +64,9 @@ use crate::protocol::{
     PerMessageProfileView, PollAnswerView, PollView, PredecessorRoomView, PublicRoomView,
     ReactionGroup, ReplyView, RoomJoinRuleView, RoomPermissionsView, RoomPowerLevelsView,
     RoomPreviewView, RoomStateView, RoomSummary, RoomTag, SearchContextView, SearchHitView,
-    SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView, ThreadSummaryView,
-    TimelineItemContentView, TimelineItemView, UploadProgressView, UrlPreviewView, UtdCauseView,
-    VectorDiff,
+    SendBlockView, SendStateView, SpaceChildEdge, SpaceHierarchyRoomView, StateChangeView,
+    ThreadSummaryView, TimelineItemContentView, TimelineItemView, UploadProgressView,
+    UrlPreviewView, UtdCauseView, VectorDiff,
 };
 
 // These are independent room capabilities, not a state machine.
@@ -994,8 +995,19 @@ fn send_state(state: &EventSendState) -> SendStateView {
         } => SendStateView::Failed {
             error: error.to_string(),
             recoverable: *is_recoverable,
+            blocked: send_block(&QueueWedgeError::from(&**error)),
         },
         EventSendState::Sent { .. } => SendStateView::Sent,
+    }
+}
+
+fn send_block(error: &QueueWedgeError) -> Option<SendBlockView> {
+    match error {
+        QueueWedgeError::IdentityViolations { users } => Some(SendBlockView::IdentityChanged {
+            user_ids: users.iter().map(ToString::to_string).collect(),
+        }),
+        QueueWedgeError::CrossVerificationRequired => Some(SendBlockView::VerifyThisDevice),
+        _ => None,
     }
 }
 
@@ -2207,7 +2219,33 @@ pub fn room_power_levels(power_levels: &RoomPowerLevels) -> RoomPowerLevelsView 
 #[cfg(test)]
 mod tests {
     use matrix_sdk::ruma::events::room::message::FormattedBody;
+    use matrix_sdk::ruma::owned_user_id;
+    use matrix_sdk_base::store::QueueWedgeError;
     use serde_json::json;
+
+    use crate::protocol::SendBlockView;
+
+    #[test]
+    fn a_send_blocked_by_a_changed_identity_names_the_users() {
+        let error = QueueWedgeError::IdentityViolations {
+            users: vec![owned_user_id!("@bob:example.org")],
+        };
+
+        assert_eq!(
+            super::send_block(&error),
+            Some(SendBlockView::IdentityChanged {
+                user_ids: vec!["@bob:example.org".to_owned()],
+            })
+        );
+        assert_eq!(
+            super::send_block(&QueueWedgeError::CrossVerificationRequired),
+            Some(SendBlockView::VerifyThisDevice)
+        );
+        assert_eq!(
+            super::send_block(&QueueWedgeError::MissingMediaContent),
+            None
+        );
+    }
 
     use super::{
         LocalContent, RoomSendQueueUpdate, SerializableEventContent, audio_metadata,

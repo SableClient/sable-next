@@ -1009,6 +1009,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         device_id: Option<OwnedDeviceId>,
     },
+    WithdrawVerification {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+    },
     /// Also transitions into SAS, so the emoji need no further round trip.
     AcceptVerification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1554,6 +1558,7 @@ pub enum CommandOk {
     RequestVerification {
         flow_id: String,
     },
+    WithdrawVerification,
     AcceptVerification,
     ScanVerificationQr,
     StartSasVerification,
@@ -2851,9 +2856,18 @@ pub enum SendStateView {
         /// A recoverable failure resumes by itself. An unrecoverable one is
         /// parked until `RetrySend` or `CancelSend`, so only it needs a prompt.
         recoverable: bool,
+        blocked: Option<SendBlockView>,
     },
     /// Accepted, still waiting to arrive through sync.
     Sent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SendBlockView {
+    IdentityChanged { user_ids: Vec<String> },
+    VerifyThisDevice,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
