@@ -55,6 +55,7 @@ import { hasAndroidCompositionQuirk, hasIosKeyboardContextQuirk } from '#lib/pla
 
 import { filesFromSources, pastedImageSources } from './pasted-images';
 import { mfmTimeInputRule } from './mfm';
+import { traceComposerInput } from './input-trace';
 import { queryKey, queryPlugin } from './query-plugin';
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
@@ -752,6 +753,7 @@ export class ComposerEditor {
     );
 
     this.view = view;
+    const stopTrace = traceComposerInput(view.dom);
 
     if (hasIosKeyboardContextQuirk()) {
       const proxy = document.createElement('textarea');
@@ -763,6 +765,7 @@ export class ComposerEditor {
     }
 
     return () => {
+      stopTrace();
       if (this.keyboardResetFrame !== undefined) cancelAnimationFrame(this.keyboardResetFrame);
       this.keyboardResetFrame = undefined;
       this.keyboardReset?.remove();
