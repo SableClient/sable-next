@@ -74,10 +74,10 @@ export function groupMembers(
   isOnline: (userId: string) => boolean
 ): MemberGroup[] {
   const ordered = [...members].sort(compare(sort));
-  const offline = ordered.filter((member) => !isOnline(member.user_id));
-  const online = ordered
-    .filter((member) => isOnline(member.user_id))
-    .sort((left, right) => right.power_level - left.power_level);
+  const listed = (member: MemberView): boolean =>
+    member.power_level > 0 || isOnline(member.user_id);
+  const offline = ordered.filter((member) => !listed(member));
+  const online = ordered.filter(listed).sort((left, right) => right.power_level - left.power_level);
 
   const groups: MemberGroup[] = [];
   for (const member of online) {

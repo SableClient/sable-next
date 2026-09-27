@@ -42,12 +42,22 @@ describe('groupMembers', () => {
     expect(names('oldest')).toEqual(['Cid', 'Bob', 'Amy']);
   });
 
-  it('sinks everyone without presence under one offline group', () => {
+  it('sinks members without presence under one offline group', () => {
     const online = (userId: string): boolean => userId === amy.user_id;
+    const dee = member({ user_id: '@dee:e.org', display_name: 'Dee', power_level: -1 });
 
-    expect(groupMembers([amy, bob, cid], 'name-asc', online)).toEqual([
+    expect(groupMembers([amy, bob, dee], 'name-asc', online)).toEqual([
       { key: '0', level: 0, members: [amy] },
-      { key: 'offline', level: null, members: [bob, cid] },
+      { key: 'offline', level: null, members: [bob, dee] },
+    ]);
+  });
+
+  it('keeps elevated members under their role whatever their presence', () => {
+    const offline = (): boolean => false;
+
+    expect(groupMembers([amy, bob, cid], 'name-asc', offline)).toEqual([
+      { key: '100', level: 100, members: [cid] },
+      { key: 'offline', level: null, members: [amy, bob] },
     ]);
   });
 });

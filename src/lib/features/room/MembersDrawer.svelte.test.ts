@@ -259,6 +259,7 @@ test('renders a first page of members and grows when the sentinel shows', async 
 
 test('sinks members without presence under offline and drops service members', async () => {
   offline.add('@zoe:example.org');
+  offline.add('@amy:example.org');
   render(MembersDrawer, {
     props: {
       loading: false,
@@ -300,8 +301,8 @@ test('sinks members without presence under offline and drops service members', a
   });
   await tick();
 
-  expect(memberNames()).toEqual(['Amy', 'Zoe']);
-  expect(groups()).toEqual(['Member', 'Offline']);
+  expect(memberNames()).toEqual(['Zoe', 'Amy']);
+  expect(groups()).toEqual(['Admin', 'Offline']);
   expect(screen.getByText('2 members')).toBeInTheDocument();
 });
 
