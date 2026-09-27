@@ -181,3 +181,25 @@ test('keeps a changed power level when the reload still returns the old one', as
     expect(names()).toEqual(['Bob', 'Alice']);
   });
 });
+
+test('offers the roles created in the room alongside the default ones', async () => {
+  const bob: MemberView = { ...alice, user_id: '@bob:example.org', display_name: 'Bob' };
+  core.roomMembers.mockResolvedValue([alice, bob]);
+  core.setUserPowerLevel.mockResolvedValue(undefined);
+  Object.assign(core, {
+    roomStateEvent: vi.fn(() => Promise.resolve({ '75': { name: 'Helper' } })),
+  });
+  const user = await renderMembers({ ...permissions, can_change_power_levels: true });
+
+  const [, bobRole] = screen.getAllByRole('button', { name: 'Change role' });
+  await user.click(bobRole);
+  await user.click(await screen.findByRole('option', { name: /Helper/ }));
+
+  await vi.waitFor(() => {
+    expect(core.setUserPowerLevel).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bob:example.org',
+      75
+    );
+  });
+});

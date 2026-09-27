@@ -259,10 +259,13 @@
   }
 
   function powerOptions(member: MemberView): { value: string; label: string }[] {
-    const known = powerChoices.map((choice) => ({
-      value: String(choice.level),
-      label: $i18n.t(choice.label),
-    }));
+    const labels: Record<string, string> = Object.fromEntries(
+      powerChoices.map((choice) => [String(choice.level), $i18n.t(choice.label)])
+    );
+    for (const [level, tag] of Object.entries(powerTags)) labels[String(Number(level))] = tag.name;
+    const known = Object.entries(labels)
+      .sort(([left], [right]) => Number(right) - Number(left))
+      .map(([value, label]) => ({ value, label }));
     const current = String(member.power_level);
     if (known.some((option) => option.value === current)) return known;
     return [{ value: current, label: current }, ...known];
