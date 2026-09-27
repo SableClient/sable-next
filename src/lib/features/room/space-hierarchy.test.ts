@@ -49,17 +49,23 @@ function room(
 }
 
 test.each([
-  ['public', false, 'join'],
-  ['restricted', false, 'join'],
-  ['knock_restricted', false, 'join'],
-  ['knock', false, 'knock'],
-  ['invite', true, 'join'],
-  ['invite', false, null],
-  ['private', false, null],
-  ['unknown', false, null],
-] as const)('selects the supported lobby action for %s rooms', (joinRule, invited, action) => {
-  expect(lobbyAction(joinRule, invited)).toBe(action);
-});
+  ['public', false, true, 'join'],
+  ['public', false, false, 'join'],
+  ['restricted', false, true, 'join'],
+  ['restricted', false, false, null],
+  ['knock_restricted', false, true, 'join'],
+  ['knock_restricted', false, false, 'knock'],
+  ['knock', false, true, 'knock'],
+  ['invite', true, false, 'join'],
+  ['invite', false, true, null],
+  ['private', false, true, null],
+  ['unknown', false, true, null],
+] as const)(
+  'selects the lobby action for %s rooms (invited: %s, in the parent: %s)',
+  (joinRule, invited, inParent, action) => {
+    expect(lobbyAction(joinRule, invited, inParent)).toBe(action);
+  }
+);
 
 test('rooms follow the order of the parent edges, not the response order', () => {
   const rooms = [

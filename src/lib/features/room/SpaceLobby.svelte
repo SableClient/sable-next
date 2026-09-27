@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { CoreError } from '#src/transport';
   import type {
     RoomPermissionsView,
     RoomSummary,
@@ -124,6 +125,12 @@
   let canManage = $derived(permissions?.can_manage_children ?? false);
   let joinedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'joined').map((room) => room.room_id))
+  );
+  let knockedIds = $derived(
+    new Set([
+      ...knocked,
+      ...roomList.rooms.filter((room) => room.state === 'knocked').map((room) => room.room_id),
+    ])
   );
   let invitedIds = $derived(
     new Set(roomList.rooms.filter((room) => room.state === 'invited').map((room) => room.room_id))
@@ -377,12 +384,25 @@
       if (routing.length === 0 && child.canonical_alias === null) {
         routing = await core.commands.roomViaServers(parentId);
       }
-      if (lobbyAction(child.join_rule, invitedIds.has(child.room_id)) === 'knock') {
+      const action = lobbyAction(
+        child.join_rule,
+        invitedIds.has(child.room_id),
+        joinedIds.has(parentId)
+      );
+      if (action === 'knock') {
         await core.commands.knockRoom(address, routing);
         knocked.add(child.room_id);
         return;
       }
-      await core.commands.joinRoom(address, routing);
+      try {
+        await core.commands.joinRoom(address, routing);
+      } catch (error) {
+        if (child.join_rule !== 'knock_restricted' || !(error instanceof CoreError)) throw error;
+        if (error.detail.code !== 'denied') throw error;
+        await core.commands.knockRoom(address, routing);
+        knocked.add(child.room_id);
+        return;
+      }
       open(child);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
@@ -718,7 +738,7 @@
         {joinedIds}
         {invitedIds}
         {joining}
-        {knocked}
+        knocked={knockedIds}
         {joinErrors}
         {canManage}
         {label}

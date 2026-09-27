@@ -174,6 +174,37 @@
     </Button>
     {#if section.space}
       {@const sectionSpace = section.space}
+      {@const ownerId = section.ownerId}
+      {@const spaceAction =
+        joinedSpace || ownerId === null
+          ? null
+          : lobbyAction(
+              sectionSpace.join_rule,
+              invitedIds.has(sectionSpace.room_id),
+              joinedIds.has(ownerId)
+            )}
+      {#if spaceAction && ownerId !== null}
+        <Button
+          size="small"
+          class="section-join"
+          disabled={knocked.has(sectionSpace.room_id)}
+          loading={joining.has(sectionSpace.room_id)}
+          onclick={() => {
+            onJoin(sectionSpace, [], ownerId);
+          }}
+        >
+          <PlusIcon size={14} />{$i18n.t(
+            knocked.has(sectionSpace.room_id)
+              ? 'room.lobbyKnockSent'
+              : spaceAction === 'knock'
+                ? 'room.lobbyKnock'
+                : 'room.lobbyJoin'
+          )}
+        </Button>
+      {/if}
+      {#if joinErrors.has(sectionSpace.room_id)}
+        <span class="room-error" role="alert">{joinErrors.get(sectionSpace.room_id)}</span>
+      {/if}
       <ActionMenu label={$i18n.t('room.menuLabel')}>
         {#snippet trigger({ props })}
           <button
@@ -277,7 +308,11 @@
         {#each section.rooms as entry (entry.key)}
           {@const child = entry.room}
           {@const joined = joinedIds.has(child.room_id)}
-          {@const action = lobbyAction(child.join_rule, invitedIds.has(child.room_id))}
+          {@const action = lobbyAction(
+            child.join_rule,
+            invitedIds.has(child.room_id),
+            joinedIds.has(section.parentId)
+          )}
           <li
             class="room"
             class:dragging={dragging === child.room_id}

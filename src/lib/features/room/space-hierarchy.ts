@@ -36,8 +36,14 @@ export function sameLobbyItem(left: LobbyDragItem, right: LobbyDragItem): boolea
   return left.parentId === right.parentId && left.roomId === right.roomId;
 }
 
-export function lobbyAction(joinRule: RoomJoinRuleView, invited: boolean): 'join' | 'knock' | null {
-  if (invited || ['public', 'restricted', 'knock_restricted'].includes(joinRule)) return 'join';
+export function lobbyAction(
+  joinRule: RoomJoinRuleView,
+  invited: boolean,
+  inParent = true
+): 'join' | 'knock' | null {
+  if (invited || joinRule === 'public') return 'join';
+  if (joinRule === 'restricted') return inParent ? 'join' : null;
+  if (joinRule === 'knock_restricted') return inParent ? 'join' : 'knock';
   if (joinRule === 'knock') return 'knock';
   return null;
 }
