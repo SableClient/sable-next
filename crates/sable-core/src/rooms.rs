@@ -5,14 +5,14 @@ use matrix_sdk::ruma::SpaceChildOrder;
 use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
-use matrix_sdk::ruma::directory::Filter;
+use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
 use matrix_sdk::{Client, RoomMemberships, RoomState};
 use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
 
-use crate::protocol::{CommandErr, CommandOk};
+use crate::protocol::{CommandErr, CommandOk, DirectoryRoomType};
 
 use crate::Core;
 use crate::view;
@@ -340,6 +340,7 @@ impl Core {
         server: Option<String>,
         search: Option<String>,
         since: Option<String>,
+        room_type: Option<DirectoryRoomType>,
     ) -> Result<CommandOk, CommandErr> {
         let server = match server.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             Some(name) => Some(ServerName::parse(name).map_err(|_| CommandErr::UnknownHomeserver)?),
@@ -350,6 +351,11 @@ impl Core {
         filter.generic_search_term = search
             .map(|term| term.trim().to_owned())
             .filter(|term| !term.is_empty());
+        filter.room_types = match room_type {
+            Some(DirectoryRoomType::Rooms) => vec![RoomTypeFilter::Default],
+            Some(DirectoryRoomType::Spaces) => vec![RoomTypeFilter::Space],
+            None => Vec::new(),
+        };
 
         let mut request = get_public_rooms_filtered::v3::Request::new();
         request.server = server;

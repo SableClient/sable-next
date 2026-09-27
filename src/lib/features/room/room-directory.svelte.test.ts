@@ -148,3 +148,22 @@ test('a new search clears an earlier failure', async () => {
   await directory.search({ server: null, search: 'again' });
   expect(directory.error).toBeNull();
 });
+
+test('a room type filter is sent to the server and enforced on what comes back', async () => {
+  const publicRooms = vi.fn(() =>
+    Promise.resolve({
+      rooms: [
+        { ...page(['!room'], null).rooms[0], is_space: false },
+        { ...page(['!space'], null).rooms[0], is_space: true },
+      ],
+      next_batch: null,
+      total: null,
+    })
+  );
+  const directory = new RoomDirectory(fakeCore(publicRooms));
+
+  await directory.search({ server: null, search: '', roomType: 'spaces' });
+
+  expect(publicRooms).toHaveBeenCalledWith(expect.objectContaining({ roomType: 'spaces' }));
+  expect(directory.rooms.map((entry) => entry.room_id)).toEqual(['!space']);
+});

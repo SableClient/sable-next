@@ -934,7 +934,8 @@ impl Core {
                 server,
                 search,
                 since,
-            } => self.public_rooms(server, search, since).await,
+                room_type,
+            } => self.public_rooms(server, search, since, room_type).await,
 
             Command::RoomDirectoryVisibility { room_id } => {
                 let response = self

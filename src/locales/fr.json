@@ -620,7 +620,11 @@
     "menuReportSpace": "Signaler l’espace",
     "reportTitle": "Signaler le salon",
     "reportSpaceTitle": "Signaler l’espace",
-    "reportHint": "Expliquez aux administrateurs de votre serveur ce qui ne va pas. Le signalement porte sur ce salon, pas sur un message."
+    "reportHint": "Expliquez aux administrateurs de votre serveur ce qui ne va pas. Le signalement porte sur ce salon, pas sur un message.",
+    "directoryKind": "Afficher",
+    "directoryKindAll": "Salons et espaces",
+    "directoryKindRooms": "Salons",
+    "directoryKindSpaces": "Espaces"
   },
   "join": {
     "action": "Rejoindre",

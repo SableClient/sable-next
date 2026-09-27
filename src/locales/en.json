@@ -680,7 +680,11 @@
     "menuReportSpace": "Report space",
     "reportTitle": "Report room",
     "reportSpaceTitle": "Report space",
-    "reportHint": "Tell your homeserver administrators what is wrong here. The report names this room, not a message."
+    "reportHint": "Tell your homeserver administrators what is wrong here. The report names this room, not a message.",
+    "directoryKind": "Show",
+    "directoryKindAll": "Rooms and spaces",
+    "directoryKindRooms": "Rooms",
+    "directoryKindSpaces": "Spaces"
   },
   "join": {
     "action": "Join",

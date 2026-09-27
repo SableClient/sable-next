@@ -17,6 +17,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Select from '#lib/ui/primitives/Select.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
@@ -31,6 +32,7 @@
 
   let search = $state('');
   let server = $state('');
+  let kind = $state<'all' | 'rooms' | 'spaces'>('all');
   let failedJoin = $state<string | null>(null);
 
   let joinedIds = $derived(
@@ -44,10 +46,18 @@
     void directory.search({ server: null, search: '' });
   });
 
+  function runSearch(): void {
+    const trimmed = server.trim();
+    void directory.search({
+      server: trimmed === '' ? null : trimmed,
+      search: search.trim(),
+      roomType: kind === 'all' ? null : kind,
+    });
+  }
+
   function submit(event: SubmitEvent): void {
     event.preventDefault();
-    const trimmed = server.trim();
-    void directory.search({ server: trimmed === '' ? null : trimmed, search: search.trim() });
+    runSearch();
   }
 
   function label(room: PublicRoomView): string {
@@ -99,6 +109,20 @@
       spellcheck={false}
       aria-label={$i18n.t('room.directoryServerLabel')}
       placeholder={$i18n.t('room.directoryServerPlaceholder')}
+    />
+    <Select
+      class="directory-kind"
+      value={kind}
+      aria-label={$i18n.t('room.directoryKind')}
+      items={[
+        { value: 'all', label: $i18n.t('room.directoryKindAll') },
+        { value: 'rooms', label: $i18n.t('room.directoryKindRooms') },
+        { value: 'spaces', label: $i18n.t('room.directoryKindSpaces') },
+      ]}
+      onValueChange={(next) => {
+        kind = next === 'rooms' || next === 'spaces' ? next : 'all';
+        runSearch();
+      }}
     />
     <Button type="submit" variant="primary" loading={directory.loading}>
       <MagnifyingGlassIcon size={16} />{$i18n.t('room.directorySearch')}
@@ -208,7 +232,7 @@
     align-items: end;
     display: grid;
     gap: var(--space-300);
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
   }
 
   @media (width < 40rem) {

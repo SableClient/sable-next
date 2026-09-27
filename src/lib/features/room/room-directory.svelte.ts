@@ -1,4 +1,4 @@
-import type { PublicRoomView } from '#src/generated/protocol';
+import type { DirectoryRoomType, PublicRoomView } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
@@ -7,6 +7,7 @@ export type RoomDirectoryApi = Pick<CoreCommands, 'publicRooms'>;
 export type DirectoryQuery = {
   server: string | null;
   search: string;
+  roomType?: DirectoryRoomType | null;
 };
 
 export const EMPTY_QUERY: DirectoryQuery = { server: null, search: '' };
@@ -53,14 +54,19 @@ export class RoomDirectory {
     this.error = null;
 
     try {
+      const roomType = this.#query.roomType ?? null;
       const page = await this.commands.publicRooms({
         server: this.#query.server,
         search: this.#query.search,
         since,
+        ...(roomType ? { roomType } : {}),
       });
       if (generation !== this.#generation) return;
 
-      this.rooms = since === null ? page.rooms : mergeRooms(this.rooms, page.rooms);
+      const rooms = roomType
+        ? page.rooms.filter((room) => room.is_space === (roomType === 'spaces'))
+        : page.rooms;
+      this.rooms = since === null ? rooms : mergeRooms(this.rooms, rooms);
       this.total = page.total;
       this.#nextBatch = page.next_batch;
     } catch (cause) {

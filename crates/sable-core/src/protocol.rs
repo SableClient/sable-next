@@ -328,6 +328,7 @@ pub enum Command {
         server: Option<String>,
         search: Option<String>,
         since: Option<String>,
+        room_type: Option<DirectoryRoomType>,
     },
     RoomDirectoryVisibility {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1626,6 +1627,14 @@ pub enum CommandErr {
 pub enum LoginIdentifier {
     User { user: String },
     Email { address: String },
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum DirectoryRoomType {
+    Rooms,
+    Spaces,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
