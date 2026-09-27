@@ -22,6 +22,7 @@
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import PaperPlaneRightIcon from 'phosphor-svelte/lib/PaperPlaneRightIcon';
+  import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
@@ -56,7 +57,9 @@
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
+  import MessageReportDialog from './MessageReportDialog.svelte';
   import ProfileOverrideDialog from './ProfileOverrideDialog.svelte';
+  import { sendReport } from './report';
   import FormattedBody from './FormattedBody.svelte';
   import type { MatrixLink } from './matrix-link.js';
   import { powerTag } from './power-tags.js';
@@ -129,6 +132,7 @@
   let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
   let overrideColors = $derived(profileOverrides.colors(userId));
   let overrideOpen = $state(false);
+  let reportOpen = $state(false);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let pronounSets = $derived(
@@ -609,6 +613,14 @@
           <ProhibitIcon />
           {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
         </ActionMenuItem>
+        <ActionMenuItem
+          destructive
+          class="profile-menu-destructive"
+          onSelect={() => (reportOpen = true)}
+        >
+          <FlagIcon />
+          {$i18n.t('timeline.profileReport')}
+        </ActionMenuItem>
       {/if}
     </IconContext>
   </ActionMenu>
@@ -798,6 +810,16 @@
   footer={extra.length > 0 ? miscData : undefined}
   composer={canMessage ? composer : undefined}
   {variant}
+/>
+
+<MessageReportDialog
+  bind:open={reportOpen}
+  title={$i18n.t('timeline.profileReportTitle', { name: displayName })}
+  hint={$i18n.t('timeline.profileReportHint')}
+  onReport={(reason) => {
+    const target = userId;
+    void sendReport(() => core.commands.reportUser(target, reason ?? ''));
+  }}
 />
 
 <ProfileOverrideDialog

@@ -8,10 +8,17 @@
 
   interface Props {
     open?: boolean;
+    title?: string;
+    hint?: string;
     onReport: (reason: string | null) => void;
   }
 
-  let { open = $bindable(false), onReport }: Props = $props();
+  let {
+    open = $bindable(false),
+    title = $i18n.t('timeline.reportTitle'),
+    hint = $i18n.t('timeline.reportReasonHint'),
+    onReport,
+  }: Props = $props();
   let reason = $state('');
   const fieldId = $props.id();
 
@@ -22,9 +29,9 @@
   }
 </script>
 
-<DialogFrame bind:open variant="verification" label={$i18n.t('timeline.reportTitle')}>
-  <h2>{$i18n.t('timeline.reportTitle')}</h2>
-  <p class="hint">{$i18n.t('timeline.reportReasonHint')}</p>
+<DialogFrame bind:open variant="verification" label={title}>
+  <h2>{title}</h2>
+  <p class="hint">{hint}</p>
   <FormField {fieldId} label={$i18n.t('timeline.reportReason')}>
     <TextArea id={fieldId} bind:value={reason} />
   </FormField>

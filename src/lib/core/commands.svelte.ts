@@ -954,6 +954,14 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
+    async reportRoom(roomId: string, reason: string): Promise<void> {
+      await transport().send({ type: 'report_room', room_id: roomId, reason });
+    },
+
+    async reportUser(userId: string, reason: string): Promise<void> {
+      await transport().send({ type: 'report_user', user_id: userId, reason });
+    },
+
     async eventItems(roomId: string, eventIds: readonly string[]): Promise<TimelineItemView[]> {
       const response = await transport().send({
         type: 'event_items',

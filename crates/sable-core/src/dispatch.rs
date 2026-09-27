@@ -1258,6 +1258,16 @@ impl Core {
                 Ok(CommandOk::ReportMessage)
             }
 
+            Command::ReportRoom { room_id, reason } => {
+                self.report_room(room_id, reason).await?;
+                Ok(CommandOk::ReportRoom)
+            }
+
+            Command::ReportUser { user_id, reason } => {
+                self.report_user(user_id, reason).await?;
+                Ok(CommandOk::ReportUser)
+            }
+
             Command::EventItems { room_id, event_ids } => Ok(CommandOk::EventItems {
                 items: self.event_items(&room_id, &event_ids).await?,
             }),

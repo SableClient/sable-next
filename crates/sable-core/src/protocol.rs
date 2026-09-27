@@ -443,6 +443,16 @@ pub enum Command {
         event_id: OwnedEventId,
         reason: Option<String>,
     },
+    ReportRoom {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        reason: String,
+    },
+    ReportUser {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        reason: String,
+    },
     EventSource {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1339,6 +1349,8 @@ pub enum CommandOk {
     },
     SetAccountData,
     ReportMessage,
+    ReportRoom,
+    ReportUser,
     EventSource {
         source: String,
     },

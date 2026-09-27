@@ -6,6 +6,7 @@
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
@@ -41,6 +42,7 @@
     onPins?: () => void;
     pinsUnread?: number;
     onWidgets?: () => void;
+    onReport: () => void;
     onLeave: () => void;
   }
 
@@ -59,6 +61,7 @@
     onPins,
     pinsUnread = 0,
     onWidgets,
+    onReport,
     onLeave,
   }: Props = $props();
   const core = useCoreClient();
@@ -165,6 +168,10 @@
 
     <ActionMenuSeparator />
 
+    <ActionMenuItem destructive disabled={!room} onSelect={onReport}>
+      <FlagIcon />
+      {room?.is_space ? $i18n.t('room.menuReportSpace') : $i18n.t('room.menuReport')}
+    </ActionMenuItem>
     <ActionMenuItem destructive onSelect={onLeave}>
       <SignOutIcon />
       {room?.is_space ? $i18n.t('room.menuLeaveSpace') : $i18n.t('room.menuLeave')}

@@ -4,7 +4,8 @@ use futures_util::future::join_all;
 use matrix_sdk::deserialized_responses::TimelineEvent;
 use matrix_sdk::room::{IncludeRelations, MessagesOptions, RelationsOptions};
 use matrix_sdk::ruma::api::Direction;
-use matrix_sdk::ruma::api::client::room::report_content;
+use matrix_sdk::ruma::api::client::reporting::report_user;
+use matrix_sdk::ruma::api::client::room::{report_content, report_room};
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::{AnyMessageLikeEventContent, AnySyncTimelineEvent, Mentions};
@@ -247,6 +248,32 @@ impl Core {
             .await
             .map_err(|error| self.failed("report_message", error))?;
 
+        Ok(())
+    }
+
+    pub(crate) async fn report_room(
+        &self,
+        room_id: OwnedRoomId,
+        reason: String,
+    ) -> Result<(), CommandErr> {
+        self.client()
+            .await?
+            .send(report_room::v3::Request::new(room_id, reason))
+            .await
+            .map_err(|error| self.homeserver_http_error("report_room", error))?;
+        Ok(())
+    }
+
+    pub(crate) async fn report_user(
+        &self,
+        user_id: OwnedUserId,
+        reason: String,
+    ) -> Result<(), CommandErr> {
+        self.client()
+            .await?
+            .send(report_user::v3::Request::new(user_id, reason))
+            .await
+            .map_err(|error| self.homeserver_http_error("report_user", error))?;
         Ok(())
     }
 

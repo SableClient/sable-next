@@ -615,7 +615,12 @@
     "addressesUnpublishSelected": "Dépublier",
     "addressesDeleteSelected": "Supprimer",
     "addressesRemoveManyConfirm": "Supprimer {{count}} adresses ?",
-    "abbreviationsRemoveConfirm": "Retirer {{term}} ?"
+    "abbreviationsRemoveConfirm": "Retirer {{term}} ?",
+    "menuReport": "Signaler le salon",
+    "menuReportSpace": "Signaler l’espace",
+    "reportTitle": "Signaler le salon",
+    "reportSpaceTitle": "Signaler l’espace",
+    "reportHint": "Expliquez aux administrateurs de votre serveur ce qui ne va pas. Le signalement porte sur ce salon, pas sur un message."
   },
   "join": {
     "action": "Rejoindre",
@@ -1026,7 +1031,12 @@
     "utdWaiting": "En attente de la clé de ce message…",
     "videoConverting": "Conversion de la video…",
     "playVideo": "Lire {{name}}",
-    "profileBanner": "Voir la bannière de {{name}}"
+    "profileBanner": "Voir la bannière de {{name}}",
+    "reportSent": "Signalement envoyé",
+    "reportUnsupported": "Votre serveur n’accepte pas ce type de signalement.",
+    "profileReport": "Signaler l’utilisateur",
+    "profileReportTitle": "Signaler {{name}}",
+    "profileReportHint": "Expliquez aux administrateurs de votre serveur ce que cette personne a fait."
   },
   "viewer": {
     "title": "Visionneuse de médias",

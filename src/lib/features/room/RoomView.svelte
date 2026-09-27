@@ -71,6 +71,8 @@
   import { useCallSession, type CallMedia } from '#lib/features/call/call-session.svelte.js';
   import JumpToTimeDialog from './JumpToTimeDialog.svelte';
   import LeaveRoomDialog from './LeaveRoomDialog.svelte';
+  import MessageReportDialog from './MessageReportDialog.svelte';
+  import { sendReport } from './report';
   import MembersDrawer from './MembersDrawer.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
   import ThreadList from './ThreadList.svelte';
@@ -148,6 +150,7 @@
   let inviteOpen = $state(false);
   let jumpOpen = $state(false);
   let leaveOpen = $state(false);
+  let reportOpen = $state(false);
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
@@ -1061,6 +1064,7 @@
           onPins={phone ? () => (pinsOpen = true) : undefined}
           {pinsUnread}
           onWidgets={phone && widgets.length > 0 ? toggleWidgets : undefined}
+          onReport={() => (reportOpen = true)}
           onLeave={() => (leaveOpen = true)}
         />
       {/snippet}
@@ -1307,6 +1311,16 @@
       jumpOpen = open;
     }}
     onJump={jumpToEvent}
+  />
+
+  <MessageReportDialog
+    bind:open={reportOpen}
+    title={$i18n.t(resolvedRoom?.is_space ? 'room.reportSpaceTitle' : 'room.reportTitle')}
+    hint={$i18n.t('room.reportHint')}
+    onReport={(reason) => {
+      const target = resolvedRoomId;
+      void sendReport(() => core.commands.reportRoom(target, reason ?? ''));
+    }}
   />
 
   <LeaveRoomDialog

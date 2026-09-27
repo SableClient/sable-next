@@ -675,7 +675,12 @@
     "emojisDeletePack": "Delete {{name}}",
     "emojisUseEverywhere": "Use in every room",
     "emojisUseEverywhereHint": "Adds this pack to your picker outside this room.",
-    "emojisPacks": "Packs"
+    "emojisPacks": "Packs",
+    "menuReport": "Report room",
+    "menuReportSpace": "Report space",
+    "reportTitle": "Report room",
+    "reportSpaceTitle": "Report space",
+    "reportHint": "Tell your homeserver administrators what is wrong here. The report names this room, not a message."
   },
   "join": {
     "action": "Join",
@@ -1123,7 +1128,12 @@
     "profileOverrideSave": "Save",
     "profileOverrideCancel": "Cancel",
     "profileOverrideRemove": "Show their own profile",
-    "profileBanner": "View {{name}}'s banner"
+    "profileBanner": "View {{name}}'s banner",
+    "reportSent": "Report sent",
+    "reportUnsupported": "Your homeserver can't take this kind of report.",
+    "profileReport": "Report user",
+    "profileReportTitle": "Report {{name}}",
+    "profileReportHint": "Tell your homeserver administrators what this person did."
   },
   "viewer": {
     "title": "Media viewer",
