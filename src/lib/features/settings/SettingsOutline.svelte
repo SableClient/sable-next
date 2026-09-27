@@ -22,6 +22,7 @@
       <a
         href={`#${entry.id}`}
         aria-current={active ? 'location' : undefined}
+        draggable="false"
         onclick={(event) => {
           if (event.shiftKey || event.metaKey || event.ctrlKey || event.button !== 0) return;
 

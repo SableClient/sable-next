@@ -10,9 +10,7 @@ static GREEK: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Gr
 static ARABIC: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Arabic));
 static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Tamil));
 
-// probly-search stores terms in a character trie and vacuums it recursively.
-// Keeping a bounded term prevents a single unbroken message token exhausting
-// the shallow WebAssembly stack during that maintenance.
+// probly-search vacuums its character trie recursively on WASM.
 const MAX_TERM_CHARS: usize = 256;
 
 pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {

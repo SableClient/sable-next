@@ -143,6 +143,7 @@
     href={resolve('/(app)/profile')}
     aria-label={$i18n.t('nav.manageAccounts')}
     aria-current={page.url.pathname === '/profile' ? 'page' : undefined}
+    draggable="false"
   >
     {@render ownAvatar()}
   </a>

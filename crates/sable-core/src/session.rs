@@ -362,7 +362,8 @@ async fn build_account_client(
 
     #[cfg(target_family = "wasm")]
     {
-        let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::multi_process("main");
+        // The SharedWorker is the sole IndexedDB owner in the web runtime.
+        let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::SingleProcess;
         let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)

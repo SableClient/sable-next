@@ -41,7 +41,7 @@
 {#if variant === 'page'}
   <AppPageShell title={$i18n.t('nav.inbox')} density="compact">
     {#snippet actions()}
-      <a class="bookmarks-link" href={resolve('bookmarks')}>
+      <a class="bookmarks-link" href={resolve('bookmarks')} draggable="false">
         <BookmarkSimpleIcon aria-hidden="true" />
         {$i18n.t('inbox.bookmarks')}
       </a>
@@ -59,7 +59,7 @@
     <div class="inbox">
       <NotificationList {filter} onFilter={selectFilter} limit={5} />
       <InviteList />
-      <a class="view-all" href={resolve('inbox')}>{$i18n.t('inbox.viewAll')}</a>
+      <a class="view-all" href={resolve('inbox')} draggable="false">{$i18n.t('inbox.viewAll')}</a>
     </div>
   </section>
 {/if}
