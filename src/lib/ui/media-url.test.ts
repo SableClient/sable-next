@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
+import { CoreError } from '#src/transport';
 
 import {
   cachedMediaUrl,
@@ -8,6 +9,7 @@ import {
   holdMediaUrl,
   loadMediaUrl,
   mediaAspectRatio,
+  retryMediaUrl,
 } from './media-url.js';
 
 afterEach(() => {
@@ -344,4 +346,30 @@ test('keeps a download alive while it reports progress', async () => {
 
   await expect(request).resolves.toBe('blob:large');
   expect(listeners.size).toBe(0);
+});
+
+test('a media server the core refuses is not asked again until it says so, even on retry', async () => {
+  vi.useFakeTimers();
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:refused');
+  const fetchMedia = vi
+    .fn<() => Promise<Uint8Array<ArrayBuffer>>>()
+    .mockRejectedValueOnce(
+      new CoreError({ code: 'media_server_unavailable', retry_after_ms: 60_000 })
+    )
+    .mockResolvedValue(new Uint8Array([1]));
+  const core = {
+    session: session('account-refused', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia },
+  };
+  const source = 'mxc://dead.example/refused';
+
+  await expect(loadMediaUrl(core, source, 0, 0)).rejects.toThrow();
+  await expect(retryMediaUrl(core, source, 0, 0)).rejects.toThrow();
+  expect(fetchMedia).toHaveBeenCalledOnce();
+
+  vi.advanceTimersByTime(60_001);
+
+  await expect(retryMediaUrl(core, source, 0, 0)).resolves.toBe('blob:refused');
+  expect(fetchMedia).toHaveBeenCalledTimes(2);
 });

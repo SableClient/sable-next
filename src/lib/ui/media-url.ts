@@ -1,5 +1,6 @@
 import QuickLRU from 'quick-lru';
 
+import { CoreError } from '#src/transport';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 
@@ -23,6 +24,8 @@ const unavailable = new QuickLRU<string, true>({
   maxSize: MAX_MEDIA_METADATA,
   maxAge: MEDIA_FAILURE_TTL_MS,
 });
+/* Not cleared by a retry: the core already knows the server is failing. */
+const refused = new QuickLRU<string, true>({ maxSize: MAX_MEDIA_METADATA });
 const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
 let inflight = 0;
@@ -210,7 +213,9 @@ export function loadMediaUrl(
   mime?: string | null
 ): Promise<string> {
   const key = cacheKey(core.session?.account_id, source, width, height);
-  if (unavailable.has(key)) return Promise.reject(new Error('Media unavailable'));
+  if (unavailable.has(key) || refused.has(key)) {
+    return Promise.reject(new Error('Media unavailable'));
+  }
   const request =
     pending.get(key) ??
     fetchThroughGate(core, source, width, height)
@@ -238,7 +243,11 @@ export function loadMediaUrl(
         releaseSlot();
       });
   pending.set(key, request);
-  void request.catch(() => {
+  void request.catch((error: unknown) => {
+    if (error instanceof CoreError && error.detail.code === 'media_server_unavailable') {
+      refused.set(key, true, { maxAge: error.detail.retry_after_ms });
+      return;
+    }
     unavailable.set(key, true);
   });
   return request;

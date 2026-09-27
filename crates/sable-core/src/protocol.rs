@@ -1602,6 +1602,11 @@ pub enum CommandErr {
     Unsupported,
     /// Retryable: keep UI.
     Unavailable,
+    /// The media's server keeps failing; asking again before this is pointless.
+    MediaServerUnavailable {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        retry_after_ms: u64,
+    },
     /// Refused, recoverable by user action.
     Denied,
     RateLimited {

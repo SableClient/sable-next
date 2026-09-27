@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use futures_util::StreamExt;
 
+use matrix_sdk::HttpError;
 use matrix_sdk::attachment::{
     AttachmentInfo, BaseAudioInfo, BaseFileInfo, BaseImageInfo, BaseVideoInfo,
 };
@@ -13,13 +14,14 @@ use matrix_sdk::ruma::events::Mentions;
 use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
-    OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedUserId, UInt,
-    events::room::message::TextMessageEventContent,
+    MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedServerName,
+    OwnedUserId, ServerName, UInt, events::room::message::TextMessageEventContent,
 };
 use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
 use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource, GalleryConfig, GalleryItemInfo};
 use mime::Mime;
 
+use crate::media_health::Admission;
 use crate::messages::outgoing_mentions;
 use crate::personas::profile_extra_content;
 use crate::protocol::{
@@ -31,6 +33,7 @@ use crate::{Core, MatrixClient};
 
 const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
 const MEDIA_DOWNLOAD_TIMEOUT: Duration = Duration::from_hours(1);
+const MEDIA_FIRST_BYTE_TIMEOUT: Duration = Duration::from_secs(30);
 const UNSIZED_PROGRESS_STEP: u64 = 256 * 1024;
 
 #[derive(serde::Deserialize)]
@@ -77,15 +80,68 @@ impl Core {
 
         let client = self.client().await?;
         let media = media_label(&source);
+        let origin = media_origin(&source);
+        let mut probe = None;
+        if let Some((server, _)) = &origin {
+            let now = now_ms();
+            let admission = self
+                .media_health
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .admit(server, now);
+            match admission {
+                Admission::Refused { retry_after_ms } => {
+                    return cached_media(&client, &source, width, height)
+                        .await
+                        .ok_or(CommandErr::MediaServerUnavailable { retry_after_ms });
+                }
+                Admission::Probe => {
+                    probe = Some(ProbeGuard {
+                        core: self,
+                        server,
+                        armed: true,
+                    });
+                }
+                Admission::Allowed => {}
+            }
+        }
 
+        let result = self
+            .media_bytes(&client, &key, source, width, height, &media)
+            .await;
+        if let Some((server, media_id)) = &origin {
+            let mut health = self
+                .media_health
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            match &result {
+                Ok(_) => health.succeeded(server),
+                Err(error) if blames_media_server(error) => {
+                    health.failed(server, media_id, now_ms());
+                }
+                Err(_) => health.abandoned(server),
+            }
+        }
+        if let Some(probe) = probe.as_mut() {
+            probe.armed = false;
+        }
+        result.map_err(|_| CommandErr::Unavailable)
+    }
+
+    async fn media_bytes(
+        &self,
+        client: &MatrixClient,
+        key: &str,
+        source: MediaSource,
+        width: u32,
+        height: u32,
+        media: &str,
+    ) -> matrix_sdk::Result<Vec<u8>> {
         if width == 0 || height == 0 || matches!(source, MediaSource::Encrypted(_)) {
             return self
-                .original_media(&client, &key, source)
+                .original_media(client, key, source)
                 .await
-                .map_err(|error| {
-                    tracing::warn!(%media, "media unavailable: {error}");
-                    CommandErr::Unavailable
-                });
+                .inspect_err(|error| tracing::warn!(%media, "media unavailable: {error}"));
         }
 
         let request = MediaRequestParameters {
@@ -96,20 +152,26 @@ impl Core {
             )),
         };
 
-        match client.media().get_media_content(&request, true).await {
+        let thumbnail = matrix_sdk::timeout::timeout(
+            client.media().get_media_content(&request, true),
+            MEDIA_FIRST_BYTE_TIMEOUT,
+        )
+        .await
+        .map_err(|elapsed| matrix_sdk::Error::UnknownError(Box::new(elapsed)))
+        .and_then(|result| result);
+        match thumbnail {
             Ok(bytes) => Ok(bytes),
             Err(error) if answered_by_server(&error) => {
                 tracing::warn!(%media, "thumbnail refused, falling back to the original: {error}");
-                self.original_media(&client, &key, source)
+                self.original_media(client, key, source)
                     .await
-                    .map_err(|error| {
+                    .inspect_err(|error| {
                         tracing::warn!(%media, "the original is unavailable too: {error}");
-                        CommandErr::Unavailable
                     })
             }
             Err(error) => {
                 tracing::warn!(%media, width, height, "media unavailable: {error}");
-                Err(CommandErr::Unavailable)
+                Err(error)
             }
         }
     }
@@ -184,13 +246,17 @@ impl Core {
         ]);
         drop(segments);
 
-        let response = client
-            .http_client()
-            .get(url)
-            .bearer_auth(token)
-            .timeout(MEDIA_DOWNLOAD_TIMEOUT)
-            .send()
-            .await?;
+        let response = matrix_sdk::timeout::timeout(
+            client
+                .http_client()
+                .get(url)
+                .bearer_auth(token)
+                .timeout(MEDIA_DOWNLOAD_TIMEOUT)
+                .send(),
+            MEDIA_FIRST_BYTE_TIMEOUT,
+        )
+        .await
+        .map_err(|elapsed| matrix_sdk::Error::UnknownError(Box::new(elapsed)))??;
         if response.status() == reqwest::StatusCode::UNAUTHORIZED {
             return client.media().get_media_content(&request, true).await;
         }
@@ -726,6 +792,86 @@ fn attachment_info(mime: &Mime, view: &AttachmentInfoView, size: usize) -> Attac
         }
         _ => AttachmentInfo::File(BaseFileInfo { size }),
     }
+}
+
+struct ProbeGuard<'a> {
+    core: &'a Core,
+    server: &'a ServerName,
+    armed: bool,
+}
+
+impl Drop for ProbeGuard<'_> {
+    fn drop(&mut self) {
+        if self.armed {
+            self.core
+                .media_health
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .abandoned(self.server);
+        }
+    }
+}
+
+async fn cached_media(
+    client: &MatrixClient,
+    source: &MediaSource,
+    width: u32,
+    height: u32,
+) -> Option<Vec<u8>> {
+    let thumbnail = (width > 0 && height > 0 && matches!(source, MediaSource::Plain(_)))
+        .then(|| MediaFormat::Thumbnail(MediaThumbnailSettings::new(width.into(), height.into())));
+    let store = client.media_store().lock().await.ok()?;
+    for format in thumbnail.into_iter().chain([MediaFormat::File]) {
+        let request = MediaRequestParameters {
+            source: source.clone(),
+            format,
+        };
+        if let Ok(Some(bytes)) = store.get_media_content(&request).await {
+            return Some(bytes);
+        }
+    }
+    None
+}
+
+fn now_ms() -> u64 {
+    MilliSecondsSinceUnixEpoch::now().get().into()
+}
+
+fn media_origin(source: &MediaSource) -> Option<(OwnedServerName, String)> {
+    let uri = match source {
+        MediaSource::Plain(uri) => uri,
+        MediaSource::Encrypted(file) => &file.url,
+    };
+    let (server, media_id) = uri.parts().ok()?;
+    Some((server.to_owned(), media_id.to_owned()))
+}
+
+fn blames_media_server(error: &matrix_sdk::Error) -> bool {
+    const NOT_THE_REMOTE: [u16; 3] = [401, 403, 429];
+    match error {
+        matrix_sdk::Error::Http(http) => match http.as_ref() {
+            HttpError::Reqwest(error) => error.status().map_or_else(
+                || transport_failure_blames_remote(error),
+                |status| !NOT_THE_REMOTE.contains(&status.as_u16()),
+            ),
+            HttpError::Api(_) => http
+                .as_client_api_error()
+                .is_none_or(|error| !NOT_THE_REMOTE.contains(&error.status_code.as_u16())),
+            _ => false,
+        },
+        matrix_sdk::Error::UnknownError(error) => error.is::<matrix_sdk::timeout::ElapsedError>(),
+        _ => false,
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn transport_failure_blames_remote(error: &reqwest::Error) -> bool {
+    !error.is_connect()
+}
+
+#[cfg(target_family = "wasm")]
+const fn transport_failure_blames_remote(_: &reqwest::Error) -> bool {
+    false
 }
 
 fn answered_by_server(error: &matrix_sdk::Error) -> bool {

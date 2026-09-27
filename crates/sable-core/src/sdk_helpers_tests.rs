@@ -11,7 +11,7 @@ use matrix_sdk_ui::{
 use serde_json::json;
 use wiremock::{
     Mock, ResponseTemplate,
-    matchers::{method, path},
+    matchers::{method, path, path_regex},
 };
 
 use crate::{
@@ -655,6 +655,126 @@ async fn an_encrypted_thumbnail_downloads_the_original() {
         plaintext
     );
     assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), plaintext);
+}
+
+fn remote_media_error(status: u16) -> ResponseTemplate {
+    ResponseTemplate::new(status).set_body_json(json!({
+        "errcode": "M_UNKNOWN",
+        "error": "Unknown error when fetching thumbnail",
+    }))
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/thumbnail/dead\.example/",
+        ))
+        .respond_with(remote_media_error(400))
+        .expect(3)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/download/dead\.example/",
+        ))
+        .respond_with(remote_media_error(400))
+        .expect(3)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    for id in ["one", "two", "three"] {
+        assert!(matches!(
+            core.media_thumbnail(format!("mxc://dead.example/{id}"), 64, 64)
+                .await,
+            Err(CommandErr::Unavailable)
+        ));
+    }
+
+    assert!(matches!(
+        core.media_thumbnail("mxc://dead.example/four".to_owned(), 64, 64)
+            .await,
+        Err(CommandErr::MediaServerUnavailable { retry_after_ms }) if retry_after_ms > 0
+    ));
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn a_refused_server_still_serves_what_is_cached() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let bytes = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/dead.example/kept"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/download/dead\.example/gone",
+        ))
+        .respond_with(remote_media_error(502))
+        .expect(3)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    core.media_thumbnail("mxc://dead.example/kept".to_owned(), 0, 0)
+        .await
+        .unwrap();
+    for id in ["gone1", "gone2", "gone3"] {
+        core.media_thumbnail(format!("mxc://dead.example/{id}"), 0, 0)
+            .await
+            .unwrap_err();
+    }
+
+    assert_eq!(
+        core.media_thumbnail("mxc://dead.example/kept".to_owned(), 0, 0)
+            .await
+            .unwrap(),
+        bytes
+    );
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn forbidden_media_never_opens_the_circuit() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/download/policy\.example/",
+        ))
+        .respond_with(remote_media_error(403))
+        .expect(4)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    for id in ["a", "b", "c", "d"] {
+        assert!(matches!(
+            core.media_thumbnail(format!("mxc://policy.example/{id}"), 0, 0)
+                .await,
+            Err(CommandErr::Unavailable)
+        ));
+    }
 }
 
 #[tokio::test]

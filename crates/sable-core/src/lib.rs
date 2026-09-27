@@ -15,6 +15,7 @@ mod inbox;
 mod invites;
 pub mod matrix_html;
 mod media;
+mod media_health;
 pub use media::GalleryAttachment;
 mod messages;
 pub mod notifications;
@@ -90,6 +91,7 @@ pub struct Core {
         HashMap<matrix_sdk::ruma::OwnedRoomId, Vec<matrix_sdk::ruma::OwnedEventId>>,
     >,
     cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
+    media_health: std::sync::Mutex<media_health::MediaHealth>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
@@ -219,6 +221,7 @@ impl Core {
             session_handlers: std::sync::Mutex::new(Vec::new()),
             probed_pinned_rooms: std::sync::Mutex::new(HashMap::new()),
             cosmetics: std::sync::Mutex::new(cosmetics::CosmeticsCache::default()),
+            media_health: std::sync::Mutex::new(media_health::MediaHealth::default()),
             notification_routes: Mutex::new(HashMap::new()),
             session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),
