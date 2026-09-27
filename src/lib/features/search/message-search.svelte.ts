@@ -63,7 +63,8 @@ export class MessageSearch {
     for (const hit of this.hits) {
       const last = groups.at(-1);
       if (last?.roomId === hit.room_id) last.hits.push(hit);
-      else groups.push({ key: `${hit.room_id}/${hit.event_id}`, roomId: hit.room_id, hits: [hit] });
+      else
+        groups.push({ key: `${hit.room_id}/${groups.length}`, roomId: hit.room_id, hits: [hit] });
     }
 
     return groups;

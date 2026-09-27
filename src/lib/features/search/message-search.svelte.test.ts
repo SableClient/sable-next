@@ -236,7 +236,7 @@ test('interleaved rooms produce distinct group keys', async () => {
     page([
       { ...hit('$a'), room_id: '!one:example.org' },
       { ...hit('$b'), room_id: '!two:example.org' },
-      { ...hit('$c'), room_id: '!one:example.org' },
+      { ...hit('$a'), room_id: '!one:example.org' },
     ])
   );
   const { core } = coreReturning(searchMessages);
