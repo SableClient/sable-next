@@ -1,5 +1,6 @@
 #![recursion_limit = "512"]
 
+mod account_data;
 mod accounts;
 mod attachments;
 mod auth;
@@ -414,20 +415,48 @@ impl Core {
     }
 
     pub(crate) async fn account_data_types(&self) -> Result<Vec<String>, CommandErr> {
-        Ok(self
-            .account_data_types
-            .lock()
-            .await
-            .iter()
-            .cloned()
-            .collect())
+        let client = self.client().await?;
+        let store = client.state_store();
+        let mut types = self.account_data_types.lock().await.clone();
+        types.extend(account_data::stored_types(&client).await);
+        for candidate in account_data::KNOWN_TYPES {
+            if types.contains(*candidate) {
+                continue;
+            }
+            if let Ok(Some(_)) = store.get_account_data_event((*candidate).into()).await {
+                types.insert((*candidate).to_owned());
+            }
+        }
+        Ok(types.into_iter().collect())
     }
 
     pub(crate) async fn remember_account_data_type(&self, event_type: impl Into<String>) {
-        self.account_data_types
+        let event_type = event_type.into();
+        if !self
+            .account_data_types
             .lock()
             .await
-            .insert(event_type.into());
+            .insert(event_type.clone())
+        {
+            return;
+        }
+        let Ok(client) = self.client().await else {
+            return;
+        };
+        let mut stored = account_data::stored_types(&client).await;
+        if !stored.insert(event_type) {
+            return;
+        }
+        let Ok(bytes) = serde_json::to_vec(&stored) else {
+            return;
+        };
+        if let Err(error) = client
+            .state_store()
+            .set_custom_value_no_read(account_data::TYPES_KEY, bytes)
+            .await
+        {
+            tracing::warn!("persisting the account data types failed: {error}");
+        }
     }
 
     pub(crate) async fn global_account_data(

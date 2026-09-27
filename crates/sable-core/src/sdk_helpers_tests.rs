@@ -1172,3 +1172,42 @@ async fn profile_updates_send_the_chosen_msc4466_propagation() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn account_data_types_survive_a_restart_and_include_stored_known_types() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(
+                Raw::new(&json!({"type": "m.direct", "content": {}}))
+                    .unwrap()
+                    .cast_unchecked(),
+            );
+        })
+        .await;
+
+    let before = core(&server, client.clone()).await;
+    before
+        .remember_account_data_type("org.example.custom")
+        .await;
+
+    let after = core(&server, client).await;
+    let CommandOk::AccountDataTypes { event_types } =
+        after.dispatch(Command::AccountDataTypes).await.unwrap()
+    else {
+        panic!("wrong response")
+    };
+    assert!(
+        event_types
+            .iter()
+            .any(|event_type| event_type == "m.direct")
+    );
+    assert!(
+        event_types
+            .iter()
+            .any(|event_type| event_type == "org.example.custom")
+    );
+}
