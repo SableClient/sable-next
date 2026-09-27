@@ -1331,3 +1331,33 @@ async fn account_data_types_survive_a_restart_and_include_stored_known_types() {
             .any(|event_type| event_type == "org.example.custom")
     );
 }
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn account_data_types_include_what_the_server_lists_but_sync_never_delivered() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    server
+        .mock_sync()
+        .ok(|builder| {
+            builder.add_global_account_data(
+                Raw::new(&json!({"type": "org.example.legacy", "content": {"a": 1}}))
+                    .unwrap()
+                    .cast_unchecked(),
+            );
+        })
+        .mount()
+        .await;
+
+    let core = core(&server, client).await;
+    let CommandOk::AccountDataTypes { event_types } =
+        core.dispatch(Command::AccountDataTypes).await.unwrap()
+    else {
+        panic!("wrong response")
+    };
+    assert!(
+        event_types
+            .iter()
+            .any(|event_type| event_type == "org.example.legacy")
+    );
+}

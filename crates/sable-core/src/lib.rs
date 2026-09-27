@@ -426,6 +426,17 @@ impl Core {
         let store = client.state_store();
         let mut types = self.account_data_types.lock().await.clone();
         types.extend(account_data::stored_types(&client).await);
+        match account_data::server_types(&client, presence::state(self.desired_presence())).await {
+            Ok(listed) => {
+                for event_type in listed {
+                    if !types.contains(&event_type) {
+                        self.remember_account_data_type(event_type.clone()).await;
+                        types.insert(event_type);
+                    }
+                }
+            }
+            Err(error) => tracing::debug!("listing the account data types failed: {error}"),
+        }
         for candidate in account_data::KNOWN_TYPES {
             if types.contains(*candidate) {
                 continue;
