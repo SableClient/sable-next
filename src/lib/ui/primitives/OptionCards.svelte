@@ -74,7 +74,7 @@
   }
 
   :global(.option-card:hover:not([data-disabled])) {
-    background: var(--bg-container-hover);
+    background: var(--surface-container-hover);
   }
 
   :global(.option-card-icon) {
