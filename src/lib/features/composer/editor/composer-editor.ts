@@ -53,6 +53,7 @@ import {
   type FormatAction,
 } from './formatting';
 import { markdownColorCommand, markdownFormatCommands, markdownLink } from './markdown-format';
+import { withPastedMentions } from './pasted-mentions';
 import type { EmoteMedia } from './node-views';
 import { composerNodeViews } from './node-views';
 import { hasAndroidCompositionQuirk, hasIosKeyboardContextQuirk } from '#lib/platform/input.js';
@@ -489,6 +490,7 @@ export interface ComposerEditorOptions {
   onNavigate: (key: NavigationKey) => boolean;
   onFiles: (files: File[]) => void;
   onLinkRequest: () => void;
+  mentionName?: (userId: string) => string | null;
   onSpoilerRequest: () => void;
   onSourceToggle: (source: boolean) => void;
 }
@@ -682,6 +684,7 @@ export class ComposerEditor {
             this.handlePastedImages(slice) ||
             this.linkSelection(pasteView, slice) ||
             this.pasteAsText(pasteView, event),
+          transformPasted: (slice, pasteView) => this.pastedMentions(pasteView.state, slice),
           clipboardTextParser: (text, _context, plain) =>
             plain || this.source || !preferences.richTextComposer
               ? textSlice(text)
@@ -926,8 +929,21 @@ export class ComposerEditor {
     if (!this.markdownMode()) return false;
     const text = event.clipboardData?.getData('text/plain');
     if (!text || event.clipboardData?.getData('text/html').includes('data-pm-slice')) return false;
-    view.dispatch(view.state.tr.replaceSelection(textSlice(text)).scrollIntoView());
+    const slice = this.pastedMentions(view.state, textSlice(text));
+    view.dispatch(view.state.tr.replaceSelection(slice).scrollIntoView());
     return true;
+  }
+
+  private pastedMentions(state: EditorState, slice: Slice): Slice {
+    if (this.source) return slice;
+    const inCode =
+      state.selection.$from.parent.type.spec.code === true ||
+      (this.markdownMode() && insideFence(state));
+    return withPastedMentions(
+      slice,
+      (userId) => this.options.mentionName?.(userId) ?? null,
+      inCode
+    );
   }
 
   private linkSelection(view: EditorView, slice: Slice): boolean {

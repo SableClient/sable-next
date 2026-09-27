@@ -297,6 +297,8 @@
 
   const editor = new ComposerEditor({
     media,
+    mentionName: (userId) =>
+      members.find((member) => member.user_id === userId)?.display_name ?? null,
     emotes: () => emotes,
     label: () => $i18n.t('timeline.messagePlaceholder'),
     describedBy: hintId,

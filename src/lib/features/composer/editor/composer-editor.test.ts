@@ -2012,3 +2012,56 @@ describe('text and highlight colours', () => {
     preferences.richTextComposer = true;
   });
 });
+
+describe('a pasted user id becomes a mention', () => {
+  function paste(text: string): void {
+    const data = new DataTransfer();
+    data.setData('text/plain', text);
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: data });
+    surface().dispatchEvent(event);
+  }
+
+  function mentions(editor: ComposerEditor): { userId: string; name: string }[] {
+    const found: { userId: string; name: string }[] = [];
+    editor.doc()?.descendants((node) => {
+      if (node.type.name === 'mention') {
+        found.push({ userId: node.attrs.userId as string, name: node.attrs.name as string });
+      }
+    });
+    return found;
+  }
+
+  test.each([true, false])('in the composer with rich text %s', (rich) => {
+    preferences.richTextComposer = rich;
+    const editor = openWith({
+      mentionName: (userId) => (userId === '@ana:example.org' ? 'Ana' : null),
+    });
+    paste('ping @ana:example.org and https://matrix.to/#/@bob:example.org please');
+
+    expect(mentions(editor)).toEqual([
+      { userId: '@ana:example.org', name: '@Ana' },
+      { userId: '@bob:example.org', name: '@bob:example.org' },
+    ]);
+    preferences.richTextComposer = true;
+  });
+
+  test('not inside a fence in the plain composer', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter', true);
+    paste('@ana:example.org');
+
+    expect(mentions(editor)).toEqual([]);
+    preferences.richTextComposer = true;
+  });
+
+  test('not an address that only looks like one', () => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    paste('mail me at ana@example.org or see `@ana:example.org`');
+
+    expect(mentions(editor)).toEqual([]);
+  });
+});
