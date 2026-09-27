@@ -765,6 +765,7 @@
     data-selected={selected ? 'true' : undefined}
     style:--pmp-on-light={nameColorOnLight(personaTint?.color_on_light) ?? undefined}
     style:--pmp-on-dark={nameColorOnDark(personaTint?.color_on_dark) ?? undefined}
+    style:--sender-name-color={senderColors.nameColor}
     style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
     style:--name-color-on-dark={senderColors.nameColorDark ?? undefined}
     style:--timeline-emote-size={timelineEmoteSize}
@@ -1157,6 +1158,9 @@
     bind:this={messageRow}
     class={['message', 'event-row', 'choice', { highlighted }]}
     data-selected={selected ? 'true' : undefined}
+    style:--sender-name-color={senderColors.nameColor}
+    style:--name-color-on-light={senderColors.nameColorLight ?? undefined}
+    style:--name-color-on-dark={senderColors.nameColorDark ?? undefined}
     style:transform={swipe.offset === 0 ? undefined : `translateX(${String(-swipe.offset)}px)`}
     style:transition={swipe.dragging ? 'none' : undefined}
     onpointerdown={rowPointerDown}

@@ -640,6 +640,15 @@ test('uses the sender profile name color in every message layout', async () => {
   ).toBe('#9fd07c');
 });
 
+test('exposes the default sender colour on the whole message for themes', async () => {
+  core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
+  render(TimelineItemHarness, { props: { core, item: { item: item(false), collapsed: false } } });
+  await tick();
+
+  const message = document.querySelector<HTMLElement>('.message');
+  expect(message?.style.getPropertyValue('--sender-name-color')).not.toBe('');
+});
+
 test('falls back to the role colour when the sender profile has none', async () => {
   core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
   render(TimelineItemHarness, {
