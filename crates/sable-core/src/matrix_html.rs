@@ -311,7 +311,8 @@ fn anchor(href: &str, text: &str) -> String {
         URL_SCHEMES
             .iter()
             .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
-    }) && (!has_scheme(href, "tauri:") || has_scheme(href, DESKTOP_APP_ORIGIN));
+    }) && !has_scheme(href, "mxc:")
+        && (!has_scheme(href, "tauri:") || has_scheme(href, DESKTOP_APP_ORIGIN));
     if !allowed {
         return escape_html(text);
     }
@@ -369,6 +370,13 @@ fn linkify_urls(text: &str) -> String {
         html.push_str(&escape_html(before));
         match kind {
             SpanKind::Email => html.push_str(&anchor(&format!("mailto:{link}"), link)),
+            SpanKind::Url if is_mxc_uri(link) => {
+                let _ = write!(
+                    html,
+                    "<img src=\"{}\">",
+                    html_escape::encode_double_quoted_attribute(link)
+                );
+            }
             SpanKind::Url => html.push_str(&anchor(link, link)),
             SpanKind::Msc => {
                 let number = link.get("msc".len()..).unwrap_or_default();
@@ -1231,6 +1239,28 @@ mod tests {
 
         let plain = display_html("magnet:?xt=urn:btih:abc", None);
         assert!(!plain.contains("<a "), "magnet was autolinked: {plain}");
+    }
+
+    #[test]
+    fn a_bare_mxc_uri_renders_as_its_image() {
+        let plain = display_html("hi mxc://example.org/pic. and https://example.org", None);
+        assert!(
+            plain.contains("hi <img src=\"mxc://example.org/pic\">."),
+            "{plain}"
+        );
+        assert!(plain.contains("<a href=\"https://example.org\""), "{plain}");
+
+        let formatted = display_html("", Some("<p>see mxc://example.org/pic</p>"));
+        assert!(
+            formatted.contains("<img src=\"mxc://example.org/pic\">"),
+            "{formatted}"
+        );
+
+        let invalid = display_html("mxc://example.org", None);
+        assert!(
+            !invalid.contains("<img") && !invalid.contains("<a "),
+            "{invalid}"
+        );
     }
 
     #[test]
