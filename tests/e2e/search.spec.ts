@@ -1,14 +1,15 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test as base } from './fixtures/test';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 const test = base.extend({
   storageState: ({ workerSearchCorpus }, use) => use(workerSearchCorpus.statePath),
 });
 
 const SEARCH_FIELD = en.search.placeholder;
-const INDEXED = { timeout: 20_000 };
+const INDEXED = { timeout: COLD_BOOT_TIMEOUT };
 
 function group(page: Page, name: string) {
   return page.getByRole('main').getByRole('heading', { name, level: 2 });
@@ -24,6 +25,10 @@ function hit(page: Page, text: RegExp) {
 
 function marked(page: Page): Promise<string[]> {
   return page.evaluate(() => [...(CSS.highlights.get('search-match') ?? [])].map(String));
+}
+
+function chips(scope: Page | Locator) {
+  return scope.getByRole('list', { name: en.search.activeFilters }).getByRole('listitem');
 }
 
 function searchField(page: Page) {
@@ -55,10 +60,10 @@ test('the room header search button opens a search panel scoped to that room', a
   await page.waitForURL(/\/rooms\/.+/);
   const roomUrl = page.url();
 
-  await page.getByRole('button', { name: 'Search messages' }).click();
+  await page.getByRole('button', { name: en.search.open }).click();
 
   const panel = page.getByRole('complementary', { name: en.search.title });
-  await expect(panel.locator('.chip')).toHaveText(/in:\s*General/);
+  await expect(chips(panel)).toHaveText(/in:\s*General/);
   await expect(searchField(page)).toHaveValue('');
   await searchField(page).fill('message');
   await expect(panel.locator('.hit-row').first()).toBeVisible(INDEXED);
@@ -78,7 +83,7 @@ test('message search from a space sidebar starts scoped to that space', async ({
   await page.getByRole('link', { name: en.nav.messageSearch }).click();
 
   await expect(page).toHaveURL(/\/search\?q=/);
-  await expect(page.locator('.chips .chip')).toHaveText(/space:\s*Club/);
+  await expect(chips(page)).toHaveText(/space:\s*Club/);
 });
 
 test('a query returns hits grouped by room and opens the message it lands on', async ({ page }) => {
@@ -135,7 +140,7 @@ test('pinned:true keeps only the pinned message', async ({ page }) => {
 
   await searchField(page).fill('Clubhouse pinned:true ');
 
-  await expect(page.locator('.chips .chip')).toHaveText(/pinned:\s*true/);
+  await expect(chips(page)).toHaveText(/pinned:\s*true/);
   await expect(hit(page, /Clubhouse notice board/)).toBeVisible(INDEXED);
   await expect(hit(page, /Clubhouse thread reply/)).toHaveCount(0);
 });
@@ -170,7 +175,7 @@ test('the search shortcut in a room scopes the search to it', async ({
   await page.keyboard.press('ControlOrMeta+f');
 
   await expect(page).toHaveURL(/\/search\?q=/);
-  await expect(page.locator('.chips .chip')).toHaveText(/in:\s*General/);
+  await expect(chips(page)).toHaveText(/in:\s*General/);
 });
 
 test('a submitted search is offered again from an empty field', async ({ page }) => {
@@ -290,7 +295,7 @@ test('in: offers rooms and accepting one inserts its alias', async ({ page }) =>
     .first()
     .click();
 
-  await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
+  await expect(chips(page)).toHaveText(/in:\s*Random/);
   await expect(field).toHaveValue('message ');
   await expect(anyGroup(page, 'Random')).toBeVisible(INDEXED);
 });
@@ -418,13 +423,13 @@ test('an operator under the caret stays as text until it is committed', async ({
   const field = searchField(page);
 
   await field.fill('message in:Random');
-  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(chips(page)).toHaveCount(0);
   await expect(field).toHaveValue('message in:Random');
 
   await field.press('End');
   await field.pressSequentially(' ');
 
-  await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
+  await expect(chips(page)).toHaveText(/in:\s*Random/);
   await expect(field).toHaveValue('message ');
 });
 
@@ -437,7 +442,7 @@ test('the remove button drops the chip and rebroadens the results', async ({ pag
 
   await page.getByRole('button', { name: 'Remove in:Random' }).click();
 
-  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(chips(page)).toHaveCount(0);
   await expect(anyGroup(page, 'General')).toBeVisible(INDEXED);
 });
 
@@ -447,12 +452,12 @@ test('backspace on an empty draft removes the last chip', async ({ page, searchC
 
   const localpart = searchCorpus.sender.userId.replace(/^@/, '').split(':')[0];
   await field.fill(`in:Random from:${localpart} `);
-  await expect(page.locator('.chip')).toHaveCount(2);
+  await expect(chips(page)).toHaveCount(2);
 
   await field.press('Backspace');
 
-  await expect(page.locator('.chip')).toHaveCount(1);
-  await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
+  await expect(chips(page)).toHaveCount(1);
+  await expect(chips(page)).toHaveText(/in:\s*Random/);
 });
 
 test('a chip names the room rather than its id', async ({ page, searchCorpus }) => {
@@ -460,7 +465,7 @@ test('a chip names the room rather than its id', async ({ page, searchCorpus }) 
 
   await searchField(page).fill(`message in:${searchCorpus.randomId} `);
 
-  await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
+  await expect(chips(page)).toHaveText(/in:\s*Random/);
 });
 
 test('from: suggestions show display names', async ({ page, app, searchCorpus }) => {
@@ -485,7 +490,7 @@ test('accepting a suggestion closes the list instead of reopening it', async ({ 
 
   await field.press('Enter');
 
-  await expect(page.locator('.chip')).toHaveText(/has:\s*image/);
+  await expect(chips(page)).toHaveText(/has:\s*image/);
   await expect(field).toHaveValue('');
   await expect(listbox).toHaveCount(0);
 });
@@ -528,12 +533,12 @@ test('a pasted filter commits to a chip without stranding text in the input', as
 
   await field.fill('in:Random ');
 
-  await expect(page.locator('.chip')).toHaveCount(1);
+  await expect(chips(page)).toHaveCount(1);
   await expect(field).toHaveValue('');
 
   await field.pressSequentially('message');
 
-  await expect(page.locator('.chip')).toHaveCount(1);
+  await expect(chips(page)).toHaveCount(1);
   await expect(field).toHaveValue('message');
   await expect(page).toHaveURL(/q=in%3ARandom%20message/);
 });
@@ -546,7 +551,7 @@ test('a space typed after a committed chip is not swallowed', async ({ page }) =
   await field.pressSequentially(' ');
 
   await expect(field).toHaveValue(' ');
-  await expect(page.locator('.chip')).toHaveCount(1);
+  await expect(chips(page)).toHaveCount(1);
 });
 
 test('backspace after that space deletes the space, not the chip', async ({ page }) => {
@@ -557,7 +562,7 @@ test('backspace after that space deletes the space, not the chip', async ({ page
   await field.pressSequentially(' ');
   await field.press('Backspace');
 
-  await expect(page.locator('.chip')).toHaveCount(1);
+  await expect(chips(page)).toHaveCount(1);
   await expect(field).toHaveValue('');
 });
 
@@ -571,7 +576,7 @@ test('typing in the middle of the draft keeps the space and the caret', async ({
   await field.pressSequentially(' X');
 
   await expect(field).toHaveValue(' Xdeploy');
-  await expect(page.locator('.chip')).toHaveCount(1);
+  await expect(chips(page)).toHaveCount(1);
 });
 
 test('a chip is built character by character in front of existing text', async ({ page }) => {
@@ -579,11 +584,11 @@ test('a chip is built character by character in front of existing text', async (
   const field = searchField(page);
 
   await field.pressSequentially('message in:Random');
-  await expect(page.locator('.chip')).toHaveCount(0);
+  await expect(chips(page)).toHaveCount(0);
 
   await field.pressSequentially(' ');
 
-  await expect(page.locator('.chip')).toHaveText(/in:\s*Random/);
+  await expect(chips(page)).toHaveText(/in:\s*Random/);
   await expect(field).toHaveValue('message ');
 });
 

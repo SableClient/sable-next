@@ -811,6 +811,13 @@ test('scrolling through unmeasured history preserves the requested movement ever
   await core.emitTimelineDiff(subscription, [{ op: 'reset', values: items }]);
   await timeline.scrollToBottomAndNotify();
   await timeline.waitForScrollSettled();
+  await expect
+    .poll(async () => {
+      await timeline.wheelUp(45);
+      await timeline.waitForScrollSettled();
+      return timeline.distanceFromBottom();
+    })
+    .toBeGreaterThan(0);
 
   const drift = await timeline.viewport.evaluate(async (viewport) => {
     const errors: number[] = [];
@@ -1186,6 +1193,7 @@ test.describe('mobile', () => {
     await timeline.scrollAboveBottomAndNotify(
       await timeline.viewport.evaluate((node) => node.clientHeight + 1)
     );
+    await timeline.waitForScrollSettled();
     await expect(timeline.jumpToLatest).toBeVisible();
     const before = await timeline.scrollTop();
     const end = await timeline.scrollableHeight();
@@ -1285,6 +1293,18 @@ test.describe('mobile', () => {
       await timeline.viewport.evaluate((node) => node.clientHeight + 1)
     );
     await expect(timeline.jumpToLatest).toBeVisible();
+    let measured = Number.NaN;
+    await expect
+      .poll(
+        async () => {
+          const height = await timeline.scrollableHeight();
+          const same = height === measured;
+          measured = height;
+          return same;
+        },
+        { intervals: [250] }
+      )
+      .toBe(true);
     const before = await timeline.scrollTop();
     const end = await timeline.scrollableHeight();
     const sampling = sampleUntilAtBottom(timeline);
@@ -1449,7 +1469,8 @@ test('deleting the last composer character keeps following latest', async ({
   await app.composer.focus();
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await app.composer.press('a');
-    await page.waitForTimeout(200);
+    await expect(app.composer).toHaveText('a');
+    await timeline.waitForScrollSettled();
     const sampling = timeline.viewport.evaluate(async (node) => {
       const gaps: number[] = [];
       for (let frame = 0; frame < 20; frame += 1) {
@@ -1522,7 +1543,7 @@ test('follows sent links after scrolling back to the bottom in Firefox', async (
   await page.evaluate(() => {
     document.documentElement.style.zoom = '87.5%';
   });
-  await page.waitForTimeout(100);
+  await timeline.waitForScrollSettled();
 
   await timeline.viewport.hover();
   await page.mouse.wheel(0, -500);

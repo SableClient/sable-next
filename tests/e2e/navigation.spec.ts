@@ -1,8 +1,8 @@
 import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
@@ -45,16 +45,12 @@ for (const { path, heading } of MOBILE_DESTINATIONS) {
 test('separates the room directory filters from the join-by-address section', async ({ page }) => {
   await page.goto('/explore');
 
-  const joinSection = page
-    .locator('section')
-    .filter({ has: page.locator('#explore-join-by-address') });
+  const joinSection = page.getByRole('region', { name: en.room.directoryJoinByAddress });
   const filters = page.locator('.directory .filters');
   await expect(filters).toBeVisible();
 
-  const [joinBounds, filterBounds] = await Promise.all([
-    joinSection.boundingBox(),
-    filters.boundingBox(),
-  ]);
+  const joinBounds = await joinSection.boundingBox();
+  const filterBounds = await filters.boundingBox();
 
   if (joinBounds === null || filterBounds === null) {
     throw new Error('Explore sections must have layout bounds');
@@ -103,33 +99,35 @@ test('dismissing the inbox popover returns to the previous page', async ({ page,
   await expect(page).toHaveURL(/\/rooms$/);
 });
 
-test('closing the inbox sheet returns to the previous page', async ({ page, app }) => {
+test('the mobile inbox tab opens the inbox page, and back returns to the rooms', async ({
+  page,
+  app,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await app.openRooms();
-  const dismiss = page.getByRole('button', { name: 'Dismiss' });
-  if (await dismiss.isVisible()) await dismiss.click();
 
-  await page.getByRole('link', { name: 'Inbox' }).first().click();
-  const inbox = page.getByRole('region', { name: 'Inbox' });
-  await expect(inbox).toBeVisible();
-  await expect(page).toHaveURL(/\/rooms$/);
+  await app.mobileQuickTools.getByRole('link', { name: 'Inbox' }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
+  await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Close inbox' }).click();
-
-  await expect(inbox).toBeHidden();
+  await page.goBack();
   await expect(page).toHaveURL(/\/rooms$/);
 });
 
 test('opens a settings section over the app shell', async ({ page, app }) => {
   await page.goto('/settings/appearance');
 
-  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible({
+    timeout: COLD_BOOT_TIMEOUT,
+  });
   await expect(app.primaryNavigation).toBeVisible();
 });
 
 test('closes settings and returns to the app', async ({ page, app }) => {
   await page.goto('/settings/appearance');
-  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible({
+    timeout: COLD_BOOT_TIMEOUT,
+  });
 
   await app.closeSettings.first().click();
 

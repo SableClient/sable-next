@@ -60,7 +60,9 @@ export class HomeserverProxy {
     await once(server, 'listening');
     const { port } = server.address() as AddressInfo;
     const proxy = new HomeserverProxy(server, `http://127.0.0.1:${String(port)}`, upstream);
-    route.onRequest = (incoming, outgoing) => void proxy.handle(incoming, outgoing);
+    route.onRequest = (incoming, outgoing) => {
+      proxy.handle(incoming, outgoing).catch(() => outgoing.destroy());
+    };
     return proxy;
   }
 
@@ -155,10 +157,11 @@ export class HomeserverProxy {
       },
       (response) => {
         if (path.startsWith('/.well-known/matrix/client')) {
-          void this.rewriteWellKnown(response, outgoing);
+          this.rewriteWellKnown(response, outgoing).catch(() => outgoing.destroy());
           return;
         }
         outgoing.writeHead(response.statusCode ?? 502, response.headers);
+        response.on('error', () => outgoing.destroy());
         response.pipe(outgoing);
       }
     );

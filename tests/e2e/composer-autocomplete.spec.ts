@@ -27,7 +27,7 @@ test('the arrow keys move a visible highlight through emote suggestions', async 
     ]);
   expect(row).not.toBe(panel);
 
-  const picked = await options.nth(1).locator('.label').textContent();
+  const picked = await options.nth(1).locator('.unicode-emoji').textContent();
   await page.keyboard.press('Enter');
   await expect(app.composer).toContainText(picked ?? '');
 });

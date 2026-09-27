@@ -84,7 +84,15 @@ test.describe('with motion', () => {
     await installRoomCore('ready');
     const sections = await openJumpSheet(page);
     const sheet = page.locator('.dialog-content-sheet');
-    await page.waitForTimeout(500);
+    let settledY = Number.NaN;
+    await expect
+      .poll(async () => {
+        const y = (await sheet.boundingBox())?.y;
+        const settled = y === settledY;
+        settledY = y ?? Number.NaN;
+        return settled;
+      })
+      .toBe(true);
     const before = await sheet.boundingBox();
     const box = await sections.boundingBox();
     if (!before || !box) throw new Error('The sheet is not laid out.');

@@ -7,8 +7,6 @@ test('a tombstoned room replaces the composer with a banner offering the success
   admin,
   guest,
 }) => {
-  test.setTimeout(60_000);
-
   const roomId = await guest.createRoom({
     name: `Old Room ${String(Date.now())}`,
     invite: [admin.userId],
@@ -32,8 +30,6 @@ test('a tombstoned room replaces the composer with a banner offering the success
 });
 
 test('an upgraded room leads back to the room it replaced', async ({ page, app, admin, guest }) => {
-  test.setTimeout(60_000);
-
   const roomId = await guest.createRoom({
     name: `Old Room ${String(Date.now())}`,
     invite: [admin.userId],

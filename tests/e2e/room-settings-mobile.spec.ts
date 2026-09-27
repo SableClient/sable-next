@@ -47,21 +47,23 @@ test('mobile: no room settings section is wider than the screen', async ({
   const settings = await openSettings(page);
 
   for (const name of SECTIONS) {
-    await settings.getByRole('button', { name, exact: true }).first().click();
+    await settings.getByRole('button', { name, exact: true }).click();
     await expect(settings.getByRole('button', { name: 'Back', exact: true })).toBeVisible();
-    await page.waitForTimeout(500);
 
-    const overflowing = await page.evaluate(() => {
-      const root = document.querySelector('.dialog-content-settings');
-      if (!root) return ['the settings dialog closed itself'];
-      const limit = root.clientWidth;
-      return [...root.querySelectorAll('*')]
-        .filter((node) => !node.closest('.screen-reader-only'))
-        .filter((node) => node.scrollWidth > limit + 1)
-        .map((node) => `${node.tagName}.${node.className} ${node.scrollWidth}/${limit}`)
-        .slice(0, 4);
-    });
-    expect(overflowing, `${name} overflows`).toEqual([]);
+    await expect
+      .poll(
+        () =>
+          settings.evaluate((root) => {
+            const limit = root.clientWidth;
+            return [...root.querySelectorAll('*')]
+              .filter((node) => !node.closest('.screen-reader-only'))
+              .filter((node) => node.scrollWidth > limit + 1)
+              .map((node) => `${node.tagName}.${node.className} ${node.scrollWidth}/${limit}`)
+              .slice(0, 4);
+          }),
+        { message: `${name} overflows` }
+      )
+      .toEqual([]);
 
     await settings.getByRole('button', { name: 'Back', exact: true }).click();
   }

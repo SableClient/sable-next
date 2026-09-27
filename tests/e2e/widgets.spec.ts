@@ -7,10 +7,6 @@ function widget(): Record<string, unknown> {
   return { type: 'grafana', url: WIDGET_URL, name: 'Dashboard', data: {} };
 }
 
-test.beforeEach(() => {
-  test.setTimeout(60_000);
-});
-
 test('a widget renders in a sandboxed iframe with the room and user substituted', async ({
   page,
   app,

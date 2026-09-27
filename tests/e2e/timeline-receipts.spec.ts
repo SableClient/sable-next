@@ -1,3 +1,5 @@
+import type { Locator } from '@playwright/test';
+
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineImage, timelineItem } from './fixtures/timeline-items';
 
@@ -11,6 +13,21 @@ function reacted(id: string, own: boolean) {
     read_by: ['@bob:example.test', '@carol:example.test'],
     reactions: [{ key: '👍', senders: ['@bob:example.test'] }],
   };
+}
+
+async function heightSettled(row: Locator): Promise<void> {
+  let settled = Number.NaN;
+  await expect
+    .poll(
+      async () => {
+        const height = await row.evaluate((node) => node.getBoundingClientRect().height);
+        const same = height === settled;
+        settled = height;
+        return same;
+      },
+      { intervals: [250] }
+    )
+    .toBe(true);
 }
 
 test('own bubble receipts reach the same edge as everyone else’s on mobile', async ({
@@ -82,6 +99,7 @@ test('receipts beside text, reactions, an embed or an image add no row of their 
     const measure = async (readBy: string[]) => {
       await core.setTimelineItemById(subscription, 'general-18', { ...item, read_by: readBy });
       await expect(row.locator('.receipt-slot')).toHaveCount(readBy.length);
+      await heightSettled(row);
       return row.evaluate((node) => ({
         height: Math.round(node.getBoundingClientRect().height),
         beside: node.querySelector('.message-content')?.classList.contains('receipt-beside'),
@@ -123,6 +141,7 @@ test('bubble receipts sit beside trailing reactions on either side', async ({
         read_by: readBy,
       });
       await expect(row.locator('.receipt-slot')).toHaveCount(readBy.length);
+      await heightSettled(row);
       return row.evaluate((node) => Math.round(node.getBoundingClientRect().height));
     };
     const plain = await measure([]);

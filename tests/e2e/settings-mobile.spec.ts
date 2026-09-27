@@ -11,7 +11,13 @@ async function holdAt(page: Page, x: number, y: number): Promise<void> {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 }
 
-async function swipeRight(page: Page, y: number, fromX: number, toX: number): Promise<void> {
+async function swipeRight(
+  page: Page,
+  y: number,
+  fromX: number,
+  toX: number,
+  { stepMs = 0 } = {}
+): Promise<void> {
   const cdp = await page.context().newCDPSession(page);
   const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number) =>
     cdp.send('Input.dispatchTouchEvent', {
@@ -19,7 +25,10 @@ async function swipeRight(page: Page, y: number, fromX: number, toX: number): Pr
       touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
     });
   await touch('touchStart', fromX);
-  for (let x = fromX + 12; x <= toX; x += 12) await touch('touchMove', x);
+  for (let x = fromX + 12; x <= toX; x += 12) {
+    if (stepMs > 0) await page.waitForTimeout(stepMs);
+    await touch('touchMove', x);
+  }
   await touch('touchEnd', toX);
 }
 
@@ -104,7 +113,7 @@ test('mobile: swiping a page right goes back to the list', async ({
   const sections = page.getByRole('navigation', { name: 'Settings sections' });
   await expect(page.getByRole('button', { name: 'Timeline', exact: true })).toBeVisible();
 
-  await swipeRight(page, 400, 40, 80);
+  await swipeRight(page, 400, 40, 80, { stepMs: 60 });
   await expect(sections).toBeHidden();
 
   await swipeRight(page, 400, 40, 340);
@@ -123,7 +132,7 @@ test('mobile: swiping the section list right closes settings', async ({
   const sections = page.getByRole('navigation', { name: 'Settings sections' });
   await expect(sections).toBeVisible();
 
-  await swipeRight(page, 400, 40, 80);
+  await swipeRight(page, 400, 40, 80, { stepMs: 60 });
   await expect(sections).toBeVisible();
 
   await swipeRight(page, 400, 40, 340);

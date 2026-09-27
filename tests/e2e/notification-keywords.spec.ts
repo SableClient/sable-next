@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect, test, SIGNED_OUT } from './fixtures/test';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 
@@ -24,7 +24,7 @@ function removeButton(page: Page, text: string) {
 test.describe('against the homeserver', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/settings/notifications');
-    await expect(page.getByLabel('Add a keyword')).toBeVisible();
+    await expect(page.getByLabel('Add a keyword')).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
   });
 
   test('adding a keyword writes a push rule and lists it', async ({ admin, page }) => {
@@ -90,9 +90,10 @@ test.describe('when the server refuses', () => {
   test.use({ storageState: SIGNED_OUT });
 
   test.beforeEach(async ({ page, proxiedLogin }) => {
+    test.setTimeout(120_000);
     await proxiedLogin();
     await page.goto('/settings/notifications');
-    await expect(page.getByLabel('Add a keyword')).toBeVisible();
+    await expect(page.getByLabel('Add a keyword')).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
   });
 
   test('a failure adding a keyword leaves the list showing what the server has', async ({

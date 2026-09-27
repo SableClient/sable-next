@@ -11,13 +11,13 @@ export class AppShell {
   readonly startupStatus: Locator;
   readonly startupHeading: Locator;
   readonly backToRooms: Locator;
+  readonly roomListDrawer: Locator;
   readonly resizeRooms: Locator;
   readonly composer: Locator;
   readonly sendMessage: Locator;
   readonly createRoomName: Locator;
   readonly createRoomSubmit: Locator;
   readonly closeSettings: Locator;
-  readonly deviceBanner: Locator;
 
   constructor(private readonly page: Page) {
     this.primaryNavigation = page.getByRole('navigation', { name: 'Primary navigation' });
@@ -29,6 +29,7 @@ export class AppShell {
     this.startupStatus = page.getByRole('main').getByRole('status');
     this.startupHeading = page.getByRole('heading', { name: 'Starting Sable' });
     this.backToRooms = page.getByRole('button', { name: 'Back to rooms' });
+    this.roomListDrawer = page.locator('#drawer-toggle');
     this.resizeRooms = page.getByRole('slider', { name: 'Resize rooms' });
     this.composer = page.getByRole('combobox', { name: en.timeline.messagePlaceholder });
     this.sendMessage = page.getByRole('button', { name: 'Send message' });
@@ -39,7 +40,6 @@ export class AppShell {
     this.closeSettings = page
       .getByRole('dialog')
       .getByRole('button', { name: 'Close', exact: true });
-    this.deviceBanner = page.getByRole('status', { name: /not verified/i });
   }
 
   async openRooms(): Promise<void> {
@@ -103,11 +103,6 @@ export class AppShell {
     await this.awaitTimelineSettled();
   }
 
-  async dismissDeviceBanner(): Promise<void> {
-    await this.deviceBanner.getByRole('button', { name: 'Dismiss' }).click();
-    await expect(this.deviceBanner).toHaveCount(0);
-  }
-
   private async awaitTimelineSettled(): Promise<void> {
     await expect(this.page.locator('.timeline-viewport:not(.initial)')).toBeVisible({
       timeout: COLD_BOOT_TIMEOUT,
@@ -135,7 +130,14 @@ export class AppShell {
   }
 
   async openRoomFromList(name: string): Promise<void> {
-    if (await this.backToRooms.isVisible()) await this.backToRooms.click();
+    await this.roomLink(name).or(this.backToRooms).first().waitFor();
+    if (
+      (await this.backToRooms.isVisible()) &&
+      (await this.roomListDrawer.getAttribute('aria-pressed')) === 'false'
+    ) {
+      await this.backToRooms.click();
+      await expect(this.roomListDrawer).toHaveAttribute('aria-pressed', 'true');
+    }
     await this.roomLink(name).click();
   }
 }

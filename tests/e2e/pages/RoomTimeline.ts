@@ -229,10 +229,8 @@ export class RoomTimeline {
 
   async visibleRange(): Promise<[string, string]> {
     const visible = this.items.filter({ visible: true });
-    const [first, last] = await Promise.all([
-      visible.first().innerText(),
-      visible.last().innerText(),
-    ]);
+    const first = await visible.first().innerText();
+    const last = await visible.last().innerText();
     return [first.trim(), last.trim()];
   }
 
@@ -244,6 +242,16 @@ export class RoomTimeline {
       if (node.getClientRects().length === 0)
         throw new Error(`timeline item ${itemId} has no bounds`);
       return { itemId, y: (node.firstElementChild ?? node).getBoundingClientRect().top };
+    });
+  }
+
+  eventIdAboveViewport(): Promise<string | null> {
+    return this.viewport.evaluate((element) => {
+      const top = element.getBoundingClientRect().top;
+      const rows = Array.from(element.querySelectorAll<HTMLElement>('.item[data-event-id]'));
+      return (
+        rows.findLast((row) => row.getBoundingClientRect().bottom <= top)?.dataset.eventId ?? null
+      );
     });
   }
 
@@ -303,10 +311,8 @@ export class RoomTimeline {
     await expect(lastItem).toBeVisible();
     await expect.poll(() => this.distanceFromBottom()).toBe(0);
 
-    const [itemBox, viewportBox] = await Promise.all([
-      lastItem.boundingBox(),
-      this.viewport.boundingBox(),
-    ]);
+    const itemBox = await lastItem.boundingBox();
+    const viewportBox = await this.viewport.boundingBox();
     expect(itemBox).not.toBeNull();
     expect(viewportBox).not.toBeNull();
     expect((itemBox?.y ?? 0) + (itemBox?.height ?? 0)).toBeLessThanOrEqual(

@@ -1,6 +1,7 @@
 // Asserts the same messages stay on screen, not that scrollTop is unchanged: a
 // virtualised list renumbers rows constantly, and the text is what a reader sees.
 
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
 import { solidPng } from './fixtures/png';
 
@@ -10,7 +11,7 @@ test.beforeEach(async ({ page, timeline }) => {
   await page.setViewportSize({ width: 1280, height: 420 });
 });
 
-test.fixme('an edit above the viewport does not move the reader', async ({
+test('an edit above the viewport does not move the reader', async ({
   app,
   timeline,
   admin,
@@ -23,9 +24,11 @@ test.fixme('an edit above the viewport does not move the reader', async ({
   // Away from the end, so this is the anchor's job, not follow-to-bottom.
   await timeline.wheelUp(600);
   await expect(timeline.jumpToLatest).toBeVisible();
+  await timeline.waitForScrollSettled();
 
   const before = await timeline.visibleRange();
-  const above = await timeline.items.first().getAttribute('data-event-id');
+  await expect.poll(() => timeline.eventIdAboveViewport()).not.toBeNull();
+  const above = await timeline.eventIdAboveViewport();
   if (!above) throw new Error('no rendered row above the reader');
 
   await admin.editMessage(deepRoom.roomId, above, `Edited ${'and rewrapped '.repeat(12)}`);
@@ -36,7 +39,7 @@ test.fixme('an edit above the viewport does not move the reader', async ({
   await expect.poll(() => timeline.visibleRange()).toEqual(before);
 });
 
-test.fixme('a deletion above the viewport does not move the reader', async ({
+test('a deletion above the viewport does not move the reader', async ({
   app,
   timeline,
   admin,
@@ -48,14 +51,18 @@ test.fixme('a deletion above the viewport does not move the reader', async ({
 
   await timeline.wheelUp(600);
   await expect(timeline.jumpToLatest).toBeVisible();
+  await timeline.waitForScrollSettled();
 
   const before = await timeline.visibleRange();
-  const doomed = await timeline.items.first().getAttribute('data-event-id');
+  await expect.poll(() => timeline.eventIdAboveViewport()).not.toBeNull();
+  const doomed = await timeline.eventIdAboveViewport();
   if (!doomed) throw new Error('no rendered row above the reader');
 
   await admin.redact(deepRoom.roomId, doomed);
 
-  await expect.poll(() => timeline.itemByEventId(doomed).count(), { timeout: 20_000 }).toBe(0);
+  await expect(timeline.itemByEventId(doomed)).toContainText(en.timeline.redacted, {
+    timeout: 20_000,
+  });
   await expect.poll(() => timeline.visibleRange()).toEqual(before);
 });
 
@@ -98,20 +105,19 @@ test('an edited message keeps its marker on the body line', async ({
   await admin.sendMessage(roomId, 'Marker header owner');
   await admin.sendMessage(roomId, 'Marker plain');
   const editable = await admin.sendMessage(roomId, 'Marker before edit');
+  await admin.sendMessage(roomId, 'Marker trailing');
 
   await app.openRoom(roomId);
   await timeline.expectRevealed();
-  await expect(timeline.message('Marker plain')).toBeVisible({ timeout: 20_000 });
+  await expect(timeline.message('Marker trailing')).toBeVisible({ timeout: 20_000 });
 
   await admin.editMessage(roomId, editable, 'Marker edited');
   await expect(timeline.container.getByText('Marker edited')).toBeVisible({ timeout: 20_000 });
 
   const plainRow = timeline.container.locator('.item').filter({ hasText: 'Marker plain' });
   const editedRow = timeline.container.locator('.item').filter({ hasText: 'Marker edited' });
-  const [plainBox, editedBox] = await Promise.all([
-    plainRow.boundingBox(),
-    editedRow.boundingBox(),
-  ]);
+  const plainBox = await plainRow.boundingBox();
+  const editedBox = await editedRow.boundingBox();
   if (!plainBox || !editedBox) throw new Error('missing marker row bounds');
 
   expect(editedBox.height).toBeCloseTo(plainBox.height, 0);

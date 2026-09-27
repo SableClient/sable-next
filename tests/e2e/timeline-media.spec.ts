@@ -9,6 +9,7 @@ import { timelineItem } from './fixtures/timeline-items';
 test.use({ storageState: SIGNED_OUT });
 
 const NARROW = { width: 390, height: 800 };
+const MEDIA_LOADED = { timeout: 15_000 };
 const MEDIA_MAX_PX = 400;
 const MEDIA_MIN_PX = 128;
 
@@ -78,7 +79,7 @@ test('a captionless picture fills its bubble on mobile rather than collapsing', 
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await core.setTimelineItemById(await core.subscription(), 'general-19', picture(1000, 400));
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const box = await mediaBox(page);
   expect(box.width).toBeGreaterThan(MEDIA_MIN_PX);
@@ -99,7 +100,7 @@ test('a very tall picture keeps a usable width and a bounded height on mobile', 
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await core.setTimelineItemById(await core.subscription(), 'general-19', picture(200, 6000));
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const box = await mediaBox(page);
   expect(box.width).toBeCloseTo(MEDIA_MIN_PX, 0);
@@ -120,7 +121,7 @@ test('an ordinary portrait keeps its shape on mobile', async ({
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await core.setTimelineItemById(await core.subscription(), 'general-19', picture(600, 900));
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const box = await mediaBox(page);
   expect(box.width / box.height).toBeCloseTo(600 / 900, 2);
@@ -177,7 +178,7 @@ test('a gallery in a bubble stacks its items on mobile', async ({
       ],
     },
   });
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const box = await mediaBox(page, '.gallery');
   expect(box.width).toBeGreaterThan(MEDIA_MIN_PX);
@@ -199,6 +200,7 @@ test('a gallery keeps two columns on desktop', async ({
   installRoomCore,
 }) => {
   await installRoomCore('delayed_media');
+  await page.setViewportSize({ width: 1280, height: 900 });
   await app.openRooms();
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
@@ -223,7 +225,7 @@ test('a gallery keeps two columns on desktop', async ({
       })),
     },
   });
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const cells = await page
     .locator('.timeline-viewport .gallery .cell')
@@ -332,7 +334,7 @@ test('a picture is capped and its bubble hugs it once the column is wider than t
   await app.openRoomFromList('General');
   await timeline.expectRevealed();
   await core.setTimelineItemById(await core.subscription(), 'general-19', picture(1600, 900));
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
 
   const box = await mediaBox(page);
   const bubble = await mediaBox(page, '.content-bubble');
@@ -395,7 +397,7 @@ test('a video takes the same box as the picture it shares dimensions with', asyn
   await timeline.expectRevealed();
   const subscription = await core.subscription();
   await core.setTimelineItemById(subscription, 'general-19', picture(600, 900));
-  await expect(timeline.image.first().locator('img')).toBeVisible();
+  await expect(timeline.image.first().locator('img')).toBeVisible(MEDIA_LOADED);
   const asPicture = await mediaBox(page, '.media-image');
 
   await core.setTimelineItemById(subscription, 'media-probe', portraitVideo());

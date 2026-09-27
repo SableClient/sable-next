@@ -1,3 +1,4 @@
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
 
@@ -29,7 +30,7 @@ test('the thread screen keeps the timeline and the composer inside the viewport'
   ]);
 
   await page.locator('.thread-summary').first().click();
-  const panel = page.locator('.thread-panel');
+  const panel = page.getByRole('complementary', { name: en.timeline.thread, exact: true });
   await expect(panel).toBeVisible();
 
   const fit = await panel.evaluate((node) => {
@@ -77,7 +78,7 @@ test('the formatting toolbar keeps the thread composer inside its panel', async 
   ]);
 
   await page.locator('.thread-summary').first().click();
-  const panel = page.locator('.thread-panel');
+  const panel = page.getByRole('complementary', { name: en.timeline.thread, exact: true });
   await expect(panel.locator('.thread-composer .formatting')).toBeVisible();
 
   const fit = await panel.evaluate((node) => {
@@ -176,7 +177,9 @@ test.describe('beside the room', () => {
     ]);
 
     await page.locator('.thread-summary').first().click();
-    await expect(page.locator('.thread-panel')).toBeVisible();
+    await expect(
+      page.getByRole('complementary', { name: en.timeline.thread, exact: true })
+    ).toBeVisible();
 
     await page.locator('.message', { hasText: 'Root message' }).first().click({ button: 'right' });
     await expect(page.locator('.message-menu').first()).toBeVisible();

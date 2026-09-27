@@ -1,3 +1,4 @@
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
 
@@ -15,8 +16,8 @@ test('the background crawl makes history searchable without opening the room', a
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
 
   await page.goto('/search');
-  const field = page.getByRole('combobox', { name: /Search messages/ });
-  const hit = page.locator('.hit-body').getByText(DEEP_MESSAGE, { exact: true });
+  const field = page.getByRole('combobox', { name: en.search.placeholder });
+  const hit = page.locator('.hit-message').getByText(DEEP_MESSAGE, { exact: true });
 
   await expect
     .poll(

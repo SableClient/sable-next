@@ -1,5 +1,8 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+import en from '../../../src/locales/en.json' with { type: 'json' };
+import { COLD_BOOT_TIMEOUT } from './AppShell';
+
 export class AuthFlow {
   readonly heading: Locator;
   readonly homeserver: Locator;
@@ -21,8 +24,9 @@ export class AuthFlow {
     this.moreMethodsButton = page.getByRole('button', { name: 'More ways to sign in' });
     this.passwordSignInButton = page.getByRole('button', { name: 'Sign in with password' });
     this.setupCard = page.locator('.auth-card.active');
-    this.previousStageButton = page.getByRole('button', { name: 'Back' });
-    this.nextStageButton = page.getByRole('button', { name: 'Next' });
+    const stages = page.getByRole('navigation', { name: en.auth.stageNavigation });
+    this.previousStageButton = stages.getByRole('button', { name: en.auth.back, exact: true });
+    this.nextStageButton = stages.getByRole('button', { name: en.auth.next, exact: true });
   }
 
   async open(homeserver?: string): Promise<void> {
@@ -45,17 +49,40 @@ export class AuthFlow {
       await expect(this.page).toHaveURL(/\/(setup\/[a-z]+|rooms)$/, { timeout: 30_000 });
       if (rooms.test(new URL(this.page.url()).pathname)) return;
       const before = this.page.url();
-      const skip = this.setupCard
-        .getByRole('button', { name: /^(Skip anyway|Skip for now|Not now|Go to your chats)$/ })
-        .first();
-      const onward = this.setupCard.getByRole('button', { name: 'Continue', exact: true }).first();
-      await expect(skip.or(onward).first()).toBeVisible();
-      await ((await skip.count()) > 0 ? skip : onward).click();
+      await expect(async () => {
+        await (await this.nextSetupAction()).click({ timeout: 5_000 });
+      }).toPass({ timeout: COLD_BOOT_TIMEOUT });
       await this.page
         .waitForURL((url) => url.href !== before, { timeout: 5_000 })
         .catch(() => undefined);
     }
     await expect(this.page).toHaveURL(rooms);
+  }
+
+  private async nextSetupAction(): Promise<Locator> {
+    const candidates = [
+      this.setupCard.getByRole('button', { name: en.setup.skipAnyway, exact: true }),
+      this.page
+        .locator('.setup-checking + .auth-secondary-action')
+        .getByRole('button', { name: en.auth.skipForNow, exact: true }),
+      this.setupCard
+        .getByRole('button', {
+          name: new RegExp(
+            `^(${[
+              en.auth.skipForNow,
+              en.setup.syncNotNow,
+              en.setup.doneAction,
+              en.settings.telemetryBannerDecline,
+            ].join('|')})$`
+          ),
+        })
+        .first(),
+      this.setupCard.getByRole('button', { name: en.auth.continue, exact: true }).first(),
+    ];
+    for (const candidate of candidates) {
+      if (await candidate.isVisible()) return candidate;
+    }
+    throw new Error('no setup action is on screen');
   }
 
   async signInWithPassword(username: string, password: string): Promise<void> {

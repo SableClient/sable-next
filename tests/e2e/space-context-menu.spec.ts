@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
 test.use({ storageState: SIGNED_OUT });
@@ -51,11 +52,12 @@ test('the rail background opens the display menu at the pointer', async ({ page 
   const separator = rail(page).locator('.rail-separator').first();
   const box = await separator.boundingBox();
   expect(box).not.toBeNull();
+  const x = (box?.x ?? 0) + (box?.width ?? 0) / 2;
   const y = (box?.y ?? 0) + (box?.height ?? 0) / 2;
 
-  await separator.click({ button: 'right', force: true });
+  await page.mouse.click(x, y, { button: 'right' });
 
-  const display = page.locator('.rail-display-menu');
+  const display = page.getByRole('menu', { name: en.nav.displayOptions });
   await expect(display).toBeVisible();
   const menuBox = await display.boundingBox();
   expect(Math.abs((menuBox?.y ?? 0) - y)).toBeLessThan(220);

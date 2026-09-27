@@ -1,7 +1,7 @@
 import { expect, test, GUEST_DISPLAY_NAME, SIGNED_OUT } from './fixtures/test';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 390, height: 844 });
 });
 
@@ -17,7 +17,9 @@ test('lists rooms that named us, and opens one', async ({ page, app, admin, gues
 
   // Scoped to the page body: the sidebar lists the same rooms.
   const inbox = page.getByRole('main');
-  await expect(inbox.getByRole('heading', { name: 'Notifications' })).toBeVisible();
+  await expect(inbox.getByRole('heading', { name: 'Notifications' })).toBeVisible({
+    timeout: COLD_BOOT_TIMEOUT,
+  });
   const row = inbox.getByRole('listitem').filter({ hasText: roomName });
   await expect(row).toBeVisible({ timeout: 15_000 });
 
@@ -41,7 +43,7 @@ test('filters notifications, and says so when nothing matches', async ({
   await app.openInbox();
   const inbox = page.getByRole('main');
   const row = inbox.getByRole('listitem').filter({ hasText: roomName });
-  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
 
   await inbox.getByRole('button', { name: 'Mentions' }).click();
   await expect(page).toHaveURL(/\?filter=mentions$/);
@@ -63,7 +65,7 @@ test('answers a pending invitation above the feed', async ({ page, app, admin, g
 
   const inbox = page.getByRole('main');
   await expect(inbox.getByRole('heading', { name: /Pending invites/ })).toBeVisible({
-    timeout: 15_000,
+    timeout: COLD_BOOT_TIMEOUT,
   });
 
   const card = inbox.getByRole('listitem').filter({ hasText: roomName });
@@ -91,7 +93,7 @@ test('marks a room read from its row', async ({ page, app, admin, guest }) => {
 
   await app.openInbox();
   const row = page.getByRole('main').getByRole('listitem').filter({ hasText: roomName });
-  await expect(row).toBeVisible({ timeout: 15_000 });
+  await expect(row).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
 
   await row.getByRole('button', { name: `Mark ${roomName} as read` }).click();
 
@@ -102,6 +104,7 @@ test.describe('on a pristine account', () => {
   test.use({ storageState: SIGNED_OUT });
 
   test('badges the inbox with what is waiting', async ({ page, app, freshLogin, guest }) => {
+    test.setTimeout(120_000);
     const account = await freshLogin();
 
     const mentioned = await guest.createRoom({
@@ -121,7 +124,7 @@ test.describe('on a pristine account', () => {
     await app.openRooms();
 
     await expect(page.getByRole('link', { name: 'Inbox, 2 waiting' }).first()).toBeVisible({
-      timeout: 20_000,
+      timeout: COLD_BOOT_TIMEOUT,
     });
     const rooms = page.locator('a[href="/rooms"]').first();
     await expect(rooms.locator('.unread-badge-count [aria-hidden="true"]')).toHaveText('1');

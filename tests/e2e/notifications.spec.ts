@@ -93,7 +93,11 @@ for (const opened of [false, true]) {
       ]);
 
     await page.goto('/inbox');
-    await expect(page.getByRole('link').filter({ hasText: body })).toBeVisible();
+    const entry = page
+      .getByRole('region', { name: 'Notifications' })
+      .getByRole('listitem')
+      .filter({ hasText: body });
+    await expect(entry.getByRole('link', { name: roomName })).toBeVisible();
   });
 }
 

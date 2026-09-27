@@ -2,7 +2,6 @@ import { expect, test } from './fixtures/test';
 import { AccountSettings } from './pages/AccountSettings';
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 

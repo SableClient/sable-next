@@ -1,3 +1,4 @@
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test } from './fixtures/test';
 
 test.beforeEach(async ({ page }) => {
@@ -68,9 +69,10 @@ test('a forum topic can be deleted from its list', async ({ page, admin }) => {
   const threads = page.getByRole('list', { name: 'Threads' });
   const thread = threads.getByRole('listitem').filter({ hasText: topic });
   await expect(thread).toBeVisible({ timeout: 30_000 });
+  await thread.hover();
   await thread.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('menuitem', { name: 'Delete message' }).click();
-  await page.getByRole('button', { name: 'Delete message' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: en.forum.deleteThread }).click();
 
   await expect(thread).toHaveCount(0, { timeout: 30_000 });
 });

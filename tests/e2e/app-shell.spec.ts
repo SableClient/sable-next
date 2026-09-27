@@ -9,7 +9,6 @@ test.use({ storageState: SIGNED_OUT });
 const LATEST = `Timeline message ${String(TIMELINE_MESSAGE_COUNT - 1)}`;
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 420 });
 });
 
@@ -154,7 +153,10 @@ test('back closes an overlay before it leaves the room', async ({
   await signIn();
   await app.openRoom(homeserver.timelineRoomId);
 
-  await page.getByRole('button', { name: 'Members', exact: true }).click();
+  await page.getByRole('button', { name: 'More options' }).click();
+  const menu = page.getByRole('dialog', { name: 'More options' });
+  await menu.getByRole('menuitem', { name: 'Members' }).click();
+  await expect(menu).toBeHidden();
   const drawer = page.getByRole('dialog');
   await expect(drawer).toBeVisible();
 
@@ -176,7 +178,7 @@ test('reopens a room after returning to the mobile room list', async ({
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
 
   await app.backToRooms.click();
-  await expect(app.backToRooms).toBeHidden();
+  await expect(app.roomListDrawer).toHaveAttribute('aria-pressed', 'true');
   await app.openRoomFromList(TIMELINE_ROOM_NAME);
 
   await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
@@ -260,7 +262,7 @@ test('stays at latest when a measured timeline item grows', async ({
   await timeline.expectAtLatest(LATEST);
 });
 
-test.fixme('preserves the visible history position when the mobile viewport resizes', async ({
+test('preserves the visible history position when the mobile viewport resizes', async ({
   page,
   app,
   timeline,
@@ -278,6 +280,7 @@ test.fixme('preserves the visible history position when the mobile viewport resi
   await expect
     .poll(async () => {
       await timeline.wheelUp(300);
+      await timeline.waitForScrollSettled();
       return timeline.distanceFromBottom();
     })
     .toBeGreaterThan(80);

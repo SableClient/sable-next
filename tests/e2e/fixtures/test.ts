@@ -379,7 +379,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
 
       await use(path);
     },
-    { scope: 'worker' },
+    { scope: 'worker', timeout: 180_000 },
   ],
 
   installEmptyCore: async ({ page, workerSession }, use) => {

@@ -87,7 +87,7 @@ test('mobile hides neighboring cards and card navigation preserves page scroll',
   await expect(adjacent).toBeVisible();
   const appearance = page.locator('.rail > .auth-card.after').first();
   await expect(appearance).toBeVisible();
-  await expect(appearance.locator('.stage-activation')).toBeEnabled();
+  await expect(appearance.locator('.stage-activation')).toBeDisabled();
   await expect(page.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '2');
   for (const card of [adjacent, appearance]) {
     const { opacity, visibleWidth } = await card.evaluate((element) => {
@@ -110,12 +110,13 @@ test('mobile hides neighboring cards and card navigation preserves page scroll',
     return window.scrollY;
   });
   expect(before).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Back' }).first().click();
+  await auth.previousStageButton.click();
   await expect(page).toHaveURL(/\/setup\/profile$/);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'Next' }).first().click();
+  await auth.nextStageButton.click();
   await expect(page).toHaveURL(/\/setup\/notifications$/);
-  await page.getByRole('button', { name: 'Next' }).first().click();
+  await expect(auth.nextStageButton).toHaveCount(0);
+  await auth.setupCard.getByRole('button', { name: 'Skip for now' }).click();
   await expect(page).toHaveURL(/\/setup\/appearance$/);
 });
 
@@ -135,25 +136,27 @@ test.describe('with motion', () => {
     await card.getByRole('button', { name: 'Reset my digital identity' }).click();
     await card.getByRole('checkbox', { name: 'I understand this cannot be undone' }).check();
 
-    await page.evaluate(() => {
-      const seen = new Set<string>();
-      (window as unknown as { __e2eSeenCards: Set<string> }).__e2eSeenCards = seen;
-      const started = performance.now();
-      const sample = () => {
-        document.querySelectorAll<HTMLElement>('.rail > .auth-card').forEach((element, index) => {
-          if (Number(getComputedStyle(element).opacity) >= 0.9) seen.add(String(index));
-        });
-        if (performance.now() - started < 1500) requestAnimationFrame(sample);
-      };
-      requestAnimationFrame(sample);
-    });
+    const sampling = page.evaluate(
+      () =>
+        new Promise<string[]>((resolve) => {
+          const seen = new Set<string>();
+          const started = performance.now();
+          const sample = () => {
+            document
+              .querySelectorAll<HTMLElement>('.rail > .auth-card')
+              .forEach((element, index) => {
+                if (Number(getComputedStyle(element).opacity) >= 0.9) seen.add(String(index));
+              });
+            if (performance.now() - started < 1500) requestAnimationFrame(sample);
+            else resolve([...seen].sort());
+          };
+          requestAnimationFrame(sample);
+        })
+    );
     await card.getByRole('button', { name: 'Reset my digital identity' }).click();
     await expect(page).toHaveURL(/\/setup\/recovery$/);
-    await page.waitForTimeout(1600);
 
-    const seen = await page.evaluate(() =>
-      [...(window as unknown as { __e2eSeenCards: Set<string> }).__e2eSeenCards].sort()
-    );
+    const seen = await sampling;
     expect(seen).toEqual(['0', '1']);
   });
 });
@@ -203,13 +206,24 @@ test('touch: a swipe past device confirmation does not move', async ({
   auth,
   page,
   installRoomCore,
+  browserName,
 }) => {
+  test.skip(browserName === 'webkit', 'WebKit cannot construct a synthetic Touch');
   await page.setViewportSize({ width: 390, height: 844 });
   await installRoomCore('onboarding');
   await auth.open('https://example.test');
   await auth.signInWithPassword('e2e', 'password');
   await expect(page).toHaveURL(/\/setup\/device$/, { timeout: 20_000 });
-  await page.waitForTimeout(500);
+  await expect(auth.setupCard).toBeVisible();
+  let settledLeft = Number.NaN;
+  await expect
+    .poll(async () => {
+      const left = await page.locator('.rail').evaluate((rail) => rail.scrollLeft);
+      const settled = left === settledLeft;
+      settledLeft = left;
+      return settled;
+    })
+    .toBe(true);
 
   const moved = await page.evaluate(async () => {
     const rail = document.querySelector<HTMLElement>('.rail');

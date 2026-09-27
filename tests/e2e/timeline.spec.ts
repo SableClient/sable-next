@@ -14,7 +14,6 @@ test('loads a real room at latest and preserves the viewport while paginating', 
   homeserver,
   signIn,
 }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 420 });
   await signIn();
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
@@ -82,7 +81,6 @@ test('keeps the live subscription when another tab restores the shared session',
   homeserver,
   signIn,
 }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 420 });
   await signIn();
   await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });

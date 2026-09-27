@@ -1,6 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ storageState: SIGNED_OUT });
+test.use({ storageState: SIGNED_OUT, hasTouch: true, viewport: { width: 412, height: 915 } });
 
 test('mobile: the account page with a banner fits the screen', async ({
   page,

@@ -3,6 +3,8 @@
 
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
+
+import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
 
@@ -64,9 +66,11 @@ test('the signed-in surfaces have no accessibility violations', async ({
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/search');
-  const field = page.getByRole('combobox', { name: /Search messages/ });
+  const field = page.getByRole('combobox', { name: en.search.placeholder });
   await field.fill('in:Timeline from:e2e ');
-  await expect(page.locator('.chip')).toHaveCount(2);
+  await expect(
+    page.getByRole('list', { name: en.search.activeFilters }).getByRole('listitem')
+  ).toHaveCount(2);
 
   await expect(page.getByRole('main')).toHaveCount(1);
   expect(await violations(page)).toEqual([]);

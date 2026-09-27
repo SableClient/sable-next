@@ -29,7 +29,7 @@ async function seedDeepRoom(
   return roomId;
 }
 
-test.fixme('holds the anchor through a long scroll back', async ({
+test('holds the anchor through a long scroll back', async ({
   page,
   app,
   timeline,

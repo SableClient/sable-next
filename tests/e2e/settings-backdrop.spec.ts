@@ -3,7 +3,6 @@ import { expect, test, SIGNED_OUT } from './fixtures/test';
 test.use({ storageState: SIGNED_OUT });
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 900 });
 });
 

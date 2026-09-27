@@ -4,7 +4,6 @@ import { TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
 test.use({ storageState: SIGNED_OUT });
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(60_000);
   await page.setViewportSize({ width: 1280, height: 720 });
 });
 

@@ -110,7 +110,7 @@ test('falls back to a surviving visible anchor when the first row is replaced', 
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
   await timeline.dispatchWheel(1);
   await timeline.scrollToAndNotify(0);
-  await page.waitForTimeout(200);
+  await timeline.waitForScrollSettled();
 
   const subscription = await core.subscription();
   const anchor = await timeline.anchorAt(1);
@@ -158,7 +158,7 @@ test('anchors a large reset by surviving event identity', async ({
   await timeline.scrollToMiddleAndNotify();
   await expect(anchor).toHaveCount(1);
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(80);
-  await page.waitForTimeout(200);
+  await timeline.waitForScrollSettled();
 
   await expect(anchor).toBeInViewport();
   const before = await anchor.boundingBox();
