@@ -615,16 +615,7 @@
     "addressesUnpublishSelected": "Dépublier",
     "addressesDeleteSelected": "Supprimer",
     "addressesRemoveManyConfirm": "Supprimer {{count}} adresses ?",
-    "abbreviationsRemoveConfirm": "Retirer {{term}} ?",
-    "menuReport": "Signaler le salon",
-    "menuReportSpace": "Signaler l’espace",
-    "reportTitle": "Signaler le salon",
-    "reportSpaceTitle": "Signaler l’espace",
-    "reportHint": "Expliquez aux administrateurs de votre serveur ce qui ne va pas. Le signalement porte sur ce salon, pas sur un message.",
-    "directoryKind": "Afficher",
-    "directoryKindAll": "Salons et espaces",
-    "directoryKindRooms": "Salons",
-    "directoryKindSpaces": "Espaces"
+    "abbreviationsRemoveConfirm": "Retirer {{term}} ?"
   },
   "join": {
     "action": "Rejoindre",
@@ -1034,17 +1025,7 @@
     "utdRecoverAction": "Configurer la récupération",
     "utdWaiting": "En attente de la clé de ce message…",
     "videoConverting": "Conversion de la video…",
-    "playVideo": "Lire {{name}}",
-    "profileBanner": "Voir la bannière de {{name}}",
-    "reportSent": "Signalement envoyé",
-    "reportUnsupported": "Votre serveur n’accepte pas ce type de signalement.",
-    "profileReport": "Signaler l’utilisateur",
-    "profileReportTitle": "Signaler {{name}}",
-    "profileReportHint": "Expliquez aux administrateurs de votre serveur ce que cette personne a fait.",
-    "hiddenMedia": "Afficher le média",
-    "sendAnyway": "Envoyer quand même",
-    "sendBlockedIdentity": "{{names}} a réinitialisé son identité de chiffrement depuis que vous l’avez vérifié. Envoyer quand même retire votre vérification.",
-    "sendBlockedVerify": "Vérifiez cet appareil avant d’envoyer des messages chiffrés."
+    "playVideo": "Lire {{name}}"
   },
   "viewer": {
     "title": "Visionneuse de médias",
@@ -1892,14 +1873,7 @@
       "mlm": "MLM",
       "pride": "Fiertés"
     },
-    "notificationKeywordsConfirm": "Retirer le mot-clé {{keyword}} ?",
-    "mediaPreviews": "Afficher les aperçus des médias",
-    "mediaPreviewsHint": "Images, vidéos et autocollants que vous n’avez pas ouverts. Partagé avec vos autres clients.",
-    "mediaPreviewsOn": "Dans tous les salons",
-    "mediaPreviewsPrivate": "Seulement dans les salons privés",
-    "mediaPreviewsOff": "Jamais, demander à chaque fois",
-    "inviteAvatars": "Afficher les avatars des invitations",
-    "inviteAvatarsHint": "L’image du salon ou de la personne qui vous invite. Partagé avec vos autres clients."
+    "notificationKeywordsConfirm": "Retirer le mot-clé {{keyword}} ?"
   },
   "errors": {
     "pageTitle": "Un problème est survenu",
@@ -2336,14 +2310,7 @@
     "scheduledCancel": "Annuler",
     "scheduledSendNow": "Envoyer maintenant",
     "scheduledFor": "Envoi prévu {{when}}",
-    "scheduledPending": "En attente d’un appareil ouvert",
-    "textColor": "Couleur du texte",
-    "highlightColor": "Couleur de surlignage",
-    "colorPresets": "Couleurs",
-    "colorHex": "Couleur hexadécimale",
-    "colorApply": "Appliquer",
-    "colorRemove": "Retirer la couleur",
-    "colorClose": "Fermer les couleurs"
+    "scheduledPending": "En attente d’un appareil ouvert"
   },
   "search": {
     "title": "Rechercher des messages",
@@ -2556,25 +2523,7 @@
     "checkDevices": "Vérifier les appareils",
     "testMicNeedsMic": "Activez votre micro pour le tester",
     "lobbyNoPermissionHint": "Demandez à un modérateur du salon d’autoriser les membres à rejoindre les appels.",
-    "lobbyNoFocusHint": "Un appel pourra démarrer ici une fois qu’un serveur d’appels aura été configuré par son administrateur.",
-    "screenAudioTitle": "Partager votre écran",
-    "screenAudioExplain": "Choisissez ce que l'appel entend pendant le partage.",
-    "screenAudioNone": "Pas de son",
-    "screenAudioNoneHint": "Seule l'image est partagée.",
-    "screenAudioSystem": "Toutes les applications",
-    "screenAudioSystemHint": "Tout ce qui joue sur cet ordinateur, sauf cet appel.",
-    "screenAudioApps": "Applications choisies",
-    "screenAudioAppsHint": "Uniquement les applications cochées ci-dessous.",
-    "screenAudioExclude": "Applications à exclure",
-    "screenAudioInclude": "Applications à partager",
-    "screenAudioRefresh": "Actualiser la liste des applications",
-    "screenAudioLoading": "Recherche des applications qui jouent du son",
-    "screenAudioEmpty": "Aucune application ne joue de son. Lancez-en une, puis actualisez.",
-    "screenAudioFailed": "Impossible de lister les applications qui jouent du son. Actualisez pour réessayer.",
-    "screenAudioSilent": "Ne joue pas",
-    "screenAudioShare": "Partager",
-    "screenAudioChoice": "Ce que l'appel entend",
-    "screenVolume": "Volume de l’écran de {{name}}"
+    "lobbyNoFocusHint": "Un appel pourra démarrer ici une fois qu’un serveur d’appels aura été configuré par son administrateur."
   },
   "presence": {
     "online": "En ligne",
