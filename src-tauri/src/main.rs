@@ -189,7 +189,10 @@ fn cef_command_line_args(proxy: Option<&str>) -> Vec<(String, Option<String>)> {
             "autoplay-policy".into(),
             Some("no-user-gesture-required".into()),
         ),
-        ("enable-features".into(), Some("SharedArrayBuffer".into())),
+        (
+            "enable-features".into(),
+            Some("SharedArrayBuffer,WebRtcPipeWireCamera".into()),
+        ),
         (
             "disable-features".into(),
             Some(
@@ -400,6 +403,18 @@ mod tests {
                 || !value
                     .as_deref()
                     .is_some_and(|features| features.contains("IntensiveWakeUpThrottling"))
+        }));
+    }
+
+    #[test]
+    fn cef_captures_cameras_through_pipewire() {
+        let args = cef_command_line_args(None);
+
+        assert!(args.iter().any(|(name, value)| {
+            name == "enable-features"
+                && value.as_deref().is_some_and(|features| {
+                    features.split(',').any(|f| f == "WebRtcPipeWireCamera")
+                })
         }));
     }
 
