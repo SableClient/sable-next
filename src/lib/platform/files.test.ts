@@ -249,6 +249,22 @@ test('Android saves images to the public Pictures collection', async () => {
   );
 });
 
+test('an image with no type or extension is saved by its bytes, as a profile picture is (#510)', async () => {
+  mocks.isTauri.mockReturnValue(true);
+  mocks.osType.mockReturnValue('android');
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(png)));
+
+  await expect(saveImageToPhotos('blob:avatar', 'Sumo')).resolves.toBe('saved');
+
+  expect(mocks.androidFs.createNewPublicImageFile).toHaveBeenCalledWith(
+    'Pictures',
+    'Sumo.png',
+    'image/png',
+    { isPending: true, requestPermission: true }
+  );
+});
+
 test('iOS sends image bytes to the native Photos command', async () => {
   mocks.isTauri.mockReturnValue(true);
   mocks.osType.mockReturnValue('ios');

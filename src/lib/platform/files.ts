@@ -77,14 +77,20 @@ export async function saveImageToPhotos(
   mime = mimeFromName(filename)
 ): Promise<SaveOutcome> {
   try {
-    const bytes = new Uint8Array(await (await fetch(url)).arrayBuffer());
+    const blob = await (await fetch(url)).blob();
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const imageMime =
+      [mime, blob.type, sniffImageMime(bytes)].find((candidate) =>
+        candidate.startsWith('image/')
+      ) ?? mime;
+    const name = withImageExtension(filename, imageMime);
     const { type } = await import('@tauri-apps/plugin-os');
     if (type() === 'android') {
-      await saveAndroidFile('Pictures', filename, mime, bytes);
+      await saveAndroidFile('Pictures', name, imageMime, bytes);
       return 'saved';
     }
     if (type() === 'ios') {
-      await rawInvoke('save_media_to_photos', bytes, { filename, 'mime-type': mime });
+      await rawInvoke('save_media_to_photos', bytes, { filename: name, 'mime-type': imageMime });
       return 'saved';
     }
   } catch (error) {
@@ -222,6 +228,23 @@ export function fileNameFromPath(path: string, index: number): string {
 }
 
 /** The native picker hands back a path, which carries no media type. */
+function sniffImageMime(bytes: Uint8Array): string {
+  const ascii = (start: number, end: number): string =>
+    String.fromCharCode(...bytes.subarray(start, end));
+  if (bytes[0] === 0x89 && ascii(1, 4) === 'PNG') return 'image/png';
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (ascii(0, 4) === 'GIF8') return 'image/gif';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  if (ascii(4, 8) === 'ftyp' && ascii(8, 12).startsWith('avi')) return 'image/avif';
+  return '';
+}
+
+function withImageExtension(filename: string, mime: string): string {
+  if (mimeFromName(filename) === mime) return filename;
+  const extension = Object.entries(MIME_BY_EXTENSION).find(([, type]) => type === mime)?.[0];
+  return extension ? `${filename}.${extension}` : filename;
+}
+
 export function mimeFromName(name: string): string {
   const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined;
   return (extension && MIME_BY_EXTENSION[extension]) || 'application/octet-stream';
