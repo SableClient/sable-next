@@ -71,7 +71,7 @@
   import { shouldFocusComposer } from './type-to-focus';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
-  import type { FormatAction } from './editor/formatting';
+  import type { ActiveColors, ColorKind, FormatAction } from './editor/formatting';
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
@@ -219,6 +219,7 @@
   let empty = $state(true);
   let showPlaceholder = $state(true);
   let activeFormats = $state.raw<FormatAction[]>([]);
+  let activeColors = $state.raw<ActiveColors>({ fg: null, bg: null });
   let formattingOpen = $derived(preferences.formattingToolbar);
   let richText = $derived(preferences.richTextComposer);
   let richSend = $derived(richText && !sourceMode);
@@ -309,6 +310,9 @@
       empty = change.empty;
       showPlaceholder = change.placeholder;
       activeFormats = change.active;
+      if (change.colors.fg !== activeColors.fg || change.colors.bg !== activeColors.bg) {
+        activeColors = change.colors;
+      }
       activeIndex = 0;
       if (change.docChanged) {
         updateTyping();
@@ -1046,8 +1050,12 @@
             active={activeFormats}
             source={sourceMode}
             markdown={sourceMode || !richText}
+            colors={activeColors}
             onFormat={(action: FormatAction) => {
               editor.format(action);
+            }}
+            onColor={(kind: ColorKind, value: string | null) => {
+              editor.applyColor(kind, value);
             }}
             onToggleSource={() => {
               sourceMode = editor.toggleSource();

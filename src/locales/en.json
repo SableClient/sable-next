@@ -2746,7 +2746,14 @@
     "scheduledSendNow": "Send now",
     "scheduledSendFailed": "That scheduled message could not be sent now. It is still scheduled.",
     "scheduledFor": "Sends {{when}}",
-    "scheduledPending": "Waiting for a device to be open"
+    "scheduledPending": "Waiting for a device to be open",
+    "textColor": "Text colour",
+    "highlightColor": "Highlight colour",
+    "colorPresets": "Colours",
+    "colorHex": "Hex colour",
+    "colorApply": "Apply",
+    "colorRemove": "Remove colour",
+    "colorClose": "Close colours"
   },
   "search": {
     "title": "Search messages",

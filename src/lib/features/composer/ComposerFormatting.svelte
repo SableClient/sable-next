@@ -1,5 +1,7 @@
 <script lang="ts">
   import ArticleNyTimesIcon from 'phosphor-svelte/lib/ArticleNyTimesIcon';
+  import HighlighterIcon from 'phosphor-svelte/lib/HighlighterIcon';
+  import TextTIcon from 'phosphor-svelte/lib/TextTIcon';
   import CaretCircleDownIcon from 'phosphor-svelte/lib/CaretCircleDownIcon';
   import CodeIcon from 'phosphor-svelte/lib/CodeIcon';
   import CodeBlockIcon from 'phosphor-svelte/lib/CodeBlockIcon';
@@ -25,18 +27,21 @@
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
-  import type { FormatAction } from './editor/formatting';
+  import ComposerColorButton from './ComposerColorButton.svelte';
+  import type { ActiveColors, ColorKind, FormatAction } from './editor/formatting';
   import { MARKDOWN_FORMATS } from './editor/markdown-format';
 
   interface Props {
     active: readonly FormatAction[];
     source: boolean;
     markdown: boolean;
+    colors: ActiveColors;
     onFormat: (action: FormatAction) => void;
+    onColor: (kind: ColorKind, value: string | null) => void;
     onToggleSource: () => void;
   }
 
-  let { active, source, markdown, onFormat, onToggleSource }: Props = $props();
+  let { active, source, markdown, colors, onFormat, onColor, onToggleSource }: Props = $props();
 
   const buttons: { action: FormatAction; label: string; icon: Component }[] = [
     { action: 'strong', label: 'composer.bold', icon: TextBIcon },
@@ -76,6 +81,24 @@
       <button.icon />
     </IconButton>
   {/each}
+  <ComposerColorButton
+    label={$i18n.t('composer.textColor')}
+    icon={TextTIcon}
+    value={colors.fg}
+    removable={!markdown}
+    onPick={(value) => {
+      onColor('fg', value);
+    }}
+  />
+  <ComposerColorButton
+    label={$i18n.t('composer.highlightColor')}
+    icon={HighlighterIcon}
+    value={colors.bg}
+    removable={!markdown}
+    onPick={(value) => {
+      onColor('bg', value);
+    }}
+  />
   {#if source || !markdown}
     <IconButton
       variant="ghost"

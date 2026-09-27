@@ -1,6 +1,6 @@
 import { lift, setBlockType, toggleMark } from 'prosemirror-commands';
 import { InputRule } from 'prosemirror-inputrules';
-import type { Attrs, MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
+import type { Attrs, Mark, MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
 import { TextSelection, type Command, type EditorState, type Transaction } from 'prosemirror-state';
 import { canJoin, findWrapping } from 'prosemirror-transform';
@@ -426,4 +426,47 @@ export function activeMarks(state: EditorState): FormatAction[] {
   if (isHeading(state, 2)) active.push('heading2');
   if (isHeading(state, 3)) active.push('heading3');
   return active;
+}
+
+export type ColorKind = 'fg' | 'bg';
+
+export interface ActiveColors {
+  fg: string | null;
+  bg: string | null;
+}
+
+function colorOf(state: EditorState, type: MarkType): string | null {
+  const { from, to, $from, empty } = state.selection;
+  const inSet = (set: readonly Mark[]) =>
+    (type.isInSet(set)?.attrs.value as string | undefined) ?? null;
+  if (empty) return inSet(state.storedMarks ?? $from.marks());
+  let found: string | null | undefined;
+  state.doc.nodesBetween(from, to, (node) => {
+    if (!node.isText) return;
+    const value = inSet(node.marks);
+    found = found === undefined || found === value ? value : null;
+  });
+  return found ?? null;
+}
+
+export function activeColors(state: EditorState): ActiveColors {
+  return { fg: colorOf(state, marks.color), bg: colorOf(state, marks.bg_color) };
+}
+
+export function colorCommand(kind: ColorKind, value: string | null): Command {
+  const type = kind === 'fg' ? marks.color : marks.bg_color;
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection;
+    if (!dispatch) return true;
+    const tr = state.tr;
+    if (empty) {
+      tr.removeStoredMark(type);
+      if (value) tr.addStoredMark(type.create({ value }));
+    } else {
+      tr.removeMark(from, to, type);
+      if (value) tr.addMark(from, to, type.create({ value }));
+    }
+    dispatch(tr);
+    return true;
+  };
 }

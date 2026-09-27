@@ -1,7 +1,7 @@
 import type { Node as ProseMirrorNode } from 'prosemirror-model';
 import { TextSelection, type Command, type EditorState } from 'prosemirror-state';
 
-import type { FormatAction } from './formatting';
+import type { ColorKind, FormatAction } from './formatting';
 import { composerSchema } from './schema';
 import { atomText } from './serialize';
 
@@ -162,3 +162,17 @@ export function markdownLink(state: EditorState, href: string): ProseMirrorNode 
   const label = empty ? href : state.doc.textBetween(from, to, ' ', ' ');
   return composerSchema.text(`[${label}](${href})`);
 }
+
+export const markdownColorCommand =
+  (kind: ColorKind, value: string): Command =>
+  (state, dispatch) => {
+    const { $from, $to } = state.selection;
+    const { from, to, empty } = TextSelection.between($from, $to);
+    const open = `$[${kind}.color=${value.replace(/^#/u, '')} `;
+    if (!dispatch) return true;
+    const tr = state.tr.insertText(']', to).insertText(open, from);
+    const start = from + open.length;
+    tr.setSelection(TextSelection.create(tr.doc, start, empty ? start : to + open.length));
+    dispatch(tr);
+    return true;
+  };

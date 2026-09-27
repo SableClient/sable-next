@@ -2311,7 +2311,14 @@
     "scheduledCancel": "Annuler",
     "scheduledSendNow": "Envoyer maintenant",
     "scheduledFor": "Envoi prévu {{when}}",
-    "scheduledPending": "En attente d’un appareil ouvert"
+    "scheduledPending": "En attente d’un appareil ouvert",
+    "textColor": "Couleur du texte",
+    "highlightColor": "Couleur de surlignage",
+    "colorPresets": "Couleurs",
+    "colorHex": "Couleur hexadécimale",
+    "colorApply": "Appliquer",
+    "colorRemove": "Retirer la couleur",
+    "colorClose": "Fermer les couleurs"
   },
   "search": {
     "title": "Rechercher des messages",

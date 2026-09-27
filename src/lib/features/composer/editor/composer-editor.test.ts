@@ -3,7 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { undo } from 'prosemirror-history';
 import { Fragment, Slice } from 'prosemirror-model';
-import { NodeSelection, Selection, TextSelection } from 'prosemirror-state';
+import { AllSelection, NodeSelection, Selection, TextSelection } from 'prosemirror-state';
 import type { EditorView } from 'prosemirror-view';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -1953,5 +1953,62 @@ describe('code indentation in the composer', () => {
     const doc = editor.doc();
     if (!doc) throw new Error('no doc');
     expect(serializePlain(doc).body).toBe('```\n    x');
+  });
+});
+
+describe('text and highlight colours', () => {
+  function selectAll(editor: ComposerEditor): void {
+    const editorView = view(editor);
+    const size = editorView.state.doc.content.size;
+    editorView.dispatch(
+      editorView.state.tr.setSelection(TextSelection.create(editorView.state.doc, 1, size - 1))
+    );
+  }
+
+  function message(editor: ComposerEditor) {
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    return serializeComposer(doc);
+  }
+
+  test('colours the selection and sends it as MFM with the Matrix attributes', () => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    type(editor, 'hi');
+    selectAll(editor);
+    editor.applyColor('fg', '#ff0000');
+    editor.applyColor('bg', '#000000');
+
+    expect(message(editor).body).toBe('$[fg.color=ff0000 $[bg.color=000000 hi]]');
+    expect(message(editor).formatted).toContain('data-mx-color="#ff0000"');
+    expect(message(editor).formatted).toContain('data-mx-bg-color="#000000"');
+  });
+
+  test('reports the colour under the selection, and clears it', () => {
+    preferences.richTextComposer = true;
+    const seen: (string | null)[] = [];
+    const editor = openWith({ onChange: (change) => seen.push(change.colors.fg) });
+    type(editor, 'hi');
+    selectAll(editor);
+    editor.applyColor('fg', '#00ff00');
+    expect(seen.at(-1)).toBe('#00ff00');
+
+    editor.applyColor('fg', null);
+    expect(seen.at(-1)).toBeNull();
+    expect(message(editor).body).toBe('hi');
+  });
+
+  test('writes the MFM around the selection in the plain composer', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    type(editor, 'hi');
+    const editorView = view(editor);
+    editorView.dispatch(editorView.state.tr.setSelection(new AllSelection(editorView.state.doc)));
+    editor.applyColor('fg', '#ff0000');
+
+    expect(message(editor).body).toBe('$[fg.color=ff0000 hi]');
+    editor.applyColor('bg', '#000000');
+    expect(message(editor).body).toBe('$[fg.color=ff0000 $[bg.color=000000 hi]]');
+    preferences.richTextComposer = true;
   });
 });
