@@ -9,6 +9,7 @@
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl, retryMediaUrl } from '#lib/ui/media-url.js';
+  import { pixelatedImage } from '#lib/ui/pixelated.js';
   import { animationsPaused, holdStillFrame } from '#lib/ui/still-frame.js';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
@@ -116,8 +117,17 @@
     return releases;
   }
 
+  function pixelateEmote(image: HTMLImageElement): void {
+    if (image.dataset.mxEmoticon === undefined || !image.complete) return;
+    image.classList.toggle(
+      'pixelated',
+      pixelatedImage(preferences.pixelatedImages, image.naturalWidth, image.naturalHeight)
+    );
+  }
+
   function paint(image: HTMLImageElement, url: string): void {
     image.onload = () => {
+      pixelateEmote(image);
       holdStillFrame(image, animationsPaused());
     };
     image.src = url;
@@ -255,6 +265,10 @@
         if (!time || !zoned) continue;
         time.textContent = formatMessageTimestamp(zoned.instant);
         if (chip instanceof HTMLButtonElement) chip.ariaLabel = timeDetail(chip);
+      }
+
+      for (const image of node.querySelectorAll<HTMLImageElement>('img[data-mx-emoticon]')) {
+        pixelateEmote(image);
       }
 
       const pattern = abbreviations?.pattern;
@@ -785,6 +799,10 @@
   .formatted-body :global(img[data-mx-emoticon]) {
     height: var(--timeline-emote-size, 1em);
     vertical-align: var(--timeline-emote-align, middle);
+  }
+
+  .formatted-body :global(img[data-mx-emoticon].pixelated) {
+    image-rendering: pixelated;
   }
 
   .formatted-body :global(table) {

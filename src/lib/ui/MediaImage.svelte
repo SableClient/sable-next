@@ -105,9 +105,6 @@
       intrinsicHeight > 0;
     return hasIntrinsicSize ? intrinsicWidth / intrinsicHeight : null;
   });
-  let pixelated = $derived(
-    pixelatedImage(preferences.pixelatedImages, intrinsicWidth, intrinsicHeight)
-  );
   let animated = $derived(
     ANIMATED_MIMES.includes(mime ?? '') || ANIMATED_EXTENSIONS.some((extension) => named(extension))
   );
@@ -149,6 +146,16 @@
       : mediaAspectRatio(core, requested, requestedWidth, requestedHeight)
   );
   let imageLoaded = $derived(url !== null && loadedUrl === url);
+  let naturalImage = $derived(
+    imageLoaded && asIs && requested === source ? (imageElement ?? null) : null
+  );
+  let pixelated = $derived(
+    pixelatedImage(
+      preferences.pixelatedImages,
+      intrinsicWidth ?? naturalImage?.naturalWidth,
+      intrinsicHeight ?? naturalImage?.naturalHeight
+    )
+  );
   let gifPreviewReady = $derived(url !== null && previewUrl === url);
   let gifPlaying = $derived(url !== null && playingUrl === url);
   let plate = $derived.by(() => {

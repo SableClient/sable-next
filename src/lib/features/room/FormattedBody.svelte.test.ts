@@ -177,6 +177,28 @@ test('resolves an mxc emoticon through the core media command', async () => {
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/emoji', 0, 0);
 });
 
+test('pixelates a small emote by its decoded size, following the setting', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
+  vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+  vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(20);
+  vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(20);
+  preferences.pixelatedImages = 'smart';
+  render(FormattedBody, {
+    props: { html: '<img src="mxc://example.org/tiny" alt=":tiny:" data-mx-emoticon="">' },
+  });
+  const image = screen.getByRole('img', { name: ':tiny:' });
+  await vi.waitFor(() => {
+    expect(image).toHaveAttribute('src', expect.stringMatching(/^blob:/));
+  });
+  image.dispatchEvent(new Event('load'));
+  expect(image).toHaveClass('pixelated');
+
+  preferences.pixelatedImages = 'never';
+  await tick();
+  expect(image).not.toHaveClass('pixelated');
+  preferences.pixelatedImages = 'smart';
+});
+
 test('recognises a sanitised custom emote from its Matrix image attributes', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
   render(FormattedBody, {
