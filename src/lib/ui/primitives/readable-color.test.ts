@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 
+import { preferences } from '#lib/settings/preferences.svelte.js';
+
 import {
   BLACK,
   WHITE,
@@ -82,4 +84,22 @@ test('name colours reach 4.5:1 on the theme grounds', () => {
 test('an unparseable colour is left alone', () => {
   expect(nameColorOn('var(--sec-main)', WHITE)).toBe('var(--sec-main)');
   expect(profilePalette('var(--sec-main)', WHITE)).toBeNull();
+});
+
+test('name colour correction can be weakened or turned off', () => {
+  const pale = '#fff2a8';
+  try {
+    preferences.nameColorCorrection = 'off';
+    expect(nameColorOnLight(pale)).toBe(pale);
+
+    preferences.nameColorCorrection = 'weak';
+    const weak = nameColorOnLight(pale);
+    preferences.nameColorCorrection = 'strong';
+    const strong = nameColorOnLight(pale);
+
+    expect(weak).not.toBe(pale);
+    expect(weak).not.toBe(strong);
+  } finally {
+    preferences.nameColorCorrection = 'strong';
+  }
 });

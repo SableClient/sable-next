@@ -35,6 +35,7 @@ export const SUBSPACE_DEPTHS = [
   '10',
 ] as const satisfies readonly SubspaceDepth[];
 export type PixelatedImages = 'always' | 'smart' | 'never';
+export type NameColorCorrection = 'strong' | 'weak' | 'off';
 export type PronounPillLimit = '1' | '2' | '3' | 'all';
 export type PronounPillLength = '12' | '16' | '24' | 'all';
 export type ReadReceiptPlacement = 'message' | 'room';
@@ -69,6 +70,7 @@ export interface Preferences {
   alwaysShowAltText: boolean;
   twitterEmoji: boolean;
   pixelatedImages: PixelatedImages;
+  nameColorCorrection: NameColorCorrection;
   showRoomIcon: ShowRoomIcon;
   showRoomBanners: boolean;
   roomBannerHeight: number;
@@ -233,6 +235,7 @@ const ENUMS = {
   subspaceHierarchyLimit: SUBSPACE_DEPTHS,
   searchIndexLimit: SEARCH_INDEX_LIMITS,
   pixelatedImages: ['always', 'smart', 'never'],
+  nameColorCorrection: ['strong', 'weak', 'off'],
   pronounPillLimit: ['1', '2', '3', 'all'],
   pronounPillLength: ['12', '16', '24', 'all'],
   readReceiptPlacement: ['message', 'room'],
@@ -288,6 +291,7 @@ const DEFAULTS: Preferences = {
   alwaysShowAltText: false,
   twitterEmoji: true,
   pixelatedImages: 'smart',
+  nameColorCorrection: 'strong',
   showRoomIcon: 'always',
   showRoomBanners: true,
   roomBannerHeight: 190,

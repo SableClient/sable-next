@@ -567,6 +567,19 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'nameColorCorrection',
+        section: 'accessibility',
+        icon: PaletteIcon,
+        name: 'settings.nameColorCorrection',
+        description: 'settings.nameColorCorrectionHint',
+        type: 'select',
+        options: [
+          { value: 'strong', label: 'settings.nameColorCorrectionStrong' },
+          { value: 'weak', label: 'settings.nameColorCorrectionWeak' },
+          { value: 'off', label: 'settings.nameColorCorrectionOff' },
+        ],
+      },
+      {
         key: 'renderRoomColors',
         section: 'accessibility',
         icon: PaletteIcon,
