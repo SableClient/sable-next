@@ -927,6 +927,6 @@ test('a room set to all messages badges its unread messages in green', async () 
     'unread-badge-count',
     'unread-badge-highlight'
   );
-  expect(row('Quiet').querySelector('.unread-badge-dot')).toBeInTheDocument();
+  expect(within(row('Quiet')).getByText('6')).toHaveClass('unread-badge-count');
   expect(row('Quiet').querySelector('.unread-badge-highlight')).not.toBeInTheDocument();
 });

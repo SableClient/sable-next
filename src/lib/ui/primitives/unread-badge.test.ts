@@ -26,18 +26,26 @@ test('a hand-marked room dots with no count', () => {
   ).toBe('dot');
 });
 
-test('a count setting never numbers messages that did not notify', () => {
+test('room counts number a room whatever its messages notified', () => {
   const counts = { unread: 4, highlight: 0, notifying: 0 };
 
-  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })?.mode).toBe('dot');
-  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true })).toEqual({
+    mode: 'count',
+    count: 4,
+    highlight: false,
+  });
+  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)).toEqual({
+    mode: 'count',
+    count: 4,
+    highlight: false,
+  });
 });
 
-test('a direct chat mention follows the direct-message count setting', () => {
+test('a direct chat mention follows the mention count setting', () => {
   const counts = { unread: 4, highlight: 1 };
 
-  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('count');
-  expect(resolveUnreadBadge(counts, { ...off, showUnreadCounts: true }, true)?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, badgeCountDMsOnly: true }, true)?.mode).toBe('dot');
+  expect(resolveUnreadBadge(counts, { ...off, showPingCounts: true }, true)?.mode).toBe('count');
 });
 
 test('a mention counts mentions, not messages', () => {

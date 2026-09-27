@@ -34,13 +34,18 @@ export function resolveUnreadBadge(
 
   const notified = (counts.notifying ?? 0) > 0;
   const highlight = mention || notified;
-  const all = (dm && settings.badgeCountDMsOnly) || (!dm && settings.showUnreadCounts);
   const numeric = mention
-    ? settings.showPingCounts || (dm && settings.badgeCountDMsOnly)
-    : notified && all;
+    ? settings.showPingCounts
+    : dm
+      ? settings.badgeCountDMsOnly
+      : settings.showUnreadCounts;
   if (!numeric) return { mode: 'dot', count, highlight };
 
-  return { mode: 'count', count: mention ? count : (counts.notifying ?? count), highlight };
+  return {
+    mode: 'count',
+    count: notified && !mention ? (counts.notifying ?? count) : count,
+    highlight,
+  };
 }
 
 export function hideQuietDot(
