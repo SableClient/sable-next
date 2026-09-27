@@ -2110,6 +2110,7 @@
     "troubleshootTransportWeb": "This browser can receive web push.",
     "troubleshootTransportUnsupported": "This browser cannot receive push notifications.",
     "troubleshootTransportApple": "Apple Push Notification service.",
+    "troubleshootTransportAppleNoToken": "iOS has not given Sable a push token. A copy installed from AltStore or SideStore is signed with your own certificate, and Apple only delivers Sable's pushes to builds Sable signs.",
     "troubleshootTransportNative": "{{provider}} through {{distributor}}.",
     "troubleshootTransportNone": "No push service is set up on this device.",
     "troubleshootPusherNone": "This device has no push registration.",

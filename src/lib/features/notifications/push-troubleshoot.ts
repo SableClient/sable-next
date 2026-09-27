@@ -67,7 +67,9 @@ async function transport(deps: TroubleshootDeps): Promise<TroubleshootResult> {
       : { check: 'transport', state: 'fail', message: 'settings.troubleshootTransportUnsupported' };
   }
   if (deps.platform === 'ios') {
-    return { check: 'transport', state: 'pass', message: 'settings.troubleshootTransportApple' };
+    return (await deps.ownPushkey()) === null
+      ? { check: 'transport', state: 'fail', message: 'settings.troubleshootTransportAppleNoToken' }
+      : { check: 'transport', state: 'pass', message: 'settings.troubleshootTransportApple' };
   }
   const native = await deps.nativeTransport();
   if (native?.provider == null) {

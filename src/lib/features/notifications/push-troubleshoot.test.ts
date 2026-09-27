@@ -157,3 +157,13 @@ test('an Android device reports its distributor', async () => {
     distributor: 'io.heckel.ntfy',
   });
 });
+
+test('an iPhone without a push token says why instead of blaming the homeserver', async () => {
+  const results = await run(deps({ platform: 'ios', ownPushkey: () => Promise.resolve(null) }));
+
+  expect(results.transport).toMatchObject({
+    state: 'fail',
+    message: 'settings.troubleshootTransportAppleNoToken',
+  });
+  expect(results.pusher?.state).toBe('skip');
+});
