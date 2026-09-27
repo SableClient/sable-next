@@ -37,11 +37,18 @@ export class AccountSync {
 
   #core: CoreClient | null = null;
   #generation = 0;
+  #accountId: string | undefined;
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- not a render source
   readonly #states = new Map<string, DocumentState>();
 
   start(core: CoreClient, documents: readonly SyncedDocument[]): () => void {
     const generation = ++this.#generation;
+    const accountId = core.session?.account_id;
+    if (accountId !== this.#accountId) {
+      for (const state of this.#states.values()) clearTimeout(state.timer);
+      this.#states.clear();
+      this.#accountId = accountId;
+    }
     this.#core = core;
 
     for (const document of documents) {

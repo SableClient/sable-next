@@ -470,7 +470,7 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     app.manage(notifications::PushStore(data_dir.clone()));
     let (core, events) = Core::new(
         data_dir.to_string_lossy().into_owned(),
-        Box::new(sable_core::store::FileSessionStore::new(&data_dir)),
+        Box::new(sable_core::store::FileSessionStore::exclusive(&data_dir)?),
     );
     let event_sink = Arc::new(EventSink::default());
     let pushing = core.clone();

@@ -551,7 +551,9 @@ export class CallSession {
 
     const provider = this.#livekit?.keyProvider;
     if (provider) {
-      provider.setKey(entry, event.own);
+      void provider.setKey(entry, event.own).catch((error: unknown) => {
+        this.#telemetry?.failure('call.encryption.key', error);
+      });
       return;
     }
 

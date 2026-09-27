@@ -2,6 +2,7 @@
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import { goto } from '$app/navigation';
 
+  import { useCoreClient } from '#lib/core/context.js';
   import { readDraft, writeDraft } from '#lib/features/composer/composer-drafts.svelte.js';
   import { stageFiles } from '#lib/features/composer/composer-files.js';
   import { i18n } from '#lib/i18n.js';
@@ -22,6 +23,7 @@
 
   let { inbox }: Props = $props();
 
+  const core = useCoreClient();
   const roomList = useRoomList();
   let staging = $state(false);
   let failed = $state(false);
@@ -31,17 +33,22 @@
     staging = true;
     failed = false;
 
+    const accountId = core.session?.account_id ?? '';
     try {
       const files = await inbox.files();
       const text = inbox.text;
-      const existing = readDraft(roomId);
+      const existing = readDraft(roomId, accountId);
       let nextStagedId = existing?.nextStagedId ?? 0;
 
-      writeDraft(roomId, {
-        doc: appendPlainText(existing?.doc, text),
-        staged: stageFiles(existing?.staged ?? [], files, () => nextStagedId++),
-        nextStagedId,
-      });
+      writeDraft(
+        roomId,
+        {
+          doc: appendPlainText(existing?.doc, text),
+          staged: stageFiles(existing?.staged ?? [], files, () => nextStagedId++),
+          nextStagedId,
+        },
+        accountId
+      );
 
       const path = roomSectionPath(roomList.rooms, roomId);
       await inbox.clear();

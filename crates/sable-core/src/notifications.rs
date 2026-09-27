@@ -98,15 +98,30 @@ pub async fn decrypt_cold_push(
             }
         };
     }
-    let Some(client) = push_client(&store_dir, user_id, device_id).await else {
+    let Some(client) = restore_push_client(&store_dir, user_id, device_id).await else {
         return ColdPush::Undecryptable;
     };
-    let key_fetch = if fetch_keys {
-        KeyFetch::Cold
-    } else {
-        KeyFetch::Never
+    let decrypt = || {
+        decrypt_push_event(
+            &client,
+            if fetch_keys {
+                KeyFetch::Cold
+            } else {
+                KeyFetch::Never
+            },
+            room_id,
+            event_json,
+        )
     };
-    decrypt_push_event(&client, key_fetch, room_id, event_json).await
+    let result = decrypt().await;
+    if fetch_keys
+        && matches!(result, ColdPush::Undecryptable | ColdPush::NeedsKey { .. })
+        && client.refresh().await
+    {
+        decrypt().await
+    } else {
+        result
+    }
 }
 
 /// Decrypt using the same session and SDK stores as the application. Callers
@@ -133,7 +148,7 @@ async fn cold_push_from_store(
     room_id: &str,
     event_json: &str,
 ) -> ColdPush {
-    let Some(client) = push_client(store_dir, user_id, device_id).await else {
+    let Some(client) = restore_push_client(store_dir, user_id, device_id).await else {
         return ColdPush::Undecryptable;
     };
     Box::pin(decrypt_push_event(
@@ -145,45 +160,95 @@ async fn cold_push_from_store(
     .await
 }
 
+/// A notification operation owns refreshes separately from SDK background tasks.
 #[cfg(not(target_family = "wasm"))]
-async fn push_client(
+pub struct PushClient {
+    client: Client,
+    owner: Option<FileSessionStore>,
+    base_store: String,
+    account_id: String,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl std::ops::Deref for PushClient {
+    type Target = Client;
+
+    fn deref(&self) -> &Self::Target {
+        &self.client
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl PushClient {
+    async fn refresh(&self) -> bool {
+        let Some(store) = &self.owner else {
+            return false;
+        };
+        if self.client.refresh_access_token().await.is_err() {
+            return false;
+        }
+        match persist_push_session(store, &self.base_store, &self.account_id, &self.client).await {
+            Ok(()) => true,
+            Err(error) => {
+                tracing::error!("could not persist push session: {error}");
+                false
+            }
+        }
+    }
+
+    /// Retry a failed notification request once with refreshed credentials.
+    ///
+    /// # Errors
+    /// Returns the request error when refresh is unavailable or the retry fails.
+    pub async fn retry<T, E, F: std::future::Future<Output = Result<T, E>>>(
+        &self,
+        request: impl Fn() -> F,
+    ) -> Result<T, E> {
+        let result = request().await;
+        if result.is_err() && self.refresh().await {
+            request().await
+        } else {
+            result
+        }
+    }
+}
+
+/// Restore a notification login, rotating credentials only while holding ownership.
+#[cfg(not(target_family = "wasm"))]
+pub async fn restore_push_client(
     store_dir: &std::path::Path,
     user_id: &str,
     device_id: &str,
-) -> Option<Client> {
+) -> Option<PushClient> {
+    let directory = store_dir.to_owned();
+    let owner = tokio::task::spawn_blocking(move || FileSessionStore::try_exclusive(directory))
+        .await
+        .ok()?
+        .ok()?;
     let stored = FileSessionStore::new(store_dir).load().await.ok()??;
     let base_store = store_dir.to_str()?;
     let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
     accounts.reanchor_stores(base_store);
     let account = push_account(&accounts, user_id, device_id)?;
-    let client = crate::session::restore_authenticated_client(&account.store_id, &account.session)
+    let client = crate::session::restore_notification_client(&account.store_id, &account.session)
         .await
         .ok()?;
-    let store = FileSessionStore::new(store_dir);
-    let base_store = base_store.to_owned();
-    let account_id = account.account_id.clone();
-    let save = move |client: Client| {
-        persist_push_session(&store, &base_store, &account_id, &client).map_err(Into::into)
-    };
-    let reload = |client: Client| {
-        client
-            .session_tokens()
-            .ok_or_else(|| "no session tokens to reload".into())
-    };
-    if let Err(error) = client.set_session_callbacks(Box::new(reload), Box::new(save)) {
-        tracing::error!("could not install push session callbacks: {error}");
-    }
-    Some(client)
+    Some(PushClient {
+        client,
+        owner,
+        base_store: base_store.to_owned(),
+        account_id: account.account_id.clone(),
+    })
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn persist_push_session(
+async fn persist_push_session(
     store: &FileSessionStore,
     base_store: &str,
     account_id: &str,
     client: &Client,
 ) -> Result<(), String> {
-    let stored = store.load_blocking()?;
+    let stored = store.load().await?.ok_or("push session is missing")?;
     let (mut accounts, _) =
         AccountRegistry::from_bytes(&stored, base_store).map_err(|error| error.to_string())?;
     let Some(account) = accounts
@@ -199,7 +264,7 @@ fn persist_push_session(
     };
     account.session = current.keeping_endpoint_of(&account.session);
     let bytes = serde_json::to_vec(&accounts).map_err(|error| error.to_string())?;
-    store.save_blocking(&bytes)
+    store.save(bytes).await
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -318,19 +383,28 @@ pub async fn fetch_cold_push_event(
             .map(|session| (session.client.clone(), session.sync_service.clone())),
         None => None,
     };
-    let (client, sync_service) = if let Some(live) = live {
-        live
-    } else {
-        let store_dir = cold_push_store_dir(data_dir);
-        let Some(client) = push_client(&store_dir, user_id, device_id).await else {
-            return PushFetchView::Unavailable;
-        };
-        let Ok(sync_service) = crate::session::build_sync(client.clone()).await else {
-            return PushFetchView::Unavailable;
-        };
-        (client, sync_service)
+    if let Some((client, sync_service)) = live {
+        return Box::pin(fetch_push_event(&client, sync_service, &room_id, &event_id)).await;
+    }
+    let store_dir = cold_push_store_dir(data_dir);
+    let Some(client) = restore_push_client(&store_dir, user_id, device_id).await else {
+        return PushFetchView::Unavailable;
     };
-    Box::pin(fetch_push_event(&client, sync_service, &room_id, &event_id)).await
+    let Ok(sync_service) = crate::session::build_sync(client.client.clone()).await else {
+        return PushFetchView::Unavailable;
+    };
+    let result = Box::pin(fetch_push_event(
+        &client,
+        sync_service.clone(),
+        &room_id,
+        &event_id,
+    ))
+    .await;
+    if matches!(result, PushFetchView::Unavailable) && client.refresh().await {
+        Box::pin(fetch_push_event(&client, sync_service, &room_id, &event_id)).await
+    } else {
+        result
+    }
 }
 
 pub async fn fetch_push_event(
@@ -643,7 +717,7 @@ mod tests {
 
     use super::{
         ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
-        is_backfill, push_account, push_client, timeline_body,
+        is_backfill, push_account, restore_push_client, timeline_body,
     };
     use crate::protocol::PushFetchView;
     use crate::session::{PersistedSession, restore_authenticated_client};
@@ -1052,7 +1126,7 @@ mod tests {
     async fn a_cold_push_saves_the_tokens_it_refreshes() {
         use wiremock::{
             Mock, ResponseTemplate,
-            matchers::{method, path},
+            matchers::{header, method, path},
         };
 
         let data_dir =
@@ -1080,10 +1154,26 @@ mod tests {
             .mount(server.server())
             .await;
 
-        let client = push_client(&store_dir, "@alice:example.org", "A")
+        let client = restore_push_client(&store_dir, "@alice:example.org", "A")
             .await
             .unwrap();
-        client.matrix_auth().refresh_access_token().await.unwrap();
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/account/whoami"))
+            .and(header("authorization", "Bearer old-access"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+                "errcode": "M_UNKNOWN_TOKEN", "error": "expired"
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/account/whoami"))
+            .and(header("authorization", "Bearer new-access"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "user_id": "@alice:example.org", "device_id": "A"
+            })))
+            .mount(server.server())
+            .await;
+        client.retry(|| client.whoami()).await.unwrap();
 
         let saved = store.load().await.unwrap().unwrap();
         let (accounts, _) =
@@ -1091,8 +1181,63 @@ mod tests {
                 .unwrap();
         let session = serde_json::to_value(&accounts.accounts[0].session).unwrap();
         assert_eq!(session["credentials"]["refresh_token"], "new-refresh");
+        assert!(
+            FileSessionStore::try_exclusive(&store_dir)
+                .unwrap()
+                .is_none()
+        );
+        let lingering = client.client.clone();
+        drop(client);
+        assert!(
+            FileSessionStore::try_exclusive(&store_dir)
+                .unwrap()
+                .is_some()
+        );
 
+        drop(lingering);
         tokio::fs::remove_dir_all(&data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cold_client_does_not_refresh_while_the_foreground_owns_credentials() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+        let dir = tempfile::tempdir().unwrap();
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let store = FileSessionStore::exclusive(dir.path()).unwrap();
+        let persisted: PersistedSession = serde_json::from_value(json!({
+            "homeserver": server.uri(), "resolved_homeserver": server.uri(),
+            "credentials": {"kind": "password", "user_id": "@alice:example.org",
+                "device_id": "A", "access_token": "old-access", "refresh_token": "old-refresh"}
+        }))
+        .unwrap();
+        let bytes = serde_json::to_vec(&persisted).unwrap();
+        store.save(bytes.clone()).await.unwrap();
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/account/whoami"))
+            .respond_with(
+                ResponseTemplate::new(401)
+                    .set_body_json(json!({"errcode": "M_UNKNOWN_TOKEN", "error": "expired"})),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/refresh"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"access_token": "new", "refresh_token": "new"})),
+            )
+            .expect(0)
+            .mount(server.server())
+            .await;
+        let client = restore_push_client(dir.path(), "@alice:example.org", "A")
+            .await
+            .unwrap();
+        client.retry(|| client.whoami()).await.unwrap_err();
+        assert_eq!(store.load().await.unwrap(), Some(bytes));
     }
 
     fn stub(event_type: &str, content: &serde_json::Value) -> serde_json::Value {

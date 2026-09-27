@@ -22,7 +22,9 @@ import { readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import { adoptRecentReactions, recentReactionEntries } from '#lib/emoji/recents.svelte.js';
 import { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
 
-import { draftsDocument, recentEmojiDocument, workspaceDocument } from './sync-documents';
+import { draftsDocumentFor, recentEmojiDocument, workspaceDocument } from './sync-documents';
+
+const draftsDocument = draftsDocumentFor('');
 
 const gif = {
   id: 'abc',

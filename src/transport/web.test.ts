@@ -56,17 +56,16 @@ class FakePort {
   close(): void {}
 }
 
-class FakeSharedWorker {
+class FakeSharedWorker extends EventTarget {
   static last: FakeSharedWorker | null = null;
   port = new FakePort();
   url: URL;
 
   constructor(url: string | URL) {
+    super();
     this.url = new URL(url);
     FakeSharedWorker.last = this;
   }
-
-  addEventListener(): void {}
 }
 
 beforeEach(() => {
@@ -253,4 +252,22 @@ test('a worker crash reports the stack the worker sent, grouped on its message',
   expect(context).toMatchObject({
     fingerprint: ['wasm-core-crash', 'worker error: Uncaught RangeError'],
   });
+});
+
+test('a worker startup failure rejects restore and allows a new worker', async () => {
+  const transport = await load();
+  const crashed = vi.fn();
+  transport.subscribeCrash(crashed);
+  const restored = transport.send({ type: 'restore' }).catch((error: unknown) => error);
+  const failed = FakeSharedWorker.last;
+  failed?.dispatchEvent(new Event('error'));
+  await Promise.resolve();
+  expect(crashed).toHaveBeenCalledTimes(1);
+  expect(await restored).toBeInstanceOf(Error);
+  const retry = transport.send({ type: 'restore' }).catch(() => undefined);
+  expect(FakeSharedWorker.last).not.toBe(failed);
+  failed?.dispatchEvent(new Event('error'));
+  expect(crashed).toHaveBeenCalledTimes(1);
+  transport.close();
+  await retry;
 });

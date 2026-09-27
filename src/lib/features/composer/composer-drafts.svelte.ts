@@ -10,29 +10,42 @@ export interface ComposerDraft {
 
 const MAX_SYNCED_DRAFTS = 50;
 
-// eslint-disable-next-line svelte/prefer-svelte-reactivity -- a lookup must not subscribe the composer to every other room's draft
-const drafts = new Map<string, ComposerDraft>();
-// eslint-disable-next-line svelte/prefer-svelte-reactivity -- not a render source
-const synced = new Map<string, string>();
-// eslint-disable-next-line svelte/prefer-svelte-reactivity -- read through remoteRevision
-const adopted = new Map<string, number>();
-// eslint-disable-next-line svelte/prefer-svelte-reactivity -- not a render source
-const discarded = new Map<string, string>();
+interface DraftState {
+  drafts: Map<string, ComposerDraft>;
+  synced: Map<string, string>;
+  adopted: Map<string, number>;
+  discarded: Map<string, string>;
+}
+
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- changes publish through revision
+const accounts = new Map<string, DraftState>();
+
+function stateFor(accountId: string): DraftState {
+  let state = accounts.get(accountId);
+  if (!state) {
+    state = { drafts: new Map(), synced: new Map(), adopted: new Map(), discarded: new Map() };
+    accounts.set(accountId, state);
+  }
+  return state;
+}
+
 const revision = $state({ value: 0 });
 const remote = $state({ value: 0 });
 
-export function readDraft(roomId: string): ComposerDraft | undefined {
-  return drafts.get(roomId);
+export function readDraft(roomId: string, accountId = ''): ComposerDraft | undefined {
+  return stateFor(accountId).drafts.get(roomId);
 }
 
-export function writeDraft(roomId: string, draft: ComposerDraft): void {
+export function writeDraft(roomId: string, draft: ComposerDraft, accountId = ''): void {
+  const { drafts, discarded } = stateFor(accountId);
   drafts.delete(roomId);
   drafts.set(roomId, draft);
   discarded.delete(roomId);
   revision.value += 1;
 }
 
-export function clearDraft(roomId: string): void {
+export function clearDraft(roomId: string, accountId = ''): void {
+  const { drafts, discarded } = stateFor(accountId);
   const doc = drafts.get(roomId)?.doc;
   if (!drafts.delete(roomId)) return;
   if (doc !== null && doc !== undefined) discarded.set(roomId, fingerprint(doc));
@@ -40,28 +53,26 @@ export function clearDraft(roomId: string): void {
 }
 
 export function clearDrafts(): void {
-  drafts.clear();
-  synced.clear();
-  adopted.clear();
-  discarded.clear();
+  accounts.clear();
   revision.value += 1;
 }
 
-export function remoteRevision(roomId: string): number {
+export function remoteRevision(roomId: string, accountId = ''): number {
   void remote.value;
-  return adopted.get(roomId) ?? 0;
+  return stateFor(accountId).adopted.get(roomId) ?? 0;
 }
 
-export function draftDocuments(): Record<string, unknown> {
+export function draftDocuments(accountId = ''): Record<string, unknown> {
   void revision.value;
 
-  const entries = [...drafts.entries()]
+  const entries = [...stateFor(accountId).drafts.entries()]
     .filter(([, draft]) => draft.doc !== null && draft.doc !== undefined)
     .slice(-MAX_SYNCED_DRAFTS);
   return Object.fromEntries(entries.map(([roomId, draft]) => [roomId, draft.doc]));
 }
 
-export function adoptDraftDocuments(documents: Record<string, unknown>): void {
+export function adoptDraftDocuments(documents: Record<string, unknown>, accountId = ''): void {
+  const { drafts, synced, adopted, discarded } = stateFor(accountId);
   let changed = false;
   const dropped = [...synced.keys()].filter((roomId) => !(roomId in documents));
   for (const roomId of [...Object.keys(documents), ...dropped]) {

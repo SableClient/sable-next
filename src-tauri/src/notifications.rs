@@ -110,7 +110,14 @@ async fn remove_saved_pusher(
     pusher: &RegisteredPusher,
 ) -> Result<(), CommandErr> {
     let client = pusher_client(root, pusher).await?;
-    sable_core::notifications::remove_pusher(&client, pusher.pushkey.clone(), pusher.app_id.clone())
+    client
+        .retry(|| {
+            sable_core::notifications::remove_pusher(
+                &client,
+                pusher.pushkey.clone(),
+                pusher.app_id.clone(),
+            )
+        })
         .await
         .map_err(|_| CommandErr::Unavailable)
 }
@@ -118,29 +125,10 @@ async fn remove_saved_pusher(
 async fn pusher_client(
     root: &std::path::Path,
     pusher: &RegisteredPusher,
-) -> Result<sable_core::MatrixClient, CommandErr> {
-    use sable_core::store::SessionStore;
-    let bytes = sable_core::store::FileSessionStore::new(root)
-        .load()
+) -> Result<sable_core::notifications::PushClient, CommandErr> {
+    sable_core::notifications::restore_push_client(root, &pusher.user_id, &pusher.device_id)
         .await
-        .map_err(|_| CommandErr::Unavailable)?
-        .ok_or(CommandErr::Unavailable)?;
-    let (mut accounts, _) =
-        sable_core::session::AccountRegistry::from_bytes(&bytes, &root.to_string_lossy())
-            .map_err(|_| CommandErr::Unavailable)?;
-    accounts.reanchor_stores(&root.to_string_lossy());
-    let account = accounts
-        .accounts
-        .iter()
-        .find(|account| {
-            !account.needs_reauth
-                && account.session.credentials.user_id() == pusher.user_id
-                && account.session.credentials.device_id() == pusher.device_id
-        })
-        .ok_or(CommandErr::Unavailable)?;
-    sable_core::session::restore_authenticated_client(&account.store_id, &account.session)
-        .await
-        .map_err(|_| CommandErr::Unavailable)
+        .ok_or(CommandErr::Unavailable)
 }
 
 #[cfg(target_os = "android")]
@@ -175,7 +163,8 @@ pub async fn maintain_background_push(
                 .find(|pusher| pusher.app_id == app_id)
                 .ok_or(CommandErr::Unavailable)?;
             let client = pusher_client(root, current).await?;
-            sable_core::webpush::ack(&client, app_id, ack_token)
+            client
+                .retry(|| sable_core::webpush::ack(&client, app_id.clone(), ack_token.clone()))
                 .await
                 .map_err(|_| CommandErr::Unavailable)
         }
@@ -227,26 +216,30 @@ async fn rotate_pusher(
             (None, None) => None,
             _ => return Err(CommandErr::Unavailable),
         };
-        sable_core::notifications::set_pusher(
-            &client,
-            PusherView {
-                pushkey: key.clone(),
-                app_id: pusher.app_id.clone(),
-                url: gateway.clone(),
-                device_display_name: "Sable on Android".into(),
-                web_push,
-                event_id_only: pusher.event_id_only,
-                append: false,
-            },
-        )
-        .await
-        .map_err(|_| CommandErr::Unavailable)?;
+        client
+            .retry(|| {
+                sable_core::notifications::set_pusher(
+                    &client,
+                    PusherView {
+                        pushkey: key.clone(),
+                        app_id: pusher.app_id.clone(),
+                        url: gateway.clone(),
+                        device_display_name: "Sable on Android".into(),
+                        web_push: web_push.clone(),
+                        event_id_only: pusher.event_id_only,
+                        append: false,
+                    },
+                )
+            })
+            .await
+            .map_err(|_| CommandErr::Unavailable)?;
         key
     } else {
         let rotated = server_web_pusher(registration, &pusher.app_id, pusher.event_id_only)
             .ok_or(CommandErr::Unavailable)?;
         let key = rotated.pushkey.clone();
-        sable_core::webpush::set_pusher(&client, rotated)
+        client
+            .retry(|| sable_core::webpush::set_pusher(&client, rotated.clone()))
             .await
             .map_err(|_| CommandErr::Unavailable)?;
         key

@@ -60,9 +60,9 @@
   } from '#lib/settings/preferences.svelte.js';
   import { accountSync } from '#lib/settings/account-sync.svelte.js';
   import {
-    draftsDocument,
+    draftsDocumentFor,
     recentEmojiDocument,
-    scheduledDocument,
+    scheduledDocumentFor,
     settingsDocument,
     workspaceDocument,
   } from '#lib/settings/sync-documents.js';
@@ -272,13 +272,13 @@
     document.documentElement.dataset.underlineLinks = preferences.underlineLinks ? 'on' : 'off';
   });
 
-  const syncDocuments = [
+  const syncDocuments = $derived([
     settingsDocument,
     workspaceDocument(spaceSidebar),
-    draftsDocument,
+    draftsDocumentFor(core.session?.account_id ?? ''),
     recentEmojiDocument,
-    scheduledDocument,
-  ];
+    scheduledDocumentFor(core.session?.account_id ?? ''),
+  ]);
 
   $effect(() => {
     void core.accountRevision;
@@ -295,9 +295,10 @@
     }
   });
 
-  for (const synced of syncDocuments) {
+  for (const index of untrack(() => [...syncDocuments.keys()])) {
     $effect(() => {
-      accountSync.push(synced);
+      const synced = syncDocuments[index];
+      if (synced) accountSync.push(synced);
     });
   }
 
@@ -623,6 +624,7 @@
   });
 
   $effect(() => {
+    void core.accountRevision;
     if (core.status !== 'ready') return;
     return watchScheduledQueue(core);
   });

@@ -1,3 +1,5 @@
+import { SvelteMap } from 'svelte/reactivity';
+
 export interface QueuedMessage {
   id: string;
   roomId: string;
@@ -9,30 +11,34 @@ export interface QueuedMessage {
 
 const TAKEOVER_MS = 5 * 60 * 1000;
 
-let queue = $state.raw<QueuedMessage[]>([]);
+const queues = new SvelteMap<string, readonly QueuedMessage[]>();
+const EMPTY: readonly QueuedMessage[] = [];
 
-export function scheduledQueue(): readonly QueuedMessage[] {
-  return queue;
+export function scheduledQueue(accountId = ''): readonly QueuedMessage[] {
+  return queues.get(accountId) ?? EMPTY;
 }
 
-export function queueFor(roomId: string): QueuedMessage[] {
-  return queue.filter((message) => message.roomId === roomId);
+export function queueFor(roomId: string, accountId = ''): QueuedMessage[] {
+  return scheduledQueue(accountId).filter((message) => message.roomId === roomId);
 }
 
-export function enqueue(message: QueuedMessage): void {
-  queue = [...queue, message];
+export function enqueue(message: QueuedMessage, accountId = ''): void {
+  adoptQueue([...scheduledQueue(accountId), message], accountId);
 }
 
-export function dequeue(id: string): void {
-  queue = queue.filter((message) => message.id !== id);
+export function dequeue(id: string, accountId = ''): void {
+  adoptQueue(
+    scheduledQueue(accountId).filter((message) => message.id !== id),
+    accountId
+  );
 }
 
-export function adoptQueue(next: readonly QueuedMessage[]): void {
-  queue = [...next];
+export function adoptQueue(next: readonly QueuedMessage[], accountId = ''): void {
+  queues.set(accountId, [...next]);
 }
 
-export function dueMessages(now: number, deviceId: string): QueuedMessage[] {
-  return queue.filter((message) => {
+export function dueMessages(now: number, deviceId: string, accountId = ''): QueuedMessage[] {
+  return scheduledQueue(accountId).filter((message) => {
     if (message.owner === deviceId) return message.dueTs <= now;
     return message.dueTs + TAKEOVER_MS <= now;
   });

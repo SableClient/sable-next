@@ -281,6 +281,7 @@ export class Conversation {
     const delayMs = dueTs - Date.now();
     if (delayMs <= 0) return;
 
+    const accountId = this.#core.session?.account_id ?? '';
     const replacing = this.context?.kind === 'schedule' ? this.context : null;
     await this.#scheduleNew(targetRoomId, body, formatted, dueTs, delayMs);
     if (replacing === null) {
@@ -290,7 +291,7 @@ export class Conversation {
 
     this.context = null;
     try {
-      if (replacing.scheduled?.source === 'queue') dequeue(replacing.eventId);
+      if (replacing.scheduled?.source === 'queue') dequeue(replacing.eventId, accountId);
       else await this.#core.commands.cancelScheduledMessage(replacing.eventId);
     } catch (error) {
       throw new ScheduledOriginalKept(error);
@@ -306,6 +307,8 @@ export class Conversation {
     dueTs: number,
     delayMs: number
   ): Promise<void> {
+    const accountId = this.#core.session?.account_id ?? '';
+    const deviceId = this.#core.session?.device_id ?? '';
     try {
       await this.#core.commands.scheduleMessage(targetRoomId, body, formatted, delayMs);
       return;
@@ -316,14 +319,17 @@ export class Conversation {
       }
     }
 
-    enqueue({
-      id: crypto.randomUUID(),
-      roomId: targetRoomId,
-      body,
-      formatted,
-      dueTs,
-      owner: this.#core.session?.device_id ?? '',
-    });
+    enqueue(
+      {
+        id: crypto.randomUUID(),
+        roomId: targetRoomId,
+        body,
+        formatted,
+        dueTs,
+        owner: deviceId,
+      },
+      accountId
+    );
   }
 
   readonly editScheduled = (

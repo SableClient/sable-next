@@ -230,7 +230,7 @@ pub async fn build_client(
     store_id: &str,
     homeserver: &str,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    build_account_client(apply_server(Client::builder(), homeserver), store_id).await
+    build_account_client(apply_server(Client::builder(), homeserver), store_id, true).await
 }
 
 /// # Errors
@@ -242,7 +242,7 @@ pub async fn build_client_at(
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
     let builder = crate::tls::apply_sdk(Client::builder()).homeserver_url(homeserver_url.as_str());
 
-    build_account_client(builder, store_id).await
+    build_account_client(builder, store_id, true).await
 }
 
 /// # Errors
@@ -271,6 +271,27 @@ pub async fn restore_authenticated_client(
         .await
         .map_err(|error| error.to_string())?;
 
+    restore_credentials(&client, persisted).await?;
+    Ok(client)
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn restore_notification_client(
+    store_id: &str,
+    persisted: &PersistedSession,
+) -> Result<Client, String> {
+    let builder = persisted.resolved_homeserver.as_ref().map_or_else(
+        || apply_server(Client::builder(), &persisted.homeserver),
+        |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
+    );
+    let client = build_account_client(builder, store_id, false)
+        .await
+        .map_err(|error| error.to_string())?;
+    restore_credentials(&client, persisted).await?;
+    Ok(client)
+}
+
+async fn restore_credentials(client: &Client, persisted: &PersistedSession) -> Result<(), String> {
     match persisted.credentials.clone() {
         Credentials::Password(matrix) => client
             .restore_session(matrix)
@@ -286,16 +307,21 @@ pub async fn restore_authenticated_client(
             .map_err(|error| error.to_string())?,
     }
 
-    Ok(client)
+    Ok(())
 }
 
 async fn build_account_client(
     builder: ClientBuilder,
     store_id: &str,
+    refresh_tokens: bool,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
+    let builder = if refresh_tokens {
+        builder.handle_refresh_tokens()
+    } else {
+        builder
+    };
     let builder = builder
         .request_config(RequestConfig::new().timeout(SESSION_TIMEOUT))
-        .handle_refresh_tokens()
         .with_threading_support(THREADING_SUPPORT)
         .with_encryption_settings(EncryptionSettings {
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,

@@ -14,6 +14,7 @@ pub trait SessionStore: SendOutsideWasm + SyncOutsideWasm + 'static {
 #[cfg(not(target_family = "wasm"))]
 pub struct FileSessionStore {
     path: std::path::PathBuf,
+    owner: Option<std::sync::Arc<std::fs::File>>,
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -21,17 +22,85 @@ impl FileSessionStore {
     pub fn new(data_dir: impl Into<std::path::PathBuf>) -> Self {
         Self {
             path: data_dir.into().join("session.json"),
+            owner: None,
         }
     }
 
-    pub(crate) fn load_blocking(&self) -> Result<Vec<u8>, String> {
-        std::fs::read(&self.path).map_err(|e| e.to_string())
+    /// Own credential refreshes until this store is dropped. Foreground startup
+    /// waits for any cold notification already using the saved login.
+    ///
+    /// # Errors
+    /// Returns an error if the private directory or ownership lock cannot be opened.
+    pub fn exclusive(data_dir: impl Into<std::path::PathBuf>) -> std::io::Result<Self> {
+        let store = Self::new(data_dir);
+        let owner = store.open_owner()?;
+        owner.lock()?;
+        Ok(Self {
+            owner: Some(std::sync::Arc::new(owner)),
+            ..store
+        })
+    }
+
+    pub(crate) fn try_exclusive(
+        data_dir: impl Into<std::path::PathBuf>,
+    ) -> std::io::Result<Option<Self>> {
+        let store = Self::new(data_dir);
+        let owner = store.open_owner()?;
+        match owner.try_lock() {
+            Ok(()) => Ok(Some(Self {
+                owner: Some(std::sync::Arc::new(owner)),
+                ..store
+            })),
+            Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+            Err(std::fs::TryLockError::Error(error)) => Err(error),
+        }
+    }
+
+    fn open_owner(&self) -> std::io::Result<std::fs::File> {
+        self.prepare_directory()?;
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true).truncate(false).read(true).write(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        options.open(self.path.with_extension("lock"))
+    }
+
+    fn prepare_directory(&self) -> std::io::Result<()> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn read_blocking(&self) -> std::io::Result<Vec<u8>> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&self.path, std::fs::Permissions::from_mode(0o600))?;
+            if let Some(parent) = self.path.parent() {
+                std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o700))?;
+            }
+        }
+        std::fs::read(&self.path)
     }
 
     pub(crate) fn save_blocking(&self, bytes: &[u8]) -> Result<(), String> {
-        let temporary = self.path.with_extension("tmp");
-        std::fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
-        std::fs::rename(&temporary, &self.path).map_err(|e| e.to_string())
+        use std::io::Write;
+        self.prepare_directory().map_err(|e| e.to_string())?;
+        let parent = self.path.parent().ok_or("session directory is missing")?;
+        let mut temporary = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
+        temporary.write_all(bytes).map_err(|e| e.to_string())?;
+        temporary.as_file().sync_all().map_err(|e| e.to_string())?;
+        temporary.persist(&self.path).map_err(|e| e.to_string())?;
+        Ok(())
     }
 }
 
@@ -39,26 +108,27 @@ impl FileSessionStore {
 #[async_trait]
 impl SessionStore for FileSessionStore {
     async fn load(&self) -> Result<Option<Vec<u8>>, String> {
-        match tokio::fs::read(&self.path).await {
+        let reader = Self {
+            path: self.path.clone(),
+            owner: self.owner.clone(),
+        };
+        tokio::task::spawn_blocking(move || match reader.read_blocking() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
             Err(error) => Err(error.to_string()),
-        }
+        })
+        .await
+        .map_err(|e| e.to_string())?
     }
 
     async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
-        if let Some(parent) = self.path.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| e.to_string())?;
-        }
-        let temporary = self.path.with_extension("tmp");
-        tokio::fs::write(&temporary, bytes)
+        let writer = Self {
+            path: self.path.clone(),
+            owner: self.owner.clone(),
+        };
+        tokio::task::spawn_blocking(move || writer.save_blocking(&bytes))
             .await
-            .map_err(|e| e.to_string())?;
-        tokio::fs::rename(&temporary, &self.path)
-            .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?
     }
 
     async fn clear(&self) -> Result<(), String> {
@@ -106,6 +176,56 @@ impl SessionStore for MemorySessionStore {
 #[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
     use super::{FileSessionStore, SessionStore};
+
+    #[test]
+    fn credential_ownership_excludes_other_clients_until_released() {
+        let dir = tempfile::tempdir().unwrap();
+        let owner = FileSessionStore::exclusive(dir.path()).unwrap();
+        assert!(
+            FileSessionStore::try_exclusive(dir.path())
+                .unwrap()
+                .is_none()
+        );
+        drop(owner);
+        assert!(
+            FileSessionStore::try_exclusive(dir.path())
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn saved_credentials_are_private_and_existing_permissions_are_repaired() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("account");
+        std::fs::create_dir(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let file = root.join("session.json");
+        std::fs::write(&file, b"old").unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let store = FileSessionStore::new(&root);
+        assert_eq!(store.load().await.unwrap(), Some(b"old".to_vec()));
+        assert_eq!(
+            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(&root).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        store.save(b"new".to_vec()).await.unwrap();
+        assert_eq!(
+            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        store.save_blocking(b"refreshed").unwrap();
+        assert_eq!(
+            std::fs::metadata(&file).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
 
     #[tokio::test]
     async fn a_saved_session_replaces_the_previous_file_without_leftovers() {

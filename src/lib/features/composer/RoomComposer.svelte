@@ -386,10 +386,12 @@
 
   const queue = new SendQueue();
 
+  let activeDraftAccount = '';
+
   function persistDraft(key: string): void {
     const doc = preEdit ?? (editor.isEmpty() ? undefined : editor.doc());
-    if (!doc && staged.length === 0) clearDraft(key);
-    else writeDraft(key, { doc: doc?.toJSON() ?? null, staged, nextStagedId });
+    if (!doc && staged.length === 0) clearDraft(key, activeDraftAccount);
+    else writeDraft(key, { doc: doc?.toJSON() ?? null, staged, nextStagedId }, activeDraftAccount);
   }
 
   function schedulePersistDraft(): void {
@@ -402,16 +404,19 @@
 
   $effect(() => {
     const key = draftKey();
-    if (activeDraftKey === key) return;
+    const accountId = core.session?.account_id ?? '';
+    if (activeDraftKey === key && activeDraftAccount === accountId) return;
     const previous = activeDraftKey;
     clearTimeout(draftTimeout);
     draftTimeout = undefined;
     if (previous !== null) untrack(() => persistDraft(previous));
+    if (activeDraftAccount !== accountId) preEdit = undefined;
     activeDraftKey = key;
+    activeDraftAccount = accountId;
 
     untrack(() => {
-      seenRemoteDraft = remoteRevision(key);
-      const draft = readDraft(key);
+      seenRemoteDraft = remoteRevision(key, core.session?.account_id ?? '');
+      const draft = readDraft(key, activeDraftAccount);
       if (draft) {
         staged = draft.staged;
         nextStagedId = draft.nextStagedId;
@@ -437,13 +442,13 @@
 
   $effect(() => {
     const key = draftKey();
-    const revision = remoteRevision(key);
+    const revision = remoteRevision(key, core.session?.account_id ?? '');
     untrack(() => {
       if (activeDraftKey !== key || revision === seenRemoteDraft) return;
       seenRemoteDraft = revision;
       if (draftTimeout !== undefined || preEdit !== undefined) return;
 
-      const draft = readDraft(key);
+      const draft = readDraft(key, activeDraftAccount);
       editor.clear();
       if (draft?.doc) editor.setDoc(composerSchema.nodeFromJSON(draft.doc));
     });

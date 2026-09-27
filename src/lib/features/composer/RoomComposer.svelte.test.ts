@@ -1273,3 +1273,32 @@ test('Down in an untouched edit moves to the next message, a changed one stays',
   pressInEditor({ key: 'ArrowDown' });
   expect(editNext).not.toHaveBeenCalled();
 });
+
+test('switching accounts in the same room restores only that account draft', async () => {
+  const session = $state({ account_id: 'a' });
+  const client = Object.assign(core(), { session }) as unknown as CoreClient;
+  const doc = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('A private draft')]),
+  ]);
+  writeDraft('!room:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 }, 'a');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+  await tick();
+  expect(editorText()).toBe('A private draft');
+  session.account_id = 'b';
+  await tick();
+  expect(editorText()).toBe('');
+  expect(readDraft('!room:example.org', 'b')).toBeUndefined();
+  session.account_id = 'a';
+  await tick();
+  expect(editorText()).toBe('A private draft');
+});

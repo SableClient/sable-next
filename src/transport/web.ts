@@ -136,7 +136,11 @@ export function createWebTransport(): Transport {
       fingerprint: ['wasm-core-crash', message],
       tags: { source: 'wasm-core' },
     });
+    worker?.port.close();
     worker = null;
+    clearHealthProbe();
+    overdue.clear();
+    reportStall(false);
     rejectPending(`core panicked: ${message}`);
     for (const listener of crashListeners) listener(message);
   }
@@ -159,11 +163,9 @@ export function createWebTransport(): Transport {
     // Only the worker failing to load reaches here. Runtime failures inside it
     // are reported to its own global scope, so the worker forwards those itself.
     on(nextWorker, 'error', (event) => {
+      if (worker !== nextWorker) return;
       const { message } = event as ErrorEvent;
-      console.error('[sable transport] shared worker error', message);
-      Sentry.captureException(new Error(`shared worker failed to start: ${message}`), {
-        tags: { source: 'wasm-core' },
-      });
+      handleCrash(`shared worker failed to start: ${message || 'unknown error'}`);
     });
 
     nextWorker.port.onmessageerror = (event) => {

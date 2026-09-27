@@ -106,38 +106,42 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
   };
 }
 
-export const draftsDocument: SyncedDocument = {
-  eventType: DRAFTS_ACCOUNT_DATA_TYPE,
-  debounceMs: DRAFT_DEBOUNCE_MS,
-  enabled: () => preferences.syncDrafts,
+export function draftsDocumentFor(accountId: string): SyncedDocument {
+  return {
+    eventType: DRAFTS_ACCOUNT_DATA_TYPE,
+    debounceMs: DRAFT_DEBOUNCE_MS,
+    enabled: () => preferences.syncDrafts,
 
-  snapshot: () => ({ content: { v: DOCUMENT_VERSION, drafts: draftDocuments() } }),
+    snapshot: () => ({ content: { v: DOCUMENT_VERSION, drafts: draftDocuments(accountId) } }),
 
-  adopt(content) {
-    const body = versioned(content);
-    if (body === null) return Object.keys(draftDocuments()).length === 0;
+    adopt(content) {
+      const body = versioned(content);
+      if (body === null) return Object.keys(draftDocuments(accountId)).length === 0;
 
-    const drafts = body.drafts;
-    if (drafts === null || typeof drafts !== 'object' || Array.isArray(drafts)) return false;
+      const drafts = body.drafts;
+      if (drafts === null || typeof drafts !== 'object' || Array.isArray(drafts)) return false;
 
-    adoptDraftDocuments(drafts as Record<string, unknown>);
-    return true;
-  },
-};
+      adoptDraftDocuments(drafts as Record<string, unknown>, accountId);
+      return true;
+    },
+  };
+}
 
-export const scheduledDocument: SyncedDocument = {
-  eventType: SCHEDULED_ACCOUNT_DATA_TYPE,
+export function scheduledDocumentFor(accountId: string): SyncedDocument {
+  return {
+    eventType: SCHEDULED_ACCOUNT_DATA_TYPE,
 
-  snapshot: () => ({ content: { v: DOCUMENT_VERSION, scheduled: scheduledQueue() } }),
+    snapshot: () => ({ content: { v: DOCUMENT_VERSION, scheduled: scheduledQueue(accountId) } }),
 
-  adopt(content) {
-    const body = versioned(content);
-    if (body === null) return scheduledQueue().length === 0;
+    adopt(content) {
+      const body = versioned(content);
+      if (body === null) return scheduledQueue(accountId).length === 0;
 
-    adoptQueue(parseQueue(body.scheduled));
-    return true;
-  },
-};
+      adoptQueue(parseQueue(body.scheduled), accountId);
+      return true;
+    },
+  };
+}
 
 export const recentEmojiDocument: SyncedDocument = {
   eventType: RECENT_EMOJI_ACCOUNT_DATA_TYPE,

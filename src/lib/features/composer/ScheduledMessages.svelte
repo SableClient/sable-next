@@ -39,7 +39,9 @@
   let remote = $derived(
     fetched.filter((message) => message.delay_id !== editing && !pending.includes(message.delay_id))
   );
-  let local = $derived(queueFor(roomId).filter((message) => message.id !== editing));
+  let local = $derived(
+    queueFor(roomId, core.session?.account_id ?? '').filter((message) => message.id !== editing)
+  );
   let total = $derived(remote.length + local.length);
 
   $effect(() => {
@@ -123,25 +125,27 @@
 
   async function sendLocal(message: QueuedMessage): Promise<void> {
     failure = null;
-    dequeue(message.id);
+    const accountId = core.session?.account_id ?? '';
+    dequeue(message.id, accountId);
     try {
       await core.commands.sendMessage(message.roomId, message.body, {
         formatted: message.formatted,
       });
     } catch (error) {
       console.warn('[sable composer] sending a queued message failed', error);
-      enqueue(message);
+      enqueue(message, accountId);
       failure = $i18n.t('composer.scheduledSendFailed');
     }
   }
 
   function deleteLocal(message: QueuedMessage): void {
     failure = null;
-    dequeue(message.id);
+    const accountId = core.session?.account_id ?? '';
+    dequeue(message.id, accountId);
     toasts.undoable($i18n.t('composer.scheduledDeleted'), {
       label: $i18n.t('composer.undo'),
       onUndo: () => {
-        enqueue(message);
+        enqueue(message, accountId);
       },
     });
   }

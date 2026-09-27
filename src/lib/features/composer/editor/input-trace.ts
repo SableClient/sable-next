@@ -1,6 +1,10 @@
-import { recordDebugLog } from '#lib/observability/debug-log.svelte.js';
+import { debugLog, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 
 const TRACED = ['keydown', 'beforeinput', 'input', 'compositionstart', 'compositionend'] as const;
+
+function length(text: string | null | undefined): number {
+  return text?.length ?? 0;
+}
 
 function newlines(text: string | null | undefined): number {
   return text?.match(/\r?\n/g)?.length ?? 0;
@@ -25,19 +29,20 @@ function describe(event: Event, node: HTMLElement): Record<string, unknown> {
       inputType: event.inputType,
       cancelable: event.cancelable,
       prevented: event.defaultPrevented,
-      length: event.data?.length ?? 0,
+      length: length(event.data),
       newlines: newlines(event.data),
       ...shape,
     };
   }
   if (event instanceof CompositionEvent) {
-    return { length: event.data.length, newlines: newlines(event.data), ...shape };
+    return { length: length(event.data), newlines: newlines(event.data), ...shape };
   }
   return shape;
 }
 
 export function traceComposerInput(node: HTMLElement): () => void {
   const listener = (event: Event): void => {
+    if (!debugLog.enabled) return;
     queueMicrotask(() => {
       recordDebugLog('debug', 'ui', 'composer-input', event.type, describe(event, node));
     });
