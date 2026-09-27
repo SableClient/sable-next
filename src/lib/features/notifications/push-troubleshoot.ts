@@ -1,6 +1,7 @@
 import type { DiagnosticPushView, RegisteredPusherView } from '#src/generated/protocol';
 import type { PushPlatform } from '#lib/platform/notifications.js';
 
+import { describePushFailure, type PushFailure } from './push-failure';
 import type { PushHistoryEntry } from './push-history';
 
 export type TroubleshootCheck =
@@ -18,6 +19,7 @@ export interface TroubleshootResult {
   state: TroubleshootState;
   message: string;
   params?: Record<string, string>;
+  detail?: { message: string; params: Record<string, string> };
 }
 
 export interface PushTransportInfo {
@@ -36,6 +38,7 @@ export interface TroubleshootDeps {
   pingGateway: (url: string) => Promise<boolean | null>;
   sendDiagnostic: (pushkey: string, appId: string) => Promise<DiagnosticPushView>;
   history: () => Promise<PushHistoryEntry[]>;
+  registrationFailure: () => PushFailure | null;
   wait: (ms: number) => Promise<void>;
 }
 
@@ -50,6 +53,11 @@ function host(url: string): string {
   } catch {
     return url;
   }
+}
+
+function withFailure(deps: TroubleshootDeps, result: TroubleshootResult): TroubleshootResult {
+  const failure = deps.registrationFailure();
+  return failure === null ? result : { ...result, detail: describePushFailure(failure) };
 }
 
 function skipped(from: TroubleshootCheck, message: string): TroubleshootResult[] {
@@ -68,7 +76,11 @@ async function transport(deps: TroubleshootDeps): Promise<TroubleshootResult> {
   }
   if (deps.platform === 'ios') {
     return (await deps.ownPushkey()) === null
-      ? { check: 'transport', state: 'fail', message: 'settings.troubleshootTransportAppleNoToken' }
+      ? withFailure(deps, {
+          check: 'transport',
+          state: 'fail',
+          message: 'settings.troubleshootTransportAppleNoToken',
+        })
       : { check: 'transport', state: 'pass', message: 'settings.troubleshootTransportApple' };
   }
   const native = await deps.nativeTransport();
@@ -150,7 +162,11 @@ export async function* troubleshoot(deps: TroubleshootDeps): AsyncGenerator<Trou
 
   const pushkey = await deps.ownPushkey();
   if (pushkey === null) {
-    yield { check: 'pusher', state: 'fail', message: 'settings.troubleshootPusherNone' };
+    yield withFailure(deps, {
+      check: 'pusher',
+      state: 'fail',
+      message: 'settings.troubleshootPusherNone',
+    });
     yield* skipped('gateway', 'settings.troubleshootNotApplicable');
     return;
   }
@@ -164,7 +180,11 @@ export async function* troubleshoot(deps: TroubleshootDeps): AsyncGenerator<Trou
   }
   const pusher = pushers.find((candidate) => candidate.pushkey === pushkey);
   if (pusher === undefined) {
-    yield { check: 'pusher', state: 'fail', message: 'settings.troubleshootPusherMissing' };
+    yield withFailure(deps, {
+      check: 'pusher',
+      state: 'fail',
+      message: 'settings.troubleshootPusherMissing',
+    });
     yield* skipped('gateway', 'settings.troubleshootNotApplicable');
     return;
   }

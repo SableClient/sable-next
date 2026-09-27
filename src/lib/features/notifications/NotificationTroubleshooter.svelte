@@ -22,6 +22,7 @@
     type TroubleshootResult,
     troubleshoot,
   } from './push-troubleshoot';
+  import { lastPushFailure } from './push-failure';
   import { currentPushKey } from './web-push';
 
   const core = useCoreClient();
@@ -57,6 +58,7 @@
       pingGateway: (url) => core.commands.pingPushGateway(url),
       sendDiagnostic: (pushkey, appId) => core.commands.sendDiagnosticPush(pushkey, appId),
       history: loadPushHistory,
+      registrationFailure: lastPushFailure,
       wait: (ms) =>
         new Promise((settle) => {
           setTimeout(settle, ms);
@@ -119,6 +121,9 @@
             <span class="label">{$i18n.t(label)}</span>
             {#if result}
               <span class="message">{$i18n.t(result.message, result.params ?? {})}</span>
+              {#if result.detail}
+                <span class="message">{$i18n.t(result.detail.message, result.detail.params)}</span>
+              {/if}
             {/if}
           </span>
           {#if result?.state === 'fail' && check === 'permission'}
