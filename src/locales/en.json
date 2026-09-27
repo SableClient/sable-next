@@ -2478,6 +2478,7 @@
     "pollCreate": "Create poll",
     "pollCancel": "Cancel",
     "voiceRecord": "Record a voice message",
+    "voiceMessage": "Voice message",
     "voiceCancel": "Cancel recording",
     "voiceSend": "Stop and send",
     "voiceRecording": "Recording",

@@ -4,6 +4,7 @@
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
   import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
+  import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -18,10 +19,19 @@
     onPick: (accept: string) => void;
     onPoll?: () => void;
     onLocation?: () => void;
+    onVoice?: () => void;
     onBeforeOpen?: () => void;
   }
 
-  let { desktop, disabled = false, onPick, onPoll, onLocation, onBeforeOpen }: Props = $props();
+  let {
+    desktop,
+    disabled = false,
+    onPick,
+    onPoll,
+    onLocation,
+    onVoice,
+    onBeforeOpen,
+  }: Props = $props();
   let open = $state(false);
 
   const media = 'image/*,video/*';
@@ -73,6 +83,12 @@
           <DropdownMenu.Item class="menu-item" onclick={onLocation}>
             <MapPinIcon />
             {$i18n.t('composer.location')}
+          </DropdownMenu.Item>
+        {/if}
+        {#if onVoice}
+          <DropdownMenu.Item class="menu-item" onclick={onVoice}>
+            <MicrophoneIcon />
+            {$i18n.t('composer.voiceMessage')}
           </DropdownMenu.Item>
         {/if}
       </DropdownMenu.Content>
@@ -144,6 +160,19 @@
         >
           <MapPinIcon />
           {$i18n.t('composer.location')}
+        </Button>
+      {/if}
+      {#if onVoice}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onVoice();
+          }}
+        >
+          <MicrophoneIcon />
+          {$i18n.t('composer.voiceMessage')}
         </Button>
       {/if}
     </div>

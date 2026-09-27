@@ -1093,6 +1093,11 @@
                       locationOpen = true;
                     }
                   : undefined}
+                onVoice={!preferences.composerVoiceButton && voiceSupported && !micDenied
+                  ? () => {
+                      recording = true;
+                    }
+                  : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
             </div>
