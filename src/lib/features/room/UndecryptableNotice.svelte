@@ -42,6 +42,7 @@
     {#if utdIsRecoverable(cause)}
       <a
         href={resolve('/(app)/settings/[section]', { section: SETTINGS_DEVICES_SECTION })}
+        draggable="false"
         data-settings-link={SETTINGS_DEVICES_SECTION}
       >
         {$i18n.t('timeline.utdRecoverAction')}

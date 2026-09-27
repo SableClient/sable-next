@@ -110,6 +110,7 @@
           <a
             class="selection-layer"
             href={`${resolve(`settings/${hit.category.id}`)}?focus=${encodeURIComponent(focus)}`}
+            draggable="false"
             onclick={(event) => {
               select(event, hit.category.id, focus);
             }}

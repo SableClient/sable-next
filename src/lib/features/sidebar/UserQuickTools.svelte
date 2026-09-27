@@ -152,6 +152,7 @@
           }}
           aria-label={toolLabel(item)}
           aria-current={toolActive ? 'page' : undefined}
+          draggable="false"
         >
           <span class="mobile-icon" aria-hidden="true"
             ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
@@ -182,6 +183,7 @@
           }}
           aria-label={toolLabel(item)}
           aria-current={toolActive ? 'page' : undefined}
+          draggable="false"
         >
           <span class="tool-icon" aria-hidden="true"
             ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
@@ -213,6 +215,7 @@
             }}
             aria-label={toolLabel(item)}
             aria-current={toolActive ? 'page' : undefined}
+            draggable="false"
           >
             <span class="tool-icon" aria-hidden="true"
               ><item.icon weight={toolActive ? 'fill' : 'regular'} /></span
