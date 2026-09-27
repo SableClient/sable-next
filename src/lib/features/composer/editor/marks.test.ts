@@ -137,14 +137,14 @@ test('a mark survives a soft line break', () => {
   expect(tx(model)).toBe('<p><del>foo<br>bar|</del></p>');
 });
 
-test('a mark survives a paragraph split when enter makes newlines', () => {
+test('a mark survives enter when enter makes newlines', () => {
   preferences.enterForNewline = true;
   const model = cm('<p>|</p>');
   strike(model);
   replaceText(model, 'foo');
   enter(model);
   replaceText(model, 'bar');
-  expect(tx(model)).toBe('<p><del>foo</del></p><p><del>bar|</del></p>');
+  expect(tx(model)).toBe('<p><del>foo<br>bar|</del></p>');
 });
 
 test('the selection stays where it was after bolding', () => {

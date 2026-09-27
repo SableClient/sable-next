@@ -448,13 +448,40 @@ test('a lone newline committed by an IME is an Enter press', () => {
 describe('Android enter', () => {
   const androidUserAgent = 'Mozilla/5.0 (Linux; Android 14; Pixel 8)';
 
-  test.each(['insertParagraph', 'insertLineBreak'])('submits on %s', (inputType) => {
+  test('submits on insertParagraph', () => {
     setUserAgent(androidUserAgent);
     const submit = vi.fn();
     const editor = openWith({ onSubmit: submit });
     editor.setText('hi');
 
-    const event = beforeInput(surface(), inputType);
+    const event = beforeInput(surface(), 'insertParagraph');
+
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+    expect(editor.doc()?.textContent).toBe('hi');
+  });
+
+  test('breaks the line on insertLineBreak, the Shift+Enter of a hardware keyboard', () => {
+    setUserAgent(androidUserAgent);
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    editor.setText('hi');
+
+    const event = beforeInput(surface(), 'insertLineBreak');
+
+    expect(submit).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+    expect(editor.doc()?.firstChild?.lastChild?.type.name).toBe('hard_break');
+  });
+
+  test('submits on insertLineBreak when Enter makes newlines', () => {
+    setUserAgent(androidUserAgent);
+    preferences.enterForNewline = true;
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    editor.setText('hi');
+
+    const event = beforeInput(surface(), 'insertLineBreak');
 
     expect(submit).toHaveBeenCalledTimes(1);
     expect(event.defaultPrevented).toBe(true);
@@ -1791,7 +1818,7 @@ describe('the editor api the composer component drives', () => {
   });
 });
 
-describe('Enter for a newline in the plain composer', () => {
+describe('Enter for a newline', () => {
   function typeLines(editor: ComposerEditor, lines: string[]): void {
     for (const [index, line] of lines.entries()) {
       if (index > 0) press(editor, 'Enter');
@@ -1808,6 +1835,17 @@ describe('Enter for a newline in the plain composer', () => {
     const doc = editor.doc();
     if (!doc) throw new Error('no doc');
     expect(serializePlain(doc).body).toBe('a\nb');
+  });
+
+  test('breaks the line in the rich composer too', () => {
+    preferences.richTextComposer = true;
+    preferences.enterForNewline = true;
+    const editor = open();
+    typeLines(editor, ['a', 'b']);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializeComposer(doc).body).toBe('a\nb');
   });
 
   test('keeps a typed fence as markdown, with its lines single-spaced', () => {
@@ -1911,6 +1949,40 @@ describe('code indentation in the composer', () => {
     const doc = editor.doc();
     if (!doc) throw new Error('no doc');
     expect(serializePlain(doc).body).toBe('```\nfn main() {\n    let x = 1;\n}\n```');
+  });
+
+  test.each([
+    ['one div per line', '<div>a</div><div>b</div>', 'a\nb'],
+    [
+      'an editor',
+      '<div style="white-space: pre;"><div><span>a</span></div><div><span>b</span></div></div>',
+      'a\nb',
+    ],
+    ['an empty div between lines', '<div>a</div><div><br></div><div>b</div>', 'a\n\nb'],
+    ['a line ending in a break', '<div>a<br></div><div>b</div>', 'a\nb'],
+    ['one paragraph per line', '<p>a</p><p>b</p>', 'a\n\nb'],
+  ])('a paste of %s breaks the line in the rich composer', (_, html, body) => {
+    preferences.richTextComposer = true;
+    const editor = open();
+    paste(body, html);
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    expect(serializeComposer(doc).body).toBe(body);
+  });
+
+  test('a paste from an editor into a code block keeps its lines in the rich composer', () => {
+    preferences.richTextComposer = true;
+    preferences.enterForNewline = true;
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter');
+    paste(
+      'fn main() {\n    let x = 1;\n}',
+      '<div><div><span>fn main() {</span></div><div><span>    let x = 1;</span></div><div><span>}</span></div></div>'
+    );
+
+    expect(editor.doc()?.firstChild?.textContent).toBe('fn main() {\n    let x = 1;\n}');
   });
 
   test('a paste with a blank line continues the fence line in plain mode', () => {
