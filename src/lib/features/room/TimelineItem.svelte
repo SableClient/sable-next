@@ -1709,6 +1709,10 @@
     display: inline;
   }
 
+  .has-edited {
+    line-height: var(--line-height-body);
+  }
+
   .has-edited :global(.formatted-body) {
     display: inline;
   }
