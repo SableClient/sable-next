@@ -10,12 +10,24 @@ static GREEK: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Gr
 static ARABIC: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Arabic));
 static TAMIL: LazyLock<Stemmer> = LazyLock::new(|| Stemmer::create(Algorithm::Tamil));
 
+// probly-search stores terms in a character trie and vacuums it recursively.
+// Keeping a bounded term prevents a single unbroken message token exhausting
+// the shallow WebAssembly stack during that maintenance.
+const MAX_TERM_CHARS: usize = 256;
+
 pub(crate) fn tokenize(text: &str) -> Vec<Cow<'static, str>> {
     text.tokenize()
         .filter(|token| token.kind == TokenKind::Word)
-        .map(|token| Cow::<'static, str>::Owned(stem(&token)))
+        .map(|token| Cow::<'static, str>::Owned(limit_term(stem(&token))))
         .filter(|term| !term.is_empty())
         .collect()
+}
+
+fn limit_term(mut term: String) -> String {
+    if let Some((index, _)) = term.char_indices().nth(MAX_TERM_CHARS) {
+        term.truncate(index);
+    }
+    term
 }
 
 fn stem(token: &Token<'_>) -> String {
@@ -39,7 +51,7 @@ fn stemmer_for(script: Script) -> Option<&'static Stemmer> {
 
 #[cfg(test)]
 mod tests {
-    use super::tokenize;
+    use super::{MAX_TERM_CHARS, tokenize};
 
     fn terms(text: &str) -> Vec<String> {
         tokenize(text).into_iter().map(Into::into).collect()
@@ -69,6 +81,14 @@ mod tests {
     #[test]
     fn test_a_script_without_spaces_still_yields_terms() {
         assert!(!terms("สวัสดี").is_empty());
+    }
+
+    #[test]
+    fn test_a_long_unbroken_word_is_bounded() {
+        assert_eq!(
+            terms(&"x".repeat(MAX_TERM_CHARS + 1)),
+            vec!["x".repeat(MAX_TERM_CHARS)]
+        );
     }
 
     #[test]
