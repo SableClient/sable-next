@@ -74,12 +74,13 @@ description = "Run all frontend and Rust tests"
 alias = "t"
 run = [
   "pnpm test",
-  "cargo test --locked --workspace --exclude app --all-features",
-  "cargo test --locked -p app",
+  "cargo nextest run --locked --workspace --exclude app --all-features",
+  "cargo nextest run --locked -p app",
   # Needs chromedriver on PATH.
   "cargo test --locked -p sable-wasm --target wasm32-unknown-unknown --profile wasm-test",
 ]
 raw = true
+tools = { "github:nextest-rs/nextest" = { version = "0.9.146", version_prefix = "cargo-nextest-" } }
 
 [tasks.doc]
 description = "Build Rust documentation with warnings denied"

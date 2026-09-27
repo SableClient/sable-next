@@ -71,8 +71,13 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --locked --workspace --exclude app --all-targets --all-features -- -D warnings
 
+      - name: Install cargo-nextest
+        uses: https://github.com/taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        with:
+          tool: cargo-nextest@0.9.146
+
       - name: Run tests
-        run: cargo test --locked --workspace --exclude app --all-features
+        run: cargo nextest run --locked --workspace --exclude app --all-features
 
       - name: Check generated bindings are current
         run: cargo run --locked -p sable-core --example generate-types --features typegen -- --check
@@ -104,8 +109,13 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --locked -p app --all-targets -- -D warnings
 
+      - name: Install cargo-nextest
+        uses: https://github.com/taiki-e/install-action@94c31af3204a9f15ab40b35ad084410b905bbc73 # v2.87.17
+        with:
+          tool: cargo-nextest@0.9.146
+
       - name: Run tests
-        run: cargo test --locked -p app
+        run: cargo nextest run --locked -p app
 
   wasm:
     name: WASM target
