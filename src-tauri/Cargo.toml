@@ -115,7 +115,7 @@ sha2 = { version = "0.11", optional = true }
 ffmpeg-sidecar = { version = "2.5", optional = true }
 # Keeps the Rust heap out of glibc's mallinfo(), which CEF's MemoryInfra thread
 # CHECKs into a SIGILL past 2 GiB. See .claude/rules/native.md.
-mimalloc = { version = "0.1.52", optional = true }
+tikv-jemallocator = { version = "0.7.0", optional = true }
 libloading = "0.9"
 zbus = "5"
 
@@ -151,7 +151,7 @@ cef = [
   "dep:cef",
   "dep:sha2",
   "dep:ffmpeg-sidecar",
-  "dep:mimalloc",
+  "dep:tikv-jemallocator",
   "tauri-runtime-cef/devtools",
 ]
 
