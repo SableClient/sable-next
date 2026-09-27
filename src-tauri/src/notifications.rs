@@ -157,16 +157,23 @@ pub async fn maintain_background_push(
     let pushers = registered_pushers(root)?;
     match operation {
         BackgroundPush::Activate { app_id, ack_token } => {
-            let current = pushers
+            for pusher in pushers
                 .iter()
                 .rev()
-                .find(|pusher| pusher.app_id == app_id)
-                .ok_or(CommandErr::Unavailable)?;
-            let client = pusher_client(root, current).await?;
-            client
-                .retry(|| sable_core::webpush::ack(&client, app_id.clone(), ack_token.clone()))
-                .await
-                .map_err(|_| CommandErr::Unavailable)
+                .filter(|pusher| pusher.app_id == app_id)
+            {
+                let Ok(client) = pusher_client(root, pusher).await else {
+                    continue;
+                };
+                if client
+                    .retry(|| sable_core::webpush::ack(&client, app_id.clone(), ack_token.clone()))
+                    .await
+                    .is_ok()
+                {
+                    return Ok(());
+                }
+            }
+            Err(CommandErr::Unavailable)
         }
         BackgroundPush::Rotate {
             user_id,
