@@ -242,6 +242,10 @@
     position: relative;
   }
 
+  :global(.account-popover .profile-card:not([style*='--profile-hero']) .profile-card-identity) {
+    padding-bottom: var(--space-150);
+  }
+
   :global(.quick-tool > .account-presence) {
     bottom: -0.125rem;
     position: absolute;

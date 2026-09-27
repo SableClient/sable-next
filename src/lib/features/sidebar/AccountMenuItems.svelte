@@ -9,6 +9,9 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import UserIcon from 'phosphor-svelte/lib/UserIcon';
+  import PencilIcon from 'phosphor-svelte/lib/PencilIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import { useActionMenuSurface } from '#lib/ui/primitives/action-menu.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -47,9 +50,9 @@
 </script>
 
 {#if preferences.sendPresence}
-  <ActionMenuSub label={$i18n.t('presence.title')}>
+  <ActionMenuSub class="presence-selector" label={$i18n.t('presence.title')}>
     {#snippet trigger()}
-      <PresenceDot {presence} label={$i18n.t(`presence.${presence}`)} />
+      <PresenceDot {presence} size="large" label={$i18n.t(`presence.${presence}`)} />
       <span class="presence-name">{$i18n.t(`presence.${presence}`)}</span>
     {/snippet}
     {#each PRESENCE_OPTIONS as option (option)}
@@ -59,13 +62,17 @@
           setPreference('presence', option);
         }}
       >
-        <PresenceDot presence={option} label={$i18n.t(`presence.${option}`)} />
+        <PresenceDot presence={option} label={$i18n.t(`presence.${option}`)} size="medium" />
         <span class="presence-name">{$i18n.t(`presence.${option}`)}</span>
       </ActionMenuItem>
     {/each}
   </ActionMenuSub>
-  <ActionMenuSeparator />
 {/if}
+<ActionMenuItem onSelect={onProfile}>
+  <PencilIcon aria-hidden="true" />
+  <span>{$i18n.t('nav.editProfile')}</span>
+</ActionMenuItem>
+<ActionMenuSeparator />
 {#if accountSwitching}
   <ActionMenuSub label={$i18n.t('nav.switchAccount')} class="account-switcher-popover">
     {#snippet trigger()}
@@ -76,7 +83,11 @@
       {#each accounts as account (account.account_id)}
         {@const active = account.account_id === currentAccountId}
         {@const identity = profiles.identity(account.user_id)}
-        <div class="account-row" data-active={active ? 'true' : undefined}>
+        <div
+          class="account-row menu-item"
+          aria-checked={active ? 'true' : undefined}
+          data-active={active ? 'true' : undefined}
+        >
           <button
             class="account-select"
             type="button"
@@ -124,41 +135,42 @@
         </div>
       {/each}
     </div>
+    <ActionMenuSeparator />
+    <ActionMenuItem onSelect={onAddAccount}>
+      <PlusIcon aria-hidden="true" />
+      <span>{$i18n.t('nav.addAccount')}</span>
+    </ActionMenuItem>
   </ActionMenuSub>
-  <ActionMenuSeparator />
 {/if}
-<ActionMenuItem onSelect={onProfile}>{$i18n.t('nav.editProfile')}</ActionMenuItem>
-{#if accountSwitching}
-  <ActionMenuItem onSelect={onAddAccount}>{$i18n.t('nav.addAccount')}</ActionMenuItem>
-{/if}
-<ActionMenuSeparator />
-<ActionMenuItem destructive onSelect={onLogout}>{$i18n.t('settings.logout')}</ActionMenuItem>
+<ActionMenuItem destructive onSelect={onLogout}>
+  <SignOutIcon aria-hidden="true" />
+  <span>{$i18n.t('settings.logout')}</span>
+</ActionMenuItem>
 
 <style>
+  :global(.account-popover .menu-item .presence-dot) {
+    /* margin: (size of menu item icon - size of large presence dot) / 2 */
+    margin: 0 calc((var(--size-x200) - var(--space-250)) / 2);
+  }
+
+  :global(.presence-selector .menu-item .presence-dot) {
+    /* margin: (size of menu item icon - size of medium presence dot) / 2 */
+    margin-right: calc((var(--size-x200) - var(--space-200)) / 2);
+  }
+
   .account-row {
     align-items: center;
-    border-radius: var(--radius-inner);
     display: flex;
-    gap: var(--space-150);
-    min-height: var(--control-height-400);
-    padding: var(--space-100);
+    gap: var(--space-300);
+    min-height: var(--control-height-500);
+    padding: var(--space-150) var(--space-200);
   }
 
   .account-list {
     display: grid;
     gap: var(--space-100);
     min-width: min(15rem, calc(100vw - 2rem));
-    padding: var(--space-100);
-  }
-
-  .account-row:hover,
-  .account-row:focus-within {
-    background: var(--bg-container-hover);
-  }
-
-  .account-row[data-active='true'] {
-    background: var(--primary-container);
-    color: var(--primary-on-container);
+    padding: 0;
   }
 
   .account-select {
@@ -173,7 +185,7 @@
     flex: 1;
     gap: var(--space-200);
     min-width: 0;
-    padding: var(--space-100);
+    padding: 0;
     text-align: left;
   }
 
