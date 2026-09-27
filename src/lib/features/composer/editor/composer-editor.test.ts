@@ -1913,6 +1913,22 @@ describe('code indentation in the composer', () => {
     expect(serializePlain(doc).body).toBe('```\nfn main() {\n    let x = 1;\n}\n```');
   });
 
+  test('a paste with a blank line continues the fence line in plain mode', () => {
+    preferences.richTextComposer = false;
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter', true);
+    paste('use a;\nuse b;\n\nuse c;');
+    press(editor, 'Enter', true);
+    type(editor, '```');
+
+    const doc = editor.doc();
+    if (!doc) throw new Error('no doc');
+    const message = serializePlain(doc);
+    expect(message.body).toBe('```\nuse a;\nuse b;\n\nuse c;\n```');
+    expect(message.formatted).toBe('<pre><code>use a;\nuse b;\n\nuse c;</code></pre>');
+  });
+
   test('Tab indents inside a code block', () => {
     preferences.richTextComposer = true;
     preferences.enterForNewline = true;

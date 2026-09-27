@@ -683,7 +683,7 @@ export function textSlice(text: string): Slice {
 
   const only = blocks.length === 1 ? blocks[0] : null;
   if (only) return new Slice(only.content, 0, 0);
-  return new Slice(Fragment.fromArray(blocks), 0, 0);
+  return new Slice(Fragment.fromArray(blocks), 1, 1);
 }
 
 export function markdownFromSlice(slice: Slice): string {
