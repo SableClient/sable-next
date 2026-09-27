@@ -278,6 +278,11 @@
       transition: transform var(--duration-slow) var(--ease-smooth-out);
     }
 
+    :global(html:not([data-reduced-motion='on']) .dialog-content-sheet.sheet-dismissing) {
+      animation: none;
+      transition: transform var(--duration-fast) var(--ease-smooth-out);
+    }
+
     :global(.dialog-content-sheet.sheet-dragging) {
       transition: none;
     }

@@ -71,3 +71,44 @@ test('mobile: a scrolled sheet scrolls back up instead of closing', async ({
 
   await expect(sections).toBeVisible();
 });
+
+test.describe('with motion', () => {
+  test.use({ contextOptions: { reducedMotion: 'no-preference' } });
+
+  test('mobile: the sheet follows the finger all the way and slides out when let go', async ({
+    page,
+    installRoomCore,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'touch is driven over CDP');
+    await installRoomCore('ready');
+    const sections = await openJumpSheet(page);
+    const sheet = page.locator('.dialog-content-sheet');
+    await page.waitForTimeout(500);
+    const before = await sheet.boundingBox();
+    const box = await sections.boundingBox();
+    if (!before || !box) throw new Error('The sheet is not laid out.');
+
+    const cdp = await page.context().newCDPSession(page);
+    const x = box.x + box.width / 2;
+    const fromY = before.y + 80;
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', y: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+      });
+    const travel = Math.min(before.height * 0.8, 880 - fromY);
+    await touch('touchStart', fromY);
+    for (let y = fromY + 20; y <= fromY + travel; y += 20) await touch('touchMove', y);
+
+    const dragged = await sheet.boundingBox();
+    if (!dragged) throw new Error('The sheet vanished mid-drag.');
+    expect(dragged.y - before.y).toBeGreaterThan(travel - 30);
+
+    await touch('touchEnd', fromY + travel);
+    await expect
+      .poll(async () => (await sheet.boundingBox())?.y ?? Infinity)
+      .toBeGreaterThan(dragged.y);
+    await expect(sections).toBeHidden();
+  });
+});

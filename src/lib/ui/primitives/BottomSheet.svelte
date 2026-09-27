@@ -3,6 +3,8 @@
   import type { Attachment } from 'svelte/attachments';
   import { on } from 'svelte/events';
 
+  import { MOTION_MS, motionMs } from '#lib/ui/motion.js';
+
   import DialogFrame from './DialogFrame.svelte';
 
   interface Props {
@@ -39,10 +41,13 @@
   let lastY = 0;
   let lastTime = 0;
   let velocityY = 0;
-  let dragProgress = $state(0);
+  let dragOffset = $state(0);
+  let dismissing = $state(false);
+  let body = $state<HTMLElement | null>(null);
   let suppressClick = false;
   let touchDragging = $state(false);
   const dismissVelocity = 0.3;
+  const dismissShare = 0.3;
   const NO_DRAG =
     '[data-sheet-no-drag], input, textarea, select, [contenteditable="true"], .slider';
 
@@ -51,15 +56,31 @@
     // runs and the next open would render pushed down.
     if (!open) {
       pointerId = null;
-      dragProgress = 0;
+      dragOffset = 0;
+    } else {
+      dismissing = false;
     }
   });
 
   function close(): void {
     // Left set, this transform reopens the sheet already pushed off screen.
-    dragProgress = 0;
+    dragOffset = 0;
     open = false;
     onOpenChange?.(false);
+  }
+
+  function sheetHeight(): number {
+    return Math.max(body?.closest('.dialog-content')?.getBoundingClientRect().height ?? 0, 1);
+  }
+
+  function dismiss(): void {
+    const duration = motionMs(MOTION_MS.fast);
+    if (duration === 0) {
+      close();
+      return;
+    }
+    dismissing = true;
+    window.setTimeout(close, duration);
   }
 
   function startDrag(event: PointerEvent): void {
@@ -69,7 +90,7 @@
     lastY = event.clientY;
     lastTime = event.timeStamp;
     velocityY = 0;
-    dragProgress = 0;
+    dragOffset = 0;
     suppressClick = false;
   }
 
@@ -84,9 +105,8 @@
   function drag(event: PointerEvent): void {
     if (pointerId !== event.pointerId) return;
     trackVelocity(event);
-    const viewportHeight = Math.max(window.innerHeight, 1);
-    dragProgress = Math.min(Math.max(0, event.clientY - startY) / viewportHeight, 0.5);
-    if (dragProgress <= 0) return;
+    dragOffset = Math.max(0, event.clientY - startY);
+    if (dragOffset <= 0) return;
     suppressClick = true;
     const target = event.currentTarget;
     if (target instanceof HTMLElement && !target.hasPointerCapture(event.pointerId)) {
@@ -115,9 +135,8 @@
   }
 
   function settle(moved: number, velocity: number): void {
-    const viewportHeight = Math.max(window.innerHeight, 1);
-    if (moved / viewportHeight >= 0.18 || velocity >= dismissVelocity) close();
-    else dragProgress = 0;
+    if (moved >= sheetHeight() * dismissShare || velocity >= dismissVelocity) dismiss();
+    else dragOffset = 0;
   }
 
   const swipeToDismiss: Attachment<HTMLElement> = (node) => {
@@ -168,7 +187,7 @@
       previousY = touch.clientY;
       previousTime = event.timeStamp;
       moved = Math.max(0, deltaY);
-      dragProgress = Math.min(moved / Math.max(window.innerHeight, 1), 0.5);
+      dragOffset = moved;
     }
 
     function end(): void {
@@ -200,7 +219,7 @@
     if (pointerId !== event.pointerId) return;
     trackVelocity(event);
     pointerId = null;
-    settle(dragProgress * Math.max(window.innerHeight, 1), velocityY);
+    settle(dragOffset, velocityY);
   }
 
   function handleClick(event: MouseEvent): void {
@@ -209,7 +228,7 @@
       suppressClick = false;
       return;
     }
-    close();
+    dismiss();
   }
 </script>
 
@@ -218,12 +237,17 @@
   variant="sheet"
   {ownsBack}
   {label}
-  contentClass={pointerId !== null || touchDragging ? 'sheet-dragging' : 'sheet-settling'}
-  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--space-300) * 2);' : ''} transform: translateY(${String(dragProgress * 100)}%)`}
+  contentClass={pointerId !== null || touchDragging
+    ? 'sheet-dragging'
+    : dismissing
+      ? 'sheet-dismissing'
+      : 'sheet-settling'}
+  contentStyle={`${background ? `background: ${background};` : ''} ${fullHeight ? 'height: calc(100dvh - var(--safe-top) - var(--space-300) * 2);' : ''} transform: translateY(${dismissing ? '100%' : `${String(dragOffset)}px`})`}
   {onOpenChange}
   {onOpenAutoFocus}
 >
   <div
+    bind:this={body}
     class:content-inset={contentInset}
     role="presentation"
     onclickcapture={contentClick}
