@@ -64,6 +64,10 @@
     margin: 0;
   }
 
+  .editor :global([contenteditable='true'] p + p) {
+    margin-block-start: 1lh;
+  }
+
   .editor :global(h1),
   .editor :global(h2),
   .editor :global(h3) {
