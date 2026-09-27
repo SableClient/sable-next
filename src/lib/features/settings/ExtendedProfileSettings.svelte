@@ -6,6 +6,7 @@
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -304,6 +305,7 @@
             alt={$i18n.t('settings.currentProfileBanner')}
             width={1000}
             height={375}
+            original={preferences.autoplayGifs}
           />{/if}
         <label class="file-button btn btn-secondary btn-small">
           <input
