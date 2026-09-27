@@ -23,6 +23,7 @@ export type CallParticipant = {
   local?: boolean;
   camera?: CallTrack;
   screenShare?: CallTrack;
+  screenShareAudio?: CallTrack;
   microphone?: CallTrack;
   connectionQuality?: CallConnectionQuality;
   speaking?: boolean;

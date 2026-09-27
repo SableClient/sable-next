@@ -11,7 +11,7 @@
     room: LivekitRoom | undefined;
     telemetry?: Pick<CallTelemetry, 'event' | 'failure'>;
     deafened?: boolean;
-    volumeOf?: (identity: string) => number;
+    volumeOf?: (identity: string, screen: boolean) => number;
   }
 
   let { room, telemetry, deafened = false, volumeOf = () => 1 }: Props = $props();
@@ -97,14 +97,16 @@
         const element = track.attach();
         element.autoplay = true;
         element.dataset.identity = identity;
-        if (bank) {
+        const screen = track.source === Track.Source.ScreenShareAudio;
+        if (screen) element.dataset.screen = 'true';
+        if (bank && !screen) {
           element.muted = true;
           route(bank, track, element);
         }
         levelOf(
           element,
           untrack(() => deafened),
-          untrack(() => volumeOf(identity))
+          untrack(() => volumeOf(identity, screen))
         );
         currentNode.append(element);
         attached.set(track.sid, { track, element });
@@ -172,7 +174,7 @@
         levelOf(
           element,
           muted,
-          untrack(() => volumeOf(element.dataset.identity ?? ''))
+          untrack(() => volumeOf(element.dataset.identity ?? '', element.dataset.screen === 'true'))
         );
     }
   });
@@ -187,7 +189,7 @@
         levelOf(
           element,
           untrack(() => deafened),
-          volume(element.dataset.identity ?? '')
+          volume(element.dataset.identity ?? '', element.dataset.screen === 'true')
         );
     }
   });

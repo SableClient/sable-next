@@ -23,6 +23,7 @@
   import {
     MAX_PARTICIPANT_VOLUME,
     participantVolume,
+    screenVolumeKey,
     setParticipantVolume,
   } from './participant-volumes.svelte.js';
 
@@ -55,17 +56,24 @@
   }: Props = $props();
 
   function applyVolume(next: number): void {
-    setParticipantVolume(userId, next);
-    onVolumeChange?.(participant.identity, next);
+    setParticipantVolume(volumeKey, next);
+    if (!screen) onVolumeChange?.(participant.identity, next);
   }
 
   let screen = $derived(source === 'screen');
+  let volumeKey = $derived(screen ? screenVolumeKey(userId) : userId);
+  let adjustable = $derived(
+    !participant.local && (!screen || participant.screenShareAudio !== undefined)
+  );
+  let volumeLabel = $derived(
+    screen ? $i18n.t('call.screenVolume', { name }) : $i18n.t('call.participantVolume', { name })
+  );
   let videoOn = $derived(screen || cameraVisible(participant));
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
   let label = $derived(screen ? $i18n.t('call.screenOf', { name }) : name);
-  let volume = $derived(participantVolume(userId));
+  let volume = $derived(participantVolume(volumeKey));
   let volumeOpen = $state(false);
   let revealed = $state(false);
 
@@ -76,7 +84,7 @@
   }
 
   function openVolume(event: MouseEvent): void {
-    if (participant.local || screen) return;
+    if (!adjustable) return;
     event.preventDefault();
     volumeOpen = true;
   }
@@ -173,12 +181,12 @@
         {/if}
       </IconButton>
     {/if}
-    {#if !participant.local && !screen}
+    {#if adjustable}
       <IconButton
         variant="ghost"
         size="small"
         class="tile-action"
-        label={$i18n.t('call.participantVolume', { name })}
+        label={volumeLabel}
         aria-expanded={volumeOpen}
         data-volume-toggle
         onclick={() => (volumeOpen = !volumeOpen)}
@@ -221,7 +229,7 @@
         min={0}
         max={MAX_PARTICIPANT_VOLUME}
         step={0.05}
-        label={$i18n.t('call.participantVolume', { name })}
+        label={volumeLabel}
         value={volume}
         oninput={applyVolume}
       />

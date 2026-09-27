@@ -119,6 +119,24 @@ test('applies a per-participant volume to attached audio', () => {
   expect(elements()[1].volume).toBe(0);
 });
 
+test('plays a shared screen at its own volume, apart from the voice', () => {
+  const voice = fakeTrack('voice');
+  const room = fakeRoom(voice);
+  const screenAudio = Object.assign(fakeTrack('screen'), {
+    source: Track.Source.ScreenShareAudio,
+  });
+
+  render(CallAudio, {
+    room: room.room,
+    volumeOf: (_identity: string, screen: boolean) => (screen ? 0.25 : 0.8),
+  });
+  room.emit(RoomEvent.TrackSubscribed, screenAudio, undefined, { identity: 'participant' });
+
+  const [voiceElement, screenElement] = document.querySelectorAll('audio');
+  expect(voiceElement.volume).toBe(0.8);
+  expect(screenElement.volume).toBe(0.25);
+});
+
 test('replaces room listeners and tracks with the current room', async () => {
   const firstTrack = fakeTrack('first');
   const secondTrack = fakeTrack('second');

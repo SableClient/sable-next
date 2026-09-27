@@ -42,6 +42,10 @@ export function setOutputVolume(volume: number): void {
   }
 }
 
+export function screenVolumeKey(userId: string): string {
+  return `screen:${userId}`;
+}
+
 export function effectiveVolume(userId: string): number {
   return Math.min(participantVolume(userId) * output.volume, 1);
 }

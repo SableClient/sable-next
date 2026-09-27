@@ -78,3 +78,44 @@ test('the volume button still toggles the panel closed', async () => {
   await user.click(screen.getByRole('button', { name: 'Volume for Bob' }));
   expect(panel()).not.toBeInTheDocument();
 });
+
+function mountScreen(screenShareAudio: boolean, onVolumeChange = vi.fn()) {
+  render(CallParticipantTile, {
+    participant: {
+      identity: '@bob:example.org:DEVICE',
+      screenShare: { id: 'TR_video', muted: false, subscribed: true },
+      screenShareAudio: screenShareAudio
+        ? { id: 'TR_audio', muted: false, subscribed: true }
+        : undefined,
+    },
+    source: 'screen',
+    room: undefined,
+    name: 'Bob',
+    userId: '@bob:example.org',
+    avatar: null,
+    onVolumeChange,
+  });
+  return userEvent.setup();
+}
+
+test('a shared screen with sound has its own volume, apart from the voice', async () => {
+  const onVolumeChange = vi.fn();
+  const user = mountScreen(true, onVolumeChange);
+
+  await user.click(screen.getByRole('button', { name: "Volume of Bob's screen" }));
+  const slider = screen.getByRole('slider', { name: "Volume of Bob's screen" });
+  slider.focus();
+  await user.keyboard('{ArrowLeft}');
+
+  expect(screen.getByText('95%')).toBeInTheDocument();
+  expect(onVolumeChange).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem('sable-call-volumes') ?? '{}')).toMatchObject({
+    'screen:@bob:example.org': 0.95,
+  });
+});
+
+test('a shared screen without sound offers no volume', () => {
+  mountScreen(false);
+
+  expect(screen.queryByRole('button', { name: "Volume of Bob's screen" })).not.toBeInTheDocument();
+});

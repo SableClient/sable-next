@@ -2541,7 +2541,8 @@
     "screenAudioFailed": "Impossible de lister les applications qui jouent du son. Actualisez pour réessayer.",
     "screenAudioSilent": "Ne joue pas",
     "screenAudioShare": "Partager",
-    "screenAudioChoice": "Ce que l'appel entend"
+    "screenAudioChoice": "Ce que l'appel entend",
+    "screenVolume": "Volume de l’écran de {{name}}"
   },
   "presence": {
     "online": "En ligne",

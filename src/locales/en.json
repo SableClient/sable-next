@@ -2978,7 +2978,8 @@
     "screenAudioFailed": "Couldn't list the apps playing sound. Refresh to try again.",
     "screenAudioSilent": "Not playing",
     "screenAudioShare": "Share",
-    "screenAudioChoice": "What the call hears"
+    "screenAudioChoice": "What the call hears",
+    "screenVolume": "Volume of {{name}}'s screen"
   },
   "presence": {
     "online": "Online",
