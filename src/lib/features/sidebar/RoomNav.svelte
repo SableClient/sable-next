@@ -1051,8 +1051,6 @@
       {:else}
         {#if canCreateHere}
           {@render createMenu()}
-        {:else}
-          {@render action(joinHref, $i18n.t('nav.joinWithAddress'), LinkIcon)}
         {/if}
         {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}

@@ -608,7 +608,7 @@ test('message search from a space is scoped to that space', async () => {
   );
 });
 
-test('a space you cannot add rooms to offers a join instead of a create', async () => {
+test('a space you cannot add rooms to does not show a create action', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
   ];
@@ -616,7 +616,7 @@ test('a space you cannot add rooms to offers a join instead of a create', async 
 
   await mountNav();
   expect(screen.queryByRole('button', { name: 'nav.createRoomInSpace' })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'nav.joinWithAddress' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'nav.joinWithAddress' })).not.toBeInTheDocument();
 
   core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: true });
   cleanup();
