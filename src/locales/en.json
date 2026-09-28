@@ -2986,6 +2986,8 @@
     "chat": "Chat",
     "showCall": "Show call",
     "screenOf": "{{name}}'s screen",
+    "nameOnDevice": "{{name}} ({{device}})",
+    "thisDevice": "this device",
     "pin": "Pin {{name}}",
     "unpin": "Unpin {{name}}",
     "gridView": "Grid view",

@@ -12,7 +12,7 @@
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity, type MemberIdentity } from '#lib/features/room/members/members.js';
@@ -67,6 +67,26 @@
     return memberIdentity(members, byIdentity.get(identity) ?? identity);
   }
 
+  let tileNames = $derived.by(() => {
+    const identities = [...new Set(tiles.map((tile) => tile.participant.identity))];
+    const names = new Map(identities.map((identity) => [identity, profileOf(identity).name]));
+    const shared = (name: string) =>
+      [...names.values()].filter((other) => other === name).length > 1;
+    return new Map(
+      identities.map((identity) => {
+        const name = names.get(identity) ?? identity;
+        if (!shared(name)) return [identity, name];
+        const local = tiles.some(
+          (tile) => tile.participant.identity === identity && tile.participant.local === true
+        );
+        const device = local
+          ? $i18n.t('call.thisDevice')
+          : (session.members.find((member) => member.identity === identity)?.device_id ?? identity);
+        return [identity, $i18n.t('call.nameOnDevice', { name, device })];
+      })
+    );
+  });
+
   let busy = $derived(session.lifecycle === 'joining' || session.lifecycle === 'connecting');
   let ready = $derived(session.mediaReady && session.lifecycle === 'active');
   let health = $derived(
@@ -91,8 +111,11 @@
   let failed = $derived(session.failure !== null);
   let alone = $derived(ready && tiles.length === 1 && tiles[0].participant.local === true);
 
-  let pinned = $state<string | null>(null);
-  let gridForced = $state(false);
+  let pinned = $state<string | null>(untrack(() => session.layout.pinned));
+  let gridForced = $state(untrack(() => session.layout.gridForced));
+  $effect(() => {
+    session.layout = { pinned, gridForced };
+  });
   let featured = $derived(pinned === null && gridForced ? [] : featuredTiles(tiles, pinned));
   let spotlight = $derived(featured.length > 0);
   let strip = $derived(spotlight ? tiles.filter((tile) => !featured.includes(tile)) : []);
@@ -420,7 +443,7 @@
     source={item.source}
     room={session.roomFor(item.participant.backendId)}
     localVideo={item.participant.local ? session.localVideo : undefined}
-    name={profile.name}
+    name={tileNames.get(item.participant.identity) ?? profile.name}
     userId={profile.userId}
     avatar={profile.avatar}
     featured={large}

@@ -21,7 +21,7 @@ import { createNativeTransport } from './native-transport';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
-import { cameraVisible, screenShareVisible } from './call-layout';
+import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
@@ -105,6 +105,7 @@ export class CallSession {
   encryptsMedia = $state(false);
   deafened = $state(false);
   connectedAt = $state<number | null>(null);
+  layout: CallPin = { pinned: null, gridForced: false };
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
 
@@ -203,6 +204,7 @@ export class CallSession {
 
     this.#lease = lease;
     this.#lastJoin = { roomId, media, serviceUrl };
+    this.layout = { pinned: null, gridForced: false };
     this.deviceError = null;
     const attempt = ++this.#attemptGeneration;
     const telemetry = new CallTelemetry({
