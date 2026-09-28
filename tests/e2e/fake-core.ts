@@ -464,6 +464,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         user_signing: identityConfirmed,
       },
       recovery_passphrase: false,
+      account_data_key: false,
     });
     const subscriptions = new Map<number, { roomId: string; page: number }>();
     const notificationKeywords: KeywordNotificationView[] = [];
@@ -1000,6 +1001,19 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         saveOnboarding();
         return { type: 'set_account_data' };
       },
+      sealed_account_data: (command) => ({
+        type: 'sealed_account_data',
+        document: {
+          content: accountData.get(command.event_type) ?? null,
+          state: 'plain',
+          can_seal: false,
+        },
+      }),
+      set_sealed_account_data: (command) => {
+        if (workerMode === 'onboarding') accountData.set(command.event_type, command.content);
+        saveOnboarding();
+        return { type: 'set_sealed_account_data' };
+      },
       event_source: (command) => ({
         type: 'event_source',
         source:
@@ -1157,6 +1171,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             backup_unlocked: true,
             signing_keys: { master: true, self_signing: true, user_signing: true },
             recovery_passphrase: false,
+            account_data_key: false,
           },
           backup_enabled: true,
           backup_uploaded: true,

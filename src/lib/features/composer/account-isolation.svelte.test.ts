@@ -46,10 +46,13 @@ test('a pending draft upload is not reused for the next account', async () => {
   const { draftsDocumentFor } = await import('#lib/settings/sync-documents.js');
   vi.useFakeTimers();
   const session = { account_id: 'a' };
-  const setAccountData = vi.fn(() => Promise.resolve());
+  const setSealedAccountData = vi.fn(() => Promise.resolve());
   const core = {
     session,
-    commands: { accountData: () => Promise.resolve(null), setAccountData },
+    commands: {
+      sealedAccountData: () => Promise.resolve({ content: null, state: 'plain', can_seal: true }),
+      setSealedAccountData,
+    },
     subscribeEvents: () => () => {},
   } as unknown as import('#lib/core/client.svelte.js').CoreClient;
   const sync = new AccountSync();
@@ -61,8 +64,8 @@ test('a pending draft upload is not reused for the next account', async () => {
   writeDraft(room, { ...draft, doc: { text: 'B only' } }, 'b');
   const stopB = sync.start(core, [draftsDocumentFor('b')]);
   await vi.advanceTimersByTimeAsync(10_000);
-  expect(setAccountData).toHaveBeenCalledTimes(1);
-  expect(setAccountData).toHaveBeenCalledWith('moe.sable.next.drafts', {
+  expect(setSealedAccountData).toHaveBeenCalledTimes(1);
+  expect(setSealedAccountData).toHaveBeenCalledWith('moe.sable.next.drafts', {
     v: 1,
     drafts: { [room]: { text: 'B only' } },
   });

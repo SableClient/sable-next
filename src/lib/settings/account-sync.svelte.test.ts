@@ -4,15 +4,33 @@ import type { CoreEvent } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-import { AccountSync, type SyncedDocument } from './account-sync.svelte';
+import { ACCOUNT_DATA_KEY_TYPE, AccountSync, type SyncedDocument } from './account-sync.svelte';
 
-function stubCore(remote: Record<string, unknown>) {
+type SealState = 'plain' | 'sealed' | 'locked';
+
+function stubCore(
+  remote: Record<string, unknown>,
+  sealing: { canSeal: boolean; states: Record<string, SealState> } = { canSeal: false, states: {} }
+) {
   const listeners: ((event: CoreEvent) => void)[] = [];
   const core = {
     commands: {
       accountData: vi.fn((eventType: string) => Promise.resolve(remote[eventType] ?? null)),
       setAccountData: vi.fn((eventType: string, content: unknown) => {
         remote[eventType] = content;
+        return Promise.resolve();
+      }),
+      sealedAccountData: vi.fn((eventType: string) => {
+        const state = sealing.states[eventType] ?? 'plain';
+        return Promise.resolve({
+          content: state === 'locked' ? null : (remote[eventType] ?? null),
+          state,
+          can_seal: sealing.canSeal,
+        });
+      }),
+      setSealedAccountData: vi.fn((eventType: string, content: unknown) => {
+        remote[eventType] = content;
+        sealing.states[eventType] = sealing.canSeal ? 'sealed' : 'plain';
         return Promise.resolve();
       }),
     },
@@ -194,5 +212,75 @@ describe('AccountSync', () => {
     themes[0].css = 'body { color: red }';
 
     expect(content).toEqual({ v: 1, themes: [{ id: 'one', css: 'body {}' }] });
+  });
+
+  describe('a sealed document', () => {
+    it('is neither adopted nor overwritten while this device lacks the key', async () => {
+      const local = { value: 'local' };
+      const document = stubDocument(local, { sealed: true });
+      const sealing = { canSeal: false, states: { [document.eventType]: 'locked' as SealState } };
+      const { core, commands, announce } = stubCore(
+        { [document.eventType]: { v: 1, value: 'remote' } },
+        sealing
+      );
+      const sync = new AccountSync();
+
+      sync.start(core, [document]);
+      await vi.runAllTimersAsync();
+      local.value = 'edited';
+      sync.push(document);
+      await vi.runAllTimersAsync();
+
+      expect(local.value).toBe('edited');
+      expect(commands.setSealedAccountData).not.toHaveBeenCalled();
+      expect(commands.sealedAccountData).toHaveBeenCalledTimes(1);
+
+      sealing.canSeal = true;
+      sealing.states[document.eventType] = 'sealed';
+      announce(ACCOUNT_DATA_KEY_TYPE);
+      await vi.runAllTimersAsync();
+
+      expect(local.value).toBe('remote');
+      expect(commands.setSealedAccountData).not.toHaveBeenCalled();
+    });
+
+    it('reseals a plaintext copy once the key is here, even when nothing changed', async () => {
+      const local = { value: 'same' };
+      const document = stubDocument(local, { sealed: true });
+      const sealing = { canSeal: true, states: {} as Record<string, SealState> };
+      const { core, commands } = stubCore(
+        { [document.eventType]: { v: 1, value: 'same' } },
+        sealing
+      );
+
+      new AccountSync().start(core, [document]);
+      await vi.runAllTimersAsync();
+
+      expect(commands.setSealedAccountData).toHaveBeenCalledTimes(1);
+      expect(sealing.states[document.eventType]).toBe('sealed');
+      expect(commands.setAccountData).not.toHaveBeenCalled();
+    });
+
+    it('does not reupload its own sealed echo', async () => {
+      const local = { value: 'local' };
+      const document = stubDocument(local, { sealed: true });
+      const sealing = { canSeal: true, states: { [document.eventType]: 'sealed' as SealState } };
+      const { core, commands, announce } = stubCore(
+        { [document.eventType]: { v: 1, value: 'local' } },
+        sealing
+      );
+      const sync = new AccountSync();
+
+      sync.start(core, [document]);
+      await vi.runAllTimersAsync();
+      local.value = 'edited';
+      sync.push(document);
+      await vi.runAllTimersAsync();
+      announce(document.eventType);
+      await vi.runAllTimersAsync();
+
+      expect(commands.setSealedAccountData).toHaveBeenCalledTimes(1);
+      expect(local.value).toBe('edited');
+    });
   });
 });

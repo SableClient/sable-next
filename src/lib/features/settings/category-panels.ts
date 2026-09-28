@@ -21,6 +21,7 @@ import PushGateway from '#lib/features/notifications/PushGateway.svelte';
 import PushersSettings from '#lib/features/notifications/PushersSettings.svelte';
 import SettingsFile from '#lib/features/settings/SettingsFile.svelte';
 import SettingsSyncStatus from '#lib/features/settings/SettingsSyncStatus.svelte';
+import SyncEncryption from '#lib/features/settings/SyncEncryption.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
@@ -60,6 +61,11 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
   personas: [{ component: PersonaSettings }],
   [SETTINGS_ACCOUNT_SECTION]: [
     { component: SettingsSyncStatus, section: 'sync', when: () => preferences.settingsSync },
+    {
+      component: SyncEncryption,
+      section: 'sync',
+      when: () => preferences.settingsSync && preferences.syncDrafts,
+    },
     { component: SettingsFile, section: 'sync' },
   ],
   developer: [

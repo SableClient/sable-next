@@ -59,6 +59,7 @@ import type {
   RoomTag,
   RoomVersionsView,
   ScheduledMessageView,
+  SealedAccountDataView,
   SearchFilter,
   SearchHitView,
   SearchMetricsView,
@@ -493,6 +494,22 @@ export function createCommands(transport: () => Transport) {
     async setAccountData(eventType: string, content: unknown): Promise<void> {
       await transport().send({
         type: 'set_account_data',
+        event_type: eventType,
+        content: $state.snapshot(content),
+      });
+    },
+
+    async sealedAccountData(eventType: string): Promise<SealedAccountDataView> {
+      const response = await transport().send({
+        type: 'sealed_account_data',
+        event_type: eventType,
+      });
+      return response.document;
+    },
+
+    async setSealedAccountData(eventType: string, content: unknown): Promise<void> {
+      await transport().send({
+        type: 'set_sealed_account_data',
         event_type: eventType,
         content: $state.snapshot(content),
       });

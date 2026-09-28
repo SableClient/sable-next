@@ -30,6 +30,7 @@ const safe: SignOutSafetyView = {
     backup_unlocked: true,
     signing_keys: { master: true, self_signing: true, user_signing: true },
     recovery_passphrase: false,
+    account_data_key: false,
   },
   backup_enabled: true,
   backup_uploaded: true,

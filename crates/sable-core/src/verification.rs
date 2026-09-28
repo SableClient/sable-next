@@ -152,12 +152,14 @@ impl Core {
         &self,
         client: &matrix_sdk::Client,
     ) -> Result<String, CommandErr> {
-        client
+        let recovery_key = client
             .encryption()
             .recovery()
             .enable()
             .await
-            .map_err(|error| self.failed("reset_identity: enable_recovery", error))
+            .map_err(|error| self.failed("reset_identity: enable_recovery", error))?;
+        self.adopt_account_data_key(client, &recovery_key).await;
+        Ok(recovery_key)
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
@@ -685,6 +687,9 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
         .unwrap_or_default();
     let backup_unlocked = encryption.backups().are_enabled().await;
     let recovery_passphrase = recovery_passphrase(client).await;
+    let account_data_key = crate::sealed_account_data::cached_key(client)
+        .await
+        .is_some();
 
     EncryptionStatusView {
         verification: match encryption.verification_state().get() {
@@ -702,6 +707,7 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
         signing_keys,
         backup_unlocked,
         recovery_passphrase,
+        account_data_key,
     }
 }
 

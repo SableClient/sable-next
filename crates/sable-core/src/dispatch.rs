@@ -1270,6 +1270,22 @@ impl Core {
                 Ok(CommandOk::SetAccountData)
             }
 
+            Command::SealedAccountData { event_type } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                Ok(CommandOk::SealedAccountData {
+                    document: self.sealed_account_data(&event_type).await?,
+                })
+            }
+
+            Command::SetSealedAccountData {
+                event_type,
+                content,
+            } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                self.set_sealed_account_data(&event_type, &content).await?;
+                Ok(CommandOk::SetSealedAccountData)
+            }
+
             Command::SetRoomAccountData {
                 room_id,
                 event_type,
@@ -1698,13 +1714,14 @@ impl Core {
             }
 
             Command::RecoverIdentity { recovery_key } => {
-                self.client()
-                    .await?
+                let client = self.client().await?;
+                client
                     .encryption()
                     .recovery()
                     .recover(&recovery_key)
                     .await
                     .map_err(|error| self.recovery_error(error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::RecoverIdentity)
             }
@@ -1719,6 +1736,7 @@ impl Core {
                     None => enable.await,
                 }
                 .map_err(|error| self.failed("enable_recovery", error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::EnableRecovery { recovery_key })
             }
@@ -1733,6 +1751,7 @@ impl Core {
                     None => reset.await,
                 }
                 .map_err(|error| self.failed("reset_recovery_key", error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::ResetRecoveryKey { recovery_key })
             }

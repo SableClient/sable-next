@@ -456,6 +456,14 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
     },
+    SealedAccountData {
+        event_type: String,
+    },
+    SetSealedAccountData {
+        event_type: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        content: serde_json::Value,
+    },
     SetRoomAccountData {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1424,6 +1432,10 @@ pub enum CommandOk {
         content: Option<serde_json::Value>,
     },
     SetAccountData,
+    SealedAccountData {
+        document: SealedAccountDataView,
+    },
+    SetSealedAccountData,
     ReportMessage,
     ReportRoom,
     ReportUser,
@@ -2290,6 +2302,7 @@ pub struct RoomSummary {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EncryptionStatusView {
     /// Whether *this* device is signed by our own identity.
     pub verification: VerificationStateView,
@@ -2301,6 +2314,25 @@ pub struct EncryptionStatusView {
     pub backup_unlocked: bool,
     /// The default secret storage key can also be unlocked with a passphrase.
     pub recovery_passphrase: bool,
+    pub account_data_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SealedAccountDataView {
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
+    pub content: Option<serde_json::Value>,
+    pub state: SealStateView,
+    pub can_seal: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SealStateView {
+    Plain,
+    Sealed,
+    Locked,
 }
 
 /// Which private cross-signing keys this device holds.

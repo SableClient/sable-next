@@ -113,6 +113,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
 export function draftsDocumentFor(accountId: string): SyncedDocument {
   return {
     eventType: DRAFTS_ACCOUNT_DATA_TYPE,
+    sealed: true,
     debounceMs: DRAFT_DEBOUNCE_MS,
     enabled: () => preferences.syncDrafts,
 

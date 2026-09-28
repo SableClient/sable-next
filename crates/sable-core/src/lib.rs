@@ -34,6 +34,7 @@ mod registration;
 mod room_keys;
 mod rooms;
 mod scheduled;
+mod sealed_account_data;
 pub mod search;
 pub mod session;
 pub mod spaces;

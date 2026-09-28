@@ -1412,3 +1412,106 @@ async fn account_data_types_include_what_the_server_lists_but_sync_never_deliver
             .any(|event_type| event_type == "org.example.legacy")
     );
 }
+
+#[allow(clippy::unwrap_used)]
+async fn last_put_body(server: &MatrixMockServer, event_type: &str) -> serde_json::Value {
+    let requests = server.server().received_requests().await.unwrap();
+    let request = requests
+        .iter()
+        .rev()
+        .find(|request| {
+            request.method.as_str() == "PUT" && request.url.path().ends_with(event_type)
+        })
+        .unwrap();
+    serde_json::from_slice(&request.body).unwrap()
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
+    use matrix_sdk_base::crypto::secret_storage::SecretStorageKey;
+
+    use crate::protocol::SealStateView;
+    use crate::sealed_account_data::{ADK_SECRET, cached_key, is_sealed};
+
+    const DRAFTS: &str = "moe.sable.next.drafts";
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let key = SecretStorageKey::new();
+    let user_id = client.user_id().unwrap().to_owned();
+    server
+        .mock_get_default_secret_storage_key()
+        .ok(&user_id, key.key_id())
+        .mount()
+        .await;
+    server
+        .mock_get_secret_storage_key()
+        .ok(&user_id, key.event_content())
+        .mount()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(format!(
+            r"/account_data/{}$",
+            regex_lite::escape(ADK_SECRET)
+        )))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "not found",
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/account_data/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client.clone()).await;
+
+    assert!(matches!(
+        core.dispatch(Command::SetSealedAccountData {
+            event_type: "m.push_rules".to_owned(),
+            content: json!({}),
+        })
+        .await,
+        Err(CommandErr::Unsupported)
+    ));
+
+    core.adopt_account_data_key(&client, &key.to_base58()).await;
+
+    assert!(cached_key(&client).await.is_some());
+    let stored = last_put_body(&server, ADK_SECRET).await;
+    assert!(stored["encrypted"][key.key_id()]["ciphertext"].is_string());
+
+    let draft = json!({ "v": 1, "drafts": { "!room:example.org": "unsent" } });
+    core.dispatch(Command::SetSealedAccountData {
+        event_type: DRAFTS.to_owned(),
+        content: draft.clone(),
+    })
+    .await
+    .unwrap();
+    let sealed = last_put_body(&server, DRAFTS).await;
+    assert!(is_sealed(&sealed));
+    assert!(!sealed.to_string().contains("unsent"));
+
+    Mock::given(method("GET"))
+        .and(path_regex(format!(
+            r"/account_data/{}$",
+            regex_lite::escape(DRAFTS)
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(sealed))
+        .mount(server.server())
+        .await;
+    let Ok(CommandOk::SealedAccountData { document }) = core
+        .dispatch(Command::SealedAccountData {
+            event_type: DRAFTS.to_owned(),
+        })
+        .await
+    else {
+        panic!("the sealed drafts could not be read");
+    };
+
+    assert_eq!(document.state, SealStateView::Sealed);
+    assert_eq!(document.content, Some(draft));
+    assert!(document.can_seal);
+}

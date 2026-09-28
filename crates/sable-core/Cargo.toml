@@ -48,6 +48,10 @@ time = "0.3"
 base64 = "0.23"
 sha2 = "0.11"
 getrandom = "0.4"
+aes = { version = "0.9.3", default-features = false }
+ctr = { version = "0.10.1", default-features = false }
+hkdf = "0.13"
+hmac = "0.13"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["socks"] }
@@ -80,6 +84,7 @@ matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/matrix-o
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
+bs58 = "0.5"
 
 [lints]
 workspace = true
