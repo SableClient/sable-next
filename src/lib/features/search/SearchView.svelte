@@ -327,6 +327,8 @@
     const parts: string[] = [];
     if (search.query !== '') parts.push(`q=${encodeURIComponent(search.query)}`);
     if (search.order !== 'rank') parts.push(`order=${search.order}`);
+    const space = page.url.searchParams.get('space');
+    if (space !== null) parts.push(`space=${encodeURIComponent(space)}`);
 
     const encoded = parts.join('&');
     void goto(encoded === '' ? page.url.pathname : `${page.url.pathname}?${encoded}`, {

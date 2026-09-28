@@ -214,7 +214,9 @@
   let searchHref = $derived(
     activeSpace === null
       ? resolve('/(app)/search')
-      : scopedSearchPath('space', activeSpace, activeSpace.room_id)
+      : `${scopedSearchPath('space', activeSpace, activeSpace.room_id)}&space=${encodeURIComponent(
+          activeSpace.room_id
+        )}`
   );
   const joinHref = `${resolve('explore')}#explore-join-by-address`;
   let createSpaceHref = $derived(

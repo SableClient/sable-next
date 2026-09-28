@@ -606,7 +606,7 @@ test('message search from a space is scoped to that space', async () => {
     .getAllByRole('link')
     .find((node) => node.getAttribute('href')?.startsWith('/search'));
   expect(search?.getAttribute('href')).toBe(
-    `/search?q=${encodeURIComponent('space:#design:example.org ')}`
+    `/search?q=${encodeURIComponent('space:#design:example.org ')}&space=!space%3Aexample.org`
   );
 });
 
