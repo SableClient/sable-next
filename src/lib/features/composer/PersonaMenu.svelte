@@ -104,7 +104,7 @@
         </button>
       </li>
     {/if}
-    {#each filteredPersonas as persona (persona.id)}
+    {#each filteredPersonas as persona, index (`${index}:${persona.id}`)}
       {@const light = persona.color_on_light ?? persona.color_on_dark}
       {@const dark = persona.color_on_dark ?? persona.color_on_light}
       <li>

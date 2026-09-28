@@ -38,3 +38,17 @@ test('a persona with a name colour is listed in that colour', () => {
   expect(tinted.style.getPropertyValue('--name-color-on-light')).not.toBe('');
   expect(screen.getByText('Plain')).not.toHaveClass('tinted');
 });
+
+test('lists personas with duplicate IDs without crashing', () => {
+  render(PersonaMenu, {
+    personas: [persona('duplicate', null), persona('duplicate', null)],
+    selected: null,
+    disabled: false,
+    scope: 'account',
+    onScope: vi.fn(),
+    onChoose: vi.fn(),
+    onDisable: vi.fn(),
+  });
+
+  expect(screen.getAllByText('duplicate')).toHaveLength(2);
+});
