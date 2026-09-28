@@ -1906,8 +1906,8 @@
 
   .call-participant-list li.speaking :global(.avatar-root) {
     box-shadow:
-      0 0 0 0.125rem var(--bg-container),
-      0 0 0 0.3125rem var(--success-main);
+      0 0 0 var(--border-width-300) var(--bg-container),
+      0 0 0 calc(var(--border-width-300) + var(--border-width-500)) var(--success-main);
   }
 
   .voice-badges {
