@@ -581,6 +581,34 @@ fn toggle_devtools(window: tauri::WebviewWindow<BrowserEngine>) {
     }
 }
 
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn hdr_monitors() -> Vec<sable_hdr::share::HdrMonitor> {
+    tauri::async_runtime::spawn_blocking(sable_hdr::share::list)
+        .await
+        .unwrap_or_default()
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn start_hdr_share(app: AppHandle<BrowserEngine>, index: usize) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || sable_hdr::share::start(app, index))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn hdr_frame_done(slot: usize) {
+    sable_hdr::share::release(slot);
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn stop_hdr_share() {
+    let _ = tauri::async_runtime::spawn_blocking(sable_hdr::share::stop).await;
+}
+
 #[cfg(target_os = "linux")]
 #[tauri::command]
 async fn start_screen_audio(selection: screen_audio::Selection) -> Result<String, String> {
@@ -780,6 +808,14 @@ pub fn run() {
             stop_screen_audio,
             #[cfg(target_os = "linux")]
             screen_audio_apps,
+            #[cfg(target_os = "windows")]
+            hdr_monitors,
+            #[cfg(target_os = "windows")]
+            start_hdr_share,
+            #[cfg(target_os = "windows")]
+            hdr_frame_done,
+            #[cfg(target_os = "windows")]
+            stop_hdr_share,
             #[cfg(desktop)]
             toggle_devtools,
             #[cfg(all(feature = "cef", target_os = "linux"))]

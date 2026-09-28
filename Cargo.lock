@@ -252,6 +252,7 @@ dependencies = [
  "percent-encoding",
  "pipewire",
  "sable-core",
+ "sable-hdr",
  "sentry",
  "serde",
  "serde_json",
@@ -7110,6 +7111,9 @@ version = "0.1.0"
 dependencies = [
  "half",
  "linear-srgb",
+ "log",
+ "serde",
+ "tauri",
  "webview2-com",
  "windows 0.62.2",
  "windows-capture",
