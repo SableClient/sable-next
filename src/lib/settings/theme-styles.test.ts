@@ -22,4 +22,16 @@ describe('applyCustomTweaks', () => {
     applyQuickCss('');
     expect(styleIds()).toEqual([]);
   });
+
+  it('keeps quick CSS after styles recreated later', () => {
+    applyQuickCss('.btn { color: blue; }');
+    applyCustomTweaks(['.sable-button { color: red; }']);
+    applyCustomTheme('/* @sable-theme */ :root { --primary-main: #fff; }');
+
+    expect(styleIds()).toEqual(['sable-custom-theme', 'sable-custom-tweaks', 'sable-quick-css']);
+
+    applyCustomTheme(undefined);
+    applyCustomTweaks([]);
+    applyQuickCss('');
+  });
 });

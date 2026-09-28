@@ -50,7 +50,12 @@ export function applyCustomTheme(css: string | undefined): void {
     return;
   }
 
-  const style = existing ?? createStyle(THEME_STYLE_ID, document.getElementById(TWEAK_STYLE_ID));
+  const style =
+    existing ??
+    createStyle(
+      THEME_STYLE_ID,
+      document.getElementById(TWEAK_STYLE_ID) ?? document.getElementById(QUICK_CSS_STYLE_ID)
+    );
   style.textContent = renameLegacyThemeIdentifiers(css);
 }
 
@@ -61,7 +66,8 @@ export function applyCustomTweaks(css: readonly string[]): void {
     return;
   }
 
-  const style = existing ?? createStyle(TWEAK_STYLE_ID, null);
+  const style =
+    existing ?? createStyle(TWEAK_STYLE_ID, document.getElementById(QUICK_CSS_STYLE_ID));
   style.textContent = css.map(renameLegacyThemeIdentifiers).join('\n');
 }
 
