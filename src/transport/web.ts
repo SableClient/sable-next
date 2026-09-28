@@ -26,7 +26,14 @@ const QUIET_COMMAND_FAILURES = new Set([
 const MAX_REPORTED_CORE_ERRORS = 20;
 const reportedCoreErrors = new Set<string>();
 
-function reportCoreError(line: string): void {
+function isStorageFailure(line: string): boolean {
+  return /database without an in-progress transaction|connection to indexed database server lost/i.test(
+    line
+  );
+}
+
+function reportCoreError(line: string, onStorageFailure: () => void): void {
+  if (isStorageFailure(line)) onStorageFailure();
   if (reportedCoreErrors.size >= MAX_REPORTED_CORE_ERRORS) return;
   const fingerprint = wasmErrorFingerprint(line);
   if (fingerprint === '' || reportedCoreErrors.has(fingerprint)) return;
@@ -56,6 +63,7 @@ export function createWebTransport(): Transport {
   >();
   const pendingCommands = new Map<number, RequestLabel>();
   const crashListeners = new Set<(message: string) => void>();
+  const storageFailureListeners = new Set<() => void>();
   const stallListeners = new Set<(stalled: boolean) => void>();
   const overdue = new Set<number>();
   let healthProbeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -152,6 +160,11 @@ export function createWebTransport(): Transport {
     // Shared workers outlive tabs, so changing their URL prevents an old glue
     // module from being paired with a freshly generated WASM binary.
     workerUrl.searchParams.set('wasm', wasmVersion);
+    const iosPwa =
+      /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+      (matchMedia('(display-mode: standalone)').matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone);
+    if (iosPwa) workerUrl.searchParams.set('event-cache', 'memory');
     const logFilter = new URLSearchParams(self.location.search).get('log');
     if (logFilter) workerUrl.searchParams.set('log', logFilter);
 
@@ -187,7 +200,11 @@ export function createWebTransport(): Transport {
         for (const line of data.logs) {
           const level = wasmLogLevel(line);
           recordDebugLog(level, level === 'error' ? 'error' : 'general', 'wasm', line.trim());
-          if (level === 'error') reportCoreError(line);
+          if (level === 'error') {
+            reportCoreError(line, () => {
+              for (const listener of storageFailureListeners) listener();
+            });
+          }
         }
         return;
       }
@@ -412,6 +429,11 @@ export function createWebTransport(): Transport {
     subscribeCrash(onCrash) {
       crashListeners.add(onCrash);
       return () => crashListeners.delete(onCrash);
+    },
+
+    subscribeStorageFailure(onStorageFailure) {
+      storageFailureListeners.add(onStorageFailure);
+      return () => storageFailureListeners.delete(onStorageFailure);
     },
 
     subscribeStall(onStall) {

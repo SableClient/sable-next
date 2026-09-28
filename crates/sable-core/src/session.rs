@@ -230,8 +230,15 @@ impl Credentials {
 pub async fn build_client(
     store_id: &str,
     homeserver: &str,
+    persistent_event_cache: bool,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
-    build_account_client(apply_server(Client::builder(), homeserver), store_id, true).await
+    build_account_client(
+        apply_server(Client::builder(), homeserver),
+        store_id,
+        true,
+        persistent_event_cache,
+    )
+    .await
 }
 
 /// # Errors
@@ -240,10 +247,11 @@ pub async fn build_client(
 pub async fn build_client_at(
     store_id: &str,
     homeserver_url: &Url,
+    persistent_event_cache: bool,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
     let builder = crate::tls::apply_sdk(Client::builder()).homeserver_url(homeserver_url.as_str());
 
-    build_account_client(builder, store_id, true).await
+    build_account_client(builder, store_id, true, persistent_event_cache).await
 }
 
 /// # Errors
@@ -252,10 +260,11 @@ pub async fn build_client_at(
 pub async fn restore_client(
     store_id: &str,
     persisted: &PersistedSession,
+    persistent_event_cache: bool,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
     match &persisted.resolved_homeserver {
-        Some(url) => build_client_at(store_id, url).await,
-        None => build_client(store_id, &persisted.homeserver).await,
+        Some(url) => build_client_at(store_id, url, persistent_event_cache).await,
+        None => build_client(store_id, &persisted.homeserver, persistent_event_cache).await,
     }
 }
 
@@ -268,7 +277,7 @@ pub async fn restore_authenticated_client(
     store_id: &str,
     persisted: &PersistedSession,
 ) -> Result<Client, String> {
-    let client = restore_client(store_id, persisted)
+    let client = restore_client(store_id, persisted, true)
         .await
         .map_err(|error| error.to_string())?;
 
@@ -285,7 +294,7 @@ pub(crate) async fn restore_notification_client(
         || apply_server(Client::builder(), &persisted.homeserver),
         |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
     );
-    let client = build_account_client(builder, store_id, false)
+    let client = build_account_client(builder, store_id, false, true)
         .await
         .map_err(|error| error.to_string())?;
     restore_credentials(&client, persisted).await?;
@@ -315,6 +324,7 @@ async fn build_account_client(
     builder: ClientBuilder,
     store_id: &str,
     refresh_tokens: bool,
+    persistent_event_cache: bool,
 ) -> Result<Client, matrix_sdk::ClientBuildError> {
     let builder = if refresh_tokens {
         builder.handle_refresh_tokens()
@@ -338,6 +348,7 @@ async fn build_account_client(
 
     #[cfg(not(target_family = "wasm"))]
     let builder = {
+        let _ = persistent_event_cache;
         static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let holder = format!(
             "sable-{}-{}-{}",
@@ -367,9 +378,13 @@ async fn build_account_client(
         let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)
-            .event_cache_store(stores.event_cache)
             .media_store(stores.media)
             .crypto_store(stores.crypto);
+        let config = if persistent_event_cache {
+            config.event_cache_store(stores.event_cache)
+        } else {
+            config
+        };
         let base = std::rc::Rc::new(matrix_sdk_base::BaseClient::new(
             config,
             THREADING_SUPPORT,
@@ -628,7 +643,7 @@ mod tests {
             "sable-offline-{}",
             matrix_sdk::ruma::TransactionId::new()
         ));
-        let client = super::restore_client(directory.to_str().unwrap(), persisted)
+        let client = super::restore_client(directory.to_str().unwrap(), persisted, true)
             .await
             .unwrap();
         assert_eq!(

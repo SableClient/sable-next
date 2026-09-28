@@ -127,6 +127,7 @@ export class CoreClient {
   accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
+  storageInterrupted = $state(false);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -840,6 +841,9 @@ export class CoreClient {
       this.cleanupTransport();
       this.status = 'error';
     });
+    const unsubscribeStorageFailure = transport.subscribeStorageFailure?.(() => {
+      this.storageInterrupted = true;
+    });
     const unsubscribeStall = transport.subscribeStall((stalled) => {
       this.unresponsive = stalled;
     });
@@ -849,6 +853,7 @@ export class CoreClient {
     this.unsubscribeTransport = () => {
       unsubscribeEvents();
       unsubscribeCrash();
+      unsubscribeStorageFailure?.();
       unsubscribeStall();
       stopLogCapture();
     };

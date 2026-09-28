@@ -40,7 +40,10 @@ impl Core {
         account: Option<&session::PersistedAccount>,
     ) -> Result<matrix_sdk::Client, matrix_sdk::ClientBuildError> {
         match account {
-            Some(account) => session::restore_client(store_id, &account.session).await,
+            Some(account) => {
+                session::restore_client(store_id, &account.session, self.persistent_event_cache)
+                    .await
+            }
             None => self.build_account_client(store_id, homeserver).await,
         }
     }
@@ -787,7 +790,9 @@ mod tests {
         assert_eq!(live.homeserver().host_str(), Some("advertised.invalid"));
         let persisted = core.accounts().await.unwrap().accounts.remove(0).session;
         assert_eq!(persisted.resolved_homeserver, Some(entered.clone()));
-        let restored = session::restore_client(store_id, &persisted).await.unwrap();
+        let restored = session::restore_client(store_id, &persisted, true)
+            .await
+            .unwrap();
         assert_eq!(restored.homeserver(), entered);
         if let Some(session) = core.take_session().await {
             session.sync_service.stop().await;

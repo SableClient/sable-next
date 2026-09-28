@@ -369,9 +369,13 @@ impl Core {
         if let Some(client) = cached {
             return Ok(client);
         }
-        let client = session::restore_client(&account.store_id, &account.session)
-            .await
-            .map_err(|error| self.failed("restore: build_client", error))?;
+        let client = session::restore_client(
+            &account.store_id,
+            &account.session,
+            self.persistent_event_cache,
+        )
+        .await
+        .map_err(|error| self.failed("restore: build_client", error))?;
         match account.session.credentials.clone() {
             Credentials::Password(matrix) => client
                 .restore_session(matrix)

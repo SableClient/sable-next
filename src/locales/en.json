@@ -2401,6 +2401,7 @@
     "resetPasswordFailed": "Unable to reset your password. Try again.",
     "coreError": "Sign-in could not be completed. Try again, or report the problem if it keeps happening.",
     "coreCrashed": "Sable hit an internal error and stopped syncing.",
+    "storageInterrupted": "Sable's local storage was interrupted. Reload to reconnect.",
     "coreUnresponsive": "Sable is not responding.",
     "syncFailed": "Sync failed: {{message}}",
     "localNetworkBlocked": "Your browser is blocking Sable from reaching {{host}} on your local network. Allow local network access for this site in the browser's site settings. In Firefox, add {{host}} to network.lna.skip-domains in about:config.",

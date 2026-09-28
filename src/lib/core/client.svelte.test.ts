@@ -32,6 +32,7 @@ const otherSession: SessionInfo = {
 
 function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
+  const storageFailureListeners = new Set<() => void>();
   const sent: { type: string }[] = [];
   const close = vi.fn();
   const resetCaches = vi.fn().mockResolvedValue(undefined);
@@ -49,6 +50,10 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
       return () => listeners.delete(listener);
     },
     subscribeCrash: () => () => {},
+    subscribeStorageFailure: (listener: () => void) => {
+      storageFailureListeners.add(listener);
+      return () => storageFailureListeners.delete(listener);
+    },
     subscribeStall: () => () => {},
     setDebugLogs: vi.fn(),
     close,
@@ -66,6 +71,9 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
+    emitStorageFailure: () => {
+      for (const listener of storageFailureListeners) listener();
+    },
   };
 }
 
@@ -78,6 +86,16 @@ test('a restore that returns a session leaves the client ready', async () => {
   expect(core.status).toBe('ready');
   expect(core.session?.user_id).toBe('@erwan:example.org');
   expect(core.accounts).toHaveLength(1);
+});
+
+test('an interrupted storage connection requires an explicit reload', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  fake.emitStorageFailure();
+
+  expect(core.storageInterrupted).toBe(true);
 });
 
 test('resetting caches also drops the persisted room list snapshot', async () => {
