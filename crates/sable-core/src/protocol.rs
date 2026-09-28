@@ -2162,6 +2162,8 @@ pub struct CallMemberView {
     pub device_id: String,
     pub identity: String,
     pub backend_id: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub joined_ts: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -87,6 +87,7 @@ export type CallMemberView = {
 	device_id: string,
 	identity: string,
 	backend_id: string | null,
+	joined_ts: number,
 };
 
 export type CallMode = "legacy" | "compatibility" | "matrix_2";

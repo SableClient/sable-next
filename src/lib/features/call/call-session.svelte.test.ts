@@ -328,11 +328,36 @@ test('a key for another session is ignored', async () => {
         device_id: 'X',
         identity: '@bob:example.org:X',
         backend_id: null,
+        joined_ts: 0,
       },
     ],
   });
 
   expect(session.members).toEqual([]);
+});
+
+test('the call is timed from the earliest member still in it', async () => {
+  const { client, transport, emit } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  const connectedAt = session.connectedAt ?? 0;
+  const member = (device: string, joined: number) => ({
+    user_id: '@bob:example.org',
+    device_id: device,
+    identity: `@bob:example.org:${device}`,
+    backend_id: null,
+    joined_ts: joined,
+  });
+
+  emit({
+    type: 'call_members',
+    session: 7,
+    members: [member('X', connectedAt - 7_200_000), member('Y', connectedAt - 60_000)],
+  });
+  expect(session.startedAt).toBe(connectedAt - 7_200_000);
+
+  emit({ type: 'call_members', session: 7, members: [member('Y', connectedAt + 5_000)] });
+  expect(session.startedAt).toBe(connectedAt);
 });
 
 test('leaving releases the lease and tells the core', async () => {
@@ -770,6 +795,7 @@ test('two devices of one account keep their own voice state', () => {
     device_id: device,
     identity: `@me:x:${device}`,
     backend_id: null,
+    joined_ts: 0,
   });
   const states = voiceStates(
     [member('BBBB'), member('AAAA')],

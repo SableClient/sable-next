@@ -108,6 +108,15 @@ export class CallSession {
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
 
+  get startedAt(): number | null {
+    if (this.connectedAt === null) return null;
+    return this.members.reduce(
+      (earliest, member) =>
+        member.joined_ts > 0 ? Math.min(earliest, member.joined_ts) : earliest,
+      this.connectedAt
+    );
+  }
+
   readonly #client: CoreClient;
   readonly #deps: CallSessionDeps;
   #media = $state.raw<CallTransport | undefined>(undefined);

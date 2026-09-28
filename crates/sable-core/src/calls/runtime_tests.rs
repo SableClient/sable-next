@@ -22,6 +22,7 @@ fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -> CallMember {
         identity: "@user:example.org:DEVICE".to_owned(),
         mode,
         created_ts,
+        joined_ts: created_ts,
         expires_at_ms: None,
         foci: foci.iter().map(ToString::to_string).collect(),
     }

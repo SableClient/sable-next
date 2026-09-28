@@ -288,6 +288,7 @@ async fn discover(
     } else {
         sfu::livekit_identity(&user, &device)
     };
+    let now = keys::now_ms();
     let own = CallMember {
         user_id: user,
         device_id: device,
@@ -298,7 +299,8 @@ async fn discover(
         },
         identity,
         mode,
-        created_ts: keys::now_ms(),
+        created_ts: now,
+        joined_ts: now,
         expires_at_ms: None,
         foci: vec![service],
     };

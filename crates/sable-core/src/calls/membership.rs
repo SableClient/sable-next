@@ -38,6 +38,7 @@ struct StickyEntry {
     event_id: String,
     order_expires_at_ms: u64,
     created_ts: u64,
+    joined_ts: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -127,6 +128,7 @@ pub(crate) struct CallMember {
     pub(crate) identity: String,
     pub(crate) mode: CallMode,
     pub(crate) created_ts: u64,
+    pub(crate) joined_ts: u64,
     pub(crate) expires_at_ms: Option<u64>,
     pub(crate) foci: Vec<String>,
 }
@@ -204,6 +206,11 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
                 "multi_sfu" => CallMode::Compatibility,
                 _ => continue,
             };
+            let created_ts = membership
+                .created_ts()
+                .unwrap_or(origin_server_ts)
+                .get()
+                .into();
             members.push(CallMember {
                 user_id: event.state_key.user_id().to_owned(),
                 device_id: membership.device_id().to_owned(),
@@ -216,11 +223,8 @@ pub(crate) async fn active_members(room: &Room) -> Vec<CallMember> {
                 }),
                 identity: format!("{}:{}", event.state_key.user_id(), membership.device_id()),
                 mode,
-                created_ts: membership
-                    .created_ts()
-                    .unwrap_or(origin_server_ts)
-                    .get()
-                    .into(),
+                created_ts,
+                joined_ts: created_ts,
                 expires_at_ms: membership
                     .expires_ts(Some(origin_server_ts))
                     .map(|expires| expires.get().into()),
@@ -314,6 +318,7 @@ impl StickyMemberships {
             }
             Some(member)
         };
+        let joined_ts = self.joined_ts(&entry_key, member.as_ref(), now_ms, created_ts);
         self.entries.insert(
             entry_key,
             StickyEntry {
@@ -322,9 +327,31 @@ impl StickyMemberships {
                 event_id: event_id.to_owned(),
                 order_expires_at_ms,
                 created_ts,
+                joined_ts,
             },
         );
         true
+    }
+
+    fn joined_ts(
+        &self,
+        key: &(OwnedUserId, String),
+        member: Option<&StickyMember>,
+        now_ms: u64,
+        created_ts: u64,
+    ) -> u64 {
+        let Some(member) = member else {
+            return created_ts;
+        };
+        self.entries
+            .get(key)
+            .filter(|old| old.expires_at_ms > now_ms)
+            .filter(|old| {
+                old.member
+                    .as_ref()
+                    .is_some_and(|previous| previous.member_id == member.member_id)
+            })
+            .map_or(created_ts, |old| old.joined_ts)
     }
 
     pub(crate) fn members(&self, now_ms: u64) -> Vec<CallMember> {
@@ -339,6 +366,7 @@ impl StickyMemberships {
                     identity: member.identity.clone(),
                     mode: CallMode::Matrix2,
                     created_ts: entry.created_ts,
+                    joined_ts: entry.joined_ts,
                     expires_at_ms: Some(entry.expires_at_ms),
                     foci: member.foci.clone(),
                 })
@@ -399,6 +427,7 @@ mod tests {
             identity: format!("@erwan:localhost:{device}"),
             mode: CallMode::Legacy,
             created_ts,
+            joined_ts: created_ts,
             expires_at_ms: None,
             foci: foci.iter().map(|url| (*url).to_owned()).collect(),
         }
@@ -522,6 +551,26 @@ mod tests {
         assert!(store.members(200).is_empty());
         assert!(!store.apply(&event, 300));
         assert!(store.members(300).is_empty());
+    }
+
+    #[test]
+    fn a_sticky_renewal_keeps_the_time_the_member_joined() {
+        let mut store = super::StickyMemberships::default();
+        assert!(store.apply(&sticky_event("$a", 100), 100));
+        assert!(store.apply(&sticky_event("$b", 600_000), 600_000));
+        let member = &store.members(600_000)[0];
+        assert_eq!(member.created_ts, 600_000);
+        assert_eq!(member.joined_ts, 100);
+
+        let mut rejoin = sticky_event("$c", 700_000);
+        rejoin["content"]["member"]["id"] = serde_json::json!("fresh");
+        rejoin["content"]["msc4354_sticky_key"] = serde_json::json!("fresh");
+        assert!(store.apply(&rejoin, 700_000));
+        let fresh = store
+            .members(700_000)
+            .into_iter()
+            .find(|member| member.member_id.as_deref() == Some("fresh"));
+        assert_eq!(fresh.map(|member| member.joined_ts), Some(700_000));
     }
 
     #[test]

@@ -118,7 +118,7 @@
 
   let now = $state(Date.now());
   $effect(() => {
-    if (session.connectedAt === null) return;
+    if (session.startedAt === null) return;
     const timer = setInterval(() => (now = Date.now()), 1000);
     return () => clearInterval(timer);
   });
@@ -208,11 +208,11 @@
         <span class="live-dot {health}"></span>
       {/if}
       <span>{statusLabel}</span>
-      {#if session.connectedAt !== null && !failed}
+      {#if session.startedAt !== null && !failed}
         <span class="meta" title={$i18n.t('call.duration')}>
           <TimerIcon aria-hidden="true" weight="bold" />
           <span class="screen-reader-only">{$i18n.t('call.duration')}</span>
-          {formatClockDuration(Math.max(0, Math.floor((now - session.connectedAt) / 1000)))}
+          {formatClockDuration(Math.max(0, Math.floor((now - session.startedAt) / 1000)))}
         </span>
       {/if}
       {#if ready && others > 0}

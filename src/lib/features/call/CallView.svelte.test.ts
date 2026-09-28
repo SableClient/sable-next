@@ -20,6 +20,7 @@ function mountBothSharing() {
     failure: null,
     deviceError: null,
     connectedAt: null,
+    startedAt: null,
     deafened: false,
     encryptsMedia: false,
     canScreenShare: true,
@@ -27,8 +28,20 @@ function mountBothSharing() {
     localVideo: undefined,
     rooms: [],
     members: [
-      { user_id: '@here:x', device_id: 'AAAA', identity: 'me:AAAA', backend_id: null },
-      { user_id: '@there:x', device_id: 'BBBB', identity: 'me:BBBB', backend_id: null },
+      {
+        user_id: '@here:x',
+        device_id: 'AAAA',
+        identity: 'me:AAAA',
+        backend_id: null,
+        joined_ts: 0,
+      },
+      {
+        user_id: '@there:x',
+        device_id: 'BBBB',
+        identity: 'me:BBBB',
+        backend_id: null,
+        joined_ts: 0,
+      },
     ],
     transport: {
       ...idleTransportState(),
