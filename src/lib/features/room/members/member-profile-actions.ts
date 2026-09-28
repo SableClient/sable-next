@@ -1,4 +1,12 @@
+import { t } from '#lib/i18n.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { CoreError } from '#src/transport';
+
+export function moderationErrorMessage(cause: unknown): string {
+  return cause instanceof CoreError && cause.detail.code === 'denied'
+    ? t('timeline.profileModerationDenied')
+    : t('timeline.profileModerationFailed');
+}
 
 export class MemberProfileActions {
   constructor(private readonly core: CoreClient) {}

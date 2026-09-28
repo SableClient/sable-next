@@ -1256,7 +1256,7 @@
     userId={memberProfile.userId}
     anchor={memberProfile.anchor}
     member={memberLoader.members.find((member) => member.user_id === memberProfile.userId) ?? null}
-    {roomId}
+    roomId={resolvedRoomId}
     ownPowerLevel={memberLoader.members.find((member) => member.user_id === core.session?.user_id)
       ?.power_level ?? 0}
     permissions={roomSession.permissions}

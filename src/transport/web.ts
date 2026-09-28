@@ -212,7 +212,7 @@ export function createWebTransport(): Transport {
       else if ('uri' in data) waiting.resolve(data.uri);
       else {
         if (!QUIET_COMMAND_FAILURES.has(`${String(command)}:${data.err.code}`)) {
-          console.warn('[sable transport] command failed', { command, code: data.err.code });
+          console.warn('[sable transport] command failed', { command, ...data.err });
         }
         waiting.reject(new CoreError(data.err));
       }

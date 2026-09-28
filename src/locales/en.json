@@ -1118,6 +1118,7 @@
     "profileKickConfirm": "Remove {{name}} from the room?",
     "profileBanConfirm": "Ban {{name}} from the room?",
     "profileModerationFailed": "That action could not be completed.",
+    "profileModerationDenied": "You don't have permission to do that in this room.",
     "redactedWithReason": "Message deleted: {{reason}}",
     "locationShowMap": "Show map",
     "locationMapLoading": "Loading map…",

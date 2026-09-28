@@ -10,6 +10,7 @@ import type { MutualRoomView, ProfileView } from '#src/generated/protocol';
 vi.mock('#lib/core/context.js');
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
+import { CoreError } from '#src/transport';
 
 const core = Object.assign(baseCore, {
   session: { user_id: '@me:example.org' },
@@ -489,6 +490,130 @@ test('sends no reason when the moderation reason is left blank', async () => {
   await vi.waitFor(() => {
     expect(core.banUser).toHaveBeenCalledWith('!room:example.org', '@alice:example.org', null);
   });
+});
+
+test('hides the kick action while the target membership is unknown', async () => {
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_react: true,
+        can_redact_own: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: true,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+  expect(screen.queryByRole('menuitem', { name: /Remove from room/ })).toBeNull();
+});
+
+test('shows a permission message when the kick is refused', async () => {
+  core.kickUser.mockRejectedValue(new CoreError({ code: 'denied' }));
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_react: true,
+        can_redact_own: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: true,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await chooseAction('Remove from room');
+
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('button', { name: 'Remove from room' }));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    "You don't have permission to do that in this room."
+  );
+});
+
+test('shows a generic message when the kick fails for another reason', async () => {
+  core.kickUser.mockRejectedValue(new CoreError({ code: 'failed', log_id: 'e1' }));
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_react: true,
+        can_redact_own: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: true,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: {
+        user_id: '@alice:example.org',
+        display_name: 'Alice',
+        avatar_url: null,
+        power_level: 0,
+        membership: 'join',
+        member_ts: null,
+        kicked: false,
+        service: false,
+      },
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  await chooseAction('Remove from room');
+
+  const dialog = await screen.findByRole('dialog');
+  await user.click(within(dialog).getByRole('button', { name: 'Remove from room' }));
+  expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+    'That action could not be completed.'
+  );
 });
 
 async function changeRoleToModerator(onPowerLevelChange: () => void): Promise<void> {
