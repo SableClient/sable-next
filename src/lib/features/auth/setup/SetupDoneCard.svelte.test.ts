@@ -27,6 +27,7 @@ function setEncryption(verification: string, recovery: string) {
       recovery,
       cross_signing_ready: true,
       backup_unlocked: true,
+      signing_keys: { master: true, self_signing: true, user_signing: true },
       recovery_passphrase: false,
     },
   });

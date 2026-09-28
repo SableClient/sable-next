@@ -25,7 +25,8 @@ use qrcode::{Color, EcLevel, QrCode, Version};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
-    QrCodeView, RecoveryStateView, SignOutSafetyView, VerificationStateView, VerificationView,
+    QrCodeView, RecoveryStateView, SignOutSafetyView, SigningKeysView, VerificationStateView,
+    VerificationView,
 };
 
 use crate::Core;
@@ -576,10 +577,17 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {
     let encryption = client.encryption();
-    let cross_signing_ready = encryption
-        .cross_signing_status()
-        .await
-        .is_some_and(|status| status.is_complete());
+    let cross_signing = encryption.cross_signing_status().await;
+    let cross_signing_ready = cross_signing
+        .as_ref()
+        .is_some_and(matrix_sdk::encryption::CrossSigningStatus::is_complete);
+    let signing_keys = cross_signing
+        .map(|status| SigningKeysView {
+            master: status.has_master,
+            self_signing: status.has_self_signing,
+            user_signing: status.has_user_signing,
+        })
+        .unwrap_or_default();
     let backup_unlocked = encryption.backups().are_enabled().await;
     let recovery_passphrase = recovery_passphrase(client).await;
 
@@ -596,6 +604,7 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             RecoveryState::Unknown => RecoveryStateView::Unknown,
         },
         cross_signing_ready,
+        signing_keys,
         backup_unlocked,
         recovery_passphrase,
     }

@@ -648,6 +648,7 @@ test('a status reported while the first read is in flight is not overwritten by 
     recovery: 'unknown',
     cross_signing_ready: false,
     backup_unlocked: false,
+    signing_keys: { master: false, self_signing: false, user_signing: false },
     recovery_passphrase: false,
   } as const;
   const known = { ...unknown, verification: 'verified', recovery: 'enabled' } as const;

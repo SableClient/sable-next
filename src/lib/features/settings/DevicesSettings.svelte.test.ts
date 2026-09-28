@@ -27,6 +27,7 @@ const status: EncryptionStatusView = {
   recovery: 'enabled',
   cross_signing_ready: true,
   backup_unlocked: true,
+  signing_keys: { master: true, self_signing: true, user_signing: true },
   recovery_passphrase: false,
 };
 
@@ -176,4 +177,35 @@ test('removing one device shows it is in progress until the list no longer has i
   await vi.waitFor(() => {
     expect(screen.queryByRole('button', { name: 'Remove device' })).not.toBeInTheDocument();
   });
+});
+
+test('a verified session missing its master key explains it instead of asking to unlock', async () => {
+  core.encryptionStatus.mockResolvedValue({
+    ...status,
+    recovery: 'incomplete',
+    backup_unlocked: true,
+    signing_keys: { master: false, self_signing: true, user_signing: true },
+  });
+  core.devices.mockResolvedValue({ devices: [own], accountManagement: false });
+  render(DevicesSettings);
+
+  expect(await screen.findByText('Some signing keys are not on this device')).toBeInTheDocument();
+  expect(screen.getByText(/It is missing your master key,/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Fetch missing keys' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Unlock' })).not.toBeInTheDocument();
+  expect(screen.getAllByText('Verified').length).toBeGreaterThan(0);
+});
+
+test('a verified session whose key backup is still locked keeps the unlock action', async () => {
+  core.encryptionStatus.mockResolvedValue({
+    ...status,
+    recovery: 'incomplete',
+    backup_unlocked: false,
+    signing_keys: { master: false, self_signing: true, user_signing: true },
+  });
+  core.devices.mockResolvedValue({ devices: [own], accountManagement: false });
+  render(DevicesSettings);
+
+  expect(await screen.findByRole('button', { name: 'Unlock' })).toBeInTheDocument();
+  expect(screen.queryByText('Some signing keys are not on this device')).not.toBeInTheDocument();
 });

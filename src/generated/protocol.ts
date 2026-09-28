@@ -401,6 +401,7 @@ export type EncryptionStatusView = {
 	 *  verification must come from another session.
 	 */
 	cross_signing_ready: boolean,
+	signing_keys: SigningKeysView,
 	backup_unlocked: boolean,
 	/**  The default secret storage key can also be unlocked with a passphrase. */
 	recovery_passphrase: boolean,
@@ -1103,6 +1104,13 @@ export type SignOutSafetyView = {
 	backup_enabled: boolean,
 	backup_uploaded: boolean,
 	has_encrypted_rooms: boolean,
+};
+
+/**  Which private cross-signing keys this device holds. */
+export type SigningKeysView = {
+	master: boolean,
+	self_signing: boolean,
+	user_signing: boolean,
 };
 
 export type SpaceChildEdge = {

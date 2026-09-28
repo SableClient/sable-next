@@ -2292,9 +2292,19 @@ pub struct EncryptionStatusView {
     /// All three keys held locally, so this device can sign others. False means
     /// verification must come from another session.
     pub cross_signing_ready: bool,
+    pub signing_keys: SigningKeysView,
     pub backup_unlocked: bool,
     /// The default secret storage key can also be unlocked with a passphrase.
     pub recovery_passphrase: bool,
+}
+
+/// Which private cross-signing keys this device holds.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SigningKeysView {
+    pub master: bool,
+    pub self_signing: bool,
+    pub user_signing: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

@@ -45,6 +45,7 @@ const status = (
   recovery,
   cross_signing_ready: false,
   backup_unlocked: false,
+  signing_keys: { master: false, self_signing: false, user_signing: false },
   recovery_passphrase: false,
 });
 

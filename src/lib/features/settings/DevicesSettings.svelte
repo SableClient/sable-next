@@ -75,6 +75,14 @@
     return device?.display_name?.trim() || t('settings.unnamedDevice');
   }
 
+  function missingSigningKeys(keys: EncryptionStatusView['signing_keys']): string[] {
+    return [
+      keys.master ? null : t('settings.signingKeyMaster'),
+      keys.self_signing ? null : t('settings.signingKeySelf'),
+      keys.user_signing ? null : t('settings.signingKeyUser'),
+    ].filter((name): name is string => name !== null);
+  }
+
   const verificationLabel = (value: EncryptionStatusView['verification']) =>
     value === 'verified'
       ? t('settings.verified')
@@ -329,7 +337,7 @@
                 />
               </dd>
             </div>
-            {#if status.verification !== 'verified' || status.recovery === 'incomplete'}
+            {#if status.verification !== 'verified' || (status.recovery === 'incomplete' && !status.backup_unlocked)}
               <Button variant="primary" onclick={() => (verificationOpen = true)}>
                 {$i18n.t(
                   status.verification === 'verified'
@@ -340,6 +348,23 @@
             {/if}
           </div>
         </dl>
+
+        {#if status.verification === 'verified' && status.recovery === 'incomplete' && status.backup_unlocked}
+          <div class="setting-row">
+            <span class="row-icon" aria-hidden="true"><KeyIcon /></span>
+            <div class="row-copy">
+              <strong>{$i18n.t('settings.signingKeysMissingTitle')}</strong>
+              <p>
+                {$i18n.t('settings.signingKeysMissingBody', {
+                  keys: missingSigningKeys(status.signing_keys).join(', '),
+                })}
+              </p>
+            </div>
+            <Button variant="secondary" onclick={() => (verificationOpen = true)}>
+              {$i18n.t('settings.signingKeysFetch')}
+            </Button>
+          </div>
+        {/if}
 
         {#if status.verification === 'verified' && status.recovery !== 'incomplete'}
           <div class="setting-row">
