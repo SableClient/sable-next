@@ -8,6 +8,8 @@ import android.provider.OpenableColumns
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
@@ -115,6 +117,8 @@ class MainActivity : TauriActivity() {
 
   companion object {
     private var instance: MainActivity? = null
+    private var hiddenBarsDepth = 0
+    private var shownBarsBehavior: Int? = null
 
     @JvmStatic
     fun hapticFeedbackNative(strong: Boolean) {
@@ -157,6 +161,29 @@ class MainActivity : TauriActivity() {
         val window = activity.window
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.isAppearanceLightNavigationBars = light
+      }
+    }
+
+    @JvmStatic
+    fun setSystemBarsHiddenNative(hidden: Boolean) {
+      val activity = instance ?: return
+      activity.runOnUiThread {
+        val window = activity.window
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (hidden) {
+          hiddenBarsDepth += 1
+          if (hiddenBarsDepth > 1) return@runOnUiThread
+          shownBarsBehavior = controller.systemBarsBehavior
+          controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+          controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+          hiddenBarsDepth = maxOf(0, hiddenBarsDepth - 1)
+          if (hiddenBarsDepth > 0) return@runOnUiThread
+          controller.show(WindowInsetsCompat.Type.systemBars())
+          shownBarsBehavior?.let { controller.systemBarsBehavior = it }
+          shownBarsBehavior = null
+        }
       }
     }
 

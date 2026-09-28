@@ -876,12 +876,16 @@ pub fn run() {
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]
             ios::haptic_feedback,
+            #[cfg(target_os = "ios")]
+            ios::set_system_bars_hidden,
             #[cfg(target_os = "android")]
             mobile::haptic_feedback,
             #[cfg(target_os = "android")]
             mobile::set_status_bar_light,
             #[cfg(target_os = "android")]
             mobile::set_navigation_bar_light,
+            #[cfg(target_os = "android")]
+            mobile::set_system_bars_hidden,
             #[cfg(target_os = "android")]
             mobile::set_window_background
         ])

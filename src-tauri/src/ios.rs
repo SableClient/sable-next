@@ -218,6 +218,17 @@ pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
 }
 
 #[tauri::command]
+pub fn set_system_bars_hidden(window: tauri::WebviewWindow, hidden: bool) -> Result<(), String> {
+    window
+        .with_webview(move |webview| unsafe {
+            let controller: *mut AnyObject = webview.view_controller().cast();
+            let _: () = msg_send![&*controller, setPrefersStatusBarHidden: hidden];
+            let _: () = msg_send![&*controller, setPrefersHomeIndicatorAutoHidden: hidden];
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn haptic_feedback(app: tauri::AppHandle, strong: bool) -> Result<(), String> {
     app.run_on_main_thread(move || unsafe {
         let allocated: objc2::rc::Allocated<AnyObject> =

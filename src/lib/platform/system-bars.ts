@@ -62,6 +62,11 @@ function syncWindowBackground(color: string | undefined, last: string): string {
   return color;
 }
 
+export function setSystemBarsHidden(hidden: boolean): void {
+  if (!isTauri() || (osType() !== 'android' && osType() !== 'ios')) return;
+  void invoke('set_system_bars_hidden', { hidden }).catch(() => undefined);
+}
+
 const SAMPLE_INTERVAL_MS = 200;
 
 type BarCommand = 'set_status_bar_light' | 'set_navigation_bar_light';

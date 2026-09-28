@@ -11,11 +11,13 @@ vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
+vi.mock('#lib/platform/system-bars.js', () => ({ setSystemBarsHidden: vi.fn() }));
 
 import MediaViewer from './MediaViewer.svelte';
 import { resetVideoStreaming } from '#lib/ui/video-stream.svelte.js';
 import { resetVideoSupport } from '#lib/ui/video-support.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
+import { setSystemBarsHidden } from '#lib/platform/system-bars.js';
 
 const imageItem: MediaItem = {
   kind: 'image',
@@ -254,6 +256,46 @@ test('double click zooms in, and again returns to the fitted size', async () => 
   await tap();
 
   expect(img.style.transform).toContain('scale(1)');
+});
+
+test('a single tap goes immersive, and another brings the bars back', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  await openImage([imageItem, videoItem]);
+  const toolbar = document.querySelector('.toolbar');
+
+  await user.pointer({ keys: '[TouchA]', target: stage(), coords: { clientX: 400, clientY: 300 } });
+  await vi.waitFor(() => {
+    expect(toolbar).toHaveClass('chrome-hidden');
+  });
+  expect(stage()).toHaveClass('chrome-hidden');
+  expect(document.querySelector('.bottom-bar')).toHaveClass('chrome-hidden');
+  expect(document.querySelector('.viewer')).toHaveClass('immersive');
+  expect(setSystemBarsHidden).toHaveBeenLastCalledWith(true);
+
+  await user.pointer({ keys: '[TouchA]', target: stage(), coords: { clientX: 400, clientY: 300 } });
+  await vi.waitFor(() => {
+    expect(toolbar).not.toHaveClass('chrome-hidden');
+  });
+  expect(setSystemBarsHidden).toHaveBeenLastCalledWith(false);
+});
+
+test('a double tap zooms without hiding the bars', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const clock = vi.spyOn(Date, 'now');
+  clock.mockReturnValue(1_000);
+  const img = await openImage();
+  const tap = () =>
+    user.pointer({ keys: '[TouchA]', target: stage(), coords: { clientX: 400, clientY: 300 } });
+
+  await tap();
+  clock.mockReturnValue(1_100);
+  await tap();
+  await new Promise((resolve) => setTimeout(resolve, 400));
+
+  expect(img.style.transform).toContain('scale(2)');
+  expect(document.querySelector('.toolbar')).not.toHaveClass('chrome-hidden');
 });
 
 test('a downward swipe past the threshold dismisses the viewer', async () => {
