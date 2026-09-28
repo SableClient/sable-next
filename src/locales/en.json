@@ -19,7 +19,9 @@
     "profile": "Profile",
     "editProfile": "Edit profile",
     "account": "Account",
+    "accounts": "Accounts",
     "switchAccount": "Switch account",
+    "switch": "Switch",
     "addAccount": "Add account",
     "manageAccounts": "Manage accounts",
     "manageAccountsDescription": "Switch between accounts or remove accounts from this device.",
@@ -3059,7 +3061,8 @@
     "description": "How you appear to other people, and what they see under your name.",
     "statusMessage": "Status message",
     "statusMessagePlaceholder": "What are you up to?",
-    "statusMessageSave": "Save"
+    "statusMessageSave": "Save",
+    "setStatus": "Set your presence and status"
   },
   "widgets": {
     "label": "Widgets",

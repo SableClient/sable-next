@@ -20,6 +20,29 @@
   }
 </script>
 
-<AppPageShell title={$i18n.t('nav.navigate')} density="compact">
+<AppPageShell class="navigate-page" title={$i18n.t('nav.navigate')} density="compact">
   <RoomJumpList onSelect={select} onClose={back} />
 </AppPageShell>
+
+<style>
+  :global(.app-page-shell.navigate-page) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  :global(.navigate-page .jump-list) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  :global(.navigate-page .jump-list ul) {
+    align-content: start;
+    flex: 1;
+    max-height: none;
+    min-height: 0;
+  }
+</style>

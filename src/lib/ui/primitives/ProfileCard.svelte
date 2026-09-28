@@ -40,6 +40,7 @@
     class?: ClassValue;
     meta?: Snippet;
     actions?: Snippet;
+    crest?: Snippet;
     pronouns?: Snippet;
     children?: Snippet;
     footer?: Snippet;
@@ -66,6 +67,7 @@
     class: className = '',
     meta,
     actions,
+    crest,
     children,
     footer,
     composer,
@@ -178,7 +180,9 @@
         alt={displayName}
       />
     {/if}
-    {#if status}
+    {#if crest}
+      {@render crest()}
+    {:else if status}
       <p class="profile-card-status">
         {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
       </p>
