@@ -27,7 +27,7 @@ export function memberGroupCategory(item: TimelineItemView): MemberGroupCategory
   if (item.event_id === null || item.reactions.length > 0) return null;
   const content = item.content;
   if (content.kind === 'membership') {
-    return content.reason ? null : (MEMBERSHIP_CATEGORIES[content.change] ?? null);
+    return MEMBERSHIP_CATEGORIES[content.change] ?? null;
   }
   if (content.kind === 'profile_change') {
     return content.display_name === null && content.avatar !== null ? 'avatar' : null;
