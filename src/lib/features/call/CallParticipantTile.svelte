@@ -6,7 +6,6 @@
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import SpeakerHighIcon from 'phosphor-svelte/lib/SpeakerHighIcon';
   import SpeakerSlashIcon from 'phosphor-svelte/lib/SpeakerSlashIcon';
-  import SunDimIcon from 'phosphor-svelte/lib/SunDimIcon';
   import CellSignalLowIcon from 'phosphor-svelte/lib/CellSignalLowIcon';
   import CellSignalSlashIcon from 'phosphor-svelte/lib/CellSignalSlashIcon';
   import { untrack } from 'svelte';
@@ -27,7 +26,6 @@
     screenVolumeKey,
     setParticipantVolume,
   } from './participant-volumes.svelte.js';
-  import { screenToned, setScreenToned } from './screen-tone.svelte.js';
 
   interface Props {
     participant: CallParticipant;
@@ -71,8 +69,6 @@
     screen ? $i18n.t('call.screenVolume', { name }) : $i18n.t('call.participantVolume', { name })
   );
   let videoOn = $derived(screen || cameraVisible(participant));
-  let tonable = $derived(screen && !participant.local);
-  let toned = $derived(tonable && screenToned(userId));
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
@@ -156,7 +152,6 @@
   {:else if videoOn}
     <video
       class="video"
-      class:toned
       class:mirrored={participant.local && !screen}
       autoplay
       muted
@@ -184,20 +179,6 @@
         {:else}
           <PushPinIcon />
         {/if}
-      </IconButton>
-    {/if}
-    {#if tonable}
-      <IconButton
-        variant="ghost"
-        size="small"
-        class="tile-action"
-        label={$i18n.t('call.toneDownScreen', { name })}
-        aria-pressed={toned}
-        onclick={() => {
-          setScreenToned(userId, !toned);
-        }}
-      >
-        <SunDimIcon weight={toned ? 'fill' : 'regular'} />
       </IconButton>
     {/if}
     {#if adjustable}
@@ -271,10 +252,6 @@
 </li>
 
 <style>
-  .video.toned {
-    filter: brightness(0.75) contrast(0.9) saturate(0.8);
-  }
-
   .tile {
     --tile-scrim: color-mix(in srgb, var(--picker-black) 62%, transparent);
 
