@@ -480,7 +480,7 @@ impl Core {
         let mut packs = Vec::new();
 
         let (own, _) = self
-            .pack_account_data(&client, USER_EMOTES, true)
+            .pack_account_data(&client, USER_EMOTES, false)
             .await
             .map_err(|error| self.failed("all_image_packs_account", error))?;
         if let Some(content) =
@@ -499,7 +499,7 @@ impl Core {
             .map(|room| async move {
                 (
                     room.room_id().to_owned(),
-                    self.room_packs(client, &room, ImagePackOriginView::Room, None, true)
+                    self.room_packs(client, &room, ImagePackOriginView::Room, None, false)
                         .await,
                 )
             })

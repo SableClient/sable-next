@@ -357,6 +357,57 @@ async fn cached_image_packs_return_without_waiting_for_room_state() {
 }
 
 #[tokio::test]
+async fn all_image_packs_return_without_waiting_for_room_state() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!cached-all-packs:example.org");
+    let pack = json!({
+        "type": "im.ponies.room_emotes", "state_key": "cached", "sender": "@alice:example.org",
+        "event_id": "$cached-pack", "origin_server_ts": 1,
+        "content": {"images": {"wave": {"url": "mxc://example.org/wave"}}}
+    });
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(Raw::new(&pack).unwrap().cast_unchecked()),
+        )
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(2))
+                .set_body_json(json!([pack])),
+        )
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let response = tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        core.dispatch(Command::AllImagePacks),
+    )
+    .await
+    .expect("settings packs do not wait for the homeserver")
+    .unwrap();
+    let CommandOk::AllImagePacks { packs } = response else {
+        panic!("wrong response")
+    };
+    assert_eq!(packs.len(), 1);
+    assert_eq!(packs[0].id, "cached");
+    assert!(
+        !server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .any(|request| request.url.path().ends_with("/state"))
+    );
+}
+
+#[tokio::test]
 async fn a_pack_with_no_images_is_still_listed() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
