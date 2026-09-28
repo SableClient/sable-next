@@ -8,6 +8,7 @@ export default defineConfig({
     'timeline-keyboard.spec.ts',
     'timeline-lifecycle.spec.ts',
     'timeline-media.spec.ts',
+    'timeline-media-hold.spec.ts',
     'timeline-receipts.spec.ts',
     'timeline-notified.spec.ts',
     'timeline-row-height.spec.ts',
