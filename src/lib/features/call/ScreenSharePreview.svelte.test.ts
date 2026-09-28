@@ -2,7 +2,7 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
 
@@ -15,26 +15,15 @@ import ScreenSharePreview from './ScreenSharePreview.svelte';
 
 const shared = { id: 's', muted: false, subscribed: true };
 
+const track = { attach: vi.fn(), detach: vi.fn() };
+
 beforeEach(() => {
-  vi.stubGlobal(
-    'MediaStream',
-    class {
-      constructor(readonly tracks: unknown[]) {}
-    }
-  );
-  Object.defineProperty(HTMLMediaElement.prototype, 'srcObject', {
-    configurable: true,
-    get: () => null,
-    set: () => {},
-  });
+  track.attach.mockClear();
+  track.detach.mockClear();
   Object.assign(core, {
     userProfile: vi.fn(() => Promise.resolve({ display_name: 'Alice' })),
   });
   dismissedPreview.key = null;
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
 });
 
 function session(participants: CallParticipant[], withRoom = true): CallSession {
@@ -42,7 +31,7 @@ function session(participants: CallParticipant[], withRoom = true): CallSession 
     remoteParticipants: new Map(
       participants.map((participant) => [
         participant.identity,
-        { getTrackPublication: () => ({ track: { mediaStreamTrack: {} } }) },
+        { getTrackPublication: () => ({ track }) },
       ])
     ),
   };
@@ -67,6 +56,18 @@ test('previews a remote screen and returns to the call when its name is pressed'
   await userEvent.setup().click(name);
 
   expect(onReturn).toHaveBeenCalledOnce();
+});
+
+test('attaches the screen through LiveKit so adaptive stream keeps it playing', () => {
+  const { container, unmount } = render(ScreenSharePreview, {
+    session: session([{ identity: 'alice:A', screenShare: shared }]),
+    onReturn: vi.fn(),
+  });
+  const video = container.querySelector('video');
+
+  expect(track.attach).toHaveBeenCalledWith(video);
+  unmount();
+  expect(track.detach).toHaveBeenCalledWith(video);
 });
 
 test('hiding the preview keeps it hidden for that share', async () => {

@@ -2,6 +2,7 @@
   import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import MonitorIcon from 'phosphor-svelte/lib/MonitorIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
+  import { Track, type RemoteTrack } from 'livekit-client';
   import { untrack } from 'svelte';
   import { on } from 'svelte/events';
 
@@ -75,19 +76,18 @@
     return 'documentPictureInPicture' in window || document.pictureInPictureEnabled;
   }
 
-  function track(): MediaStreamTrack | undefined {
+  function track(): RemoteTrack | undefined {
     if (!shown || !room) return undefined;
     return room.remoteParticipants
       .get(shown.participant.identity)
-      ?.getTrackPublication('screen_share' as never)?.track?.mediaStreamTrack;
+      ?.getTrackPublication(Track.Source.ScreenShare)?.track;
   }
 
   function attach(node: HTMLVideoElement) {
     const media = untrack(track);
-    if (!media) return;
-    node.srcObject = new MediaStream([media]);
+    media?.attach(node);
     return () => {
-      node.srcObject = null;
+      media?.detach(node);
     };
   }
 
@@ -114,7 +114,6 @@
       player.autoplay = true;
       player.muted = true;
       player.playsInline = true;
-      player.srcObject = new MediaStream([media]);
       player.style.cssText = 'width:100%;height:100%;object-fit:contain;min-height:0';
       const back = doc.createElement('button');
       back.type = 'button';
@@ -130,8 +129,10 @@
         opened.close();
       });
       doc.body.append(player, back);
+      media.attach(player);
       popped = 'document';
       on(opened, 'pagehide', () => {
+        media.detach(player);
         popped = null;
       });
       return;
