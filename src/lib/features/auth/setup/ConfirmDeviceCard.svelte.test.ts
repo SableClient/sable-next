@@ -52,6 +52,7 @@ const device = (device_id: string, is_own: boolean, cross_signed: boolean): Devi
   device_id,
   display_name: null,
   is_verified: false,
+  has_keys: true,
   cross_signed,
   is_own,
   last_seen_ts: null,

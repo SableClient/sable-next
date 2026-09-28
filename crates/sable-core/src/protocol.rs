@@ -2393,6 +2393,8 @@ pub struct EmojiView {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+// These are independent facts about one device, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 pub struct DeviceView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub device_id: OwnedDeviceId,
@@ -2401,6 +2403,8 @@ pub struct DeviceView {
     /// Signed by the account's own identity, whether or not this device trusts
     /// that identity yet. What a new device can be confirmed from.
     pub cross_signed: bool,
+    /// The device has uploaded device keys, so it can be verified at all.
+    pub has_keys: bool,
     /// The session this core is running in.
     pub is_own: bool,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]

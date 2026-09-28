@@ -535,6 +535,7 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
                     cross_signed: crypto.as_ref().is_some_and(
                         matrix_sdk::encryption::identities::Device::is_cross_signed_by_owner,
                     ),
+                    has_keys: crypto.is_some(),
                     display_name: device.display_name,
                     device_id: device.device_id,
                     last_seen_ts: device.last_seen_ts.map(|ts| u64::from(ts.get())),
@@ -552,6 +553,7 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
                             is_own: Some(device.device_id()) == own_device_id,
                             is_verified: device.is_verified(),
                             cross_signed: device.is_cross_signed_by_owner(),
+                            has_keys: true,
                             display_name: device.display_name().map(str::to_owned),
                             device_id: device.device_id().to_owned(),
                             last_seen_ts: None,

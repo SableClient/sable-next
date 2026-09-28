@@ -35,6 +35,7 @@ const own: DeviceView = {
   display_name: 'This device',
   is_own: true,
   is_verified: true,
+  has_keys: true,
   cross_signed: true,
   last_seen_ts: null,
   last_seen_ip: null,
@@ -45,6 +46,7 @@ const other1: DeviceView = {
   display_name: 'Phone',
   is_own: false,
   is_verified: true,
+  has_keys: true,
   cross_signed: true,
   last_seen_ts: null,
   last_seen_ip: null,
@@ -55,6 +57,7 @@ const other2: DeviceView = {
   display_name: 'Tablet',
   is_own: false,
   is_verified: false,
+  has_keys: true,
   cross_signed: false,
   last_seen_ts: null,
   last_seen_ip: null,
@@ -130,4 +133,16 @@ test('asks for confirmation before resetting the recovery key', async () => {
   await user.click(within(dialog).getByRole('button', { name: 'Reset recovery key' }));
   expect(await screen.findByText('NEW KEY')).toBeInTheDocument();
   expect(core.resetRecoveryKey).toHaveBeenCalledOnce();
+});
+
+test('a session without device keys says so and offers no verification', async () => {
+  await renderDevices([own, { ...other2, has_keys: false }, { ...other1, is_verified: false }]);
+
+  const keyless = screen.getByText('Tablet').closest('li');
+  const unverified = screen.getByText('Phone').closest('li');
+  if (!keyless || !unverified) throw new Error('the device rows are not laid out');
+  expect(within(keyless).getByText('No encryption keys')).toBeInTheDocument();
+  expect(within(keyless).queryByRole('button', { name: 'Verify device' })).not.toBeInTheDocument();
+  expect(within(unverified).getByText('Not verified')).toBeInTheDocument();
+  expect(within(unverified).getByRole('button', { name: 'Verify device' })).toBeInTheDocument();
 });

@@ -1497,6 +1497,7 @@
     "encryption": "Encryption",
     "refresh": "Refresh",
     "verified": "Verified",
+    "noDeviceKeys": "No encryption keys",
     "notVerified": "Not verified",
     "unavailable": "Unavailable",
     "verifyThisDevice": "Verify this device",

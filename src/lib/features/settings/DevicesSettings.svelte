@@ -514,10 +514,16 @@
                   </div>
                   <div class="device-meta">
                     <StatusBadge
-                      variant={device.is_verified ? 'success' : 'warning'}
-                      label={device.is_verified
-                        ? $i18n.t('settings.verified')
-                        : $i18n.t('settings.notVerified')}
+                      variant={!device.has_keys
+                        ? 'neutral'
+                        : device.is_verified
+                          ? 'success'
+                          : 'warning'}
+                      label={!device.has_keys
+                        ? $i18n.t('settings.noDeviceKeys')
+                        : device.is_verified
+                          ? $i18n.t('settings.verified')
+                          : $i18n.t('settings.notVerified')}
                     />
                     <code title={device.device_id}>{device.device_id}</code>
                   </div>
@@ -528,7 +534,7 @@
                       })}
                     </span>
                   {/if}
-                  {#if !device.is_own && !device.is_verified && status?.verification === 'verified'}
+                  {#if !device.is_own && device.has_keys && !device.is_verified && status?.verification === 'verified'}
                     <div class="device-verify">
                       <Button
                         variant="secondary"

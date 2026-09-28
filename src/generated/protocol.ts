@@ -358,6 +358,8 @@ export type DeviceView = {
 	 *  that identity yet. What a new device can be confirmed from.
 	 */
 	cross_signed: boolean,
+	/**  The device has uploaded device keys, so it can be verified at all. */
+	has_keys: boolean,
 	/**  The session this core is running in. */
 	is_own: boolean,
 	last_seen_ts: number | null,
