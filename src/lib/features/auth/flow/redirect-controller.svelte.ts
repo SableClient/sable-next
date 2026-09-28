@@ -76,6 +76,7 @@ export class RedirectController {
     id?: string,
     intent: RedirectIntent = 'register'
   ): Promise<void> {
+    if (this.isLaunching) return;
     this.loginError = null;
     this.registrationError = null;
     this.pendingIntent = intent;
