@@ -287,7 +287,7 @@ pub(crate) async fn build_room_timeline(
             },
         },
         TimelineFocusView::Thread { root_event_id } => TimelineFocus::Thread {
-            root_event_id: root_event_id.clone(),
+            thread_id: root_event_id.clone(),
         },
     });
     let builder = if hidden_events {
