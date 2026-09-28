@@ -2028,7 +2028,7 @@ fn in_reply_to(content: &TimelineItemContent) -> Option<ReplyView> {
             TimelineDetails::Ready(profile) => profile.display_name.clone(),
             _ => None,
         }),
-        body: embedded.and_then(|event| body_of(&event.content)),
+        body: embedded.and_then(|event| reply_preview_body(&event.content)),
     })
 }
 
@@ -2044,7 +2044,7 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
                 TimelineEventItemId::EventId(event_id) => Some(event_id.to_string()),
                 TimelineEventItemId::TransactionId(_) => None,
             },
-            body_of(&event.content),
+            reply_preview_body(&event.content),
         ),
         _ => (None, None),
     };
@@ -2057,16 +2057,24 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
 }
 
 /// Plain text: a preview must not run untrusted HTML.
-fn body_of(content: &TimelineItemContent) -> Option<String> {
-    match &msg_like(content)?.kind {
-        MsgLikeKind::Message(message) => Some(match message.msgtype() {
-            MessageType::Gallery(gallery) if gallery.body.is_empty() => {
-                gallery_filenames(gallery).join(", ")
-            }
-            _ => preview_body(message.body(), formatted_body(message.msgtype()).as_deref()),
-        }),
-        MsgLikeKind::Sticker(sticker) => Some(sticker.content().body.clone()),
-        MsgLikeKind::Poll(state) => Some(state.results().question),
+fn reply_preview_body(content: &TimelineItemContent) -> Option<String> {
+    match content {
+        TimelineItemContent::MsgLike(msg) => match &msg.kind {
+            MsgLikeKind::Message(message) => Some(match message.msgtype() {
+                MessageType::Gallery(gallery) if gallery.body.is_empty() => {
+                    gallery_filenames(gallery).join(", ")
+                }
+                _ => preview_body(message.body(), formatted_body(message.msgtype()).as_deref()),
+            }),
+            MsgLikeKind::Sticker(sticker) => Some(sticker.content().body.clone()),
+            MsgLikeKind::Poll(state) => Some(state.results().question),
+            _ => None,
+        },
+        TimelineItemContent::MembershipChange(_) | TimelineItemContent::ProfileChange(_) => {
+            Some("m.room.member".to_owned())
+        }
+        TimelineItemContent::OtherState(state) => Some(state.content().event_type().to_string()),
+        TimelineItemContent::FailedToParseState { event_type, .. } => Some(event_type.to_string()),
         _ => None,
     }
 }

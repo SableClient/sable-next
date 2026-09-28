@@ -1570,6 +1570,54 @@ async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
     assert_eq!(reply.body.as_deref(), Some("beach.jpg"));
 }
 
+#[tokio::test]
+async fn replies_to_state_and_membership_events_quote_their_type() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!state-reply:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(factory.room_name("Sable").event_id(event_id!("$name")))
+                .add_timeline_event(
+                    factory
+                        .text_msg("nice")
+                        .reply_to(event_id!("$name"))
+                        .event_id(event_id!("$reply")),
+                )
+                .add_timeline_event(factory.member(*ALICE).event_id(event_id!("$member")))
+                .add_timeline_event(
+                    factory
+                        .text_msg("welcome")
+                        .reply_to(event_id!("$member"))
+                        .event_id(event_id!("$member-reply")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false)
+        .await
+        .expect("a timeline for a joined room");
+    let state_reply = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$reply")))
+        .and_then(|view| view.in_reply_to.as_ref())
+        .expect("a reply");
+    let membership_reply = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$member-reply")))
+        .and_then(|view| view.in_reply_to.as_ref())
+        .expect("a membership reply");
+
+    assert_eq!(state_reply.body.as_deref(), Some("m.room.name"));
+    assert_eq!(membership_reply.body.as_deref(), Some("m.room.member"));
+}
+
 fn state_changes(
     views: &[crate::protocol::TimelineItemView],
 ) -> Vec<Option<crate::protocol::StateChangeView>> {
