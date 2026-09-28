@@ -18,6 +18,8 @@ mod map_tiles;
 pub use map_tiles::TILE_URI_SCHEME;
 #[cfg(target_os = "android")]
 mod cold_push;
+#[cfg(target_os = "linux")]
+mod hdr_share;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
@@ -611,6 +613,33 @@ async fn stop_hdr_share() {
 
 #[cfg(target_os = "linux")]
 #[tauri::command]
+async fn hdr_monitors() -> Vec<hdr_share::HdrMonitor> {
+    tauri::async_runtime::spawn_blocking(hdr_share::monitors)
+        .await
+        .unwrap_or_default()
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn start_hdr_share(frames: tauri::ipc::Channel<tauri::ipc::Response>) -> Result<(), String> {
+    let _ = tauri::async_runtime::spawn_blocking(hdr_share::stop).await;
+    hdr_share::start(frames).await
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn hdr_frame_done() {
+    hdr_share::release();
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn stop_hdr_share() {
+    let _ = tauri::async_runtime::spawn_blocking(hdr_share::stop).await;
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
 async fn start_screen_audio(selection: screen_audio::Selection) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || screen_audio::start(selection))
         .await
@@ -808,13 +837,13 @@ pub fn run() {
             stop_screen_audio,
             #[cfg(target_os = "linux")]
             screen_audio_apps,
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             hdr_monitors,
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             start_hdr_share,
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             hdr_frame_done,
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             stop_hdr_share,
             #[cfg(desktop)]
             toggle_devtools,

@@ -190,6 +190,18 @@ fn run(
                 );
             }
         })
+        .state_changed({
+            let mainloop = mainloop.clone();
+            move |_, state, _, new| {
+                if matches!(
+                    new,
+                    pw::stream::StreamState::Error(_) | pw::stream::StreamState::Unconnected
+                ) {
+                    (state.sink)(0, 0, &[]);
+                    mainloop.quit();
+                }
+            }
+        })
         .process(|stream, state| {
             let Some(mut buffer) = stream.dequeue_buffer() else {
                 return;
@@ -238,7 +250,8 @@ pub struct HdrCapture {
 
 impl HdrCapture {
     /// Asks the portal for a monitor, then streams it on a worker thread,
-    /// handing every converted BGRA frame to `sink`.
+    /// handing every converted BGRA frame to `sink`, and an empty one when
+    /// the desktop ends the cast.
     ///
     /// # Errors
     ///

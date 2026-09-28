@@ -113,6 +113,7 @@ export class CallSession {
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
   choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
+  #pendingScreenSource: ScreenSource | null = null;
 
   get startedAt(): number | null {
     if (this.connectedAt === null) return null;
@@ -465,28 +466,35 @@ export class CallSession {
   async toggleScreenShare(): Promise<void> {
     if (this.transport.screenShareEnabled) {
       await this.setScreenShareEnabled(false);
-    } else if (screenAudioSupported()) {
-      this.choosingScreenAudio = true;
-    } else if (hdrShareSupported()) {
-      const monitors = await listHdrMonitors().catch(() => []);
-      if (monitors.length > 0) this.choosingScreenSource = monitors;
-      else await this.setScreenShareEnabled(true);
-    } else {
-      await this.setScreenShareEnabled(true);
+      return;
     }
+    const monitors = hdrShareSupported() ? await listHdrMonitors().catch(() => []) : [];
+    if (monitors.length > 0) this.choosingScreenSource = monitors;
+    else await this.shareScreenFrom(null);
   }
 
   async shareScreenFrom(source: ScreenSource | null): Promise<void> {
     this.choosingScreenSource = null;
-    await this.#device('screen', () =>
-      this.#media?.capabilities.screenShare?.setEnabled(true, undefined, source ?? undefined)
-    );
+    if (screenAudioSupported()) {
+      this.#pendingScreenSource = source;
+      this.choosingScreenAudio = true;
+      return;
+    }
+    await this.#shareScreen(undefined, source);
   }
 
   async shareScreenWith(audio: ScreenAudioChoice): Promise<void> {
     this.choosingScreenAudio = false;
     rememberScreenAudioChoice(audio);
-    await this.setScreenShareEnabled(true, audio);
+    const source = this.#pendingScreenSource;
+    this.#pendingScreenSource = null;
+    await this.#shareScreen(audio, source);
+  }
+
+  async #shareScreen(audio: ScreenAudioChoice | undefined, source: ScreenSource | null) {
+    await this.#device('screen', () =>
+      this.#media?.capabilities.screenShare?.setEnabled(true, audio, source ?? undefined)
+    );
   }
 
   async setScreenShareEnabled(enabled: boolean, audio?: ScreenAudioChoice): Promise<void> {

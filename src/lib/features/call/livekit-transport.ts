@@ -545,18 +545,22 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
           if (enabled && source?.kind === 'hdr') {
             await step('call.screen_share.hdr', async () => {
               const track = new LocalVideoTrack(
-                await startHdrShare(source.monitor),
+                await startHdrShare(source.monitor, () => {
+                  void stopHdrScreen().then(stopSharingAudio).then(syncLocal);
+                }),
                 undefined,
                 true
               );
               hdrScreen = track;
               await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShare });
             });
+            await shareAudio(audio);
             syncLocal();
             return;
           }
           if (!enabled && hdrScreen) {
             await stopHdrScreen();
+            await stopSharingAudio();
             syncLocal();
             return;
           }

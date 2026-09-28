@@ -1,4 +1,4 @@
-import { invoke, isTauri } from '@tauri-apps/api/core';
+import { Channel, invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { type as osType } from '@tauri-apps/plugin-os';
 
@@ -46,13 +46,15 @@ function generatorConstructor(): GeneratorConstructor | undefined {
 }
 
 export function hdrShareSupported(): boolean {
-  return (
-    isTauri() &&
-    osType() === 'windows' &&
-    bridge() !== undefined &&
-    generatorConstructor() !== undefined &&
-    typeof VideoFrame !== 'undefined'
-  );
+  if (!isTauri() || generatorConstructor() === undefined || typeof VideoFrame === 'undefined') {
+    return false;
+  }
+  const os = osType();
+  return (os === 'windows' && bridge() !== undefined) || os === 'linux';
+}
+
+export function hdrSharePicksMonitor(): boolean {
+  return osType() === 'linux';
 }
 
 export async function listHdrMonitors(): Promise<HdrMonitor[]> {
@@ -62,13 +64,78 @@ export async function listHdrMonitors(): Promise<HdrMonitor[]> {
 
 let active: { stop: () => Promise<void> } | null = null;
 
+function frameFrom(data: ArrayBuffer, offset: number, width: number, height: number): VideoFrame {
+  return new VideoFrame(new Uint8Array(data, offset, width * height * 4), {
+    format: 'BGRX',
+    codedWidth: width,
+    codedHeight: height,
+    timestamp: Math.round(performance.now() * 1000),
+  });
+}
+
+function writeFrame(writer: WritableStreamDefaultWriter<VideoFrame>, frame: VideoFrame): void {
+  void writer.write(frame).catch(() => {
+    frame.close();
+  });
+}
+
 /** Captures monitor `index` through the desktop app's HDR-to-SDR path and
     returns it as a video track the page can publish like any screen share. */
-export async function startHdrShare(index: number): Promise<MediaStreamTrack> {
+export async function startHdrShare(
+  index: number,
+  onEnded: () => void = () => undefined
+): Promise<MediaStreamTrack> {
   await stopHdrShare();
-  const webview = bridge();
   const Generator = generatorConstructor();
-  if (!webview || !Generator) throw new Error('hdr share unsupported');
+  if (!Generator) throw new Error('hdr share unsupported');
+  return osType() === 'linux'
+    ? startPortalShare(Generator, onEnded)
+    : startWindowsShare(Generator, index);
+}
+
+async function startPortalShare(
+  Generator: GeneratorConstructor,
+  onEnded: () => void
+): Promise<MediaStreamTrack> {
+  const generator = new Generator({ kind: 'video' });
+  const writer = generator.writable.getWriter();
+  const frames = new Channel<ArrayBuffer>();
+  const stop = async (): Promise<void> => {
+    frames.onmessage = () => undefined;
+    await writer.close().catch(() => undefined);
+    await invoke('stop_hdr_share');
+  };
+  frames.onmessage = (data) => {
+    if (data.byteLength === 0) {
+      if (active?.stop === stop) onEnded();
+      return;
+    }
+    try {
+      const header = new DataView(data, 0, 8);
+      writeFrame(writer, frameFrom(data, 8, header.getUint32(0, true), header.getUint32(4, true)));
+    } catch (error) {
+      console.warn('[sable hdr] dropped a frame', error);
+    } finally {
+      void invoke('hdr_frame_done');
+    }
+  };
+  active = { stop };
+
+  try {
+    await invoke('start_hdr_share', { frames });
+  } catch (error) {
+    await stopHdrShare();
+    throw error;
+  }
+  return generator;
+}
+
+async function startWindowsShare(
+  Generator: GeneratorConstructor,
+  index: number
+): Promise<MediaStreamTrack> {
+  const webview = bridge();
+  if (!webview) throw new Error('hdr share unsupported');
 
   const buffers = new Map<number, ArrayBuffer>();
   let generation = -1;
@@ -89,15 +156,7 @@ export async function startHdrShare(index: number): Promise<MediaStreamTrack> {
     const buffer = buffers.get(payload.slot);
     try {
       if (!buffer || payload.generation !== generation) return;
-      const frame = new VideoFrame(new Uint8Array(buffer, 0, payload.width * payload.height * 4), {
-        format: 'BGRX',
-        codedWidth: payload.width,
-        codedHeight: payload.height,
-        timestamp: Math.round(performance.now() * 1000),
-      });
-      void writer.write(frame).catch(() => {
-        frame.close();
-      });
+      writeFrame(writer, frameFrom(buffer, 0, payload.width, payload.height));
     } finally {
       void invoke('hdr_frame_done', { slot: payload.slot });
     }

@@ -5,7 +5,7 @@
   import { untrack } from 'svelte';
 
   import { i18n } from '#lib/i18n.js';
-  import type { HdrMonitor } from '#lib/platform/hdr-share.js';
+  import { hdrSharePicksMonitor, type HdrMonitor } from '#lib/platform/hdr-share.js';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -25,11 +25,15 @@
     untrack(() => (monitors.length > 0 ? `hdr:${String(monitors[0]?.index ?? 0)}` : 'picker'))
   );
 
+  const portal = hdrSharePicksMonitor();
+
   let options = $derived([
-    ...monitors.map((monitor) => ({
+    ...(portal ? monitors.slice(0, 1) : monitors).map((monitor) => ({
       value: `hdr:${String(monitor.index)}`,
-      label: $i18n.t('call.screenSourceHdr', { name: monitor.name }),
-      hint: $i18n.t('call.screenSourceHdrHint'),
+      label: portal
+        ? $i18n.t('call.screenSourceHdrPortal')
+        : $i18n.t('call.screenSourceHdr', { name: monitor.name }),
+      hint: $i18n.t(portal ? 'call.screenSourceHdrPortalHint' : 'call.screenSourceHdrHint'),
       icon: MonitorIcon,
     })),
     {

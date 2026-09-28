@@ -9,14 +9,21 @@ const tauri = vi.hoisted(() => ({
   listeners: new Map<string, (event: { payload: unknown }) => void>(),
 }));
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: tauri.invoke, isTauri: () => true }));
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: tauri.invoke,
+  isTauri: () => true,
+  Channel: class {
+    onmessage: (data: ArrayBuffer) => void = () => undefined;
+  },
+}));
 vi.mock('@tauri-apps/api/event', () => ({
   listen: (name: string, handler: (event: { payload: unknown }) => void) => {
     tauri.listeners.set(name, handler);
     return Promise.resolve(() => tauri.listeners.delete(name));
   },
 }));
-vi.mock('@tauri-apps/plugin-os', () => ({ type: () => 'windows' }));
+const os = vi.hoisted(() => ({ type: vi.fn(() => 'windows') }));
+vi.mock('@tauri-apps/plugin-os', () => os);
 
 import { hdrShareSupported, startHdrShare, stopHdrShare } from './hdr-share';
 
@@ -110,4 +117,43 @@ test('stopping tells the desktop app to stop capturing', async () => {
   await stopHdrShare();
   expect(tauri.invoke).toHaveBeenCalledWith('stop_hdr_share');
   expect(tauri.listeners.has('hdr-frame')).toBe(false);
+});
+
+function portalFrames(): (data: ArrayBuffer) => void {
+  const call = tauri.invoke.mock.calls.find(([command]) => command === 'start_hdr_share');
+  const args = call?.[1] as { frames: { onmessage: (data: ArrayBuffer) => void } } | undefined;
+  return (data) => {
+    args?.frames.onmessage(data);
+  };
+}
+
+test('on Linux a channel frame becomes a video frame and is handed back', async () => {
+  os.type.mockReturnValue('linux');
+  vi.stubGlobal('chrome', undefined);
+  expect(hdrShareSupported()).toBe(true);
+
+  await startHdrShare(0);
+  const frame = new ArrayBuffer(16);
+  new DataView(frame).setUint32(0, 2, true);
+  new DataView(frame).setUint32(4, 1, true);
+  portalFrames()(frame);
+
+  await vi.waitFor(() => {
+    expect(written).toHaveLength(1);
+  });
+  expect(written[0]?.init).toMatchObject({ codedWidth: 2, codedHeight: 1 });
+  expect(tauri.invoke).toHaveBeenCalledWith('hdr_frame_done');
+  os.type.mockReturnValue('windows');
+});
+
+test('on Linux an empty message means the desktop ended the capture', async () => {
+  os.type.mockReturnValue('linux');
+  const ended = vi.fn();
+
+  await startHdrShare(0, ended);
+  portalFrames()(new ArrayBuffer(0));
+
+  expect(ended).toHaveBeenCalledOnce();
+  expect(tauri.invoke).not.toHaveBeenCalledWith('hdr_frame_done');
+  os.type.mockReturnValue('windows');
 });

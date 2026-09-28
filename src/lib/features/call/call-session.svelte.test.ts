@@ -8,6 +8,11 @@ const hdr = vi.hoisted(() => ({
   listHdrMonitors: vi.fn(() => Promise.resolve([{ index: 0, name: 'Main', hdr: true }])),
 }));
 vi.mock('#lib/platform/hdr-share.js', () => hdr);
+const screenAudio = vi.hoisted(() => ({ supported: vi.fn(() => false) }));
+vi.mock('#lib/platform/screen-audio.js', async (original) => ({
+  ...(await original<typeof import('#lib/platform/screen-audio.js')>()),
+  screenAudioSupported: screenAudio.supported,
+}));
 
 import { CallSession, voiceStates } from './call-session.svelte.js';
 import { MatrixKeyProvider } from './key-provider';
@@ -835,4 +840,29 @@ test('an HDR monitor on the Windows app is offered before the browser picker', a
   await session.shareScreenFrom(null);
   expect(setEnabled).toHaveBeenLastCalledWith(true, undefined, undefined);
   hdr.hdrShareSupported.mockReturnValue(false);
+});
+
+test('on Linux the HDR choice is carried through the screen sound picker', async () => {
+  const { client, transport } = harness();
+  const setEnabled = vi.fn(() => Promise.resolve());
+  transport.capabilities = { screenShare: { setEnabled } };
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  hdr.hdrShareSupported.mockReturnValue(true);
+  screenAudio.supported.mockReturnValue(true);
+
+  await session.toggleScreenShare();
+  await session.shareScreenFrom({ kind: 'hdr', monitor: 0 });
+  expect(session.choosingScreenAudio).toBe(true);
+  expect(setEnabled).not.toHaveBeenCalled();
+
+  await session.shareScreenWith({ kind: 'none' });
+  expect(setEnabled).toHaveBeenLastCalledWith(true, { kind: 'none' }, { kind: 'hdr', monitor: 0 });
+
+  hdr.hdrShareSupported.mockReturnValue(false);
+  await session.toggleScreenShare();
+  expect(session.choosingScreenSource).toBeNull();
+  await session.shareScreenWith({ kind: 'none' });
+  expect(setEnabled).toHaveBeenLastCalledWith(true, { kind: 'none' }, undefined);
+  screenAudio.supported.mockReturnValue(false);
 });

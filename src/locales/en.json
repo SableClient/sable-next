@@ -3001,6 +3001,8 @@
     "screenSourceExplain": "This monitor is in HDR mode. Sable can capture it itself and convert HDR to SDR, so bright content does not blind the people watching.",
     "screenSourceHdr": "{{name}}, HDR converted",
     "screenSourceHdrHint": "The whole monitor, brought down to normal brightness. No sound is shared this way.",
+    "screenSourceHdrPortal": "A monitor, HDR converted",
+    "screenSourceHdrPortalHint": "The whole monitor, brought down to normal brightness. Your desktop asks which one next.",
     "screenSourcePicker": "Choose a screen or window",
     "screenSourcePickerHint": "The usual picker, with sound. HDR content may look too bright or washed out.",
     "returnToCall": "Back to the call",
