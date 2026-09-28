@@ -1937,6 +1937,17 @@ fn content(
         TimelineItemContent::FailedToParseMessageLike { event_type, .. } => {
             unparsed(&event_type.to_string(), raw)
         }
+        TimelineItemContent::FailedToParseState {
+            event_type,
+            state_key,
+            ..
+        } if raw.content_stripped() => TimelineItemContentView::StateEvent {
+            event_type: event_type.to_string(),
+            state_key: state_key.clone(),
+            change: None,
+            content: raw.content.clone(),
+            prev_content: raw.prev_content().cloned(),
+        },
         TimelineItemContent::FailedToParseState { event_type, .. } => {
             unparsed(&event_type.to_string(), raw)
         }

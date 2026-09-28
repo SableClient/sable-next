@@ -588,7 +588,7 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
-    let room_id = room_id!("!packs:example.org");
+    let room_id = room_id!("!cleared:example.org");
     server.sync_joined_room(&client, room_id).await;
     server.mock_room_state_encryption().plain().mount().await;
     server
@@ -3114,4 +3114,52 @@ async fn a_synced_calendar_entry_tells_the_page_to_reload() {
     .await
     .expect("a calendar change");
     assert_eq!(changed, room_id);
+}
+
+#[tokio::test]
+async fn an_emptied_state_event_is_a_state_event_not_a_deleted_message() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!cleared:example.org");
+    let cleared = |id: &str| {
+        serde_json::from_value::<
+            matrix_sdk::ruma::serde::Raw<matrix_sdk::ruma::events::AnySyncTimelineEvent>,
+        >(json!({
+            "type": "m.room.pinned_events",
+            "state_key": "",
+            "event_id": id,
+            "sender": ALICE.to_string(),
+            "origin_server_ts": 1,
+            "content": {},
+        }))
+        .unwrap()
+    };
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(cleared("$cleared")),
+        )
+        .await;
+    let views = timeline_views(&client, &room, true).await.unwrap();
+    let item = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$cleared")))
+        .unwrap();
+
+    match &item.content {
+        crate::protocol::TimelineItemContentView::StateEvent {
+            event_type,
+            state_key,
+            change,
+            ..
+        } => {
+            assert_eq!(event_type, "m.room.pinned_events");
+            assert_eq!(state_key, "");
+            assert!(change.is_none());
+        }
+        other => panic!("expected a state event, got {other:?}"),
+    }
 }
