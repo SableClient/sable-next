@@ -279,14 +279,16 @@
   }
 
   function trackGridSize(element: HTMLElement): () => void {
-    const update = (): void => {
-      gridWidth = element.clientWidth;
-      gridHeight = element.clientHeight;
+    const update = (size?: ResizeObserverSize): void => {
+      gridWidth = size?.inlineSize ?? element.clientWidth;
+      gridHeight = size?.blockSize ?? element.clientHeight;
     };
     update();
     if (typeof ResizeObserver === 'undefined') return () => {};
 
-    const observer = new ResizeObserver(update);
+    const observer = new ResizeObserver(([entry]) => {
+      update(entry.contentBoxSize[0]);
+    });
     observer.observe(element);
     return () => observer.disconnect();
   }
@@ -513,42 +515,10 @@
           estimatedItemSize={cellSize + GRID_GAP}
           overscanCount={2}
           getKey={(index) => pickerRows[index]?.id}
-          scrollToIndex={scrollToRow}
+          scrollToIndex={scrollToRow === -1 ? undefined : scrollToRow}
           scrollToAlignment="start"
           scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
         >
-          {#snippet header()}
-            {#if emojiTab && !searching}
-              {@render cellGrid('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells)}
-            {:else if recentImages.length > 0}
-              <section id="emoji-recent">
-                <h3>{$i18n.t('composer.recent')}</h3>
-                <ul>
-                  {#each recentImages as image (image.shortcode)}
-                    <li>
-                      <button
-                        type="button"
-                        title=":{image.shortcode}:"
-                        aria-label=":{image.shortcode}:"
-                        onclick={() => {
-                          pick(image);
-                        }}
-                      >
-                        <MediaImage
-                          source={image.url}
-                          alt={image.body ?? image.shortcode}
-                          width={cellSize}
-                          height={cellSize}
-                          original
-                        />
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              </section>
-            {/if}
-          {/snippet}
-
           {#snippet item({ index, style })}
             {@const row = pickerRows[index]}
             <div {style} class="virtual-row">
@@ -602,7 +572,7 @@
       </div>
 
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
-        {#if emojiTab || recentImages.length > 0}
+        {#if (emojiTab && frequentCells.length > 0) || recentImages.length > 0}
           <button
             type="button"
             class="rail-pack rail-glyph"
