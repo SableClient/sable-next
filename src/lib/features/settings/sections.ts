@@ -10,6 +10,7 @@ import {
   SETTINGS_DEVICES_SECTION,
   SETTINGS_EMOTES_SECTION,
 } from '#lib/settings/registry.js';
+import { supportsKeyboardShortcuts } from '#lib/platform/os.js';
 
 import AccountSettings from './AccountSettings.svelte';
 import AboutSettings from './AboutSettings.svelte';
@@ -45,7 +46,14 @@ export const settingsNavGroups: SettingsNavGroup[] = [
   {
     id: 'interface',
     label: 'settings.navGroups.interface',
-    sections: ['appearance', 'composer', 'keyboard', 'media', 'timeline', 'desktop'],
+    sections: [
+      'appearance',
+      'composer',
+      ...(supportsKeyboardShortcuts() ? ['keyboard'] : []),
+      'media',
+      'timeline',
+      'desktop',
+    ],
   },
   {
     id: 'behavior',
