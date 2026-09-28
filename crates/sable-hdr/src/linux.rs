@@ -20,6 +20,8 @@ use crate::{HdrToSdr, OBS_PEAK_NITS, Scratch, sdr_row};
 /// BT.2408 graphics white: where PQ content puts the UI a reader calls white.
 pub const PQ_REFERENCE_WHITE_NITS: f32 = 203.0;
 
+const SPA_VIDEO_TRANSFER_SMPTE2084: spa::sys::spa_video_transfer_function = 14;
+
 pub type FrameSink = Box<dyn FnMut(u32, u32, &[u8]) + Send>;
 
 type Row = fn(&HdrToSdr, &[u8], &mut Scratch, &mut [u8]);
@@ -31,7 +33,7 @@ enum Layout {
 }
 
 fn layout(info: &VideoInfoRaw) -> Option<Layout> {
-    let pq = info.transfer_function() == spa::sys::SPA_VIDEO_TRANSFER_SMPTE2084;
+    let pq = info.transfer_function() == SPA_VIDEO_TRANSFER_SMPTE2084;
     match info.format() {
         VideoFormat::RGBA_F16 if pq => Some(Layout::Hdr(HdrToSdr::pq_f16_bytes_row)),
         VideoFormat::RGBA_F16 => Some(Layout::Hdr(HdrToSdr::scrgb_bytes_row)),
