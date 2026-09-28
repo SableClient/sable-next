@@ -95,7 +95,7 @@ test('does not check for web updates automatically when disabled', async () => {
   expect(update).not.toHaveBeenCalled();
 });
 
-test('activates a worker built from the same version without prompting', async () => {
+test('does not activate a worker built from the same version automatically', async () => {
   const postMessage = answering(version);
   const registration = Object.assign(new EventTarget(), {
     waiting: { postMessage },
@@ -109,5 +109,5 @@ test('activates a worker built from the same version without prompting', async (
   await settle();
 
   expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
-  expect(postMessage).toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
+  expect(postMessage).not.toHaveBeenCalledWith({ type: 'sable:skip-waiting' });
 });

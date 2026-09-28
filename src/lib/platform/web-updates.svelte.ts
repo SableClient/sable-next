@@ -29,7 +29,6 @@ async function consider(
 ): Promise<boolean> {
   const reported = await workerVersion(worker);
   if (reported === version) {
-    worker.postMessage({ type: 'sable:skip-waiting' });
     webUpdateState.registration = null;
     webUpdateState.worker = null;
     return false;
