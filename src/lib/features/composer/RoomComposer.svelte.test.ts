@@ -11,6 +11,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { BotCommandInvocation } from './bot-commands';
 import type { ComposerContext } from './composer-context';
+import { invalidatePacks } from '#lib/emoji/load-packs.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
 import {
@@ -1450,6 +1451,46 @@ test('a bot command change clears stale suggestions', async () => {
   await vi.waitFor(() => {
     expect(screen.queryByRole('option', { name: /\/warn/ })).toBeNull();
   });
+});
+
+test('a pack change refreshes open emote suggestions', async () => {
+  const listeners: Array<(event: { type: string; room_id?: string }) => void> = [];
+  let listed = packs;
+  const client = core();
+  Object.assign(client, {
+    subscribeEvents: (listener: (event: { type: string; room_id?: string }) => void) => {
+      listeners.push(listener);
+      return () => {};
+    },
+  });
+  Object.assign(client.commands, {
+    imagePackListing: () => Promise.resolve({ packs: listed, complete: true }),
+  });
+  draftText(':wa');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+
+  expect(await screen.findByRole('option', { name: /:wave:/ })).toBeTruthy();
+  listed = [
+    {
+      ...packs[0],
+      images: [...packs[0].images, { ...packs[0].images[0], shortcode: 'wave2' }],
+    },
+  ];
+  invalidatePacks(client.commands);
+  for (const listener of listeners)
+    listener({ type: 'image_packs_changed', room_id: '!space:example.org' });
+
+  expect(await screen.findByRole('option', { name: /:wave2:/ })).toBeTruthy();
 });
 
 test('a zero-parameter bot command preserves raw trailing input', async () => {

@@ -173,18 +173,20 @@ pub fn pack_view(
 }
 
 use std::collections::{BTreeSet, HashMap};
+use std::sync::Arc;
 
 use futures_util::{StreamExt, future, stream};
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::ruma::api::client::state::get_state_events;
 use matrix_sdk::ruma::events::{
-    AnyGlobalAccountDataEventContent, AnyStateEvent, GlobalAccountDataEventType, StateEventType,
+    AnyGlobalAccountDataEventContent, AnyStateEvent, AnySyncStateEvent, GlobalAccountDataEventType,
+    StateEventType,
 };
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 
 use crate::Core;
-use crate::protocol::{CommandErr, CommandOk};
+use crate::protocol::{CommandErr, CommandOk, CoreEvent};
 
 type AccountDataContent = Option<Raw<AnyGlobalAccountDataEventContent>>;
 
@@ -277,6 +279,31 @@ fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
 }
 
 impl Core {
+    pub(crate) fn watch_image_packs(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |raw: Raw<AnySyncStateEvent>, room: matrix_sdk::Room| {
+                let core = core.clone();
+                async move {
+                    let kind = raw.get_field::<String>("type").ok().flatten();
+                    if matches!(kind.as_deref(), Some(ROOM_EMOTES | ROOM_IMAGE_PACK)) {
+                        core.emit_if_current(
+                            generation,
+                            CoreEvent::ImagePacksChanged {
+                                room_id: room.room_id().to_owned(),
+                            },
+                        );
+                    }
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
+    }
+
     async fn pack_account_data(
         &self,
         client: &matrix_sdk::Client,
@@ -859,15 +886,17 @@ mod tests {
 mod server_tests {
     use std::sync::Arc;
 
-    use matrix_sdk::ruma::room_id;
+    use matrix_sdk::ruma::serde::Raw;
+    use matrix_sdk::ruma::{OwnedRoomId, room_id};
     use matrix_sdk::test_utils::mocks::MatrixMockServer;
+    use matrix_sdk_test::JoinedRoomBuilder;
     use serde_json::json;
     use wiremock::matchers::{method, path_regex};
     use wiremock::{Mock, ResponseTemplate};
 
     use super::{AccountDataContent, PackContent, USER_EMOTES};
     use crate::Core;
-    use crate::protocol::ImagePackOriginView;
+    use crate::protocol::{CoreEvent, ImagePackOriginView};
     use crate::store::MemorySessionStore;
 
     const ACCOUNT_DATA_PATH: &str =
@@ -1026,5 +1055,54 @@ mod server_tests {
         assert!(!fallback.complete);
         assert_eq!(fallback.packs.len(), 1);
         assert_eq!(fallback.packs[0].id, "cats");
+    }
+
+    #[tokio::test]
+    async fn a_synced_pack_edit_is_announced() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!space:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        let (core, mut events) = Core::new("image-packs", Box::new(MemorySessionStore::default()));
+        core.watch_image_packs(&client, 1);
+
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(
+                        Raw::new(&json!({
+                            "type": "m.room.image_pack",
+                            "state_key": "cats",
+                            "event_id": "$pack",
+                            "sender": "@alice:example.org",
+                            "origin_server_ts": 1,
+                            "content": { "images": { "neocat": { "url": "mxc://example.org/neocat" } } }
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    )
+                    .add_timeline_event(
+                        Raw::new(&json!({
+                            "type": "m.room.topic",
+                            "state_key": "",
+                            "event_id": "$topic",
+                            "sender": "@alice:example.org",
+                            "origin_server_ts": 2,
+                            "content": { "topic": "cats" }
+                        }))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
+            )
+            .await;
+
+        let announced: Vec<OwnedRoomId> = std::iter::from_fn(|| events.try_recv().ok())
+            .filter_map(|event| match event {
+                CoreEvent::ImagePacksChanged { room_id } => Some(room_id),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(announced, [room_id.to_owned()]);
     }
 }

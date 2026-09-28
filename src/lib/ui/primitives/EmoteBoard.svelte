@@ -5,7 +5,7 @@
   import type { GifProviderSetting, GifResult, GifsConfig } from '#lib/features/gif/providers.js';
   import { i18n } from '#lib/i18n.js';
   import { shouldReduceMotion } from '#lib/ui/motion.js';
-  import { loadPacks } from '#lib/emoji/load-packs.js';
+  import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -90,22 +90,30 @@
     loading = true;
     failed = false;
     packs = [];
-    void loadPacks(
-      core.commands,
-      roomId,
-      (loaded) => {
-        if (cancelled) return;
-        packs = loaded;
+    const load = (): void => {
+      void loadPacks(
+        core.commands,
+        roomId,
+        (loaded) => {
+          if (cancelled) return;
+          packs = loaded;
+          loading = false;
+          failed = false;
+        },
+        accountId
+      ).catch(() => {
+        if (cancelled || packs.length > 0) return;
+        failed = true;
         loading = false;
-      },
-      accountId
-    ).catch(() => {
-      if (cancelled) return;
-      failed = true;
-      loading = false;
+      });
+    };
+    load();
+    const unsubscribe = core.subscribeEvents((event) => {
+      if (isPackChange(event)) load();
     });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   });
 

@@ -24,7 +24,7 @@
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { loadPacks } from '#lib/emoji/load-packs.js';
+  import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -361,6 +361,14 @@
     void roomId;
     activeBotCommand = null;
   });
+
+  $effect(() =>
+    core.subscribeEvents((event) => {
+      if (!isPackChange(event)) return;
+      loadedEmotesFor = null;
+      if (query?.sigil === ':') void loadEmotes();
+    })
+  );
 
   async function loadAdminCatalog(): Promise<void> {
     if (adminCommands) return;

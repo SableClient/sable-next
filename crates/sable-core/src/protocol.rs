@@ -1879,6 +1879,11 @@ pub enum CoreEvent {
         room_id: OwnedRoomId,
     },
 
+    ImagePacksChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+
     /// An incoming request arrives unsolicited. There is no other prompt.
     Verification {
         #[cfg_attr(feature = "typegen", specta(type = String))]

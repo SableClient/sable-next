@@ -926,6 +926,9 @@ export class CoreClient {
       case 'account_data_changed':
         if (isPackAccountDataEvent(event.event_type)) invalidatePacks(this.commands);
         return;
+      case 'image_packs_changed':
+        invalidatePacks(this.commands);
+        return;
       case 'session_ended':
         this.reauthenticationAccountId = this.session?.account_id ?? null;
         this.replaceSession(null);
