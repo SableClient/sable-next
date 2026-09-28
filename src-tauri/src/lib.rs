@@ -21,6 +21,8 @@ mod cold_push;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
+#[cfg(target_os = "linux")]
+pub mod permission_grants;
 #[cfg(all(feature = "cef", target_os = "linux"))]
 mod portal_theme;
 #[cfg(desktop)]

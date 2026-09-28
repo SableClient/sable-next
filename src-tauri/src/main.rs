@@ -39,11 +39,18 @@ fn prompt_for_permission(message: &str, answer: std::sync::mpsc::Sender<bool>) {
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
 fn install_permission_policy() {
-    use std::collections::HashSet;
-    use std::sync::{Mutex, OnceLock};
+    use app_lib::permission_grants::Grants;
+    use std::sync::{Arc, OnceLock};
 
-    static GRANTED: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    let granted = GRANTED.get_or_init(|| Mutex::new(HashSet::new()));
+    static GRANTED: OnceLock<Arc<Grants>> = OnceLock::new();
+    let granted = GRANTED.get_or_init(|| {
+        Arc::new(Grants::load(&[
+            "microphone",
+            "camera",
+            "screen",
+            "location",
+        ]))
+    });
 
     tauri_runtime_cef::set_permission_policy(move |request, responder| {
         use tauri_runtime_cef::{DenyReason, PermissionKind};
@@ -79,13 +86,8 @@ fn install_permission_policy() {
             return responder.deny(DenyReason::NoPolicy);
         }
 
-        {
-            let cache = granted
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            if kinds.iter().all(|kind| cache.contains(kind)) {
-                return responder.allow();
-            }
+        if granted.contains_all(&kinds) {
+            return responder.allow();
         }
 
         let message = match kinds.as_slice() {
@@ -99,6 +101,7 @@ fn install_permission_policy() {
         let deferred = responder.defer(tauri_runtime_cef::DEFAULT_PROMPT_TIMEOUT);
         let (tx, rx) = std::sync::mpsc::channel();
         prompt_for_permission(message, tx);
+        let granted = Arc::clone(granted);
         std::thread::spawn(move || {
             let allowed = rx
                 .recv_timeout(tauri_runtime_cef::DEFAULT_PROMPT_TIMEOUT)
@@ -107,10 +110,7 @@ fn install_permission_policy() {
                 deferred.deny(DenyReason::PolicyDenied);
                 return;
             }
-            granted
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .extend(kinds);
+            granted.grant(&kinds);
             deferred.allow();
         });
     });
