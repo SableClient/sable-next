@@ -6,6 +6,12 @@ test('keeps the cached loading animal', () => {
   expect(sanitize({ loadingAnimal: 'otter' }, preferences).loadingAnimal).toBe('otter');
 });
 
+test('keeps quick CSS', () => {
+  expect(sanitize({ quickCss: '.btn { color: red; }' }, preferences).quickCss).toBe(
+    '.btn { color: red; }'
+  );
+});
+
 test('keeps a notification volume inside its range', () => {
   expect(sanitize({ notificationSoundVolume: 0.4 }, preferences).notificationSoundVolume).toBe(0.4);
   expect(sanitize({ notificationSoundVolume: 3 }, preferences).notificationSoundVolume).toBe(1);

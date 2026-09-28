@@ -44,11 +44,15 @@ function exportedContent(json: string): SettingsSyncContent {
 describe('settingsFileJson', () => {
   it('writes syncable preferences under the account data type', () => {
     const content = exportedContent(
-      settingsFileJson({ ...base, dateFormat: 'ymd', developerTools: true }, noThemes)
+      settingsFileJson(
+        { ...base, dateFormat: 'ymd', quickCss: '.btn { color: red; }', developerTools: true },
+        noThemes
+      )
     );
 
     expect(content.v).toBe(SETTINGS_SYNC_VERSION);
     expect(content.settings.dateFormat).toBe('ymd');
+    expect(content.settings.quickCss).toBe('.btn { color: red; }');
     expect(content.settings).not.toHaveProperty('developerTools');
     expect(content.settings).not.toHaveProperty('pushGatewayUrl');
     expect(content.themes).toEqual(noThemes);

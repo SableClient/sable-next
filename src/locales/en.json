@@ -2323,6 +2323,8 @@
     "themeFileConfirmHint": "It is CSS from someone else and applies right away. Only install themes and tweaks from people you trust.",
     "themeRemoved": "{{name}} removed",
     "customThemesRemove": "Remove {{name}}",
+    "quickCss": "Quick CSS",
+    "quickCssHint": "Add CSS that applies immediately and overrides your theme and tweaks.",
     "appIconTitle": "App icon",
     "appIconDescription": "Choose your home screen icon.",
     "appIconFailed": "Could not change the app icon. Try again.",

@@ -60,6 +60,7 @@ export interface Preferences {
   messageSpacing: MessageSpacing;
   timelineEmoteSize: TimelineEmoteSize;
   theme: ThemeMode;
+  quickCss: string;
   underlineLinks: boolean;
   renderRoomColors: boolean;
   renderRoomFonts: boolean;
@@ -253,6 +254,7 @@ const ENUMS = {
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
+  'quickCss',
   'audioInputDevice',
   'audioOutputDevice',
   'videoInputDevice',
@@ -282,6 +284,7 @@ const DEFAULTS: Preferences = {
   messageSpacing: 'cozy',
   timelineEmoteSize: 'default',
   theme: 'system',
+  quickCss: '',
   underlineLinks: true,
   renderRoomColors: true,
   renderRoomFonts: true,

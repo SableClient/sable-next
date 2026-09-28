@@ -40,6 +40,7 @@ export function renameLegacyThemeIdentifiers(css: string): string {
 
 const THEME_STYLE_ID = 'sable-custom-theme';
 const TWEAK_STYLE_ID = 'sable-custom-tweaks';
+const QUICK_CSS_STYLE_ID = 'sable-quick-css';
 
 export function applyCustomTheme(css: string | undefined): void {
   const existing = document.getElementById(THEME_STYLE_ID);
@@ -62,6 +63,17 @@ export function applyCustomTweaks(css: readonly string[]): void {
 
   const style = existing ?? createStyle(TWEAK_STYLE_ID, null);
   style.textContent = css.map(renameLegacyThemeIdentifiers).join('\n');
+}
+
+export function applyQuickCss(css: string): void {
+  const existing = document.getElementById(QUICK_CSS_STYLE_ID);
+  if (!css) {
+    existing?.remove();
+    return;
+  }
+
+  const style = existing ?? createStyle(QUICK_CSS_STYLE_ID, null);
+  style.textContent = css;
 }
 
 function createStyle(id: string, anchor: Element | null): HTMLStyleElement {

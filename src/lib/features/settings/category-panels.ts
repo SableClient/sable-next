@@ -8,6 +8,7 @@ import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
 import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
+import QuickCss from '#lib/features/settings/QuickCss.svelte';
 import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
 import MediaPreviewPrivacy from '#lib/features/settings/MediaPreviewPrivacy.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
@@ -40,6 +41,7 @@ export interface CategoryPanel {
 export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [
     { component: CustomThemes, section: 'themes' },
+    { component: QuickCss, section: 'themes' },
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
