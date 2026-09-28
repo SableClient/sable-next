@@ -24,6 +24,7 @@ export default defineConfig({
     'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
     'mobile-drawer.spec.ts',
+    'settings-slide.spec.ts',
     'profile-card-tint.spec.ts',
     'reply-name-color.spec.ts',
     'thread-panel.spec.ts',
