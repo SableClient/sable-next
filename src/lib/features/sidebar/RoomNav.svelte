@@ -71,6 +71,7 @@
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
+  import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
@@ -752,6 +753,7 @@
                 uniform
               >
                 <RoomIcon
+                  isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
                   isSpace={room?.is_space ?? false}
                   isVoice={room?.is_voice ?? false}
                   joinRule={room?.join_rule ?? null}
@@ -770,6 +772,7 @@
           {:else}
             <span class="room-icon" aria-hidden="true">
               <RoomIcon
+                isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
                 isSpace={room?.is_space ?? false}
                 isVoice={room?.is_voice ?? false}
                 joinRule={room?.join_rule ?? null}
