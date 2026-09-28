@@ -280,6 +280,20 @@ impl Core {
         let watched = client.clone();
         self.track_session_task(
             spawn(async move {
+                core.emit_if_current(
+                    generation,
+                    CoreEvent::EncryptionStatus {
+                        status: crate::verification::encryption_status(&watched).await,
+                    },
+                );
+            })
+            .abort_on_drop(),
+        );
+
+        let core = self.clone();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
                 while verification.next().await.is_some() {
                     core.emit_if_current(
                         generation,

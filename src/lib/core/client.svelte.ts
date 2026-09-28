@@ -142,6 +142,7 @@ export class CoreClient {
   private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
+  private encryptionEvents = 0;
   private readonly accountChannel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('sable-active-account');
   /* Nothing renders from these, and a reactive map would make every mounted
@@ -742,13 +743,14 @@ export class CoreClient {
       would otherwise report nothing. */
   private async primeEncryptionStatus(): Promise<void> {
     const generation = this.generation;
+    const reported = this.encryptionEvents;
     try {
       const [status, devices] = await Promise.all([
         this.commands.encryptionStatus(),
         this.commands.devices(),
       ]);
       if (generation !== this.generation) return;
-      this.encryption = status;
+      if (reported === this.encryptionEvents) this.encryption = status;
       this.deviceList = devices.devices;
     } catch (error) {
       console.debug('[sable core] encryption status unavailable', error);
@@ -902,6 +904,7 @@ export class CoreClient {
         this.applySyncStatus(event);
         return;
       case 'encryption_status':
+        this.encryptionEvents += 1;
         this.encryption = event.status;
         return;
       case 'devices_changed':

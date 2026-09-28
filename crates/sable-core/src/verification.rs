@@ -574,6 +574,12 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {
     let encryption = client.encryption();
+    let cross_signing_ready = encryption
+        .cross_signing_status()
+        .await
+        .is_some_and(|status| status.is_complete());
+    let backup_unlocked = encryption.backups().are_enabled().await;
+    let recovery_passphrase = recovery_passphrase(client).await;
 
     EncryptionStatusView {
         verification: match encryption.verification_state().get() {
@@ -587,13 +593,9 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             RecoveryState::Incomplete => RecoveryStateView::Incomplete,
             RecoveryState::Unknown => RecoveryStateView::Unknown,
         },
-        // A partial set cannot sign another device, so it does not count.
-        cross_signing_ready: encryption
-            .cross_signing_status()
-            .await
-            .is_some_and(|status| status.is_complete()),
-        backup_unlocked: encryption.backups().are_enabled().await,
-        recovery_passphrase: recovery_passphrase(client).await,
+        cross_signing_ready,
+        backup_unlocked,
+        recovery_passphrase,
     }
 }
 

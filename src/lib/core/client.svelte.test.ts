@@ -641,3 +641,40 @@ test('an onion homeserver leaves discovery to the Matrix core without a browser 
   expect(fetchMock).not.toHaveBeenCalled();
   expect(fake.sent).toContainEqual({ type: 'login_flows', homeserver });
 });
+
+test('a status reported while the first read is in flight is not overwritten by it', async () => {
+  const unknown = {
+    verification: 'unknown',
+    recovery: 'unknown',
+    cross_signing_ready: false,
+    backup_unlocked: false,
+    recovery_passphrase: false,
+  } as const;
+  const known = { ...unknown, verification: 'verified', recovery: 'enabled' } as const;
+  let answer: (value: object) => void = () => {};
+  const device = { device_id: 'LAPTOP' };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session] },
+    devices: { devices: [device] },
+  });
+  const plain = fake.send.getMockImplementation();
+  fake.send.mockImplementation((command: { type: string }) =>
+    command.type === 'encryption_status'
+      ? new Promise<object>((resolve) => {
+          answer = resolve;
+        })
+      : (plain?.(command) ?? Promise.resolve({}))
+  );
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  fake.emit({ type: 'encryption_status', status: known } as unknown as CoreEvent);
+  answer({ status: unknown });
+  await vi.waitFor(() => {
+    expect(core.deviceList).toEqual([device]);
+  });
+
+  expect(core.encryption).toEqual(known);
+  core.stop();
+});
