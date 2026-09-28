@@ -768,6 +768,7 @@
   },
   "timeline": {
     "label": "Timeline",
+    "eventTimeline": "Event timeline",
     "back": "Back to rooms",
     "loading": "Loading messages…",
     "loadingHistory": "Loading older messages…",

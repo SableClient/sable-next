@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { RoomPermissionsView } from '#src/generated/protocol';
+  import { goto } from '$app/navigation';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
   import ThreadPanel from '#lib/features/room/conversation/ThreadPanel.svelte';
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
@@ -25,7 +27,7 @@
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
-  import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -227,6 +229,11 @@
       {roomAvatar}
       onBack={backToRoomList}
       onSearch={() => searchInRoom(resolvedRoom, resolvedRoomId)}
+      onEventTimeline={preferences.developerTools
+        ? () => {
+            void goto(eventTimelinePath(resolvedRoomId));
+          }
+        : undefined}
     />
     <div class="forum-content">
       <div class="forum-compose-area">

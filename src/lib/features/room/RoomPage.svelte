@@ -75,15 +75,16 @@
 
   let resolvedRoom = $derived(listedRoom ?? unlistedRoom);
   let space = $derived(resolvedRoom?.is_space ? resolvedRoom : null);
+  let eventTimeline = $derived(page.url.searchParams.get('timeline') === 'events');
   $effect(() => {
-    if (!space) return;
+    if (!space || eventTimeline) return;
     void goto(resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(space) }), {
       replace: true,
     });
   });
 </script>
 
-{#if space === null && mountedRoomId === roomId}
+{#if (space === null || eventTimeline) && mountedRoomId === roomId}
   {#if joined || !listed || unlistedRoom}
     <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
   {:else}

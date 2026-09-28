@@ -93,6 +93,17 @@ test('a space opened as a room is sent to its lobby', async () => {
   expect(rendered.at(-1)?.kind).not.toBe('view');
 });
 
+test('the event timeline opens a space as a normal room', async () => {
+  visit('/rooms/!old:example.org?timeline=events', { roomId: '!old:example.org' });
+  const space = { room_id: '!old:example.org', state: 'joined', is_space: true } as RoomSummary;
+  Object.assign(core, { roomSummary: vi.fn(() => Promise.resolve(space)) });
+  render(RoomPage);
+  await settle();
+
+  expect(goto).not.toHaveBeenCalled();
+  expect(rendered.at(-1)).toEqual({ kind: 'view', roomId: '!old:example.org', extra: space });
+});
+
 test('on the mobile layout the room mounts a frame after the route, behind the drawer slide', async () => {
   const { happyDOM } = window as unknown as {
     happyDOM: { setViewport: (viewport: { width: number }) => void };
