@@ -112,6 +112,7 @@
   {open}
   {onOpenChange}
   variant="verification"
+  contentStyle="max-width: min(40rem, calc(100vw - 3rem))"
   label={$i18n.t(item ? 'calendar.editTitle' : 'calendar.newTitle')}
 >
   <form
