@@ -505,6 +505,32 @@ test('a cancellation for an unknown verification flow does not open the verifica
   unsubscribe();
 });
 
+test('verifying while another device is asking accepts its request instead of crossing it', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  const unsubscribe = core.subscribeEvents(() => {});
+
+  fake.emit({
+    type: 'verification',
+    user_id: session.user_id,
+    flow_id: 'incoming-flow',
+    state: { phase: 'requested', is_self: true, initiated_by_us: false },
+  });
+
+  await expect(core.requestVerification(session.user_id, 'NEWDEVICE')).resolves.toBe(
+    'incoming-flow'
+  );
+  expect(fake.sent).toContainEqual({
+    type: 'accept_verification',
+    user_id: session.user_id,
+    flow_id: 'incoming-flow',
+  });
+  expect(fake.sent.some((command) => command.type === 'request_verification')).toBe(false);
+  unsubscribe();
+});
+
 test('a session ending clears the session and looks for a fallback account', async () => {
   const fake = fakeTransport({
     restore: { session },

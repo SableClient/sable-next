@@ -657,6 +657,15 @@ export class CoreClient {
   }
 
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {
+    const pending = this.verification;
+    if (
+      userId === this.session?.user_id &&
+      pending?.state.phase === 'requested' &&
+      !pending.state.initiated_by_us
+    ) {
+      await this.commands.acceptVerification(userId, pending.flowId);
+      return pending.flowId;
+    }
     const response = await this.ensureTransport().send({
       type: 'request_verification',
       user_id: userId,

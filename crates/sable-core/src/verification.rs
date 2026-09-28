@@ -19,7 +19,7 @@ use matrix_sdk::ruma::events::key::verification::VerificationMethod;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
 use matrix_sdk::ruma::events::secret_storage::default_key::SecretStorageDefaultKeyEventContent;
-use matrix_sdk::ruma::{OwnedUserId, UserId};
+use matrix_sdk::ruma::{OwnedDeviceId, OwnedUserId, UserId};
 use qrcode::bits::Bits;
 use qrcode::{Color, EcLevel, QrCode, Version};
 
@@ -32,6 +32,13 @@ use crate::protocol::{
 use crate::Core;
 
 const BACKUP_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+
+pub(crate) const VERIFICATION_METHODS: [VerificationMethod; 4] = [
+    VerificationMethod::SasV1,
+    VerificationMethod::QrCodeShowV1,
+    VerificationMethod::QrCodeScanV1,
+    VerificationMethod::ReciprocateV1,
+];
 
 pub(crate) struct PendingIdentityReset {
     generation: u64,
@@ -177,7 +184,12 @@ impl Core {
                     );
 
                     if let Some(request) = request {
-                        core.watch_verification(request);
+                        core.receive_verification_request(
+                            &client,
+                            request,
+                            event.content.from_device,
+                        )
+                        .await;
                     }
                 }
             }
@@ -207,6 +219,89 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
+    async fn receive_verification_request(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        request: VerificationRequest,
+        from_device: OwnedDeviceId,
+    ) {
+        let user_id = request.other_user_id().to_owned();
+
+        if request
+            .cancel_info()
+            .is_some_and(|info| info.cancelled_by_us())
+        {
+            let we_resend = client
+                .device_id()
+                .is_some_and(|ours| ours.as_str() < from_device.as_str());
+            tracing::info!(
+                operation = "verification",
+                we_resend,
+                "verification request crossed ours"
+            );
+
+            if we_resend {
+                self.resend_crossed_verification(client.clone(), user_id, from_device);
+            } else {
+                *self.crossed_verification.lock().await = Some((user_id, from_device));
+            }
+            return;
+        }
+
+        let expected = {
+            let mut crossed = self.crossed_verification.lock().await;
+            let expected = crossed
+                .as_ref()
+                .is_some_and(|(user, device)| *user == user_id && *device == from_device);
+            if expected {
+                crossed.take();
+            }
+            expected
+        };
+
+        self.watch_verification(request.clone());
+
+        if expected
+            && let Err(error) = request
+                .accept_with_methods(VERIFICATION_METHODS.to_vec())
+                .await
+        {
+            self.failed("verification: accept crossed request", error);
+        }
+    }
+
+    fn resend_crossed_verification(
+        self: &Arc<Self>,
+        client: matrix_sdk::Client,
+        user_id: OwnedUserId,
+        device_id: OwnedDeviceId,
+    ) {
+        let core = self.clone();
+        let task = spawn(async move {
+            let request = match client.encryption().get_device(&user_id, &device_id).await {
+                Ok(Some(device)) => {
+                    device
+                        .request_verification_with_methods(VERIFICATION_METHODS.to_vec())
+                        .await
+                }
+                Ok(None) => return,
+                Err(error) => {
+                    core.failed("verification: crossed request device", error);
+                    return;
+                }
+            };
+
+            match request {
+                Ok(request) => core.watch_verification(request),
+                Err(error) => {
+                    core.failed("verification: resend crossed request", error);
+                }
+            }
+        })
+        .abort_on_drop();
+        self.track_session_task(task);
+    }
+
     /// The request and the SAS it becomes are two objects with two state enums.
     /// Both funnel into one event stream keyed by the flow id.
     pub(crate) fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
@@ -215,8 +310,8 @@ impl Core {
             let user_id = request.other_user_id().to_owned();
             let flow_id = request.flow_id().to_owned();
 
-            let mut changes = request.changes();
-            core.emit_verification(&user_id, &flow_id, request_view(&request, &request.state()));
+            let changes = request.changes();
+            let mut changes = futures_util::stream::iter([request.state()]).chain(changes);
 
             while let Some(state) = changes.next().await {
                 match state {

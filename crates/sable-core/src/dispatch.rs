@@ -2483,7 +2483,9 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("request_verification: device", error))?
                         .ok_or(CommandErr::Unavailable)?
-                        .request_verification()
+                        .request_verification_with_methods(
+                            crate::verification::VERIFICATION_METHODS.to_vec(),
+                        )
                         .await
                         .map_err(|error| self.failed("request_verification", error))?,
                     None => encryption
@@ -2491,10 +2493,19 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("request_verification: identity", error))?
                         .ok_or(CommandErr::Unavailable)?
-                        .request_verification()
+                        .request_verification_with_methods(
+                            crate::verification::VERIFICATION_METHODS.to_vec(),
+                        )
                         .await
                         .map_err(|error| self.failed("request_verification", error))?,
                 };
+
+                if request.is_cancelled() {
+                    return Err(self.failed(
+                        "request_verification",
+                        "cancelled on creation by another ongoing request",
+                    ));
+                }
 
                 let flow_id = request.flow_id().to_owned();
                 self.watch_verification(request);
@@ -2550,7 +2561,7 @@ impl Core {
                 let request = self.verification_request(&user_id, &flow_id).await?;
 
                 request
-                    .accept()
+                    .accept_with_methods(crate::verification::VERIFICATION_METHODS.to_vec())
                     .await
                     .map_err(|error| self.failed("accept_verification", error))?;
 
