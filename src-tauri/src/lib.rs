@@ -704,17 +704,20 @@ fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Build
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[expect(clippy::too_many_lines, reason = "the platform-specific builder remains together")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the platform-specific builder remains together"
+)]
 pub fn run() {
     install_logging();
 
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let sentry_guard = sentry::init();
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(desktop)]
     let sentry_minidump_guard = sentry_guard
         .as_ref()
         .map(|guard| tauri_plugin_sentry::minidump::init(guard));
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(desktop)]
     let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
