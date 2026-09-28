@@ -31,7 +31,7 @@
     callTiles,
     GRID_GAP_PX,
     NARROW_STAGE_PX,
-    spotlightTile,
+    featuredTiles,
     togglePin,
     type CallTile,
   } from './call-layout';
@@ -93,8 +93,9 @@
 
   let pinned = $state<string | null>(null);
   let gridForced = $state(false);
-  let spotlight = $derived(pinned === null && gridForced ? null : spotlightTile(tiles, pinned));
-  let strip = $derived(spotlight ? tiles.filter((tile) => tile.key !== spotlight.key) : []);
+  let featured = $derived(pinned === null && gridForced ? [] : featuredTiles(tiles, pinned));
+  let spotlight = $derived(featured.length > 0);
+  let strip = $derived(spotlight ? tiles.filter((tile) => !featured.includes(tile)) : []);
   let canSpotlight = $derived(pinned !== null || tiles.some((tile) => tile.source === 'screen'));
 
   let noticeHeight = $state(0);
@@ -102,9 +103,14 @@
   let mediaHeight = $state(0);
   let aspect = $derived(mediaWidth > 0 && mediaWidth < NARROW_STAGE_PX ? 1 : 16 / 9);
   let grid = $derived(bestGrid(tiles.length, mediaWidth, mediaHeight, GRID_GAP_PX, aspect));
+  let featuredWidth = $state(0);
+  let featuredHeight = $state(0);
+  let featuredGrid = $derived(
+    bestGrid(featured.length, featuredWidth, featuredHeight, GRID_GAP_PX, 16 / 9)
+  );
 
   function pin(tile: CallTile): void {
-    ({ pinned, gridForced } = togglePin(tiles, spotlight, tile));
+    ({ pinned, gridForced } = togglePin(tiles, featured, tile));
   }
 
   function toggleLayout(): void {
@@ -341,8 +347,17 @@
       <p class="empty">{$i18n.t('call.noParticipants')}</p>
     {:else if spotlight}
       <div class="focus">
-        <ul class="featured">
-          {@render tile(spotlight, true)}
+        <ul
+          class="featured"
+          class:several={featured.length > 1}
+          bind:clientWidth={featuredWidth}
+          bind:clientHeight={featuredHeight}
+          style:--tile-width="{Math.floor(featuredGrid.width)}px"
+          style:--grid-gap="{GRID_GAP_PX}px"
+        >
+          {#each featured as item (item.key)}
+            {@render tile(item, true)}
+          {/each}
         </ul>
         {#if strip.length > 0}
           <ul
@@ -398,7 +413,7 @@
   {/if}
 </section>
 
-{#snippet tile(item: CallTile, featured: boolean)}
+{#snippet tile(item: CallTile, large: boolean)}
   {@const profile = profileOf(item.participant.identity)}
   <CallParticipantTile
     participant={item.participant}
@@ -408,8 +423,8 @@
     name={profile.name}
     userId={profile.userId}
     avatar={profile.avatar}
-    {featured}
-    pinned={spotlight?.key === item.key}
+    featured={large}
+    pinned={featured.length === 1 && featured[0].key === item.key}
     onPin={tiles.length > 1 ? () => pin(item) : undefined}
     onVolumeChange={(identity, volume) => void session.setParticipantVolume(identity, volume)}
   />
@@ -657,6 +672,18 @@
 
   .featured > :global(.tile) {
     flex: 1;
+  }
+
+  .featured.several {
+    flex-wrap: wrap;
+    gap: var(--grid-gap);
+    place-content: center;
+  }
+
+  .featured.several > :global(.tile) {
+    aspect-ratio: 16 / 9;
+    flex: none;
+    inline-size: var(--tile-width);
   }
 
   .strip {

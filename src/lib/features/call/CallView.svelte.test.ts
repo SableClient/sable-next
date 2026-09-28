@@ -11,9 +11,10 @@ import CallViewHarness from './CallViewHarness.test.svelte';
 
 const shared = { id: 's', muted: false, subscribed: true };
 
-function mountBothSharing() {
-  const self: CallParticipant = { identity: 'me:AAAA', local: true, screenShare: shared };
-  const other: CallParticipant = { identity: 'me:BBBB', screenShare: shared };
+function mountBothSharing(
+  self: CallParticipant = { identity: 'me:AAAA', local: true, screenShare: shared },
+  others: CallParticipant[] = [{ identity: 'me:BBBB', screenShare: shared }]
+) {
   const session = {
     lifecycle: 'active',
     mediaReady: true,
@@ -47,7 +48,7 @@ function mountBothSharing() {
       ...idleTransportState(),
       connection: 'connected',
       self,
-      participants: [other],
+      participants: others,
     },
     roomFor: () => undefined,
   } as unknown as CallSession;
@@ -78,4 +79,19 @@ test('pins either screen of an account sharing from two devices, and unpins to t
   await user.click(spotlight().getByRole('button', { name: "Unpin @there:x's screen" }));
   expect(container.querySelector('.featured')).not.toBeInTheDocument();
   expect(container.querySelector('.grid')).toBeInTheDocument();
+});
+
+test('features every remote screen together and keeps the people in the strip', () => {
+  const { container } = mountBothSharing({ identity: 'me:AAAA', local: true }, [
+    { identity: 'me:BBBB', screenShare: shared },
+    { identity: 'me:CCCC', screenShare: shared },
+  ]);
+  const featured = container.querySelector<HTMLElement>('ul.featured');
+  if (!featured) throw new Error('no featured list');
+
+  expect(within(featured).getAllByRole('listitem')).toHaveLength(2);
+  expect(featured).toHaveClass('several');
+  expect(
+    within(screen.getByRole('list', { name: /participants?$/ })).getAllByRole('listitem')
+  ).toHaveLength(3);
 });
