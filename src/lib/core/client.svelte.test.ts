@@ -216,6 +216,25 @@ test('commands dispatch through the transport the client was given', async () =>
   expect(fake.sent).toContainEqual({ type: 'room_aliases', room_id: '!room:example.org' });
 });
 
+test('commands copy caller-provided arrays, so reactive proxies cannot reach the transport', async () => {
+  const fake = fakeTransport({ restore: { session: null }, join_room: { room_id: '!x:b' } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+
+  // Any Proxy stands in for a `$state` array, which structured clone refuses.
+  const via = new Proxy(['example.org'], {});
+  await core.commands.joinRoom('!room:example.org', via);
+
+  const sent = fake.sent.find((command) => command.type === 'join_room');
+  expect(sent).toEqual({
+    type: 'join_room',
+    address: '!room:example.org',
+    via: ['example.org'],
+  });
+  expect(() => structuredClone(sent)).not.toThrow();
+});
+
 test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {
   const fake = fakeTransport();
   const sendAttachment = vi.fn<Transport['sendAttachment']>();

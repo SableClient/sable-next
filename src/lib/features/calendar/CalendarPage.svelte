@@ -56,7 +56,7 @@
   let permissions = $state<RoomPermissionsView | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let showPast = $state(false);
-  let editing = $state<CalendarItem | null>(null);
+  let editing = $state.raw<CalendarItem | null>(null);
   let dialogOpen = $state(false);
   let deleting = $state<CalendarItem | null>(null);
   let deleteBusy = $state(false);
