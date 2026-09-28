@@ -13,7 +13,9 @@
   const core = useCoreClient();
   const dismissal = persistedDismissal('sable-recovery-incomplete-dismissed');
   const deviceId = $derived(core.session?.device_id ?? null);
-  const incomplete = $derived(core.encryption?.recovery === 'incomplete');
+  const incomplete = $derived(
+    core.encryption?.recovery === 'incomplete' && !core.encryption.backup_unlocked
+  );
   const selfUnverified = $derived(core.encryption?.verification === 'unverified');
   const inAppShell = $derived(page.route.id?.startsWith('/(app)') ?? false);
   const show = $derived(

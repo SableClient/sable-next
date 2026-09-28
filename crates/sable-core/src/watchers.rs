@@ -274,6 +274,7 @@ impl Core {
     pub(crate) fn watch_encryption(self: &Arc<Self>, client: &matrix_sdk::Client, generation: u64) {
         let mut verification = client.encryption().verification_state();
         let recovery = client.encryption().recovery().state_stream();
+        let backups = client.encryption().backups().state_stream();
 
         let core = self.clone();
         let watched = client.clone();
@@ -297,6 +298,23 @@ impl Core {
             spawn(async move {
                 pin_mut!(recovery);
                 while recovery.next().await.is_some() {
+                    core.emit_if_current(
+                        generation,
+                        CoreEvent::EncryptionStatus {
+                            status: crate::verification::encryption_status(&watched).await,
+                        },
+                    );
+                }
+            })
+            .abort_on_drop(),
+        );
+
+        let core = self.clone();
+        let watched = client.clone();
+        self.track_session_task(
+            spawn(async move {
+                pin_mut!(backups);
+                while backups.next().await.is_some() {
                     core.emit_if_current(
                         generation,
                         CoreEvent::EncryptionStatus {

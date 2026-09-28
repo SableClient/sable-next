@@ -22,7 +22,13 @@ import SetupDoneCard from './SetupDoneCard.svelte';
 
 function setEncryption(verification: string, recovery: string) {
   Object.assign(core, {
-    encryption: { verification, recovery, cross_signing_ready: true, recovery_passphrase: false },
+    encryption: {
+      verification,
+      recovery,
+      cross_signing_ready: true,
+      backup_unlocked: true,
+      recovery_passphrase: false,
+    },
   });
 }
 

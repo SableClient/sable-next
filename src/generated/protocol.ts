@@ -399,6 +399,7 @@ export type EncryptionStatusView = {
 	 *  verification must come from another session.
 	 */
 	cross_signing_ready: boolean,
+	backup_unlocked: boolean,
 	/**  The default secret storage key can also be unlocked with a passphrase. */
 	recovery_passphrase: boolean,
 };

@@ -457,6 +457,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       verification: identityConfirmed ? 'verified' : 'unverified',
       recovery: identityConfirmed ? 'enabled' : 'disabled',
       cross_signing_ready: identityConfirmed,
+      backup_unlocked: identityConfirmed,
       recovery_passphrase: false,
     });
     const subscriptions = new Map<number, { roomId: string; page: number }>();
@@ -1146,6 +1147,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             verification: workerMode === 'unverified' ? 'unverified' : 'verified',
             recovery: 'enabled',
             cross_signing_ready: true,
+            backup_unlocked: true,
             recovery_passphrase: false,
           },
           backup_enabled: true,

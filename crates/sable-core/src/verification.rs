@@ -592,6 +592,7 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             .cross_signing_status()
             .await
             .is_some_and(|status| status.is_complete()),
+        backup_unlocked: encryption.backups().are_enabled().await,
         recovery_passphrase: recovery_passphrase(client).await,
     }
 }

@@ -26,6 +26,7 @@ const status: EncryptionStatusView = {
   verification: 'verified',
   recovery: 'enabled',
   cross_signing_ready: true,
+  backup_unlocked: true,
   recovery_passphrase: false,
 };
 

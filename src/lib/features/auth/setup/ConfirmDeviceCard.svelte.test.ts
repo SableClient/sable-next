@@ -44,6 +44,7 @@ const status = (
   verification,
   recovery,
   cross_signing_ready: false,
+  backup_unlocked: false,
   recovery_passphrase: false,
 });
 
