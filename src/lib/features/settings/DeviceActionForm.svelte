@@ -12,6 +12,7 @@
     accountManagement?: boolean;
     displayName?: string;
     password?: string;
+    busy?: boolean;
     onSubmit: () => void;
     onCancel: () => void;
   }
@@ -22,6 +23,7 @@
     accountManagement = false,
     displayName = $bindable(''),
     password = $bindable(''),
+    busy = false,
     onSubmit,
     onCancel,
   }: Props = $props();
@@ -31,7 +33,7 @@
   class={['device-form', { 'danger-form': mode === 'remove' }]}
   onsubmit={(event) => {
     event.preventDefault();
-    onSubmit();
+    if (!busy) onSubmit();
   }}
 >
   {#if mode === 'rename'}
@@ -57,8 +59,12 @@
       />
     {/if}
     <div class="form-actions">
-      <Button type="submit" variant="danger">{$i18n.t('settings.removeDevice')}</Button>
-      <Button variant="ghost" onclick={onCancel}>{$i18n.t('settings.cancel')}</Button>
+      <Button type="submit" variant="danger" loading={busy}>
+        {$i18n.t('settings.removeDevice')}
+      </Button>
+      <Button variant="ghost" disabled={busy} onclick={onCancel}>
+        {$i18n.t('settings.cancel')}
+      </Button>
     </div>
   {/if}
 </form>

@@ -146,3 +146,34 @@ test('a session without device keys says so and offers no verification', async (
   expect(within(unverified).getByText('Not verified')).toBeInTheDocument();
   expect(within(unverified).getByRole('button', { name: 'Verify device' })).toBeInTheDocument();
 });
+
+test('removing one device shows it is in progress until the list no longer has it', async () => {
+  const user = await renderDevices([own, other1]);
+  let answer: (value: string | null) => void = () => {};
+  core.deleteDevice.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      })
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Options for Phone' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'Remove' }));
+  await vi.waitFor(() => {
+    expect(document.body.style.pointerEvents).toBe('');
+  });
+  await user.type(screen.getByLabelText('Password (if required)'), 'hunter2');
+  const confirm = screen.getByRole('button', { name: 'Remove device' });
+  await user.click(confirm);
+
+  expect(core.deleteDevice).toHaveBeenCalledWith('DEV1', 'hunter2');
+  expect(confirm).toHaveAttribute('aria-busy', 'true');
+  expect(confirm).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+
+  core.devices.mockResolvedValue({ devices: [own], accountManagement: false });
+  answer(null);
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('button', { name: 'Remove device' })).not.toBeInTheDocument();
+  });
+});

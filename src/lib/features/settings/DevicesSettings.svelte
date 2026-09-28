@@ -55,6 +55,7 @@
   let newRecoveryKey = $state<string | null>(null);
   let confirmingReset = $state(false);
   let deleting = $state<string | null>(null);
+  let removing = $state<string | null>(null);
   let verificationOpen = $state(false);
   let resettingIdentity = $state(false);
   let verifying = $state<string | null>(null);
@@ -158,18 +159,23 @@
     deviceId: string,
     authWindow: ExternalAuthWindow | null = null
   ): Promise<void> {
+    if (removing !== null) return;
+    removing = deviceId;
+    error = null;
     try {
       const managementUrl = await core.commands.deleteDevice(deviceId, password || null);
-      cancelRemoval();
       if (managementUrl) {
         if (authWindow) await authWindow.navigate(managementUrl);
         else await openExternalAuthUrl(managementUrl);
       } else {
         await refresh();
       }
+      cancelRemoval();
     } catch (cause) {
       authWindow?.close();
       error = messageFor(cause);
+    } finally {
+      removing = null;
     }
   }
 
@@ -612,6 +618,7 @@
                   deviceId={device.device_id}
                   {accountManagement}
                   bind:password
+                  busy={removing === device.device_id}
                   onSubmit={() => void removeDevice(device.device_id)}
                   onCancel={cancelRemoval}
                 />
