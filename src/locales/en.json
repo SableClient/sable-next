@@ -2992,6 +2992,7 @@
     "showCall": "Show call",
     "screenOf": "{{name}}'s screen",
     "returnToCall": "Back to the call",
+    "toneDownScreen": "Tone down {{name}}'s screen",
     "popOutScreen": "Pop out the shared screen",
     "hideScreenPreview": "Hide the shared screen",
     "nameOnDevice": "{{name}} ({{device}})",

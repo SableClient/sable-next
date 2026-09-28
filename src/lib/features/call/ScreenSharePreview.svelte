@@ -10,6 +10,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { callTiles, featuredTiles, type CallTile } from './call-layout';
+  import { screenToned } from './screen-tone.svelte.js';
   import type { CallSession } from './call-session.svelte.js';
   import {
     dismissedPreview,
@@ -187,7 +188,14 @@
     onpointerdown={startDrag}
   >
     {#key shown.key}
-      <video bind:this={video} autoplay muted playsinline {@attach attach}></video>
+      <video
+        bind:this={video}
+        class:toned={sharerId !== null && screenToned(sharerId)}
+        autoplay
+        muted
+        playsinline
+        {@attach attach}
+      ></video>
     {/key}
     <div class="bar">
       <MonitorIcon aria-hidden="true" weight="fill" />
@@ -268,6 +276,10 @@
     object-fit: contain;
     pointer-events: none;
     width: 100%;
+  }
+
+  video.toned {
+    filter: brightness(0.75) contrast(0.9) saturate(0.8);
   }
 
   .bar {

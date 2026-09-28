@@ -131,3 +131,22 @@ test('the call view counts itself as watching while it is on screen', () => {
   unmount();
   expect(session.views).toBe(0);
 });
+
+test('a remote screen can be toned down, and the choice sticks to its sharer', async () => {
+  const user = userEvent.setup();
+  const { unmount } = mountBothSharing();
+  const tone = screen.getByRole('button', { name: "Tone down @there:x's screen" });
+  expect(screen.queryByRole('button', { name: "Tone down @here:x's screen" })).toBeNull();
+
+  await user.click(tone);
+  expect(tone).toHaveAttribute('aria-pressed', 'true');
+  expect(tone.closest('li')?.querySelector('video')).toHaveClass('toned');
+  unmount();
+
+  mountBothSharing();
+  expect(screen.getByRole('button', { name: "Tone down @there:x's screen" })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await user.click(screen.getByRole('button', { name: "Tone down @there:x's screen" }));
+});
