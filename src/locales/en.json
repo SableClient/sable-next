@@ -3130,7 +3130,7 @@
     "markAllRead": "Mark every room as read",
     "replyOlder": "Reply to the previous message",
     "replyNewer": "Reply to the next message",
-    "pressKeys": "Press keys…",
+    "pressKeys": "Press keys, Esc to cancel…",
     "conflict": "That combination is already used by “{{name}}”.",
     "resetOne": "Reset to default",
     "resetAll": "Reset every shortcut",
