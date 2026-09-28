@@ -129,6 +129,16 @@ test('an unencrypted call connects without waiting for a key', async () => {
   expect(transport.connect).toHaveBeenCalledOnce();
 });
 
+test('joining clears screen shares watched in an earlier call', async () => {
+  const { client, transport } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  session.watchScreenShare('screen');
+
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  expect(session.watchedScreenShareIds).toEqual([]);
+});
+
 test('a call tears down after a successful join reports disconnected', async () => {
   const { client, transport, emitTransportState, leaveCall } = harness();
   const session = new CallSession(client, { createTransport: () => transport });

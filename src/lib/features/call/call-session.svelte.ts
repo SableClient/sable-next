@@ -218,6 +218,7 @@ export class CallSession {
     this.#lease = lease;
     this.#lastJoin = { roomId, media, serviceUrl };
     this.layout = { pinned: null, gridForced: false };
+    this.watchedScreenShareIds = [];
     this.deviceError = null;
     const attempt = ++this.#attemptGeneration;
     const telemetry = new CallTelemetry({
