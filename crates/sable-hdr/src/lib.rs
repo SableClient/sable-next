@@ -6,6 +6,9 @@ use half::f16;
 use linear_srgb::lut::SrgbConverter;
 use zentone::{Bt2408Tonemapper, ToneMap, gamut};
 
+#[cfg(windows)]
+pub mod windows;
+
 /// OBS's defaults for "SDR white level" and "HDR nominal peak level".
 pub const OBS_SDR_WHITE_NITS: f32 = 300.0;
 pub const OBS_PEAK_NITS: f32 = 1000.0;
@@ -69,6 +72,18 @@ impl HdrToSdr {
         scratch.rgb = rgb;
     }
 
+    /// The same row as it comes off the capture texture: little-endian bytes.
+    pub fn scrgb_bytes_row(&self, source: &[u8], scratch: &mut Scratch, out: &mut [u8]) {
+        let (pixels, _) = source.as_chunks::<2>();
+        scratch.halves.clear();
+        scratch
+            .halves
+            .extend(pixels.iter().map(|&bytes| u16::from_le_bytes(bytes)));
+        let halves = std::mem::take(&mut scratch.halves);
+        self.scrgb_row(&halves, scratch, out);
+        scratch.halves = halves;
+    }
+
     /// One row of PQ-encoded BT.2020 samples in `[0, 1]`, as a `PipeWire` HDR
     /// screencast delivers them once unpacked. `out` receives BGRA.
     pub fn pq_row(&self, source: &[[f32; 3]], scratch: &mut Scratch, out: &mut [u8]) {
@@ -120,6 +135,7 @@ impl HdrToSdr {
 /// Per-thread buffers reused from one row to the next.
 #[derive(Default)]
 pub struct Scratch {
+    halves: Vec<u16>,
     rgb: Vec<[f32; 3]>,
     flat: Vec<f32>,
     encoded: Vec<u8>,
@@ -242,6 +258,27 @@ mod timing {
             );
         }
         println!("TIMING 1080p frame, all cores: {:?}", start.elapsed() / 10);
+    }
+}
+
+#[cfg(test)]
+mod bytes {
+    use half::f16;
+
+    use super::{HdrToSdr, OBS_PEAK_NITS, OBS_SDR_WHITE_NITS, Scratch};
+
+    #[test]
+    fn capture_bytes_convert_like_the_halves_they_hold() {
+        let map = HdrToSdr::new(OBS_SDR_WHITE_NITS, OBS_PEAK_NITS);
+        let halves: Vec<u16> = [2.0_f32, 5.0, 9.0, 1.0]
+            .iter()
+            .map(|&value| f16::from_f32(value).to_bits())
+            .collect();
+        let bytes: Vec<u8> = halves.iter().flat_map(|half| half.to_le_bytes()).collect();
+        let (mut from_halves, mut from_bytes) = ([0u8; 4], [0u8; 4]);
+        map.scrgb_row(&halves, &mut Scratch::default(), &mut from_halves);
+        map.scrgb_bytes_row(&bytes, &mut Scratch::default(), &mut from_bytes);
+        assert_eq!(from_halves, from_bytes);
     }
 }
 

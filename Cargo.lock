@@ -7110,6 +7110,7 @@ version = "0.1.0"
 dependencies = [
  "half",
  "linear-srgb",
+ "windows 0.62.2",
  "windows-capture",
  "zentone",
 ]
