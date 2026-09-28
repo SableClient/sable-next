@@ -138,7 +138,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
     /// Error lines always reach the page: the `Failed` command error only
     /// carries a `log_id`, and the real cause lives in the log line that
     /// Sentry's `reportCoreError` feeds on.
-    fn make_writer_for(&'a self, meta: &Metadata<'_>) -> Self::Writer {
+    fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
         JsLogWriter {
             capturing: LOG_CAPTURE.load(Ordering::Relaxed)
                 || meta.level() == &tracing::Level::ERROR,
