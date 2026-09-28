@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use matrix_sdk::{
     Client,
-    ruma::{MilliSecondsSinceUnixEpoch, room_id},
+    ruma::{MilliSecondsSinceUnixEpoch, room_id, user_id},
     test_utils::mocks::MatrixMockServer,
 };
 use matrix_sdk_test::{
@@ -448,9 +448,9 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
         .await
         .snapshot()
         .await;
-    let direct = notifications::is_one_to_one(&room);
-    let result = crate::push_rules::room_settings(&rules, room_id, direct);
-    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), direct)]);
+    let shape = notifications::room_shape(&room).await;
+    let result = crate::push_rules::room_settings(&rules, room_id, shape);
+    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), shape)]);
 
     assert!(result.room.is_none());
     assert_eq!(
@@ -545,4 +545,50 @@ async fn a_missing_rule_on_delete_is_not_a_failure() {
         ))
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn a_direct_chat_with_a_bridge_bot_is_still_a_direct_chat() {
+    use std::collections::BTreeSet;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!bridged:example.org");
+    let own = client.user_id().unwrap().to_owned();
+    let ghost = user_id!("@whatsapp_123:example.org");
+    let bot = user_id!("@whatsappbot:example.org");
+    let factory = EventFactory::new().room(room_id);
+    let members = [own.as_ref(), ghost, bot];
+    server
+        .mock_get_members()
+        .ok(members
+            .iter()
+            .map(|member| factory.member(member).into_raw())
+            .collect())
+        .mount()
+        .await;
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(member).into()))
+                    .add_state_event(
+                        factory
+                            .member_hints(BTreeSet::from([bot.to_owned()]))
+                            .sender(ghost),
+                    )
+                    .set_joined_members_count(3),
+            );
+        })
+        .await;
+    let room = client.get_room(room_id).unwrap();
+
+    assert_eq!(
+        notifications::room_shape(&room).await,
+        notifications::RoomShape {
+            direct: true,
+            bridged: true,
+        }
+    );
 }

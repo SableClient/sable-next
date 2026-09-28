@@ -142,7 +142,7 @@ beforeEach(() => {
   core.roomPermissions.mockReset();
   core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: false });
   notificationSettings.mockReset();
-  notificationSettings.mockResolvedValue({ room: null, default: 'mentions' });
+  notificationSettings.mockResolvedValue({ room: null, default: 'mentions', bridged: false });
 });
 
 afterEach(() => {

@@ -2014,17 +2014,19 @@ impl Core {
                 Ok(CommandOk::NotificationSettings(push_rules::room_settings(
                     &rules,
                     &room_id,
-                    notifications::is_one_to_one(&room),
+                    notifications::room_shape(&room).await,
                 )))
             }
 
             Command::RoomNotificationModes { room_ids } => {
                 let client = self.client().await?;
                 let rules = self.push_rules().await?.snapshot().await;
-                let rooms = room_ids.into_iter().filter_map(|room_id| {
-                    let direct = notifications::is_one_to_one(&client.get_room(&room_id)?);
-                    Some((room_id, direct))
-                });
+                let mut rooms = Vec::with_capacity(room_ids.len());
+                for room_id in room_ids {
+                    if let Some(room) = client.get_room(&room_id) {
+                        rooms.push((room_id, notifications::room_shape(&room).await));
+                    }
+                }
 
                 Ok(CommandOk::RoomNotificationModes {
                     modes: push_rules::room_modes(&rules, rooms),
@@ -2171,29 +2173,34 @@ impl Core {
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
                 let rules = self.push_rules().await?;
+                let shape = notifications::room_shape(&room).await;
                 let writes = push_rules::plan_room_mode(
                     &rules.snapshot().await,
                     &room_id,
-                    notifications::is_one_to_one(&room),
+                    shape.direct,
                     mode,
                 );
                 rules
                     .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_room_notification_mode", error))?;
+                if shape.bridged {
+                    self.align_bridged_dms(None).await;
+                }
 
                 Ok(CommandOk::SetRoomNotificationMode)
             }
 
             Command::SetDefaultNotificationMode { direct, mode } => {
                 let rules = self.push_rules().await?;
-                let writes =
-                    push_rules::plan_default_mode(&rules.snapshot().await, direct, mode)
-                        .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                let before = rules.snapshot().await;
+                let writes = push_rules::plan_default_mode(&before, direct, mode)
+                    .map_err(|error| self.failed("set_default_notification_mode", error))?;
                 rules
                     .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                self.align_bridged_dms(Some(&before)).await;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
             }

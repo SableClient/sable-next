@@ -628,6 +628,7 @@ impl Core {
         self.watch_cosmetics(&client, generation);
         self.watch_bot_commands(&client, generation);
         self.watch_joined_invites(&client);
+        self.watch_bridged_dms(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         self.watch_search_index(&client);
@@ -659,6 +660,7 @@ impl Core {
                         core.reconcile_memberships().await;
                         core.fill_own_members().await;
                         core.align_encrypted_defaults().await;
+                        core.align_bridged_dms(None).await;
                     }
 
                     if stalled {
