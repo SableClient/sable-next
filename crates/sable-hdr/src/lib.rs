@@ -136,10 +136,78 @@ impl HdrToSdr {
     }
 }
 
+impl HdrToSdr {
+    fn pq_codes_row(
+        &self,
+        codes: impl Iterator<Item = [f32; 3]>,
+        scratch: &mut Scratch,
+        out: &mut [u8],
+    ) {
+        let mut pq = std::mem::take(&mut scratch.pq);
+        pq.clear();
+        pq.extend(codes);
+        self.pq_row(&pq, scratch, out);
+        scratch.pq = pq;
+    }
+
+    /// `PipeWire`'s `RGBA_F16` with the PQ transfer: half floats holding PQ
+    /// code values, little-endian.
+    pub fn pq_f16_bytes_row(&self, source: &[u8], scratch: &mut Scratch, out: &mut [u8]) {
+        let (pixels, _) = source.as_chunks::<8>();
+        self.pq_codes_row(
+            pixels.iter().map(|pixel| {
+                let half = |low: u8, high: u8| f16::from_le_bytes([low, high]).to_f32();
+                [
+                    half(pixel[0], pixel[1]),
+                    half(pixel[2], pixel[3]),
+                    half(pixel[4], pixel[5]),
+                ]
+            }),
+            scratch,
+            out,
+        );
+    }
+
+    /// `PipeWire`'s `xRGB_210LE`: red in bits 20-29, blue in bits 0-9.
+    pub fn pq_xrgb210_bytes_row(&self, source: &[u8], scratch: &mut Scratch, out: &mut [u8]) {
+        self.pq_codes_row(unpack_210(source, 20, 0), scratch, out);
+    }
+
+    /// `PipeWire`'s `xBGR_210LE`: red in bits 0-9, blue in bits 20-29.
+    pub fn pq_xbgr210_bytes_row(&self, source: &[u8], scratch: &mut Scratch, out: &mut [u8]) {
+        self.pq_codes_row(unpack_210(source, 0, 20), scratch, out);
+    }
+}
+
+fn unpack_210(source: &[u8], red: u32, blue: u32) -> impl Iterator<Item = [f32; 3]> + '_ {
+    let (pixels, _) = source.as_chunks::<4>();
+    pixels.iter().map(move |&bytes| {
+        let word = u32::from_le_bytes(bytes);
+        #[allow(clippy::cast_precision_loss)]
+        let code = |shift: u32| ((word >> shift) & 0x3ff) as f32 / 1023.0;
+        [code(red), code(10), code(blue)]
+    })
+}
+
+/// 8-bit SDR rows need no conversion, only BGRA ordering. `rgb` says whether
+/// the source is red-first.
+pub fn sdr_row(source: &[u8], out: &mut [u8], rgb: bool) {
+    let (pixels, _) = source.as_chunks::<4>();
+    let (targets, _) = out.as_chunks_mut::<4>();
+    for (&[first, green, third, _], target) in pixels.iter().zip(targets) {
+        *target = if rgb {
+            [third, green, first, u8::MAX]
+        } else {
+            [first, green, third, u8::MAX]
+        };
+    }
+}
+
 /// Per-thread buffers reused from one row to the next.
 #[derive(Default)]
 pub struct Scratch {
     halves: Vec<u16>,
+    pq: Vec<[f32; 3]>,
     rgb: Vec<[f32; 3]>,
     flat: Vec<f32>,
     encoded: Vec<u8>,
@@ -283,6 +351,90 @@ mod bytes {
         map.scrgb_row(&halves, &mut Scratch::default(), &mut from_halves);
         map.scrgb_bytes_row(&bytes, &mut Scratch::default(), &mut from_bytes);
         assert_eq!(from_halves, from_bytes);
+    }
+}
+
+#[cfg(test)]
+mod packed {
+    use half::f16;
+
+    use super::{HdrToSdr, OBS_PEAK_NITS, Scratch, sdr_row};
+
+    fn code(nits: f32) -> f32 {
+        linear_srgb::tf::linear_to_pq(nits / 10_000.0)
+    }
+
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    fn ten_bit(nits: f32) -> u32 {
+        (code(nits) * 1023.0).round() as u32
+    }
+
+    fn reference(map: &HdrToSdr, nits: f32) -> [u8; 4] {
+        let mut out = [0u8; 4];
+        map.pq_row(&[[code(nits); 3]], &mut Scratch::default(), &mut out);
+        out
+    }
+
+    #[test]
+    fn every_pq_layout_decodes_to_the_same_grey() {
+        let map = HdrToSdr::new(203.0, OBS_PEAK_NITS);
+        for nits in [5.0_f32, 203.0, 800.0] {
+            let expected = reference(&map, nits);
+            let ten = ten_bit(nits);
+            let word = (ten << 20) | (ten << 10) | ten;
+            let half = f16::from_f32(code(nits)).to_le_bytes();
+            let f16_pixel = [half[0], half[1], half[0], half[1], half[0], half[1], 0, 60];
+
+            for (name, row, bytes) in [
+                (
+                    "xRGB_210LE",
+                    HdrToSdr::pq_xrgb210_bytes_row as fn(&HdrToSdr, &[u8], &mut Scratch, &mut [u8]),
+                    word.to_le_bytes().to_vec(),
+                ),
+                (
+                    "xBGR_210LE",
+                    HdrToSdr::pq_xbgr210_bytes_row,
+                    word.to_le_bytes().to_vec(),
+                ),
+                ("RGBA_F16", HdrToSdr::pq_f16_bytes_row, f16_pixel.to_vec()),
+            ] {
+                let mut out = [0u8; 4];
+                row(&map, &bytes, &mut Scratch::default(), &mut out);
+                assert!(
+                    out.iter()
+                        .zip(expected)
+                        .all(|(got, want)| got.abs_diff(want) <= 1),
+                    "{name} at {nits} nits: {out:?} vs {expected:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_10_bit_layout_puts_red_where_it_says() {
+        let map = HdrToSdr::new(203.0, OBS_PEAK_NITS);
+        let red = ten_bit(600.0);
+        let (mut xrgb, mut xbgr) = ([0u8; 4], [0u8; 4]);
+        map.pq_xrgb210_bytes_row(
+            &(red << 20).to_le_bytes(),
+            &mut Scratch::default(),
+            &mut xrgb,
+        );
+        map.pq_xbgr210_bytes_row(&red.to_le_bytes(), &mut Scratch::default(), &mut xbgr);
+        assert!(
+            xrgb[2] > xrgb[0],
+            "xRGB red lands in BGRA's third byte: {xrgb:?}"
+        );
+        assert_eq!(xrgb, xbgr);
+    }
+
+    #[test]
+    fn sdr_rows_are_reordered_to_bgra_and_made_opaque() {
+        let mut out = [0u8; 8];
+        sdr_row(&[1, 2, 3, 0, 4, 5, 6, 0], &mut out, true);
+        assert_eq!(out, [3, 2, 1, 255, 6, 5, 4, 255]);
+        sdr_row(&[1, 2, 3, 0], &mut out[..4], false);
+        assert_eq!(out[..4], [1, 2, 3, 255]);
     }
 }
 
