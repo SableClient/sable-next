@@ -154,7 +154,7 @@ fn space_child_ties_follow_ruma_room_id_order() {
 }
 
 #[tokio::test]
-async fn event_focus_keeps_its_explicit_sync_subscription_after_unsubscribing() {
+async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing() {
     use crate::protocol::TimelineFocusView;
     use futures_util::StreamExt;
     use matrix_sdk::{ruma::event_id, test_utils::mocks::RoomContextResponseTemplate};
@@ -227,10 +227,7 @@ async fn event_focus_keeps_its_explicit_sync_subscription_after_unsubscribing() 
         .find(|request| request.method == "POST" && request.url.path().contains("sync"))
         .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-    assert_eq!(
-        body["room_subscriptions"][room_id.as_str()]["timeline_limit"],
-        20
-    );
+    assert!(body["room_subscriptions"].get(room_id.as_str()).is_none());
 }
 
 #[tokio::test]
