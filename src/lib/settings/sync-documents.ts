@@ -24,6 +24,7 @@ import {
   parseQueue,
   scheduledQueue,
 } from '#lib/features/composer/scheduled-queue.svelte.js';
+import { adoptQuietRooms, parseQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
 import { parseShortcodes, readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import {
   adoptRecentReactions,
@@ -79,6 +80,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
         roomIcons: roomIconOverrides(),
         openFolders: [...sidebar.openFolders],
         ungroupedFavourites: ungroupedFavourites(),
+        quietRooms: quietRooms(),
       },
     }),
 
@@ -91,7 +93,8 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
           recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
           sidebar.openFolders.size === 0 &&
-          ungroupedFavourites().length === 0
+          ungroupedFavourites().length === 0 &&
+          quietRooms().length === 0
         );
       }
 
@@ -101,6 +104,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));
       sidebar.adoptOpenFolders(stringList(body.openFolders));
       adoptUngroupedFavourites(parseUngroupedFavourites(body.ungroupedFavourites));
+      adoptQuietRooms(parseQuietRooms(body.quietRooms));
       return true;
     },
   };

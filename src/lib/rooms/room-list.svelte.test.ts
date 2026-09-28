@@ -5,6 +5,7 @@ import type { RoomSummary } from '#src/generated/protocol';
 
 import { countNotifications, notifications } from '#lib/features/inbox/inbox.js';
 
+import { setQuiet } from './quiet-rooms.svelte.js';
 import { RoomList } from './room-list.svelte.js';
 
 afterEach(() => {
@@ -524,4 +525,48 @@ test('looks rooms up by id and labels them by name, then alias, then id', () => 
 
   roomList.rooms = [{ room_id: '!missing:example.org', name: 'Arrived' }] as RoomSummary[];
   expect(roomList.labelFor('!missing:example.org')).toBe('Arrived');
+});
+
+test('a hidden room keeps its unread state and badges only its mentions', async () => {
+  const quiet = {
+    room_id: '!quiet:example.org',
+    unread: 4,
+    notifying: 4,
+    highlight: 1,
+    marked_unread: false,
+    space_children: [],
+  } as unknown as RoomSummary;
+  const core = {
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [quiet] })),
+      roomNotificationModes: vi.fn(() =>
+        Promise.resolve([{ room_id: quiet.room_id, room: null, default: 'all' as const }])
+      ),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(quiet.room_id)).toBe('all');
+  });
+  setQuiet(quiet.room_id, true);
+
+  expect(roomList.unreadFor(quiet)).toEqual({
+    unread: 4,
+    highlight: 1,
+    marked: false,
+    notifying: 4,
+  });
+  expect(roomList.badgeUnreadFor(quiet)).toEqual({
+    unread: 1,
+    highlight: 1,
+    marked: false,
+    notifying: 0,
+  });
+
+  setQuiet(quiet.room_id, false);
+  roomList.stop();
 });

@@ -13,9 +13,12 @@ import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
 
+import { quietTargets } from './quiet-rooms.svelte.js';
 import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
+import { quietRoomIds } from './spaces.js';
 import {
   type NotificationModeResolver,
+  quietUnread,
   roomNotifications,
   type RoomUnread,
   roomUnread,
@@ -92,6 +95,7 @@ export class RoomList {
 
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- rebuilt wholesale, never mutated
   private readonly roomsById = $derived(new Map(this.rooms.map((room) => [room.room_id, room])));
+  readonly quietRoomIds = $derived(quietRoomIds(this.rooms, quietTargets()));
 
   constructor(private readonly core: CoreClient) {}
 
@@ -132,6 +136,11 @@ export class RoomList {
     this.notificationModeIsLoading(room.room_id)
       ? { unread: 0, highlight: 0, marked: room.marked_unread, notifying: 0 }
       : roomUnread(room, this.notificationMode(room.room_id));
+
+  readonly badgeUnreadFor: RoomUnread = (room) => {
+    const counts = this.unreadFor(room);
+    return this.quietRoomIds.has(room.room_id) ? quietUnread(counts) : counts;
+  };
 
   readonly notificationsFor: RoomUnread = (room) =>
     this.notificationModeIsLoading(room.room_id)

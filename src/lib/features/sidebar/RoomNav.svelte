@@ -392,7 +392,7 @@
     const room = item.room;
     if (room === undefined) return false;
     if (page.url.pathname === roomHref(item)) return true;
-    return hasUnread(roomList.unreadFor(room));
+    return hasUnread(roomList.badgeUnreadFor(room));
   }
 
   function isFavourite(row: RoomNavRow): boolean {
@@ -530,7 +530,7 @@
   let sectionUnread = $derived(
     sectionRooms.some((item) => {
       const room = item.room;
-      return room !== undefined && hasUnread(roomList.unreadFor(room));
+      return room !== undefined && hasUnread(roomList.badgeUnreadFor(room));
     })
   );
 
@@ -698,7 +698,7 @@
     {@const avatarUrl = room ? roomAvatarUrl(room) : null}
     {@const href = roomHref(item)}
     {@const active = page.url.pathname === href}
-    {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
+    {@const counts = room ? roomList.badgeUnreadFor(room) : NO_UNREAD}
     {@const mentions = counts.highlight}
     {@const unread = counts.unread}
     {@const marked = counts.marked ?? false}

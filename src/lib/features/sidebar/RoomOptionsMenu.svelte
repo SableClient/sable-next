@@ -6,6 +6,8 @@
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -22,6 +24,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
+  import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -92,6 +95,8 @@
   let unread = $derived(
     readable.some((entry) => entry.unread > 0 || entry.highlight > 0 || entry.marked_unread)
   );
+  let quiet = $derived(isQuiet(room.room_id));
+  let quietBySpace = $derived(!quiet && roomList.quietRoomIds.has(room.room_id));
 
   const manageable = new SvelteSet<string>();
   let manageableRun = 0;
@@ -266,6 +271,23 @@
     >
       <StarIcon weight={favourite ? 'fill' : 'regular'} />
       {$i18n.t('room.menuFavourite')}
+    </ActionMenuItem>
+    <ActionMenuItem
+      disabled={quietBySpace}
+      onSelect={() => {
+        setQuiet(room.room_id, !quiet);
+      }}
+    >
+      {#if quiet || quietBySpace}
+        <EyeIcon />
+      {:else}
+        <EyeSlashIcon />
+      {/if}
+      {quietBySpace
+        ? $i18n.t('room.menuUnreadHiddenBySpace')
+        : quiet
+          ? $i18n.t('room.menuShowUnread')
+          : $i18n.t('room.menuHideUnread')}
     </ActionMenuItem>
 
     {#if room.is_direct}

@@ -39,6 +39,10 @@ export function roomNotifications(
   return { unread: Math.max(room.notifying || 0, highlight), highlight, marked };
 }
 
+export function quietUnread(count: UnreadCount): UnreadCount {
+  return { ...count, unread: count.highlight, notifying: 0 };
+}
+
 export function hasUnread(count: UnreadCount): boolean {
   return count.unread > 0 || count.highlight > 0 || (count.marked ?? false);
 }

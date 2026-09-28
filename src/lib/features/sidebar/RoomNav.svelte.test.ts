@@ -26,6 +26,8 @@ const roomsFixture = vi.hoisted(() => {
     byId: (roomId: string | null) => fixture.rooms.find((room) => room.room_id === roomId),
     notificationOverride: () => null,
     unreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    badgeUnreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    quietRoomIds: new Set<string>(),
     notificationsFor: (room: RoomSummary) =>
       roomNotifications(room, fixture.notificationMode(room.room_id)),
     ...muteAware,
