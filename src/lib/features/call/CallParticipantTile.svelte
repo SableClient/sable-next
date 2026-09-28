@@ -38,6 +38,7 @@
     pinned?: boolean;
     featured?: boolean;
     onPin?: () => void;
+    onWatchScreen?: () => void;
     onVolumeChange?: (identity: string, volume: number) => void;
   }
 
@@ -52,6 +53,7 @@
     pinned = false,
     featured = false,
     onPin,
+    onWatchScreen,
     onVolumeChange,
   }: Props = $props();
 
@@ -69,6 +71,13 @@
     screen ? $i18n.t('call.screenVolume', { name }) : $i18n.t('call.participantVolume', { name })
   );
   let videoOn = $derived(screen || cameraVisible(participant));
+  let watchable = $derived(
+    !participant.local &&
+      !screen &&
+      participant.screenShare !== undefined &&
+      !participant.screenShare.muted &&
+      onWatchScreen !== undefined
+  );
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
@@ -165,6 +174,17 @@
   {/if}
 
   <div class="actions">
+    {#if watchable}
+      <IconButton
+        variant="ghost"
+        size="small"
+        class="tile-action"
+        label={$i18n.t('call.watchScreen', { name })}
+        onclick={onWatchScreen}
+      >
+        <MonitorIcon />
+      </IconButton>
+    {/if}
     {#if onPin}
       <IconButton
         variant="ghost"

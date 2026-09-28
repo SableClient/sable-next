@@ -102,7 +102,8 @@
     callTiles(
       session.transport.self
         ? [session.transport.self, ...session.transport.participants]
-        : session.transport.participants
+        : session.transport.participants,
+      session.watchedScreenShareIds
     )
   );
   let others = $derived(
@@ -456,6 +457,9 @@
     featured={large}
     pinned={featured.length === 1 && featured[0].key === item.key}
     onPin={tiles.length > 1 ? () => pin(item) : undefined}
+    onWatchScreen={item.source === 'camera' && item.participant.screenShare
+      ? () => session.watchScreenShare(item.participant.screenShare?.id ?? '')
+      : undefined}
     onVolumeChange={(identity, volume) => void session.setParticipantVolume(identity, volume)}
   />
 {/snippet}

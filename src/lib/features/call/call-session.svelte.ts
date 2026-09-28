@@ -109,11 +109,18 @@ export class CallSession {
   deafened = $state(false);
   connectedAt = $state<number | null>(null);
   layout: CallPin = { pinned: null, gridForced: false };
+  watchedScreenShareIds = $state<string[]>([]);
   views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
   choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
   #pendingScreenSource: ScreenSource | null = null;
+
+  watchScreenShare(trackId: string): void {
+    if (!this.watchedScreenShareIds.includes(trackId)) {
+      this.watchedScreenShareIds = [...this.watchedScreenShareIds, trackId];
+    }
+  }
 
   get startedAt(): number | null {
     if (this.connectedAt === null) return null;

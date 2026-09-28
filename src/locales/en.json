@@ -2999,6 +2999,7 @@
     "chat": "Chat",
     "showCall": "Show call",
     "screenOf": "{{name}}'s screen",
+    "watchScreen": "Watch {{name}}'s screen",
     "screenSourceTitle": "Share a screen",
     "screenSourceExplain": "This monitor is in HDR mode. Sable can capture it itself and convert HDR to SDR, so bright content does not blind the people watching.",
     "screenSourceHdr": "{{name}}, HDR converted",

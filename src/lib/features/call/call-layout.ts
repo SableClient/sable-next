@@ -21,12 +21,20 @@ export function cameraVisible(participant: CallParticipant): boolean {
   return visible(participant, participant.camera);
 }
 
-export function callTiles(participants: readonly CallParticipant[]): CallTile[] {
+export function callTiles(
+  participants: readonly CallParticipant[],
+  watchedScreenShareIds: readonly string[] = []
+): CallTile[] {
   const tiles: CallTile[] = [];
   for (const participant of participants) {
     const base = `${participant.backendId ?? 'legacy'}:${participant.identity}`;
     tiles.push({ key: `${base}:camera`, participant, source: 'camera' });
-    if (screenShareVisible(participant)) {
+    const screenShare = participant.screenShare;
+    if (
+      screenShareVisible(participant) &&
+      screenShare &&
+      (participant.local === true || watchedScreenShareIds.includes(screenShare.id))
+    ) {
       tiles.push({ key: `${base}:screen`, participant, source: 'screen' });
     }
   }

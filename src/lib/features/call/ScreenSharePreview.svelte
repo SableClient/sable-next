@@ -35,7 +35,8 @@
     callTiles(
       session.transport.self
         ? [session.transport.self, ...session.transport.participants]
-        : session.transport.participants
+        : session.transport.participants,
+      session.watchedScreenShareIds
     ).filter((tile) => tile.source === 'screen' && !tile.participant.local)
   );
   let shown = $derived.by<CallTile | undefined>(() => {

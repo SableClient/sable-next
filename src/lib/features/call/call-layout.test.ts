@@ -31,11 +31,16 @@ describe('callTiles', () => {
   it('adds a separate screen tile next to the camera tile', () => {
     const sharer: CallParticipant = { identity: 'a', screenShare: track() };
     const other: CallParticipant = { identity: 'b', screenShare: track(true) };
-    expect(callTiles([sharer, other]).map((tile) => tile.key)).toEqual([
+    expect(callTiles([sharer, other], ['t']).map((tile) => tile.key)).toEqual([
       'legacy:a:camera',
       'legacy:a:screen',
       'legacy:b:camera',
     ]);
+  });
+
+  it('hides a remote screen until it is watched', () => {
+    const sharer: CallParticipant = { identity: 'a', screenShare: track() };
+    expect(callTiles([sharer]).map((tile) => tile.key)).toEqual(['legacy:a:camera']);
   });
 });
 
@@ -43,40 +48,43 @@ describe('featuredTiles', () => {
   const self: CallParticipant = { identity: 'me', local: true, screenShare: track() };
   const remote: CallParticipant = { identity: 'them', screenShare: track() };
   const keys = (tiles: { key: string }[]) => tiles.map((tile) => tile.key);
+  const watched = ['t'];
 
   it('features a remote screen over your own', () => {
-    expect(keys(featuredTiles(callTiles([self, remote]), null))).toEqual(['legacy:them:screen']);
+    expect(keys(featuredTiles(callTiles([self, remote], watched), null))).toEqual([
+      'legacy:them:screen',
+    ]);
   });
 
   it('features every remote screen together', () => {
     const other: CallParticipant = { identity: 'other', screenShare: track() };
-    expect(keys(featuredTiles(callTiles([self, remote, other]), null))).toEqual([
+    expect(keys(featuredTiles(callTiles([self, remote, other], watched), null))).toEqual([
       'legacy:them:screen',
       'legacy:other:screen',
     ]);
   });
 
   it('features your own screen when it is the only one', () => {
-    expect(keys(featuredTiles(callTiles([self, { identity: 'x' }]), null))).toEqual([
+    expect(keys(featuredTiles(callTiles([self, { identity: 'x' }], watched), null))).toEqual([
       'legacy:me:screen',
     ]);
   });
 
   it('prefers the pinned tile', () => {
-    expect(keys(featuredTiles(callTiles([self, remote]), 'legacy:me:camera'))).toEqual([
+    expect(keys(featuredTiles(callTiles([self, remote], watched), 'legacy:me:camera'))).toEqual([
       'legacy:me:camera',
     ]);
   });
 
   it('falls back to the grid when nothing is shared or pinned', () => {
-    expect(featuredTiles(callTiles([{ identity: 'x' }]), 'gone')).toEqual([]);
+    expect(featuredTiles(callTiles([{ identity: 'x' }], watched), 'gone')).toEqual([]);
   });
 });
 
 describe('togglePin', () => {
   const self: CallParticipant = { identity: 'me', local: true, screenShare: track() };
   const remote: CallParticipant = { identity: 'them', screenShare: track() };
-  const tiles = callTiles([self, remote]);
+  const tiles = callTiles([self, remote], ['t']);
   const tile = (key: string) => tiles.find((candidate) => candidate.key === key) ?? tiles[0];
 
   it('leaves for the grid when unpinning the screen shown on its own', () => {
@@ -99,7 +107,7 @@ describe('togglePin', () => {
 
   it('pins one of several featured screens', () => {
     const other: CallParticipant = { identity: 'other', screenShare: track() };
-    const all = callTiles([self, remote, other]);
+    const all = callTiles([self, remote, other], ['t']);
     const featured = featuredTiles(all, null);
     expect(togglePin(all, featured, featured[1])).toEqual({
       pinned: 'legacy:other:screen',

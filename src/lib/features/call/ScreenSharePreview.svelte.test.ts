@@ -37,6 +37,7 @@ function session(participants: CallParticipant[], withRoom = true): CallSession 
   };
   return {
     layout: { pinned: null, gridForced: false },
+    watchedScreenShareIds: [shared.id],
     members: [
       { user_id: '@alice:x', device_id: 'A', identity: 'alice:A', backend_id: null, joined_ts: 0 },
     ],
