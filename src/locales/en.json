@@ -2877,7 +2877,7 @@
     "triggersHint": "Text around a message that picks this profile. The first match in the list wins.",
     "triggerPrefix": "Before",
     "triggerSuffix": "After",
-    "triggerKeep": "Keep the trigger in the message",
+    "triggerKeep": "Keep in message",
     "triggerAdd": "Add a trigger",
     "triggerRemove": "Remove this trigger",
     "save": "Save",

@@ -195,7 +195,10 @@
               value={trigger.prefix ?? ''}
               autocomplete="off"
               oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-                triggers[index] = { ...trigger, prefix: event.currentTarget.value };
+                triggers[index] = {
+                  ...trigger,
+                  prefix: event.currentTarget.value,
+                };
               }}
             />
           </label>
@@ -206,27 +209,35 @@
               value={trigger.suffix ?? ''}
               autocomplete="off"
               oninput={(event: Event & { currentTarget: HTMLInputElement }) => {
-                triggers[index] = { ...trigger, suffix: event.currentTarget.value };
+                triggers[index] = {
+                  ...trigger,
+                  suffix: event.currentTarget.value,
+                };
               }}
             />
           </label>
-          <Switch
-            label={$i18n.t('personas.triggerKeep')}
-            checked={trigger.keep_trigger}
-            onCheckedChange={(checked: boolean) => {
-              triggers[index] = { ...trigger, keep_trigger: checked };
-            }}
-          />
-          <IconButton
-            variant="subtle"
-            size="small"
-            label={$i18n.t('personas.triggerRemove')}
-            onclick={() => {
-              removeTrigger(index);
-            }}
-          >
-            <TrashIcon />
-          </IconButton>
+          <label class="field wrap">
+            <span>{$i18n.t('personas.triggerKeep')}</span>
+            <Switch
+              label=""
+              checked={trigger.keep_trigger}
+              onCheckedChange={(checked: boolean) => {
+                triggers[index] = { ...trigger, keep_trigger: checked };
+              }}
+            />
+          </label>
+          <div class="button">
+            <IconButton
+              variant="subtle"
+              size="small"
+              label={$i18n.t('personas.triggerRemove')}
+              onclick={() => {
+                removeTrigger(index);
+              }}
+            >
+              <TrashIcon />
+            </IconButton>
+          </div>
         </div>
       {/each}
       <Button variant="secondary" size="small" onclick={addTrigger}>
@@ -330,14 +341,36 @@
   }
 
   .trigger-row {
-    align-items: end;
+    align-items: center;
+    column-gap: var(--space-300);
     display: grid;
-    gap: var(--space-300);
+    grid-template-columns: 1fr 1fr auto auto;
   }
 
-  @media (width >= 34rem) {
+  .trigger-row .field {
+    align-items: center;
+    grid-row: 1 / 3;
+    grid-template-rows: subgrid;
+  }
+
+  .trigger-row .button {
+    grid-row: 2 / 3;
+  }
+
+  @media (width < 34rem) {
     .trigger-row {
-      grid-template-columns: 1fr 1fr auto auto;
+      grid-template-columns: 1fr 1fr auto;
+      grid-template-rows: auto auto var(--space-300) auto;
+    }
+
+    .trigger-row .field.wrap {
+      grid-column: 1 / 4;
+      grid-row: 4 / 5;
+      grid-template-columns: 1fr auto;
+    }
+
+    .triggers {
+      gap: var(--space-600);
     }
   }
 </style>
