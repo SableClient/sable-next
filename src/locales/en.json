@@ -993,6 +993,7 @@
     "cancel": "Cancel",
     "copyMessage": "Copy message",
     "copyLink": "Copy link",
+    "copyMessageLink": "Copy link to message",
     "moreActions": "More actions",
     "closeMenu": "Close menu",
     "toggleReaction": "{{key}}, {{count, number}} reactions. Toggle yours.",

@@ -438,7 +438,15 @@
     if (!actionable) return;
     event.preventDefault();
     emoteAnchor = cursorAnchor(event);
-    openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => actions);
+    const link =
+      event.target instanceof Element
+        ? event.target.closest<HTMLAnchorElement>('a[href]')?.href
+        : null;
+    openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
+      ...actions,
+      onCopyLink: link ? () => void navigator.clipboard.writeText(link) : actions.onCopyLink,
+      copyLinkLabel: link ? 'timeline.copyLink' : undefined,
+    }));
   }
 
   // A virtualised row can unmount mid-press, so the pending timer has to go.
