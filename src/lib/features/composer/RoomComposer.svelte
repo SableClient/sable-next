@@ -698,7 +698,7 @@
 
     editor.clear();
     if (matched.command.parameters.length === 0 && matched.args !== '') {
-      const body = `${typed.prefix}${matched.command.command} ${matched.args}`;
+      const body = `${typed.prefix}${matched.command.command}${matched.rawArgs}`;
       if (
         !(await sendBotCommand(matched.command, body, {
           command: matched.command.command,

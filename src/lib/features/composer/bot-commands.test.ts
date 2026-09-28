@@ -114,6 +114,17 @@ describe('matchBotCommand', () => {
     expect(matchBotCommand('banana', commands)).toBeNull();
     expect(matchBotCommand('rooms add #a:b', commands)?.args).toBe('#a:b');
   });
+
+  test('preserves whitespace after a command for pass-through commands', () => {
+    expect(
+      matchBotCommand('appservices register\n\nid: meowlnir', [
+        command({ command: 'appservices register' }),
+      ])
+    ).toMatchObject({
+      args: 'id: meowlnir',
+      rawArgs: '\n\nid: meowlnir',
+    });
+  });
 });
 
 describe('buildInvocation', () => {
