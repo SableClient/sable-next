@@ -32,6 +32,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
+  import { untrack } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
@@ -183,9 +184,9 @@
   $effect(() => {
     if (!open) return;
     opened = true;
-    readManageableSpaces();
-    readInvitePermission();
-    readParents();
+    untrack(readManageableSpaces);
+    untrack(readInvitePermission);
+    untrack(readParents);
   });
 
   function report(error: unknown): void {
