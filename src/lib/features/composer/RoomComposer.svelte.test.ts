@@ -85,6 +85,12 @@ const botCommands: BotCommandDescriptionView[] = [
       ],
     },
   },
+  {
+    sender: '@bot:example.org',
+    sender_name: 'Bot',
+    sender_avatar: null,
+    content: { command: 'register' },
+  },
 ];
 
 function core(): CoreClient {
@@ -1402,6 +1408,66 @@ test('a complete bot command typed in the composer is sent as a structured comma
   });
   expect(onSend).not.toHaveBeenCalled();
   expect(editorText()).toBe('');
+});
+
+test('choosing a bot command suggestion opens its argument form', async () => {
+  draftText('/wa');
+  setup({ roomId: '!room:example.org', onSendBotCommand: async () => {} });
+
+  await press(await screen.findByRole('option', { name: /\/warn/ }));
+
+  expect(await screen.findByRole('form', { name: 'Arguments for /warn' })).toBeTruthy();
+  expect(screen.getByLabelText('user')).toBeTruthy();
+  expect(screen.getByLabelText('days')).toBeTruthy();
+});
+
+test('a bot command change clears stale suggestions', async () => {
+  const listeners: Array<(event: { type: string; room_id?: string }) => void> = [];
+  const client = Object.assign(core(), {
+    subscribeEvents: (listener: (event: { type: string; room_id?: string }) => void) => {
+      listeners.push(listener);
+      return () => {};
+    },
+  });
+  draftText('/wa');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+        onSendBotCommand: async () => {},
+      },
+    },
+  });
+
+  expect(await screen.findByRole('option', { name: /\/warn/ })).toBeTruthy();
+  for (const listener of listeners)
+    listener({ type: 'bot_commands_changed', room_id: '!room:example.org' });
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('option', { name: /\/warn/ })).toBeNull();
+  });
+});
+
+test('a zero-parameter bot command preserves raw trailing input', async () => {
+  const onSendBotCommand = vi.fn(async () => {});
+  draftText('/register ```yaml\nid: bridge\n```');
+  setup({ roomId: '!room:example.org', onSendBotCommand });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/register ```yaml\nid: bridge\n```',
+      { command: 'register', arguments: {} }
+    );
+  });
 });
 
 test('an incomplete bot command opens its form, which sends once it is filled in', async () => {

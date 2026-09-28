@@ -351,6 +351,8 @@
     return core.subscribeEvents((event) => {
       if (event.type === 'bot_commands_changed' && event.room_id === target) {
         loadedBotCommandsFor = null;
+        botCommandsFor = null;
+        botCommands = [];
       }
     });
   });
@@ -695,6 +697,18 @@
     if (!matched) return false;
 
     editor.clear();
+    if (matched.command.parameters.length === 0 && matched.args !== '') {
+      const body = `${typed.prefix}${matched.command.command} ${matched.args}`;
+      if (
+        !(await sendBotCommand(matched.command, body, {
+          command: matched.command.command,
+          arguments: {},
+        }))
+      ) {
+        editor.setText(text);
+      }
+      return true;
+    }
     const drafts = draftsFromText(matched.command, matched.args);
     const result = buildInvocation(matched.command, drafts, typed.prefix);
     if (result.ok) {
