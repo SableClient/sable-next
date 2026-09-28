@@ -44,6 +44,53 @@ for (const scheme of ['light', 'dark'] as const) {
       locator.evaluate((node) => getComputedStyle(node).color);
     expect(await colour(reply)).toBe(await colour(header));
   });
+
+  test(`a pinned message names its sender in the colour of their messages on the ${scheme} theme`, async ({
+    app,
+    core,
+    page,
+    installRoomCore,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.addInitScript(() => {
+      (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = {
+        name_color_light: '#b0306a',
+        name_color_dark: '#f09ac0',
+      };
+    });
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    await core.emitTimelineDiff(await core.subscription(), [
+      {
+        op: 'push_back',
+        value: {
+          ...timelineItem('pin-alice', ''),
+          sender: '@e2e:example.test',
+          sender_name: 'E2E User',
+          content: {
+            kind: 'state_event',
+            event_type: 'm.room.pinned_events',
+            state_key: '',
+            content: null,
+            prev_content: null,
+            change: {
+              kind: 'pinned_events',
+              added: ['$general-1:example.test'],
+              removed: [],
+              total: 1,
+            },
+          },
+        },
+      },
+    ]);
+
+    const target = page.locator('.target-preview .target-name', { hasText: 'Alice' });
+    await expect(target).toHaveClass(/tinted/);
+    const header = page.locator('.sender-identity-name.tinted', { hasText: 'Alice' }).first();
+    const colour = (locator: typeof target) =>
+      locator.evaluate((node) => getComputedStyle(node).color);
+    expect(await colour(target)).toBe(await colour(header));
+  });
 }
 
 test('a compact connected reply keeps its connector clear of the name gutter', async ({

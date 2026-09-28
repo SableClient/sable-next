@@ -168,8 +168,9 @@ test('places a connected reply preview above the sender header', async () => {
   expect(message?.classList.contains('has-connected-reply')).toBe(true);
   expect(message?.querySelector(':scope > .message-avatar')).not.toBeNull();
   expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
-  expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
-  expect(reply?.querySelector('.reply-name')?.textContent).toBe('Bob');
+  const name = reply?.querySelector<HTMLElement>('.reply-name');
+  expect(name?.style.color).toBe(senderColor('@bob:example.org'));
+  expect(name?.textContent).toBe('Bob');
   await press(reply);
   expect(onJumpToEvent).toHaveBeenCalledWith('$original');
 });
