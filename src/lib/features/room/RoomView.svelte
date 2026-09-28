@@ -93,6 +93,10 @@
   import TimelineList from './timeline/TimelineList.svelte';
   import MediaViewer, { type MediaItem } from './media/MediaViewer.svelte';
   import { galleryEventId, timelineMediaItems } from './media/media-items.js';
+  import {
+    provideMediaViewerOpener,
+    type StandaloneMedia,
+  } from './media/media-viewer-opener.svelte.js';
   import { tagForLevel } from './settings/power-level-tags.js';
   import { memberListChanges } from './settings/member-list.svelte.js';
   import { provideSenderRoles, type SenderRole } from './members/sender-roles.js';
@@ -144,9 +148,9 @@
   let timelineAtBottom = $state(true);
   let timelineFollowingLive = $state<boolean>(false);
   let mediaEventId = $state<string | null>(null);
-  let profileAvatarItem = $state<MediaItem | null>(null);
+  let standaloneMediaItem = $state<MediaItem | null>(null);
   let panelMediaItems = $state.raw<MediaItem[] | null>(null);
-  let profileAvatarSequence = 0;
+  let standaloneSequence = 0;
   let callSupport = $state<CallSupportView | null>(null);
   let callFallbackUrl = $state<string | null>(null);
   let tombstoneJoining = $state(false);
@@ -157,8 +161,8 @@
   );
 
   let mediaItems = $derived(
-    profileAvatarItem
-      ? [profileAvatarItem]
+    standaloneMediaItem
+      ? [standaloneMediaItem]
       : (panelMediaItems ?? timelineMediaItems(timeline.items))
   );
 
@@ -358,6 +362,7 @@
   provideRoomAbbreviations(abbreviations);
   const mediaPreviews = new RoomMediaPreviews(() => resolvedRoom?.join_rule ?? null);
   provideRoomMediaPreviews(mediaPreviews);
+  provideMediaViewerOpener(openStandaloneMedia);
   $effect(() => {
     void mediaPreviews.load(resolvedRoomId);
   });
@@ -655,13 +660,13 @@
   }
 
   function openMedia(eventId: string): void {
-    profileAvatarItem = null;
+    standaloneMediaItem = null;
     panelMediaItems = null;
     mediaEventId = eventId;
   }
 
   function openPanelMedia(items: MediaItem[], eventId: string): void {
-    profileAvatarItem = null;
+    standaloneMediaItem = null;
     panelMediaItems = items;
     mediaEventId = eventId;
   }
@@ -692,8 +697,7 @@
 
   function openProfileAvatar(source: string, displayName: string): void {
     closeProfile();
-    const eventId = `profile-avatar-${String(++profileAvatarSequence)}`;
-    profileAvatarItem = {
+    openStandaloneMedia({
       kind: 'image',
       filename: displayName,
       caption: null,
@@ -707,15 +711,20 @@
       thumbnail: null,
       spoiler: null,
       animated: null,
-      eventId,
       sender: displayName,
-    };
-    mediaEventId = eventId;
+    });
+  }
+
+  function openStandaloneMedia(item: StandaloneMedia): void {
+    panelMediaItems = null;
+    const standalone = { ...item, eventId: `standalone-${String(++standaloneSequence)}` };
+    standaloneMediaItem = standalone;
+    mediaEventId = standalone.eventId;
   }
 
   function closeMedia(): void {
     mediaEventId = null;
-    profileAvatarItem = null;
+    standaloneMediaItem = null;
     panelMediaItems = null;
   }
 

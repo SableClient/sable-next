@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -14,6 +15,7 @@ const core = Object.assign(baseCore, { urlPreview: vi.fn<() => Promise<UrlPrevie
 
 import LinkPreviewCard from './LinkPreviewCard.svelte';
 import LinkPreviewCardMediaHarness from './LinkPreviewCardMediaHarness.test.svelte';
+import type { StandaloneMedia } from './media-viewer-opener.svelte.js';
 import { mediaPreviewSettings } from '#lib/settings/media-previews.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
@@ -146,6 +148,50 @@ test('an image-only preview renders inline instead of as a card', async () => {
   expect(link).not.toHaveClass('link-preview');
   expect(link).toHaveAttribute('href', 'https://media.example/anim.gif');
   expect(link.querySelector('.link-preview-inline')).toBeInTheDocument();
+});
+
+test('an image-only preview opens the media viewer instead of the url', async () => {
+  preferences.urlPreviews = true;
+  core.urlPreview.mockResolvedValue(
+    preview({
+      url: 'https://media.example/anim.gif',
+      title: null,
+      description: 'anim.gif',
+      image: 'mxc://example.org/anim',
+      image_mime: 'image/gif',
+      image_width: 320,
+      image_height: 240,
+    })
+  );
+  const opener = vi.fn<(item: StandaloneMedia) => void>();
+  render(LinkPreviewCardMediaHarness, {
+    url: 'https://media.example/anim.gif',
+    joinRule: 'invite',
+    opener,
+  });
+
+  await tick();
+  await Promise.resolve();
+  await tick();
+
+  expect(screen.queryByRole('link')).toBeNull();
+  await userEvent.click(screen.getByRole('button'));
+  expect(opener).toHaveBeenCalledWith({
+    kind: 'image',
+    filename: 'https://media.example/anim.gif',
+    caption: null,
+    html: null,
+    source: 'mxc://example.org/anim',
+    mime: 'image/gif',
+    width: 320,
+    height: 240,
+    size: null,
+    blurhash: null,
+    thumbnail: null,
+    spoiler: null,
+    animated: null,
+    sender: 'https://media.example/anim.gif',
+  });
 });
 
 test('a preview carrying a title stays a card even with an image', async () => {
