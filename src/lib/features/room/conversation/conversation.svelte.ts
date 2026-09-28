@@ -418,7 +418,7 @@ export class Conversation {
     this.context = {
       kind: 'reply',
       eventId,
-      sender: item.sender_name ?? item.sender,
+      sender: item.per_message_profile?.display_name ?? item.sender_name ?? item.sender,
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
       body: version?.body ?? replyPreviewBody(item.content),
     };

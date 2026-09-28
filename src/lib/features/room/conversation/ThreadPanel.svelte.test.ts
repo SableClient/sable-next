@@ -12,6 +12,9 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({ useRoomList: () => ({ rooms: 
 vi.mock('#lib/personas/personas.svelte.js', () => ({
   usePersonaStore: () => ({ personas: [], load: () => Promise.resolve() }),
 }));
+vi.mock('../messages/event-items.svelte.js', () => ({
+  useEventItems: () => ({ get: () => undefined }),
+}));
 
 import { core } from '#lib/core/__mocks__/context.js';
 

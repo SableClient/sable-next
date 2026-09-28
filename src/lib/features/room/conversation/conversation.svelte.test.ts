@@ -92,6 +92,17 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
+test('a reply to a persona message names the persona', () => {
+  const target = {
+    ...item('$one:example.org', '@ana:example.org'),
+    per_message_profile: { display_name: 'Ghost' },
+  } as unknown as TimelineItemView;
+  const { conversation } = setup([target], '@kris:example.org');
+
+  conversation.reply('$one:example.org');
+  expect(conversation.context?.sender).toBe('Ghost');
+});
+
 test('a reply to an earlier version targets the edit and quotes its text', async () => {
   const { conversation, sendMessage } = setup(
     [item('$one:example.org', '@ana:example.org')],

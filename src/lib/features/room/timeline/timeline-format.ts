@@ -237,21 +237,23 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
 
 export type PersonaLookup = (eventId: string | null | undefined) => PerMessageProfileView | null;
 
-export function personaLookup(items: readonly TimelineItemView[]): PersonaLookup {
-  let personas: Map<string, PerMessageProfileView> | null = null;
+export function personaLookup(
+  items: readonly TimelineItemView[],
+  unloaded?: PersonaLookup
+): PersonaLookup {
+  let personas: Map<string, PerMessageProfileView | null> | null = null;
 
   return (eventId) => {
     if (eventId === null || eventId === undefined) return null;
     if (personas === null) {
       personas = new Map();
       for (const item of items) {
-        if (item.event_id && item.per_message_profile) {
-          personas.set(item.event_id, item.per_message_profile);
-        }
+        if (item.event_id) personas.set(item.event_id, item.per_message_profile);
       }
     }
 
-    return personas.get(eventId) ?? null;
+    const loaded = personas.get(eventId);
+    return loaded === undefined ? (unloaded?.(eventId) ?? null) : loaded;
   };
 }
 

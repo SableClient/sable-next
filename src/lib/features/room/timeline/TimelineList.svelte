@@ -24,6 +24,7 @@
 
   import MessageContextMenu from '../messages/MessageContextMenu.svelte';
   import MessageDialogHost from '../messages/MessageDialogHost.svelte';
+  import { useEventItems } from '../messages/event-items.svelte.js';
   import { MessageDialogs, provideMessageDialogs } from '../messages/message-dialogs.svelte.js';
   import { OpenMessageMenu, provideMessageMenu } from '../messages/message-menu-open.svelte.js';
   import TimelineItem from './TimelineItem.svelte';
@@ -212,7 +213,12 @@
   let filling = $state(false);
   let disposed = false;
   let refillPending = false;
-  let personas = $derived(personaLookup(timeline.items));
+  const fetchedItems = useEventItems();
+  let personas = $derived(
+    personaLookup(timeline.items, (eventId) =>
+      roomId && eventId ? (fetchedItems.get(roomId, eventId)?.per_message_profile ?? null) : null
+    )
+  );
   let readersByItem = $derived(cumulativeReadBy(timeline.items));
   let personaOpen = $state(false);
   const pagination = new TimelinePagination(

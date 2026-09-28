@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import type {
   MembershipChangeView,
+  PerMessageProfileView,
   StateChangeView,
   TimelineItemView,
 } from '#src/generated/protocol';
@@ -687,6 +688,19 @@ test('the persona lookup resolves a reply target and reports a miss as null', ()
   expect(lookup('$a')?.display_name).toBe('Ghost');
   expect(lookup('$b')).toBeNull();
   expect(lookup('$missing')).toBeNull();
+});
+
+test('the persona lookup asks the fallback only for a target outside the window', () => {
+  const items = [{ event_id: '$a', per_message_profile: null }] as unknown as TimelineItemView[];
+  const asked: (string | null | undefined)[] = [];
+  const lookup = personaLookup(items, (eventId) => {
+    asked.push(eventId);
+    return { display_name: 'Ghost' } as PerMessageProfileView;
+  });
+
+  expect(lookup('$a')).toBeNull();
+  expect(lookup('$old')?.display_name).toBe('Ghost');
+  expect(asked).toEqual(['$old']);
 });
 
 test('the persona lookup reads the items only when first asked', () => {
