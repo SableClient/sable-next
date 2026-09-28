@@ -6,6 +6,8 @@ use half::f16;
 use linear_srgb::lut::SrgbConverter;
 use zentone::{Bt2408Tonemapper, ToneMap, gamut};
 
+#[cfg(target_os = "linux")]
+pub mod linux;
 #[cfg(all(windows, feature = "tauri"))]
 pub mod share;
 #[cfg(windows)]
