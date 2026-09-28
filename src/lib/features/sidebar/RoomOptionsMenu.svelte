@@ -10,6 +10,7 @@
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
+  import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import StarIcon from 'phosphor-svelte/lib/StarIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
@@ -134,6 +135,40 @@
     parentSpace !== null && manageable.has(parentSpace.room_id) ? parentSpace : null
   );
 
+  let joinableParents = $state<{ room_id: string; via: string[]; name: string | null }[]>([]);
+  let parentsRun = 0;
+
+  function readParents(): void {
+    const run = ++parentsRun;
+    joinableParents = [];
+    void core.commands
+      .unjoinedSpaceParents(room.room_id)
+      .then((parents) => {
+        if (run !== parentsRun) return;
+        joinableParents = parents.map((parent) => ({ ...parent, name: null }));
+        for (const parent of parents) {
+          void core.commands
+            .roomPreview(parent.room_id, parent.via)
+            .then((preview) => {
+              if (run !== parentsRun) return;
+              joinableParents = joinableParents.map((entry) =>
+                entry.room_id === parent.room_id ? { ...entry, name: preview.name } : entry
+              );
+            })
+            .catch((error: unknown) => {
+              console.debug('[sable room] parent space preview unavailable', error);
+            });
+        }
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] parent spaces unavailable', error);
+      });
+  }
+
+  function joinParent(parent: { room_id: string; via: string[] }): void {
+    void core.commands.joinRoom(parent.room_id, parent.via).catch(report);
+  }
+
   let opened = $state(false);
   let addToSpaceOpen = $state(false);
   let inviteOpen = $state(false);
@@ -145,6 +180,7 @@
     opened = true;
     readManageableSpaces();
     readInvitePermission();
+    readParents();
   });
 
   function report(error: unknown): void {
@@ -306,6 +342,17 @@
         {$i18n.t('room.menuAddToSpace')}
       </ActionMenuItem>
     {/if}
+
+    {#each joinableParents as parent (parent.room_id)}
+      <ActionMenuItem
+        onSelect={() => {
+          joinParent(parent);
+        }}
+      >
+        <SignInIcon />
+        {$i18n.t('room.menuJoinParentSpace', { space: parent.name ?? parent.room_id })}
+      </ActionMenuItem>
+    {/each}
 
     {#if !room.is_space && removableParent}
       <ActionMenuItem

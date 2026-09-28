@@ -1136,6 +1136,14 @@ impl Core {
                 })
             }
 
+            Command::UnjoinedSpaceParents { room_id } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                Ok(CommandOk::UnjoinedSpaceParents {
+                    parents: crate::cosmetics::unjoined_space_parents(&client, &room).await,
+                })
+            }
+
             Command::RoomCosmetics { room_id, space_id } => Ok(CommandOk::RoomCosmetics(
                 self.room_cosmetics(&room_id, space_id).await?,
             )),

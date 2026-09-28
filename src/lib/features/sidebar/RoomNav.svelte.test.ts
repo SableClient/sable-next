@@ -930,3 +930,26 @@ test('a room set to all messages badges its unread messages in green', async () 
   expect(within(row('Quiet')).getByText('6')).toHaveClass('unread-badge-count');
   expect(row('Quiet').querySelector('.unread-badge-highlight')).not.toBeInTheDocument();
 });
+
+test('a room whose parent space we are not in offers to join it', async () => {
+  roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
+  const unjoinedSpaceParents = vi.fn(() =>
+    Promise.resolve([{ room_id: '!parent:example.org', via: ['example.org'] }])
+  );
+  const roomPreview = vi.fn(() => Promise.resolve({ name: 'Parent' }));
+  const joinRoom = vi.fn(() => Promise.resolve('!parent:example.org'));
+  Object.assign(core, { unjoinedSpaceParents, roomPreview, joinRoom });
+  await mountNav();
+
+  await openMenu('Plain');
+  const join = await screen.findByRole('menuitem', {
+    name: 'room.menuJoinParentSpace:Parent',
+  });
+  await user.click(join);
+
+  expect(unjoinedSpaceParents).toHaveBeenCalledWith('!plain:example.org');
+  expect(roomPreview).toHaveBeenCalledWith('!parent:example.org', ['example.org']);
+  await vi.waitFor(() => {
+    expect(joinRoom).toHaveBeenCalledWith('!parent:example.org', ['example.org']);
+  });
+});

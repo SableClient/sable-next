@@ -383,6 +383,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    UnjoinedSpaceParents {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     RoomCosmetics {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1371,6 +1375,9 @@ pub enum CommandOk {
     },
     RoomHasSpaceParent {
         has_space_parent: bool,
+    },
+    UnjoinedSpaceParents {
+        parents: Vec<SpaceParentView>,
     },
     RoomCosmetics(RoomCosmeticsView),
     RoomOpen(RoomOpenView),
@@ -2507,6 +2514,14 @@ pub struct SpaceHierarchyRoomView {
     /// This room's own `m.space.child` edges, already sorted. Empty unless it is
     /// a space.
     pub children: Vec<SpaceChildEdge>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SpaceParentView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub via: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

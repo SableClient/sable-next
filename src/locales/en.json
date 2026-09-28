@@ -276,6 +276,7 @@
     "menuMoveDown": "Move down",
     "menuAddToSpace": "Add to space",
     "menuRemoveFromSpace": "Remove from {{space}}",
+    "menuJoinParentSpace": "Join {{space}}",
     "menuLeave": "Leave room",
     "menuLeaveSpace": "Leave space",
     "menuCopyLink": "Copy room link",

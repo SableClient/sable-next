@@ -48,6 +48,7 @@ import type {
   RoomAttachmentKind,
   RoomAttachmentView,
   RoomCosmeticsView,
+  SpaceParentView,
   RoomNotificationModeView,
   RoomOpenView,
   RoomPermissionsView,
@@ -368,6 +369,14 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
       });
       return response.has_space_parent;
+    },
+
+    async unjoinedSpaceParents(roomId: string): Promise<SpaceParentView[]> {
+      const response = await transport().send({
+        type: 'unjoined_space_parents',
+        room_id: roomId,
+      });
+      return response.parents;
     },
 
     async roomCosmetics(roomId: string, spaceId: string | null): Promise<RoomCosmeticsView> {
