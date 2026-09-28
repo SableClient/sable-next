@@ -1062,6 +1062,14 @@
       display: none;
     }
 
+    .stage.has-nav {
+      padding-inline: var(--space-200);
+    }
+
+    :global(.nav) {
+      display: none;
+    }
+
     :global(.viewer) {
       grid-template-rows: minmax(0, 1fr);
     }
