@@ -625,6 +625,7 @@
   }
 
   .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global([data-mx-room-mention]),
   .formatted-body :global(a[data-settings-link]) {
     display: inline-block;
   }
@@ -636,6 +637,7 @@
   }
 
   .formatted-body :global(a[data-matrix-link]),
+  .formatted-body :global([data-mx-room-mention]),
   .formatted-body :global(a[data-settings-link]),
   .formatted-body :global(.time-chip) {
     background: var(--sec-container);
