@@ -95,7 +95,7 @@ tauri-plugin-sharekit = "=0.4.0-rc.7"
 # target directory, where scripts/cef/copy-libs.sh looks for it.
 [target."cfg(target_os = \"windows\")".dependencies]
 enigo = { version = "0.6.1", default-features = false }
-sable-hdr = { path = "../crates/sable-hdr", features = ["tauri"] }
+sable-hdr = { path = "../crates/sable-hdr", version = "0.1.0", features = ["tauri"] }
 windows = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_System_ProcessStatus",
@@ -122,7 +122,7 @@ libloading = "0.9"
 # Ubuntu 22.04's PipeWire headers predate pipewire-rs 0.10's generated bindings.
 # Keep the capture client on the compatible 0.9 series used by the release runner.
 pipewire = "0.9.2"
-sable-hdr = { path = "../crates/sable-hdr" }
+sable-hdr = { path = "../crates/sable-hdr", version = "0.1.0" }
 zbus = "5"
 
 [target."cfg(target_os = \"ios\")".dependencies]
