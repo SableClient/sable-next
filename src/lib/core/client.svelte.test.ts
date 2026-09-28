@@ -724,3 +724,45 @@ test('a status reported while the first read is in flight is not overwritten by 
   expect(core.encryption).toEqual(known);
   core.stop();
 });
+
+test('a stale login callback that fails does not discard the first status read', async () => {
+  const known = {
+    verification: 'unverified',
+    recovery: 'enabled',
+    cross_signing_ready: true,
+    backup_unlocked: false,
+    signing_keys: { master: true, self_signing: true, user_signing: true },
+    recovery_passphrase: false,
+  } as const;
+  let answer: (value: object) => void = () => {};
+  const device = { device_id: 'LAPTOP' };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session] },
+    devices: { devices: [device] },
+  });
+  const plain = fake.send.getMockImplementation();
+  fake.send.mockImplementation((command: { type: string }) => {
+    if (command.type === 'encryption_status')
+      return new Promise<object>((resolve) => {
+        answer = resolve;
+      });
+    if (command.type === 'complete_oidc_login')
+      return Promise.reject(new CoreError({ code: 'unavailable' }));
+    return plain?.(command) ?? Promise.resolve({});
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  await expect(core.completeOidcLogin('sable://oauth/callback?code=used')).rejects.toBeInstanceOf(
+    CoreError
+  );
+  answer({ status: known });
+  await vi.waitFor(() => {
+    expect(core.encryption).toEqual(known);
+  });
+
+  expect(core.deviceList).toEqual([device]);
+  expect(core.status).toBe('ready');
+  core.stop();
+});

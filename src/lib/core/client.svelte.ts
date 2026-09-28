@@ -751,14 +751,14 @@ export class CoreClient {
   /** Both events fire only on a change, so a session that starts unverified
       would otherwise report nothing. */
   private async primeEncryptionStatus(): Promise<void> {
-    const generation = this.generation;
+    const revision = this.accountRevision;
     const reported = this.encryptionEvents;
     try {
       const [status, devices] = await Promise.all([
         this.commands.encryptionStatus(),
         this.commands.devices(),
       ]);
-      if (generation !== this.generation) return;
+      if (revision !== this.accountRevision) return;
       if (reported === this.encryptionEvents) this.encryption = status;
       this.deviceList = devices.devices;
     } catch (error) {
@@ -876,10 +876,10 @@ export class CoreClient {
   }
 
   private async primeSyncStatus(): Promise<void> {
-    const generation = this.generation;
+    const revision = this.accountRevision;
     try {
       const status = await this.commands.syncStatus();
-      if (generation !== this.generation || this.sync !== null) return;
+      if (revision !== this.accountRevision || this.sync !== null) return;
       this.applySyncStatus(status);
     } catch (error) {
       console.debug('[sable core] sync status unavailable', error);
