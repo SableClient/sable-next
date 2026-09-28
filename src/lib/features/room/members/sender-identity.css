@@ -69,6 +69,11 @@
   }
 }
 
+:root.dark
+  :is(.sender-identity-name, .sender-identity-via, .sender-identity-pronouns, .reply-name).tinted {
+  color: var(--name-color-on-dark);
+}
+
 @media (width <= 25rem) {
   .sender-identity:has(> .sender-identity-via) .sender-identity-pronouns {
     max-width: 6rem;

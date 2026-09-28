@@ -94,3 +94,32 @@ test('a compact connected reply keeps its connector clear of the name gutter', a
   });
   expect(connectorLeft).toBeGreaterThanOrEqual(gutterRight);
 });
+
+test('a pinned dark theme corrects names for the dark ground on a light browser', async ({
+  app,
+  page,
+  installRoomCore,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ theme: 'dark' }));
+    (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = {
+      name_color_light: '#b0306a',
+      name_color_dark: '#f09ac0',
+    };
+  });
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+
+  const name = page.locator('.sender-identity-name.tinted', { hasText: 'Alice' }).first();
+  await expect(name).toBeVisible();
+  const colours = await name.evaluate((node) => {
+    const probe = document.createElement('span');
+    probe.style.color = getComputedStyle(node).getPropertyValue('--name-color-on-dark');
+    document.body.append(probe);
+    const dark = getComputedStyle(probe).color;
+    probe.remove();
+    return { shown: getComputedStyle(node).color, dark };
+  });
+  expect(colours.shown).toBe(colours.dark);
+});
