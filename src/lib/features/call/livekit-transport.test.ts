@@ -299,6 +299,26 @@ function withPublishing(fixture: ReturnType<typeof roomFixture>) {
   });
 }
 
+test('a share without our own audio capture asks the browser for stereo system audio', async () => {
+  const fixture = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+
+  await transport.connect(connectOptions);
+  await transport.capabilities.screenShare?.setEnabled(true);
+
+  expect(fixture.localParticipant.setScreenShareEnabled).toHaveBeenCalledWith(
+    true,
+    expect.objectContaining({
+      systemAudio: 'include',
+      audio: expect.objectContaining({ channelCount: 2, echoCancellation: false }) as unknown,
+    }),
+    expect.objectContaining({ forceStereo: true, dtx: false, red: false })
+  );
+
+  await transport.capabilities.screenShare?.setEnabled(false);
+  expect(fixture.localParticipant.setScreenShareEnabled).toHaveBeenLastCalledWith(false);
+});
+
 test('publishes the screen audio beside the share, and tears it down with it', async () => {
   const fixture = roomFixture();
   const participant = withPublishing(fixture);

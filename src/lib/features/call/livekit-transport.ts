@@ -4,6 +4,8 @@ import {
   ConnectionState,
   LocalAudioTrack,
   Room as LivekitRoom,
+  type ScreenShareCaptureOptions,
+  type TrackPublishOptions,
   type LocalParticipant,
   type RemoteParticipant,
   RoomEvent,
@@ -93,6 +95,23 @@ export type LivekitTransportOptions = {
 
 const defaultWorker = (): Worker =>
   new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
+
+const SCREEN_AUDIO_PUBLISH: TrackPublishOptions = {
+  audioPreset: AudioPresets.musicHighQualityStereo,
+  forceStereo: true,
+  dtx: false,
+  red: false,
+};
+
+const DISPLAY_AUDIO_CAPTURE: ScreenShareCaptureOptions = {
+  audio: {
+    channelCount: 2,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+  },
+  systemAudio: 'include',
+};
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
@@ -441,11 +460,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       const track = new LocalAudioTrack(await captureScreenAudio(choice), undefined, false);
       screenAudio = track;
       await room.localParticipant.publishTrack(track, {
+        ...SCREEN_AUDIO_PUBLISH,
         source: Track.Source.ScreenShareAudio,
-        audioPreset: AudioPresets.musicHighQualityStereo,
-        forceStereo: true,
-        dtx: false,
-        red: false,
       });
     } catch (error) {
       fail('call.screen_share.audio', error);
@@ -513,7 +529,13 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
         setEnabled: async (enabled, audio) => {
           if (disposed || options.publishMedia === false) return;
           await step('call.screen_share.set', () =>
-            room.localParticipant.setScreenShareEnabled(enabled)
+            enabled && !screenAudioSupported()
+              ? room.localParticipant.setScreenShareEnabled(
+                  true,
+                  DISPLAY_AUDIO_CAPTURE,
+                  SCREEN_AUDIO_PUBLISH
+                )
+              : room.localParticipant.setScreenShareEnabled(enabled)
           );
           if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio(audio);
           else if (!enabled) await stopSharingAudio();
