@@ -930,6 +930,18 @@
         {/each}
       {/await}
     {/if}
+    {#if callSession.choosingScreenSource}
+      {@const monitors = callSession.choosingScreenSource}
+      {#await import('#lib/features/call/ScreenShareSourceDialog.svelte') then { default: ScreenShareSourceDialog }}
+        <ScreenShareSourceDialog
+          {monitors}
+          onShare={(source) => void callSession.shareScreenFrom(source)}
+          onCancel={() => {
+            callSession.choosingScreenSource = null;
+          }}
+        />
+      {/await}
+    {/if}
     {#if callSession.choosingScreenAudio}
       {#await import('#lib/features/call/ScreenShareAudioDialog.svelte') then { default: ScreenShareAudioDialog }}
         <ScreenShareAudioDialog

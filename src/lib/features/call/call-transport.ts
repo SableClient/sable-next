@@ -82,9 +82,16 @@ export type CallTransportCapabilities = {
     select: (routeId: string) => Promise<void>;
   };
   screenShare?: {
-    setEnabled: (enabled: boolean, audio?: ScreenAudioChoice) => Promise<void>;
+    setEnabled: (
+      enabled: boolean,
+      audio?: ScreenAudioChoice,
+      source?: ScreenSource
+    ) => Promise<void>;
   };
 };
+
+/** A monitor the desktop app captures itself, converting HDR to SDR. */
+export type ScreenSource = { kind: 'hdr'; monitor: number };
 
 export type CallTransport = {
   connect: (options: CallTransportConnectOptions) => Promise<void>;

@@ -5,6 +5,8 @@ import {
 } from '#lib/platform/screen-audio.js';
 import { createContext } from 'svelte';
 
+import { hdrShareSupported, listHdrMonitors, type HdrMonitor } from '#lib/platform/hdr-share.js';
+
 import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
 import type { CallGrant, CoreClient } from '#lib/core/client.svelte.js';
 
@@ -13,6 +15,7 @@ import type {
   CallParticipant,
   CallTransport,
   CallTransportState,
+  ScreenSource,
 } from './call-transport';
 import { decodeCallKey, idleTransportState, ignoreError } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
@@ -109,6 +112,7 @@ export class CallSession {
   views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
+  choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
 
   get startedAt(): number | null {
     if (this.connectedAt === null) return null;
@@ -463,9 +467,20 @@ export class CallSession {
       await this.setScreenShareEnabled(false);
     } else if (screenAudioSupported()) {
       this.choosingScreenAudio = true;
+    } else if (hdrShareSupported()) {
+      const monitors = await listHdrMonitors().catch(() => []);
+      if (monitors.length > 0) this.choosingScreenSource = monitors;
+      else await this.setScreenShareEnabled(true);
     } else {
       await this.setScreenShareEnabled(true);
     }
+  }
+
+  async shareScreenFrom(source: ScreenSource | null): Promise<void> {
+    this.choosingScreenSource = null;
+    await this.#device('screen', () =>
+      this.#media?.capabilities.screenShare?.setEnabled(true, undefined, source ?? undefined)
+    );
   }
 
   async shareScreenWith(audio: ScreenAudioChoice): Promise<void> {

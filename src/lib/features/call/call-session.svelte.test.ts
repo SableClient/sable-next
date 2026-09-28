@@ -3,6 +3,12 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
+const hdr = vi.hoisted(() => ({
+  hdrShareSupported: vi.fn(() => false),
+  listHdrMonitors: vi.fn(() => Promise.resolve([{ index: 0, name: 'Main', hdr: true }])),
+}));
+vi.mock('#lib/platform/hdr-share.js', () => hdr);
+
 import { CallSession, voiceStates } from './call-session.svelte.js';
 import { MatrixKeyProvider } from './key-provider';
 import type { CallTransportConnectOptions } from './call-transport';
@@ -808,4 +814,25 @@ test('two devices of one account keep their own voice state', () => {
 
   expect(states.get('@me:x')?.speaking).toBe(false);
   expect(states.get('@me:x#1')?.speaking).toBe(true);
+});
+
+test('an HDR monitor on the Windows app is offered before the browser picker', async () => {
+  const { client, transport } = harness();
+  const setEnabled = vi.fn(() => Promise.resolve());
+  transport.capabilities = { screenShare: { setEnabled } };
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  hdr.hdrShareSupported.mockReturnValue(true);
+
+  await session.toggleScreenShare();
+  expect(session.choosingScreenSource).toEqual([{ index: 0, name: 'Main', hdr: true }]);
+  expect(setEnabled).not.toHaveBeenCalled();
+
+  await session.shareScreenFrom({ kind: 'hdr', monitor: 0 });
+  expect(session.choosingScreenSource).toBeNull();
+  expect(setEnabled).toHaveBeenLastCalledWith(true, undefined, { kind: 'hdr', monitor: 0 });
+
+  await session.shareScreenFrom(null);
+  expect(setEnabled).toHaveBeenLastCalledWith(true, undefined, undefined);
+  hdr.hdrShareSupported.mockReturnValue(false);
 });
