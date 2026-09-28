@@ -348,8 +348,9 @@ async fn build_account_client(
 
     #[cfg(not(target_family = "wasm"))]
     let builder = {
-        let _ = persistent_event_cache;
         static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+        let _ = persistent_event_cache;
         let holder = format!(
             "sable-{}-{}-{}",
             std::process::id(),

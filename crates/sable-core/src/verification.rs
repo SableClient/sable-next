@@ -186,7 +186,7 @@ impl Core {
                     );
 
                     if let Some(request) = request {
-                        core.receive_verification_request(request).await;
+                        core.receive_verification_request(request);
                     }
                 }
             }
@@ -216,7 +216,7 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
-    async fn receive_verification_request(self: &Arc<Self>, request: VerificationRequest) {
+    fn receive_verification_request(self: &Arc<Self>, request: VerificationRequest) {
         self.watch_verification(request);
     }
 

@@ -193,8 +193,8 @@ impl SableCore {
     /// session store, each of which must return a Promise.
     ///
     /// `log_filter` is an `EnvFilter` directive. `persistent_event_cache` keeps
-    /// timeline history in IndexedDB; iOS PWAs disable it after WebKit loses
-    /// IndexedDB transactions while backgrounded.
+    /// timeline history in `IndexedDB`; iOS PWAs disable it after `WebKit` loses
+    /// `IndexedDB` transactions while backgrounded.
     /// `"info,matrix_sdk::http_client=debug"` is the only way to see the SDK's
     /// requests at all: a `SharedWorker`'s never reach the page's network panel.
     #[wasm_bindgen(constructor)]
