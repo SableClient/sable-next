@@ -7,6 +7,8 @@ use linear_srgb::lut::SrgbConverter;
 use zentone::{Bt2408Tonemapper, ToneMap, gamut};
 
 #[cfg(windows)]
+pub mod webview2;
+#[cfg(windows)]
 pub mod windows;
 
 /// OBS's defaults for "SDR white level" and "HDR nominal peak level".
