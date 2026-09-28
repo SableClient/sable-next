@@ -40,6 +40,9 @@
   const canUseAnotherDevice = $derived(
     core.deviceList.some((device) => !device.is_own && device.cross_signed)
   );
+  const verificationDevice = $derived(
+    core.deviceList.find((device) => !device.is_own && device.cross_signed)
+  );
   const resetOnly = $derived(!canUseRecovery && !canUseAnotherDevice);
 
   holdOverlayBack(
@@ -245,7 +248,8 @@
         <Button
           block
           loading={verification.requesting}
-          onclick={() => void verification.requestVerification()}
+          onclick={() =>
+            void verification.requestVerification(undefined, verificationDevice?.device_id)}
         >
           <DevicesIcon aria-hidden="true" />
           {$i18n.t('setup.useAnotherDevice')}

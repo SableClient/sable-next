@@ -11,13 +11,17 @@ export class DeviceVerification {
 
   constructor(private readonly core: CoreClient) {}
 
-  async requestVerification(onRequested?: Continuation): Promise<void> {
+  async requestVerification(onRequested?: Continuation, deviceId?: string): Promise<void> {
     const userId = this.core.session?.user_id;
     if (!userId) return;
     this.requesting = true;
     this.error = null;
     try {
-      await this.core.requestVerification(userId);
+      if (deviceId) {
+        await this.core.requestVerification(userId, deviceId);
+      } else {
+        await this.core.requestVerification(userId);
+      }
       await onRequested?.();
     } catch (cause) {
       this.error = verificationErrorMessage(cause);
