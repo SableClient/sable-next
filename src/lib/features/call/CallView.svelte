@@ -12,7 +12,7 @@
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
   import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import WarningCircleIcon from 'phosphor-svelte/lib/WarningCircleIcon';
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import type { MemberView } from '#src/generated/protocol';
 
   import { memberIdentity, type MemberIdentity } from '#lib/features/room/members/members.js';
@@ -207,6 +207,13 @@
   }
 
   onDestroy(() => clearTimeout(idleTimer));
+
+  onMount(() => {
+    session.views += 1;
+    return () => {
+      session.views -= 1;
+    };
+  });
 </script>
 
 <svelte:document onfullscreenchange={() => (fullscreen = document.fullscreenElement === stage)} />

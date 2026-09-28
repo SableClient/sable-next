@@ -24,6 +24,7 @@ function mountBothSharing(
     connectedAt: null,
     startedAt: null,
     layout: { pinned: null, gridForced: false },
+    views: 0,
     deafened: false,
     encryptsMedia: false,
     canScreenShare: true,
@@ -122,4 +123,11 @@ test('two devices of one account are told apart by device', () => {
 
   expect(screen.getByText("@here:x (this device)'s screen")).toBeInTheDocument();
   expect(screen.getByText("@here:x (BBBB)'s screen")).toBeInTheDocument();
+});
+
+test('the call view counts itself as watching while it is on screen', () => {
+  const { session, unmount } = mountBothSharing();
+  expect(session.views).toBe(1);
+  unmount();
+  expect(session.views).toBe(0);
 });

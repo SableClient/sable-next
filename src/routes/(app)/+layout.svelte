@@ -906,6 +906,18 @@
     <AppShell>
       {@render children()}
     </AppShell>
+    {#if preferences.callScreenPreview && callSession.active && callSession.views === 0 && callSession.rooms.length > 0}
+      {#await import('#lib/features/call/ScreenSharePreview.svelte') then { default: ScreenSharePreview }}
+        <ScreenSharePreview
+          session={callSession}
+          onReturn={() => {
+            if (callSession.roomId !== null) {
+              void goto(roomSectionPath(roomList.rooms, callSession.roomId));
+            }
+          }}
+        />
+      {/await}
+    {/if}
     {#if callSession.rooms.length > 0}
       {#await import('#lib/features/call/CallAudio.svelte') then { default: CallAudio }}
         {#each callSession.rooms as entry (entry.backendId)}

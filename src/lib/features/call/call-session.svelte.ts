@@ -106,6 +106,7 @@ export class CallSession {
   deafened = $state(false);
   connectedAt = $state<number | null>(null);
   layout: CallPin = { pinned: null, gridForced: false };
+  views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
 
