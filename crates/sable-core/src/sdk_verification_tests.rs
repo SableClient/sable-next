@@ -132,7 +132,7 @@ async fn two_devices(
 
 #[allow(clippy::unwrap_used)]
 #[tokio::test]
-async fn crossed_self_verification_requests_converge_on_one_flow() {
+async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
     let server = MatrixMockServer::new().await;
     let (mut old, mut new, queue) = two_devices(&server, false).await;
     let user_id = old.client.user_id().unwrap().to_owned();
@@ -157,17 +157,17 @@ async fn crossed_self_verification_requests_converge_on_one_flow() {
 
     deliver(&server, &queue, &mut [&mut old, &mut new]).await;
 
-    let (old_flow, old_state) = old.last_live().unwrap();
-    let (new_flow, new_state) = new.last_live().unwrap();
-    assert_eq!(old_flow, new_flow);
-    assert!(
-        matches!(old_state, VerificationView::Choose { .. }),
-        "{old_state:?}"
-    );
-    assert!(
-        matches!(new_state, VerificationView::Choose { .. }),
-        "{new_state:?}"
-    );
+    for device in [&old, &new] {
+        assert!(device.last_live().is_none(), "{:?}", device.states);
+        assert!(
+            device
+                .states
+                .iter()
+                .any(|(_, state)| matches!(state, VerificationView::Cancelled { .. })),
+            "{:?}",
+            device.states
+        );
+    }
 }
 
 #[allow(clippy::unwrap_used)]

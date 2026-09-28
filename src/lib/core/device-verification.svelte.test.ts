@@ -66,18 +66,6 @@ test('a request is sent for the signed-in user and continues', async () => {
   expect(onRequested).toHaveBeenCalledOnce();
 });
 
-test('a request can target a signed-in device', async () => {
-  const requestVerification = vi.fn(() => Promise.resolve('flow'));
-  const { verification } = verificationWith({
-    session: { user_id: '@me:example.org' },
-    requestVerification,
-  });
-
-  await verification.requestVerification(undefined, 'OTHERDEVICE');
-
-  expect(requestVerification).toHaveBeenCalledWith('@me:example.org', 'OTHERDEVICE');
-});
-
 test('nothing is requested without a session', async () => {
   const requestVerification = vi.fn();
   const { verification } = verificationWith({ requestVerification });

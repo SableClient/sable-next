@@ -63,7 +63,7 @@ use matrix_sdk::executor::AbortOnDrop;
 use matrix_sdk::ruma::events::call::member::CallMemberStateKey;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEventContent, GlobalAccountDataEventType};
 use matrix_sdk::ruma::serde::Raw;
-use matrix_sdk::ruma::{OwnedDeviceId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
+use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId};
 use matrix_sdk_ui::timeline::Timeline;
 use tokio::sync::{Mutex, RwLock, mpsc};
 use url::Url;
@@ -107,7 +107,6 @@ pub struct Core {
     pending_registration: Mutex<Option<registration::PendingRegistration>>,
     qr_flow: Mutex<Option<qr_login::QrFlow>>,
     pending_identity_reset: Mutex<Option<verification::PendingIdentityReset>>,
-    crossed_verification: Mutex<Option<(OwnedUserId, OwnedDeviceId)>>,
     session_tasks: std::sync::Mutex<Vec<Task>>,
     subscriptions: Mutex<HashMap<SubscriptionId, Subscription>>,
     room_subscriptions: Mutex<std::collections::BTreeSet<OwnedRoomId>>,
@@ -249,7 +248,6 @@ impl Core {
             pending_registration: Mutex::new(None),
             qr_flow: Mutex::new(None),
             pending_identity_reset: Mutex::new(None),
-            crossed_verification: Mutex::new(None),
             session_tasks: std::sync::Mutex::new(Vec::new()),
             subscriptions: Mutex::new(HashMap::new()),
             room_subscriptions: Mutex::new(std::collections::BTreeSet::new()),
