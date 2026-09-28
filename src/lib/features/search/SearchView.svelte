@@ -524,7 +524,7 @@
                       if (opensFrom(event)) void openHit(hit);
                     }}
                   >
-                    {#each hit.context_before as line (line.event_id)}
+                    {#each hit.context_before as line, index (`${index}:${line.event_id}`)}
                       {@render contextLine(line)}
                     {/each}
                     <div class="hit-message" {@attach markTerms(terms)}>
@@ -560,7 +560,7 @@
                         {/snippet}
                       </MessagePreview>
                     </div>
-                    {#each hit.context_after as line (line.event_id)}
+                    {#each hit.context_after as line, index (`${index}:${line.event_id}`)}
                       {@render contextLine(line)}
                     {/each}
                   </div>
