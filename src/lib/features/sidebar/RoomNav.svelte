@@ -1407,6 +1407,10 @@
     padding: var(--space-100) var(--space-200) var(--space-200);
   }
 
+  .room-nav-top:has(.room-banner) + .room-nav-content .room-nav-actions {
+    padding-top: var(--space-250);
+  }
+
   .room-nav-actions a:hover,
   .room-nav-actions a:focus-visible,
   .room-nav-actions :global(.room-nav-trigger:hover),
