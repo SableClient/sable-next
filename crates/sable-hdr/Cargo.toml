@@ -1,0 +1,16 @@
+[package]
+name = "sable-hdr"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+half = "2.7.1"
+linear-srgb = { version = "0.6.12", features = ["transfer"] }
+zentone = "0.1.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-capture = "2.0.1"
+
+[lints]
+workspace = true
