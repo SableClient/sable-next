@@ -491,6 +491,18 @@ fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::W
     }
 }
 
+#[cfg(mobile)]
+fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::WindowEvent) {
+    let active = match event {
+        tauri::WindowEvent::Suspended => false,
+        tauri::WindowEvent::Resumed => true,
+        _ => return,
+    };
+    if let Some(state) = window.try_state::<AppState>() {
+        state.core.set_app_active(active);
+    }
+}
+
 #[tauri::command]
 async fn notification_permission(app: AppHandle<BrowserEngine>) -> &'static str {
     notifications::permission(&app).await
@@ -752,6 +764,9 @@ pub fn run() {
     let builder = builder
         .plugin(window_geometry::plugin())
         .on_window_event(hide_to_tray_on_close);
+
+    #[cfg(mobile)]
+    let builder = builder.on_window_event(update_mobile_activity);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = with_updates(builder);

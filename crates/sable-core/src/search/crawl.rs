@@ -345,10 +345,7 @@ impl Core {
 
             self.save_changed_checkpoints(client).await;
 
-            if !self
-                .search_foreground
-                .load(std::sync::atomic::Ordering::Relaxed)
-            {
+            if !self.search_crawl_active() {
                 self.search_crawl
                     .lock()
                     .await

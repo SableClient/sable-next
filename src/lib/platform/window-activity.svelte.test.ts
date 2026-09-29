@@ -33,11 +33,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function track(): { seen: boolean[]; stop: () => void } {
+function track(activity: 'active' | 'visible' = 'active'): { seen: boolean[]; stop: () => void } {
   const seen: boolean[] = [];
   const stop = $effect.root(() => {
     $effect(() => {
-      seen.push(windowActivity.active);
+      seen.push(windowActivity[activity]);
     });
   });
   flushSync();
@@ -72,6 +72,22 @@ test('goes inactive while the document is hidden', () => {
   stop();
 });
 
+test('goes invisible when a PWA page is hidden or frozen', () => {
+  const { seen, stop } = track('visible');
+
+  window.dispatchEvent(new Event('pagehide'));
+  flushSync();
+  window.dispatchEvent(new Event('pageshow'));
+  flushSync();
+  document.dispatchEvent(new Event('freeze'));
+  flushSync();
+  document.dispatchEvent(new Event('resume'));
+  flushSync();
+
+  expect(seen).toEqual([true, false, true, false, true]);
+  stop();
+});
+
 test('trusts the native window focus over the document', async () => {
   const { seen, stop } = track();
   await Promise.resolve();
@@ -95,6 +111,11 @@ test('stops listening once nothing reads it', () => {
   flushSync();
 
   expect(seen).toEqual([true]);
-  expect(removed.mock.calls.map(([type]) => type)).toEqual(['focus', 'blur']);
+  expect(removed.mock.calls.map(([type]) => type)).toEqual([
+    'focus',
+    'blur',
+    'pagehide',
+    'pageshow',
+  ]);
   expect(windowActivity.active).toBe(false);
 });

@@ -48,6 +48,7 @@
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { followExternalLink } from '#lib/platform/external-links.js';
   import { watchWindowFocus } from '#lib/platform/window-decorations.js';
+  import { windowActivity } from '#lib/platform/window-activity.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
@@ -741,17 +742,9 @@
     notifications.retireRead(roomList.rooms, roomList.notificationsFor);
   });
 
-  let documentVisible = $state(true);
+  let documentVisible = $derived(windowActivity.visible);
   let windowFocused = $state(true);
   let visible = $derived(documentVisible && windowFocused);
-
-  $effect(() => {
-    const read = () => {
-      documentVisible = document.visibilityState === 'visible';
-    };
-    read();
-    return on(document, 'visibilitychange', read);
-  });
 
   $effect(() => {
     let stopped = false;

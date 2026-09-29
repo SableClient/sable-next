@@ -128,6 +128,7 @@ pub struct Core {
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
     search_foreground: AtomicBool,
+    app_active: AtomicBool,
     server_search_enabled: AtomicBool,
     read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
@@ -228,6 +229,7 @@ impl Core {
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
             search_foreground: AtomicBool::new(true),
+            app_active: AtomicBool::new(true),
             server_search_enabled: AtomicBool::new(true),
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
@@ -348,6 +350,14 @@ impl Core {
 
     pub(crate) fn foreground_paginations(&self) -> u32 {
         self.foreground_paginations.load(Ordering::Relaxed)
+    }
+
+    pub fn set_app_active(&self, active: bool) {
+        self.app_active.store(active, Ordering::Relaxed);
+    }
+
+    pub(crate) fn search_crawl_active(&self) -> bool {
+        self.app_active.load(Ordering::Relaxed) && self.search_foreground.load(Ordering::Relaxed)
     }
 
     pub(crate) fn begin_foreground_pagination(self: &Arc<Self>) -> ForegroundPagination {
@@ -603,6 +613,20 @@ mod tests {
             *self.bytes.lock().await = None;
             Ok(())
         }
+    }
+
+    #[test]
+    fn app_activity_gates_the_search_crawler() {
+        let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        assert!(core.search_crawl_active());
+
+        core.set_app_active(false);
+        assert!(!core.search_crawl_active());
+
+        core.set_app_active(true);
+        assert!(core.search_crawl_active());
+        core.search_foreground.store(false, Ordering::Relaxed);
+        assert!(!core.search_crawl_active());
     }
 
     #[tokio::test]
