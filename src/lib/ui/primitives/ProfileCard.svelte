@@ -288,6 +288,8 @@
     --profile-bio-lines: 4;
     --profile-card-ground: var(--surface-container);
     --profile-chip-line: var(--profile-line);
+    --profile-action-size: 1.5rem;
+    --profile-action-padding: var(--space-250);
     --profile-chip-state: var(--bg-on-container);
     --profile-panel-ground: var(--surface-var-container);
 

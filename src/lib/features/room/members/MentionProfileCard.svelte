@@ -833,13 +833,11 @@
     justify-content: center;
     max-width: 100%;
     min-height: var(--profile-action-size);
-    padding: 0 var(--space-250);
+    padding: 0 var(--profile-action-padding);
     white-space: nowrap;
   }
 
   :global(.profile-card-actions) {
-    --profile-action-size: 1.5rem;
-
     align-items: center;
     display: flex;
     flex-wrap: wrap;
@@ -881,6 +879,15 @@
   :global(.profile-action:focus-visible) {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
+  }
+
+  :global(.btn.profile-message) {
+    border-radius: var(--radius-pill);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    height: auto;
+    min-height: var(--profile-action-size);
+    padding: 0 var(--profile-action-padding);
   }
 
   :global(.profile-card.tinted .btn.profile-message) {
