@@ -231,7 +231,7 @@
                   aria-label={$i18n.t(
                     copied === `gateway\u0000${key}`
                       ? 'settings.copied'
-                      : 'settings.pushersCopyGateway'
+                      : 'settings.pushersCopyProvider'
                   )}
                   onclick={() => void copyValue(`gateway\u0000${key}`, gateway)}
                 >
@@ -241,7 +241,7 @@
                       {$i18n.t(
                         copied === `gateway\u0000${key}`
                           ? 'settings.copied'
-                          : 'settings.pushGateway'
+                          : 'settings.pushersProvider'
                       )}
                     </span>
                     <code>{gateway}</code>
