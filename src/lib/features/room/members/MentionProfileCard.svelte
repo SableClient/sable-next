@@ -397,11 +397,6 @@
       <ActionMenuItem onSelect={copyProfileLink}>
         {$i18n.t('timeline.profileCopyLink')}
       </ActionMenuItem>
-      {#if canShareLink}
-        <ActionMenuItem onSelect={shareProfileLink}>
-          {$i18n.t('timeline.profileShareLink')}
-        </ActionMenuItem>
-      {/if}
     </IconContext>
   </ActionMenu>
   {#if !isSelf}
@@ -441,6 +436,12 @@
         <ArrowSquareOutIcon />
         {$i18n.t('timeline.profileOpenServer')}
       </ActionMenuItem>
+      {#if canShareLink}
+        <ActionMenuItem onSelect={shareProfileLink}>
+          <ShareNetworkIcon />
+          {$i18n.t('timeline.profileShareLink')}
+        </ActionMenuItem>
+      {/if}
       {#if !isSelf}
         <ActionMenuSeparator />
       {/if}
