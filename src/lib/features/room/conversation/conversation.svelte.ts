@@ -201,9 +201,11 @@ export class Conversation {
     options: SendAttachmentOptions = {}
   ): Promise<void> => {
     const persona = this.#personaFor(targetRoomId, '', null).persona;
+    const reply = this.#consumeReply();
     await this.#core.commands.sendAttachment(targetRoomId, file, {
       ...options,
-      inReplyTo: this.#consumeReply(),
+      inReplyTo: reply?.eventId ?? null,
+      silentReply: reply?.silentReply ?? options.silentReply ?? false,
       threadRoot: this.#threadRoot,
       persona,
     });
@@ -214,9 +216,11 @@ export class Conversation {
     files: readonly File[],
     options: SendGalleryOptions = {}
   ): Promise<void> => {
+    const reply = this.#consumeReply();
     await this.#core.commands.sendGallery(targetRoomId, files, {
       ...options,
-      inReplyTo: this.#consumeReply(),
+      inReplyTo: reply?.eventId ?? null,
+      silentReply: reply?.silentReply ?? options.silentReply ?? false,
       threadRoot: this.#threadRoot,
     });
   };
@@ -234,7 +238,7 @@ export class Conversation {
       body,
       info,
       sourcePack,
-      this.#consumeReply(),
+      this.#consumeReply()?.eventId ?? null,
       this.#threadRoot,
       this.#personaFor(targetRoomId, '', null).persona
     );
@@ -245,6 +249,7 @@ export class Conversation {
     const proxied = proxiedGif(gif, gifs.proxyUrl);
     if (!proxied) throw new Error('no GIF proxy route for this result');
 
+    const reply = this.#consumeReply();
     await this.#core.commands.sendGif(
       targetRoomId,
       proxied.mxcUrl,
@@ -253,9 +258,10 @@ export class Conversation {
       gif.height || null,
       proxied.mimetype,
       gif.size > 0 ? gif.size : null,
-      this.#consumeReply(),
+      reply?.eventId ?? null,
       this.#threadRoot,
-      this.#personaFor(targetRoomId, '', null).persona
+      this.#personaFor(targetRoomId, '', null).persona,
+      reply?.silentReply ?? false
     );
   };
 
@@ -281,12 +287,14 @@ export class Conversation {
     body: string,
     geoUri: string
   ): Promise<void> => {
+    const reply = this.#consumeReply();
     await this.#core.commands.sendLocation(
       targetRoomId,
       body,
       geoUri,
-      this.#consumeReply(),
-      this.#threadRoot
+      reply?.eventId ?? null,
+      this.#threadRoot,
+      reply?.silentReply ?? false
     );
   };
 
@@ -538,10 +546,10 @@ export class Conversation {
     }
   };
 
-  #consumeReply(): string | null {
-    const replyTo = this.context?.kind === 'reply' ? this.context.eventId : null;
-    if (replyTo !== null) this.context = null;
-    return replyTo;
+  #consumeReply(): ComposerContext | null {
+    const reply = this.context?.kind === 'reply' ? this.context : null;
+    if (reply !== null) this.context = null;
+    return reply;
   }
 
   #personaFor(

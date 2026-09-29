@@ -295,6 +295,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
         #[serde(default)]
+        silent_reply: bool,
+        #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
         #[serde(default)]
@@ -635,6 +637,8 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
+        #[serde(default)]
+        silent_reply: bool,
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,

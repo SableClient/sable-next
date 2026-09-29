@@ -77,6 +77,49 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   };
 }
 
+test.each([false, true])(
+  'GIF and location commands serialize silentReply=%s',
+  async (silentReply) => {
+    const fake = fakeTransport();
+    const core = createCoreClient(() => fake.transport);
+    await core.commands.sendGif(
+      '!room:example.org',
+      'mxc://example.org/gif',
+      'cat.gif',
+      null,
+      null,
+      'image/gif',
+      null,
+      '$target',
+      null,
+      null,
+      silentReply
+    );
+    expect(fake.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'send_gif',
+        in_reply_to: '$target',
+        silent_reply: silentReply,
+      })
+    );
+    await core.commands.sendLocation(
+      '!room:example.org',
+      'here',
+      'geo:48,2',
+      '$target',
+      null,
+      silentReply
+    );
+    expect(fake.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'send_location',
+        in_reply_to: '$target',
+        silent_reply: silentReply,
+      })
+    );
+  }
+);
+
 test('a restore that returns a session leaves the client ready', async () => {
   const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
   const core = createCoreClient(() => fake.transport);

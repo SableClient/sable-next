@@ -862,7 +862,8 @@ export function createCommands(transport: () => Transport) {
       size: number | null = null,
       inReplyTo: string | null = null,
       threadRoot: string | null = null,
-      persona: PerMessageProfileView | null = null
+      persona: PerMessageProfileView | null = null,
+      silentReply = false
     ): Promise<void> {
       await transport().send({
         type: 'send_gif',
@@ -874,6 +875,7 @@ export function createCommands(transport: () => Transport) {
         mimetype,
         size,
         in_reply_to: inReplyTo,
+        silent_reply: silentReply,
         thread_root: threadRoot,
         persona: $state.snapshot(persona),
       });
@@ -884,7 +886,8 @@ export function createCommands(transport: () => Transport) {
       body: string,
       geoUri: string,
       inReplyTo: string | null = null,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      silentReply = false
     ): Promise<void> {
       await transport().send({
         type: 'send_location',
@@ -892,6 +895,7 @@ export function createCommands(transport: () => Transport) {
         body,
         geo_uri: geoUri,
         in_reply_to: inReplyTo,
+        silent_reply: silentReply,
         thread_root: threadRoot,
       });
     },

@@ -531,6 +531,7 @@ impl Core {
                 mimetype,
                 size,
                 in_reply_to,
+                silent_reply,
                 thread_root,
                 persona,
             } => {
@@ -548,7 +549,7 @@ impl Core {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = gif_content(body, url, info);
 
-                let reply = thread_reply(in_reply_to, thread_root.clone(), false);
+                let reply = thread_reply(in_reply_to, thread_root.clone(), silent_reply);
                 let content = self
                     .with_reply(&room_id, content, reply, thread_root, "send_gif_reply")
                     .await?;
@@ -1500,6 +1501,7 @@ impl Core {
                 body,
                 geo_uri,
                 in_reply_to,
+                silent_reply,
                 thread_root,
             } => {
                 if view::geo_coordinates(&geo_uri).is_none() {
@@ -1508,8 +1510,8 @@ impl Core {
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = location_content(body, geo_uri);
-                let reply =
-                    in_reply_to.map(|event_id| reply_to(event_id, thread_root.is_some(), false));
+                let reply = in_reply_to
+                    .map(|event_id| reply_to(event_id, thread_root.is_some(), silent_reply));
                 let content = self
                     .with_reply(&room_id, content, reply, thread_root, "send_location")
                     .await?;

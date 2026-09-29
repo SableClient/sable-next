@@ -9,6 +9,7 @@ import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js'
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { ScheduledOriginalKept } from '#lib/features/composer/send-failure.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import * as runtime from '#lib/config/runtime-config.js';
 
 import { Conversation } from './conversation.svelte';
 
@@ -27,9 +28,13 @@ function item(eventId: string, sender: string): TimelineItemView {
 function setup(items: TimelineItemView[], userId: string, store: Partial<PersonaStore> = {}) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
+  const sendAttachment = vi.fn(() => Promise.resolve());
+  const sendGallery = vi.fn(() => Promise.resolve());
+  const sendGif = vi.fn(() => Promise.resolve());
+  const sendLocation = vi.fn(() => Promise.resolve());
   const core = {
     session: { user_id: userId },
-    commands: { sendMessage, editMessage },
+    commands: { sendMessage, editMessage, sendAttachment, sendGallery, sendGif, sendLocation },
   } as unknown as CoreClient;
   const personas = {
     personas: [],
@@ -43,6 +48,10 @@ function setup(items: TimelineItemView[], userId: string, store: Partial<Persona
   return {
     sendMessage,
     editMessage,
+    sendAttachment,
+    sendGallery,
+    sendGif,
+    sendLocation,
     timeline,
     conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM }),
   };
@@ -91,6 +100,71 @@ test('replying to yourself never mentions', () => {
 
   conversation.reply('$one:example.org');
   expect(conversation.context?.silentReply).toBe(true);
+});
+
+test.each([false, true])('media replies preserve silentReply=%s', async (silentReply) => {
+  vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
+    runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
+  );
+  const fixture = setup([item('$one:example.org', '@ana:example.org')], '@kris:example.org');
+  const { conversation } = fixture;
+  const file = new File(['picture'], 'picture.png', { type: 'image/png' });
+  const mentions = { userIds: ['@bea:example.org'], room: false };
+
+  for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
+    conversation.reply('$one:example.org');
+    if (silentReply) conversation.toggleSilentReply();
+    if (kind === 'attachment') {
+      await conversation.sendAttachment(ROOM, file, { mentions });
+      expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
+        ROOM,
+        file,
+        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
+      );
+    } else if (kind === 'gallery') {
+      await conversation.sendGallery(ROOM, [file, file], { mentions });
+      expect(fixture.sendGallery).toHaveBeenLastCalledWith(
+        ROOM,
+        [file, file],
+        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
+      );
+    } else if (kind === 'gif') {
+      await conversation.sendGif(ROOM, {
+        id: 'cat',
+        title: 'cat',
+        mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
+        previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
+        width: 320,
+        height: 240,
+        size: 1000,
+        mimetype: 'image/gif',
+      });
+      expect(fixture.sendGif.mock.lastCall).toEqual([
+        ROOM,
+        expect.any(String),
+        'cat.gif',
+        320,
+        240,
+        'image/gif',
+        1000,
+        '$one:example.org',
+        null,
+        null,
+        silentReply,
+      ]);
+    } else {
+      await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
+      expect(fixture.sendLocation).toHaveBeenLastCalledWith(
+        ROOM,
+        'here',
+        'geo:48,2',
+        '$one:example.org',
+        null,
+        silentReply
+      );
+    }
+    expect(conversation.context).toBeNull();
+  }
 });
 
 test('a reply to a persona message names the persona', () => {
@@ -271,6 +345,7 @@ function scheduling() {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   adoptQueue([]);
   setPreference('scheduleInEncryptedRooms', true);
   setPreference('personaProxying', false);
