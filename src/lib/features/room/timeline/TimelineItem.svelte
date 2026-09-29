@@ -49,7 +49,7 @@
   import '#lib/ui/primitives/menu.css';
   import PersonaProfile from '../members/PersonaProfile.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
-  import { trailingReceipt } from './receipt-fit';
+  import { receiptReserve } from './receipt-reserve';
   import SenderName from '../members/SenderName.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
@@ -369,7 +369,6 @@
   );
 
   let trailingReceiptBadge = $derived(actionable && showReceiptBadge && !receiptsInline);
-  let receiptBeside = $state(false);
 
   const rowPress = new LongPress({
     enabled: () => actionable,
@@ -657,12 +656,8 @@
       {/if}
     {/if}
     <div
-      class={['message-content', { 'receipt-beside': trailingReceiptBadge && receiptBeside }]}
-      {@attach trailingReceiptBadge
-        ? trailingReceipt((fits) => {
-            receiptBeside = fits;
-          })
-        : undefined}
+      class="message-content"
+      style:--receipt-reserve={trailingReceiptBadge ? `${String(receiptWidth)}px` : undefined}
     >
       {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
         {@const target = item.in_reply_to.event_id}
@@ -758,6 +753,7 @@
           <div
             class={['emote', { 'has-receipts': inlineReceipts }]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             * <SenderName
               displayName={senderName}
@@ -783,6 +779,7 @@
               { notice, 'has-edited': item.content.edited, 'has-receipts': inlineReceipts },
             ]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             <!-- Trails the body, where the edit happened, not the header. -->
@@ -808,6 +805,7 @@
           <div
             class={{ 'content-bubble': layout === 'bubble', 'has-receipts': inlineReceipts }}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             <MessageBody {item} {canRedactOthers} />
             {#if inlineReceipts}
@@ -955,8 +953,11 @@
             </span>
           </p>
         {/if}
+        {#if trailingReceiptBadge}
+          <span class="receipt-tail" aria-hidden="true"></span>
+        {/if}
       </div>
-      {#if actionable && showReceiptBadge && !receiptsInline}
+      {#if trailingReceiptBadge}
         {@render receiptSlot()}
       {/if}
     </div>
@@ -1373,12 +1374,6 @@
   }
 
   .message-content > .receipt-slot {
-    grid-column: 1;
-    margin-inline-start: var(--space-200);
-    place-self: end;
-  }
-
-  .receipt-beside > .receipt-slot {
     inset-block-end: 0;
     inset-inline-end: 0;
     position: absolute;
@@ -1401,6 +1396,14 @@
   .receipt-space {
     display: inline-block;
     inline-size: var(--receipt-reserve);
+  }
+
+  .has-receipts:global([data-receipt-narrow]) {
+    padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
+  }
+
+  .has-receipts:global([data-receipt-narrow]) .receipt-space {
+    display: none;
   }
 
   .message header {
@@ -1824,8 +1827,36 @@
     display: inline-block;
   }
 
-  .message.layout-bubble .receipt-space {
+  .message.layout-bubble .receipt-space,
+  .message.layout-bubble .receipt-tail {
     display: none;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) > * {
+    flex: 0 0 100%;
+    min-width: 0;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) > :nth-last-child(2) {
+    flex: 0 1 auto;
+  }
+
+  .message:not(.layout-bubble) .message-main > .receipt-tail {
+    flex: none;
+    inline-size: calc(var(--receipt-reserve) + var(--space-200));
+    margin-inline-start: auto;
+  }
+
+  .message.layout-bubble:not(.own.align-own)
+    .message-main:has(> .receipt-tail)
+    > :nth-last-child(2) {
+    margin-inline-end: calc(var(--receipt-reserve) + var(--space-200));
   }
 
   .message.layout-bubble.own.align-own .has-edited {
