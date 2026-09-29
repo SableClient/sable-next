@@ -9,33 +9,8 @@ export type WorkerCore = {
   submitCommand(command: string): Promise<string>;
   fetchMedia(source: string, width: number, height: number): Promise<Uint8Array>;
   forgetMedia(source: string): Promise<void>;
-  sendAttachment(
-    roomId: string,
-    filename: string,
-    mime: string,
-    bytes: Uint8Array<ArrayBuffer>,
-    caption: string | null,
-    inReplyTo: string | null,
-    silentReply: boolean,
-    info: string | null,
-    threadRoot: string | null,
-    formattedCaption: string | null,
-    mentions: string | null,
-    mentionsRoom: boolean,
-    persona: string | null,
-    spoiler: boolean
-  ): Promise<void>;
-  sendGallery(
-    roomId: string,
-    attachments: string,
-    caption: string | null,
-    inReplyTo: string | null,
-    silentReply: boolean,
-    threadRoot: string | null,
-    formattedCaption: string | null,
-    mentions: string | null,
-    mentionsRoom: boolean
-  ): Promise<void>;
+  sendAttachment(request: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
+  sendGallery(request: string, items: string): Promise<void>;
   uploadMedia(mime: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>;
 };
 
@@ -224,20 +199,22 @@ export function createCoreWorkerBoundary(
             spoiler,
           } = request.attachment;
           await instance.sendAttachment(
-            roomId,
-            filename,
-            mime,
-            bytes,
-            caption,
-            inReplyTo,
-            silentReply,
-            info === null ? null : JSON.stringify(info),
-            threadRoot,
-            formattedCaption,
-            JSON.stringify(mentions),
-            mentionsRoom,
-            persona === null ? null : JSON.stringify(persona),
-            spoiler
+            JSON.stringify({
+              room_id: roomId,
+              filename,
+              mime,
+              caption,
+              in_reply_to: inReplyTo,
+              silent_reply: silentReply,
+              info,
+              thread_root: threadRoot,
+              formatted_caption: formattedCaption,
+              mentions,
+              mentions_room: mentionsRoom,
+              persona,
+              spoiler,
+            }),
+            bytes
           );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;
@@ -255,7 +232,22 @@ export function createCoreWorkerBoundary(
             mentionsRoom,
           } = request.gallery;
           await instance.sendGallery(
-            roomId,
+            JSON.stringify({
+              room_id: roomId,
+              attachments: attachments.map(({ filename, mime, info = null }) => ({
+                filename,
+                mime,
+                info,
+              })),
+              caption,
+              in_reply_to: inReplyTo,
+              silent_reply: silentReply,
+              thread_root: threadRoot,
+              formatted_caption: formattedCaption,
+              mentions,
+              mentions_room: mentionsRoom,
+              persona: null,
+            }),
             JSON.stringify(
               attachments.map(({ filename, mime, bytes, info = null }) => ({
                 filename,
@@ -263,14 +255,7 @@ export function createCoreWorkerBoundary(
                 bytes: Array.from(bytes),
                 info,
               }))
-            ),
-            caption,
-            inReplyTo,
-            silentReply,
-            threadRoot,
-            formattedCaption,
-            JSON.stringify(mentions),
-            mentionsRoom
+            )
           );
           port.postMessage({ id, uri: null } satisfies WorkerMessage);
           return;

@@ -417,6 +417,12 @@ export type ForwardedView = {
 	event_id: string | null,
 };
 
+export type GalleryAttachmentView = {
+	filename: string,
+	mime: string,
+	info: AttachmentInfoView | null,
+};
+
 export type GalleryItemView = { kind: "image"; filename: string; caption: string | null; source: string; mime: string | null; width: number | null; height: number | null; size: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "video"; filename: string; caption: string | null; source: string; mime: string | null; width: number | null; height: number | null; blurhash: string | null; thumbnail: string | null; spoiler: string | null } | { kind: "audio"; filename: string; caption: string | null; source: string; mime: string | null; duration_ms: number | null; waveform: number[] | null } | { kind: "file"; filename: string; caption: string | null; source: string; mime: string | null; size: number | null };
 
 export type HomeserverSoftwareView = {
@@ -586,6 +592,15 @@ export type OpenIdTokenView = {
 	token_type: string,
 	matrix_server_name: string,
 	expires_in_ms: number,
+};
+
+export type Outgoing = {
+	thread_root: string | null,
+	in_reply_to: string | null,
+	silent_reply: boolean,
+	mentions: string[],
+	mentions_room: boolean,
+	persona: PerMessageProfileView | null,
 };
 
 export type PackImageInfoView = {
@@ -1088,7 +1103,24 @@ export type SearchTuning = {
 	max_events: number,
 };
 
+export type SendAttachmentRequest = {
+	room_id: string,
+	filename: string,
+	mime: string,
+	caption?: string | null,
+	formatted_caption?: string | null,
+	info?: AttachmentInfoView | null,
+	spoiler?: boolean,
+} & Outgoing;
+
 export type SendBlockView = { kind: "identity_changed"; user_ids: string[] } | { kind: "verify_this_device" };
+
+export type SendGalleryRequest = {
+	room_id: string,
+	attachments: GalleryAttachmentView[],
+	caption?: string | null,
+	formatted_caption?: string | null,
+} & Outgoing;
 
 /**  Without this a failed send renders as an ordinary message. */
 export type SendStateView = { status: "sending";

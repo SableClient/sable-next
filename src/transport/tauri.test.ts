@@ -23,7 +23,7 @@ function headersOf(call: unknown[]): Record<string, string> {
   return options.headers;
 }
 
-test('percent-encodes a caption and a filename a header value cannot carry', async () => {
+test('percent-encodes the attachment request header', async () => {
   invoke.mockResolvedValue(undefined);
   const transport = createTauriTransport();
 
@@ -43,14 +43,14 @@ test('percent-encodes a caption and a filename a header value cannot carry', asy
   });
 
   const headers = headersOf(invoke.mock.calls.at(-1) ?? []);
-  expect(headers.filename).toBe(encodeURIComponent('été 😂.png'));
-  expect(headers.caption).toBe(encodeURIComponent('Next works well :3 😂'));
-  expect(headers['formatted-caption']).toBe(
-    encodeURIComponent('<a href="https://matrix.to/#/@one:example.org">One</a> 😂')
-  );
-  expect(headers.mentions).toBe(encodeURIComponent(JSON.stringify(['@one:example.org'])));
-  expect(headers['mentions-room']).toBe('true');
-  expect(headers.spoiler).toBe('true');
+  expect(JSON.parse(decodeURIComponent(headers.request))).toMatchObject({
+    filename: 'été 😂.png',
+    caption: 'Next works well :3 😂',
+    formatted_caption: '<a href="https://matrix.to/#/@one:example.org">One</a> 😂',
+    mentions: ['@one:example.org'],
+    mentions_room: true,
+    spoiler: true,
+  });
   for (const value of Object.values(headers)) {
     expect(value).toMatch(/^[ -~]*$/);
   }

@@ -1,6 +1,9 @@
 use std::{borrow::Cow, error::Error, path::Path};
 
-use sable_core::protocol::{AttachmentInfoView, Command, CommandErr, CommandOk, CoreEvent};
+use sable_core::protocol::{
+    AttachmentInfoView, Command, CommandErr, CommandOk, CoreEvent, SendAttachmentRequest,
+    SendGalleryRequest,
+};
 use specta::{Format, FormatError, Types, datatype::DataType};
 
 struct ProtocolFormat;
@@ -56,7 +59,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register::<CommandOk>()
         .register::<CommandErr>()
         .register::<CoreEvent>()
-        .register::<AttachmentInfoView>();
+        .register::<AttachmentInfoView>()
+        .register::<SendAttachmentRequest>()
+        .register::<SendGalleryRequest>();
     let output = specta_typescript::Typescript::default().export(&types, ProtocolFormat)?;
     let output = format!(
         "{}\n",

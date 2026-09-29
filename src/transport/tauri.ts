@@ -119,19 +119,21 @@ export function createTauriTransport(): Transport {
       spoiler,
     }) {
       await carry('send_attachment', bytes, {
-        'room-id': roomId,
-        filename,
-        mime,
-        ...(caption ? { caption } : {}),
-        ...(formattedCaption ? { 'formatted-caption': formattedCaption } : {}),
-        ...(mentions ? { mentions: JSON.stringify(mentions) } : {}),
-        ...(mentionsRoom ? { 'mentions-room': 'true' } : {}),
-        ...(inReplyTo ? { 'in-reply-to': inReplyTo } : {}),
-        ...(silentReply ? { 'silent-reply': 'true' } : {}),
-        ...(info ? { info: JSON.stringify(info) } : {}),
-        ...(threadRoot ? { 'thread-root': threadRoot } : {}),
-        ...(persona ? { persona: JSON.stringify(persona) } : {}),
-        ...(spoiler ? { spoiler: 'true' } : {}),
+        request: JSON.stringify({
+          room_id: roomId,
+          filename,
+          mime,
+          caption: caption ?? null,
+          formatted_caption: formattedCaption ?? null,
+          mentions: mentions ?? [],
+          mentions_room: mentionsRoom ?? false,
+          in_reply_to: inReplyTo ?? null,
+          silent_reply: silentReply ?? false,
+          info: info ?? null,
+          thread_root: threadRoot ?? null,
+          persona: persona ?? null,
+          spoiler: spoiler ?? false,
+        }),
       });
     },
 
@@ -139,12 +141,25 @@ export function createTauriTransport(): Transport {
       try {
         await invoke('send_gallery', {
           request: {
-            ...gallery,
-            attachments: gallery.attachments.map((attachment) => ({
-              ...attachment,
-              bytes: Array.from(attachment.bytes),
+            room_id: gallery.roomId,
+            attachments: gallery.attachments.map(({ filename, mime, info = null }) => ({
+              filename,
+              mime,
+              info,
             })),
+            caption: gallery.caption ?? null,
+            formatted_caption: gallery.formattedCaption ?? null,
+            mentions: gallery.mentions ?? [],
+            mentions_room: gallery.mentionsRoom ?? false,
+            in_reply_to: gallery.inReplyTo ?? null,
+            silent_reply: gallery.silentReply ?? false,
+            thread_root: gallery.threadRoot ?? null,
+            persona: null,
           },
+          items: gallery.attachments.map((attachment) => ({
+            ...attachment,
+            bytes: Array.from(attachment.bytes),
+          })),
         });
       } catch (error) {
         throw new CoreError(error as CommandErr);

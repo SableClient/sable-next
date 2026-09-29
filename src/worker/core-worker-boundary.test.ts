@@ -62,20 +62,22 @@ test('passes rich attachment captions and mentions to the WASM core', async () =
   });
 
   expect(sendAttachment).toHaveBeenCalledWith(
-    '!room:example.org',
-    'photo.png',
-    'image/png',
-    bytes,
-    'One',
-    '$reply',
-    true,
-    null,
-    '$thread',
-    formattedCaption,
-    JSON.stringify(['@one:example.org']),
-    true,
-    null,
-    true
+    JSON.stringify({
+      room_id: '!room:example.org',
+      filename: 'photo.png',
+      mime: 'image/png',
+      caption: 'One',
+      in_reply_to: '$reply',
+      silent_reply: true,
+      info: null,
+      thread_root: '$thread',
+      formatted_caption: formattedCaption,
+      mentions: ['@one:example.org'],
+      mentions_room: true,
+      persona: null,
+      spoiler: true,
+    }),
+    bytes
   );
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
 });
@@ -129,18 +131,25 @@ test('passes gallery items and shared metadata to the WASM core', async () => {
   });
 
   expect(sendGallery).toHaveBeenCalledWith(
-    '!room:example.org',
+    JSON.stringify({
+      room_id: '!room:example.org',
+      attachments: [
+        { filename: 'one.png', mime: 'image/png', info: null },
+        { filename: 'two.pdf', mime: 'application/pdf', info: null },
+      ],
+      caption: 'Weekend',
+      in_reply_to: '$reply',
+      silent_reply: true,
+      thread_root: '$thread',
+      formatted_caption: '<strong>Weekend</strong>',
+      mentions: ['@one:example.org'],
+      mentions_room: true,
+      persona: null,
+    }),
     JSON.stringify([
       { filename: 'one.png', mime: 'image/png', bytes: [1], info: null },
       { filename: 'two.pdf', mime: 'application/pdf', bytes: [2], info: null },
-    ]),
-    'Weekend',
-    '$reply',
-    true,
-    '$thread',
-    '<strong>Weekend</strong>',
-    JSON.stringify(['@one:example.org']),
-    true
+    ])
   );
   expect(port.messages).toEqual([{ id: 1, uri: null }]);
 });

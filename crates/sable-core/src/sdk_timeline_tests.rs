@@ -690,7 +690,31 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     });
 
     core.send_gallery(
-        room_id.to_string(),
+        crate::protocol::SendGalleryRequest {
+            room_id: room_id.to_owned(),
+            attachments: vec![
+                crate::protocol::GalleryAttachmentView {
+                    filename: "beach.png".to_owned(),
+                    mime: "image/png".to_owned(),
+                    info: None,
+                },
+                crate::protocol::GalleryAttachmentView {
+                    filename: "report.pdf".to_owned(),
+                    mime: "application/pdf".to_owned(),
+                    info: None,
+                },
+            ],
+            caption: None,
+            formatted_caption: None,
+            outgoing: crate::protocol::Outgoing {
+                mentions: Vec::new(),
+                mentions_room: false,
+                in_reply_to: None,
+                silent_reply: false,
+                thread_root: None,
+                persona: None,
+            },
+        },
         vec![
             crate::GalleryAttachment {
                 filename: "beach.png".to_owned(),
@@ -705,12 +729,6 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
                 info: None,
             },
         ],
-        None,
-        None,
-        None,
-        None,
-        Vec::new(),
-        false,
     )
     .await
     .unwrap();

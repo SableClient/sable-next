@@ -3,6 +3,68 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct Outgoing {
+    #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub thread_root: Option<OwnedEventId>,
+    #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+    pub in_reply_to: Option<OwnedEventId>,
+    #[serde(default)]
+    pub silent_reply: bool,
+    #[serde(default)]
+    #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+    pub mentions: Vec<OwnedUserId>,
+    #[serde(default)]
+    pub mentions_room: bool,
+    #[serde(default)]
+    pub persona: Option<PerMessageProfileView>,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SendAttachmentRequest {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub filename: String,
+    pub mime: String,
+    #[serde(default)]
+    pub caption: Option<String>,
+    #[serde(default)]
+    pub formatted_caption: Option<String>,
+    #[serde(default)]
+    pub info: Option<AttachmentInfoView>,
+    #[serde(flatten)]
+    pub outgoing: Outgoing,
+    #[serde(default)]
+    pub spoiler: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SendGalleryRequest {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub attachments: Vec<GalleryAttachmentView>,
+    #[serde(default)]
+    pub caption: Option<String>,
+    #[serde(default)]
+    pub formatted_caption: Option<String>,
+    #[serde(flatten)]
+    pub outgoing: Outgoing,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct GalleryAttachmentView {
+    pub filename: String,
+    pub mime: String,
+    #[serde(default)]
+    pub info: Option<AttachmentInfoView>,
+}
+
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
     DiscoverHomeserver {

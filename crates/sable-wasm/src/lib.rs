@@ -275,50 +275,11 @@ impl SableCore {
     ///
     /// Returns a JSON-encoded command error when queuing fails.
     #[wasm_bindgen(js_name = sendAttachment)]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn send_attachment(
-        &self,
-        room_id: String,
-        filename: String,
-        mime: String,
-        bytes: Vec<u8>,
-        caption: Option<String>,
-        in_reply_to: Option<String>,
-        info: Option<String>,
-        thread_root: Option<String>,
-        formatted_caption: Option<String>,
-        mentions: Option<String>,
-        mentions_room: bool,
-        persona: Option<String>,
-        spoiler: bool,
-    ) -> Result<(), String> {
-        let info = info
-            .as_deref()
-            .and_then(|json| serde_json::from_str(json).ok());
-        let mentions = mentions
-            .as_deref()
-            .and_then(|json| serde_json::from_str(json).ok())
-            .unwrap_or_default();
-        let persona = persona
-            .as_deref()
-            .and_then(|json| serde_json::from_str(json).ok());
+    pub async fn send_attachment(&self, request: String, bytes: Vec<u8>) -> Result<(), String> {
+        let request = serde_json::from_str(&request).map_err(err_json)?;
 
         self.core
-            .send_attachment(
-                room_id,
-                filename,
-                mime,
-                bytes,
-                caption,
-                in_reply_to,
-                info,
-                thread_root,
-                formatted_caption,
-                mentions,
-                mentions_room,
-                persona,
-                spoiler,
-            )
+            .send_attachment(request, bytes)
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }
@@ -327,36 +288,13 @@ impl SableCore {
     ///
     /// Returns a JSON-encoded command error when an attachment is invalid or sending fails.
     #[wasm_bindgen(js_name = sendGallery)]
-    #[allow(clippy::too_many_arguments)]
-    pub async fn send_gallery(
-        &self,
-        room_id: String,
-        attachments: String,
-        caption: Option<String>,
-        in_reply_to: Option<String>,
-        thread_root: Option<String>,
-        formatted_caption: Option<String>,
-        mentions: Option<String>,
-        mentions_room: bool,
-    ) -> Result<(), String> {
-        let attachments = serde_json::from_str(&attachments).map_err(|_| {
+    pub async fn send_gallery(&self, request: String, items: String) -> Result<(), String> {
+        let request = serde_json::from_str(&request).map_err(err_json)?;
+        let items = serde_json::from_str(&items).map_err(|_| {
             serde_json::to_string(&CommandErr::InvalidMedia).unwrap_or_else(err_json)
         })?;
-        let mentions = mentions
-            .as_deref()
-            .and_then(|json| serde_json::from_str(json).ok())
-            .unwrap_or_default();
         self.core
-            .send_gallery(
-                room_id,
-                attachments,
-                caption,
-                in_reply_to,
-                thread_root,
-                formatted_caption,
-                mentions,
-                mentions_room,
-            )
+            .send_gallery(request, items)
             .await
             .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
     }

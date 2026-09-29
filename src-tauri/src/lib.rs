@@ -204,37 +204,13 @@ impl Base64Invoke {
     }
 }
 
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GalleryInvoke {
-    room_id: String,
-    attachments: Vec<GalleryAttachment>,
-    caption: Option<String>,
-    formatted_caption: Option<String>,
-    mentions: Vec<String>,
-    mentions_room: bool,
-    in_reply_to: Option<String>,
-    thread_root: Option<String>,
-}
-
 #[tauri::command]
 async fn send_gallery(
     state: State<'_, AppState>,
-    request: GalleryInvoke,
+    request: sable_core::protocol::SendGalleryRequest,
+    items: Vec<GalleryAttachment>,
 ) -> Result<(), CommandErr> {
-    state
-        .core
-        .send_gallery(
-            request.room_id,
-            request.attachments,
-            request.caption,
-            request.in_reply_to,
-            request.thread_root,
-            request.formatted_caption,
-            request.mentions,
-            request.mentions_room,
-        )
-        .await
+    state.core.send_gallery(request, items).await
 }
 
 #[tauri::command]
@@ -246,28 +222,11 @@ async fn send_attachment(
         return Err(CommandErr::InvalidMedia);
     };
 
-    let header = |name: &str| decode_header(&request, name);
+    let request = decode_header(&request, "request")
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .ok_or(CommandErr::InvalidMedia)?;
 
-    state
-        .core
-        .send_attachment(
-            header("room-id").ok_or(CommandErr::UnknownRoom)?,
-            header("filename").ok_or(CommandErr::InvalidMedia)?,
-            header("mime").ok_or(CommandErr::InvalidMedia)?,
-            bytes.clone(),
-            header("caption"),
-            header("in-reply-to"),
-            header("info").and_then(|json| serde_json::from_str(&json).ok()),
-            header("thread-root"),
-            header("formatted-caption"),
-            header("mentions")
-                .and_then(|json| serde_json::from_str(&json).ok())
-                .unwrap_or_default(),
-            header("mentions-room").is_some_and(|value| value == "true"),
-            header("persona").and_then(|json| serde_json::from_str(&json).ok()),
-            header("spoiler").is_some_and(|value| value == "true"),
-        )
-        .await
+    state.core.send_attachment(request, bytes.clone()).await
 }
 
 /// Returns the `mxc:` URI.
@@ -293,30 +252,11 @@ async fn send_attachment_base64(
     state
         .core
         .send_attachment(
-            request.header("room-id").ok_or(CommandErr::UnknownRoom)?,
-            request.header("filename").ok_or(CommandErr::InvalidMedia)?,
-            request.header("mime").ok_or(CommandErr::InvalidMedia)?,
-            request.bytes()?,
-            request.header("caption"),
-            request.header("in-reply-to"),
             request
-                .header("info")
-                .and_then(|json| serde_json::from_str(&json).ok()),
-            request.header("thread-root"),
-            request.header("formatted-caption"),
-            request
-                .header("mentions")
+                .header("request")
                 .and_then(|json| serde_json::from_str(&json).ok())
-                .unwrap_or_default(),
-            request
-                .header("mentions-room")
-                .is_some_and(|value| value == "true"),
-            request
-                .header("persona")
-                .and_then(|json| serde_json::from_str(&json).ok()),
-            request
-                .header("spoiler")
-                .is_some_and(|value| value == "true"),
+                .ok_or(CommandErr::InvalidMedia)?,
+            request.bytes()?,
         )
         .await
 }

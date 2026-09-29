@@ -5,7 +5,8 @@ use futures_util::StreamExt;
 
 use matrix_sdk::HttpError;
 use matrix_sdk::attachment::{
-    AttachmentInfo, BaseAudioInfo, BaseFileInfo, BaseImageInfo, BaseVideoInfo,
+    AttachmentConfig, AttachmentInfo, BaseAudioInfo, BaseFileInfo, BaseImageInfo, BaseVideoInfo,
+    GalleryConfig, GalleryItemInfo,
 };
 use matrix_sdk::media::{MediaFormat, MediaRequestParameters, MediaThumbnailSettings};
 use matrix_sdk::ruma::api::Metadata;
@@ -15,10 +16,9 @@ use matrix_sdk::ruma::events::room::MediaSource;
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedMxcUri, OwnedRoomId, OwnedServerName,
-    OwnedUserId, ServerName, UInt, events::room::message::TextMessageEventContent,
+    ServerName, UInt, events::room::message::TextMessageEventContent,
 };
 use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
-use matrix_sdk_ui::timeline::{AttachmentConfig, AttachmentSource, GalleryConfig, GalleryItemInfo};
 use mime::Mime;
 
 use crate::media_health::Admission;
@@ -26,6 +26,7 @@ use crate::messages::outgoing_mentions;
 use crate::personas::profile_extra_content;
 use crate::protocol::{
     AttachmentInfoView, AudioMetadataView, CommandErr, CoreEvent, PerMessageProfileView,
+    SendAttachmentRequest, SendGalleryRequest,
 };
 use crate::view::SPOILER_PROPERTY;
 
@@ -336,65 +337,59 @@ impl Core {
     ///
     /// Returns an error when an attachment field is invalid, the room is
     /// unavailable, or queuing the upload fails.
-    #[allow(clippy::too_many_arguments)] // the platform ports call this positionally
     pub async fn send_attachment(
         &self,
-        room_id: String,
-        filename: String,
-        mime: String,
+        request: SendAttachmentRequest,
         bytes: Vec<u8>,
-        caption: Option<String>,
-        in_reply_to: Option<String>,
-        info: Option<AttachmentInfoView>,
-        thread_root: Option<String>,
-        formatted_caption: Option<String>,
-        mentions: Vec<String>,
-        mentions_room: bool,
-        persona: Option<PerMessageProfileView>,
-        spoiler: bool,
     ) -> Result<(), CommandErr> {
         if bytes.len() > MAX_ATTACHMENT_BYTES {
             return Err(CommandErr::InvalidMedia);
         }
-        let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
-        let mime: Mime = mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
+        let mime: Mime = request.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
+        let reply = crate::dispatch::thread_reply(
+            request.outgoing.in_reply_to.clone(),
+            request.outgoing.thread_root.clone(),
+            request.outgoing.silent_reply,
+        );
 
-        let in_reply_to = event_id(in_reply_to)?;
-        let thread_root = event_id(thread_root)?;
-        let mentions = user_ids(mentions)?;
-
-        let (caption, formatted_caption, persona) = match persona {
-            Some(persona) => match caption {
+        let (caption, formatted_caption, persona) = match request.outgoing.persona {
+            Some(persona) => match request.caption {
                 Some(text) => {
-                    let (text, formatted, persona) =
-                        crate::personas::outgoing_with_fallback(text, formatted_caption, &persona);
+                    let (text, formatted, persona) = crate::personas::outgoing_with_fallback(
+                        text,
+                        request.formatted_caption,
+                        &persona,
+                    );
                     (Some(text), formatted, Some(persona))
                 }
                 None => (
                     None,
-                    formatted_caption,
+                    request.formatted_caption,
                     Some(crate::personas::without_fallback(&persona)),
                 ),
             },
-            None => (caption, formatted_caption, None),
+            None => (request.caption, request.formatted_caption, None),
         };
 
-        let info = info.unwrap_or_default();
+        let info = request.info.unwrap_or_default();
         if mime.type_() == mime::AUDIO
             && let Some(metadata) = info.audio_metadata.clone()
         {
             return self
                 .send_tagged_audio(TaggedAudio {
-                    room_id,
-                    filename,
+                    room_id: request.room_id,
+                    filename: request.filename,
                     mime,
                     bytes,
                     caption,
                     formatted_caption,
-                    in_reply_to,
-                    thread_root,
-                    mentions: outgoing_mentions(mentions, mentions_room),
-                    extra: attachment_extra_content(persona.as_ref(), spoiler),
+                    in_reply_to: request.outgoing.in_reply_to,
+                    thread_root: request.outgoing.thread_root,
+                    mentions: outgoing_mentions(
+                        request.outgoing.mentions,
+                        request.outgoing.mentions_room,
+                    ),
+                    extra: attachment_extra_content(persona.as_ref(), request.spoiler),
                     duration_ms: info.duration_ms,
                     metadata,
                 })
@@ -403,18 +398,20 @@ impl Core {
 
         let config = AttachmentConfig {
             caption: attachment_caption(caption, formatted_caption),
-            mentions: Some(outgoing_mentions(mentions, mentions_room)),
-            in_reply_to,
+            mentions: Some(outgoing_mentions(
+                request.outgoing.mentions,
+                request.outgoing.mentions_room,
+            )),
+            reply,
             info: Some(attachment_info(&mime, &info, bytes.len())),
-            extra_content: attachment_extra_content(persona.as_ref(), spoiler),
+            extra_content: attachment_extra_content(persona.as_ref(), request.spoiler),
             ..AttachmentConfig::default()
         };
 
-        self.timeline_for(&room_id, thread_root.as_ref())
+        self.room(&request.room_id)
             .await?
-            .send_attachment(AttachmentSource::Data { bytes, filename }, mime, config)
-            // Inline, a dropped connection loses the file. Queued, it retries.
-            .use_send_queue()
+            .send_queue()
+            .send_attachment(request.filename, mime, bytes, config)
             .await
             .map_err(|error| self.failed("send_attachment", error))?;
 
@@ -425,51 +422,49 @@ impl Core {
     ///
     /// Returns an error when an attachment is invalid, the room is unavailable,
     /// or queuing the gallery fails.
-    #[allow(clippy::too_many_arguments)]
     pub async fn send_gallery(
         &self,
-        room_id: String,
+        request: SendGalleryRequest,
         attachments: Vec<GalleryAttachment>,
-        caption: Option<String>,
-        in_reply_to: Option<String>,
-        thread_root: Option<String>,
-        formatted_caption: Option<String>,
-        mentions: Vec<String>,
-        mentions_room: bool,
     ) -> Result<(), CommandErr> {
-        if attachments.len() < 2
+        if attachments.len() != request.attachments.len()
+            || attachments.len() < 2
             || attachments
                 .iter()
                 .any(|item| item.bytes.len() > MAX_ATTACHMENT_BYTES)
         {
             return Err(CommandErr::InvalidMedia);
         }
-        let room_id = OwnedRoomId::try_from(room_id).map_err(|_| CommandErr::UnknownRoom)?;
-        let in_reply_to = event_id(in_reply_to)?;
-        let thread_root = event_id(thread_root)?;
-        let mentions = user_ids(mentions)?;
-
         let mut gallery = GalleryConfig::new()
-            .caption(attachment_caption(caption, formatted_caption))
-            .mentions(Some(outgoing_mentions(mentions, mentions_room)))
-            .in_reply_to(in_reply_to);
+            .caption(attachment_caption(
+                request.caption,
+                request.formatted_caption,
+            ))
+            .mentions(Some(outgoing_mentions(
+                request.outgoing.mentions,
+                request.outgoing.mentions_room,
+            )))
+            .reply(crate::dispatch::thread_reply(
+                request.outgoing.in_reply_to,
+                request.outgoing.thread_root,
+                request.outgoing.silent_reply,
+            ));
         for item in attachments {
             let mime: Mime = item.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
             let info = attachment_info(&mime, &item.info.unwrap_or_default(), item.bytes.len());
             gallery = gallery.add_item(GalleryItemInfo {
-                source: AttachmentSource::Data {
-                    bytes: item.bytes,
-                    filename: item.filename,
-                },
+                filename: item.filename,
                 content_type: mime,
+                data: item.bytes,
                 attachment_info: info,
                 caption: None,
                 thumbnail: None,
             });
         }
 
-        self.timeline_for(&room_id, thread_root.as_ref())
+        self.room(&request.room_id)
             .await?
+            .send_queue()
             .send_gallery(gallery)
             .await
             .map_err(|error| self.failed("send_gallery", error))?;
@@ -734,18 +729,6 @@ mod avatar_import_tests {
     }
 }
 
-fn event_id(id: Option<String>) -> Result<Option<OwnedEventId>, CommandErr> {
-    id.map(OwnedEventId::try_from)
-        .transpose()
-        .map_err(|_| CommandErr::UnknownRoom)
-}
-
-fn user_ids(ids: Vec<String>) -> Result<Vec<OwnedUserId>, CommandErr> {
-    ids.into_iter()
-        .map(|id| OwnedUserId::try_from(id).map_err(|_| CommandErr::InvalidMedia))
-        .collect()
-}
-
 fn attachment_caption(
     caption: Option<String>,
     formatted_caption: Option<String>,
@@ -895,9 +878,11 @@ pub(crate) fn mxc_uri(url: &str) -> Result<OwnedMxcUri, CommandErr> {
 
 #[cfg(test)]
 mod tests {
+    use matrix_sdk::ruma::OwnedUserId;
+
     use super::{
         AttachmentConfig, AttachmentInfo, AttachmentInfoView, Mime, OwnedEventId, OwnedRoomId,
-        OwnedUserId, PerMessageProfileView, SPOILER_PROPERTY, TaggedAudio, attachment_caption,
+        PerMessageProfileView, SPOILER_PROPERTY, TaggedAudio, attachment_caption,
         attachment_extra_content, attachment_info, attachment_profile, outgoing_mentions,
         tagged_audio_content,
     };
