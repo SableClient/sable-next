@@ -1119,7 +1119,6 @@
           onClose={closeThread}
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
-          onPersonaAvatarClick={openProfileAvatar}
         />
       {/key}
     {/if}
@@ -1179,7 +1178,6 @@
           onClose={closeThread}
           onSenderProfile={openProfile}
           onCopyLink={copyEventLink}
-          onPersonaAvatarClick={openProfileAvatar}
         />
       {/key}
     {/if}
@@ -1286,6 +1284,7 @@
     onPowerLevelChange={(target, userId, level) => {
       memberLoader.setPowerLevel(target, userId, level);
     }}
+    onOpenMainAccount={() => memberProfile.showMainAccount()}
   />
 
   {#if mediaEventId}

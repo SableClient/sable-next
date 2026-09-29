@@ -723,7 +723,6 @@ test('opens an image from a mobile pointer interaction', async () => {
 });
 
 test('opens a per-message profile avatar through viewer callback', async () => {
-  const onPersonaAvatarClick = vi.fn();
   const persona = {
     ...item(false),
     per_message_profile: {
@@ -739,7 +738,7 @@ test('opens a per-message profile avatar through viewer callback', async () => {
   render(TimelineItemHarness, {
     props: {
       core,
-      item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
+      item: { item: persona, collapsed: false, layout: 'modern' },
     },
   });
   await tick();

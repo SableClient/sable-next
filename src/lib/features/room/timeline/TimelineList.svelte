@@ -226,7 +226,7 @@
     )
   );
   let readersByItem = $derived(cumulativeReadBy(timeline.items));
-  let personaOpen = $state(false);
+  let menuOpen = $state(false);
   const pagination = new TimelinePagination(
     () => timeline,
     () => onRequestHistory()
@@ -545,8 +545,8 @@
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
   }
-  function setPersonaOpen(open: boolean): void {
-    personaOpen = open;
+  function setMenuOpen(open: boolean): void {
+    menuOpen = open;
   }
   function scrollLock(locked: boolean) {
     return (node: HTMLElement) => {
@@ -667,7 +667,7 @@
         tabindex="0"
         {@attach mountWindow}
         {@attach userScrollMarker}
-        {@attach scrollLock(scrollLocked || personaOpen)}
+        {@attach scrollLock(scrollLocked || menuOpen)}
         role="log"
         aria-live="off"
       >
@@ -723,7 +723,7 @@
                     {onVotePoll}
                     {onEndPoll}
                     {events}
-                    onPersonaOpenChange={setPersonaOpen}
+                    onMenuOpenChange={setMenuOpen}
                     {roomId}
                   />
                 {/if}

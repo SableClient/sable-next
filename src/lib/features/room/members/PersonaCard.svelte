@@ -14,7 +14,7 @@
     accountId: string;
     accountName: string;
     variant?: 'popover' | 'sheet';
-    onOpenAccount: () => void;
+    onOpenAccount?: () => void;
     onAvatarClick?: (source: string, displayName: string) => void;
   }
 
@@ -47,7 +47,9 @@
     {/if}
   {/snippet}
   {#snippet actions()}
-    <Pill onclick={onOpenAccount}>{$i18n.t('timeline.openAccount')}</Pill>
+    {#if onOpenAccount}
+      <Pill onclick={onOpenAccount}>{$i18n.t('timeline.openAccount')}</Pill>
+    {/if}
   {/snippet}
 </ProfileCard>
 

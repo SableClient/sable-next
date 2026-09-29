@@ -31,6 +31,7 @@
     failed?: boolean;
     anchor: HTMLElement | null;
     onOpenChange?: (open: boolean) => void;
+    onOpenMainAccount?: () => void;
   }
 
   let {
@@ -49,6 +50,7 @@
     failed = false,
     anchor,
     onOpenChange,
+    onOpenMainAccount,
   }: Props = $props();
 
   let side = $derived.by((): 'left' | 'right' => {
@@ -86,10 +88,8 @@
         accountId={userId}
         accountName={member?.display_name ?? ''}
         profile={pmp}
-        onOpenAccount={() => {}}
-        // TODO: Implement
-        onAvatarClick={() => {}}
-        // TODO: Implement
+        onOpenAccount={onOpenMainAccount}
+        {onAvatarClick}
         variant={sheet ? 'sheet' : 'popover'}
       />
     {:else if userId}

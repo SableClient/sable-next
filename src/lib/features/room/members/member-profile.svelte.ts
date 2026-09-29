@@ -30,6 +30,13 @@ export class MemberProfile {
     this.pmp = pmp;
   }
 
+  showMainAccount(): void {
+    console.log('showMainAccount', this);
+    if (this.userId && this.anchor) {
+      void this.show(this.userId, this.anchor);
+    }
+  }
+
   async show(userId: string, anchor: HTMLElement): Promise<void> {
     const request = ++this.#request;
     this.userId = userId;

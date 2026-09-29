@@ -105,7 +105,7 @@
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     events?: TimelineEventIndex;
-    onPersonaOpenChange?: (open: boolean) => void; // TODO: Misleading Name
+    onMenuOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
   }
@@ -148,7 +148,7 @@
     onVotePoll,
     onEndPoll,
     events,
-    onPersonaOpenChange,
+    onMenuOpenChange,
     placeholder = false,
     placeholderCharacters = 35,
   }: Props = $props();
@@ -420,7 +420,7 @@
   function pinActions(open: boolean): void {
     if (open) emoteAnchor = null;
     actionsPinned = open;
-    onPersonaOpenChange?.(open);
+    onMenuOpenChange?.(open);
   }
 
   function openContextMenu(event: MouseEvent): void {
