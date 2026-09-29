@@ -133,6 +133,24 @@ test('backs off repeated manual retries', async () => {
   expect(retryButton()).toHaveTextContent('Retry in 2 seconds');
 });
 
+test('a failed hidden image keeps its caption private and its retry accessible', async () => {
+  core.fetchMedia.mockRejectedValue(new Error('media unavailable'));
+  render(MediaImage, {
+    source: 'mxc://example.org/hidden-unavailable',
+    alt: 'Secret ending',
+    width: 800,
+    height: 600,
+    spoilerReason: 'Ending',
+    spoilerHidden: true,
+    retryable: true,
+  });
+  await settle();
+
+  expect(screen.getByText('Media unavailable')).toBeInTheDocument();
+  expect(screen.queryByText(/Secret ending/)).not.toBeInTheDocument();
+  expect(retryButton()).toBeEnabled();
+});
+
 test('counts the retry backoff down while it waits', async () => {
   vi.useFakeTimers();
   core.fetchMedia.mockRejectedValue(new Error('media unavailable'));

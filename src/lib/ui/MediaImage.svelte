@@ -22,6 +22,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import ImageBrokenIcon from 'phosphor-svelte/lib/ImageBrokenIcon';
+  import ImageSpoilerControl from './ImageSpoilerControl.svelte';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import PlayIcon from 'phosphor-svelte/lib/PlayIcon';
 
@@ -54,6 +55,10 @@
     uniform?: boolean;
     original?: boolean;
     autoplay?: boolean | null;
+    spoilerReason?: string | null;
+    href?: string;
+    spoilerHidden?: boolean;
+    spoilerName?: string;
   }
 
   let {
@@ -80,6 +85,10 @@
     uniform = false,
     original = false,
     autoplay = null,
+    spoilerReason = null,
+    href,
+    spoilerHidden = $bindable(),
+    spoilerName,
   }: Props = $props();
   const core = useCoreClient();
   let outcome = $state.raw<{ key: string; url: string | null; undecodable?: true } | null>(null);
@@ -197,9 +206,6 @@
       ? null
       : decodeBlurhashPixels(blurhash, BLURHASH_DECODE_WIDTH, blurhashDecodeHeight)
   );
-  let unavailableLabel = $derived(
-    alt ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}` : $i18n.t('timeline.mediaUnavailable')
-  );
   let retryWait = $derived(Math.max(0, backoff.at - clock));
   const loading = mediaProgress(core, () => (!url && !failed ? requested : null));
   let sizeLabel = $derived(size !== null && size > 0 ? formatByteSize(size) : null);
@@ -214,6 +220,11 @@
     retryWait === 0
       ? $i18n.t('timeline.retryMedia')
       : $i18n.t('timeline.retryMediaIn', { count: Math.ceil(retryWait / 1000) })
+  );
+  let unavailableLabel = $derived(
+    alt && !spoilerHidden
+      ? `${alt}: ${$i18n.t('timeline.mediaUnavailable')}`
+      : $i18n.t('timeline.mediaUnavailable')
   );
 
   $effect(() => {
@@ -437,6 +448,10 @@
       playingUrl = null;
     }
   }
+
+  function toggleSpoiler(): void {
+    spoilerHidden = !spoilerHidden;
+  }
 </script>
 
 {#snippet content()}
@@ -518,7 +533,73 @@
   {/if}
 {/snippet}
 
-{#if !showUnavailable && (manualGif || onclick)}
+{#if spoilerHidden !== undefined}
+  <span
+    class={[
+      className,
+      'media-image',
+      'spoilerable-media',
+      {
+        interactive: !showUnavailable && (manualGif || onclick || href),
+        gif: manualGif,
+        pixelated,
+      },
+      { spoilered: spoilerHidden && !showUnavailable },
+    ]}
+    {style}
+    style:--media-ratio={aspectRatio}
+    style:contain-intrinsic-inline-size="{width}px"
+  >
+    <span
+      class="media-image-visual"
+      aria-hidden={spoilerHidden && !showUnavailable ? 'true' : undefined}
+      inert={spoilerHidden && !showUnavailable}
+    >
+      {#if !showUnavailable && href && !onclick}
+        <a
+          class="media-image-activation"
+          {href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={mediaLabel}
+          onpointerdown={stopTimelinePress}
+          onpointermove={stopTimelinePress}
+          onpointerup={stopTimelinePress}
+        >
+          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+          {@render content()}
+        </a>
+      {:else if !showUnavailable && (manualGif || onclick)}
+        <button
+          class="media-image-activation"
+          type="button"
+          aria-label={mediaLabel}
+          aria-hidden={spoilerHidden ? 'true' : undefined}
+          tabindex={spoilerHidden ? -1 : undefined}
+          disabled={spoilerHidden}
+          onclick={activate}
+          onpointerdown={stopTimelinePress}
+          onpointermove={stopTimelinePress}
+          onpointerup={stopTimelinePress}
+        >
+          <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+          {@render content()}
+        </button>
+      {:else}
+        <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
+        {@render content()}
+      {/if}
+    </span>
+    {#if !showUnavailable}
+      <ImageSpoilerControl
+        hidden={spoilerHidden}
+        reason={spoilerReason}
+        name={spoilerName ?? alt}
+        ontoggle={toggleSpoiler}
+      />
+    {/if}
+  </span>
+{:else if !showUnavailable && (manualGif || onclick)}
   <button
     class={[className, 'media-image', 'interactive', { gif: manualGif, pixelated }]}
     {style}
@@ -553,6 +634,35 @@
     display: block;
     overflow: hidden;
     position: relative;
+  }
+
+  .media-image-visual {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+
+  .spoilerable-media {
+    background: var(--surface-var-container);
+    border-radius: var(--radius);
+  }
+
+  .spoilered .media-image-visual {
+    filter: blur(2.75rem);
+    pointer-events: none;
+    transform: scale(1.15);
+  }
+
+  .media-image-activation {
+    background: none;
+    border: 0;
+    cursor: inherit;
+    display: block;
+    height: 100%;
+    padding: 0;
+    text-align: left;
+    text-decoration: none;
+    width: 100%;
   }
 
   .media-image-content {
@@ -700,9 +810,12 @@
   }
 
   .media-image.interactive {
+    cursor: zoom-in;
+  }
+
+  .media-image.interactive:not(.spoilerable-media) {
     background: none;
     border: 0;
-    cursor: zoom-in;
     padding: 0;
     text-align: left;
   }
@@ -711,9 +824,10 @@
     cursor: pointer;
   }
 
+  .media-image-activation:focus-visible,
   .media-image.interactive:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 0.2rem;
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   :global(button.retry-media) {

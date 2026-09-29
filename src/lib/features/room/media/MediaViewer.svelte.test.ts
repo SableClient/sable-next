@@ -123,20 +123,59 @@ test('renders a video attachment with a player and no zoom controls', async () =
   expect(screen.getByRole('button', { name: 'viewer.downloadVideo' })).toBeInTheDocument();
 });
 
-test('a spoiler opened in the viewer is not fetched or exposed before reveal', async () => {
+test('a spoiler opened in the viewer loads blurred without exposing its caption', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   render(MediaViewer, {
-    items: [{ ...imageItem, source: 'mxc://example.org/spoiler', spoiler: 'Ending' }],
+    items: [
+      {
+        ...imageItem,
+        caption: 'Secret ending',
+        source: 'mxc://example.org/spoiler',
+        spoiler: 'Ending',
+      },
+    ],
     selectedEventId: '$image',
     onClose: () => {},
   });
   await tick();
-  expect(core.fetchMedia).not.toHaveBeenCalled();
+  await vi.waitFor(() => {
+    expect(document.querySelector('.stage img.spoilered')).toBeInTheDocument();
+  });
+  expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/spoiler', 0, 0);
   expect(screen.queryByRole('img')).not.toBeInTheDocument();
   expect(screen.queryByText(/photo\.png/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Secret ending')).not.toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: /Ending/ }));
+  const reveal = screen.getByRole('button', { name: 'timeline.revealImage:photo.png' });
+  expect(reveal).toHaveAccessibleDescription('Ending');
+  await user.click(reveal);
   expect(await screen.findByRole('img')).toBeInTheDocument();
+  expect(document.querySelector('.stage img')).not.toHaveClass('spoilered');
+});
+
+test('an ordinary viewer image can be locally hidden and revealed without closing', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  await openImage([imageItem], onClose);
+  await user.click(screen.getByRole('button', { name: 'timeline.hideImage:photo.png' }));
+  expect(document.querySelector('.stage img')).toHaveClass('spoilered');
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'timeline.revealImage:photo.png' }));
+  expect(await screen.findByRole('img')).not.toHaveClass('spoilered');
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('a hidden video still waits for reveal before fetching', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  render(MediaViewer, {
+    items: [{ ...videoItem, spoiler: 'Ending' }],
+    selectedEventId: '$video',
+    onClose: () => {},
+  });
+  await tick();
+  expect(core.fetchMedia).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: /Ending/ }));
+  await vi.waitFor(() => expect(document.querySelector('video')).toBeInTheDocument());
 });
 
 test('renders an audio attachment with a player', async () => {

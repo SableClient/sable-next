@@ -714,7 +714,7 @@ test('opens an image from a mobile pointer interaction', async () => {
     props: { core, item: { item: imageItem(), collapsed: false, onOpenMedia } },
   });
   await tick();
-  const image = document.querySelector<HTMLButtonElement>('.media-image');
+  const image = document.querySelector<HTMLButtonElement>('.media-image-activation');
   if (!image) throw new Error('media trigger was not rendered');
 
   image.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
@@ -1401,7 +1401,9 @@ test('renders a link preview for every link in a message', async () => {
   });
   await vi.waitFor(() => {
     expect(
-      [...document.querySelectorAll<HTMLAnchorElement>('a.link-preview')].map((link) => link.href)
+      [...document.querySelectorAll<HTMLAnchorElement>('.link-preview > a.link-preview-text')].map(
+        (link) => link.href
+      )
     ).toEqual(['https://example.org/one', 'https://example.org/two']);
   });
   instance.unmount();

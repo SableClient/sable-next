@@ -489,12 +489,26 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           )
         );
       }
-      const [width, height] = source.includes('wide-') ? [1000, 400] : [80, 60];
+      const [width, height] = source.includes('spoiler-preview')
+        ? [800, 600]
+        : source.includes('wide-')
+          ? [1000, 400]
+          : [80, 60];
       const key = `${String(width)}x${String(height)}`;
       let bytes = servedBytes.get(key);
       if (bytes === undefined) {
         const canvas = new OffscreenCanvas(width, height);
-        canvas.getContext('2d')?.clearRect(0, 0, width, height);
+        const context = canvas.getContext('2d');
+        if (context && source.includes('spoiler-preview')) {
+          for (const [index, color] of ['#328cab', '#dfb36d', '#43614a'].entries()) {
+            context.fillStyle = color;
+            context.fillRect(0, (height * index) / 3, width, height / 3);
+          }
+          context.fillStyle = '#f7e5bd';
+          context.beginPath();
+          context.arc(width * 0.75, height * 0.2, height * 0.1, 0, Math.PI * 2);
+          context.fill();
+        }
         bytes = canvas
           .convertToBlob({ type: 'image/png' })
           .then((blob) => blob.arrayBuffer())

@@ -67,10 +67,14 @@
     JSON.stringify([item.id, 'source' in item.content ? item.content.source : null, spoiler])
   );
   let revealedSpoiler = $state<string | null>(null);
+  let imageSpoilerHidden = $derived.by(() => {
+    void spoilerKey;
+    return spoiler !== null;
+  });
   let showCaption = $derived(preferences.captionPosition !== 'hidden');
 </script>
 
-{#if (spoiler !== null || hiddenByPolicy) && revealedSpoiler !== spoilerKey}
+{#if ((item.content.kind !== 'image' && spoiler !== null) || hiddenByPolicy) && revealedSpoiler !== spoilerKey}
   <Button
     class="spoiler-reveal"
     onclick={() => {
@@ -100,10 +104,13 @@
     intrinsicWidth={item.content.width}
     intrinsicHeight={item.content.height}
     mime={item.content.mime}
+    bind:spoilerHidden={imageSpoilerHidden}
     retryable
     onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
   />
-  {#if preferences.alwaysShowAltText}<p class="body">{item.content.body}</p>{/if}
+  {#if !imageSpoilerHidden && preferences.alwaysShowAltText}<p class="body">
+      {item.content.body}
+    </p>{/if}
 {:else if item.content.kind === 'image'}
   <div class={['captioned', `caption-${preferences.captionPosition}`]}>
     <MediaImage
@@ -120,14 +127,17 @@
       animatedHint={item.content.animated}
       size={item.content.size}
       blurhash={item.content.blurhash}
+      spoilerReason={item.content.spoiler}
+      bind:spoilerHidden={imageSpoilerHidden}
+      spoilerName={item.content.filename}
       retryable
       onclick={() => item.event_id && onOpenMedia?.(item.event_id)}
     />
-    {#if showCaption && item.content.html}
+    {#if !imageSpoilerHidden && showCaption && item.content.html}
       <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
-    {:else if showCaption && item.content.caption}
+    {:else if !imageSpoilerHidden && showCaption && item.content.caption}
       <p class="body">{item.content.caption}</p>
-    {:else if !item.content.caption && preferences.alwaysShowAltText}
+    {:else if !imageSpoilerHidden && !item.content.caption && preferences.alwaysShowAltText}
       <p class="body">{item.content.filename}</p>
     {/if}
   </div>

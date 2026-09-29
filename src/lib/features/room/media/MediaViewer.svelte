@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap } from 'svelte/reactivity';
   import { flushSync, onDestroy, tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -13,6 +13,7 @@
   import { isEncryptedMedia } from '#lib/ui/media-url.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
   import { videoStreamingSupported } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
@@ -72,11 +73,11 @@
     )
   );
   let item = $derived<MediaItem | undefined>(items[index]);
-  const revealedSpoilers = new SvelteSet<string>();
+  const spoilerVisibility = new SvelteMap<string, boolean>();
   let spoiler = $derived(item?.kind === 'image' || item?.kind === 'video' ? item.spoiler : null);
   let spoilerKey = $derived(JSON.stringify([item?.eventId, item?.source, spoiler]));
-  let spoilerHidden = $derived(spoiler !== null && !revealedSpoilers.has(spoilerKey));
-  let source = $derived(spoilerHidden ? null : (item?.source ?? null));
+  let spoilerHidden = $derived(spoilerVisibility.get(spoilerKey) ?? spoiler !== null);
+  let source = $derived(spoilerHidden && item?.kind === 'video' ? null : (item?.source ?? null));
   let mime = $derived(item?.mime ?? null);
   let fileName = $derived(
     item === undefined ? '' : item.kind === 'sticker' ? item.body : item.filename
@@ -291,7 +292,7 @@
   function handleKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || imageMenuOpen) return;
     if (event.key === 'Escape') onClose();
-    if (isImage && pannable) {
+    if (isImage && !spoilerHidden && pannable) {
       if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
       if (event.key === 'ArrowRight') return panBy(-PAN_STEP, 0);
       if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
@@ -333,7 +334,7 @@
       setZoom(zoom * (1 - event.deltaY * 0.01));
       return;
     }
-    if (!isImage) return;
+    if (!isImage || spoilerHidden) return;
     event.preventDefault();
     zoomTowards(event, zoom * (1 - event.deltaY * 0.001));
   }
@@ -378,7 +379,7 @@
   }
 
   function startPan(event: PointerEvent): void {
-    if (!isImage) return;
+    if (!isImage || spoilerHidden) return;
     if (event.button !== 0) return;
     clearTimeout(tapTimer);
     if (handleDoubleTap(event)) return;
@@ -645,6 +646,8 @@
 
         <main
           class="stage"
+          class:spoilerable-media={isImage}
+          class:spoilered={spoilerHidden}
           class:has-nav={items.length > 1}
           class:chrome-hidden={chromeHidden}
           bind:this={stageEl}
@@ -663,8 +666,8 @@
               onclick={previous}><ArrowLeftIcon /></IconButton
             >
           {/if}
-          {#if spoilerHidden}
-            <Button class="spoiler-reveal" onclick={() => revealedSpoilers.add(spoilerKey)}>
+          {#if spoilerHidden && !isImage}
+            <Button class="spoiler-reveal" onclick={() => spoilerVisibility.set(spoilerKey, false)}>
               {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
             </Button>
           {:else if url}
@@ -705,8 +708,10 @@
                 class:pixelated
                 class:dragging
                 class:instant
+                class:spoilered={spoilerHidden}
                 src={url}
-                alt={mediaLabel || $i18n.t('viewer.imageAlt')}
+                alt={spoilerHidden ? '' : mediaLabel || $i18n.t('viewer.imageAlt')}
+                aria-hidden={spoilerHidden ? 'true' : undefined}
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
@@ -757,6 +762,16 @@
                 <span>{$i18n.t('timeline.downloadProgress', { percent: loading.percent })}</span>
               {/if}
             </span>
+          {/if}
+          {#if isImage}
+            <ImageSpoilerControl
+              hidden={spoilerHidden}
+              reason={spoiler}
+              name={fileName}
+              ontoggle={() => {
+                spoilerVisibility.set(spoilerKey, !spoilerHidden);
+              }}
+            />
           {/if}
           {#if index < items.length - 1}
             <IconButton class="nav next" label={$i18n.t('viewer.next')} size="large" onclick={next}
@@ -1014,6 +1029,12 @@
     cursor: grabbing;
   }
 
+  .stage img.spoilered,
+  .stage.spoilered :global(.viewer-preview) {
+    filter: blur(2.75rem);
+    pointer-events: none;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .stage img {
       transition: transform var(--motion-normal) var(--ease-smooth-out);
@@ -1076,6 +1097,10 @@
   }
 
   @media (width < 48rem) {
+    .stage :global(.media-image-spoiler:not(.hidden)) {
+      inset-block-start: calc(var(--safe-top) + var(--control-height-medium) + var(--space-400));
+    }
+
     .actions :global(.desktop-control) {
       display: none;
     }

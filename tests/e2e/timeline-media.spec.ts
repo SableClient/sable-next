@@ -43,6 +43,112 @@ function undecodablePicture() {
   };
 }
 
+for (const mobile of [false, true]) {
+  test(`image spoilers blur and reveal without opening the viewer${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const photo = picture(800, 600);
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...photo,
+      content: {
+        ...photo.content,
+        source: JSON.stringify({ Plain: 'mxc://example.test/spoiler-preview' }),
+        spoiler: 'Final scene',
+      },
+    });
+    const media = timeline.container.locator('.spoilerable-media');
+    await expect(media.locator('img')).toBeVisible(MEDIA_LOADED);
+    await expect(media.locator('.media-image-visual')).toHaveCSS('filter', 'blur(44px)');
+    const hiddenBox = await media.boundingBox();
+    await page.screenshot({ path: testInfo.outputPath('spoiler-hidden.png') });
+
+    const reveal = media.getByRole('button', { name: 'Reveal shot.png' });
+    await reveal.focus();
+    await reveal.press('Enter');
+    await expect(media).not.toHaveClass(/spoilered/);
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toHaveCount(0);
+    expect(await media.boundingBox()).toEqual(hiddenBox);
+
+    await media.hover();
+    await page.screenshot({ path: testInfo.outputPath('spoiler-revealed.png') });
+    await media.getByRole('button', { name: 'Hide shot.png' }).click();
+    await expect(media).toHaveClass(/spoilered/);
+    await media.getByRole('button', { name: 'Reveal shot.png' }).click();
+    await media.getByRole('button', { name: 'Open shot.png' }).click();
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toBeVisible();
+    const viewer = page.getByRole('dialog', { name: 'Media viewer' });
+    await expect(viewer.locator('.stage img')).toBeVisible(MEDIA_LOADED);
+    await expect(viewer.locator('.stage img')).toHaveCSS('filter', 'blur(44px)');
+    await page.screenshot({ path: testInfo.outputPath('viewer-spoiler-hidden.png') });
+    await viewer.getByRole('button', { name: 'Reveal shot.png' }).click();
+    await expect(viewer.getByRole('img', { name: 'shot.png', exact: true })).toHaveCSS(
+      'filter',
+      'none'
+    );
+    await viewer.locator('.stage').hover();
+    await viewer.getByRole('button', { name: 'Hide shot.png' }).click();
+    await expect(viewer.locator('.stage img')).toHaveCSS('filter', 'blur(44px)');
+  });
+
+  test(`inline and link-preview images can be hidden${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const message = timelineItem('inline-probe', 'Photo and link');
+    const html =
+      '<p><img src="mxc://example.test/spoiler-preview-inline" alt="Landscape"></p><p><a href="https://example.org/landscape">Landscape link</a></p>';
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...message,
+      content: { ...message.content, html },
+      bundled_link_previews: [
+        {
+          url: 'https://example.org/landscape',
+          title: 'Landscape',
+          description: null,
+          site_name: 'Example',
+          image: 'mxc://example.test/spoiler-preview-link',
+          image_width: 800,
+          image_height: 600,
+          image_mime: 'image/png',
+        },
+      ],
+    });
+    for (const selector of ['.inline-image', '.link-preview-image']) {
+      const media = timeline.container.locator(selector);
+      await expect(media.locator('img')).toBeVisible(MEDIA_LOADED);
+      await media.hover();
+      await media.getByRole('button', { name: 'Hide image' }).click();
+      await expect(media).toHaveClass(/spoilered/);
+      await expect(media.getByRole('button', { name: 'Reveal image' })).toBeVisible();
+    }
+    await page.screenshot({ path: testInfo.outputPath('inline-link-hidden.png') });
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toHaveCount(0);
+    for (const selector of ['.inline-image', '.link-preview-image']) {
+      const media = timeline.container.locator(selector);
+      await media.getByRole('button', { name: 'Reveal image' }).click();
+      await expect(media).not.toHaveClass(/spoilered/);
+    }
+    await page.screenshot({ path: testInfo.outputPath('inline-link-revealed.png') });
+  });
+}
+
 function mediaBox(page: Page, selector = '.media-image') {
   return page.evaluate((target: string) => {
     const node = document.querySelector(`.timeline-viewport ${target}`);

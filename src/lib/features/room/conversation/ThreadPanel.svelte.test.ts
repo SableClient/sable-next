@@ -76,7 +76,7 @@ test('an image in a thread opens the viewer on that image', async () => {
     panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
   });
 
-  await user.click(await screen.findByRole('button', { name: /second\.png/ }));
+  await user.click(await screen.findByRole('button', { name: 'Open second.png' }));
 
   const viewer = await screen.findByRole('dialog', { name: 'Media viewer' });
   expect(viewer).toHaveTextContent('Alice');

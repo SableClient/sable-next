@@ -38,6 +38,7 @@
   import { parseSettingsLink } from '../settings/settings-link';
   import { replyPreviewBody } from './reply-preview';
   import { FormattedBodyImages } from './formatted-body-images';
+  import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
 
   interface Props {
     html: string;
@@ -69,6 +70,100 @@
       void html;
       return untrack(() => bodyImages.attach(node, concealed));
     };
+  }
+
+  function spoilerImages(html: string, concealed: boolean) {
+    return (node: HTMLElement) => {
+      void html;
+      if (concealed) return;
+      return untrack(() => {
+        const cleanups: (() => void)[] = [];
+        const imageSpoilers = new Set(
+          [...node.querySelectorAll<HTMLElement>('[data-mx-spoiler]')].filter(
+            (spoiler) => !spoiler.textContent?.trim()
+          )
+        );
+        for (const image of node.querySelectorAll<HTMLImageElement>(
+          'img:not([data-mx-emoticon])'
+        )) {
+          if (image.closest('.inline-image')) continue;
+          const spoiler = image.closest<HTMLElement>('[data-mx-spoiler]');
+          const imageOnly = spoiler && imageSpoilers.has(spoiler);
+          const reason = imageOnly ? (spoiler.dataset.mxSpoiler ?? '') : null;
+          if (imageOnly) {
+            spoiler.dataset.imageSpoiler = '';
+            spoiler.removeAttribute('role');
+            spoiler.removeAttribute('tabindex');
+            spoiler.removeAttribute('aria-pressed');
+            spoiler.removeAttribute('aria-label');
+          }
+          const anchor = image.closest('a');
+          const content = anchor ? imageLink(image, anchor) : image;
+          const wrapper = document.createElement('span');
+          wrapper.className = 'inline-image spoilerable-media';
+          const visual = document.createElement('span');
+          visual.className = 'inline-image-visual';
+          content.replaceWith(wrapper);
+          wrapper.append(visual);
+          visual.append(content);
+          let hidden = $state(false);
+          const setHidden = (value: boolean) => {
+            hidden = value;
+            wrapper.classList.toggle('spoilered', hidden);
+            visual.inert = hidden;
+            visual.setAttribute('aria-hidden', String(hidden));
+          };
+          setHidden(reason !== null);
+          const control = mount(ImageSpoilerControl, {
+            target: wrapper,
+            props: {
+              get hidden() {
+                return hidden;
+              },
+              reason,
+              ontoggle: () => setHidden(!hidden),
+            },
+          });
+          cleanups.push(() => {
+            wrapper.replaceWith(content);
+            void unmount(control);
+            if (imageOnly) {
+              delete spoiler.dataset.imageSpoiler;
+              spoiler.role = 'button';
+              spoiler.tabIndex = 0;
+              spoiler.ariaPressed = 'true';
+            }
+          });
+        }
+        return () => {
+          for (const cleanup of cleanups) cleanup();
+        };
+      });
+    };
+  }
+
+  function imageLink(image: HTMLImageElement, anchor: HTMLAnchorElement): HTMLAnchorElement {
+    if (!anchor.textContent?.trim()) return anchor;
+    const before = document.createRange();
+    before.selectNodeContents(anchor);
+    before.setEndBefore(image);
+    const after = document.createRange();
+    after.selectNodeContents(anchor);
+    after.setStartAfter(image);
+    const fragments = [before.extractContents(), after.extractContents()];
+    const imageAnchor = anchor.cloneNode(false) as HTMLAnchorElement;
+    imageAnchor.append(image);
+    const links = fragments.map((fragment) => {
+      const link = anchor.cloneNode(false) as HTMLAnchorElement;
+      link.append(fragment);
+      return link;
+    });
+    anchor.replaceWith(
+      ...[links[0], imageAnchor, links[1]].filter(
+        (link) => link.textContent?.trim() || link.querySelector('img')
+      )
+    );
+    return imageAnchor;
   }
 
   function pixelateEmote(image: HTMLImageElement): void {
@@ -387,7 +482,8 @@
 
   function reveal(target: Element): boolean {
     const spoiler = target.closest<HTMLElement>('[data-mx-spoiler]');
-    if (!spoiler || spoiler.ariaPressed === 'false') return false;
+    if (!spoiler || spoiler.dataset.imageSpoiler !== undefined || spoiler.ariaPressed === 'false')
+      return false;
     spoiler.ariaPressed = 'false';
     return true;
   }
@@ -469,6 +565,7 @@
   class="formatted-body"
   {@attach decorate(renderedHtml)}
   {@attach images(renderedHtml, imagesConcealed)}
+  {@attach spoilerImages(renderedHtml, imagesConcealed)}
   {@attach relabel(renderedHtml)}
   {@attach holdAnimations}
 >
@@ -649,18 +746,18 @@
     text-decoration: none;
   }
 
-  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false'])) {
+  .formatted-body :global([data-mx-spoiler]:not([data-image-spoiler], [aria-pressed='false'])) {
     background: var(--surface-var-on-container);
     border-radius: var(--radius);
     color: transparent;
     cursor: pointer;
   }
 
-  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) *) {
+  .formatted-body :global([data-mx-spoiler]:not([data-image-spoiler], [aria-pressed='false']) *) {
     visibility: hidden;
   }
 
-  .formatted-body :global([data-mx-spoiler]:not([aria-pressed='false']) img) {
+  .formatted-body :global([data-mx-spoiler]:not([data-image-spoiler], [aria-pressed='false']) img) {
     filter: blur(0.75rem);
     visibility: visible;
   }
@@ -762,6 +859,36 @@
 
   .formatted-body :global(img[data-media-pending]) {
     display: none;
+  }
+
+  .formatted-body :global(.inline-image) {
+    border-radius: var(--radius);
+    display: inline-block;
+    max-width: 100%;
+    min-height: var(--target-hit);
+    min-width: var(--target-hit);
+    overflow: hidden;
+    position: relative;
+    vertical-align: middle;
+  }
+
+  .formatted-body :global(.inline-image-visual),
+  .formatted-body :global(.inline-image-visual img) {
+    display: block;
+  }
+
+  .formatted-body :global(.inline-image.spoilered .inline-image-visual) {
+    filter: blur(2.75rem);
+    pointer-events: none;
+  }
+
+  .formatted-body :global(.inline-image .media-image-spoiler-copy) {
+    display: none;
+  }
+
+  .formatted-body :global(.inline-image .media-image-spoiler-chip) {
+    max-width: none;
+    padding: var(--space-050);
   }
 
   .formatted-body :global(img) {
