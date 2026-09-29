@@ -1302,6 +1302,30 @@ test('follows an own echo appended while the reader is still near latest', async
   expect(followingLive()).toBe(true);
 });
 
+test('follows an own message that arrives already sent while the reader is near latest', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
+
+  await dragTo(element, end, end - 30);
+  touch(element, 'touchend', 170);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  await tick();
+  expect(followingLive()).toBe(false);
+
+  roomTimeline.items = [
+    ...roomTimeline.items,
+    { ...item('own-sent'), event_id: '$own-sent', transaction_id: 'txn-own-sent', is_own: true },
+  ];
+  setScrollHeight(2_100);
+  await tick();
+  await runAnimationFrames();
+
+  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
+  expect(followingLive()).toBe(true);
+  expect(document.querySelector('.jump-to-latest')).toBeNull();
+});
+
 function focusComposer(): void {
   const composer = document.querySelector<HTMLTextAreaElement>('.harness-composer textarea');
   if (!composer) throw new Error('composer missing');

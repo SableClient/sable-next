@@ -474,15 +474,16 @@
         refillPending = false;
       });
   });
-  let sentEcho: string | null = null;
+  let sentEcho: string | null | undefined;
   $effect(() => {
     const engine = controller;
     const last = entries.at(-1)?.value.item;
     if (!engine || !revealed) return;
-    const echo = last && last.is_own && last.event_id === null ? last.transaction_id : null;
-    if (echo === null || echo === sentEcho) return;
-    sentEcho = echo;
-    if (untrack(() => nearLatest)) void engine.jumpTo(null, 'start');
+    const tail = last ? (last.transaction_id ?? last.event_id) : null;
+    if (tail === sentEcho) return;
+    const seeded = sentEcho !== undefined;
+    sentEcho = tail;
+    if (seeded && last?.is_own && untrack(() => nearLatest)) void engine.jumpTo(null, 'start');
   });
   export function composerFocused(event: FocusEvent): void {
     if (!controller || !revealed || !isEditableTarget(event.target)) return;
