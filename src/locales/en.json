@@ -3345,7 +3345,6 @@
     "waiting": "Waiting…",
     "waitingForAuth": "Approve the new device in your browser, then come back here.",
     "openApproval": "Open the approval page",
-    "approved": "I've approved it",
     "starting": "Connecting…",
     "syncing": "Finishing sign-in and setting up encryption…",
     "doneGrant": "Your new device is signed in.",

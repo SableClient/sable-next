@@ -87,6 +87,23 @@ test('a signed-in device lets another one in by showing a code', async () => {
   expect(core.qrGrantContinue).toHaveBeenCalledWith(true);
 });
 
+test('continues the grant when the other device confirms the check code', async () => {
+  const { core, emit } = fakeCore();
+  const flow = new QrFlow(core, () => 'grant');
+  const stop = flow.listen();
+
+  emit({
+    type: 'qr_login',
+    grant: true,
+    progress: { stage: 'waiting_for_auth', verification_uri: 'https://auth.example/approve' },
+  });
+
+  await vi.waitFor(() => {
+    expect(core.qrGrantContinue).toHaveBeenCalledWith(true);
+  });
+  stop();
+});
+
 test('a refused step is reported as a failure', async () => {
   const { core } = fakeCore();
   core.startQrGrant.mockRejectedValue(new Error('no session'));

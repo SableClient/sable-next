@@ -50,6 +50,7 @@ export class QrFlow {
       if (event.type !== 'qr_login' || event.grant !== grant) return;
       this.progress = event.progress;
       if (event.progress.stage === 'signed_in') void this.signIn(event.progress.user_id);
+      if (event.progress.stage === 'waiting_for_auth') void this.continueGrant(true);
     });
     return () => {
       this.stopEvents?.();

@@ -210,13 +210,6 @@
         <Button variant="primary" class="qr-action" onclick={() => void openExternalUrl(uri)}>
           {$i18n.t('qrLogin.openApproval')}
         </Button>
-        <Button
-          class="qr-action"
-          disabled={flow.pending}
-          onclick={() => void flow.continueGrant(true)}
-        >
-          {$i18n.t('qrLogin.approved')}
-        </Button>
       </div>
     {:else if progress.stage === 'starting' || progress.stage === 'syncing_secrets' || progress.stage === 'signed_in'}
       <p class="wait" aria-hidden="true">{announcement}</p>
