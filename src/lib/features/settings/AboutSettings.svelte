@@ -138,11 +138,7 @@
   {#if info}
     <SettingsSection title={$i18n.t('settings.aboutHomeserver')} headingId="about-homeserver">
       <ul class="settings">
-        <SettingsRow
-          id="homeserver-url"
-          title={$i18n.t('settings.aboutHomeserverUrl')}
-          description={$i18n.t('settings.aboutHomeserverUrlHint')}
-        >
+        <SettingsRow id="homeserver-url" title={$i18n.t('settings.aboutHomeserverUrl')}>
           <span class="value">{info.homeserver.replace(/\/+$/, '')}</span>
         </SettingsRow>
         <SettingsRow id="homeserver-software" title={$i18n.t('settings.aboutHomeserverSoftware')}>
@@ -161,11 +157,7 @@
 
   <SettingsSection title={$i18n.t('settings.aboutOptions')} headingId="about-options">
     <ul class="settings">
-      <SettingsRow
-        id="report-issue"
-        title={$i18n.t('settings.aboutReportIssue')}
-        description={$i18n.t('settings.aboutReportIssueHint')}
-      >
+      <SettingsRow id="report-issue" title={$i18n.t('settings.aboutReportIssue')}>
         <LinkButton href={resolve('bugreport')} size="small">
           {$i18n.t('settings.aboutReport')}
         </LinkButton>
@@ -185,11 +177,7 @@
           />
         </SettingsRow>
       {/if}
-      <SettingsRow
-        id="check-for-updates"
-        title={$i18n.t('settings.aboutCheckForUpdates')}
-        description={$i18n.t('settings.aboutCheckForUpdatesHint')}
-      >
+      <SettingsRow id="check-for-updates" title={$i18n.t('settings.aboutCheckForUpdates')}>
         <Button size="small" loading={checkingForUpdate} onclick={() => void checkForUpdates()}>
           {$i18n.t('settings.aboutCheckForUpdates')}
         </Button>

@@ -28,11 +28,7 @@
 </script>
 
 <ul class="settings">
-  <SettingsRow
-    id="access-token"
-    title={$i18n.t('settings.developerAccessTokenTitle')}
-    description={$i18n.t('settings.developerAccessTokenDescription')}
-  >
+  <SettingsRow id="access-token" title={$i18n.t('settings.developerAccessTokenTitle')}>
     <Button
       variant="secondary"
       size="small"

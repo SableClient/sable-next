@@ -243,7 +243,6 @@ const desktopCategories: SettingsCategory[] = supportsDesktopWindow()
       {
         id: 'desktop',
         name: 'settings.desktopTitle',
-        description: 'settings.desktopDescription',
         icon: DesktopIcon,
         sections: [{ id: 'window', name: 'settings.groups.window' }],
         items: [
@@ -252,7 +251,6 @@ const desktopCategories: SettingsCategory[] = supportsDesktopWindow()
             section: 'window',
             icon: DesktopIcon,
             name: 'settings.useCustomTitleBar',
-            description: 'settings.useCustomTitleBarHint',
             type: 'boolean',
             supported: supportsDesktopWindow,
           },
@@ -336,7 +334,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'emoji-images',
         icon: SmileyIcon,
         name: 'settings.twitterEmoji',
-        description: 'settings.twitterEmojiHint',
         type: 'boolean',
       },
       {
@@ -357,7 +354,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'gif-picker',
         icon: GifIcon,
         name: 'settings.gifProvider',
-        description: 'settings.gifProviderHint',
         type: 'select',
         options: [
           { value: 'default', label: 'settings.gifProviderDefault' },
@@ -371,7 +367,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'appearance',
     name: 'settings.appearanceTitle',
-    description: 'settings.appearanceDescription',
     icon: PaintBrushIcon,
     sections: [
       { id: 'themes', name: 'settings.groups.themes' },
@@ -387,7 +382,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'app-language',
         icon: TranslateIcon,
         name: 'settings.language',
-        description: 'settings.languageHint',
         type: 'select',
         options: [
           { value: SYSTEM_LANGUAGE, label: 'settings.languageSystem' },
@@ -406,7 +400,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'themes',
         icon: MoonIcon,
         name: 'settings.theme',
-        description: 'settings.themeHint',
         type: 'select',
         options: [
           { value: 'system', label: 'settings.themeSystem' },
@@ -440,7 +433,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'message-layout',
         icon: ArrowsOutLineVerticalIcon,
         name: 'settings.messageSpacing',
-        description: 'settings.messageSpacingHint',
         type: 'select',
         options: [
           { value: 'compact', label: 'settings.spacingCompact' },
@@ -453,7 +445,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sidebar',
         icon: ImageIcon,
         name: 'settings.showRoomIcon',
-        description: 'settings.showRoomIconHint',
         type: 'select',
         options: [
           { value: 'always', label: 'settings.showRoomIconAlways' },
@@ -475,7 +466,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sidebar',
         icon: ImageIcon,
         name: 'settings.showRoomBanners',
-        description: 'settings.showRoomBannersHint',
         type: 'boolean',
       },
       {
@@ -492,7 +482,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sidebar',
         icon: HouseIcon,
         name: 'settings.showHome',
-        description: 'settings.showHomeHint',
         type: 'boolean',
       },
       {
@@ -500,7 +489,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sidebar',
         icon: MagnifyingGlassIcon,
         name: 'settings.showSearch',
-        description: 'settings.showSearchHint',
         type: 'boolean',
       },
       {
@@ -560,7 +548,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'accessibility',
         icon: CircleHalfIcon,
         name: 'settings.highContrast',
-        description: 'settings.highContrastHint',
         type: 'boolean',
       },
       {
@@ -621,7 +608,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'timeline',
     name: 'settings.timelineTitle',
-    description: 'settings.timelineDescription',
     icon: ChatsCircleIcon,
     sections: [
       { id: 'messages', name: 'settings.groups.messages' },
@@ -636,7 +622,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'messages',
         icon: SmileyIcon,
         name: 'settings.timelineEmoteSize',
-        description: 'settings.timelineEmoteSizeHint',
         type: 'select',
         options: [
           { value: 'default', label: 'settings.timelineEmoteSizeDefault' },
@@ -652,7 +637,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'messages',
         icon: QuotesIcon,
         name: 'settings.replyPreviewStyle',
-        description: 'settings.replyPreviewStyleHint',
         type: 'select',
         options: [
           { value: 'connected', label: 'settings.replyPreviewStyleConnected' },
@@ -665,7 +649,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'messages',
         icon: TextAlignLeftIcon,
         name: 'settings.captionPosition',
-        description: 'settings.captionPositionHint',
         type: 'select',
         options: [
           { value: 'above', label: 'settings.captionPositionAbove' },
@@ -679,7 +662,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'messages',
         icon: UserCircleIcon,
         name: 'settings.usernameClick',
-        description: 'settings.usernameClickHint',
         type: 'select',
         options: [
           { value: 'mention', label: 'settings.usernameClickMention' },
@@ -691,7 +673,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'messages',
         icon: HeartIcon,
         name: 'settings.doubleTapReact',
-        description: 'settings.doubleTapReactHint',
         type: 'boolean',
       },
       {
@@ -721,7 +702,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'room-events',
         icon: UsersIcon,
         name: 'settings.hideMembershipEvents',
-        description: 'settings.hideMembershipEventsHint',
         type: 'boolean',
       },
       {
@@ -729,7 +709,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'room-events',
         icon: UserCircleIcon,
         name: 'settings.hideProfileChanges',
-        description: 'settings.hideProfileChangesHint',
         type: 'boolean',
       },
       {
@@ -737,7 +716,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'room-events',
         icon: MegaphoneIcon,
         name: 'settings.hideMemberInReadOnly',
-        description: 'settings.hideMemberInReadOnlyHint',
         type: 'boolean',
       },
       {
@@ -761,7 +739,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'receipts-typing',
         icon: ChecksIcon,
         name: 'settings.readReceiptPlacement',
-        description: 'settings.readReceiptPlacementHint',
         type: 'select',
         options: [
           { value: 'message', label: 'settings.readReceiptPlacementMessage' },
@@ -773,7 +750,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'receipts-typing',
         icon: DotsThreeIcon,
         name: 'settings.hideTypingIndicators',
-        description: 'settings.hideTypingIndicatorsHint',
         type: 'boolean',
       },
       {
@@ -789,7 +765,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'members-pronouns',
         icon: UserCircleIcon,
         name: 'settings.showPronouns',
-        description: 'settings.showPronounsHint',
         type: 'boolean',
       },
       {
@@ -836,7 +811,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'composer',
     name: 'settings.composerTitle',
-    description: 'settings.composerDescription',
     icon: PencilSimpleIcon,
     sections: [
       { id: 'writing', name: 'settings.groups.writing' },
@@ -914,7 +888,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'composer-buttons',
         icon: GifIcon,
         name: 'settings.composerGifButton',
-        description: 'settings.composerGifButtonHint',
         type: 'boolean',
       },
       {
@@ -922,7 +895,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'composer-buttons',
         icon: StickerIcon,
         name: 'settings.composerStickerButton',
-        description: 'settings.composerStickerButtonHint',
         type: 'boolean',
       },
       {
@@ -946,7 +918,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'privacy',
     name: 'settings.privacyTitle',
-    description: 'settings.privacyDescription',
     icon: EyeSlashIcon,
     sections: [
       { id: 'activity', name: 'settings.groups.activity' },
@@ -960,7 +931,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'activity',
         icon: KeyboardIcon,
         name: 'settings.sendTypingNotifications',
-        description: 'settings.sendTypingNotificationsHint',
         type: 'boolean',
       },
       {
@@ -1038,7 +1008,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'media',
     name: 'settings.mediaTitle',
-    description: 'settings.mediaDescription',
     icon: ImageIcon,
     sections: [
       { id: 'playback', name: 'settings.groups.playback' },
@@ -1051,7 +1020,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: ImageIcon,
         name: 'settings.mediaAutoLoad',
-        description: 'settings.mediaAutoLoadHint',
         type: 'boolean',
         unavailable: true,
       },
@@ -1060,7 +1028,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: FilmStripIcon,
         name: 'settings.autoplayGifs',
-        description: 'settings.autoplayGifsHint',
         type: 'boolean',
       },
       {
@@ -1068,7 +1035,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: StickerIcon,
         name: 'settings.autoplayStickers',
-        description: 'settings.autoplayStickersHint',
         type: 'boolean',
       },
       {
@@ -1076,7 +1042,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'playback',
         icon: PauseIcon,
         name: 'settings.pauseAnimationsWhenInactive',
-        description: 'settings.pauseAnimationsWhenInactiveHint',
         type: 'boolean',
       },
       {
@@ -1084,7 +1049,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'previews',
         icon: LinkSimpleIcon,
         name: 'settings.urlPreviews',
-        description: 'settings.urlPreviewsHint',
         type: 'boolean',
       },
       {
@@ -1116,7 +1080,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'embeds',
         icon: BrowserIcon,
         name: 'settings.encryptedClientEmbeds',
-        description: 'settings.encryptedClientEmbedsHint',
         type: 'boolean',
         gatedBy: 'clientEmbeds',
       },
@@ -1125,7 +1088,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'embeds',
         icon: YoutubeLogoIcon,
         name: 'settings.youtubeEmbeds',
-        description: 'settings.youtubeEmbedsHint',
         type: 'boolean',
         gatedBy: 'clientEmbeds',
       },
@@ -1134,7 +1096,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'notifications',
     name: 'settings.notificationsTitle',
-    description: 'settings.notificationsDescription',
     icon: BellIcon,
     sections: [
       { id: 'alerts', name: 'settings.groups.systemNotifications' },
@@ -1147,7 +1108,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'alerts',
         icon: BellIcon,
         name: 'settings.systemNotifications',
-        description: 'settings.systemNotificationsHint',
         type: 'boolean',
       },
       {
@@ -1205,7 +1165,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sounds',
         icon: SpeakerHighIcon,
         name: 'settings.notificationSoundVolume',
-        description: 'settings.notificationSoundVolumeHint',
         type: 'range',
         gatedBy: 'notificationSounds',
         step: 0.05,
@@ -1244,7 +1203,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'calls',
     name: 'settings.callsTitle',
-    description: 'settings.callsDescription',
     icon: PhoneIcon,
     sections: [
       { id: 'call-devices', name: 'settings.callDevicesTitle' },
@@ -1309,7 +1267,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'ringing',
         icon: SpeakerHighIcon,
         name: 'settings.callRingtoneVolume',
-        description: 'settings.callRingtoneVolumeHint',
         type: 'select',
         gatedBy: 'incomingCallSound',
         options: [
@@ -1347,7 +1304,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'call-screens',
         icon: MonitorIcon,
         name: 'settings.callScreenPreview',
-        description: 'settings.callScreenPreviewHint',
         type: 'boolean',
       },
     ],
@@ -1403,7 +1359,6 @@ export const settingsCategories: SettingsCategory[] = [
   {
     id: 'developer',
     name: 'settings.developerTitle',
-    description: 'settings.developerDescription',
     icon: CodeIcon,
     sections: [
       { id: 'developer-options', name: 'settings.groups.developerTools' },
@@ -1421,7 +1376,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-options',
         icon: CodeIcon,
         name: 'settings.developerTools',
-        description: 'settings.developerToolsHint',
         type: 'boolean',
       },
       {
@@ -1471,7 +1425,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-search-metrics',
         icon: DatabaseIcon,
         name: 'settings.searchBatchSize',
-        description: 'settings.searchBatchSizeHint',
         type: 'select',
         gatedBy: 'developerTools',
         options: SEARCH_BATCH_SIZES.map((value) => ({
@@ -1499,7 +1452,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-search-metrics',
         icon: DatabaseIcon,
         name: 'settings.searchMaxEvents',
-        description: 'settings.searchMaxEventsHint',
         type: 'select',
         gatedBy: 'developerTools',
         options: SEARCH_MAX_EVENTS.map((value) => ({
@@ -1522,7 +1474,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-options',
         icon: PencilSimpleIcon,
         name: 'settings.hiddenEventEdits',
-        description: 'settings.hiddenEventEditsHint',
         type: 'boolean',
         gatedBy: 'showHiddenEvents',
       },
@@ -1531,7 +1482,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-options',
         icon: SmileyIcon,
         name: 'settings.hiddenEventReactions',
-        description: 'settings.hiddenEventReactionsHint',
         type: 'boolean',
         gatedBy: 'showHiddenEvents',
       },
@@ -1540,7 +1490,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'developer-options',
         icon: TrashIcon,
         name: 'settings.hiddenEventRedactions',
-        description: 'settings.hiddenEventRedactionsHint',
         type: 'boolean',
         gatedBy: 'showHiddenEvents',
       },

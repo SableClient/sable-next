@@ -161,12 +161,7 @@
   }
 </script>
 
-<AppPageShell
-  title={$i18n.t('settings.emotes')}
-  description={$i18n.t('emotes.pageDescription')}
-  density="compact"
-  class="emote-settings-page"
->
+<AppPageShell title={$i18n.t('settings.emotes')} density="compact" class="emote-settings-page">
   <div class="emote-settings">
     {#if failed}
       <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>

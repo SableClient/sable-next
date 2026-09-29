@@ -72,12 +72,7 @@
   }
 </script>
 
-<AppPageShell
-  title={$i18n.t('settings.keyboard')}
-  description={$i18n.t('shortcuts.pageDescription')}
-  density="compact"
-  class="keyboard-settings-page"
->
+<AppPageShell title={$i18n.t('settings.keyboard')} density="compact" class="keyboard-settings-page">
   <div class="keyboard-settings">
     {#if rejected}
       <Alert variant="warning">{$i18n.t('shortcuts.conflict', { name: rejected })}</Alert>
