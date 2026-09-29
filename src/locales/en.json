@@ -912,6 +912,7 @@
     "downloadProgress": "{{percent}}%",
     "sendFailed": "Failed to send",
     "retrySend": "Retry",
+    "retryDecryption": "Retry decryption",
     "cancelSend": "Delete",
     "videoAttachment": "Video attachment",
     "videoConverting": "Converting video…",

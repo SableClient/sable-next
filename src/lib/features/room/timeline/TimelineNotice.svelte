@@ -174,7 +174,14 @@
     </div>
   </div>
 {:else if item.content.kind === 'unable_to_decrypt'}
-  <UndecryptableNotice id={item.id} cause={item.content.reason} />
+  <UndecryptableNotice
+    id={item.id}
+    cause={item.content.reason}
+    {roomId}
+    sessionId={item.content.session_id}
+    sender={item.sender}
+    threadRoot={item.thread_root}
+  />
 {:else if item.content.kind === 'call_invite' || item.content.kind === 'malformed'}
   <p class="state">
     {@render stateGutter()}

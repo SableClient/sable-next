@@ -636,6 +636,9 @@ impl Core {
             .event_cache()
             .subscribe()
             .or_failed(self, "subscribe_event_cache")?;
+        if let Err(error) = session::repair_room_key_sharing(&client).await {
+            tracing::warn!(%error, "repairing room key sharing failed");
+        }
 
         let session_changes = client.subscribe_to_session_changes();
         let sync_service = session::build_sync(client.clone())

@@ -2836,6 +2836,26 @@ impl Core {
                 Ok(CommandOk::RetrySend)
             }
 
+            Command::RetryDecryption {
+                room_id,
+                session_id,
+                sender,
+                thread_root,
+            } => {
+                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                if let Err(error) = self
+                    .client()
+                    .await?
+                    .encryption()
+                    .request_user_identity(&sender)
+                    .await
+                {
+                    tracing::warn!(%error, %sender, "refreshing sender identity before decryption retry failed");
+                }
+                timeline.retry_decryption([session_id]).await;
+                Ok(CommandOk::RetryDecryption)
+            }
+
             Command::CancelSend {
                 room_id,
                 transaction_id,

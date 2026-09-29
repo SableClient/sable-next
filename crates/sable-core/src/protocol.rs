@@ -771,6 +771,16 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
     },
+    RetryDecryption {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        session_id: String,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        sender: OwnedUserId,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        thread_root: Option<OwnedEventId>,
+    },
     /// A local echo is not on the server, so it cannot be redacted.
     CancelSend {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1584,6 +1594,7 @@ pub enum CommandOk {
     MarkRead,
     MarkUnread,
     RetrySend,
+    RetryDecryption,
     /// False when there was no such echo left to discard.
     CancelSend {
         cancelled: bool,
@@ -3308,6 +3319,7 @@ pub enum TimelineItemContentView {
     },
     UnableToDecrypt {
         reason: UtdCauseView,
+        session_id: Option<String>,
     },
     Membership {
         #[cfg_attr(feature = "typegen", specta(type = String))]

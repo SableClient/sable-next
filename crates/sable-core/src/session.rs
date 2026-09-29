@@ -22,6 +22,8 @@ const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(15);
 const SESSION_TIMEOUT: Duration = Duration::from_mins(2);
 const PROXIED_SESSION_TIMEOUT: Duration = Duration::from_mins(20);
 
+const ROOM_KEY_SHARING_REPAIR_KEY: &[u8] = b"sable.crypto.room-key-sharing-repair-v1";
+
 pub(crate) const THREADING_SUPPORT: ThreadingSupport = ThreadingSupport::Enabled {
     with_subscriptions: false,
 };
@@ -319,6 +321,31 @@ async fn restore_credentials(client: &Client, persisted: &PersistedSession) -> R
     Ok(())
 }
 
+pub(crate) async fn repair_room_key_sharing(client: &Client) -> Result<(), String> {
+    let store = client.state_store();
+    if store
+        .get_custom_value(ROOM_KEY_SHARING_REPAIR_KEY)
+        .await
+        .map_err(|error| error.to_string())?
+        .is_some()
+    {
+        return Ok(());
+    }
+
+    for room in client.joined_rooms() {
+        if room.encryption_state().is_encrypted() {
+            room.discard_room_key()
+                .await
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    store
+        .set_custom_value_no_read(ROOM_KEY_SHARING_REPAIR_KEY, vec![1])
+        .await
+        .map_err(|error| error.to_string())
+}
+
 async fn build_account_client(
     builder: ClientBuilder,
     store_id: &str,
@@ -567,12 +594,14 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
 
 #[cfg(test)]
 mod tests {
+    use matrix_sdk::test_utils::mocks::MatrixMockServer;
     #[cfg(not(target_family = "wasm"))]
     use matrix_sdk_base::crypto::TrustRequirement;
+    use matrix_sdk_test::{JoinedRoomBuilder, event_factory::EventFactory};
 
     use super::{
         AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
-        build_account_client, removable_account_store, session_timeout,
+        build_account_client, removable_account_store, repair_room_key_sharing, session_timeout,
     };
 
     #[test]
@@ -670,6 +699,39 @@ mod tests {
             client.decryption_settings().sender_device_trust_requirement,
             TrustRequirement::Untrusted
         ));
+    }
+
+    #[tokio::test]
+    async fn repairs_room_key_sharing_once_per_account() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let encrypted = matrix_sdk::ruma::room_id!("!encrypted:example.org");
+        let plain = matrix_sdk::ruma::room_id!("!plain:example.org");
+        let factory = EventFactory::new()
+            .room(encrypted)
+            .sender(client.user_id().unwrap());
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder
+                    .add_joined_room(
+                        JoinedRoomBuilder::new(encrypted)
+                            .add_state_event(factory.room_encryption()),
+                    )
+                    .add_joined_room(JoinedRoomBuilder::new(plain));
+            })
+            .await;
+
+        repair_room_key_sharing(&client).await.unwrap();
+        assert!(
+            client
+                .state_store()
+                .get_custom_value(super::ROOM_KEY_SHARING_REPAIR_KEY)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        repair_room_key_sharing(&client).await.unwrap();
     }
 
     #[test]

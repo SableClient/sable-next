@@ -1768,6 +1768,21 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'discard_room_key', room_id: roomId });
     },
 
+    async retryDecryption(
+      roomId: string,
+      sessionId: string,
+      sender: string,
+      threadRoot: string | null
+    ): Promise<void> {
+      await transport().send({
+        type: 'retry_decryption',
+        room_id: roomId,
+        session_id: sessionId,
+        sender,
+        thread_root: threadRoot,
+      });
+    },
+
     async deleteDevice(deviceId: string, password: string | null): Promise<string | null> {
       const response = await transport().send({
         type: 'delete_device',

@@ -1890,6 +1890,12 @@ fn content(
             },
             MsgLikeKind::UnableToDecrypt(message) => TimelineItemContentView::UnableToDecrypt {
                 reason: utd_cause(message),
+                session_id: match message {
+                    EncryptedMessage::MegolmV1AesSha2 { session_id, .. } => {
+                        Some(session_id.clone())
+                    }
+                    _ => None,
+                },
             },
             MsgLikeKind::Sticker(sticker) => {
                 let sticker = sticker.content();
