@@ -64,6 +64,18 @@
     color: currentcolor;
   }
 
+  @media (pointer: coarse) {
+    .pill {
+      position: relative;
+    }
+
+    .pill::after {
+      content: '';
+      inset: calc((var(--pill-size, 1.5rem) - var(--target-hit)) / 2) 0;
+      position: absolute;
+    }
+  }
+
   .pill:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);

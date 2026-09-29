@@ -88,7 +88,7 @@ test('an open action on a tinted card keeps its icon in the card ink', async ({
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await page.getByRole('button', { name: "Open Alice's profile" }).last().click();
-  const share = page.locator('.profile-card .profile-action[aria-haspopup]').first();
+  const share = page.locator('.profile-card .pill[aria-haspopup]').first();
   await share.click();
   await expect(share).toHaveAttribute('aria-expanded', 'true');
 

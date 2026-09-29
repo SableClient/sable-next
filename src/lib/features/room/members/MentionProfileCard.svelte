@@ -194,9 +194,17 @@
   // 4.5.4), so it stays hidden while the target's membership is unknown: the
   // server refuses to kick someone who is not in the room regardless of level.
   let canKick = $derived(outranks && member !== null && (permissions?.can_kick ?? false));
-  let canBan = $derived(outranks && (permissions?.can_ban ?? false));
-  let canInvite = $derived(!isSelf && member === null && (permissions?.can_invite ?? false));
-  let canUnban = $derived(!isSelf && member === null && (permissions?.can_ban ?? false));
+  let canBan = $derived(
+    outranks && member?.membership !== 'ban' && (permissions?.can_ban ?? false)
+  );
+  let canInvite = $derived(
+    !isSelf &&
+      (member === null || member.membership === 'leave') &&
+      (permissions?.can_invite ?? false)
+  );
+  let canUnban = $derived(
+    !isSelf && member?.membership === 'ban' && (permissions?.can_ban ?? false)
+  );
   let canSetPower = $derived(
     !isSelf &&
       (permissions?.can_change_power_levels ?? false) &&

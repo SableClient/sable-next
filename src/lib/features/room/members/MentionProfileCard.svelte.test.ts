@@ -3,7 +3,7 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
-import { expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { MutualRoomView, ProfileView } from '#src/generated/protocol';
 
@@ -750,4 +750,69 @@ test('shows a misc field in full as JSON with developer tools on, and a preview 
   expect(document.querySelector('.profile-extra-open')?.textContent.trim()).toBe(
     value.slice(0, 256)
   );
+});
+
+describe('invite and unban follow the membership', () => {
+  const permissions = {
+    own_power_level: 100,
+    can_post: true,
+    can_react: true,
+    can_redact_own: true,
+    can_redact_others: false,
+    can_invite: true,
+    can_kick: true,
+    can_ban: true,
+    can_change_settings: false,
+    can_pin: false,
+    can_change_join_rule: false,
+    can_change_power_levels: false,
+    can_manage_children: false,
+  };
+  const memberWith = (membership: 'join' | 'leave' | 'ban') => ({
+    user_id: '@alice:example.org',
+    display_name: 'Alice',
+    avatar_url: null,
+    power_level: 0,
+    membership,
+    member_ts: null,
+    kicked: false,
+    service: false,
+  });
+  const openMenu = async (member: ReturnType<typeof memberWith> | null) => {
+    render(MentionProfileCard, {
+      props: {
+        userId: '@alice:example.org',
+        roomId: '!room:example.org',
+        ownPowerLevel: 100,
+        permissions,
+        member,
+        profile: emptyProfile,
+      },
+    });
+    await tick();
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+  };
+
+  test('offers Unban, and not Invite or Ban, for a banned member', async () => {
+    await openMenu(memberWith('ban'));
+
+    expect(await screen.findByRole('menuitem', { name: /Unban/ })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /Invite/ })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Ban from room/ })).toBeNull();
+  });
+
+  test('offers Invite, and not Unban, for someone who left', async () => {
+    await openMenu(memberWith('leave'));
+
+    expect(await screen.findByRole('menuitem', { name: /Invite/ })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /Unban/ })).toBeNull();
+  });
+
+  test('offers neither for a member who is in the room', async () => {
+    await openMenu(memberWith('join'));
+
+    expect(await screen.findByRole('menuitem', { name: /Remove from room/ })).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: /Invite/ })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /Unban/ })).toBeNull();
+  });
 });
