@@ -206,7 +206,7 @@
         />{/if}
     </div>
     {#if crest}
-      {@render crest()}
+      <div class="profile-card-crest-content">{@render crest()}</div>
     {:else if status}
       <p class="profile-card-status">
         {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
@@ -364,7 +364,7 @@
     align-items: flex-start;
     display: flex;
     gap: var(--space-300);
-    height: calc(var(--profile-avatar-size) / 2);
+    min-height: calc(var(--profile-avatar-size) / 2);
     padding: 0 var(--space-400);
     pointer-events: none;
     position: relative;
@@ -376,7 +376,13 @@
 
   .profile-card-avatar-wrap {
     flex: 0 0 var(--profile-avatar-size);
+    margin-bottom: calc(var(--profile-avatar-size) / -2);
     position: relative;
+    transform: translateY(-50%);
+  }
+
+  .profile-card-crest-content {
+    min-width: 0;
     transform: translateY(-50%);
   }
 
