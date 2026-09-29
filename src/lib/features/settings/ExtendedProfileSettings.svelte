@@ -626,6 +626,12 @@
     min-width: 10rem;
   }
 
+  .form-row code,
+  .ignored-users code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
   .form-stack label {
     display: grid;
     font-weight: var(--font-weight-medium);
@@ -664,6 +670,11 @@
     display: flex;
     gap: var(--space-300);
     justify-content: space-between;
+    min-width: 0;
+  }
+
+  .ignored-users code {
+    flex: 1;
   }
 
   .extra-fields {

@@ -25,6 +25,26 @@ test('mobile: the account page with a banner fits the screen', async ({
   expect(overflowing).toEqual([]);
 });
 
+test('mobile: a long blocked user ID stays inside its settings section', async ({
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.goto('/settings/account');
+
+  await page.getByPlaceholder('@user:example.org').fill(`@${'a'.repeat(160)}:example.org`);
+  await page.getByRole('button', { name: 'Block', exact: true }).click();
+
+  const list = page.locator('.ignored-users');
+  await expect(list).toBeVisible();
+  expect(
+    await list.evaluate((element) => {
+      const section = element.closest('section');
+      return section !== null && section.scrollWidth <= section.clientWidth;
+    })
+  ).toBe(true);
+});
+
 for (const pageZoom of [1, 1.25]) {
   test(`mobile: the account page fits a 375px screen at ${String(pageZoom * 100)}% zoom (#473)`, async ({
     page,
