@@ -7,6 +7,45 @@ import {
 
 test.use({ storageState: SIGNED_OUT });
 
+test('mobile timeline truncates a long emote sender instead of scrolling sideways', async ({
+  page,
+  app,
+  timeline,
+  homeserver,
+  signIn,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await signIn();
+  await app.openRoomFromList(TIMELINE_ROOM_NAME);
+  await expect(timeline.loading).toHaveCount(0);
+  const body = `long emote sender ${String(Date.now())}`;
+
+  const response = await fetch(
+    `${homeserver.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(homeserver.timelineRoomId)}/send/m.room.message/long-emote-sender`,
+    {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${homeserver.accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ msgtype: 'm.emote', body }),
+    }
+  );
+  if (!response.ok) throw new Error(`could not send emote: ${String(response.status)}`);
+
+  const emote = page.locator('.emote').filter({ hasText: body });
+  await expect(emote).toBeVisible();
+  const sender = emote.locator('.sender');
+  const sideways = await sender.evaluate((node) => {
+    node.textContent = `* ${'a'.repeat(200)}`;
+    const viewport = node.closest('.viewport');
+    if (!viewport) throw new Error('timeline viewport not found');
+    return viewport.scrollWidth - viewport.clientWidth;
+  });
+
+  expect(sideways).toBe(0);
+});
+
 test('loads a real room at latest and preserves the viewport while paginating', async ({
   page,
   app,

@@ -759,11 +759,16 @@
             class={['emote', { 'has-receipts': inlineReceipts }]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
           >
-            <span
-              class={['sender', 'sender-identity-name', { tinted: senderColors.tinted }]}
-              style:color={senderColors.tinted ? undefined : senderColors.nameColor}
-              style:font-family={senderFont ?? undefined}>* {senderName}</span
-            >
+            * <SenderName
+              displayName={senderName}
+              accountName={persona ? accountName : undefined}
+              colors={senderColors}
+              font={senderFont}
+              {pronouns}
+              onMention={nameMentions ? mentionSender : undefined}
+              onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
+              onViaProfile={persona ? openSenderProfileAt : undefined}
+            />
             <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             {#if inlineReceipts}
               <span class="receipt-space" aria-hidden="true"></span>
