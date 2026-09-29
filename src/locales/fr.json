@@ -2387,7 +2387,7 @@
     "triggersHint": "Le texte autour d’un message qui sélectionne ce profil. La première correspondance de la liste l’emporte.",
     "triggerPrefix": "Avant",
     "triggerSuffix": "Après",
-    "triggerKeep": "Conserver le déclencheur dans le message",
+    "triggerKeep": "Conserver dans le message",
     "triggerAdd": "Ajouter un déclencheur",
     "triggerRemove": "Retirer ce déclencheur",
     "save": "Enregistrer",

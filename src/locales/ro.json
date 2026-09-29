@@ -2029,7 +2029,7 @@
     "triggersHint": "Textul din jurul mesajului care activează acest profil. Prima potrivire din listă este aleasă.",
     "triggerPrefix": "Prefix",
     "triggerSuffix": "Sufix",
-    "triggerKeep": "Păstrează declanșatorul în mesaj",
+    "triggerKeep": "Păstrează în mesaj",
     "triggerAdd": "Adaugă un declanșator",
     "triggerRemove": "Șterge acest declanșator",
     "save": "Salvează",
