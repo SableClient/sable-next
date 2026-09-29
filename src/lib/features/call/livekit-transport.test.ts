@@ -2,6 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ConnectionState, RoomEvent, type Room } from 'livekit-client';
 
 import { createLivekitTransport } from './livekit-transport';
+import { ScreenAudioError } from './call-transport';
 import type { CallTelemetry } from './call-telemetry';
 import { MatrixKeyProvider } from './key-provider';
 import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -415,7 +416,9 @@ test('keeps sharing the screen when its audio cannot be captured', async () => {
   const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
 
   await transport.connect(connectOptions);
-  await transport.capabilities.screenShare?.setEnabled(true, { kind: 'system', exclude: [] });
+  await expect(
+    transport.capabilities.screenShare?.setEnabled(true, { kind: 'system', exclude: [] })
+  ).rejects.toBeInstanceOf(ScreenAudioError);
 
   expect(fixture.localParticipant.isScreenShareEnabled).toBe(true);
   expect(participant.publishTrack).not.toHaveBeenCalled();

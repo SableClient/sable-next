@@ -343,6 +343,31 @@ test('seeds a backend that appears later with a key tagged for another backend',
   );
 });
 
+test('forwards the screen share audio choice and source to the publisher', async () => {
+  const created: ReturnType<typeof fakeTransport>[] = [];
+  const transport = createMultiSfuTransport(false, undefined, {
+    createTransport: () => {
+      const next = fakeTransport();
+      created.push(next);
+      return next;
+    },
+  });
+  await transport.connect({
+    ...idleTransportState(),
+    url: '',
+    token: '',
+    publisherId: 'publish',
+    backends: [{ id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' }],
+    encryptionKeys: [],
+  });
+  const audio = { kind: 'apps' as const, include: ['Firefox'] };
+  await transport.capabilities.screenShare?.setEnabled(true, audio, { kind: 'hdr', monitor: 2 });
+  expect(created[0].capabilities.screenShare.setEnabled).toHaveBeenCalledWith(true, audio, {
+    kind: 'hdr',
+    monitor: 2,
+  });
+});
+
 test('a publisher move republishes on the new backend and demotes the old one', async () => {
   const created: {
     publishMedia?: boolean;

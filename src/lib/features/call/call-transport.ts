@@ -110,6 +110,10 @@ export type CallTransport = {
 
 export const ignoreError = (): void => undefined;
 
+export class ScreenAudioError extends Error {
+  override name = 'ScreenAudioError';
+}
+
 export const idleTransportState = (): CallTransportState => ({
   connection: 'disconnected',
   participants: [],

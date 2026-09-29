@@ -157,6 +157,7 @@
     microphone: 'call.microphoneUnavailable',
     camera: 'call.cameraUnavailable',
     screen: 'call.screenShareUnavailable',
+    screenAudio: 'call.screenAudioUnavailable',
   } as const;
 
   let stage = $state<HTMLElement>();

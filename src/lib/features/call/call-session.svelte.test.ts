@@ -19,7 +19,7 @@ import { MatrixKeyProvider } from './key-provider';
 import type { CallTransportConnectOptions } from './call-transport';
 import { resetCallOwner } from './call-owner';
 import type { CallTransport, CallTransportState } from './call-transport';
-import { idleTransportState } from './call-transport';
+import { idleTransportState, ScreenAudioError } from './call-transport';
 
 type Harness = {
   client: CoreClient;
@@ -850,6 +850,18 @@ test('an HDR monitor on the Windows app is offered before the browser picker', a
   await session.shareScreenFrom(null);
   expect(setEnabled).toHaveBeenLastCalledWith(true, undefined, undefined);
   hdr.hdrShareSupported.mockReturnValue(false);
+});
+
+test('a screen shared without its sound is reported as a sound failure', async () => {
+  const { client, transport } = harness();
+  const setEnabled = vi.fn(() => Promise.reject(new ScreenAudioError()));
+  transport.capabilities = { screenShare: { setEnabled } };
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+
+  await session.shareScreenWith({ kind: 'system', exclude: [] });
+
+  expect(session.deviceError).toBe('screenAudio');
 });
 
 test('on Linux the HDR choice is carried through the screen sound picker', async () => {

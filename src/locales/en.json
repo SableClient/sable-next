@@ -3042,6 +3042,7 @@
     "screenShareUnavailable": "Could not share your screen.",
     "invite": "Invite people",
     "waitingForMedia": "available once the call is secured",
+    "screenAudioUnavailable": "Your screen is shared, but its sound could not be captured.",
     "deafen": "Deafen",
     "undeafen": "Undeafen",
     "microphoneDevices": "Choose microphone",

@@ -17,7 +17,7 @@ import type {
   CallTransportState,
   ScreenSource,
 } from './call-transport';
-import { decodeCallKey, idleTransportState, ignoreError } from './call-transport';
+import { decodeCallKey, idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
 import type { LivekitTransport } from './livekit-transport';
 import { createNativeTransport } from './native-transport';
@@ -44,7 +44,7 @@ export type CallVoiceState = {
   deafened: boolean;
 };
 
-export type CallDeviceError = 'microphone' | 'camera' | 'screen';
+export type CallDeviceError = 'microphone' | 'camera' | 'screen' | 'screenAudio';
 
 const OWN_KEY_TIMEOUT_MS = 10_000;
 
@@ -421,7 +421,7 @@ export class CallSession {
       if (this.deviceError === kind) this.deviceError = null;
     } catch (error) {
       if (kind === 'screen' && error instanceof Error && error.name === 'NotAllowedError') return;
-      this.deviceError = kind;
+      this.deviceError = error instanceof ScreenAudioError ? 'screenAudio' : kind;
     }
   }
 

@@ -32,7 +32,7 @@ import type {
   CallTransportConnectOptions,
   CallTransportState,
 } from './call-transport';
-import { idleTransportState, ignoreError } from './call-transport';
+import { idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
 import { createMicrophoneFilter, supportsVoiceFilter } from './voice-filter';
 import type { CallTelemetry } from './call-telemetry';
@@ -467,8 +467,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     });
   };
 
-  const shareAudio = async (choice: ScreenAudioChoice | undefined): Promise<void> => {
-    if (!choice || choice.kind === 'none' || !screenAudioSupported() || screenAudio) return;
+  const shareAudio = async (choice: ScreenAudioChoice | undefined): Promise<boolean> => {
+    if (!choice || choice.kind === 'none' || !screenAudioSupported() || screenAudio) return true;
     try {
       const track = new LocalAudioTrack(await captureScreenAudio(choice), undefined, false);
       screenAudio = track;
@@ -476,9 +476,11 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
         ...SCREEN_AUDIO_PUBLISH,
         source: Track.Source.ScreenShareAudio,
       });
+      return true;
     } catch (error) {
       fail('call.screen_share.audio', error);
       await stopSharingAudio();
+      return false;
     }
   };
 
@@ -554,8 +556,9 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
               hdrScreen = track;
               await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShare });
             });
-            await shareAudio(audio);
+            const audioShared = await shareAudio(audio);
             syncLocal();
+            if (!audioShared) throw new ScreenAudioError();
             return;
           }
           if (!enabled && hdrScreen) {
@@ -573,9 +576,11 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
                 )
               : room.localParticipant.setScreenShareEnabled(enabled)
           );
-          if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio(audio);
-          else if (!enabled) await stopSharingAudio();
+          const audioShared =
+            enabled && room.localParticipant.isScreenShareEnabled ? await shareAudio(audio) : true;
+          if (!enabled) await stopSharingAudio();
           syncLocal();
+          if (!audioShared) throw new ScreenAudioError();
         },
       },
     },
