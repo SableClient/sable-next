@@ -3,21 +3,22 @@
   import { onDestroy, onMount, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { splitDisplayNamePronouns, withDisplayNamePronouns } from '#lib/personas/pronouns.js';
+  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
-  import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
-  import { formatDate, formatTime } from '#lib/ui/date-time.js';
+  import { formatFullTimestamp, formatMessageTimestamp } from '#lib/ui/date-time.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import { MESSAGE_SEARCH_FIELD_ID, MessageSearch } from './message-search.svelte.js';
   import { clearRecentSearches, recentSearches, rememberSearch } from './recent-searches.svelte.js';
@@ -33,6 +34,8 @@
   import { markTerms } from './mark-terms';
   import MessagePreview from '../room/messages/MessagePreview.svelte';
   import { opensFrom } from '../room/messages/message-preview';
+  import SenderName from '../room/members/SenderName.svelte';
+  import { senderDisplayColors } from '../room/members/members';
   import ComposerAutocomplete from '../composer/ComposerAutocomplete.svelte';
   import type { Suggestion } from '../composer/autocomplete';
   import { applySuggestion, enterAccepts, suggestionsFor } from './search-suggestions';
@@ -530,24 +533,59 @@
                       {@render contextLine(line)}
                     {/each}
                     <div class="hit-message" {@attach markTerms(terms)}>
-                      <MessagePreview roomId={hit.room_id} eventId={hit.event_id}>
+                      <MessagePreview
+                        roomId={hit.room_id}
+                        eventId={hit.event_id}
+                        loadPreviewProfile
+                        timeAction={{
+                          label: $i18n.t('search.openResult'),
+                          run: () => void openHit(hit),
+                        }}
+                      >
                         {#snippet fallback()}
+                          {@const sender = senders.identity(hit.sender)}
+                          {@const profile = senders.profile(hit.sender)}
+                          {@const name = profileOverrides.name(hit.sender, sender.displayName)}
+                          {@const parsedName = preferences.showPronouns
+                            ? splitDisplayNamePronouns(name)
+                            : { name, pronouns: [] }}
                           <span class="hit-fallback">
                             <Avatar
                               id={hit.sender}
-                              src={senders.identity(hit.sender).avatarUrl}
-                              name={senders.identity(hit.sender).displayName}
+                              src={profileOverrides.avatar(hit.sender, sender.avatarUrl)}
+                              {name}
                               size="small"
                             />
                             <span class="hit-text">
                               <span class="hit-meta">
-                                <span class="hit-sender"
-                                  >{senders.identity(hit.sender).displayName}</span
+                                <SenderName
+                                  displayName={parsedName.name}
+                                  colors={senderDisplayColors(
+                                    hit.sender,
+                                    profile,
+                                    null,
+                                    hit.sender === userId
+                                  )}
+                                  pronouns={preferences.showPronouns
+                                    ? withDisplayNamePronouns(
+                                        profile?.pronouns ?? [],
+                                        parsedName.pronouns
+                                      )
+                                    : []}
+                                />
+                                <button
+                                  class="hit-time-action"
+                                  type="button"
+                                  aria-label={$i18n.t('search.openResult')}
+                                  onclick={() => void openHit(hit)}
                                 >
-                                <time datetime={new Date(hit.origin_server_ts).toISOString()}>
-                                  {formatDate(hit.origin_server_ts)}
-                                  {formatTime(hit.origin_server_ts)}
-                                </time>
+                                  <time
+                                    datetime={new Date(hit.origin_server_ts).toISOString()}
+                                    title={formatFullTimestamp(hit.origin_server_ts)}
+                                  >
+                                    {formatMessageTimestamp(hit.origin_server_ts)}
+                                  </time>
+                                </button>
                               </span>
                               <span class="hit-body">
                                 {#if snippet.clippedStart}…{/if}
@@ -566,15 +604,6 @@
                       {@render contextLine(line)}
                     {/each}
                   </div>
-                  <IconButton
-                    class="hit-open"
-                    variant="ghost"
-                    size="small"
-                    label={$i18n.t('search.openResult')}
-                    onclick={() => void openHit(hit)}
-                  >
-                    <ArrowSquareOutIcon aria-hidden="true" />
-                  </IconButton>
                 </li>
               {/each}
             </ul>
@@ -841,53 +870,44 @@
   }
 
   .group h2 {
-    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: 0 0 var(--space-100);
+    font-weight: var(--font-weight-medium);
+    margin: 0 0 var(--space-200);
+    padding-inline: var(--space-100);
   }
 
   .hit-list {
     display: flex;
     flex-direction: column;
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: 0;
   }
 
   .hit {
-    align-items: flex-start;
-    border-radius: var(--radius);
-    display: flex;
-    gap: var(--space-200);
-    padding: 0 var(--space-200) 0 var(--space-400);
-    position: relative;
+    background: var(--surface-container);
+    border-radius: var(--radius-inner);
+    padding: var(--space-100) var(--space-200) var(--space-200) var(--space-600);
   }
 
-  .hit + .hit::before {
-    border-top: var(--border-width) solid var(--surface-container-line);
-    content: '';
-    inset: 0 var(--space-200) auto var(--space-400);
-    position: absolute;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .hit:hover {
-      background: var(--surface-var-container);
-    }
+  .hit:is(:hover, :focus-within) {
+    background: var(--surface-container-hover);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .hit-row {
     cursor: pointer;
     display: flex;
-    flex: 1;
     flex-direction: column;
     min-width: 0;
-    padding-block: var(--space-200);
+    padding-block: var(--space-100);
   }
 
-  .hit :global(.hit-open) {
-    flex: none;
-    margin-block-start: var(--space-200);
+  .hit :global(.message.mention-silent),
+  .hit :global(.message.mention-loud) {
+    margin-inline-start: calc(-1 * (var(--space-400) + var(--border-width) * 4));
+    padding-inline-start: var(--space-400);
   }
 
   :global(::highlight(search-match)) {
@@ -915,10 +935,19 @@
     gap: var(--space-200);
   }
 
-  .hit-sender {
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .hit-time-action {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    flex: none;
+    font: inherit;
+    padding: 0;
     white-space: nowrap;
+  }
+
+  .hit-time-action:hover {
+    text-decoration: underline;
   }
 
   .hit-context {

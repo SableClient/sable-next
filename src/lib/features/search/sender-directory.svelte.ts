@@ -1,4 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
+import type { ProfileView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
@@ -8,6 +9,7 @@ export interface SenderIdentity {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  profile?: ProfileView | null;
 }
 
 export class SenderDirectory {
@@ -34,6 +36,11 @@ export class SenderDirectory {
 
   known(): SenderIdentity[] {
     return [...this.#identities.values()];
+  }
+
+  profile(userId: string): ProfileView | null {
+    this.#request(userId);
+    return this.#identities.get(userId)?.profile ?? null;
   }
 
   async lookup(term: string): Promise<boolean> {
@@ -68,6 +75,7 @@ export class SenderDirectory {
           userId,
           displayName: profile.display_name ?? userId,
           avatarUrl: profile.avatar_url,
+          profile,
         });
       })
       .catch(() => {

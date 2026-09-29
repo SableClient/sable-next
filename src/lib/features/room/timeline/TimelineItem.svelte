@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, type Snippet } from 'svelte';
 
   import type {
     MemberView,
@@ -92,6 +92,9 @@
     selected?: boolean;
     layout?: TimelineLayout;
     preview?: boolean;
+    loadPreviewProfile?: boolean;
+    timeAction?: { label: string; run: () => void };
+    headerAction?: Snippet;
     alignOwn?: boolean;
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
@@ -133,6 +136,9 @@
     selected = false,
     layout = 'modern',
     preview = false,
+    loadPreviewProfile = false,
+    timeAction,
+    headerAction,
     alignOwn = true,
     members = [],
     onJumpToEvent,
@@ -307,7 +313,7 @@
   let senderRoleIcon = $derived(senderRole?.icon ?? null);
 
   $effect(() => {
-    itemProfiles.sync(item.sender, replySender, preview);
+    itemProfiles.sync(item.sender, replySender, preview && !loadPreviewProfile);
   });
 
   onDestroy(() => itemProfiles.dispose());
@@ -487,6 +493,13 @@
       {...actions}
     />
   {/if}
+{/snippet}
+
+{#snippet messageTime()}
+  <time
+    datetime={new Date(item.timestamp).toISOString()}
+    title={formatFullTimestamp(item.timestamp)}>{formatMessageTimestamp(item.timestamp)}</time
+  >
 {/snippet}
 
 {#if placeholder}
@@ -698,11 +711,19 @@
                 onclick={openSenderProfile}>{item.sender}</button
               >
             {/if}
-            <time
-              datetime={new Date(item.timestamp).toISOString()}
-              title={formatFullTimestamp(item.timestamp)}
-              >{formatMessageTimestamp(item.timestamp)}</time
-            >
+            {#if timeAction}
+              <button
+                class="message-time-action"
+                type="button"
+                aria-label={timeAction.label}
+                onclick={timeAction.run}
+              >
+                {@render messageTime()}
+              </button>
+            {:else}
+              {@render messageTime()}
+            {/if}
+            {@render headerAction?.()}
           </div>
         </header>
       {/if}
@@ -1475,6 +1496,20 @@
 
   .message-details time {
     flex-shrink: 0;
+  }
+
+  .message-time-action {
+    background: none;
+    border: 0;
+    cursor: pointer;
+    flex: none;
+    font: inherit;
+    padding: 0;
+    white-space: nowrap;
+  }
+
+  .message-time-action:hover {
+    text-decoration: underline;
   }
 
   .edited {

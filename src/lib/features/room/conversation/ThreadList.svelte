@@ -107,23 +107,26 @@
                   if (opensFrom(event)) onOpenThread(rootId);
                 }}
               >
-                <MessagePreview {roomId} eventId={rootId} item={root} {members}>
+                <MessagePreview {roomId} eventId={rootId} item={root} {members} loadPreviewProfile>
                   {#snippet fallback()}{/snippet}
                 </MessagePreview>
               </div>
               <button
                 type="button"
                 class="thread-summary"
+                class:no-summary={!root.thread_summary}
+                aria-label={root.thread_summary ? undefined : $i18n.t('timeline.threadOpen')}
+                title={root.thread_summary ? undefined : $i18n.t('timeline.threadOpen')}
                 onclick={() => {
                   onOpenThread(rootId);
                 }}
               >
                 <ThreadIcon size={14} aria-hidden="true" />
-                <span class="thread-count">
-                  {root.thread_summary
-                    ? $i18n.t('timeline.threadReplies', { count: root.thread_summary.num_replies })
-                    : $i18n.t('timeline.thread')}
-                </span>
+                {#if root.thread_summary}
+                  <span class="thread-count">
+                    {$i18n.t('timeline.threadReplies', { count: root.thread_summary.num_replies })}
+                  </span>
+                {/if}
                 {#if root.thread_summary?.latest_body}
                   <span class="thread-latest"
                     >{stripReplyFallback(root.thread_summary.latest_body, null)}</span
@@ -202,40 +205,50 @@
 
   ul {
     display: grid;
+    gap: var(--space-200);
     list-style: none;
     margin: 0;
     padding: var(--space-200);
   }
 
   li {
-    border-radius: var(--radius);
+    background: var(--surface-container);
+    border-radius: var(--radius-inner);
     display: grid;
-    justify-items: start;
-    padding: 0 var(--space-300) var(--space-200) var(--space-400);
-    position: relative;
-  }
-
-  li + li::before {
-    border-top: var(--border-width) solid var(--bg-container-line);
-    content: '';
-    inset: 0 var(--space-300) auto;
-    position: absolute;
+    min-width: 0;
+    padding: var(--space-100) var(--space-300) var(--space-300);
   }
 
   .thread-summary {
-    align-items: center;
+    align-items: start;
     background: none;
     border: none;
     border-radius: var(--radius);
     color: var(--primary-main);
     cursor: pointer;
-    display: flex;
+    display: grid;
     font: inherit;
     font-size: var(--font-size-small);
-    gap: var(--space-200);
-    max-width: 100%;
-    padding: 0;
+    gap: var(--space-100) var(--space-200);
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-self: stretch;
+    padding: var(--space-100) 0 0;
     text-align: left;
+  }
+
+  .thread-summary :global(svg) {
+    grid-row: 1 / span 2;
+    margin-block-start: var(--space-050);
+  }
+
+  .thread-summary.no-summary {
+    justify-self: end;
+    padding: var(--space-100);
+  }
+
+  .thread-summary.no-summary :global(svg) {
+    grid-row: auto;
+    margin: 0;
   }
 
   .thread-summary:focus-visible {
@@ -244,7 +257,6 @@
   }
 
   .thread-count {
-    flex: none;
     font-weight: var(--font-weight-medium);
   }
 
@@ -253,15 +265,18 @@
   }
 
   .thread-latest {
+    -webkit-box-orient: vertical;
     color: var(--surface-var-on-container);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
-  li:hover {
-    background: var(--bg-container-hover);
+  li:is(:hover, :focus-within) {
+    background: var(--surface-container-hover);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .thread-root {

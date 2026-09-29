@@ -850,6 +850,15 @@ pub async fn standalone_item(
         .raw()
         .deserialize_as_unchecked::<RawFields>()
         .unwrap_or_default();
+    let thread_summary = thread_summary(&item_content).or_else(|| {
+        event
+            .raw()
+            .get_field::<serde_json::Value>("unsigned")
+            .ok()
+            .flatten()
+            .as_ref()
+            .and_then(bundled_thread_summary)
+    });
 
     let mut view_content = content(
         &item_content,
@@ -879,7 +888,7 @@ pub async fn standalone_item(
         mention: content_mention(&item_content, is_own, own_user_id.as_deref(), highlighted),
         in_reply_to: in_reply_to(&item_content),
         thread_root: msg_like(&item_content).and_then(|msg| msg.thread_root.clone()),
-        thread_summary: thread_summary(&item_content),
+        thread_summary,
         content: view_content,
         sender: Some(sender),
         reactions: Vec::new(),
@@ -2056,6 +2065,32 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     })
 }
 
+// Standalone thread roots lack timeline thread state, so read the server's bundled summary.
+fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<ThreadSummaryView> {
+    let summary = unsigned.pointer("/m.relations/m.thread")?;
+    let count = u32::try_from(summary.get("count")?.as_u64()?).ok()?;
+    let latest = summary.get("latest_event")?;
+    let latest_event_id = latest
+        .get("event_id")
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned);
+    let latest_body = latest
+        .pointer("/content/body")
+        .and_then(serde_json::Value::as_str)
+        .map(|body| {
+            let formatted = latest
+                .pointer("/content/formatted_body")
+                .and_then(serde_json::Value::as_str);
+            preview_body(body, formatted)
+        });
+
+    Some(ThreadSummaryView {
+        num_replies: count,
+        latest_event_id,
+        latest_body,
+    })
+}
+
 /// Plain text: a preview must not run untrusted HTML.
 fn reply_preview_body(content: &TimelineItemContent) -> Option<String> {
     match content {
@@ -2288,12 +2323,36 @@ mod tests {
 
     use super::{
         LocalContent, RoomSendQueueUpdate, SerializableEventContent, audio_metadata,
-        bundled_link_previews, caption_view, clamp_power_level, forward_meta, geo_coordinates,
-        in_call, per_message_profile, relay_author, relay_profile, via_servers,
+        bundled_link_previews, bundled_thread_summary, caption_view, clamp_power_level,
+        forward_meta, geo_coordinates, in_call, per_message_profile, relay_author, relay_profile,
+        via_servers,
     };
     use matrix_sdk::ruma::events::room::power_levels::UserPowerLevel;
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{OwnedEventId, OwnedTransactionId};
+
+    #[test]
+    fn standalone_thread_root_uses_bundled_reply_summary() {
+        let unsigned = json!({
+            "m.relations": {
+                "m.thread": {
+                    "count": 3,
+                    "latest_event": {
+                        "event_id": "$reply:example.org",
+                        "content": { "body": "Latest reply" }
+                    }
+                }
+            }
+        });
+
+        let summary = bundled_thread_summary(&unsigned).expect("thread summary");
+        assert_eq!(summary.num_replies, 3);
+        assert_eq!(
+            summary.latest_event_id.as_deref(),
+            Some("$reply:example.org")
+        );
+        assert_eq!(summary.latest_body.as_deref(), Some("Latest reply"));
+    }
 
     #[test]
     fn audio_metadata_reads_msc4549_and_prefers_the_stable_key() {

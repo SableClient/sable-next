@@ -94,6 +94,7 @@ test('lists thread roots page by page and opens the one picked', async () => {
   });
   expect(within(rows()[0]).getByText('Ana')).toBeInTheDocument();
   expect(within(rows()[0]).getByText('First topic')).toBeInTheDocument();
+  expect(within(rows()[0]).getByRole('button', { name: 'Open thread' })).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Load more threads' }));
   await vi.waitFor(() => {
@@ -138,4 +139,27 @@ test('a root shows its reply count and latest reply instead of an open button', 
 
   await user.click(summary);
   expect(onOpenThread).toHaveBeenCalledWith('$a');
+});
+
+test('thread previews show the sender profile color and pronouns', async () => {
+  core.userProfile.mockResolvedValue({
+    name_color_light: '#2f5a1f',
+    name_color_dark: '#9fd07c',
+    pronouns: [{ summary: 'they/them', language: null }],
+  });
+  listThreads.mockResolvedValueOnce({ roots: [root('$a', 'First topic')], next_batch: null });
+  render(ThreadList, {
+    roomId: '!room:example.org',
+    members: [],
+    onOpenThread: vi.fn(),
+    onClose: vi.fn(),
+  });
+
+  await vi.waitFor(() => {
+    expect(core.userProfile).toHaveBeenCalledWith('@ana:example.org');
+    expect(screen.getByText('they/them')).toBeInTheDocument();
+  });
+  expect(document.querySelector('.message')?.getAttribute('style')).toContain(
+    '--name-color-on-light: #2f5a1f'
+  );
 });

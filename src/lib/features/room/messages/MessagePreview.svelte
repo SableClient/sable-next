@@ -14,6 +14,9 @@
     item?: TimelineItemView | null;
     members?: readonly MemberView[];
     fallback: Snippet;
+    headerAction?: Snippet;
+    loadPreviewProfile?: boolean;
+    timeAction?: { label: string; run: () => void };
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onJumpToEvent?: (eventId: string) => void;
   }
@@ -24,6 +27,9 @@
     item = null,
     members = [],
     fallback,
+    headerAction,
+    loadPreviewProfile,
+    timeAction,
     onMatrixLink,
     onJumpToEvent,
   }: Props = $props();
@@ -40,6 +46,9 @@
           item={shown}
           collapsed={false}
           preview
+          {headerAction}
+          {loadPreviewProfile}
+          {timeAction}
           {roomId}
           {members}
           layout="modern"

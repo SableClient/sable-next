@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ArrowSquareOutIcon from 'phosphor-svelte/lib/ArrowSquareOutIcon';
   import PushPinIcon from 'phosphor-svelte/lib/PushPinIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -224,36 +223,46 @@
                 {eventId}
                 item={entries.get(eventId) ?? null}
                 {members}
+                loadPreviewProfile
+                timeAction={{ label: $i18n.t('room.pinsJump'), run: () => jump(eventId) }}
                 onJumpToEvent={jump}
               >
                 {#snippet fallback()}
-                  <p class="pin-unreadable">{$i18n.t('room.pinsUnreadable')}</p>
+                  <div class="pin-unreadable">
+                    <button
+                      class="pin-unreadable-open"
+                      type="button"
+                      aria-label={$i18n.t('room.pinsJump')}
+                      onclick={() => jump(eventId)}
+                    >
+                      {$i18n.t('room.pinsUnreadable')}
+                    </button>
+                    {#if canPin}
+                      <IconButton
+                        variant="ghost"
+                        size="small"
+                        label={$i18n.t('timeline.unpinMessage')}
+                        onclick={() => void unpin(eventId)}
+                      >
+                        <PushPinSlashIcon />
+                      </IconButton>
+                    {/if}
+                  </div>
+                {/snippet}
+                {#snippet headerAction()}
+                  {#if canPin}
+                    <IconButton
+                      class="pin-unpin"
+                      variant="ghost"
+                      size="small"
+                      label={$i18n.t('timeline.unpinMessage')}
+                      onclick={() => void unpin(eventId)}
+                    >
+                      <PushPinSlashIcon />
+                    </IconButton>
+                  {/if}
                 {/snippet}
               </MessagePreview>
-            </div>
-            <div class="pin-actions">
-              <IconButton
-                variant="ghost"
-                size="small"
-                label={$i18n.t('room.pinsJump')}
-                onclick={() => {
-                  jump(eventId);
-                }}
-              >
-                <ArrowSquareOutIcon />
-              </IconButton>
-              {#if canPin}
-                <IconButton
-                  variant="ghost"
-                  size="small"
-                  label={$i18n.t('timeline.unpinMessage')}
-                  onclick={() => {
-                    void unpin(eventId);
-                  }}
-                >
-                  <PushPinSlashIcon />
-                </IconButton>
-              {/if}
             </div>
           </li>
         {/each}
@@ -264,11 +273,10 @@
 
 <style>
   :global(.menu-surface.pin-menu) {
-    --menu-min-width: 20rem;
     --menu-max-height: min(28rem, 70dvh);
 
     gap: var(--space-200);
-    max-width: min(24rem, calc(100vw - var(--space-500)));
+    width: min(28rem, calc(100vw - var(--space-500)));
   }
 
   :global(.pin-button) {
@@ -345,34 +353,60 @@
   }
 
   .pin-item {
-    align-items: flex-start;
+    background: var(--bg-container);
     border-radius: var(--radius-inner);
-    display: flex;
-    gap: var(--space-200);
-    padding: 0 var(--space-200) 0 var(--space-400);
+    padding: var(--space-100) var(--space-200) var(--space-100) var(--space-600);
+  }
+
+  .pin-item:is(:hover, :focus-within) {
+    background: var(--bg-container-hover);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .pin-item.fresh {
-    background: var(--primary-container);
-    color: var(--primary-on-container);
+    background: color-mix(in srgb, var(--primary-container) 30%, var(--bg-container));
+  }
+
+  .pin-item.fresh:is(:hover, :focus-within) {
+    background: color-mix(in srgb, var(--primary-container) 50%, var(--bg-container));
   }
 
   .pin-open {
     cursor: pointer;
-    flex: 1;
     min-width: 0;
   }
 
-  .pin-actions {
-    display: flex;
+  .pin-item :global(.pin-unpin) {
     flex: none;
-    gap: var(--space-100);
-    padding-block-start: var(--space-200);
+    margin-inline-start: var(--space-050);
+  }
+
+  .pin-item :global(.message.mention-silent),
+  .pin-item :global(.message.mention-loud) {
+    margin-inline-start: calc(-1 * (var(--space-400) + var(--border-width) * 4));
+    padding-inline-start: var(--space-400);
   }
 
   .pin-unreadable {
+    align-items: center;
     color: var(--surface-var-on-container);
-    margin: 0;
+    display: flex;
+    gap: var(--space-100);
     padding: var(--space-300) 0;
+  }
+
+  .pin-unreadable-open {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    flex: 1;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+  }
+
+  .pin-unreadable-open:hover {
+    text-decoration: underline;
   }
 </style>
