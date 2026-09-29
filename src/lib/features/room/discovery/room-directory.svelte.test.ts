@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 
 import type { PublicRoomView } from '#src/generated/protocol';
+import { CoreError } from '#src/transport';
 
 import { RoomDirectory, type RoomDirectoryApi } from './room-directory.svelte.js';
 
@@ -147,6 +148,20 @@ test('a new search clears an earlier failure', async () => {
 
   await directory.search({ server: null, search: 'again' });
   expect(directory.error).toBeNull();
+});
+
+test.each([
+  [new CoreError({ code: 'unknown_homeserver' }), 'room.directoryInvalidServer'],
+  [new CoreError({ code: 'denied' }), 'room.directoryPrivate'],
+  [new CoreError({ code: 'unsupported' }), 'room.directoryUnsupported'],
+  [new CoreError({ code: 'unavailable' }), 'room.directoryUnavailable'],
+  [new CoreError({ code: 'rate_limited', retry_after_ms: null }), 'room.directoryRateLimited'],
+] as const)('a directory error explains why it cannot be read', async (error, message) => {
+  const directory = new RoomDirectory(fakeCore(() => Promise.reject(error)));
+
+  await directory.search({ server: 'other.org', search: '' });
+
+  expect(directory.error).toBe(message);
 });
 
 test('a room type filter is sent to the server and enforced on what comes back', async () => {

@@ -1,6 +1,7 @@
 import type { DirectoryRoomType, PublicRoomView } from '#src/generated/protocol';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
+import { CoreError } from '#src/transport';
 
 export type RoomDirectoryApi = Pick<CoreCommands, 'publicRooms'>;
 
@@ -72,12 +73,31 @@ export class RoomDirectory {
     } catch (cause) {
       if (generation !== this.#generation) return;
       console.warn('[sable directory] the room directory is unavailable', cause);
-      this.error = 'room.directoryFailed';
+      this.error = directoryErrorMessage(cause);
       this.#nextBatch = null;
     } finally {
       if (generation === this.#generation) this.loading = false;
     }
   }
+}
+
+function directoryErrorMessage(cause: unknown): string {
+  if (cause instanceof CoreError) {
+    switch (cause.detail.code) {
+      case 'unknown_homeserver':
+        return 'room.directoryInvalidServer';
+      case 'denied':
+        return 'room.directoryPrivate';
+      case 'unsupported':
+        return 'room.directoryUnsupported';
+      case 'unavailable':
+        return 'room.directoryUnavailable';
+      case 'rate_limited':
+        return 'room.directoryRateLimited';
+    }
+  }
+
+  return 'room.directoryFailed';
 }
 
 function mergeRooms(

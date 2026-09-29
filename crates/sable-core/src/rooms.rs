@@ -428,7 +428,7 @@ impl Core {
             .await?
             .public_rooms_filtered(request)
             .await
-            .map_err(|error| self.failed("public_rooms", error))?;
+            .map_err(|error| self.room_error("public_rooms", error.into()))?;
 
         Ok(CommandOk::PublicRooms {
             rooms: response.chunk.iter().map(view::public_room).collect(),
