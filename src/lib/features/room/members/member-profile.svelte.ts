@@ -1,4 +1,4 @@
-import type { ProfileView } from '#src/generated/protocol';
+import type { PerMessageProfileView, ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 export class MemberProfile {
@@ -6,6 +6,7 @@ export class MemberProfile {
   userId = $state<string | null>(null);
   anchor = $state<HTMLElement | null>(null);
   profile = $state<ProfileView | null>(null);
+  pmp = $state<PerMessageProfileView | null>(null);
   failed = $state(false);
   #request = 0;
 
@@ -20,12 +21,22 @@ export class MemberProfile {
     this.failed = false;
   }
 
+  showPmp(userId: string, anchor: HTMLElement, pmp: PerMessageProfileView): void {
+    this.userId = userId;
+    this.anchor = anchor;
+    this.open = true;
+    this.failed = false;
+    this.profile = null;
+    this.pmp = pmp;
+  }
+
   async show(userId: string, anchor: HTMLElement): Promise<void> {
     const request = ++this.#request;
     this.userId = userId;
     this.anchor = anchor;
     this.open = true;
     this.profile = null;
+    this.pmp = null;
     this.failed = false;
     try {
       const profile = await this.core.userProfile(userId);

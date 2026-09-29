@@ -562,7 +562,7 @@ test('with profile on name click, the sender name opens the profile instead', as
 
   await press(document.querySelector<HTMLButtonElement>('header button.sender'));
 
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement));
+  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement), null);
   expect(onMentionUser).not.toHaveBeenCalled();
   preferences.usernameClick = 'mention';
 });
@@ -724,44 +724,6 @@ test('opens an image from a mobile pointer interaction', async () => {
   expect(onOpenMedia).toHaveBeenCalledWith('$item');
 });
 
-test('opens a per-message profile avatar through viewer callback', async () => {
-  const onPersonaAvatarClick = vi.fn();
-  const persona = {
-    ...item(false),
-    per_message_profile: {
-      id: 'kris',
-      display_name: 'Kris',
-      avatar_url: 'mxc://example.org/kris',
-      pronouns: [],
-      color_on_light: null,
-      color_on_dark: null,
-      has_fallback: false,
-    },
-  };
-  render(TimelineItemHarness, {
-    props: {
-      core,
-      item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
-    },
-  });
-  await tick();
-
-  const profileTrigger = document.querySelector<HTMLButtonElement>('.avatar-button');
-  if (!profileTrigger) throw new Error('persona profile trigger was not rendered');
-  await press(profileTrigger);
-  await tick();
-
-  const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
-  if (!avatarButton) throw new Error('persona avatar button was not rendered');
-  await press(avatarButton);
-  await tick();
-
-  expect(onPersonaAvatarClick).toHaveBeenCalledWith('mxc://example.org/kris', 'Kris');
-  expect(
-    profileTrigger.getAttribute('aria-expanded') ?? profileTrigger.getAttribute('data-state')
-  ).toMatch(/false|closed/);
-});
-
 test('a per-message profile takes the sender position and names the account behind it', async () => {
   core.userProfile.mockResolvedValue({
     name_color_light: '#2244aa',
@@ -798,7 +760,11 @@ test('a per-message profile takes the sender position and names the account behi
   const viaButton = via?.querySelector<HTMLButtonElement>('.name-button');
   if (!viaButton) throw new Error('the account behind the persona was not a button');
   await press(viaButton);
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', viaButton);
+  expect(onSenderProfile).toHaveBeenCalledWith(
+    '@alice:example.org',
+    viaButton,
+    persona.per_message_profile
+  );
 });
 
 test('without a persona the hover-only via keeps the account MXID', async () => {
