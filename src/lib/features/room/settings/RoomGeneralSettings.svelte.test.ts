@@ -11,6 +11,10 @@ import type {
 } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
+  useRoomList: () => ({ rooms: [], labelFor: (id: string) => id }),
+}));
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
@@ -20,6 +24,7 @@ import RoomGeneralSettings from './RoomGeneralSettings.svelte';
 const core = Object.assign(baseCore, {
   roomHasSpaceParent: vi.fn<() => Promise<boolean>>(),
   roomAliases: vi.fn<() => Promise<string[]>>(),
+  roomStateEventsRaw: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
   roomDirectoryVisibility: vi.fn<() => Promise<boolean>>(),
   setRoomJoinRule: vi.fn<() => Promise<void>>(),
 });

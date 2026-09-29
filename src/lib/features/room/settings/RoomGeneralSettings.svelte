@@ -36,6 +36,7 @@
   import RoomEncryptionSettings from './RoomEncryptionSettings.svelte';
   import RoomHistorySettings from './RoomHistorySettings.svelte';
   import RoomPublishSettings from './RoomPublishSettings.svelte';
+  import RoomSpacesSettings from './RoomSpacesSettings.svelte';
   import RoomUpgradeSettings from './RoomUpgradeSettings.svelte';
   import { canSendState } from './permission-groups';
 
@@ -403,6 +404,7 @@
         <RoomEncryptionSettings {room} {levels} {ownPowerLevel} />
       {/if}
       <RoomPublishSettings {room} {levels} {ownPowerLevel} />
+      <RoomSpacesSettings {room} />
       {#if room?.is_direct}
         <SettingsRow
           title={$i18n.t('room.settingsDirectLabel')}

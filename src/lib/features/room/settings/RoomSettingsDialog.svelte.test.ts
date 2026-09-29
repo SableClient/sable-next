@@ -8,12 +8,16 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { RoomPermissionsView, RoomSummary } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
+vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/rooms/room-list.svelte.js')>()),
+  useRoomList: () => ({ rooms: [], labelFor: (id: string) => id }),
+}));
 
 import { core as baseCore } from '#lib/core/__mocks__/context.js';
 
 const core = Object.assign(baseCore, {
   roomPowerLevels: vi.fn(),
-  roomStateEventsRaw: vi.fn(),
+  roomStateEventsRaw: vi.fn().mockResolvedValue([]),
   roomAliases: vi.fn(),
   roomDirectoryVisibility: vi.fn(),
   roomHasSpaceParent: vi.fn(),
