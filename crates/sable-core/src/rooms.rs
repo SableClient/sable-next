@@ -10,7 +10,7 @@ use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRu
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
-use matrix_sdk::{Client, RoomMemberships, RoomState};
+use matrix_sdk::{Client, EncryptionState, RoomMemberships, RoomState};
 use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
 
 use crate::ResultExt;
@@ -584,6 +584,14 @@ impl Core {
     }
 }
 
+pub(crate) fn room_maybe_encrypted(room: &Room) -> bool {
+    maybe_encrypted(&room.encryption_state())
+}
+
+const fn maybe_encrypted(state: &EncryptionState) -> bool {
+    !matches!(state, EncryptionState::NotEncrypted)
+}
+
 pub(crate) fn join_rule_support(room: &Room) -> (bool, bool, bool) {
     let Some(room_version) = room.version() else {
         return (false, false, false);
@@ -597,4 +605,16 @@ pub(crate) fn join_rule_support(room: &Room) -> (bool, bool, bool) {
         rules.authorization.restricted_join_rule,
         rules.authorization.knock_restricted_join_rule,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use matrix_sdk::EncryptionState;
+
+    use super::maybe_encrypted;
+
+    #[test]
+    fn an_unknown_encryption_state_is_treated_as_encrypted() {
+        assert!(maybe_encrypted(&EncryptionState::Unknown));
+    }
 }

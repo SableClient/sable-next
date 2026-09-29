@@ -324,7 +324,7 @@ impl Core {
             .ok()
             .flatten()
             .and_then(|member| member.display_name().map(ToOwned::to_owned));
-        let encrypted = room.encryption_state().is_encrypted();
+        let encrypted = crate::rooms::room_maybe_encrypted(room);
         Some(Entry {
             room_id: room.room_id().to_owned(),
             event_id: event.event_id().to_owned(),
@@ -537,11 +537,12 @@ fn event_ts(event: &TimelineEvent) -> Option<u64> {
 mod tests {
     use std::{collections::BTreeMap, sync::Arc};
 
-    use matrix_sdk::ruma::{OwnedEventId, owned_room_id, owned_user_id};
+    use matrix_sdk::ruma::{OwnedEventId, owned_room_id, owned_user_id, push::Action, serde::Raw};
     use matrix_sdk::{
         Client, Room,
         ruma::{
             event_id,
+            events::AnySyncTimelineEvent,
             events::receipt::{ReceiptThread, ReceiptType},
             room_id,
         },
@@ -594,6 +595,23 @@ mod tests {
         json!({"type": "m.room.message", "event_id": event_id, "room_id": "!room:example.org",
             "sender": *ALICE, "origin_server_ts": ts,
             "content": {"msgtype": "m.text", "body": "hello", "m.mentions": {"user_ids": user.into_iter().collect::<Vec<_>>()}}})
+    }
+
+    #[tokio::test]
+    async fn an_unknown_encryption_state_hides_the_inbox_preview() {
+        let server = MatrixMockServer::new().await;
+        let (core, _client, room) = setup(&server, 1).await;
+        assert!(room.encryption_state().is_unknown());
+        let raw =
+            Raw::<AnySyncTimelineEvent>::from_json_string(message("$message", 1, None).to_string())
+                .unwrap();
+
+        let entry = core
+            .inbox_entry(&room, &raw, &[Action::Notify])
+            .await
+            .unwrap();
+        assert!(entry.encrypted);
+        assert!(entry.body.is_none());
     }
 
     #[tokio::test]
