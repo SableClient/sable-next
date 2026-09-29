@@ -349,6 +349,7 @@ export function createWebTransport(): Transport {
       mentions,
       mentionsRoom,
       inReplyTo,
+      silentReply,
       info,
       threadRoot,
       persona,
@@ -367,6 +368,7 @@ export function createWebTransport(): Transport {
             mentions: mentions ?? [],
             mentionsRoom: mentionsRoom ?? false,
             inReplyTo: inReplyTo ?? null,
+            silentReply: silentReply ?? false,
             info: info ?? null,
             threadRoot: threadRoot ?? null,
             persona: persona ?? null,
@@ -385,6 +387,7 @@ export function createWebTransport(): Transport {
       mentions,
       mentionsRoom,
       inReplyTo,
+      silentReply,
       threadRoot,
     }) {
       const transfer = attachments.map((attachment) => attachment.bytes.buffer);
@@ -399,6 +402,7 @@ export function createWebTransport(): Transport {
             mentions: mentions ?? [],
             mentionsRoom: mentionsRoom ?? false,
             inReplyTo: inReplyTo ?? null,
+            silentReply: silentReply ?? false,
             threadRoot: threadRoot ?? null,
           },
         }),

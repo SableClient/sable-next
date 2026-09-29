@@ -20,6 +20,7 @@ export type Attachment = {
   mentions?: string[];
   mentionsRoom?: boolean;
   inReplyTo?: string | null;
+  silentReply?: boolean;
   info?: AttachmentInfoView | null;
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
@@ -34,6 +35,7 @@ export type Gallery = {
   mentions?: string[];
   mentionsRoom?: boolean;
   inReplyTo?: string | null;
+  silentReply?: boolean;
   threadRoot?: string | null;
 };
 

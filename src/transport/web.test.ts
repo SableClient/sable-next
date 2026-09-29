@@ -130,6 +130,7 @@ test('preserves rich attachment captions and mentions across the worker transpor
     mentions: ['@one:example.org'],
     mentionsRoom: true,
     inReplyTo: '$reply',
+    silentReply: false,
     info: null,
     threadRoot: '$thread',
     persona: null,
@@ -161,6 +162,7 @@ test('sends a gallery as one worker request', async () => {
     mentions: ['@one:example.org'],
     mentionsRoom: true,
     inReplyTo: '$reply',
+    silentReply: false,
     threadRoot: '$thread',
   });
 
@@ -177,6 +179,7 @@ test('sends a gallery as one worker request', async () => {
       mentions: ['@one:example.org'],
       mentionsRoom: true,
       inReplyTo: '$reply',
+      silentReply: false,
       threadRoot: '$thread',
     },
   });

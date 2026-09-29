@@ -289,6 +289,7 @@ test('sending an attachment forwards its rich caption, mentions, reply, and thre
     mentions: ['@one:example.org'],
     mentionsRoom: true,
     inReplyTo: '$reply:example.org',
+    silentReply: false,
     info: null,
     threadRoot: '$thread:example.org',
     persona: {
@@ -380,6 +381,7 @@ test('sending a gallery forwards shared metadata and every attachment', async ()
     mentions: ['@one:example.org'],
     mentionsRoom: true,
     inReplyTo: '$reply',
+    silentReply: false,
     threadRoot: '$thread',
   });
 });

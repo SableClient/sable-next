@@ -132,6 +132,7 @@ export type SendAttachmentOptions = {
   formattedCaption?: string | null;
   mentions?: OutgoingMentions;
   inReplyTo?: string | null;
+  silentReply?: boolean;
   threadRoot?: string | null;
   persona?: PerMessageProfileView | null;
   spoiler?: boolean;
@@ -1395,6 +1396,7 @@ export function createCommands(transport: () => Transport) {
         mentions: [...(options.mentions?.userIds ?? [])],
         mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
+        silentReply: options.silentReply ?? false,
         info,
         threadRoot: options.threadRoot ?? null,
         persona: $state.snapshot(options.persona ?? null),
@@ -1429,6 +1431,7 @@ export function createCommands(transport: () => Transport) {
         mentions: [...(options.mentions?.userIds ?? [])],
         mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
+        silentReply: options.silentReply ?? false,
         threadRoot: options.threadRoot ?? null,
       });
     },
@@ -1617,6 +1620,8 @@ export function createCommands(transport: () => Transport) {
         disk_budget_mb: diskBudgetMb,
         crawler,
         server_search: serverSearch,
+        tuning,
+        foreground,
       });
     },
 
