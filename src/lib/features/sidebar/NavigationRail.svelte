@@ -89,6 +89,7 @@
     onToggleFolder?: (folderId: string) => void;
     onRenameFolder?: (folder: SidebarFolder) => void;
     onUngroupFolder?: (folderId: string) => void;
+    onMarkFolderRead?: (folder: SidebarFolder) => void;
     onRemoveFromFolder?: (roomId: string, folderId: string) => void;
     onReorder?: (source: LayoutRef, target: LayoutRef, instruction: DropInstruction) => void;
     onMarkSectionRead?: (section: RailSection) => void;
@@ -113,6 +114,7 @@
     onToggleFolder,
     onRenameFolder,
     onUngroupFolder,
+    onMarkFolderRead,
     onRemoveFromFolder,
     onReorder,
     onMarkSectionRead,
@@ -874,6 +876,15 @@
     side="right"
     align="start"
   >
+    <ActionMenuItem
+      onSelect={() => {
+        onMarkFolderRead?.(folder);
+      }}
+    >
+      <ChecksIcon />
+      {$i18n.t('nav.markSectionRead')}
+    </ActionMenuItem>
+    <ActionMenuSeparator />
     <ActionMenuItem
       onSelect={() => {
         onRenameFolder?.(folder);

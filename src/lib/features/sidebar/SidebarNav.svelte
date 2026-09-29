@@ -37,7 +37,12 @@
   import NavigationRail from './NavigationRail.svelte';
   import RoomNav from './RoomNav.svelte';
   import UserQuickTools from './UserQuickTools.svelte';
-  import { claimedRoomIds, isActiveSpace, markRoomsRead } from './nav-rooms.js';
+  import {
+    claimedRoomIds,
+    isActiveSpace,
+    markRoomsRead,
+    spacesDescendantRooms,
+  } from './nav-rooms.js';
 
   interface Props {
     mobile?: boolean;
@@ -139,6 +144,14 @@
     markRoomsRead(rooms, core.commands, readReceiptIsPrivate());
   }
 
+  function markFolderRead(folder: SidebarFolder): void {
+    markRoomsRead(
+      spacesDescendantRooms(roomList.rooms, folder.content),
+      core.commands,
+      readReceiptIsPrivate()
+    );
+  }
+
   $effect.pre(() => {
     const next = rememberSpaceIds(
       knownSpaceIds,
@@ -195,6 +208,7 @@
       spaceSidebar.write(applyDrop(entries, source, target, instruction));
     },
     onMarkSectionRead: markSectionRead,
+    onMarkFolderRead: markFolderRead,
     get pinnedSpaceIds() {
       return pinnedSpaceIds;
     },

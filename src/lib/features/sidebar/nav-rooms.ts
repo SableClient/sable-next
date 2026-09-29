@@ -39,6 +39,13 @@ export function spaceDescendantRooms(
   rooms: readonly RoomSummary[],
   spaceId: string
 ): RoomSummary[] {
+  return spacesDescendantRooms(rooms, [spaceId]);
+}
+
+export function spacesDescendantRooms(
+  rooms: readonly RoomSummary[],
+  spaceIds: Iterable<string>
+): RoomSummary[] {
   const byId = new Map(rooms.map((room) => [room.room_id, room]));
   const seen = new Set<string>();
   const found: RoomSummary[] = [];
@@ -60,6 +67,6 @@ export function spaceDescendantRooms(
     }
   };
 
-  walk(spaceId);
+  for (const spaceId of spaceIds) walk(spaceId);
   return found;
 }
