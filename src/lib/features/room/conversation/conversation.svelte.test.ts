@@ -448,6 +448,30 @@ test('editing steps back to the own message before the one being edited', () => 
   expect(conversation.context).toMatchObject({ kind: 'edit', eventId: '$one:example.org' });
 });
 
+test('editing the last own message includes an image caption', () => {
+  const me = '@kris:example.org';
+  const image = {
+    ...item('$image:example.org', me),
+    content: {
+      kind: 'image',
+      filename: 'photo.png',
+      caption: 'A photo',
+      html: '<strong>A photo</strong>',
+    },
+  } as unknown as TimelineItemView;
+  const { conversation } = setup([image], me);
+
+  conversation.editLast();
+
+  expect(conversation.context).toMatchObject({
+    kind: 'edit',
+    eventId: '$image:example.org',
+    body: 'A photo',
+    html: '<strong>A photo</strong>',
+    mediaCaption: true,
+  });
+});
+
 test('editing steps forward to the next own message and leaves after the last', () => {
   const me = '@kris:example.org';
   const { conversation } = setup(

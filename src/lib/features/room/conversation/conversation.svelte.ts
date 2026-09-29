@@ -449,6 +449,18 @@ export class Conversation {
     this.context = { kind: 'edit', eventId, timelineItemId: item?.id, body, html, mediaCaption };
   };
 
+  #editTimelineItem(item: TimelineItemView, itemId: string): boolean {
+    if (item.content.kind === 'message') {
+      this.edit(itemId, item.content.body, item.content.html);
+      return true;
+    }
+    if (item.content.kind === 'image') {
+      this.edit(itemId, item.content.caption ?? '', item.content.html, true);
+      return true;
+    }
+    return false;
+  }
+
   readonly editLast = (before?: string): void => {
     const userId = this.#core.session?.user_id;
     if (!userId) return;
@@ -462,10 +474,7 @@ export class Conversation {
       const item = items[index];
       const itemId = item.event_id ?? item.transaction_id;
       if (!itemId || item.sender !== userId) continue;
-      if (item.content.kind !== 'message') continue;
-
-      this.edit(itemId, item.content.body, item.content.html);
-      return;
+      if (this.#editTimelineItem(item, itemId)) return;
     }
   };
 
@@ -482,10 +491,7 @@ export class Conversation {
       const item = items[index];
       const itemId = item.event_id ?? item.transaction_id;
       if (!itemId || item.sender !== userId) continue;
-      if (item.content.kind !== 'message') continue;
-
-      this.edit(itemId, item.content.body, item.content.html);
-      return;
+      if (this.#editTimelineItem(item, itemId)) return;
     }
     this.context = null;
   };
