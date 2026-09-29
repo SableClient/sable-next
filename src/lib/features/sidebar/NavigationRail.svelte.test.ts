@@ -45,6 +45,7 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear();
+  setPreference('showHome', false);
   setPreference('showSearch', true);
 });
 
@@ -129,6 +130,35 @@ test('badges the unspaced section', async () => {
   expect(within(tab('nav.unspaced')).getByText('2').closest('.unread-badge')).toHaveClass(
     'unread-badge-count'
   );
+});
+
+test('home is absent until the preference asks for it', async () => {
+  renderRail({ spaces: [], mobile: true });
+  await tick();
+
+  expect(linkTo('/home')).toBeNull();
+  expect(linkTo('/rooms')).not.toBeNull();
+
+  setPreference('showHome', true);
+  await tick();
+
+  expect(linkTo('/home')).not.toBeNull();
+});
+
+test('home carries no badge, the unspaced section does', async () => {
+  setPreference('showHome', true);
+  renderRail({
+    props: {
+      spaces: [],
+      homeUnread: { unread: 9, highlight: 5 },
+      unspacedUnread: { unread: 4, highlight: 2 },
+      mobile: true,
+    },
+  });
+  await tick();
+
+  expect(tab('nav.home').querySelector('.unread-badge')).toBeNull();
+  expect(within(tab('nav.unspaced')).getByText('2')).toBeInTheDocument();
 });
 
 test('search leaves the rail when the preference is off', async () => {

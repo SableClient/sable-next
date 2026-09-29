@@ -41,7 +41,7 @@ import { RoomList } from '#lib/rooms/room-list.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 beforeEach(() => {
-  visit('/home');
+  visit('/rooms');
 });
 
 afterEach(() => {

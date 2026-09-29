@@ -82,6 +82,7 @@ export interface Preferences {
   searchIndexLimit: SearchIndexLimit;
   searchCrawler: boolean;
   serverSearch: boolean;
+  showHome: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
   badgeCountDMsOnly: boolean;
@@ -311,6 +312,7 @@ const DEFAULTS: Preferences = {
   searchIndexLimit: '512',
   searchCrawler: true,
   serverSearch: true,
+  showHome: false,
   showSearch: false,
   showUnreadCounts: false,
   badgeCountDMsOnly: true,

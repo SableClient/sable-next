@@ -135,7 +135,7 @@ async function openMenu(name: string): Promise<void> {
 }
 
 beforeEach(() => {
-  visit('/rooms', {});
+  visit('/home', {});
   roomsFixture.rooms = [];
   roomsFixture.reset();
   presenceFixture.entry = null;
@@ -298,8 +298,7 @@ test('nests subspaces with thread lines and links past the depth limit to the lo
   expect(roomNames()).not.toContain('Deepest');
 });
 
-test('a route outside every list shows the rooms outside spaces', async () => {
-  visit('/inbox');
+test('home lists every joined room, including the children of joined spaces', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!plain:example.org', name: 'Plain' }),
     makeRoom({ room_id: '!direct:example.org', name: 'Direct', is_direct: true }),
@@ -322,10 +321,10 @@ test('a route outside every list shows the rooms outside spaces', async () => {
   ];
 
   await mountNav();
-  expect(roomNames()).toEqual(['Plain']);
+  expect(roomNames()).toEqual(['Plain', 'Direct', 'Child']);
 });
 
-test('rooms are ordered by their latest event', async () => {
+test('home orders rooms by their latest event', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!quiet:example.org', name: 'Quiet', latest_event: latestAt(10) }),
     makeRoom({ room_id: '!silent:example.org', name: 'Silent' }),
@@ -361,6 +360,7 @@ test('favourites sit in their own section above the rest of the list', async () 
 });
 
 test('a view that stops grouping favourites keeps them in recency order', async () => {
+  visit('/rooms');
   roomsFixture.rooms = [
     makeRoom({ room_id: '!busy:example.org', name: 'Busy', latest_event: latestAt(30) }),
     makeRoom({
@@ -410,12 +410,11 @@ test('a space lifts a favourite out of its subspace', async () => {
   expect(row('Deep')).toHaveAttribute('href', '/space/!root%3Aexample.org/!deep%3Aexample.org');
 });
 
-test('a route outside every list links rooms to the rooms section', async () => {
-  visit('/inbox');
+test('home links a room to its own section', async () => {
   roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
 
   await mountNav();
-  expect(row('Plain')).toHaveAttribute('href', '/rooms/!plain%3Aexample.org');
+  expect(row('Plain')).toHaveAttribute('href', '/home/!plain%3Aexample.org');
 });
 
 test('expanded room disclosures do not use the active-route surface', async () => {
