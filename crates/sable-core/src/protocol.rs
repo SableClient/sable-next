@@ -2113,6 +2113,7 @@ pub enum SearchCrawlPhase {
     Crawling,
     Trickling,
     Yielding,
+    Paused,
     BackingOff,
     Idle,
     BudgetSpent,
