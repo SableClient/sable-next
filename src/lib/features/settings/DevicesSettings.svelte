@@ -480,7 +480,13 @@
         {/if}
 
         {#if bulkRemoving}
-          <div class="bulk-remove-form">
+          <form
+            class="bulk-remove-form"
+            onsubmit={(event) => {
+              event.preventDefault();
+              void confirmBulkRemoval();
+            }}
+          >
             <div class="row-copy">
               <strong
                 >{$i18n.t('settings.removeSelectedDevicesConfirm', {
@@ -500,19 +506,14 @@
               />
             {/if}
             <div class="form-actions">
-              <Button
-                type="button"
-                variant="danger"
-                loading={bulkBusy}
-                onclick={() => void confirmBulkRemoval()}
-              >
+              <Button type="submit" variant="danger" loading={bulkBusy}>
                 {$i18n.t('settings.removeSelectedDevices')}
               </Button>
               <Button variant="ghost" disabled={bulkBusy} onclick={cancelBulkRemoval}>
                 {$i18n.t('settings.cancel')}
               </Button>
             </div>
-          </div>
+          </form>
         {/if}
 
         <ul class="device-list">
