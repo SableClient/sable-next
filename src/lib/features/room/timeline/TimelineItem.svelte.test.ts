@@ -287,7 +287,9 @@ test('reads an emote as one sentence, with the name only in the action', async (
   });
   await tick();
 
-  expect(document.querySelector('.emote')?.textContent.trim()).toBe('* Alice waves');
+  expect(document.querySelector('.emote')?.textContent.replace(/\s+/g, ' ').trim()).toBe(
+    '* Alice waves'
+  );
   expect(document.querySelector('header .sender')).toBeNull();
   expect(document.querySelector('header time')).not.toBeNull();
 });

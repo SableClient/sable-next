@@ -160,10 +160,13 @@ export function createWebTransport(): Transport {
     // Shared workers outlive tabs, so changing their URL prevents an old glue
     // module from being paired with a freshly generated WASM binary.
     workerUrl.searchParams.set('wasm', wasmVersion);
-    const iosPwa =
-      /iPhone|iPad|iPod/.test(navigator.userAgent) &&
-      (matchMedia('(display-mode: standalone)').matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone);
+    const matchMedia = Reflect.get(globalThis, 'matchMedia') as
+      | ((query: string) => MediaQueryList)
+      | undefined;
+    const standalone =
+      matchMedia?.('(display-mode: standalone)').matches === true ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    const iosPwa = /iPhone|iPad|iPod/.test(navigator.userAgent) && standalone;
     if (iosPwa) workerUrl.searchParams.set('event-cache', 'memory');
     const logFilter = new URLSearchParams(self.location.search).get('log');
     if (logFilter) workerUrl.searchParams.set('log', logFilter);
