@@ -38,11 +38,12 @@ function setup(items: TimelineItemView[], userId: string, store: Partial<Persona
     select: () => Promise.resolve(),
     ...store,
   } as unknown as PersonaStore;
-  const timeline = { items } as unknown as RoomTimeline;
+  const timeline = { items, aggregations: [] } as unknown as RoomTimeline;
 
   return {
     sendMessage,
     editMessage,
+    timeline,
     conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM }),
   };
 }
@@ -101,6 +102,29 @@ test('a reply to a persona message names the persona', () => {
 
   conversation.reply('$one:example.org');
   expect(conversation.context?.sender).toBe('Ghost');
+});
+
+test('a visible reaction aggregation can be replied to', () => {
+  const reaction = {
+    ...item('$reaction:example.org', '@ana:example.org'),
+    content: {
+      kind: 'hidden_event',
+      event_type: 'm.reaction',
+      content: { 'm.relates_to': { event_id: '$message:example.org', key: '🎉' } },
+      redacts: null,
+    },
+  } as TimelineItemView;
+  const { conversation, timeline } = setup([], '@kris:example.org');
+  timeline.aggregations = [reaction];
+
+  conversation.reply('$reaction:example.org');
+
+  expect(conversation.context).toMatchObject({
+    kind: 'reply',
+    eventId: '$reaction:example.org',
+    sender: 'Ana',
+    body: 'm.reaction',
+  });
 });
 
 test('a reply keeps the target formatting for its composer preview', () => {

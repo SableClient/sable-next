@@ -412,7 +412,9 @@ export class Conversation {
 
   readonly reply = (eventId: string, version?: ReplyVersion): void => {
     const target = version?.of ?? eventId;
-    const item = this.#timeline.items.find((entry) => entry.event_id === target);
+    const item =
+      this.#timeline.items.find((entry) => entry.event_id === target) ??
+      this.#timeline.aggregations.find((entry) => entry.event_id === target);
     if (!item) return;
 
     this.context = {
