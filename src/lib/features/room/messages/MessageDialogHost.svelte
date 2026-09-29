@@ -129,7 +129,7 @@
       notice: false,
       edited: false,
     });
-    onReply(version.event_id, { of: item.event_id, body });
+    onReply(version.event_id, { of: item.event_id, body, html: version.html });
   }
 </script>
 

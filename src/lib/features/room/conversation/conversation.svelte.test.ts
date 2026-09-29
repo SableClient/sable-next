@@ -103,18 +103,43 @@ test('a reply to a persona message names the persona', () => {
   expect(conversation.context?.sender).toBe('Ghost');
 });
 
+test('a reply keeps the target formatting for its composer preview', () => {
+  const target = item('$one:example.org', '@ana:example.org');
+  target.content = {
+    kind: 'message',
+    body: ':rotate:',
+    html: '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">',
+    emote: false,
+    notice: false,
+    edited: false,
+  };
+  const { conversation } = setup([target], '@kris:example.org');
+
+  conversation.reply('$one:example.org');
+
+  expect(conversation.context).toMatchObject({
+    body: ':rotate:',
+    html: '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">',
+  });
+});
+
 test('a reply to an earlier version targets the edit and quotes its text', async () => {
   const { conversation, sendMessage } = setup(
     [item('$one:example.org', '@ana:example.org')],
     '@kris:example.org'
   );
 
-  conversation.reply('$edit:example.org', { of: '$one:example.org', body: 'Helo' });
+  conversation.reply('$edit:example.org', {
+    of: '$one:example.org',
+    body: 'Helo',
+    html: '<em>Helo</em>',
+  });
   expect(conversation.context).toMatchObject({
     kind: 'reply',
     eventId: '$edit:example.org',
     sender: 'Ana',
     body: 'Helo',
+    html: '<em>Helo</em>',
     silentReply: false,
   });
 

@@ -421,6 +421,7 @@ export class Conversation {
       sender: item.per_message_profile?.display_name ?? item.sender_name ?? item.sender,
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
       body: version?.body ?? replyPreviewBody(item.content),
+      html: version?.html ?? (item.content.kind === 'message' ? item.content.html : null),
     };
   };
 

@@ -1,7 +1,12 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+
+vi.mock('#lib/core/context.js');
+vi.mock('#lib/rooms/room-list.svelte.js', () => ({
+  useRoomList: () => ({ rooms: [] }),
+}));
 
 import ComposerContextBanner from './ComposerContextBanner.svelte';
 
@@ -25,4 +30,21 @@ test('an edit context offers no reply controls', () => {
 
   expect(screen.queryByText(/Replying to/)).not.toBeInTheDocument();
   expect(screen.getAllByRole('button')).toHaveLength(1);
+});
+
+test('a reply context renders a custom emote from its formatted body', () => {
+  render(ComposerContextBanner, {
+    props: {
+      context: {
+        kind: 'reply',
+        eventId: '$one:example.org',
+        sender: 'Alice',
+        body: ':rotate:',
+        html: '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">',
+      },
+    },
+  });
+
+  expect(screen.getByRole('img', { name: ':rotate:' })).toBeInTheDocument();
+  expect(screen.queryByText(':rotate:')).not.toBeInTheDocument();
 });
