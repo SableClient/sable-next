@@ -176,13 +176,11 @@
   );
 
   let frequentCells = $derived.by((): Cell[] => {
-    if (!emojiTab || searching) return [];
-    return [
-      ...recentReactions.map((emoji) => ({ emoji })),
-      ...recentImages
-        .filter((image) => !recentReactions.includes(image.url))
-        .map((image) => ({ image })),
-    ];
+    if (searching || gifTab) return [];
+    const images = recentImages
+      .filter((image) => !emojiTab || !recentReactions.includes(image.url))
+      .map((image): Cell => ({ image }));
+    return emojiTab ? [...recentReactions.map((emoji): Cell => ({ emoji })), ...images] : images;
   });
 
   let groupSections = $derived(
@@ -249,6 +247,11 @@
       rows[index]?.kind === 'header' ? PACK_HEADER_HEIGHT : imageRowHeight;
   });
   let rowIndex = $derived(new Map(pickerRows.map((row, index) => [row.id, index])));
+
+  function pickerRowKey(index: number): string | number {
+    // VirtualList keys old visible indices before dropping them when the row count shrinks.
+    return pickerRows[index]?.id ?? index;
+  }
 
   let originLabels: Record<ImagePackView['origin'], string> = $derived({
     account: $i18n.t('composer.packMine'),
@@ -513,11 +516,16 @@
           itemSize={rowSize}
           estimatedItemSize={cellSize + GRID_GAP}
           overscanCount={2}
-          getKey={(index) => pickerRows[index]?.id}
+          getKey={pickerRowKey}
           scrollToIndex={scrollToRow === -1 ? undefined : scrollToRow}
           scrollToAlignment="start"
           scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
         >
+          {#snippet header()}
+            {#if frequentCells.length > 0}
+              {@render cellGrid('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells)}
+            {/if}
+          {/snippet}
           {#snippet item({ index, style })}
             {@const row = pickerRows[index]}
             <div {style} class="virtual-row">
@@ -571,7 +579,7 @@
       </div>
 
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
-        {#if (emojiTab && frequentCells.length > 0) || recentImages.length > 0}
+        {#if frequentCells.length > 0}
           <button
             type="button"
             class="rail-pack rail-glyph"
