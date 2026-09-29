@@ -14,6 +14,7 @@ Object.assign(core, {
   confirmVerification: vi.fn(() => Promise.resolve()),
   session: { user_id: '@alice:example.org' },
   verification: {
+    userId: '@alice:example.org',
     flowId: 'flow',
     state: {
       phase: 'compare' as const,
@@ -42,6 +43,7 @@ test('renders every SAS emoji slot when a symbol repeats', () => {
 
 test('dismissing an active flow cancels it and clears it so a new request can reopen the panel', async () => {
   core.verification = {
+    userId: '@alice:example.org',
     flowId: 'flow',
     state: { phase: 'requested' as const, is_self: true, initiated_by_us: true },
   };

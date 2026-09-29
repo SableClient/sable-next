@@ -1240,6 +1240,22 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           },
         ],
       }),
+      user_security: (command) => ({
+        type: 'user_security',
+        security: {
+          verification: command.user_id === '@alice:example.org' ? 'verified' : 'unverified',
+          verification_violation: false,
+          devices: [
+            {
+              device_id: 'PHONE',
+              display_name: 'Phone',
+              verified: true,
+              cross_signed: true,
+              blocked: false,
+            },
+          ],
+        },
+      }),
       enable_recovery: () => ({ type: 'enable_recovery', recovery_key: 'e2e-recovery-key' }),
       reset_recovery_key: () => ({ type: 'reset_recovery_key', recovery_key: 'e2e-recovery-key' }),
       reset_identity: (_command, port) => {

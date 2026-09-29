@@ -74,6 +74,7 @@ import type {
   TimelineItemView,
   UrlPreviewView,
   UserDirectoryEntryView,
+  UserSecurityView,
   WebPusherView,
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
@@ -1025,6 +1026,15 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'withdraw_verification', user_id: userId });
     },
 
+    async setDeviceBlocked(userId: string, deviceId: string, blocked: boolean): Promise<void> {
+      await transport().send({
+        type: 'set_device_blocked',
+        user_id: userId,
+        device_id: deviceId,
+        blocked,
+      });
+    },
+
     async reportRoom(roomId: string, reason: string): Promise<void> {
       await transport().send({ type: 'report_room', room_id: roomId, reason });
     },
@@ -1700,6 +1710,11 @@ export function createCommands(transport: () => Transport) {
         accountManagement: response.account_management,
         oauth: response.oauth,
       };
+    },
+
+    async userSecurity(userId: string): Promise<UserSecurityView> {
+      const response = await transport().send({ type: 'user_security', user_id: userId });
+      return response.security;
     },
 
     async recoverIdentity(recoveryKey: string): Promise<void> {

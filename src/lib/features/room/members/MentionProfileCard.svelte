@@ -26,6 +26,7 @@
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
+  import LockKeyIcon from 'phosphor-svelte/lib/LockKeyIcon';
 
   import { onDestroy } from 'svelte';
 
@@ -71,6 +72,7 @@
   import { profileFieldJson, profileFieldMap, profileFieldPreview } from './profile-field-map.js';
   import { MemberProfileRelations } from './member-profile-relations.svelte';
   import { MemberProfileActions, moderationErrorMessage } from './member-profile-actions';
+  import UserSecurityDialog from './UserSecurityDialog.svelte';
 
   interface Props {
     userId: string;
@@ -134,6 +136,7 @@
   let overrideColors = $derived(profileOverrides.colors(userId));
   let overrideOpen = $state(false);
   let reportOpen = $state(false);
+  let securityOpen = $state(false);
   let color = $derived(currentProfile?.hero_color ?? senderColor(userId));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let pronounSets = $derived(
@@ -448,6 +451,10 @@
       {/if}
       {#if !isSelf}
         <ActionMenuSeparator />
+        <ActionMenuItem onSelect={() => (securityOpen = true)}>
+          <LockKeyIcon />
+          {$i18n.t('timeline.profileEncryption')}
+        </ActionMenuItem>
       {/if}
       {#if canInvite}
         <ActionMenuItem onSelect={moderate(core.commands.inviteUser)}>
@@ -732,6 +739,13 @@
   {realName}
   {realAvatar}
   onOpenChange={(next) => (overrideOpen = next)}
+/>
+
+<UserSecurityDialog
+  open={securityOpen}
+  {userId}
+  {displayName}
+  onOpenChange={(next) => (securityOpen = next)}
 />
 
 <DialogFrame

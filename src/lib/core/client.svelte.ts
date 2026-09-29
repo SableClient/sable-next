@@ -112,7 +112,7 @@ async function resolveHomeserverInPage(
 export type UserRelations = { mutualRooms: MutualRoomView[]; ignored: boolean };
 export type CoreStatus = 'idle' | 'starting' | 'signed-out' | 'authenticating' | 'ready' | 'error';
 export type CoreSession = SessionInfo;
-export type ActiveVerification = { flowId: string; state: VerificationView };
+export type ActiveVerification = { userId: string; flowId: string; state: VerificationView };
 
 function discardAccountStore(transport: Transport, accountId: string): void {
   void transport.deleteAccountStore(accountId).catch((error: unknown) => {
@@ -660,8 +660,8 @@ export class CoreClient {
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {
     const pending = this.verification;
     if (
-      userId === this.session?.user_id &&
-      pending?.state.phase === 'requested' &&
+      pending?.userId === userId &&
+      pending.state.phase === 'requested' &&
       !pending.state.initiated_by_us
     ) {
       await this.commands.acceptVerification(userId, pending.flowId);
@@ -673,8 +673,13 @@ export class CoreClient {
       device_id: deviceId,
     });
     this.verification = {
+      userId,
       flowId: response.flow_id,
-      state: { phase: 'requested', is_self: true, initiated_by_us: true },
+      state: {
+        phase: 'requested',
+        is_self: userId === this.session?.user_id,
+        initiated_by_us: true,
+      },
     };
     return response.flow_id;
   }
@@ -711,10 +716,14 @@ export class CoreClient {
 
   subscribeEvents(onEvent: (event: CoreEvent) => void): () => void {
     return this.ensureTransport().subscribe((event) => {
-      if (event.type === 'verification' && event.user_id === this.session?.user_id) {
+      if (event.type === 'verification') {
         const isTerminal = event.state.phase === 'done' || event.state.phase === 'cancelled';
         if (!isTerminal || this.verification?.flowId === event.flow_id) {
-          this.verification = { flowId: event.flow_id, state: event.state };
+          this.verification = {
+            userId: event.user_id,
+            flowId: event.flow_id,
+            state: event.state,
+          };
         }
       }
       onEvent(event);

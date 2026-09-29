@@ -519,6 +519,7 @@ test('a cancellation for an unknown verification flow does not open the verifica
   });
 
   expect(core.verification).toEqual({
+    userId: session.user_id,
     flowId: 'active-flow',
     state: { phase: 'cancelled', reason: 'm.user' },
   });
@@ -546,6 +547,35 @@ test('verifying while another device is asking accepts its request instead of cr
     type: 'accept_verification',
     user_id: session.user_id,
     flow_id: 'incoming-flow',
+  });
+  expect(fake.sent.some((command) => command.type === 'request_verification')).toBe(false);
+  unsubscribe();
+});
+
+test('an incoming verification from another user opens a flow for that user', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  const unsubscribe = core.subscribeEvents(() => {});
+  fake.emit({
+    type: 'verification',
+    user_id: '@alice:example.org',
+    flow_id: 'alice-flow',
+    state: { phase: 'requested', is_self: false, initiated_by_us: false },
+  });
+
+  expect(core.verification).toEqual({
+    userId: '@alice:example.org',
+    flowId: 'alice-flow',
+    state: { phase: 'requested', is_self: false, initiated_by_us: false },
+  });
+
+  await expect(core.requestVerification('@alice:example.org')).resolves.toBe('alice-flow');
+  expect(fake.sent).toContainEqual({
+    type: 'accept_verification',
+    user_id: '@alice:example.org',
+    flow_id: 'alice-flow',
   });
   expect(fake.sent.some((command) => command.type === 'request_verification')).toBe(false);
   unsubscribe();

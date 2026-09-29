@@ -1619,6 +1619,10 @@ impl Core {
                 })
             }
 
+            Command::UserSecurity { user_id } => Ok(CommandOk::UserSecurity {
+                security: crate::verification::user_security(self, &user_id).await?,
+            }),
+
             Command::RecoverIdentity { recovery_key } => {
                 let client = self.client().await?;
                 client
@@ -2318,6 +2322,16 @@ impl Core {
                 self.watch_verification(request);
 
                 Ok(CommandOk::RequestVerification { flow_id })
+            }
+
+            Command::SetDeviceBlocked {
+                user_id,
+                device_id,
+                blocked,
+            } => {
+                crate::verification::set_device_blocked(self, &user_id, &device_id, blocked)
+                    .await?;
+                Ok(CommandOk::SetDeviceBlocked)
             }
 
             Command::WithdrawVerification { user_id } => {

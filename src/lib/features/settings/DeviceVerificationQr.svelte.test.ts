@@ -28,7 +28,9 @@ import DeviceVerificationDialog from './DeviceVerificationDialog.svelte';
 const code = { width: 21, modules: '1'.repeat(21 * 21) };
 
 function setup(state: VerificationView) {
-  Object.assign(core, { verification: { flowId: 'flow', state } });
+  Object.assign(core, {
+    verification: { userId: '@alice:example.org', flowId: 'flow', state },
+  });
   render(DeviceVerificationDialog);
   return userEvent.setup();
 }

@@ -901,6 +901,10 @@ pub enum Command {
     SearchCoverage,
     SearchMetrics,
     Devices,
+    UserSecurity {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+    },
     RecoverIdentity {
         recovery_key: String,
     },
@@ -1143,6 +1147,13 @@ pub enum Command {
     WithdrawVerification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
+    },
+    SetDeviceBlocked {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        device_id: OwnedDeviceId,
+        blocked: bool,
     },
     /// Signs this device in from another one (MSC4108). `scanned` is the
     /// other device's code, base64 encoded; without it this device shows one.
@@ -1661,6 +1672,9 @@ pub enum CommandOk {
         /// Signed in with OAuth, which is what linking a device by QR code needs.
         oauth: bool,
     },
+    UserSecurity {
+        security: UserSecurityView,
+    },
     RecoverIdentity,
     /// Unrecoverable once discarded.
     EnableRecovery {
@@ -1729,6 +1743,7 @@ pub enum CommandOk {
         flow_id: String,
     },
     WithdrawVerification,
+    SetDeviceBlocked,
     StartQrLogin,
     StartQrGrant,
     QrCheckCode,
@@ -2550,6 +2565,25 @@ pub struct DeviceView {
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub last_seen_ts: Option<u64>,
     pub last_seen_ip: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct UserSecurityView {
+    pub verification: VerificationStateView,
+    pub verification_violation: bool,
+    pub devices: Vec<UserDeviceView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct UserDeviceView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub device_id: OwnedDeviceId,
+    pub display_name: Option<String>,
+    pub verified: bool,
+    pub cross_signed: bool,
+    pub blocked: bool,
 }
 
 /// `restricted` and `knock_restricted` need an allowed-spaces list, so they are

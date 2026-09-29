@@ -14,6 +14,7 @@
   const core = useCoreClient();
   let error = $state<string | null>(null);
   let scanning = $state(false);
+  let selfVerification = $derived(core.verification?.userId === core.session?.user_id);
 
   // This app-level component keeps verification events flowing even when no
   // route-specific feature currently subscribes to the core transport.
@@ -24,20 +25,20 @@
   });
 
   async function accept(): Promise<void> {
-    if (!core.verification || !core.session?.user_id) return;
+    if (!core.verification) return;
     try {
-      await core.commands.acceptVerification(core.session.user_id, core.verification.flowId);
+      await core.commands.acceptVerification(core.verification.userId, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
   }
 
   async function scanned(data: Uint8Array): Promise<void> {
-    if (!core.verification || !core.session?.user_id) return;
+    if (!core.verification) return;
     scanning = false;
     try {
       await core.commands.scanVerificationQr(
-        core.session.user_id,
+        core.verification.userId,
         core.verification.flowId,
         uint8ArrayToBase64(data)
       );
@@ -47,18 +48,18 @@
   }
 
   async function compareEmoji(): Promise<void> {
-    if (!core.verification || !core.session?.user_id) return;
+    if (!core.verification) return;
     try {
-      await core.commands.startSasVerification(core.session.user_id, core.verification.flowId);
+      await core.commands.startSasVerification(core.verification.userId, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
   }
 
   async function confirm(): Promise<void> {
-    if (!core.verification || !core.session?.user_id) return;
+    if (!core.verification) return;
     try {
-      await core.commands.confirmVerification(core.session.user_id, core.verification.flowId);
+      await core.commands.confirmVerification(core.verification.userId, core.verification.flowId);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
@@ -66,9 +67,9 @@
 
   async function cancel(mismatch = false): Promise<void> {
     const flow = core.verification;
-    if (!flow || !core.session?.user_id) return;
+    if (!flow) return;
     try {
-      await core.commands.cancelVerification(core.session.user_id, flow.flowId, mismatch);
+      await core.commands.cancelVerification(flow.userId, flow.flowId, mismatch);
     } catch (cause) {
       error = verificationErrorMessage(cause);
     }
@@ -90,17 +91,23 @@
   onOpenChange={handleOpenChange}
   variant="verification"
 >
-  <Dialog.Title class="verification-title">{$i18n.t('settings.verification')}</Dialog.Title>
+  <Dialog.Title class="verification-title">
+    {$i18n.t(selfVerification ? 'settings.verification' : 'settings.userVerification')}
+  </Dialog.Title>
   {#if core.verification}
     {#if core.verification.state.phase === 'requested'}
       {#if core.verification.state.initiated_by_us}
         <Dialog.Description class="verification-description">
-          {$i18n.t('settings.acceptOtherDevice')}
+          {$i18n.t(selfVerification ? 'settings.acceptOtherDevice' : 'settings.acceptOtherUser')}
         </Dialog.Description>
         <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
       {:else}
         <Dialog.Description class="verification-description">
-          {$i18n.t('settings.verificationRequested')}
+          {$i18n.t(
+            selfVerification
+              ? 'settings.verificationRequested'
+              : 'settings.userVerificationRequested'
+          )}
         </Dialog.Description>
         <Button variant="primary" class="verification-action" onclick={accept}
           >{$i18n.t('settings.acceptVerification')}</Button
@@ -185,7 +192,9 @@
       <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'done'}
       <Dialog.Description class="verification-description">
-        {$i18n.t('settings.verificationComplete')}
+        {$i18n.t(
+          selfVerification ? 'settings.verificationComplete' : 'settings.userVerificationComplete'
+        )}
       </Dialog.Description>
       <Button
         variant="primary"

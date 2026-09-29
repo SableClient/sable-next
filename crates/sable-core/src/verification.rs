@@ -19,15 +19,16 @@ use matrix_sdk::ruma::events::key::verification::VerificationMethod;
 use matrix_sdk::ruma::events::key::verification::request::ToDeviceKeyVerificationRequestEvent;
 use matrix_sdk::ruma::events::room::message::{MessageType, OriginalSyncRoomMessageEvent};
 use matrix_sdk::ruma::events::secret_storage::default_key::SecretStorageDefaultKeyEventContent;
-use matrix_sdk::ruma::{OwnedUserId, UserId};
+use matrix_sdk::ruma::{DeviceId, OwnedUserId, UserId};
+use matrix_sdk_base::crypto::LocalTrust;
 use qrcode::bits::Bits;
 use qrcode::{Color, EcLevel, QrCode, Version};
 
 use crate::ResultExt;
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
-    QrCodeView, RecoveryStateView, SignOutSafetyView, SigningKeysView, VerificationStateView,
-    VerificationView,
+    QrCodeView, RecoveryStateView, SignOutSafetyView, SigningKeysView, UserDeviceView,
+    UserSecurityView, VerificationStateView, VerificationView,
 };
 
 use crate::Core;
@@ -587,6 +588,84 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
             .then(a.device_id.cmp(&b.device_id))
     });
     views
+}
+
+pub(crate) async fn user_security(
+    core: &Core,
+    user_id: &UserId,
+) -> Result<UserSecurityView, CommandErr> {
+    let client = core.client().await?;
+    let encryption = client.encryption();
+    let identity = match encryption
+        .get_user_identity(user_id)
+        .await
+        .or_failed(core, "user_security_identity")?
+    {
+        Some(identity) => Some(identity),
+        None => encryption
+            .request_user_identity(user_id)
+            .await
+            .or_failed(core, "user_security_request_identity")?,
+    };
+    let devices = encryption
+        .get_user_devices(user_id)
+        .await
+        .or_failed(core, "user_security_devices")?;
+    let verification_violation = identity
+        .as_ref()
+        .is_some_and(matrix_sdk::encryption::identities::UserIdentity::has_verification_violation);
+
+    let mut devices: Vec<UserDeviceView> = devices
+        .devices()
+        .map(|device| {
+            let cross_signed = device.is_cross_signed_by_owner();
+            UserDeviceView {
+                device_id: device.device_id().to_owned(),
+                display_name: device.display_name().map(str::to_owned),
+                verified: device.is_verified(),
+                cross_signed,
+                blocked: device.is_blacklisted(),
+            }
+        })
+        .collect();
+    devices.sort_by(|left, right| left.device_id.cmp(&right.device_id));
+
+    Ok(UserSecurityView {
+        verification: match identity.as_ref() {
+            Some(identity) if identity.is_verified() => VerificationStateView::Verified,
+            Some(_) => VerificationStateView::Unverified,
+            None => VerificationStateView::Unknown,
+        },
+        verification_violation,
+        devices,
+    })
+}
+
+pub(crate) async fn set_device_blocked(
+    core: &Core,
+    user_id: &UserId,
+    device_id: &DeviceId,
+    blocked: bool,
+) -> Result<(), CommandErr> {
+    let device = core
+        .client()
+        .await?
+        .encryption()
+        .get_device(user_id, device_id)
+        .await
+        .or_failed(core, "set_device_blocked_device")?
+        .ok_or(CommandErr::Unavailable)?;
+    if device.is_blacklisted() == blocked {
+        return Ok(());
+    }
+    device
+        .set_local_trust(if blocked {
+            LocalTrust::BlackListed
+        } else {
+            LocalTrust::Unset
+        })
+        .await
+        .or_failed(core, "set_device_blocked")
 }
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {
