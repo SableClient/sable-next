@@ -259,6 +259,9 @@ pub(crate) struct RawPusher {
 
 impl RawPusher {
     pub(crate) fn gateway(&self) -> Option<String> {
+        if self.kind.as_deref() == Some(PUSHER_KIND) {
+            return None;
+        }
         self.data
             .get("url")
             .and_then(serde_json::Value::as_str)
@@ -444,6 +447,36 @@ mod tests {
         assert_eq!(
             body["data"]["default_payload"]["user_id"],
             "@alice:example.org"
+        );
+    }
+
+    #[test]
+    fn an_msc4174_subscription_url_is_not_a_push_gateway() {
+        let pusher: RawPusher = serde_json::from_value(json!({
+            "pushkey": "B5Dw",
+            "app_id": "moe.sable.webpush",
+            "kind": "org.matrix.msc4174.webpush",
+            "data": { "url": "https://ntfy.example/sub/1" },
+        }))
+        .expect("valid pusher");
+
+        assert_eq!(pusher.gateway(), None);
+        assert_eq!(RegisteredPusherView::from(pusher).gateway, None);
+    }
+
+    #[test]
+    fn an_http_pusher_url_remains_a_push_gateway() {
+        let pusher: RawPusher = serde_json::from_value(json!({
+            "pushkey": "key",
+            "app_id": "moe.sable.up",
+            "kind": "http",
+            "data": { "url": "https://ntfy.example/_matrix/push/v1/notify" },
+        }))
+        .expect("valid pusher");
+
+        assert_eq!(
+            pusher.gateway().as_deref(),
+            Some("https://ntfy.example/_matrix/push/v1/notify")
         );
     }
 
