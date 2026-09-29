@@ -560,7 +560,7 @@ test('with profile on name click, the sender name opens the profile instead', as
 
   await press(document.querySelector<HTMLButtonElement>('header button.sender'));
 
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement));
+  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement), null);
   expect(onMentionUser).not.toHaveBeenCalled();
   preferences.usernameClick = 'mention';
 });
@@ -758,7 +758,11 @@ test('a per-message profile takes the sender position and names the account behi
   const viaButton = via?.querySelector<HTMLButtonElement>('.name-button');
   if (!viaButton) throw new Error('the account behind the persona was not a button');
   await press(viaButton);
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', viaButton);
+  expect(onSenderProfile).toHaveBeenCalledWith(
+    '@alice:example.org',
+    viaButton,
+    persona.per_message_profile
+  );
 });
 
 test('without a persona the hover-only via keeps the account MXID', async () => {

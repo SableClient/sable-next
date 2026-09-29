@@ -8,6 +8,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import '../members/avatar-button.css';
   import { memberIdentity } from '../members/members.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
