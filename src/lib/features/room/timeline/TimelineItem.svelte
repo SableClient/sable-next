@@ -1388,6 +1388,10 @@
     display: inline;
   }
 
+  .has-receipts :global(.formatted-body > p:only-child) {
+    display: inline;
+  }
+
   .has-receipts .receipt-slot {
     inset-block-end: 0;
     inset-inline-end: 0;

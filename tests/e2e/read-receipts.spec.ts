@@ -254,3 +254,54 @@ test('a short receipted bubble keeps its text on one line', async ({
     expect(receipted.lastLine.right).toBeLessThanOrEqual(badge.left);
   }
 });
+
+test('a short receipted notice keeps its text on one line', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ layout: 'bubble' }));
+  });
+  await page.setViewportSize({ width: 390, height: 780 });
+  await app.openRoom(ROOM_ID);
+  await timeline.expectAtLatest(LATEST);
+
+  const base = timelineItem('receipted-notice', 'miam miam');
+  const subscription = await core.subscription(0);
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...base,
+        content: { ...base.content, html: '<p>miam miam</p>', notice: true },
+        sender: '@bob:example.test',
+        sender_name: 'Bob',
+        read_by: ['@bob:example.test', '@carol:example.test'],
+      },
+    },
+  ]);
+
+  await expect(timeline.container.locator('[data-item-id="receipted-notice"]')).toBeVisible();
+  await expect
+    .poll(async () => (await measure(page, 'receipted-notice')).badge !== null)
+    .toBe(true);
+
+  const lines = await page.evaluate(() => {
+    const body = document.querySelector('[data-item-id="receipted-notice"] .formatted-body');
+    if (!body) return null;
+    const range = document.createRange();
+    range.selectNodeContents(body);
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+  });
+  const receipted = await measure(page, 'receipted-notice');
+  const badge = receipted.badge;
+  if (!badge) throw new Error('no badge');
+
+  expect(lines).toBe(1);
+  expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
+  expect(receipted.content.bottom - receipted.body.bottom).toBeLessThanOrEqual(2);
+});
