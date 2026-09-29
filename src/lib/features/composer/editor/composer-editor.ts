@@ -692,7 +692,16 @@ export class ComposerEditor {
             plain || this.source || !preferences.richTextComposer
               ? textSlice(text)
               : markdownSlice(text),
-          handleTextInput: (_inputView, from, to, text) => {
+          handleTextInput: (inputView, from, to, text) => {
+            const end = inputView.state.doc.content.size;
+            if (from < 0 || to < from || to > end) {
+              if (text === '') return true;
+              const start = Math.max(0, Math.min(from, end));
+              inputView.dispatch(
+                inputView.state.tr.insertText(text, start, Math.max(start, Math.min(to, end)))
+              );
+              return true;
+            }
             if (text !== ' ' || from !== to || from !== this.pillSpace) return false;
             this.pillSpace = null;
             return true;

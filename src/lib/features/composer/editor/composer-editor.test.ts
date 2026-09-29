@@ -204,6 +204,32 @@ describe('document replacement', () => {
 
     expect(editorView.state.selection.from).toBe(editorView.state.doc.content.size - 1);
   });
+
+  test('recovers text input whose DOM position is beyond the document', () => {
+    const editor = open();
+    editor.setText('short');
+    const editorView = view(editor);
+
+    const handled = editorView.someProp('handleTextInput', (handler) =>
+      handler(editorView, 60, 60, 'x', () => editorView.state.tr)
+    );
+
+    expect(handled).toBe(true);
+    expect(editor.doc()?.textContent).toBe('shortx');
+  });
+
+  test('ignores an out-of-range empty DOM input notification', () => {
+    const editor = open();
+    editor.setText('short');
+    const editorView = view(editor);
+
+    const handled = editorView.someProp('handleTextInput', (handler) =>
+      handler(editorView, 2, 60, '', () => editorView.state.tr)
+    );
+
+    expect(handled).toBe(true);
+    expect(editor.doc()?.textContent).toBe('short');
+  });
 });
 
 describe('history reset', () => {
