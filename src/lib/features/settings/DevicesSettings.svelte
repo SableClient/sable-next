@@ -30,21 +30,16 @@
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
-  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import '#lib/ui/primitives/settings-row.css';
   import ResetIdentityDialog from './ResetIdentityDialog.svelte';
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
   import RoomKeyFile from './RoomKeyFile.svelte';
-  import QrCodeIcon from 'phosphor-svelte/lib/QrCodeIcon';
-  import QrLinkDialog from '#lib/features/qr-login/QrLinkDialog.svelte';
 
   const core = useCoreClient();
   let devices = $state.raw<DeviceView[]>([]);
   let accountManagement = $state(false);
-  let linkingDevice = $state(false);
-  let oauth = $state(false);
   let status = $state<EncryptionStatusView | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -116,7 +111,6 @@
       status = nextStatus;
       devices = nextDevices.devices;
       accountManagement = nextDevices.accountManagement;
-      oauth = nextDevices.oauth;
     } catch (cause) {
       if (!cancelled) error = messageFor(cause);
     } finally {
@@ -424,22 +418,6 @@
       title={$i18n.t('settings.signedInDevices')}
       titleActions={refreshAction}
     >
-      {#if oauth}
-        <ul class="settings-rows">
-          <SettingsRow
-            title={$i18n.t('qrLogin.linkDevice')}
-            description={$i18n.t('qrLogin.linkDeviceHint')}
-          >
-            <Button
-              onclick={() => {
-                linkingDevice = true;
-              }}
-            >
-              <QrCodeIcon size={16} aria-hidden="true" />{$i18n.t('qrLogin.linkDeviceAction')}
-            </Button>
-          </SettingsRow>
-        </ul>
-      {/if}
       {#if loading}
         <div class="settings-form loading-state" role="status">
           <Spinner /><span>{$i18n.t('settings.loadingDevices')}</span>
@@ -679,7 +657,6 @@
 {/if}
 
 <ResetIdentityDialog bind:open={resettingIdentity} onReset={refresh} />
-<QrLinkDialog bind:open={linkingDevice} mode="grant" />
 
 <style>
   .device-seen {

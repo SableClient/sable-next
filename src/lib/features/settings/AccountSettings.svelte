@@ -19,6 +19,7 @@
   import { findCategory, SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
   import MentionProfileCard from '#lib/features/room/members/MentionProfileCard.svelte';
   import ExtendedProfileSettings from './ExtendedProfileSettings.svelte';
+  import LinkDeviceSetting from './LinkDeviceSetting.svelte';
   import SettingsCategorySections from './SettingsCategorySections.svelte';
 
   const category = findCategory(SETTINGS_ACCOUNT_SECTION);
@@ -266,6 +267,7 @@
                 onSaved={refreshProfile}
                 section="account"
               />{/if}
+            <LinkDeviceSetting />
             {#if category}<SettingsCategorySections {category} />{/if}
           </div>
         </div>
