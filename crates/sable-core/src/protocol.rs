@@ -897,6 +897,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
         direct: bool,
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        user_id: Option<OwnedUserId>,
     },
     /// Server-side, so it survives a reinstall.
     IgnoreUser {

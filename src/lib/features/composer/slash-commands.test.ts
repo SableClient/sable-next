@@ -416,14 +416,34 @@ test.each([
   });
 });
 
-test('/converttodm and /converttoroom flip the direct flag', async () => {
+test('/converttodm optionally sets its direct-message target', async () => {
   const commands = fakeCommands();
 
   await runSlash('/converttodm', context(commands));
-  expect(commands.setDirect).toHaveBeenCalledWith('!room:example.org', true);
+  expect(commands.setDirect).toHaveBeenCalledWith('!room:example.org', true, undefined);
+
+  await runSlash('/converttodm @other:example.org', context(commands));
+  expect(commands.setDirect).toHaveBeenLastCalledWith(
+    '!room:example.org',
+    true,
+    '@other:example.org'
+  );
+
+  await expect(runSlash('/converttodm other', context(commands))).rejects.toMatchObject({
+    key: 'composer.slash.converttodm.usage',
+  });
+  await expect(
+    runSlash('/converttodm @one:example.org extra', context(commands))
+  ).rejects.toMatchObject({
+    key: 'composer.slash.converttodm.usage',
+  });
+});
+
+test('/converttoroom clears the direct flag', async () => {
+  const commands = fakeCommands();
 
   await runSlash('/converttoroom', context(commands));
-  expect(commands.setDirect).toHaveBeenLastCalledWith('!room:example.org', false);
+  expect(commands.setDirect).toHaveBeenCalledWith('!room:example.org', false);
 });
 
 test('/discardsession discards the room key', async () => {

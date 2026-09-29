@@ -195,7 +195,7 @@ passphrase: string | null } | { type: "reset_recovery_key"; passphrase: string |
 /**  An `mxc:` URI from the carrier's `uploadMedia`. `null` clears it. */
 { type: "set_avatar_url"; url: string | null; propagate_to: ProfilePropagationView } | { type: "set_profile_field"; field: string; value: unknown | null } | { type: "account_contacts" } | { type: "ignored_users" } | { type: "invite_triage" } |
 /**  `m.direct` is client-owned account data. Nothing else will correct it. */
-{ type: "set_direct"; room_id: string; direct: boolean } |
+{ type: "set_direct"; room_id: string; direct: boolean; user_id: string | null } |
 /**  Server-side, so it survives a reinstall. */
 { type: "ignore_user"; user_id: string } | { type: "unignore_user"; user_id: string } |
 /**  The server expires it by itself, so a missed `false` is not fatal. */

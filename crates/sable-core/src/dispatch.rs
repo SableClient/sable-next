@@ -2307,7 +2307,11 @@ impl Core {
                 Ok(CommandOk::SetRoomTag)
             }
 
-            Command::SetDirect { room_id, direct } => {
+            Command::SetDirect {
+                room_id,
+                direct,
+                user_id,
+            } => {
                 let client = self.client().await?;
                 let room = self.room(&room_id).await?;
 
@@ -2318,11 +2322,20 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("set_direct: members", error))?;
 
-                    let others: Vec<OwnedUserId> = members
-                        .iter()
-                        .map(|member| member.user_id().to_owned())
-                        .filter(|user_id| Some(user_id.as_ref()) != client.user_id())
-                        .collect();
+                    let others = match user_id {
+                        Some(user_id)
+                            if Some(user_id.as_ref()) != client.user_id()
+                                && members.iter().any(|member| member.user_id() == user_id) =>
+                        {
+                            vec![user_id]
+                        }
+                        Some(_) => return Err(CommandErr::Denied),
+                        None => members
+                            .iter()
+                            .map(|member| member.user_id().to_owned())
+                            .filter(|user_id| Some(user_id.as_ref()) != client.user_id())
+                            .collect(),
+                    };
 
                     client
                         .account()

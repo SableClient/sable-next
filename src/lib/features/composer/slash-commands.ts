@@ -643,9 +643,12 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   {
     name: 'converttodm',
     run: async (args, { roomId, commands }) => {
-      if (args.trim() !== '') return usageError('converttodm');
+      const targets = words(args);
+      if (targets.length > 1 || (targets.length === 1 && !USER_ID.test(targets[0]))) {
+        return usageError('converttodm');
+      }
 
-      await commands.setDirect(roomId, true);
+      await commands.setDirect(roomId, true, targets[0]);
       return { kind: 'done' };
     },
   },

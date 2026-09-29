@@ -1857,11 +1857,12 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'unignore_user', user_id: userId });
     },
 
-    async setDirect(roomId: string, direct: boolean): Promise<void> {
+    async setDirect(roomId: string, direct: boolean, userId?: string): Promise<void> {
       await transport().send({
         type: 'set_direct',
         room_id: roomId,
         direct,
+        user_id: userId ?? null,
       });
     },
 

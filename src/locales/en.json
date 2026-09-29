@@ -2746,7 +2746,7 @@
       },
       "converttodm": {
         "description": "Mark this room as a direct message",
-        "usage": "/converttodm"
+        "usage": "/converttodm [@user:server]"
       },
       "converttoroom": {
         "description": "Mark this direct message as an ordinary room",
