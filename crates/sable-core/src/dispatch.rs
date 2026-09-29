@@ -24,8 +24,7 @@ use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::location::LocationContent;
-use matrix_sdk::ruma::events::reaction::ReactionEventContent;
-use matrix_sdk::ruma::events::relation::{Annotation, InReplyTo, Reply, Thread};
+use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
@@ -1454,8 +1453,9 @@ impl Core {
                 let shortcode = reaction_shortcode(&key, shortcode.as_deref());
                 if let Some(source) = image_source_pack_extra(&key, source_pack) {
                     timeline
-                        .send_with_extra_content(
-                            ReactionEventContent::new(Annotation::new(event_id, key)).into(),
+                        .toggle_reaction_with_extra_content(
+                            &TimelineEventItemId::EventId(event_id),
+                            &key,
                             extra_content(
                                 None,
                                 [
