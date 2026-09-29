@@ -345,4 +345,21 @@ mod tests {
             .unwrap();
         assert_eq!(cleared.animal_need, None);
     }
+
+    #[test]
+    fn preserves_unrecognised_profile_fields_for_misc_data() {
+        let profile = view(&json!({
+            "fyi.cisnt.connections": {
+                "description": "homepage",
+                "uri": "https://example.org"
+            }
+        }));
+
+        assert_eq!(profile.extra.len(), 1);
+        assert_eq!(profile.extra[0].key, "fyi.cisnt.connections");
+        assert_eq!(
+            profile.extra[0].value,
+            r#"{"description":"homepage","uri":"https://example.org"}"#
+        );
+    }
 }
