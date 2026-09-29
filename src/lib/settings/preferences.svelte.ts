@@ -6,6 +6,9 @@ import type { MemberSort } from '#lib/features/room/members/member-listing.js';
 import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
+import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
+
+export type { BadgeNotificationMode };
 
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
@@ -149,6 +152,8 @@ export interface Preferences {
   youtubeEmbeds: boolean;
 
   systemNotifications: boolean;
+  badgeDefaultDirect: BadgeNotificationMode;
+  badgeDefaultGroup: BadgeNotificationMode;
   notificationSounds: boolean;
   notificationSoundVolume: number;
   notifyOnce: boolean;
@@ -245,6 +250,8 @@ const ENUMS = {
   captionPosition: ['above', 'below', 'inline', 'hidden'],
   usernameClick: ['mention', 'profile'],
   callRingtoneVolume: ['quiet', 'normal', 'loud'],
+  badgeDefaultDirect: ['all', 'mentions'],
+  badgeDefaultGroup: ['all', 'mentions'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
   personaLatching: ['off', 'room', 'account'],
   presence: ['online', 'unavailable', 'offline'],
@@ -373,6 +380,8 @@ const DEFAULTS: Preferences = {
   youtubeEmbeds: false,
 
   systemNotifications: true,
+  badgeDefaultDirect: 'all',
+  badgeDefaultGroup: 'mentions',
   notificationSounds: true,
   notificationSoundVolume: 1,
   notifyOnce: true,

@@ -144,7 +144,7 @@ test('a stale notification-mode refresh cannot overwrite a room override', async
   roomList.stop();
 });
 
-test('inbox counts follow what notified, and a mute silences it at once', async () => {
+test('inbox counts follow badge defaults, and a mute silences it at once', async () => {
   const rooms = [
     { room_id: '!loud', state: 'joined', unread: 2, notifying: 2, highlight: 0 },
     { room_id: '!quiet', state: 'joined', unread: 3, notifying: 0, highlight: 0 },
@@ -170,17 +170,19 @@ test('inbox counts follow what notified, and a mute silences it at once', async 
     },
   } as unknown as CoreClient;
   const roomList = new RoomList(core);
-  const mode = (roomId: string) => roomList.notificationMode(roomId);
   await roomList.start();
   await vi.waitFor(() => {
-    expect(countNotifications(roomList.rooms, mode)).toBe(2);
+    expect(roomList.notificationMode('!loud')).toBe('all');
   });
-  expect(notifications(roomList.rooms, 'all', mode).map((room) => room.room_id)).toEqual(['!loud']);
+  expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(2);
+  expect(
+    notifications(roomList.rooms, 'all', roomList.badgeUnreadFor).map((room) => room.room_id)
+  ).toEqual(['!loud', '!quiet']);
 
   loudMode = 'mute';
   for (const listener of listeners) listener({ type: 'notification_settings_changed' });
   await vi.waitFor(() => {
-    expect(countNotifications(roomList.rooms, mode)).toBe(0);
+    expect(countNotifications(roomList.rooms, roomList.badgeUnreadFor)).toBe(0);
   });
   roomList.stop();
 });
@@ -568,5 +570,60 @@ test('a hidden room keeps its unread state and badges only its mentions', async 
   });
 
   setQuiet(quiet.room_id, false);
+  roomList.stop();
+});
+
+test('badge defaults quiet group rooms while push stays all', async () => {
+  const group = {
+    room_id: '!group:example.org',
+    is_direct: false,
+    unread: 5,
+    notifying: 5,
+    highlight: 0,
+    marked_unread: false,
+    space_children: [],
+  } as unknown as RoomSummary;
+  const dm = {
+    room_id: '!dm:example.org',
+    is_direct: true,
+    unread: 3,
+    notifying: 3,
+    highlight: 0,
+    marked_unread: false,
+    space_children: [],
+  } as unknown as RoomSummary;
+  const core = {
+    subscribeEvents: vi.fn(() => () => {}),
+    commands: {
+      subscribeRoomList: vi.fn(() => Promise.resolve({ subscription: 1, rooms: [group, dm] })),
+      roomNotificationModes: vi.fn(() =>
+        Promise.resolve([
+          { room_id: group.room_id, room: null, default: 'all' as const },
+          { room_id: dm.room_id, room: null, default: 'all' as const },
+        ])
+      ),
+      unsubscribe: vi.fn(() => Promise.resolve()),
+    },
+  } as unknown as CoreClient;
+  const roomList = new RoomList(core);
+
+  await roomList.start();
+  await vi.waitFor(() => {
+    expect(roomList.notificationMode(group.room_id)).toBe('all');
+  });
+
+  expect(roomList.badgeUnreadFor(group)).toEqual({
+    unread: 5,
+    highlight: 0,
+    marked: false,
+    notifying: 0,
+  });
+  expect(roomList.badgeUnreadFor(dm)).toEqual({
+    unread: 3,
+    highlight: 0,
+    marked: false,
+    notifying: 3,
+  });
+
   roomList.stop();
 });

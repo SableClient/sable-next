@@ -37,13 +37,12 @@ for (const viewport of [
     await expect(page).toHaveURL(/\/setup\/notifications$/);
     await page.reload();
     await expect(page).toHaveURL(/\/setup\/notifications$/);
-    const mentions = card.getByRole('radio', { name: /Mentions and keywords/ });
-    await expect(mentions).toHaveAttribute('aria-checked', 'true');
+    const allMessages = card.getByRole('radio', { name: /All messages/ });
+    await expect(allMessages).toHaveAttribute('aria-checked', 'true');
     await page.goBack();
     await expect(page).toHaveURL(/\/setup\/recovery$/);
     await page.goForward();
     await expect(page).toHaveURL(/\/setup\/notifications$/);
-    await card.getByRole('radio', { name: /All messages/ }).click();
     await card.getByRole('button', { name: 'Continue' }).click();
 
     await expect(page).toHaveURL(/\/setup\/sync$/);

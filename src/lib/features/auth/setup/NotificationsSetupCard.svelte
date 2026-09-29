@@ -25,7 +25,7 @@
   let { askDefault, onComplete, onSkip }: Props = $props();
   const core = useCoreClient();
   let permission = $state<Awaited<ReturnType<typeof permissionState>> | null>(null);
-  let groupMode = $state<GroupMode>('mentions');
+  let groupMode = $state<GroupMode>('all');
   let groupModeChanged = false;
   let saving = $state(false);
   let error = $state<string | null>(null);
@@ -117,16 +117,16 @@
         disabled={saving}
         options={[
           {
-            value: 'mentions',
-            label: $i18n.t('room.notifyMentions'),
-            hint: $i18n.t('setup.notificationsMentionsHint'),
-            icon: BellSimpleIcon,
-          },
-          {
             value: 'all',
             label: $i18n.t('room.notifyAll'),
             hint: $i18n.t('setup.notificationsAllHint'),
             icon: BellRingingIcon,
+          },
+          {
+            value: 'mentions',
+            label: $i18n.t('room.notifyMentions'),
+            hint: $i18n.t('setup.notificationsMentionsHint'),
+            icon: BellSimpleIcon,
           },
         ]}
         onSelect={(mode) => {

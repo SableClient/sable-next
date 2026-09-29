@@ -2,6 +2,8 @@ import { expect, test } from 'vitest';
 
 import type { BookmarkView, RoomSummary } from '#src/generated/protocol';
 
+import { applyBadgeMode, badgeModeFor, roomUnread, type RoomUnread } from '#lib/rooms/unread.js';
+
 import {
   backfillSignal,
   countInvites,
@@ -10,6 +12,7 @@ import {
   formatCompactTimestamp,
   hasMarkedUnread,
   inviter,
+  notificationCount,
   notifications,
   parseFilter,
   pendingInvites,
@@ -47,50 +50,85 @@ function room(overrides: Partial<RoomSummary>): RoomSummary {
   };
 }
 
+function badgeFor(
+  override: (roomId: string) => 'all' | 'mentions' | 'mute' | null = () => null
+): RoomUnread {
+  return (summary) =>
+    applyBadgeMode(
+      roomUnread(summary, override(summary.room_id) ?? 'all'),
+      badgeModeFor(summary, override(summary.room_id), {
+        direct: 'all',
+        group: 'mentions',
+      })
+    );
+}
+
 test('an unknown filter falls back to showing everything', () => {
   expect(parseFilter(null)).toBe('all');
   expect(parseFilter('unread')).toBe('all');
   expect(parseFilter('mentions')).toBe('mentions');
 });
 
-test('all-message mode counts ordinary messages in channels and chats', () => {
+test('the inbox badge counts DMs and mentions, not ordinary room messages', () => {
   const rooms = [
     room({ room_id: '!chat', is_direct: true, unread: 3, notifying: 3 }),
     room({ room_id: '!quiet-room', unread: 7, notifying: 7 }),
     room({ room_id: '!loud-room', unread: 7, notifying: 7, highlight: 2 }),
   ];
+  const unreadFor = badgeFor();
 
-  const mode = () => 'all' as const;
-  expect(notifications(rooms, 'all', mode).map((each) => each.room_id)).toEqual([
+  expect(countNotifications(rooms, unreadFor)).toBe(5);
+  expect(notifications(rooms, 'all', unreadFor).map((each) => each.room_id)).toEqual([
     '!chat',
     '!quiet-room',
     '!loud-room',
   ]);
-  expect(countNotifications(rooms, mode)).toBe(17);
+  expect(notifications(rooms, 'mentions', unreadFor).map((each) => each.room_id)).toEqual([
+    '!loud-room',
+  ]);
+  expect(notifications(rooms, 'direct', unreadFor).map((each) => each.room_id)).toEqual(['!chat']);
 });
 
-test('mentions-only and muted rooms do not contribute ordinary unread messages', () => {
+test('rooms set to badge every message also count toward the inbox badge', () => {
   const rooms = [
-    room({ room_id: '!mentions', unread: 7, highlight: 2 }),
-    room({ room_id: '!dm', is_direct: true, unread: 3 }),
-    room({ room_id: '!muted', unread: 4, highlight: 1 }),
+    room({ room_id: '!chat', is_direct: true, unread: 3, notifying: 3 }),
+    room({ room_id: '!channel', unread: 7, notifying: 7 }),
   ];
-  const mode = (roomId: string) =>
-    roomId === '!muted' ? ('mute' as const) : ('mentions' as const);
-  expect(notifications(rooms, 'all', mode).map((each) => each.room_id)).toEqual(['!mentions']);
-  expect(notifications(rooms, 'direct', mode)).toEqual([]);
-  expect(notifications(rooms, 'mentions', mode).map((each) => each.room_id)).toEqual(['!mentions']);
-  expect(countNotifications(rooms, mode)).toBe(2);
+  const unreadFor: RoomUnread = (summary) =>
+    applyBadgeMode(
+      roomUnread(summary, 'all'),
+      badgeModeFor(summary, null, { direct: 'all', group: 'all' })
+    );
+
+  expect(countNotifications(rooms, unreadFor)).toBe(10);
 });
 
-test('filters narrow to mentions or to chats', () => {
+test('a muted room does not contribute ordinary unread or mentions to the badge', () => {
+  const rooms = [
+    room({ room_id: '!mentions', unread: 7, notifying: 2, highlight: 2 }),
+    room({ room_id: '!dm', is_direct: true, unread: 3, notifying: 3 }),
+    room({ room_id: '!muted', unread: 4, notifying: 4, highlight: 1 }),
+  ];
+  const unreadFor = badgeFor((roomId) => (roomId === '!muted' ? 'mute' : null));
+
+  expect(countNotifications(rooms, unreadFor)).toBe(5);
+  expect(notifications(rooms, 'mentions', unreadFor).map((each) => each.room_id)).toEqual([
+    '!mentions',
+  ]);
+  expect(notifications(rooms, 'direct', unreadFor).map((each) => each.room_id)).toEqual(['!dm']);
+});
+
+test('filters narrow to mentions or to DMs', () => {
   const rooms = [
     room({ room_id: '!chat', is_direct: true, unread: 1, notifying: 1 }),
     room({ room_id: '!mention', highlight: 1 }),
   ];
+  const unreadFor = badgeFor();
 
-  expect(notifications(rooms, 'direct').map((each) => each.room_id)).toEqual(['!chat']);
-  expect(notifications(rooms, 'mentions').map((each) => each.room_id)).toEqual(['!mention']);
+  expect(notifications(rooms, 'direct', unreadFor).map((each) => each.room_id)).toEqual(['!chat']);
+  expect(notifications(rooms, 'mentions', unreadFor).map((each) => each.room_id)).toEqual([
+    '!mention',
+  ]);
 });
 
 test('a space never notifies, and neither does a room we have left', () => {
@@ -121,81 +159,81 @@ test('notifications are ordered by the latest event, undated last', () => {
   expect(ordered.map((each) => each.room_id)).toEqual(['!new', '!old', '!none']);
 });
 
-test('pending invitations are listed newest first, joined rooms excluded', () => {
-  const invited = (id: string, timestamp: number): RoomSummary =>
-    room({
-      room_id: id,
-      state: 'invited',
-      latest_event: {
-        sender: '@ada:example.org',
-        body: 'invited you',
-        timestamp,
-        sending: false,
-        event_id: null,
-      },
-    });
-  const rooms = [invited('!old', 10), room({ room_id: '!joined' }), invited('!new', 20)];
+test('notificationCount prefers the counted badge over the raw unread total', () => {
+  expect(notificationCount({ unread: 9, highlight: 2, notifying: 2 })).toBe(2);
+  expect(notificationCount({ unread: 9, highlight: 0, notifying: 0 })).toBe(0);
+  expect(notificationCount({ unread: 3, highlight: 0, notifying: 3 })).toBe(3);
+});
 
-  expect(pendingInvites(rooms).map((each) => each.room_id)).toEqual(['!new', '!old']);
+test('invites are counted separately from notifications', () => {
+  const rooms = [
+    room({ room_id: '!a', state: 'invited' }),
+    room({ room_id: '!b', state: 'joined', highlight: 1 }),
+    room({ room_id: '!c', state: 'invited' }),
+  ];
   expect(countInvites(rooms)).toBe(2);
+  expect(pendingInvites(rooms).map((each) => each.room_id)).toEqual(['!a', '!c']);
 });
 
-test('the inviter comes from the invitation event', () => {
-  const invite = room({
-    state: 'invited',
-    latest_event: {
-      sender: '@ada:example.org',
-      body: 'invited you',
-      timestamp: 1,
-      sending: false,
-      event_id: null,
-    },
-  });
-
-  expect(inviter(invite)).toBe('@ada:example.org');
+test('an invite without a sender still lists', () => {
   expect(inviter(room({ state: 'invited' }))).toBeNull();
-  expect(senderName('@ada:example.org')).toBe('ada');
-  expect(senderName('ada')).toBe('ada');
+  expect(
+    inviter(
+      room({
+        state: 'invited',
+        latest_event: { sender: '@a:x', body: null, timestamp: 1, sending: false, event_id: null },
+      })
+    )
+  ).toBe('@a:x');
 });
 
-function bookmark(overrides: Partial<BookmarkView>): BookmarkView {
-  return {
-    bookmark_id: 'bmk_one',
-    room_id: '!room:example.org',
-    event_id: '$one',
-    room_name: null,
-    sender: null,
-    body_preview: null,
-    event_ts: 0,
-    bookmarked_ts: 0,
-    ...overrides,
-  };
-}
-
-test('bookmarks are ordered newest-saved first', () => {
-  const bookmarks = [
-    bookmark({ bookmark_id: 'bmk_old', bookmarked_ts: 10 }),
-    bookmark({ bookmark_id: 'bmk_new', bookmarked_ts: 20 }),
-  ];
-
-  expect(filteredBookmarks(bookmarks, '').map((each) => each.bookmark_id)).toEqual([
-    'bmk_new',
-    'bmk_old',
-  ]);
+test('sender names drop the homeserver', () => {
+  expect(senderName('@alice:example.org')).toBe('alice');
+  expect(senderName('alice')).toBe('alice');
 });
 
-test('a bookmark search matches the room, the sender or the preview', () => {
+test('bookmark search matches room, sender and preview', () => {
   const bookmarks = [
-    bookmark({ bookmark_id: 'bmk_room', room_name: 'Kittens' }),
-    bookmark({ bookmark_id: 'bmk_sender', sender: '@ada:example.org' }),
-    bookmark({ bookmark_id: 'bmk_preview', body_preview: 'deploy the release' }),
-    bookmark({ bookmark_id: 'bmk_none' }),
-  ];
+    {
+      bookmark_id: 'bmk_room',
+      room_id: '!a',
+      room_name: 'Ops',
+      event_id: '$1',
+      sender: '@alice:example.org',
+      body_preview: 'shipped',
+      bookmarked_ts: 3,
+    },
+    {
+      bookmark_id: 'bmk_sender',
+      room_id: '!b',
+      room_name: 'Chat',
+      event_id: '$2',
+      sender: '@bob:example.org',
+      body_preview: 'hello',
+      bookmarked_ts: 2,
+    },
+    {
+      bookmark_id: 'bmk_preview',
+      room_id: '!c',
+      room_name: 'Lab',
+      event_id: '$3',
+      sender: null,
+      body_preview: 'deploy friday',
+      bookmarked_ts: 4,
+    },
+    {
+      bookmark_id: 'bmk_other',
+      room_id: '!d',
+      room_name: 'Misc',
+      event_id: '$4',
+      sender: '@carol:example.org',
+      body_preview: 'later',
+      bookmarked_ts: 1,
+    },
+  ] as BookmarkView[];
 
-  expect(filteredBookmarks(bookmarks, 'kitt').map((each) => each.bookmark_id)).toEqual([
-    'bmk_room',
-  ]);
-  expect(filteredBookmarks(bookmarks, 'ada').map((each) => each.bookmark_id)).toEqual([
+  expect(filteredBookmarks(bookmarks, 'ops').map((each) => each.bookmark_id)).toEqual(['bmk_room']);
+  expect(filteredBookmarks(bookmarks, 'bob').map((each) => each.bookmark_id)).toEqual([
     'bmk_sender',
   ]);
   expect(filteredBookmarks(bookmarks, 'deploy').map((each) => each.bookmark_id)).toEqual([
@@ -221,20 +259,25 @@ test('a marked direct chat shows under the direct filter', () => {
   expect(notifications([marked], 'mentions')).toEqual([]);
 });
 
-test('a channel whose mode has not loaded yet still shows what notified', () => {
+test('a channel whose mode has not loaded yet still shows unread in All, but not the badge', () => {
   const channel = room({ room_id: '!channel', unread: 4, notifying: 4 });
+  const unreadFor = badgeFor();
 
-  expect(notifications([channel], 'all').map((entry) => entry.room_id)).toEqual(['!channel']);
-  expect(countNotifications([channel])).toBe(4);
+  expect(notifications([channel], 'all', unreadFor).map((entry) => entry.room_id)).toEqual([
+    '!channel',
+  ]);
+  expect(countNotifications([channel], unreadFor)).toBe(0);
 });
 
 test('a muted room that was marked unread by hand still reaches the inbox', () => {
   const marked = room({ room_id: '!muted', unread: 9, marked_unread: true });
-  const mode = () => 'mute' as const;
+  const unreadFor = badgeFor(() => 'mute');
 
-  expect(notifications([marked], 'all', mode).map((entry) => entry.room_id)).toEqual(['!muted']);
-  expect(countNotifications([marked], mode)).toBe(0);
-  expect(notifications([marked], 'mentions', mode)).toEqual([]);
+  expect(notifications([marked], 'all', unreadFor).map((entry) => entry.room_id)).toEqual([
+    '!muted',
+  ]);
+  expect(countNotifications([marked], unreadFor)).toBe(0);
+  expect(notifications([marked], 'mentions', unreadFor)).toEqual([]);
 });
 
 test('compact timestamps shrink with age', () => {

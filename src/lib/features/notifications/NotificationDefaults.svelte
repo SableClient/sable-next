@@ -3,6 +3,11 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import {
+    type BadgeNotificationMode,
+    preferences,
+    setPreference,
+  } from '#lib/settings/preferences.svelte.js';
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -17,7 +22,15 @@
     mentions: 'room.notifyMentions',
   };
 
-  const rows: {
+  const badgeRows: {
+    key: 'badgeDefaultDirect' | 'badgeDefaultGroup';
+    label: string;
+  }[] = [
+    { key: 'badgeDefaultDirect', label: 'settings.notificationDefaultDirect' },
+    { key: 'badgeDefaultGroup', label: 'settings.notificationDefaultGroup' },
+  ];
+
+  const pushRows: {
     key: keyof DefaultNotificationModesView;
     label: string;
     direct: boolean;
@@ -60,7 +73,7 @@
     };
   });
 
-  function save(
+  function savePush(
     key: keyof DefaultNotificationModesView,
     isDirect: boolean,
     mode: NotificationModeView
@@ -83,14 +96,40 @@
   }
 </script>
 
-<section class="defaults settings-form" aria-labelledby="notification-defaults">
+<section class="defaults settings-form" aria-labelledby="notification-badges">
   <div class="settings-heading-row">
-    <h3 id="notification-defaults" data-settings-outline>
-      {$i18n.t('settings.notificationDefaults')}
+    <h3 id="notification-badges" data-settings-outline>
+      {$i18n.t('settings.notificationBadges')}
     </h3>
-    <SettingsAnchorLink anchor="notification-defaults" />
+    <SettingsAnchorLink anchor="notification-badges" />
   </div>
-  <p class="hint">{$i18n.t('settings.notificationDefaultsHint')}</p>
+  <p class="hint">{$i18n.t('settings.notificationBadgesHint')}</p>
+
+  <div class="rows">
+    {#each badgeRows as { key, label } (key)}
+      <label>
+        <span>{$i18n.t(label)}</span>
+        <Select
+          aria-label={`${$i18n.t('settings.notificationBadges')}: ${$i18n.t(label)}`}
+          value={preferences[key]}
+          items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
+          onValueChange={(value) => {
+            setPreference(key, value as BadgeNotificationMode);
+          }}
+        />
+      </label>
+    {/each}
+  </div>
+</section>
+
+<section class="defaults settings-form" aria-labelledby="notification-push">
+  <div class="settings-heading-row">
+    <h3 id="notification-push" data-settings-outline>
+      {$i18n.t('settings.notificationPush')}
+    </h3>
+    <SettingsAnchorLink anchor="notification-push" />
+  </div>
+  <p class="hint">{$i18n.t('settings.notificationPushHint')}</p>
 
   {#if failed}
     <Alert variant="warning" role="status">
@@ -99,16 +138,16 @@
   {/if}
 
   <div class="rows">
-    {#each rows as { key, label, direct } (key)}
+    {#each pushRows as { key, label, direct } (key)}
       <label>
         <span>{$i18n.t(label)}</span>
         {#if current}
           <Select
-            aria-label={$i18n.t(label)}
+            aria-label={`${$i18n.t('settings.notificationPush')}: ${$i18n.t(label)}`}
             value={current[key]}
             items={modes.map((mode) => ({ value: mode, label: $i18n.t(modeLabels[mode]) }))}
             onValueChange={(value) => {
-              save(key, direct, value as NotificationModeView);
+              savePush(key, direct, value as NotificationModeView);
             }}
           />
         {/if}

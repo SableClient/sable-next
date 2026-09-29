@@ -320,7 +320,7 @@
     countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).highlight, 0)
   );
   let notifyingTotal = $derived(
-    countedRooms.reduce((total, room) => total + roomList.notificationsFor(room).unread, 0)
+    countedRooms.reduce((total, room) => total + (roomList.badgeUnreadFor(room).notifying ?? 0), 0)
   );
 
   $effect(() => {
@@ -341,7 +341,7 @@
 
   $effect(() => {
     const state = faviconState(
-      countedRooms.some((room) => hasUnread(roomList.notificationsFor(room))),
+      countedRooms.some((room) => hasUnread(roomList.badgeUnreadFor(room))),
       unreadTotal > 0,
       preferences.faviconForMentionsOnly
     );

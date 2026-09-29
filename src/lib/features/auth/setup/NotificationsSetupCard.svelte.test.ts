@@ -20,7 +20,7 @@ vi.mock('#lib/settings/preferences.svelte.js', async (importOriginal) => ({
 import { core } from '#lib/core/__mocks__/context.js';
 
 const setDefaultNotificationMode = vi.fn(() => Promise.resolve());
-const defaultNotificationModes = vi.fn(() => Promise.resolve({ group: 'mentions', direct: 'all' }));
+const defaultNotificationModes = vi.fn(() => Promise.resolve({ group: 'all', direct: 'all' }));
 Object.assign(core, { setDefaultNotificationMode, defaultNotificationModes });
 
 import NotificationsSetupCard from './NotificationsSetupCard.svelte';
@@ -44,31 +44,31 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-test('mentions and keywords is the pre-selected group default, written to push rules', async () => {
+test('all messages is the pre-selected group default, written to push rules', async () => {
   const { user, onComplete } = await setup();
 
-  expect(radio(/Mentions and keywords/)).toBeChecked();
+  expect(radio(/All messages/)).toBeChecked();
   await user.click(continueButton());
   await vi.waitFor(() => {
     expect(onComplete).toHaveBeenCalledOnce();
   });
-  expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'mentions');
+  expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'all');
 });
 
-test('choosing all messages writes the spec default instead', async () => {
+test('choosing mentions writes mentions instead', async () => {
   const { user } = await setup();
 
-  await user.click(screen.getByRole('radio', { name: /All messages/ }));
+  await user.click(screen.getByRole('radio', { name: /Mentions and keywords/ }));
   await user.click(continueButton());
   await vi.waitFor(() => {
-    expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'all');
+    expect(setDefaultNotificationMode).toHaveBeenCalledWith(false, 'mentions');
   });
 });
 
 test('shows the account’s saved group choice', async () => {
-  defaultNotificationModes.mockResolvedValueOnce({ group: 'all', direct: 'all' });
+  defaultNotificationModes.mockResolvedValueOnce({ group: 'mentions', direct: 'all' });
   await setup();
-  expect(radio(/All messages/)).toBeChecked();
+  expect(radio(/Mentions and keywords/)).toBeChecked();
 });
 
 test('an account that already chose only asks this device for its permission', async () => {

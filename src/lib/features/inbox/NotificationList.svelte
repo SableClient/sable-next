@@ -42,7 +42,7 @@
   onDestroy(() => feed.dispose());
   const marking = new SvelteSet<string>();
   const readNow = new SvelteSet<string>();
-  const filters: readonly NotificationFilter[] = ['all', 'mentions', 'direct'];
+  const filters: readonly NotificationFilter[] = ['direct', 'mentions', 'all'];
   const filterLabels: Record<NotificationFilter, string> = {
     all: 'inbox.filterAll',
     mentions: 'inbox.filterMentions',

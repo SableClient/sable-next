@@ -11,7 +11,7 @@
   import {
     addUnread,
     spacesContainingRoom,
-    spaceUnreadCounts,
+    spaceUnreadTotals,
     type UnreadCount,
   } from '#lib/rooms/spaces.js';
   import { hasUnread } from '#lib/rooms/unread.js';
@@ -95,9 +95,7 @@
     )
   );
   let callRoom = $derived(roomList.byId(call.roomId));
-  let spaceUnread = $derived(
-    spaceUnreadCounts(spaces, roomList.rooms, roomList.notificationModeOf, roomList.quietRoomIds)
-  );
+  let spaceUnread = $derived(spaceUnreadTotals(spaces, roomList.rooms, roomList.badgeUnreadFor));
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
   );

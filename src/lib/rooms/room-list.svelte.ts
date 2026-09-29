@@ -12,11 +12,14 @@ import { applyDiffs } from '#src/transport';
 import { bufferSubscription } from '#lib/core/buffered-subscription.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { quietTargets } from './quiet-rooms.svelte.js';
 import { readRoomListSnapshot, writeRoomListSnapshot } from './room-list-snapshot.js';
 import { quietRoomIds } from './spaces.js';
 import {
+  applyBadgeMode,
+  badgeModeFor,
   type NotificationModeResolver,
   quietUnread,
   roomNotifications,
@@ -139,7 +142,14 @@ export class RoomList {
 
   readonly badgeUnreadFor: RoomUnread = (room) => {
     const counts = this.unreadFor(room);
-    return this.quietRoomIds.has(room.room_id) ? quietUnread(counts) : counts;
+    if (this.quietRoomIds.has(room.room_id)) return quietUnread(counts);
+    return applyBadgeMode(
+      counts,
+      badgeModeFor(room, this.notificationOverride(room.room_id), {
+        direct: preferences.badgeDefaultDirect,
+        group: preferences.badgeDefaultGroup,
+      })
+    );
   };
 
   readonly notificationsFor: RoomUnread = (room) =>

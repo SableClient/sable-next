@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { NotificationModeView, RoomSummary } from '#src/generated/protocol';
 
-import { hasUnread, roomNotifications, roomUnread } from './unread';
+import { applyBadgeMode, badgeModeFor, hasUnread, roomNotifications, roomUnread } from './unread';
 
 function room(overrides: Partial<RoomSummary> = {}): RoomSummary {
   return {
@@ -145,4 +145,40 @@ test('an unread count carries how much of it notified', () => {
   expect(roomUnread(room({ unread: 6 }), 'mentions').notifying).toBe(0);
   expect(roomUnread(room({ unread: 9, notifying: 2, highlight: 2 }), 'mentions').notifying).toBe(2);
   expect(roomUnread(room({ unread: 9, notifying: 2, highlight: 2 }), 'mute').notifying).toBe(0);
+});
+
+test('badge mentions mode keeps unread but drops the counted badge', () => {
+  const loud = roomUnread(room({ unread: 6, notifying: 6, highlight: 1 }), 'all');
+  expect(applyBadgeMode(loud, 'mentions')).toEqual({
+    unread: 6,
+    highlight: 1,
+    marked: false,
+    notifying: 0,
+  });
+});
+
+test('badge all mode promotes quiet unread into a counted badge', () => {
+  const quiet = roomUnread(room({ unread: 6, notifying: 0 }), 'mentions');
+  expect(applyBadgeMode(quiet, 'all')).toEqual({
+    unread: 6,
+    highlight: 0,
+    marked: false,
+    notifying: 6,
+  });
+});
+
+test('badge mode follows a room override before the local default', () => {
+  expect(badgeModeFor({ is_direct: false }, null, { direct: 'all', group: 'mentions' })).toBe(
+    'mentions'
+  );
+  expect(badgeModeFor({ is_direct: true }, null, { direct: 'all', group: 'mentions' })).toBe('all');
+  expect(badgeModeFor({ is_direct: false }, 'all', { direct: 'all', group: 'mentions' })).toBe(
+    'all'
+  );
+  expect(badgeModeFor({ is_direct: true }, 'mentions', { direct: 'all', group: 'mentions' })).toBe(
+    'mentions'
+  );
+  expect(badgeModeFor({ is_direct: false }, 'mute', { direct: 'all', group: 'mentions' })).toBe(
+    'mute'
+  );
 });
