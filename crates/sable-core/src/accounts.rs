@@ -636,7 +636,20 @@ impl Core {
         self.watch_bridged_dms(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
-        self.watch_search_index(&client);
+        let store_id = self
+            .accounts
+            .lock()
+            .await
+            .as_ref()
+            .and_then(|registry| {
+                registry
+                    .accounts
+                    .iter()
+                    .find(|account| account.account_id == account_id)
+                    .map(|account| account.store_id.clone())
+            })
+            .unwrap_or_else(|| self.store_id.clone());
+        self.watch_search_index(&client, &store_id);
         self.watch_ignored_users(&client);
         sync_service.start().await;
 

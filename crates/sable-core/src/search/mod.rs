@@ -1,4 +1,6 @@
 mod crawl;
+#[cfg(target_family = "wasm")]
+mod idb;
 mod persist;
 mod server;
 mod tokenize;
@@ -60,9 +62,9 @@ const CLASSIFIED_OVERHEAD: usize = 96;
 const PINNED_FETCH_CONCURRENCY: usize = 4;
 
 const INITIAL_DOCUMENTS: usize = 64;
-const PERSIST_INTERVAL: Duration = Duration::from_secs(20);
+const PERSIST_INTERVAL: Duration = Duration::from_secs(60);
 const CHANGES_BEFORE_FLUSH: usize = 32;
-const TICKS_BEFORE_FLUSH: u32 = 15;
+const TICKS_BEFORE_FLUSH: u32 = 5;
 const CHUNK_WEIGHT: usize = 8_000;
 const DOCUMENT_WEIGHT: usize = 8;
 
@@ -2769,14 +2771,23 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_search_index(self: &Arc<Self>, client: &matrix_sdk::Client) {
+    #[cfg_attr(not(target_family = "wasm"), allow(unused_variables))]
+    pub(crate) fn watch_search_index(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        store_id: &str,
+    ) {
         let core = self.clone();
         let client = client.clone();
+        #[cfg(target_family = "wasm")]
+        let store_id = store_id.to_owned();
 
         self.track_session_task(
             spawn(async move {
                 let mut updates = client.event_cache().subscribe_to_room_generic_updates();
 
+                #[cfg(target_family = "wasm")]
+                persist::attach(&client, &store_id).await;
                 core.restore_persisted_index(&client).await;
                 core.prime_persisted_rooms(&client).await;
 
@@ -3539,7 +3550,7 @@ mod tests {
         );
         core.foreground_paginations
             .store(1, std::sync::atomic::Ordering::Relaxed);
-        core.watch_search_index(&client);
+        core.watch_search_index(&client, "");
         wait_for_hits(&core, &room_id, "latest", 1).await;
 
         let history = (0..300)

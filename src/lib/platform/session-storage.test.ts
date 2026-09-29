@@ -108,10 +108,12 @@ test('derives every account store when database listing is unavailable', async (
     'sable-next::matrix-sdk-state',
     'sable-next::event_cache',
     'sable-next::media',
+    'sable-next::sable-search',
     'sable-next-account-a1',
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::sable-search',
   ]);
 });
 
@@ -134,6 +136,7 @@ test('deletes every store of the signed-out account, crypto included', async () 
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
     'sable-next-account-a10::matrix-sdk-state',
@@ -147,6 +150,7 @@ test('deletes every store of the signed-out account, crypto included', async () 
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
   ]);
@@ -162,6 +166,7 @@ test('derives the account stores when database listing is unavailable', async ()
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
   ]);

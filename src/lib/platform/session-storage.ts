@@ -5,7 +5,13 @@ const SESSION_KEY = 'current';
 
 const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
-const CACHE_DATABASE_SUFFIXES = ['', '::matrix-sdk-state', '::event_cache', '::media'];
+const CACHE_DATABASE_SUFFIXES = [
+  '',
+  '::matrix-sdk-state',
+  '::event_cache',
+  '::media',
+  '::sable-search',
+];
 const CRYPTO_DATABASE_SUFFIX = '::matrix-sdk-crypto';
 const CRYPTO_META_DATABASE_SUFFIX = '::matrix-sdk-crypto-meta';
 const CRYPTO_CORE_STORE = 'core';

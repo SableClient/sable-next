@@ -44,6 +44,7 @@ rust-stemmers = "1.2"
 html-escape = "0.2"
 linkify = "0.11"
 regex-lite = "0.1"
+miniz_oxide = { version = "0.9.1", default-features = false, features = ["with-alloc"] }
 time = "0.3"
 base64 = "0.23"
 sha2 = "0.11"
@@ -74,7 +75,20 @@ matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/matrix-or
 ] }
 matrix-sdk-ui = { workspace = true, features = ["js"] }
 tokio = { version = "1", default-features = false, features = ["sync", "macros"] }
+wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+  "IdbDatabase",
+  "IdbFactory",
+  "IdbObjectStore",
+  "IdbOpenDbRequest",
+  "IdbRequest",
+  "IdbTransaction",
+  "IdbTransactionMode",
+  "DomException",
+  "DomStringList",
+] }
 getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]

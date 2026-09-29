@@ -18,11 +18,11 @@ use crate::protocol::{
 
 const CRAWL_BATCH: u16 = 100;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
-const CRAWL_READABLE_PAUSE: Duration = Duration::from_millis(500);
+const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(2);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 200_000;
-const CRAWL_TRICKLE_PAUSE: Duration = Duration::from_secs(5);
+const CRAWL_TRICKLE_PAUSE: Duration = Duration::from_secs(10);
 const BLIND_EVENTS_BEFORE_SKIP: usize = 200;
 const CRAWL_BACKOFF_CAP: Duration = Duration::from_mins(5);
 const PUSHBACKS_BEFORE_SKIP: u32 = 5;

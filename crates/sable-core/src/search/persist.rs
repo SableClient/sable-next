@@ -134,15 +134,131 @@ enum Read<T> {
     Unparsable,
 }
 
+const ZLIB_HEADER: u8 = 0x78;
+const COMPRESSION_LEVEL: u8 = 6;
+
+fn encode(json: &[u8]) -> Vec<u8> {
+    miniz_oxide::deflate::compress_to_vec_zlib(json, COMPRESSION_LEVEL)
+}
+
+fn decode(bytes: Vec<u8>) -> Result<Vec<u8>, String> {
+    if bytes.first() == Some(&ZLIB_HEADER) {
+        miniz_oxide::inflate::decompress_to_vec_zlib(&bytes).map_err(|error| error.to_string())
+    } else {
+        Ok(bytes)
+    }
+}
+
+async fn seam_get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    client
+        .state_store()
+        .get_custom_value(key)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+async fn seam_put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+    client
+        .state_store()
+        .set_custom_value_no_read(key, bytes)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+async fn seam_delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+    client
+        .state_store()
+        .remove_custom_value(key)
+        .await
+        .map(drop)
+        .map_err(|error| error.to_string())
+}
+
+#[cfg(target_family = "wasm")]
+fn text_key(key: &[u8]) -> Result<&str, String> {
+    std::str::from_utf8(key).map_err(|error| error.to_string())
+}
+
+#[cfg(target_family = "wasm")]
+async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    let database = match super::idb::attached(client) {
+        super::idb::Attached::Open(database) => database,
+        super::idb::Attached::Closed => return Err("the search database is closed".to_owned()),
+        super::idb::Attached::Detached => return seam_get(client, key).await,
+    };
+    let text = text_key(key)?;
+    if let Some(bytes) = super::idb::get(&database, text).await? {
+        return Ok(Some(bytes));
+    }
+    let Some(bytes) = seam_get(client, key).await? else {
+        return Ok(None);
+    };
+    if super::idb::put(&database, text, &bytes).await.is_ok()
+        && let Err(error) = seam_delete(client, key).await
+    {
+        warn!(key = text, "dropping migrated search data failed: {error}");
+    }
+    Ok(Some(bytes))
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn get(client: &matrix_sdk::Client, key: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    seam_get(client, key).await
+}
+
+#[cfg(target_family = "wasm")]
+async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+    match super::idb::attached(client) {
+        super::idb::Attached::Open(database) => {
+            super::idb::put(&database, text_key(key)?, &bytes).await
+        }
+        super::idb::Attached::Closed => Err("the search database is closed".to_owned()),
+        super::idb::Attached::Detached => seam_put(client, key, bytes).await,
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn put(client: &matrix_sdk::Client, key: &[u8], bytes: Vec<u8>) -> Result<(), String> {
+    seam_put(client, key, bytes).await
+}
+
+#[cfg(target_family = "wasm")]
+async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+    match super::idb::attached(client) {
+        super::idb::Attached::Open(database) => {
+            super::idb::delete(&database, text_key(key)?).await?;
+            seam_delete(client, key).await
+        }
+        super::idb::Attached::Closed => Err("the search database is closed".to_owned()),
+        super::idb::Attached::Detached => seam_delete(client, key).await,
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn delete(client: &matrix_sdk::Client, key: &[u8]) -> Result<(), String> {
+    seam_delete(client, key).await
+}
+
+#[cfg(target_family = "wasm")]
+pub(super) async fn attach(client: &matrix_sdk::Client, store_id: &str) {
+    if let Err(error) = super::idb::attach(client, store_id).await {
+        warn!("opening the search database failed, using the state store: {error}");
+    }
+}
+
 async fn read<T: DeserializeOwned>(client: &matrix_sdk::Client, key: &[u8]) -> Read<T> {
-    match client.state_store().get_custom_value(key).await {
-        Ok(Some(bytes)) => match serde_json::from_slice(&bytes) {
+    match get(client, key).await.map(|bytes| bytes.map(decode)) {
+        Ok(Some(Ok(bytes))) => match serde_json::from_slice(&bytes) {
             Ok(value) => Read::Found(value),
             Err(error) => {
                 warn!(key = %String::from_utf8_lossy(key), "persisted search data did not parse: {error}");
                 Read::Unparsable
             }
         },
+        Ok(Some(Err(error))) => {
+            warn!(key = %String::from_utf8_lossy(key), "persisted search data did not decompress: {error}");
+            Read::Unparsable
+        }
         Ok(None) => Read::Absent,
         Err(error) => {
             warn!(key = %String::from_utf8_lossy(key), "reading persisted search data failed: {error}");
@@ -152,20 +268,15 @@ async fn read<T: DeserializeOwned>(client: &matrix_sdk::Client, key: &[u8]) -> R
 }
 
 async fn write(client: &matrix_sdk::Client, key: &[u8], value: &impl Serialize) -> Option<usize> {
-    let bytes = match serde_json::to_vec(value) {
-        Ok(bytes) => bytes,
+    let json = match serde_json::to_vec(value) {
+        Ok(json) => json,
         Err(error) => {
             warn!(key = %String::from_utf8_lossy(key), "serialising search data failed: {error}");
             return None;
         }
     };
-    let written = bytes.len();
-    match client
-        .state_store()
-        .set_custom_value_no_read(key, bytes)
-        .await
-    {
-        Ok(()) => Some(written),
+    match put(client, key, encode(&json)).await {
+        Ok(()) => Some(json.len()),
         Err(error) => {
             warn!(key = %String::from_utf8_lossy(key), "persisting search data failed: {error}");
             None
@@ -174,8 +285,8 @@ async fn write(client: &matrix_sdk::Client, key: &[u8], value: &impl Serialize) 
 }
 
 async fn remove(client: &matrix_sdk::Client, key: &[u8]) -> bool {
-    match client.state_store().remove_custom_value(key).await {
-        Ok(_) => true,
+    match delete(client, key).await {
+        Ok(()) => true,
         Err(error) => {
             warn!(key = %String::from_utf8_lossy(key), "dropping persisted search data failed: {error}");
             false
@@ -357,9 +468,16 @@ pub(super) struct StoredCrawlRoom {
 }
 
 pub(super) async fn load_crawl(client: &matrix_sdk::Client) -> StoredCrawl {
-    let bytes = match client.state_store().get_custom_value(&crawl_key()).await {
-        Ok(Some(bytes)) => bytes,
+    let bytes = match get(client, &crawl_key())
+        .await
+        .map(|bytes| bytes.map(decode))
+    {
+        Ok(Some(Ok(bytes))) => bytes,
         Ok(None) => return StoredCrawl::default(),
+        Ok(Some(Err(error))) => {
+            warn!("discarding crawl checkpoints that did not decompress: {error}");
+            return StoredCrawl::default();
+        }
         Err(error) => {
             warn!("reading the persisted crawl checkpoints failed: {error}");
             return StoredCrawl::default();
@@ -392,19 +510,15 @@ pub(super) async fn save_crawl(
         version: CRAWL_SCHEMA,
         rooms,
     };
-    let bytes = match serde_json::to_vec(&stored) {
-        Ok(bytes) => bytes,
+    let json = match serde_json::to_vec(&stored) {
+        Ok(json) => json,
         Err(error) => {
             warn!("serialising the crawl checkpoints failed: {error}");
             return false;
         }
     };
 
-    match client
-        .state_store()
-        .set_custom_value_no_read(&crawl_key(), bytes)
-        .await
-    {
+    match put(client, &crawl_key(), encode(&json)).await {
         Ok(()) => true,
         Err(error) => {
             warn!("persisting the crawl checkpoints failed: {error}");
@@ -415,11 +529,32 @@ pub(super) async fn save_crawl(
 
 #[must_use]
 pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
-    match client.state_store().remove_custom_value(&crawl_key()).await {
-        Ok(_) => true,
+    match delete(client, &crawl_key()).await {
+        Ok(()) => true,
         Err(error) => {
             warn!("dropping the persisted crawl checkpoints failed: {error}");
             false
         }
+    }
+}
+
+#[cfg(test)]
+mod codec_tests {
+    use super::{decode, encode};
+
+    #[test]
+    fn a_compressed_value_reads_back_and_shrinks() {
+        let json = br#"{"version":5,"documents":[]}"#.repeat(200);
+        let stored = encode(&json);
+        assert!(stored.len() < json.len() / 4);
+        assert_eq!(decode(stored), Ok(json));
+    }
+
+    #[test]
+    fn a_value_written_before_compression_passes_through() {
+        let object = br#"{"version":5}"#.to_vec();
+        let list = br#"["!a:b"]"#.to_vec();
+        assert_eq!(decode(object.clone()), Ok(object));
+        assert_eq!(decode(list.clone()), Ok(list));
     }
 }
