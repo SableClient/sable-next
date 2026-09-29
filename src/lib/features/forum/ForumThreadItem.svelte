@@ -87,6 +87,7 @@
 <li class="forum-thread-item">
   <article
     class:pressed={rowPress.pressing}
+    class:unread={thread.unread}
     class="forum-thread-card"
     onpointerdown={rowPress.start}
     onpointermove={rowPress.move}
@@ -151,17 +152,22 @@
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: var(--space-200);
+    gap: var(--space-300);
     min-width: 0;
-    padding: var(--space-200) var(--space-400) var(--space-400);
+    padding: var(--space-300) var(--space-400);
   }
 
   .forum-thread-card {
     align-items: center;
     background: var(--surface-var-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-400);
     display: flex;
     position: relative;
+  }
+
+  .forum-thread-card.unread {
+    box-shadow: inset 0.1875rem 0 0 var(--primary-main);
   }
 
   .forum-thread-card:has(.forum-thread-button:hover),
@@ -199,6 +205,7 @@
     background: none;
     border: 0;
     border-radius: var(--radius);
+    border-top: var(--border-width) solid var(--bg-container-line);
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
@@ -206,7 +213,7 @@
     font-size: var(--font-size-small);
     gap: var(--space-300);
     overflow: hidden;
-    padding: 0;
+    padding: var(--space-200) 0 0;
     text-align: start;
   }
 
@@ -219,6 +226,11 @@
     border-radius: var(--radius-pill);
     flex: 0 0 auto;
     padding: var(--space-050) var(--space-200);
+  }
+
+  .forum-thread-card.unread .forum-thread-replies {
+    background: var(--primary-container);
+    color: var(--primary-on-container);
   }
 
   .forum-thread-last {
