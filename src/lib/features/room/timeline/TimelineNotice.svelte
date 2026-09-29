@@ -65,6 +65,14 @@
     const key = reactionKey(content.content);
     return key !== null && isCustomReaction(key) ? key : null;
   });
+  let redactedReaction = $derived.by((): boolean => {
+    const content = item.content;
+    return (
+      content.kind === 'hidden_event' &&
+      content.event_type === 'm.reaction' &&
+      reactionKey(content.content) === null
+    );
+  });
   let targetAbove = $derived(preferences.replyPreviewStyle !== 'expanded');
   let pins = $derived.by(() => {
     const content = item.content;
@@ -138,6 +146,15 @@
       <StateContentDiff before={item.content.prev_content} after={item.content.content} />
     </div>
   {/if}
+{:else if item.content.kind === 'redacted' || redactedReaction}
+  <p class="state redacted">
+    {@render stateGutter()}
+    <span class="redacted-label">
+      {item.content.kind === 'redacted' && item.content.reason
+        ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
+        : $i18n.t('timeline.redacted')}
+    </span>
+  </p>
 {:else if hiddenTarget !== null}
   {#if targetAbove}{@render targetDetail(hiddenTarget)}{/if}
   <p class="state">
@@ -204,15 +221,6 @@
   {:else}
     <p class="read-marker"><span>{$i18n.t('timeline.readMarker')}</span></p>
   {/if}
-{:else}
-  <p class="state redacted">
-    {@render stateGutter()}
-    <span class="redacted-label">
-      {item.content.kind === 'redacted' && item.content.reason
-        ? $i18n.t('timeline.redactedWithReason', { reason: item.content.reason })
-        : $i18n.t('timeline.redacted')}
-    </span>
-  </p>
 {/if}
 
 <style>

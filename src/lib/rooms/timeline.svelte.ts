@@ -346,9 +346,13 @@ export class RoomTimeline {
         this.settleBackwardPagination();
       }
       if (event.type === 'timeline_aggregations') {
-        const known = this.aggregations.map((item) => item.id);
-        const added = event.items.filter((item) => !known.includes(item.id));
-        if (added.length > 0) this.aggregations = [...this.aggregations, ...added];
+        const next = [...this.aggregations];
+        for (const item of event.items) {
+          const index = next.findIndex((entry) => entry.id === item.id);
+          if (index === -1) next.push(item);
+          else next[index] = item;
+        }
+        if (event.items.length > 0) this.aggregations = next;
       }
       if (event.type === 'timeline_pagination' && this.mode.kind === 'live') {
         if (event.loading || !this.backwardPaginationPending) {

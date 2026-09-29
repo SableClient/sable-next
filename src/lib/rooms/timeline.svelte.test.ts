@@ -131,6 +131,30 @@ test('a reload drops the aggregations older than what it kept, and a page brings
   expect(timeline.aggregations.map((entry) => entry.id)).toEqual(['new-reaction', 'old-reaction']);
 });
 
+test('an updated aggregation replaces the previous version of the event', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org');
+  const reaction = {
+    ...item('reaction'),
+    content: {
+      kind: 'hidden_event',
+      event_type: 'm.reaction',
+      content: { 'm.relates_to': { event_id: '$initial', key: '👍', rel_type: 'm.annotation' } },
+      redacts: null,
+    },
+  } as TimelineItemView;
+  const redacted = {
+    ...reaction,
+    content: { kind: 'hidden_event', event_type: 'm.reaction', content: {}, redacts: null },
+  } as TimelineItemView;
+
+  core.emit({ type: 'timeline_aggregations', subscription: 1, items: [reaction] });
+  core.emit({ type: 'timeline_aggregations', subscription: 1, items: [redacted] });
+
+  expect(timeline.aggregations).toEqual([redacted]);
+});
+
 test('opens a permalink as a focused timeline without live pagination', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
