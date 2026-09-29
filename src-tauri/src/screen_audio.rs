@@ -48,13 +48,40 @@ impl Default for Selection {
 }
 
 fn app_name(props: &DictRef) -> Option<String> {
-    if props.get(SELF_MARKER_KEY).is_some() {
+    if props.get(SELF_MARKER_KEY).is_some() || is_own_process(props) {
         return None;
     }
     props
         .get("application.name")
         .or_else(|| props.get("node.name"))
         .map(str::to_owned)
+}
+
+fn is_own_process(props: &DictRef) -> bool {
+    let Some(mut pid) = ["pipewire.sec.pid", "application.process.id"]
+        .into_iter()
+        .find_map(|key| props.get(key)?.parse::<u32>().ok())
+    else {
+        return false;
+    };
+    let own_pid = std::process::id();
+
+    loop {
+        if pid == own_pid {
+            return true;
+        }
+        let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) else {
+            return false;
+        };
+        let Some(parent) = stat
+            .rsplit_once(')')
+            .and_then(|(_, fields)| fields.split_whitespace().nth(1))
+            .and_then(|parent| parent.parse().ok())
+        else {
+            return false;
+        };
+        pid = parent;
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -407,7 +434,7 @@ pub(crate) fn stop() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Graph, Selection, Side, sides};
+    use super::{Graph, Selection, Side, app_name, pw, sides};
 
     fn graph(selection: Selection) -> Graph {
         let mut graph = Graph {
@@ -494,5 +521,16 @@ mod tests {
                 include: vec!["Spotify".into()]
             }
         );
+    }
+
+    #[test]
+    fn leaves_out_unmarked_audio_from_our_process() {
+        let pid = std::process::id().to_string();
+        let props = pw::properties::properties! {
+            "application.name" => "Sable",
+            "application.process.id" => pid.as_str(),
+        };
+
+        assert_eq!(app_name(props.dict()), None);
     }
 }
