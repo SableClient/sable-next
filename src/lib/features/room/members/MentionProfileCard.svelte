@@ -848,10 +848,6 @@
     width: 100%;
   }
 
-  :global(.profile-card-sheet .profile-card-actions) {
-    --profile-action-size: 2.75rem;
-  }
-
   :global(.profile-action svg) {
     color: var(--profile-icon, var(--sec-main));
     flex: none;
