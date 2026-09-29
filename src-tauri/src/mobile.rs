@@ -45,6 +45,11 @@ pub fn set_navigation_bar_light(light: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn set_system_bars_hidden(hidden: bool) -> Result<(), String> {
+    call_activity_bool("setSystemBarsHiddenNative", hidden)
+}
+
+#[tauri::command]
 pub fn haptic_feedback(strong: bool) -> Result<(), String> {
     call_activity_bool("hapticFeedbackNative", strong)
 }

@@ -154,7 +154,7 @@ fn space_child_ties_follow_ruma_room_id_order() {
 }
 
 #[tokio::test]
-async fn event_focus_keeps_its_explicit_sync_subscription_after_unsubscribing() {
+async fn event_focus_clears_its_explicit_sync_subscription_after_unsubscribing() {
     use crate::protocol::TimelineFocusView;
     use futures_util::StreamExt;
     use matrix_sdk::{ruma::event_id, test_utils::mocks::RoomContextResponseTemplate};
@@ -227,10 +227,7 @@ async fn event_focus_keeps_its_explicit_sync_subscription_after_unsubscribing() 
         .find(|request| request.method == "POST" && request.url.path().contains("sync"))
         .unwrap();
     let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
-    assert_eq!(
-        body["room_subscriptions"][room_id.as_str()]["timeline_limit"],
-        20
-    );
+    assert!(body["room_subscriptions"].get(room_id.as_str()).is_none());
 }
 
 #[tokio::test]
@@ -341,6 +338,57 @@ async fn cached_image_packs_return_without_waiting_for_room_state() {
     .expect("cached emotes do not wait for the server")
     .unwrap();
     let CommandOk::ImagePacks { packs, .. } = response else {
+        panic!("wrong response")
+    };
+    assert_eq!(packs.len(), 1);
+    assert_eq!(packs[0].id, "cached");
+    assert!(
+        !server
+            .server()
+            .received_requests()
+            .await
+            .unwrap()
+            .iter()
+            .any(|request| request.url.path().ends_with("/state"))
+    );
+}
+
+#[tokio::test]
+async fn all_image_packs_return_without_waiting_for_room_state() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!cached-all-packs:example.org");
+    let pack = json!({
+        "type": "im.ponies.room_emotes", "state_key": "cached", "sender": "@alice:example.org",
+        "event_id": "$cached-pack", "origin_server_ts": 1,
+        "content": {"images": {"wave": {"url": "mxc://example.org/wave"}}}
+    });
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_state_event(Raw::new(&pack).unwrap().cast_unchecked()),
+        )
+        .await;
+    Mock::given(method("GET"))
+        .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_delay(std::time::Duration::from_secs(2))
+                .set_body_json(json!([pack])),
+        )
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+
+    let response = tokio::time::timeout(
+        std::time::Duration::from_millis(500),
+        core.dispatch(Command::AllImagePacks),
+    )
+    .await
+    .expect("settings packs do not wait for the homeserver")
+    .unwrap();
+    let CommandOk::AllImagePacks { packs } = response else {
         panic!("wrong response")
     };
     assert_eq!(packs.len(), 1);
@@ -1360,4 +1408,107 @@ async fn account_data_types_include_what_the_server_lists_but_sync_never_deliver
             .iter()
             .any(|event_type| event_type == "org.example.legacy")
     );
+}
+
+#[allow(clippy::unwrap_used)]
+async fn last_put_body(server: &MatrixMockServer, event_type: &str) -> serde_json::Value {
+    let requests = server.server().received_requests().await.unwrap();
+    let request = requests
+        .iter()
+        .rev()
+        .find(|request| {
+            request.method.as_str() == "PUT" && request.url.path().ends_with(event_type)
+        })
+        .unwrap();
+    serde_json::from_slice(&request.body).unwrap()
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
+    use matrix_sdk_base::crypto::secret_storage::SecretStorageKey;
+
+    use crate::protocol::SealStateView;
+    use crate::sealed_account_data::{ADK_SECRET, cached_key, is_sealed};
+
+    const DRAFTS: &str = "moe.sable.next.drafts";
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let key = SecretStorageKey::new();
+    let user_id = client.user_id().unwrap().to_owned();
+    server
+        .mock_get_default_secret_storage_key()
+        .ok(&user_id, key.key_id())
+        .mount()
+        .await;
+    server
+        .mock_get_secret_storage_key()
+        .ok(&user_id, key.event_content())
+        .mount()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(format!(
+            r"/account_data/{}$",
+            regex_lite::escape(ADK_SECRET)
+        )))
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({
+            "errcode": "M_NOT_FOUND",
+            "error": "not found",
+        })))
+        .mount(server.server())
+        .await;
+    Mock::given(method("PUT"))
+        .and(path_regex(r"/account_data/"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .mount(server.server())
+        .await;
+    let core = core(&server, client.clone()).await;
+
+    assert!(matches!(
+        core.dispatch(Command::SetSealedAccountData {
+            event_type: "m.push_rules".to_owned(),
+            content: json!({}),
+        })
+        .await,
+        Err(CommandErr::Unsupported)
+    ));
+
+    core.adopt_account_data_key(&client, &key.to_base58()).await;
+
+    assert!(cached_key(&client).await.is_some());
+    let stored = last_put_body(&server, ADK_SECRET).await;
+    assert!(stored["encrypted"][key.key_id()]["ciphertext"].is_string());
+
+    let draft = json!({ "v": 1, "drafts": { "!room:example.org": "unsent" } });
+    core.dispatch(Command::SetSealedAccountData {
+        event_type: DRAFTS.to_owned(),
+        content: draft.clone(),
+    })
+    .await
+    .unwrap();
+    let sealed = last_put_body(&server, DRAFTS).await;
+    assert!(is_sealed(&sealed));
+    assert!(!sealed.to_string().contains("unsent"));
+
+    Mock::given(method("GET"))
+        .and(path_regex(format!(
+            r"/account_data/{}$",
+            regex_lite::escape(DRAFTS)
+        )))
+        .respond_with(ResponseTemplate::new(200).set_body_json(sealed))
+        .mount(server.server())
+        .await;
+    let Ok(CommandOk::SealedAccountData { document }) = core
+        .dispatch(Command::SealedAccountData {
+            event_type: DRAFTS.to_owned(),
+        })
+        .await
+    else {
+        panic!("the sealed drafts could not be read");
+    };
+
+    assert_eq!(document.state, SealStateView::Sealed);
+    assert_eq!(document.content, Some(draft));
+    assert!(document.can_seal);
 }

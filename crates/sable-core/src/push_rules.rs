@@ -15,6 +15,7 @@ use matrix_sdk::ruma::push::{
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{RwLock, broadcast};
 
+use crate::notifications::RoomShape;
 use crate::protocol::{
     DefaultNotificationModesView, KeywordNotificationView, MentionNotificationModeView,
     MentionNotificationsView, MentionRuleView, NotificationModeView, NotificationSettingsView,
@@ -251,28 +252,100 @@ fn targets_room(conditions: &[PushCondition], room_id: &RoomId) -> bool {
     })
 }
 
-#[must_use]
-pub fn room_mode(rules: &Ruleset, room_id: &RoomId) -> Option<NotificationModeView> {
-    let muted = rules.override_.iter().any(|rule| {
+fn muted(rules: &Ruleset, room_id: &RoomId) -> bool {
+    rules.override_.iter().any(|rule| {
         !rule.default
             && rule.enabled
             && !notifies(&rule.actions)
             && targets_room(&rule.conditions, room_id)
-    });
-    if muted {
-        return Some(NotificationModeView::Mute);
-    }
+    })
+}
+
+fn room_rule<'a>(rules: &'a Ruleset, room_id: &RoomId) -> Option<&'a [Action]> {
     rules
         .room
         .iter()
         .find(|rule| rule.enabled && rule.rule_id == *room_id)
-        .map(|rule| {
-            if notifies(&rule.actions) {
-                NotificationModeView::All
-            } else {
-                NotificationModeView::Mentions
+        .map(|rule| rule.actions.as_slice())
+}
+
+fn same_actions(left: Option<&[Action]>, right: &[Action]) -> bool {
+    left.is_some_and(|left| serde_json::to_value(left).ok() == serde_json::to_value(right).ok())
+}
+
+fn direct_default_actions(mode: NotificationModeView) -> Vec<Action> {
+    match mode {
+        NotificationModeView::All => spec_actions(true),
+        NotificationModeView::Mentions | NotificationModeView::Mute => vec![],
+    }
+}
+
+#[must_use]
+pub fn bridged_room_mode(rules: &Ruleset, room_id: &RoomId) -> Option<NotificationModeView> {
+    let follows = !muted(rules, room_id)
+        && same_actions(
+            room_rule(rules, room_id),
+            &direct_default_actions(default_mode(rules, true)),
+        );
+    if follows {
+        None
+    } else {
+        room_mode(rules, room_id)
+    }
+}
+
+#[must_use]
+pub fn plan_bridged_dms(
+    before: &Ruleset,
+    after: &Ruleset,
+    bridged: &[OwnedRoomId],
+) -> Vec<RuleWrite> {
+    let direct = default_mode(after, true);
+    let target = (direct != default_mode(after, false)).then(|| direct_default_actions(direct));
+    let followed = direct_default_actions(default_mode(before, true));
+    let mut writes = Vec::new();
+    for room_id in bridged {
+        if muted(after, room_id) {
+            continue;
+        }
+        let current = room_rule(after, room_id);
+        if current.is_some() && !same_actions(current, &followed) {
+            continue;
+        }
+        match (&target, current) {
+            (Some(actions), current) if !same_actions(current, actions) => {
+                writes.push(RuleWrite::Put(NewPushRule::Room(NewSimplePushRule::new(
+                    room_id.clone(),
+                    actions.clone(),
+                ))));
+                writes.push(RuleWrite::Enabled {
+                    kind: RuleKind::Room,
+                    rule_id: room_id.to_string(),
+                    enabled: true,
+                });
             }
-        })
+            (None, Some(_)) => writes.push(RuleWrite::Delete {
+                kind: RuleKind::Room,
+                rule_id: room_id.to_string(),
+            }),
+            _ => {}
+        }
+    }
+    writes
+}
+
+#[must_use]
+pub fn room_mode(rules: &Ruleset, room_id: &RoomId) -> Option<NotificationModeView> {
+    if muted(rules, room_id) {
+        return Some(NotificationModeView::Mute);
+    }
+    room_rule(rules, room_id).map(|actions| {
+        if notifies(actions) {
+            NotificationModeView::All
+        } else {
+            NotificationModeView::Mentions
+        }
+    })
 }
 
 const fn message_rule(direct: bool) -> PredefinedUnderrideRuleId {
@@ -344,24 +417,41 @@ pub fn default_modes(rules: &Ruleset) -> DefaultNotificationModesView {
     }
 }
 
+fn shaped_room_mode(
+    rules: &Ruleset,
+    room_id: &RoomId,
+    shape: RoomShape,
+) -> Option<NotificationModeView> {
+    if shape.bridged {
+        bridged_room_mode(rules, room_id)
+    } else {
+        room_mode(rules, room_id)
+    }
+}
+
 #[must_use]
-pub fn room_settings(rules: &Ruleset, room_id: &RoomId, direct: bool) -> NotificationSettingsView {
+pub fn room_settings(
+    rules: &Ruleset,
+    room_id: &RoomId,
+    shape: RoomShape,
+) -> NotificationSettingsView {
     NotificationSettingsView {
-        room: room_mode(rules, room_id),
-        default: default_mode(rules, direct),
+        room: shaped_room_mode(rules, room_id, shape),
+        default: default_mode(rules, shape.direct),
+        bridged: shape.bridged,
     }
 }
 
 #[must_use]
 pub fn room_modes(
     rules: &Ruleset,
-    rooms: impl IntoIterator<Item = (OwnedRoomId, bool)>,
+    rooms: impl IntoIterator<Item = (OwnedRoomId, RoomShape)>,
 ) -> Vec<RoomNotificationModeView> {
     rooms
         .into_iter()
-        .map(|(room_id, direct)| RoomNotificationModeView {
-            room: room_mode(rules, &room_id),
-            default: default_mode(rules, direct),
+        .map(|(room_id, shape)| RoomNotificationModeView {
+            room: shaped_room_mode(rules, &room_id, shape),
+            default: default_mode(rules, shape.direct),
             room_id,
         })
         .collect()
@@ -729,10 +819,10 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        RuleWrite, default_modes, keywords, level_actions, membership_notifications,
-        mention_notifications, plan_add_keyword, plan_alignment, plan_default_mode,
-        plan_keyword_mode, plan_membership, plan_mention, plan_remove_keyword, plan_room_mode,
-        pushes_every_encrypted_event, room_mode,
+        RuleWrite, bridged_room_mode, default_modes, keywords, level_actions,
+        membership_notifications, mention_notifications, plan_add_keyword, plan_alignment,
+        plan_bridged_dms, plan_default_mode, plan_keyword_mode, plan_membership, plan_mention,
+        plan_remove_keyword, plan_room_mode, pushes_every_encrypted_event, room_mode,
     };
     use crate::protocol::{MentionNotificationModeView, MentionRuleView, NotificationModeView};
 
@@ -807,6 +897,88 @@ mod tests {
                 "delete override !r:example.org",
                 "delete room !r:example.org"
             ]
+        );
+    }
+
+    fn group_mentions_only() -> Ruleset {
+        let rules = Ruleset::server_default(me());
+        applied(
+            rules.clone(),
+            plan_default_mode(&rules, false, NotificationModeView::Mentions).unwrap(),
+        )
+    }
+
+    #[test]
+    fn a_bridged_dm_carries_the_dm_default_as_a_room_rule() {
+        let room = room_id!("!bridged:example.org");
+        let rules = group_mentions_only();
+        let bridged = [room.to_owned()];
+
+        let writes = plan_bridged_dms(&rules, &rules, &bridged);
+        assert_eq!(
+            describe(&writes),
+            vec![
+                r#"put !bridged:example.org ["notify",{"set_tweak":"sound","value":"default"}]"#,
+                "enabled room !bridged:example.org true",
+            ]
+        );
+        let aligned = applied(rules, writes);
+        assert_eq!(bridged_room_mode(&aligned, room), None);
+        assert_eq!(
+            room_mode(&aligned, room),
+            Some(NotificationModeView::All),
+            "other clients see the rule as the room's own"
+        );
+        assert!(plan_bridged_dms(&aligned, &aligned, &bridged).is_empty());
+    }
+
+    #[test]
+    fn a_bridged_dm_needs_no_rule_while_both_defaults_agree() {
+        let rules = Ruleset::server_default(me());
+        assert!(
+            plan_bridged_dms(&rules, &rules, &[room_id!("!b:example.org").to_owned()]).is_empty()
+        );
+    }
+
+    #[test]
+    fn a_bridged_dm_keeps_a_mode_chosen_for_it() {
+        let room = room_id!("!bridged:example.org");
+        let rules = group_mentions_only();
+        let chosen = applied(
+            rules.clone(),
+            plan_room_mode(&rules, room, true, Some(NotificationModeView::Mentions)),
+        );
+
+        assert!(plan_bridged_dms(&chosen, &chosen, &[room.to_owned()]).is_empty());
+        assert_eq!(
+            bridged_room_mode(&chosen, room),
+            Some(NotificationModeView::Mentions)
+        );
+    }
+
+    #[test]
+    fn a_bridged_dm_follows_the_defaults_when_they_change() {
+        let room = room_id!("!bridged:example.org");
+        let bridged = [room.to_owned()];
+        let rules = group_mentions_only();
+        let aligned = applied(rules.clone(), plan_bridged_dms(&rules, &rules, &bridged));
+
+        let quieter = applied(
+            aligned.clone(),
+            plan_default_mode(&aligned, true, NotificationModeView::Mentions).unwrap(),
+        );
+        assert_eq!(
+            describe(&plan_bridged_dms(&aligned, &quieter, &bridged)),
+            vec!["delete room !bridged:example.org"]
+        );
+
+        let louder = applied(
+            aligned.clone(),
+            plan_default_mode(&aligned, false, NotificationModeView::All).unwrap(),
+        );
+        assert_eq!(
+            describe(&plan_bridged_dms(&aligned, &louder, &bridged)),
+            vec!["delete room !bridged:example.org"]
         );
     }
 

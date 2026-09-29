@@ -13,12 +13,7 @@
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
-  import {
-    finishSwipeGesture,
-    startSwipeGesture,
-    updateSwipeGesture,
-    type SwipeGesture,
-  } from '#lib/ui/swipe-gesture.js';
+  import { SwipeBack } from '#lib/ui/swipe-back.svelte.js';
 
   import ConversationComposer from './ConversationComposer.svelte';
   import { Conversation } from './conversation.svelte.js';
@@ -75,9 +70,10 @@
   let timelineList = $state<TimelineList>();
   let width = $state(27.5);
   let panel = $state<HTMLElement>();
-  let swipe: SwipeGesture | undefined;
-  let swipeOffset = $state(0);
-  let swiping = $state(false);
+  const swipe = new SwipeBack({
+    width: () => panel?.clientWidth ?? 0,
+    onDismiss: () => onClose(),
+  });
   let mediaEventId = $state<string | null>(null);
 
   const core = useCoreClient();
@@ -114,33 +110,6 @@
     return remFromPointerDelta(pixels, rootFontSize);
   }
 
-  function startSwipe(event: TouchEvent): void {
-    swipe = startSwipeGesture(event, 0);
-  }
-
-  function moveSwipe(event: TouchEvent): void {
-    if (!swipe) return;
-    const update = updateSwipeGesture(swipe, event);
-    if (!update || update.mode !== 'horizontal') return;
-    swiping = true;
-    swipeOffset = Math.max(0, update.distanceX);
-  }
-
-  function finishSwipe(cancelled: boolean): void {
-    const active = swipe;
-    swipe = undefined;
-    swiping = false;
-    if (!active) return;
-    const offset = swipeOffset;
-    swipeOffset = 0;
-    const result = finishSwipeGesture(active, offset, cancelled);
-    if (!result.handled) return;
-    const width = panel?.clientWidth ?? 0;
-    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
-      onClose();
-    }
-  }
-
   function requestHistory(): Promise<boolean> {
     return timeline.paginateBackward(25);
   }
@@ -167,8 +136,8 @@
       if (!open) onClose();
     }}
     variant="fullscreen"
-    contentClass={swiping ? 'thread-screen swiping' : 'thread-screen'}
-    contentStyle={swipeOffset > 0 ? `transform: translateX(${String(swipeOffset)}px)` : undefined}
+    contentClass={swipe.swiping ? 'thread-screen swiping' : 'thread-screen'}
+    contentStyle={swipe.transform ? `transform: ${swipe.transform}` : undefined}
   >
     {@render body()}
   </DialogFrame>
@@ -183,10 +152,10 @@
     class:modal
     style:width={modal ? null : `${width}rem`}
     aria-label={$i18n.t('timeline.thread')}
-    ontouchstart={modal ? startSwipe : undefined}
-    ontouchmove={modal ? moveSwipe : undefined}
-    ontouchend={modal ? () => finishSwipe(false) : undefined}
-    ontouchcancel={modal ? () => finishSwipe(true) : undefined}
+    ontouchstart={modal ? swipe.start : undefined}
+    ontouchmove={modal ? swipe.move : undefined}
+    ontouchend={modal ? () => swipe.finish(false) : undefined}
+    ontouchcancel={modal ? () => swipe.finish(true) : undefined}
   >
     {#if !modal}
       <ResizeHandle
@@ -206,7 +175,10 @@
         <ChatsIcon aria-hidden="true" />
       {/snippet}
       {#snippet suffix()}
-        <PanelHeaderButton label={$i18n.t('timeline.threadClose')} onclick={onClose}>
+        <PanelHeaderButton
+          label={$i18n.t('timeline.threadClose')}
+          onclick={modal ? swipe.dismiss : onClose}
+        >
           <XIcon />
         </PanelHeaderButton>
       {/snippet}
@@ -292,7 +264,7 @@
 
   @media (prefers-reduced-motion: no-preference) {
     :global(html:not([data-reduced-motion='on']) .thread-screen:not(.swiping)) {
-      transition: transform var(--duration-fast) var(--ease-smooth-out);
+      transition: transform var(--duration-medium) var(--ease-slide);
     }
   }
 

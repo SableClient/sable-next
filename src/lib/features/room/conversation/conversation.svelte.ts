@@ -418,7 +418,7 @@ export class Conversation {
     this.context = {
       kind: 'reply',
       eventId,
-      sender: item.sender_name ?? item.sender,
+      sender: item.per_message_profile?.display_name ?? item.sender_name ?? item.sender,
       silentReply: item.sender === this.#core.session?.user_id || !preferences.mentionInReplies,
       body: version?.body ?? replyPreviewBody(item.content),
     };
@@ -508,13 +508,20 @@ export class Conversation {
       if (eventId === null || this.#requestedDetails.has(eventId)) continue;
 
       this.#requestedDetails.add(eventId);
+      const loadFallback = async (): Promise<void> => {
+        const source = await this.#core.commands.eventSource(roomId, reply.event_id);
+        const fallback = replyFallbackFromSource(source, t);
+        if (fallback) this.#timeline.provideReplyFallback(reply.event_id, fallback);
+      };
       void this.#core.commands
         .fetchEventDetails(roomId, eventId, this.#threadRoot)
+        .then(async () => {
+          const updated = this.#timeline.items.find((entry) => entry.event_id === eventId);
+          if (updated?.in_reply_to?.body === null) await loadFallback();
+        })
         .catch(async (error: unknown) => {
           console.debug('[sable room] reply details unavailable', error);
-          const source = await this.#core.commands.eventSource(roomId, reply.event_id);
-          const fallback = replyFallbackFromSource(source, t);
-          if (fallback) this.#timeline.provideReplyFallback(reply.event_id, fallback);
+          await loadFallback();
         })
         .catch((error: unknown) => {
           console.debug('[sable room] replied-to event unavailable', error);

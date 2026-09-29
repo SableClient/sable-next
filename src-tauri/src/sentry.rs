@@ -10,7 +10,10 @@ fn consent_path() -> Option<std::path::PathBuf> {
         .join("Library/Application Support/Sable Next/sentry-consent");
     #[cfg(not(target_os = "macos"))]
     let path = std::env::var_os("XDG_STATE_HOME")
-        .map_or_else(|| std::path::PathBuf::from(home).join(".local/state"), std::path::PathBuf::from)
+        .map_or_else(
+            || std::path::PathBuf::from(home).join(".local/state"),
+            std::path::PathBuf::from,
+        )
         .join("sable-next/sentry-consent");
     Some(path)
 }
@@ -50,9 +53,7 @@ pub fn init() -> Option<sentry::ClientInitGuard> {
     options.send_default_pii = false;
     // Consent arrives from the frontend, so anything captured before the
     // webview boots is dropped.
-    options.before_send = Some(Arc::new(|event: Event<'static>| {
-        consent().then_some(event)
-    }));
+    options.before_send = Some(Arc::new(|event: Event<'static>| consent().then_some(event)));
 
     Some(sentry::init(options))
 }

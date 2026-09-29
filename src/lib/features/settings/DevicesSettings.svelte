@@ -55,6 +55,7 @@
   let newRecoveryKey = $state<string | null>(null);
   let confirmingReset = $state(false);
   let deleting = $state<string | null>(null);
+  let removing = $state<string | null>(null);
   let verificationOpen = $state(false);
   let resettingIdentity = $state(false);
   let verifying = $state<string | null>(null);
@@ -72,6 +73,14 @@
 
   function deviceName(device: DeviceView | undefined): string {
     return device?.display_name?.trim() || t('settings.unnamedDevice');
+  }
+
+  function missingSigningKeys(keys: EncryptionStatusView['signing_keys']): string[] {
+    return [
+      keys.master ? null : t('settings.signingKeyMaster'),
+      keys.self_signing ? null : t('settings.signingKeySelf'),
+      keys.user_signing ? null : t('settings.signingKeyUser'),
+    ].filter((name): name is string => name !== null);
   }
 
   const verificationLabel = (value: EncryptionStatusView['verification']) =>
@@ -158,18 +167,23 @@
     deviceId: string,
     authWindow: ExternalAuthWindow | null = null
   ): Promise<void> {
+    if (removing !== null) return;
+    removing = deviceId;
+    error = null;
     try {
       const managementUrl = await core.commands.deleteDevice(deviceId, password || null);
-      cancelRemoval();
       if (managementUrl) {
         if (authWindow) await authWindow.navigate(managementUrl);
         else await openExternalAuthUrl(managementUrl);
       } else {
         await refresh();
       }
+      cancelRemoval();
     } catch (cause) {
       authWindow?.close();
       error = messageFor(cause);
+    } finally {
+      removing = null;
     }
   }
 
@@ -323,7 +337,7 @@
                 />
               </dd>
             </div>
-            {#if status.verification !== 'verified' || status.recovery === 'incomplete'}
+            {#if status.verification !== 'verified' || (status.recovery === 'incomplete' && !status.backup_unlocked)}
               <Button variant="primary" onclick={() => (verificationOpen = true)}>
                 {$i18n.t(
                   status.verification === 'verified'
@@ -334,6 +348,23 @@
             {/if}
           </div>
         </dl>
+
+        {#if status.verification === 'verified' && status.recovery === 'incomplete' && status.backup_unlocked}
+          <div class="setting-row">
+            <span class="row-icon" aria-hidden="true"><KeyIcon /></span>
+            <div class="row-copy">
+              <strong>{$i18n.t('settings.signingKeysMissingTitle')}</strong>
+              <p>
+                {$i18n.t('settings.signingKeysMissingBody', {
+                  keys: missingSigningKeys(status.signing_keys).join(', '),
+                })}
+              </p>
+            </div>
+            <Button variant="secondary" onclick={() => (verificationOpen = true)}>
+              {$i18n.t('settings.signingKeysFetch')}
+            </Button>
+          </div>
+        {/if}
 
         {#if status.verification === 'verified' && status.recovery !== 'incomplete'}
           <div class="setting-row">
@@ -514,10 +545,16 @@
                   </div>
                   <div class="device-meta">
                     <StatusBadge
-                      variant={device.is_verified ? 'success' : 'warning'}
-                      label={device.is_verified
-                        ? $i18n.t('settings.verified')
-                        : $i18n.t('settings.notVerified')}
+                      variant={!device.has_keys
+                        ? 'neutral'
+                        : device.is_verified
+                          ? 'success'
+                          : 'warning'}
+                      label={!device.has_keys
+                        ? $i18n.t('settings.noDeviceKeys')
+                        : device.is_verified
+                          ? $i18n.t('settings.verified')
+                          : $i18n.t('settings.notVerified')}
                     />
                     <code title={device.device_id}>{device.device_id}</code>
                   </div>
@@ -528,7 +565,7 @@
                       })}
                     </span>
                   {/if}
-                  {#if !device.is_own && !device.is_verified && status?.verification === 'verified'}
+                  {#if !device.is_own && device.has_keys && !device.is_verified && status?.verification === 'verified'}
                     <div class="device-verify">
                       <Button
                         variant="secondary"
@@ -606,6 +643,7 @@
                   deviceId={device.device_id}
                   {accountManagement}
                   bind:password
+                  busy={removing === device.device_id}
                   onSubmit={() => void removeDevice(device.device_id)}
                   onCancel={cancelRemoval}
                 />

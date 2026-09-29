@@ -2,6 +2,8 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { fingerprint } from './fingerprint.js';
 
+export const ACCOUNT_DATA_KEY_TYPE = 'dev.zirco.msc4483.account_data.key';
+
 export type AccountSyncStatus = 'idle' | 'syncing' | 'partial' | 'error';
 
 export interface SyncedSnapshot {
@@ -11,6 +13,7 @@ export interface SyncedSnapshot {
 
 export interface SyncedDocument {
   eventType: string;
+  sealed?: boolean;
   debounceMs?: number;
   enabled?: () => boolean;
   snapshot: () => SyncedSnapshot;
@@ -21,6 +24,7 @@ interface DocumentState {
   pending: SyncedSnapshot | null;
   remote: string | null;
   pulled: boolean;
+  locked: boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
   status: AccountSyncStatus;
 }
@@ -56,6 +60,7 @@ export class AccountSync {
       clearTimeout(state.timer);
       state.remote = null;
       state.pulled = false;
+      state.locked = false;
       state.status = 'idle';
     }
     this.#refresh();
@@ -63,6 +68,10 @@ export class AccountSync {
     const stopEvents = core.subscribeEvents((event) => {
       if (event.type !== 'account_data_changed') return;
 
+      if (event.event_type === ACCOUNT_DATA_KEY_TYPE) {
+        for (const sealed of documents) if (sealed.sealed) void this.#pull(sealed, generation);
+        return;
+      }
       const document = documents.find((entry) => entry.eventType === event.event_type);
       if (document) void this.#pull(document, generation);
     });
@@ -94,6 +103,7 @@ export class AccountSync {
       pending: null,
       remote: null,
       pulled: false,
+      locked: false,
       timer: undefined,
       status: 'idle',
     };
@@ -103,7 +113,7 @@ export class AccountSync {
 
   #schedule(document: SyncedDocument, state: DocumentState): void {
     clearTimeout(state.timer);
-    if (this.#core === null || document.enabled?.() === false) return;
+    if (this.#core === null || document.enabled?.() === false || state.locked) return;
     if (!state.pulled) {
       void this.#pull(document, this.#generation);
       return;
@@ -123,8 +133,23 @@ export class AccountSync {
 
     const state = this.#stateFor(document.eventType);
     let content: unknown;
+    let unsealed = false;
     try {
-      content = await core.commands.accountData(document.eventType);
+      if (document.sealed) {
+        const sealed = await core.commands.sealedAccountData(document.eventType);
+        if (generation !== this.#generation) return;
+        state.locked = sealed.state === 'locked';
+        if (state.locked) {
+          state.pulled = false;
+          state.status = 'idle';
+          this.#refresh();
+          return;
+        }
+        content = sealed.content;
+        unsealed = sealed.state === 'plain' && sealed.can_seal && sealed.content !== null;
+      } else {
+        content = await core.commands.accountData(document.eventType);
+      }
     } catch (error) {
       if (generation !== this.#generation) return;
       state.status = 'error';
@@ -143,10 +168,11 @@ export class AccountSync {
 
     const next = detach(document.snapshot());
     state.pending = next;
-    state.remote = fingerprint(next.content);
+    state.remote = unsealed ? null : fingerprint(next.content);
     state.status = next.partial === true ? 'partial' : 'idle';
     this.lastSyncedAt = Date.now();
     this.#refresh();
+    if (unsealed) this.#schedule(document, state);
   }
 
   async #upload(document: SyncedDocument, generation: number): Promise<void> {
@@ -158,7 +184,9 @@ export class AccountSync {
     state.status = 'syncing';
     this.#refresh();
     try {
-      await core.commands.setAccountData(document.eventType, sent.content);
+      await (document.sealed
+        ? core.commands.setSealedAccountData(document.eventType, sent.content)
+        : core.commands.setAccountData(document.eventType, sent.content));
     } catch (error) {
       if (generation !== this.#generation) return;
       state.status = 'error';

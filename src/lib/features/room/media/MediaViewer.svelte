@@ -25,6 +25,7 @@
     VELOCITY_THRESHOLD,
   } from '#lib/ui/swipe-gesture.js';
   import { sharesNatively, supportsPhotoLibrary } from '#lib/platform/files.js';
+  import { setSystemBarsHidden } from '#lib/platform/system-bars.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -120,6 +121,9 @@
   let zoomInput = $state('100');
   let swipeX = $state(0);
   let swipeY = $state(0);
+  let chromeHidden = $state(false);
+  let tap: { pointerId: number; x: number; y: number } | null = null;
+  let tapTimer: ReturnType<typeof setTimeout> | undefined;
   let swipe: {
     pointerId: number;
     startX: number;
@@ -195,10 +199,21 @@
   });
 
   $effect(() => {
+    if (!chromeHidden) return;
+    setSystemBarsHidden(true);
+    return () => {
+      setSystemBarsHidden(false);
+    };
+  });
+
+  $effect(() => {
     return resource.load(source, mime, transcode);
   });
 
-  onDestroy(() => resource.dispose());
+  onDestroy(() => {
+    resource.dispose();
+    clearTimeout(tapTimer);
+  });
 
   $effect(() => {
     let active = true;
@@ -348,8 +363,13 @@
   function startPan(event: PointerEvent): void {
     if (!isImage) return;
     if (event.button !== 0) return;
+    clearTimeout(tapTimer);
     if (handleDoubleTap(event)) return;
     if (event.pointerType === 'touch') {
+      tap =
+        touches.size === 0 && !(event.target instanceof Element && event.target.closest('button'))
+          ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+          : null;
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size === 2) {
         pinchDistance = distance();
@@ -381,6 +401,12 @@
 
   function movePan(event: PointerEvent): void {
     if (!isImage) return;
+    if (
+      tap?.pointerId === event.pointerId &&
+      Math.hypot(event.clientX - tap.x, event.clientY - tap.y) > AXIS_LOCK_THRESHOLD
+    ) {
+      tap = null;
+    }
     if (event.pointerType === 'touch' && touches.has(event.pointerId)) {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size === 2 && pinchDistance > 0) {
@@ -446,6 +472,14 @@
 
   function endPan(event: PointerEvent): void {
     if (!isImage) return;
+    if (tap?.pointerId === event.pointerId) {
+      if (event.type === 'pointerup') {
+        tapTimer = setTimeout(() => {
+          chromeHidden = !chromeHidden;
+        }, DOUBLE_TAP_MS);
+      }
+      tap = null;
+    }
     releaseSwipe(event.pointerId);
     touches.delete(event.pointerId);
     if (touches.size < 2) pinchDistance = 0;
@@ -501,7 +535,7 @@
   >
     <Dialog.Portal>
       <Dialog.Content
-        class="viewer"
+        class={chromeHidden ? 'viewer immersive' : 'viewer'}
         {...overlayLayer()}
         style={`height: calc(100dvh - var(--titlebar-height)); inset: var(--titlebar-height) 0 0; opacity: ${String(1 - Math.min(0.75, Math.abs(swipeY) / 400))}; position: fixed; width: 100vw;`}
         aria-label={$i18n.t('viewer.title')}
@@ -511,7 +545,7 @@
           }
         }}
       >
-        <header class="toolbar">
+        <header class="toolbar" class:chrome-hidden={chromeHidden}>
           <div class="heading">
             <IconButton
               label={$i18n.t('viewer.close')}
@@ -595,6 +629,7 @@
         <main
           class="stage"
           class:has-nav={items.length > 1}
+          class:chrome-hidden={chromeHidden}
           bind:this={stageEl}
           onwheel={handleWheel}
           onpointerdown={startPan}
@@ -712,7 +747,7 @@
           {/if}
         </main>
 
-        <footer class="bottom-bar">
+        <footer class="bottom-bar" class:chrome-hidden={chromeHidden}>
           {#if isPdf && pdfPages > 1}
             <div class="zoom-controls">
               <IconButton
@@ -812,6 +847,10 @@
     overscroll-behavior: contain;
     position: fixed;
     width: 100vw;
+  }
+
+  :global(.viewer.immersive) {
+    background: var(--viewer-immersive);
   }
 
   .toolbar,
@@ -985,6 +1024,27 @@
     z-index: 1;
   }
 
+  .toolbar.chrome-hidden,
+  .bottom-bar.chrome-hidden,
+  .stage.chrome-hidden :global(.nav) {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.viewer) {
+      transition: background-color var(--motion-normal) var(--ease-smooth-out);
+    }
+
+    .toolbar,
+    .bottom-bar,
+    :global(.nav) {
+      transition:
+        opacity var(--motion-normal) var(--ease-smooth-out),
+        visibility var(--motion-normal);
+    }
+  }
+
   :global(.nav:hover) {
     background: var(--surface-container-active);
   }
@@ -1000,6 +1060,34 @@
   @media (width < 48rem) {
     .actions :global(.desktop-control) {
       display: none;
+    }
+
+    .stage.has-nav {
+      padding-inline: var(--space-200);
+    }
+
+    :global(.nav) {
+      display: none;
+    }
+
+    :global(.viewer) {
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .toolbar,
+    .bottom-bar {
+      background: color-mix(in srgb, var(--surface-var-container) 85%, transparent);
+      inset-inline: 0;
+      position: absolute;
+    }
+
+    .toolbar {
+      inset-block-start: 0;
+    }
+
+    .bottom-bar {
+      border-top: 0;
+      inset-block-end: 0;
     }
   }
 

@@ -92,6 +92,17 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
+test('a reply to a persona message names the persona', () => {
+  const target = {
+    ...item('$one:example.org', '@ana:example.org'),
+    per_message_profile: { display_name: 'Ghost' },
+  } as unknown as TimelineItemView;
+  const { conversation } = setup([target], '@kris:example.org');
+
+  conversation.reply('$one:example.org');
+  expect(conversation.context?.sender).toBe('Ghost');
+});
+
 test('a reply to an earlier version targets the edit and quotes its text', async () => {
   const { conversation, sendMessage } = setup(
     [item('$one:example.org', '@ana:example.org')],
@@ -353,6 +364,43 @@ test('a reply the SDK cannot embed takes its preview from the event source', asy
   expect(fallback.sender).toBe('@ana:example.org');
   expect(fallback.body).toContain('🎉');
 });
+
+test.each([
+  ['m.room.name', 'Sent a m.room.name event'],
+  ['m.room.member', 'Sent a m.room.member event'],
+])(
+  '%s replies with missing details after a successful fetch take their preview from the event source',
+  async (type, body) => {
+    const reply = {
+      ...item('$reply:example.org', '@kris:example.org'),
+      in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
+    } as unknown as TimelineItemView;
+    const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
+    const eventSource = vi.fn(() =>
+      Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {} }))
+    );
+    const core = {
+      session: { user_id: '@kris:example.org' },
+      commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
+    } as unknown as CoreClient;
+    const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
+    const conversation = new Conversation({
+      core,
+      personas: {} as PersonaStore,
+      timeline,
+      roomId: () => ROOM,
+    });
+
+    conversation.fetchMissingReplyDetails();
+    await vi.waitFor(() => {
+      expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
+        sender: '@ana:example.org',
+        body,
+      });
+    });
+    expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
+  }
+);
 
 test('editing steps back to the own message before the one being edited', () => {
   const me = '@kris:example.org';

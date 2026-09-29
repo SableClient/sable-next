@@ -18,6 +18,7 @@ import {
   adoptRoomIconOverrides,
   roomIconOverrides,
 } from '#lib/features/room/settings/room-appearance.svelte.js';
+import { adoptQuietRooms, quietRooms } from '#lib/rooms/quiet-rooms.svelte.js';
 import { readRecent, writeRecent } from '#lib/emoji/recent-packs.svelte.js';
 import { adoptRecentReactions, recentReactionEntries } from '#lib/emoji/recents.svelte.js';
 import { SpaceSidebar } from '#lib/spaces/sidebar-layout.svelte.js';
@@ -42,6 +43,7 @@ function reset(): void {
   adoptFavorites([]);
   adoptRecentGifs([]);
   adoptRoomIconOverrides([]);
+  adoptQuietRooms([]);
   adoptRecentReactions([]);
   clearDrafts();
   localStorage.clear();
@@ -59,6 +61,7 @@ describe('the workspace document', () => {
     adoptFavorites([gif]);
     adoptRecentGifs([gif]);
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
+    adoptQuietRooms(['!space:example.org']);
     sidebar.adoptOpenFolders(['folder-1']);
     const { content } = document.snapshot();
 
@@ -70,6 +73,7 @@ describe('the workspace document', () => {
     expect(favoriteGifs()).toEqual([gif]);
     expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
+    expect(quietRooms()).toEqual(['!space:example.org']);
     expect([...sidebar.openFolders]).toEqual(['folder-1']);
   });
 

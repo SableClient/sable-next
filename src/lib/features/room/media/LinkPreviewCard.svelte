@@ -8,6 +8,7 @@
   import { imageMimeFromUrl } from './link-preview.js';
   import { loadUrlPreview } from './link-preview-cache';
   import { findLinkPresentation } from './link-presentations';
+  import { hasMediaViewerOpener, useMediaViewerOpener } from './media-viewer-opener.svelte.js';
   import { hasRoomMediaPreviews, useRoomMediaPreviews } from './room-media-previews.svelte.js';
 
   interface Props {
@@ -46,13 +47,34 @@
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
+  const openMediaViewer = hasMediaViewerOpener() ? useMediaViewerOpener() : null;
   let Presentation = $derived(preview && findLinkPresentation(url, preview));
+
+  function openPreviewImage(): void {
+    if (openMediaViewer === null || preview === null || preview.image === null) return;
+    openMediaViewer({
+      kind: 'image',
+      filename: url,
+      caption: null,
+      html: null,
+      source: preview.image,
+      mime: preview.image_mime ?? imageMimeFromUrl(url),
+      width: preview.image_width,
+      height: preview.image_height,
+      size: null,
+      blurhash: null,
+      thumbnail: null,
+      spoiler: null,
+      animated: null,
+      sender: url,
+    });
+  }
 </script>
 
 {#if preview && Presentation}
   <Presentation {url} {preview} {mediaHidden} />
 {:else if preview?.image && !mediaHidden && preview.title === null && preview.site_name === null}
-  <a class="link-preview-link" href={url} target="_blank" rel="noopener noreferrer">
+  {#if openMediaViewer}
     <MediaImage
       class="link-preview-inline"
       source={preview.image}
@@ -62,8 +84,22 @@
       intrinsicWidth={preview.image_width}
       intrinsicHeight={preview.image_height}
       mime={preview.image_mime ?? imageMimeFromUrl(url)}
+      onclick={openPreviewImage}
     />
-  </a>
+  {:else}
+    <a class="link-preview-link" href={url} target="_blank" rel="noopener noreferrer">
+      <MediaImage
+        class="link-preview-inline"
+        source={preview.image}
+        alt={preview.description ?? ''}
+        width={400}
+        height={300}
+        intrinsicWidth={preview.image_width}
+        intrinsicHeight={preview.image_height}
+        mime={preview.image_mime ?? imageMimeFromUrl(url)}
+      />
+    </a>
+  {/if}
 {:else if preview}
   <a class="link-preview" href={url} target="_blank" rel="noopener noreferrer" aria-label={title}>
     {#if preview.image && !mediaHidden}

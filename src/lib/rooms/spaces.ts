@@ -1,6 +1,11 @@
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { type NotificationModeResolver, roomUnread, UNRESOLVED_MODE } from './unread.js';
+import {
+  type NotificationModeResolver,
+  quietUnread,
+  roomUnread,
+  UNRESOLVED_MODE,
+} from './unread.js';
 
 export type UnreadCount = {
   unread: number;
@@ -12,7 +17,8 @@ export type UnreadCount = {
 export function spaceUnreadCounts(
   spaces: readonly RoomSummary[],
   rooms: readonly RoomSummary[],
-  mode: NotificationModeResolver = UNRESOLVED_MODE
+  mode: NotificationModeResolver = UNRESOLVED_MODE,
+  quiet: ReadonlySet<string> = new Set()
 ): Map<string, UnreadCount> {
   const roomsById = new Map(
     rooms.filter((room) => room.state === 'joined').map((room) => [room.room_id, room])
@@ -33,7 +39,8 @@ export function spaceUnreadCounts(
       }
       if (visited.has(room.room_id)) continue;
       visited.add(room.room_id);
-      const counts = roomUnread(room, mode(room.room_id));
+      const loud = roomUnread(room, mode(room.room_id));
+      const counts = quiet.has(room.room_id) ? quietUnread(loud) : loud;
       if (counts.marked) total.marked = true;
       total.unread += counts.unread;
       total.highlight += counts.highlight;
@@ -61,6 +68,23 @@ export function addUnread(left: UnreadCount, right: UnreadCount): UnreadCount {
     marked: (left.marked ?? false) || (right.marked ?? false),
     notifying: (left.notifying ?? 0) + (right.notifying ?? 0),
   };
+}
+
+export function quietRoomIds(
+  rooms: readonly RoomSummary[],
+  targets: Iterable<string>
+): Set<string> {
+  const roomsById = new Map(rooms.map((room) => [room.room_id, room]));
+  const quiet = new Set<string>();
+
+  function walk(roomId: string): void {
+    if (quiet.has(roomId)) return;
+    quiet.add(roomId);
+    for (const child of roomsById.get(roomId)?.space_children ?? []) walk(child.room_id);
+  }
+
+  for (const roomId of targets) walk(roomId);
+  return quiet;
 }
 
 export type ChildRouting = { via: string[]; parentId: string | null };

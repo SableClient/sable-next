@@ -5,6 +5,8 @@ import {
 } from '#lib/platform/screen-audio.js';
 import { createContext } from 'svelte';
 
+import { hdrShareSupported, listHdrMonitors, type HdrMonitor } from '#lib/platform/hdr-share.js';
+
 import type { CallMemberView, CoreEvent } from '#src/generated/protocol';
 import type { CallGrant, CoreClient } from '#lib/core/client.svelte.js';
 
@@ -13,6 +15,7 @@ import type {
   CallParticipant,
   CallTransport,
   CallTransportState,
+  ScreenSource,
 } from './call-transport';
 import { decodeCallKey, idleTransportState, ignoreError } from './call-transport';
 import { acquireCallOwner, type CallOwnerLease } from './call-owner';
@@ -21,7 +24,7 @@ import { createNativeTransport } from './native-transport';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { commandErrorCode } from './command-error';
 import { CallTelemetry } from './call-telemetry';
-import { cameraVisible, screenShareVisible } from './call-layout';
+import { cameraVisible, screenShareVisible, type CallPin } from './call-layout';
 import { participantKeys } from './participant-keys';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { DEVICE_PREFERENCE } from './devices';
@@ -105,8 +108,28 @@ export class CallSession {
   encryptsMedia = $state(false);
   deafened = $state(false);
   connectedAt = $state<number | null>(null);
+  layout: CallPin = { pinned: null, gridForced: false };
+  watchedScreenShareIds = $state<string[]>([]);
+  views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
   choosingScreenAudio = $state(false);
+  choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
+  #pendingScreenSource: ScreenSource | null = null;
+
+  watchScreenShare(trackId: string): void {
+    if (!this.watchedScreenShareIds.includes(trackId)) {
+      this.watchedScreenShareIds = [...this.watchedScreenShareIds, trackId];
+    }
+  }
+
+  get startedAt(): number | null {
+    if (this.connectedAt === null) return null;
+    return this.members.reduce(
+      (earliest, member) =>
+        member.joined_ts > 0 ? Math.min(earliest, member.joined_ts) : earliest,
+      this.connectedAt
+    );
+  }
 
   readonly #client: CoreClient;
   readonly #deps: CallSessionDeps;
@@ -194,6 +217,8 @@ export class CallSession {
 
     this.#lease = lease;
     this.#lastJoin = { roomId, media, serviceUrl };
+    this.layout = { pinned: null, gridForced: false };
+    this.watchedScreenShareIds = [];
     this.deviceError = null;
     const attempt = ++this.#attemptGeneration;
     const telemetry = new CallTelemetry({
@@ -449,17 +474,35 @@ export class CallSession {
   async toggleScreenShare(): Promise<void> {
     if (this.transport.screenShareEnabled) {
       await this.setScreenShareEnabled(false);
-    } else if (screenAudioSupported()) {
-      this.choosingScreenAudio = true;
-    } else {
-      await this.setScreenShareEnabled(true);
+      return;
     }
+    const monitors = hdrShareSupported() ? await listHdrMonitors().catch(() => []) : [];
+    if (monitors.length > 0) this.choosingScreenSource = monitors;
+    else await this.shareScreenFrom(null);
+  }
+
+  async shareScreenFrom(source: ScreenSource | null): Promise<void> {
+    this.choosingScreenSource = null;
+    if (screenAudioSupported()) {
+      this.#pendingScreenSource = source;
+      this.choosingScreenAudio = true;
+      return;
+    }
+    await this.#shareScreen(undefined, source);
   }
 
   async shareScreenWith(audio: ScreenAudioChoice): Promise<void> {
     this.choosingScreenAudio = false;
     rememberScreenAudioChoice(audio);
-    await this.setScreenShareEnabled(true, audio);
+    const source = this.#pendingScreenSource;
+    this.#pendingScreenSource = null;
+    await this.#shareScreen(audio, source);
+  }
+
+  async #shareScreen(audio: ScreenAudioChoice | undefined, source: ScreenSource | null) {
+    await this.#device('screen', () =>
+      this.#media?.capabilities.screenShare?.setEnabled(true, audio, source ?? undefined)
+    );
   }
 
   async setScreenShareEnabled(enabled: boolean, audio?: ScreenAudioChoice): Promise<void> {

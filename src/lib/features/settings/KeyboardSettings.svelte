@@ -51,6 +51,12 @@
 
   function capture(id: ShortcutId, event: KeyboardEvent): void {
     event.preventDefault();
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      capturing = null;
+      rejected = null;
+      return;
+    }
     const binding = bindingFromEvent(event, isMac);
     if (binding === null) return;
 

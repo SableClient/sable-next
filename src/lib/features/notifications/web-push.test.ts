@@ -27,6 +27,7 @@ import {
   applicationServerKeyMatches,
   currentPushKey,
   needsRegistering,
+  pusherDisplayName,
   registrationMarker,
   syncPushSubscription,
   vapidBytes,
@@ -156,7 +157,11 @@ function core(vapid: string | null, pushers: unknown[] = []) {
     removePusher: vi.fn().mockResolvedValue(undefined),
   };
   commandsOf = commands;
-  return { commands, session: { account_id: 'account-a' } } as unknown as CoreClient;
+  return {
+    commands,
+    session: { account_id: 'account-a', device_id: 'LAPTOP' },
+    deviceList: [],
+  } as unknown as CoreClient;
 }
 
 let client: CoreClient;
@@ -269,4 +274,33 @@ test('a browser without push has no push key, whatever its service worker holds'
   await expect(currentPushKey()).resolves.toBeNull();
   expect(getRegistration).not.toHaveBeenCalled();
   Reflect.deleteProperty(navigator, 'serviceWorker');
+});
+
+test('a pusher is named after its session, so two browsers on one account differ', () => {
+  const session = { account_id: 'a', device_id: 'LAPTOP' };
+  const own = (display_name: string | null) => ({ is_own: true, display_name });
+
+  expect(pusherDisplayName({ session, deviceList: [] } as unknown as CoreClient)).toBe(
+    'Sable (LAPTOP)'
+  );
+  expect(
+    pusherDisplayName({ session, deviceList: [own('Work Firefox')] } as unknown as CoreClient)
+  ).toBe('Work Firefox (LAPTOP)');
+  expect(pusherDisplayName({ session, deviceList: [own('  ')] } as unknown as CoreClient)).toBe(
+    'Sable (LAPTOP)'
+  );
+});
+
+test('a renamed session registers its pusher again under the new name', async () => {
+  mocks.activeServiceWorker.mockResolvedValue(registration(SERVER_KEY));
+  await syncPushSubscription(client, NONE);
+  expect(commandsOf.setWebPusher).toHaveBeenLastCalledWith(
+    expect.objectContaining({ device_display_name: 'Sable (LAPTOP)' })
+  );
+
+  Object.assign(client, { deviceList: [{ is_own: true, display_name: 'Work Firefox' }] });
+  await syncPushSubscription(client, NONE);
+  expect(commandsOf.setWebPusher).toHaveBeenLastCalledWith(
+    expect.objectContaining({ device_display_name: 'Work Firefox (LAPTOP)' })
+  );
 });

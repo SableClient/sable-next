@@ -10,18 +10,14 @@
 
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import { untrack } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { i18n } from '#lib/i18n.js';
   import { createMasterDetail } from '#lib/ui/master-detail.svelte.js';
   import { shouldReduceMotion } from '#lib/ui/motion.js';
-  import {
-    finishSwipeGesture,
-    startSwipeGesture,
-    updateSwipeGesture,
-    type SwipeGesture,
-  } from '#lib/ui/swipe-gesture.js';
+  import { SwipeBack } from '#lib/ui/swipe-back.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import SettingsJumpSheet from './SettingsJumpSheet.svelte';
   import SettingsOutline from './SettingsOutline.svelte';
@@ -64,77 +60,33 @@
   );
   let activeLabel = $derived(pages.openSection ? sectionLabel(pages.openSection) : label);
 
-  let swipe: SwipeGesture | undefined;
-  let swipeOffset = $state(0);
-  let swiping = $state(false);
-  let revealed = $state(false);
   let content = $state<HTMLElement | null>(null);
-
-  function startSwipe(event: TouchEvent): void {
-    const target = event.target instanceof Element ? event.target : null;
-    swipe = target?.closest(SWIPE_IGNORE) ? undefined : startSwipeGesture(event, 0);
-  }
-
-  function moveSwipe(event: TouchEvent): void {
-    if (!swipe) return;
-    const update = updateSwipeGesture(swipe, event);
-    if (!update || update.mode !== 'horizontal') return;
-    swiping = true;
-    revealed = true;
-    swipeOffset = Math.max(0, update.distanceX);
-  }
-
-  function finishSwipe(cancelled: boolean): void {
-    const active = swipe;
-    swipe = undefined;
-    swiping = false;
-    if (!active) return;
-    const offset = swipeOffset;
-    swipeOffset = 0;
-    const result = finishSwipeGesture(active, offset, cancelled);
-    if (!result.handled) return;
-    const width = content?.clientWidth ?? 0;
-    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
-      revealed = false;
-      onBack();
-      return;
-    }
-    if (offset === 0 || shouldReduceMotion()) revealed = false;
-  }
-
-  let listSwipe: SwipeGesture | undefined;
-  let listOffset = $state(0);
-  let listSwiping = $state(false);
   let list = $state<HTMLElement | null>(null);
+  let entering = $state(false);
+  let shownSection: string | null = untrack(() => pages.openSection);
+  const pageSwipe = new SwipeBack({
+    width: () => content?.clientWidth ?? 0,
+    onDismiss: () => onBack(),
+    ignore: SWIPE_IGNORE,
+  });
+  const listSwipe = new SwipeBack({
+    width: () => list?.clientWidth ?? 0,
+    onDismiss: () => onClose(),
+    ignore: SWIPE_IGNORE,
+    slideOut: false,
+  });
+  let revealed = $derived(pageSwipe.moved || entering);
   let listSwipeable = $derived(!pages.desktop && !(pages.showContent && pages.openSection));
 
-  function startListSwipe(event: TouchEvent): void {
-    const target = event.target instanceof Element ? event.target : null;
-    listSwipe = target?.closest(SWIPE_IGNORE) ? undefined : startSwipeGesture(event, 0);
-  }
-
-  function moveListSwipe(event: TouchEvent): void {
-    if (!listSwipe) return;
-    const update = updateSwipeGesture(listSwipe, event);
-    if (!update || update.mode !== 'horizontal') return;
-    listSwiping = true;
-    listOffset = Math.max(0, update.distanceX);
-  }
-
-  function finishListSwipe(cancelled: boolean): void {
-    const active = listSwipe;
-    listSwipe = undefined;
-    listSwiping = false;
-    if (!active) return;
-    const offset = listOffset;
-    listOffset = 0;
-    const result = finishSwipeGesture(active, offset, cancelled);
-    if (!result.handled) return;
-    const width = list?.clientWidth ?? 0;
-    if (result.direction === 'right' || (result.direction === undefined && offset > width / 2)) {
-      onClose();
-    }
-  }
+  $effect(() => {
+    const next = pages.openSection;
+    const desktop = pages.desktop;
+    untrack(() => {
+      pageSwipe.reset();
+      entering = !desktop && shownSection === null && next !== null && !shouldReduceMotion();
+      shownSection = next;
+    });
+  });
 </script>
 
 {#snippet currentOutline(entry: { label: string })}
@@ -150,14 +102,14 @@
     <aside
       class="settings-nav"
       class:settings-nav-paged={!pages.desktop}
-      class:swiping={listSwiping}
+      class:swiping={listSwipe.swiping}
       aria-label={label}
-      style:transform={listOffset > 0 ? `translateX(${String(listOffset)}px)` : undefined}
+      style:transform={listSwipe.transform}
       bind:this={list}
-      ontouchstart={listSwipeable ? startListSwipe : undefined}
-      ontouchmove={listSwipeable ? moveListSwipe : undefined}
-      ontouchend={listSwipeable ? () => finishListSwipe(false) : undefined}
-      ontouchcancel={listSwipeable ? () => finishListSwipe(true) : undefined}
+      ontouchstart={listSwipeable ? listSwipe.start : undefined}
+      ontouchmove={listSwipeable ? listSwipe.move : undefined}
+      ontouchend={listSwipeable ? () => listSwipe.finish(false) : undefined}
+      ontouchcancel={listSwipeable ? () => listSwipe.finish(true) : undefined}
     >
       <div class="settings-title settings-nav-header">
         <Dialog.Title class="settings-heading">{@render heading()}</Dialog.Title>
@@ -177,21 +129,22 @@
     <section
       class="settings-content"
       aria-label={activeLabel}
-      class:swiping
+      class:swiping={pageSwipe.swiping}
       class:swiped={revealed}
-      style:transform={swipeOffset > 0 ? `translateX(${String(swipeOffset)}px)` : undefined}
+      class:entering
+      style:transform={pageSwipe.transform}
       bind:this={content}
-      ontouchstart={pages.desktop ? undefined : startSwipe}
-      ontouchmove={pages.desktop ? undefined : moveSwipe}
-      ontouchend={pages.desktop ? undefined : () => finishSwipe(false)}
-      ontouchcancel={pages.desktop ? undefined : () => finishSwipe(true)}
-      ontransitionend={(event) => {
-        if (event.target === event.currentTarget && !swiping) revealed = false;
+      ontouchstart={pages.desktop ? undefined : pageSwipe.start}
+      ontouchmove={pages.desktop ? undefined : pageSwipe.move}
+      ontouchend={pages.desktop ? undefined : () => pageSwipe.finish(false)}
+      ontouchcancel={pages.desktop ? undefined : () => pageSwipe.finish(true)}
+      onanimationend={(event) => {
+        if (event.target === event.currentTarget) entering = false;
       }}
     >
       {#if !pages.desktop}
         <div class="settings-title section-bar settings-nav-header">
-          <IconButton variant="ghost" size="small" label={backLabel} onclick={onBack}
+          <IconButton variant="ghost" size="small" label={backLabel} onclick={pageSwipe.dismiss}
             ><ArrowLeftIcon /></IconButton
           >
           <Dialog.Title class="settings-heading">
@@ -258,11 +211,24 @@
     box-shadow: var(--shadow-dialog);
     inset: 0;
     position: absolute;
+    will-change: transform;
   }
 
-  .paged .settings-content:not(.swiping),
-  .settings-nav-paged:not(.swiping) {
-    transition: transform var(--duration-fast) var(--ease-smooth-out);
+  @media (prefers-reduced-motion: no-preference) {
+    :global(html:not([data-reduced-motion='on'])) .paged .settings-content:not(.swiping),
+    :global(html:not([data-reduced-motion='on'])) .settings-nav-paged:not(.swiping) {
+      transition: transform var(--duration-medium) var(--ease-slide);
+    }
+
+    :global(html:not([data-reduced-motion='on'])) .paged .settings-content.entering {
+      animation: page-in var(--duration-medium) var(--ease-slide);
+    }
+  }
+
+  @keyframes page-in {
+    from {
+      transform: translateX(100%);
+    }
   }
 
   .settings-scroll {

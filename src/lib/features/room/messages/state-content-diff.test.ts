@@ -21,10 +21,24 @@ test('added and removed keys carry an undefined side', () => {
   ]);
 });
 
-test('arrays are compared whole', () => {
+test('arrays show only added and removed items', () => {
   expect(stateContentDiff({ allow: ['*'] }, { allow: ['*'] })).toEqual([]);
   expect(stateContentDiff({ allow: ['*'] }, { allow: ['*', 'x'] })).toEqual([
-    { path: ['allow'], before: ['*'], after: ['*', 'x'] },
+    { path: ['allow', '1'], before: undefined, after: 'x' },
+  ]);
+  expect(stateContentDiff({ allow: ['a', 'b', 'c'] }, { allow: ['a', 'c'] })).toEqual([
+    { path: ['allow', '1'], before: 'b', after: undefined },
+  ]);
+  expect(stateContentDiff({ allow: ['a', 'b'] }, { allow: ['a', 'c'] })).toEqual([
+    { path: ['allow', '1'], before: 'b', after: undefined },
+    { path: ['allow', '1'], before: undefined, after: 'c' },
+  ]);
+});
+
+test('array reordering shows moved items without unchanged items', () => {
+  expect(stateContentDiff({ allow: ['a', 'b', 'c'] }, { allow: ['c', 'a', 'b'] })).toEqual([
+    { path: ['allow', '0'], before: undefined, after: 'c' },
+    { path: ['allow', '3'], before: 'c', after: undefined },
   ]);
 });
 

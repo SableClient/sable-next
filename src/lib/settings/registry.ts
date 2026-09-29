@@ -36,6 +36,7 @@ import MagnifyingGlassPlusIcon from 'phosphor-svelte/lib/MagnifyingGlassPlusIcon
 import MegaphoneIcon from 'phosphor-svelte/lib/MegaphoneIcon';
 import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
 import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+import MonitorIcon from 'phosphor-svelte/lib/MonitorIcon';
 import MoonIcon from 'phosphor-svelte/lib/MoonIcon';
 import PaintBrushIcon from 'phosphor-svelte/lib/PaintBrushIcon';
 import PaletteIcon from 'phosphor-svelte/lib/PaletteIcon';
@@ -1223,6 +1224,7 @@ export const settingsCategories: SettingsCategory[] = [
       { id: 'microphone', name: 'settings.groups.microphone' },
       { id: 'ringing', name: 'settings.groups.ringing' },
       { id: 'call-button', name: 'settings.groups.callButton' },
+      { id: 'call-screens', name: 'settings.groups.callScreens' },
     ],
     items: [
       {
@@ -1311,6 +1313,14 @@ export const settingsCategories: SettingsCategory[] = [
         icon: PhoneIcon,
         name: 'settings.alwaysShowCallButton',
         description: 'settings.alwaysShowCallButtonHint',
+        type: 'boolean',
+      },
+      {
+        key: 'callScreenPreview',
+        section: 'call-screens',
+        icon: MonitorIcon,
+        name: 'settings.callScreenPreview',
+        description: 'settings.callScreenPreviewHint',
         type: 'boolean',
       },
     ],

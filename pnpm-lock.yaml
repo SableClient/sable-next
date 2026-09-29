@@ -319,6 +319,9 @@ importers:
       svelte-i18next:
         specifier: ^2.2.2
         version: 2.2.2(i18next@26.4.2(typescript@6.0.3))(svelte@5.57.1(@typescript-eslint/types@8.70.0))
+      svelte-tiny-virtual-list:
+        specifier: ^4.0.0
+        version: 4.0.0(svelte@5.57.1(@typescript-eslint/types@8.70.0))
       tauri-plugin-android-fs-api:
         specifier: 29.0.0
         version: 29.0.0
@@ -4913,6 +4916,12 @@ packages:
     peerDependencies:
       i18next: '*'
       svelte: '*'
+
+  svelte-tiny-virtual-list@4.0.0:
+    resolution: {integrity: sha512-SrsI2dTYBAnzWeOhZ6fUX0qA3olSvsFeonIvEnyzvPL3AEsKropuSdRCPud84oCV53y6ztcawvs83Qnt0lux2A==}
+    engines: {node: '>=20.17.0'}
+    peerDependencies:
+      svelte: ^5.0.0
 
   svelte-toolbelt@0.10.6:
     resolution: {integrity: sha512-YWuX+RE+CnWYx09yseAe4ZVMM7e7GRFZM6OYWpBKOb++s+SQ8RBIMMe+Bs/CznBMc0QPLjr+vDBxTAkozXsFXQ==}
@@ -9517,6 +9526,10 @@ snapshots:
   svelte-i18next@2.2.2(i18next@26.4.2(typescript@6.0.3))(svelte@5.57.1(@typescript-eslint/types@8.70.0)):
     dependencies:
       i18next: 26.4.2(typescript@6.0.3)
+      svelte: 5.57.1(@typescript-eslint/types@8.70.0)
+
+  svelte-tiny-virtual-list@4.0.0(svelte@5.57.1(@typescript-eslint/types@8.70.0)):
+    dependencies:
       svelte: 5.57.1(@typescript-eslint/types@8.70.0)
 
   svelte-toolbelt@0.10.6(@sveltejs/kit@3.0.0-next.29(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@7.3.1(svelte@5.57.1(@typescript-eslint/types@8.70.0))(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.1(@typescript-eslint/types@8.70.0))(typescript@6.0.3)(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(svelte@5.57.1(@typescript-eslint/types@8.70.0)):

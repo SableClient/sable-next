@@ -26,6 +26,8 @@ const roomsFixture = vi.hoisted(() => {
     byId: (roomId: string | null) => fixture.rooms.find((room) => room.room_id === roomId),
     notificationOverride: () => null,
     unreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    badgeUnreadFor: (room: RoomSummary) => roomUnread(room, fixture.notificationMode(room.room_id)),
+    quietRoomIds: new Set<string>(),
     notificationsFor: (room: RoomSummary) =>
       roomNotifications(room, fixture.notificationMode(room.room_id)),
     ...muteAware,
@@ -142,7 +144,7 @@ beforeEach(() => {
   core.roomPermissions.mockReset();
   core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: false });
   notificationSettings.mockReset();
-  notificationSettings.mockResolvedValue({ room: null, default: 'mentions' });
+  notificationSettings.mockResolvedValue({ room: null, default: 'mentions', bridged: false });
 });
 
 afterEach(() => {
@@ -604,11 +606,11 @@ test('message search from a space is scoped to that space', async () => {
     .getAllByRole('link')
     .find((node) => node.getAttribute('href')?.startsWith('/search'));
   expect(search?.getAttribute('href')).toBe(
-    `/search?q=${encodeURIComponent('space:#design:example.org ')}`
+    `/search?q=${encodeURIComponent('space:#design:example.org ')}&space=!space%3Aexample.org`
   );
 });
 
-test('a space you cannot add rooms to offers a join instead of a create', async () => {
+test('a space you cannot add rooms to does not show a create action', async () => {
   roomsFixture.rooms = [
     makeRoom({ room_id: '!space:example.org', name: 'Design', is_space: true }),
   ];
@@ -616,7 +618,7 @@ test('a space you cannot add rooms to offers a join instead of a create', async 
 
   await mountNav();
   expect(screen.queryByRole('button', { name: 'nav.createRoomInSpace' })).not.toBeInTheDocument();
-  expect(screen.getByRole('link', { name: 'nav.joinWithAddress' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: 'nav.joinWithAddress' })).not.toBeInTheDocument();
 
   core.roomPermissions.mockResolvedValue({ can_invite: false, can_manage_children: true });
   cleanup();
@@ -929,4 +931,27 @@ test('a room set to all messages badges its unread messages in green', async () 
   );
   expect(within(row('Quiet')).getByText('6')).toHaveClass('unread-badge-count');
   expect(row('Quiet').querySelector('.unread-badge-highlight')).not.toBeInTheDocument();
+});
+
+test('a room whose parent space we are not in offers to join it', async () => {
+  roomsFixture.rooms = [makeRoom({ room_id: '!plain:example.org', name: 'Plain' })];
+  const unjoinedSpaceParents = vi.fn(() =>
+    Promise.resolve([{ room_id: '!parent:example.org', via: ['example.org'] }])
+  );
+  const roomPreview = vi.fn(() => Promise.resolve({ name: 'Parent' }));
+  const joinRoom = vi.fn(() => Promise.resolve('!parent:example.org'));
+  Object.assign(core, { unjoinedSpaceParents, roomPreview, joinRoom });
+  await mountNav();
+
+  await openMenu('Plain');
+  const join = await screen.findByRole('menuitem', {
+    name: 'room.menuJoinParentSpace:Parent',
+  });
+  await user.click(join);
+
+  expect(unjoinedSpaceParents).toHaveBeenCalledWith('!plain:example.org');
+  expect(roomPreview).toHaveBeenCalledWith('!parent:example.org', ['example.org']);
+  await vi.waitFor(() => {
+    expect(joinRoom).toHaveBeenCalledWith('!parent:example.org', ['example.org']);
+  });
 });

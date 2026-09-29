@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import type { RoomSummary } from '#src/generated/protocol';
 
-import { childRouting, spaceUnreadCounts, spacesContainingRoom } from './spaces';
+import { childRouting, quietRoomIds, spaceUnreadCounts, spacesContainingRoom } from './spaces';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
   return {
@@ -218,4 +218,48 @@ test('a space totals how much of its unread notified', () => {
 
   expect(totals?.unread).toBe(9);
   expect(totals?.notifying).toBe(4);
+});
+
+function child(roomId: string) {
+  return { room_id: roomId, via: [], order: null, origin_server_ts: 1, suggested: false };
+}
+
+test('a hidden space hides the unread of every room beneath it', () => {
+  const root = room({
+    room_id: '!root:example.org',
+    is_space: true,
+    space_children: [child('!sub:example.org'), child('!top:example.org')],
+  });
+  const sub = room({
+    room_id: '!sub:example.org',
+    is_space: true,
+    space_children: [child('!deep:example.org'), child('!root:example.org')],
+  });
+  const rooms = [
+    root,
+    sub,
+    room({ room_id: '!top:example.org' }),
+    room({ room_id: '!deep:example.org' }),
+  ];
+
+  expect(quietRoomIds(rooms, ['!sub:example.org'])).toEqual(
+    new Set(['!sub:example.org', '!deep:example.org', '!root:example.org', '!top:example.org'])
+  );
+  expect(quietRoomIds(rooms, ['!top:example.org'])).toEqual(new Set(['!top:example.org']));
+});
+
+test('a hidden room adds only its mentions to its space', () => {
+  const space = room({
+    room_id: '!space:example.org',
+    is_space: true,
+    space_children: [child('!quiet:example.org')],
+  });
+  const quiet = room({ room_id: '!quiet:example.org', unread: 5, notifying: 5 });
+  const mentioned = room({ room_id: '!quiet:example.org', unread: 5, notifying: 5, highlight: 1 });
+  const hidden = new Set([quiet.room_id]);
+
+  expect(spaceUnreadCounts([space], [space, quiet], () => 'all', hidden)).toEqual(new Map());
+  expect(
+    spaceUnreadCounts([space], [space, mentioned], () => 'all', hidden).get(space.room_id)
+  ).toEqual({ unread: 1, highlight: 1, marked: false, notifying: 0 });
 });

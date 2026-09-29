@@ -15,9 +15,12 @@
   let room = $derived(findRoomByPathId(roomList.rooms, roomId));
   let isForum = $derived(room?.room_type === FORUM_ROOM_TYPE);
   let isCalendar = $derived(room?.room_type === CALENDAR_ROOM_TYPE);
+  let eventTimeline = $derived(page.url.searchParams.get('timeline') === 'events');
 </script>
 
-{#if isForum}
+{#if eventTimeline}
+  <RoomPage />
+{:else if isForum}
   <ForumPage {roomId} />
 {:else if isCalendar}
   <CalendarPage {roomId} />

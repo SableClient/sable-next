@@ -64,7 +64,6 @@
     isMessageRow,
     jumboEmojiLevel,
     jumboEmoticonLevel,
-    senderColor,
   } from './timeline-format';
 
   import { MessageActionExecutor } from '../messages/message-action-controller.svelte.js';
@@ -224,30 +223,18 @@
   let replyCosmetics = $derived(
     replyPersona ? null : (roomCosmetics?.for(item.in_reply_to?.sender) ?? null)
   );
-  let replyTint = $derived(
-    personaWithColor(replyPersona) ??
-      (replyCosmetics && (replyCosmetics.colorOnLight || replyCosmetics.colorOnDark)
-        ? {
-            color_on_light: replyCosmetics.colorOnLight ?? replyCosmetics.colorOnDark,
-            color_on_dark: replyCosmetics.colorOnDark ?? replyCosmetics.colorOnLight,
-          }
-        : null)
-  );
   let replyProfile = $derived(itemProfiles.reply);
   let replySender = $derived(item.in_reply_to?.sender ?? null);
   let replyColors = $derived(
-    replySender === null
-      ? null
-      : senderDisplayColors(
-          replySender,
-          replyProfile,
-          replyPersona,
-          currentUserId !== null && replySender === currentUserId,
-          replyCosmetics,
-          senderRoles?.(replySender)?.color ?? null
-        )
+    senderDisplayColors(
+      replySender ?? '',
+      replyProfile,
+      replyPersona,
+      currentUserId !== null && replySender === currentUserId,
+      replyCosmetics,
+      replySender ? (senderRoles?.(replySender)?.color ?? null) : null
+    )
   );
-  let replyNameColor = $derived(replyColors?.nameColor ?? senderColor(null));
   let emote = $derived(item.content.kind === 'message' && item.content.emote);
   let notice = $derived(item.content.kind === 'message' && item.content.notice);
   let jumbo = $derived(
@@ -438,7 +425,15 @@
     if (!actionable) return;
     event.preventDefault();
     emoteAnchor = cursorAnchor(event);
-    openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => actions);
+    const link =
+      event.target instanceof Element
+        ? event.target.closest<HTMLAnchorElement>('a[href]')?.href
+        : null;
+    openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
+      ...actions,
+      onCopyLink: link ? () => void navigator.clipboard.writeText(link) : actions.onCopyLink,
+      copyLinkLabel: link ? 'timeline.copyLink' : undefined,
+    }));
   }
 
   // A virtualised row can unmount mid-press, so the pending timer has to go.
@@ -657,26 +652,22 @@
         : undefined}
     >
       {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
-        {@const tint = replyTint}
         {@const target = item.in_reply_to.event_id}
         <button
-          class={['reply-preview', 'reply-connected', { persona: tint }]}
+          class={['reply-preview', 'reply-connected']}
           type="button"
-          style:--pmp-on-light={nameColorOnLight(tint?.color_on_light) ?? undefined}
-          style:--pmp-on-dark={nameColorOnDark(tint?.color_on_dark) ?? undefined}
-          style:--reply-name-color={replyNameColor}
           onclick={() => {
             onJumpToEvent?.(target);
           }}
         >
           <span class="reply-copy"
-            ><span
-              class="reply-name"
-              class:tinted={replyColors?.tinted}
-              style:--name-color-on-light={replyColors?.nameColorLight ?? undefined}
-              style:--name-color-on-dark={replyColors?.nameColorDark ?? undefined}
-              style:font-family={replyCosmetics?.font ?? undefined}>{replyName}</span
-            >
+            ><SenderName
+              displayName={replyName}
+              colors={replyColors}
+              font={replyCosmetics?.font ?? null}
+              nameClass="reply-name"
+              compact
+            />
             <span class="reply-body">{replyBody}</span></span
           >
         </button>
@@ -717,27 +708,23 @@
       {/if}
       <div class="message-main">
         {#if item.in_reply_to && preferences.replyPreviewStyle !== 'connected'}
-          {@const tint = replyTint}
           {@const target = item.in_reply_to.event_id}
           <button
-            class={['reply-preview', `reply-${preferences.replyPreviewStyle}`, { persona: tint }]}
+            class={['reply-preview', `reply-${preferences.replyPreviewStyle}`]}
             type="button"
-            style:--pmp-on-light={nameColorOnLight(tint?.color_on_light) ?? undefined}
-            style:--pmp-on-dark={nameColorOnDark(tint?.color_on_dark) ?? undefined}
-            style:--reply-name-color={replyNameColor}
             onclick={() => {
               onJumpToEvent?.(target);
             }}
           >
             <ReplyIcon class="reply-icon" />
             <span class="reply-copy"
-              ><span
-                class="reply-name"
-                class:tinted={replyColors?.tinted}
-                style:--name-color-on-light={replyColors?.nameColorLight ?? undefined}
-                style:--name-color-on-dark={replyColors?.nameColorDark ?? undefined}
-                style:font-family={replyCosmetics?.font ?? undefined}>{replyName}</span
-              >
+              ><SenderName
+                displayName={replyName}
+                colors={replyColors}
+                font={replyCosmetics?.font ?? null}
+                nameClass="reply-name"
+                compact
+              />
               <span class="reply-body">{replyBody}</span></span
             >
           </button>
@@ -1680,14 +1667,6 @@
     -webkit-line-clamp: 6;
     line-clamp: 6;
     overflow: hidden;
-  }
-
-  .reply-preview .reply-name:not(.tinted) {
-    color: var(--reply-name-color);
-  }
-
-  .reply-preview.persona .reply-name {
-    color: var(--pmp-ink);
   }
 
   .reply-preview:is(:hover, :focus-visible) .reply-body {

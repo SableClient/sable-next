@@ -8,7 +8,7 @@ test('mobile: the profile card keeps its actions inside the card', async ({
 }) => {
   await installRoomCore('ready');
   await page.goto('/profile');
-  await expect(page.getByRole('heading', { name: 'Your presence' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible();
 
   const cardBox = await page.locator('.profile-card').boundingBox();
   const actionsBox = await page.locator('.profile-card-actions').boundingBox();

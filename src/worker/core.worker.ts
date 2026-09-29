@@ -21,7 +21,8 @@ const core = init().then(() => {
     () => loadSession(),
     (bytes: Uint8Array) => saveSession(bytes),
     () => clearSession(),
-    new URLSearchParams(self.location.search).get('log')
+    new URLSearchParams(self.location.search).get('log'),
+    new URLSearchParams(self.location.search).get('event-cache') !== 'memory'
   );
 
   return instance;

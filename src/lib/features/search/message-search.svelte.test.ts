@@ -130,6 +130,18 @@ test('a short page marks the results exhausted', async () => {
   expect(searchMessages).toHaveBeenCalledTimes(1);
 });
 
+test('a page with repeated events keeps each event once', async () => {
+  const searchMessages = vi.fn().mockResolvedValue(page([hit('$duplicate'), hit('$duplicate')]));
+  const { core } = coreReturning(searchMessages);
+  const search = new MessageSearch(core, () => resolvers);
+
+  search.query = 'deploy';
+  search.schedule();
+  await vi.advanceTimersByTimeAsync(500);
+
+  expect(search.hits.map((entry) => entry.event_id)).toEqual(['$duplicate']);
+});
+
 test('a full page loads more and appends', async () => {
   const firstPage = Array.from({ length: 30 }, (_, index) => hit(`$first${String(index)}`));
   const searchMessages = vi
@@ -236,7 +248,7 @@ test('interleaved rooms produce distinct group keys', async () => {
     page([
       { ...hit('$a'), room_id: '!one:example.org' },
       { ...hit('$b'), room_id: '!two:example.org' },
-      { ...hit('$a'), room_id: '!one:example.org' },
+      { ...hit('$c'), room_id: '!one:example.org' },
     ])
   );
   const { core } = coreReturning(searchMessages);

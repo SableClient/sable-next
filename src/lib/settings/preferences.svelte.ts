@@ -60,6 +60,7 @@ export interface Preferences {
   messageSpacing: MessageSpacing;
   timelineEmoteSize: TimelineEmoteSize;
   theme: ThemeMode;
+  quickCss: string;
   underlineLinks: boolean;
   renderRoomColors: boolean;
   renderRoomFonts: boolean;
@@ -160,6 +161,7 @@ export interface Preferences {
   faviconForMentionsOnly: boolean;
   ringForGroupCalls: boolean;
   alwaysShowCallButton: boolean;
+  callScreenPreview: boolean;
   incomingCallSound: boolean;
   outgoingRingback: boolean;
   callRingtoneVolume: CallRingtoneVolume;
@@ -252,6 +254,7 @@ const ENUMS = {
 /** Strings with no fixed set of values, which `load` would otherwise drop and
     `SelectPreference` would otherwise claim. */
 const FREE_TEXT = [
+  'quickCss',
   'audioInputDevice',
   'audioOutputDevice',
   'videoInputDevice',
@@ -281,6 +284,7 @@ const DEFAULTS: Preferences = {
   messageSpacing: 'cozy',
   timelineEmoteSize: 'default',
   theme: 'system',
+  quickCss: '',
   underlineLinks: true,
   renderRoomColors: true,
   renderRoomFonts: true,
@@ -381,6 +385,7 @@ const DEFAULTS: Preferences = {
   faviconForMentionsOnly: false,
   ringForGroupCalls: false,
   alwaysShowCallButton: false,
+  callScreenPreview: true,
   incomingCallSound: true,
   outgoingRingback: true,
   callRingtoneVolume: 'normal',

@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { trackKeyboardInset } from './keyboard';
+import { resetDocumentScroll, trackKeyboardInset } from './keyboard';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -91,4 +91,61 @@ test('pinch zoom and panning do not become keyboard insets', async () => {
   await vi.runAllTimersAsync();
   expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   stop();
+});
+
+test('a document offset the shell cannot scroll back is zeroed', () => {
+  const scrollTo = vi.fn();
+  vi.stubGlobal('scrollTo', scrollTo);
+  vi.stubGlobal('scrollY', 120);
+  Object.defineProperty(document, 'scrollingElement', {
+    value: { scrollHeight: 800, clientHeight: 800 },
+    configurable: true,
+  });
+  try {
+    resetDocumentScroll();
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  } finally {
+    delete (document as { scrollingElement?: unknown }).scrollingElement;
+  }
+});
+
+test('a document that genuinely scrolls keeps its offset', () => {
+  const scrollTo = vi.fn();
+  vi.stubGlobal('scrollTo', scrollTo);
+  vi.stubGlobal('scrollY', 120);
+  Object.defineProperty(document, 'scrollingElement', {
+    value: { scrollHeight: 2000, clientHeight: 800 },
+    configurable: true,
+  });
+  try {
+    resetDocumentScroll();
+    expect(scrollTo).not.toHaveBeenCalled();
+  } finally {
+    delete (document as { scrollingElement?: unknown }).scrollingElement;
+  }
+});
+
+test('a window scroll event zeroes a wedged document offset', async () => {
+  vi.useFakeTimers();
+  const scrollTo = vi.fn();
+  vi.stubGlobal('scrollTo', scrollTo);
+  vi.stubGlobal('scrollY', 0);
+  const viewport = Object.assign(new EventTarget(), { height: 500, offsetTop: 0 });
+  vi.stubGlobal('visualViewport', viewport);
+  vi.stubGlobal('innerHeight', 800);
+  Object.defineProperty(document, 'scrollingElement', {
+    value: { scrollHeight: 800, clientHeight: 800 },
+    configurable: true,
+  });
+  const stop = trackKeyboardInset();
+  try {
+    vi.stubGlobal('scrollY', 40);
+    window.dispatchEvent(new Event('scroll'));
+    await vi.runAllTimersAsync();
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(scrollTo).toHaveBeenCalledWith(0, 0);
+  } finally {
+    stop();
+    delete (document as { scrollingElement?: unknown }).scrollingElement;
+  }
 });

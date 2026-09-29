@@ -66,6 +66,7 @@ jobs:
         uses: ./.forgejo/actions/rust
         with:
           components: clippy
+          tauri-dependencies: 'true'
           cache-key: workspace
 
       - name: Run Clippy

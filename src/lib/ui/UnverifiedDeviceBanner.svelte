@@ -15,7 +15,8 @@
   const deviceId = $derived(core.session?.device_id ?? null);
   const selfUnverified = $derived(core.encryption?.verification === 'unverified');
   const otherUnverified = $derived(
-    core.deviceList.filter((device) => !device.is_own && !device.is_verified).length
+    core.deviceList.filter((device) => !device.is_own && device.has_keys && !device.is_verified)
+      .length
   );
   const inAppShell = $derived(page.route.id?.startsWith('/(app)') ?? false);
   const dismissKey = $derived(

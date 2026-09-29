@@ -96,7 +96,7 @@
   );
   let callRoom = $derived(roomList.byId(call.roomId));
   let spaceUnread = $derived(
-    spaceUnreadCounts(spaces, roomList.rooms, roomList.notificationModeOf)
+    spaceUnreadCounts(spaces, roomList.rooms, roomList.notificationModeOf, roomList.quietRoomIds)
   );
   let callSpaces = $derived(
     call.active ? spacesContainingRoom(spaces, roomList.rooms, call.roomId) : new Set<string>()
@@ -114,7 +114,7 @@
   );
   let directRooms = $derived(
     allDirectRooms
-      .filter((room) => hasUnread(roomList.unreadFor(room)))
+      .filter((room) => hasUnread(roomList.badgeUnreadFor(room)))
       .sort(
         (left, right) => (right.latest_event?.timestamp ?? 0) - (left.latest_event?.timestamp ?? 0)
       )
@@ -129,7 +129,7 @@
   );
 
   function unreadCounts(rooms: readonly RoomSummary[]): UnreadCount {
-    return rooms.reduce((total, room) => addUnread(total, roomList.unreadFor(room)), {
+    return rooms.reduce((total, room) => addUnread(total, roomList.badgeUnreadFor(room)), {
       unread: 0,
       highlight: 0,
     });
@@ -230,7 +230,7 @@
           {unspacedUnread}
           {directRooms}
           {directUnread}
-          unreadFor={roomList.unreadFor}
+          unreadFor={roomList.badgeUnreadFor}
           mobile
           {onNavigate}
           {...railProps}
@@ -255,7 +255,7 @@
           {unspacedUnread}
           {directRooms}
           {directUnread}
-          unreadFor={roomList.unreadFor}
+          unreadFor={roomList.badgeUnreadFor}
           compact={collapsed}
           {...railProps}
         />

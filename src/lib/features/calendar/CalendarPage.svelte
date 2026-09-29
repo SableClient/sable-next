@@ -1,15 +1,19 @@
 <script lang="ts">
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
   import type { CalendarView, MemberView, RoomPermissionsView } from '#src/generated/protocol';
 
+  import { goto } from '$app/navigation';
   import { useCoreClient } from '#lib/core/context.js';
+  import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import { memberName } from '#lib/features/room/members/members.js';
   import { backToRoomList, trackRoomEntry } from '#lib/features/room/room-navigation.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -56,7 +60,7 @@
   let permissions = $state<RoomPermissionsView | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let showPast = $state(false);
-  let editing = $state<CalendarItem | null>(null);
+  let editing = $state.raw<CalendarItem | null>(null);
   let dialogOpen = $state(false);
   let deleting = $state<CalendarItem | null>(null);
   let deleteBusy = $state(false);
@@ -244,6 +248,16 @@
       />
     {/snippet}
     {#snippet suffix()}
+      {#if preferences.developerTools}
+        <PanelHeaderButton
+          label={$i18n.t('timeline.eventTimeline')}
+          onclick={() => {
+            void goto(eventTimelinePath(resolvedRoomId));
+          }}
+        >
+          <ListBulletsIcon />
+        </PanelHeaderButton>
+      {/if}
       {#if permissions?.can_post !== false}
         <PanelHeaderButton label={$i18n.t('calendar.newTitle')} onclick={openNew}>
           <PlusIcon />

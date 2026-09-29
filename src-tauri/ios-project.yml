@@ -153,6 +153,20 @@ targets:
         ENABLE_BITCODE: false
         ARCHS: [{{join ios-valid-archs}}]
         VALID_ARCHS: {{~#each ios-valid-archs}} {{this}} {{/each}}
+        # Force LiveKit's Objective-C delegate categories out of its static archive.
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - "-Wl,-u,_$s7LiveKit4RoomC3add8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit4RoomC6remove8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit4RoomC15allParticipantsSDyAA11ParticipantC8IdentityCAFGvg"
+          - "-Wl,-u,_$s7LiveKit11ParticipantC3add8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit11ParticipantC6remove8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit5TrackC3add8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit5TrackC6remove8delegateyAA0C8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit13VideoCapturerC3add8delegateyAA0cD8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit13VideoCapturerC6remove8delegateyAA0cD8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit9VideoViewC3add8delegateyAA0cD8Delegate_p_tF"
+          - "-Wl,-u,_$s7LiveKit9VideoViewC6remove8delegateyAA0cD8Delegate_p_tF"
         LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { render, screen } from '@testing-library/svelte';
+import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 vi.mock('#lib/core/context.js');
@@ -37,4 +38,25 @@ test('renders every SAS emoji slot when a symbol repeats', () => {
   expect(screen.getAllByText('🐶')).toHaveLength(2);
   expect(screen.getByText('Dog')).toBeInTheDocument();
   expect(screen.getByText('Dog again')).toBeInTheDocument();
+});
+
+test('dismissing an active flow cancels it and clears it so a new request can reopen the panel', async () => {
+  core.verification = {
+    flowId: 'flow',
+    state: { phase: 'requested' as const, is_self: true, initiated_by_us: true },
+  };
+  render(DeviceVerificationDialog);
+
+  const user = userEvent.setup();
+  await screen.findByRole('dialog');
+  await user.keyboard('{Escape}');
+
+  await vi.waitFor(() => {
+    expect(core.commands.cancelVerification).toHaveBeenCalledWith(
+      '@alice:example.org',
+      'flow',
+      false
+    );
+    expect(core.verification).toBeNull();
+  });
 });

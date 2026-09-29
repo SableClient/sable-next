@@ -10,6 +10,7 @@ import {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { hasCompleteOverride, pushConfig, type PushOverride } from './push-config';
+import { clearPushFailure, PushConfigMissing, recordPushFailure } from './push-failure';
 
 export type PushProvider = 'auto' | 'fcm' | 'unifiedpush' | 'embedded';
 
@@ -22,7 +23,7 @@ async function register(
   if (!(await deliversNativePush())) return;
 
   const { resolved, details } = await pushConfig(override);
-  if (!resolved) throw new Error('Push gateway is not configured');
+  if (!resolved) throw new PushConfigMissing();
 
   await registerNativePushConfig({
     gatewayUrl: resolved.gateway,
@@ -76,7 +77,15 @@ export function registerNativePush(
   session: SessionInfo | null,
   accounts: readonly SessionInfo[]
 ): Promise<void> {
-  return enqueue(() => register(override, session, accounts));
+  return enqueue(async () => {
+    try {
+      await register(override, session, accounts);
+      clearPushFailure();
+    } catch (error) {
+      recordPushFailure(error);
+      throw error;
+    }
+  });
 }
 
 export function unregisterNativePush(): Promise<void> {
@@ -139,7 +148,7 @@ export function switchPushDistributor(
     const available = await listPushDistributors();
     if (!available.includes(name)) throw new Error('Distributor is not available');
     const { resolved } = await pushConfig(override);
-    if (!resolved) throw new Error('Push gateway is not configured');
+    if (!resolved) throw new PushConfigMissing();
     const previous = selectedPushDistributor();
     try {
       await setPushDistributor(name);

@@ -6,3 +6,8 @@ export function isNativeMobile(): boolean {
   const os = osType();
   return os === 'ios' || os === 'android';
 }
+
+export function supportsKeyboardShortcuts(): boolean {
+  if (isNativeMobile()) return false;
+  return typeof matchMedia !== 'function' || matchMedia('(any-pointer: fine)').matches;
+}

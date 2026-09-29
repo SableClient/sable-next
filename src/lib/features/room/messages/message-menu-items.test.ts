@@ -18,6 +18,12 @@ test('bookmark reads back the state it was given', () => {
   expect(plain.find((row) => row.key === 'bookmark')?.label).toBe('timeline.bookmarkMessage');
 });
 
+test('message permalinks are labelled separately from body links', () => {
+  const rows = messageMenuRows({ onCopyLink: () => {} });
+
+  expect(rows.find((row) => row.key === 'link')?.label).toBe('timeline.copyMessageLink');
+});
+
 test('version history sits with the other inspection rows', () => {
   const rows = messageMenuRows({
     onReadReceipts: () => {},

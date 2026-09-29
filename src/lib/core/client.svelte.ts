@@ -127,6 +127,7 @@ export class CoreClient {
   accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
+  storageInterrupted = $state(false);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -142,6 +143,7 @@ export class CoreClient {
   private unsubscribeTransport: (() => void) | null = null;
   private startPromise: Promise<void> | null = null;
   private generation = 0;
+  private encryptionEvents = 0;
   private readonly accountChannel =
     typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('sable-active-account');
   /* Nothing renders from these, and a reactive map would make every mounted
@@ -656,6 +658,15 @@ export class CoreClient {
   }
 
   async requestVerification(userId: string, deviceId: string | null = null): Promise<string> {
+    const pending = this.verification;
+    if (
+      userId === this.session?.user_id &&
+      pending?.state.phase === 'requested' &&
+      !pending.state.initiated_by_us
+    ) {
+      await this.commands.acceptVerification(userId, pending.flowId);
+      return pending.flowId;
+    }
     const response = await this.ensureTransport().send({
       type: 'request_verification',
       user_id: userId,
@@ -741,14 +752,15 @@ export class CoreClient {
   /** Both events fire only on a change, so a session that starts unverified
       would otherwise report nothing. */
   private async primeEncryptionStatus(): Promise<void> {
-    const generation = this.generation;
+    const revision = this.accountRevision;
+    const reported = this.encryptionEvents;
     try {
       const [status, devices] = await Promise.all([
         this.commands.encryptionStatus(),
         this.commands.devices(),
       ]);
-      if (generation !== this.generation) return;
-      this.encryption = status;
+      if (revision !== this.accountRevision) return;
+      if (reported === this.encryptionEvents) this.encryption = status;
       this.deviceList = devices.devices;
     } catch (error) {
       console.debug('[sable core] encryption status unavailable', error);
@@ -829,6 +841,9 @@ export class CoreClient {
       this.cleanupTransport();
       this.status = 'error';
     });
+    const unsubscribeStorageFailure = transport.subscribeStorageFailure?.(() => {
+      this.storageInterrupted = true;
+    });
     const unsubscribeStall = transport.subscribeStall((stalled) => {
       this.unresponsive = stalled;
     });
@@ -838,6 +853,7 @@ export class CoreClient {
     this.unsubscribeTransport = () => {
       unsubscribeEvents();
       unsubscribeCrash();
+      unsubscribeStorageFailure?.();
       unsubscribeStall();
       stopLogCapture();
     };
@@ -865,10 +881,10 @@ export class CoreClient {
   }
 
   private async primeSyncStatus(): Promise<void> {
-    const generation = this.generation;
+    const revision = this.accountRevision;
     try {
       const status = await this.commands.syncStatus();
-      if (generation !== this.generation || this.sync !== null) return;
+      if (revision !== this.accountRevision || this.sync !== null) return;
       this.applySyncStatus(status);
     } catch (error) {
       console.debug('[sable core] sync status unavailable', error);
@@ -902,6 +918,7 @@ export class CoreClient {
         this.applySyncStatus(event);
         return;
       case 'encryption_status':
+        this.encryptionEvents += 1;
         this.encryption = event.status;
         return;
       case 'devices_changed':
@@ -913,6 +930,9 @@ export class CoreClient {
         return;
       case 'account_data_changed':
         if (isPackAccountDataEvent(event.event_type)) invalidatePacks(this.commands);
+        return;
+      case 'image_packs_changed':
+        invalidatePacks(this.commands);
         return;
       case 'session_ended':
         this.reauthenticationAccountId = this.session?.account_id ?? null;

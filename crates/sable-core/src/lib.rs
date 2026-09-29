@@ -34,6 +34,7 @@ mod registration;
 mod room_keys;
 mod rooms;
 mod scheduled;
+mod sealed_account_data;
 pub mod search;
 pub mod session;
 pub mod spaces;
@@ -77,6 +78,7 @@ pub(crate) type Task = AbortOnDrop<()>;
 /// `CoreEvent`s out.
 pub struct Core {
     store_id: String,
+    persistent_event_cache: bool,
     sessions: Box<dyn SessionStore>,
     events: mpsc::UnboundedSender<CoreEvent>,
     next_subscription: AtomicU32,
@@ -199,9 +201,19 @@ impl Core {
         store_id: impl Into<String>,
         sessions: Box<dyn SessionStore>,
     ) -> (Arc<Self>, mpsc::UnboundedReceiver<CoreEvent>) {
+        Self::new_with_event_cache(store_id, sessions, true)
+    }
+
+    #[allow(clippy::arc_with_non_send_sync)] // WASM keeps the core on one event-loop thread
+    pub fn new_with_event_cache(
+        store_id: impl Into<String>,
+        sessions: Box<dyn SessionStore>,
+        persistent_event_cache: bool,
+    ) -> (Arc<Self>, mpsc::UnboundedReceiver<CoreEvent>) {
         let (events, rx) = mpsc::unbounded_channel();
         let core = Arc::new(Self {
             store_id: store_id.into(),
+            persistent_event_cache,
             sessions,
             events,
             notification_content: AtomicBool::new(false),
@@ -395,8 +407,10 @@ impl Core {
             .cloned();
 
         match resolved {
-            Some(url) => session::build_client_at(store_id, &url).await,
-            None => session::build_client(store_id, homeserver).await,
+            Some(url) => {
+                session::build_client_at(store_id, &url, self.persistent_event_cache).await
+            }
+            None => session::build_client(store_id, homeserver, self.persistent_event_cache).await,
         }
     }
 
@@ -834,6 +848,10 @@ mod sdk_notification_tests;
 #[cfg(all(test, not(target_family = "wasm")))]
 #[allow(clippy::large_futures)]
 mod sdk_helpers_tests;
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[allow(clippy::large_futures)]
+mod sdk_verification_tests;
 
 #[cfg(test)]
 #[allow(clippy::large_futures)]

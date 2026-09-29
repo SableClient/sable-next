@@ -1,15 +1,12 @@
-use std::{
-    collections::HashSet,
-    sync::{Mutex, OnceLock},
-};
+use std::sync::OnceLock;
 
 use tauri::{AppHandle, Manager};
 
-use crate::BrowserEngine;
+use crate::{BrowserEngine, permission_grants::Grants};
 
-fn granted() -> &'static Mutex<HashSet<&'static str>> {
-    static GRANTED: OnceLock<Mutex<HashSet<&'static str>>> = OnceLock::new();
-    GRANTED.get_or_init(|| Mutex::new(HashSet::new()))
+fn granted() -> &'static Grants {
+    static GRANTED: OnceLock<Grants> = OnceLock::new();
+    GRANTED.get_or_init(|| Grants::load(&["media", "notifications", "location"]))
 }
 
 fn prompt(message: &str, resolve: impl FnOnce(bool) + 'static) {
@@ -37,21 +34,14 @@ fn prompt(message: &str, resolve: impl FnOnce(bool) + 'static) {
 }
 
 fn resolve(key: &'static str, message: &'static str, answer: impl FnOnce(bool) + 'static) {
-    if granted()
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .contains(key)
-    {
+    if granted().contains_all(&[key]) {
         answer(true);
         return;
     }
 
     prompt(message, move |allowed| {
         if allowed {
-            granted()
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .insert(key);
+            granted().grant(&[key]);
         }
         answer(allowed);
     });

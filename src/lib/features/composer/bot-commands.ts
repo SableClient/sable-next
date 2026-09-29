@@ -188,9 +188,9 @@ export function botCommandNames(command: BotCommand): string[] {
 export function matchBotCommand(
   line: string,
   commands: readonly BotCommand[]
-): { command: BotCommand; args: string } | null {
+): { command: BotCommand; args: string; rawArgs: string } | null {
   const lower = line.toLowerCase();
-  let best: { command: BotCommand; args: string; length: number } | null = null;
+  let best: { command: BotCommand; args: string; rawArgs: string; length: number } | null = null;
   for (const command of commands) {
     for (const name of botCommandNames(command)) {
       const candidate = name.toLowerCase();
@@ -198,10 +198,10 @@ export function matchBotCommand(
       const rest = line.slice(candidate.length);
       if (rest !== '' && !/^\s/.test(rest)) continue;
       if (best && best.length >= candidate.length) continue;
-      best = { command, args: rest.trim(), length: candidate.length };
+      best = { command, args: rest.trim(), rawArgs: rest, length: candidate.length };
     }
   }
-  return best && { command: best.command, args: best.args };
+  return best && { command: best.command, args: best.args, rawArgs: best.rawArgs };
 }
 
 const USER_ID = /^@[^:\s]+:\S+$/;

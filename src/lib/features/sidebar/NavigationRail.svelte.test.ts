@@ -24,7 +24,7 @@ vi.mock('$app/paths', () => ({
 vi.mock('#lib/i18n.js', () => import('#lib/test-support/i18n.js'));
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
   roomPathParam: (room: RoomSummary) => encodeURIComponent(room.room_id),
-  useRoomList: () => ({ rooms: [] }),
+  useRoomList: () => ({ rooms: [], quietRoomIds: new Set() }),
 }));
 vi.mock('#lib/core/context.js');
 

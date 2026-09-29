@@ -3,7 +3,10 @@ import {
   ConnectionQuality,
   ConnectionState,
   LocalAudioTrack,
+  LocalVideoTrack,
   Room as LivekitRoom,
+  type ScreenShareCaptureOptions,
+  type TrackPublishOptions,
   type LocalParticipant,
   type RemoteParticipant,
   RoomEvent,
@@ -17,6 +20,7 @@ import {
   screenAudioSupported,
   stopScreenAudio,
 } from '#lib/platform/screen-audio.js';
+import { startHdrShare, stopHdrShare } from '#lib/platform/hdr-share.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import type {
@@ -93,6 +97,23 @@ export type LivekitTransportOptions = {
 
 const defaultWorker = (): Worker =>
   new Worker(new URL('livekit-client/e2ee-worker', import.meta.url), { type: 'module' });
+
+const SCREEN_AUDIO_PUBLISH: TrackPublishOptions = {
+  audioPreset: AudioPresets.musicHighQualityStereo,
+  forceStereo: true,
+  dtx: false,
+  red: false,
+};
+
+const DISPLAY_AUDIO_CAPTURE: ScreenShareCaptureOptions = {
+  audio: {
+    channelCount: 2,
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false,
+  },
+  systemAudio: 'include',
+};
 
 export function createLivekitTransport(options: LivekitTransportOptions): LivekitTransport {
   const keyProvider = options.encryptMedia ? new MatrixKeyProvider() : undefined;
@@ -424,6 +445,17 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   };
 
   let screenAudio: LocalAudioTrack | null = null;
+  let hdrScreen: LocalVideoTrack | null = null;
+
+  const stopHdrScreen = async (): Promise<void> => {
+    const track = hdrScreen;
+    hdrScreen = null;
+    if (!track) return;
+    await room.localParticipant.unpublishTrack(track, true).catch(ignoreError);
+    await stopHdrShare().catch((error: unknown) => {
+      fail('call.screen_share.hdr_stop', error);
+    });
+  };
 
   const stopSharingAudio = async (): Promise<void> => {
     const track = screenAudio;
@@ -441,11 +473,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       const track = new LocalAudioTrack(await captureScreenAudio(choice), undefined, false);
       screenAudio = track;
       await room.localParticipant.publishTrack(track, {
+        ...SCREEN_AUDIO_PUBLISH,
         source: Track.Source.ScreenShareAudio,
-        audioPreset: AudioPresets.musicHighQualityStereo,
-        forceStereo: true,
-        dtx: false,
-        red: false,
       });
     } catch (error) {
       fail('call.screen_share.audio', error);
@@ -481,6 +510,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       healthTimer = undefined;
       try {
         await stopSharingAudio();
+        await stopHdrScreen();
         await room.disconnect();
       } finally {
         worker?.terminate();
@@ -510,10 +540,38 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     getState: () => ({ ...state, participants: [...state.participants] }),
     capabilities: {
       screenShare: {
-        setEnabled: async (enabled, audio) => {
+        setEnabled: async (enabled, audio, source) => {
           if (disposed || options.publishMedia === false) return;
+          if (enabled && source?.kind === 'hdr') {
+            await step('call.screen_share.hdr', async () => {
+              const track = new LocalVideoTrack(
+                await startHdrShare(source.monitor, () => {
+                  void stopHdrScreen().then(stopSharingAudio).then(syncLocal);
+                }),
+                undefined,
+                true
+              );
+              hdrScreen = track;
+              await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShare });
+            });
+            await shareAudio(audio);
+            syncLocal();
+            return;
+          }
+          if (!enabled && hdrScreen) {
+            await stopHdrScreen();
+            await stopSharingAudio();
+            syncLocal();
+            return;
+          }
           await step('call.screen_share.set', () =>
-            room.localParticipant.setScreenShareEnabled(enabled)
+            enabled && !screenAudioSupported()
+              ? room.localParticipant.setScreenShareEnabled(
+                  true,
+                  DISPLAY_AUDIO_CAPTURE,
+                  SCREEN_AUDIO_PUBLISH
+                )
+              : room.localParticipant.setScreenShareEnabled(enabled)
           );
           if (enabled && room.localParticipant.isScreenShareEnabled) await shareAudio(audio);
           else if (!enabled) await stopSharingAudio();

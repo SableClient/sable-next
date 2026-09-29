@@ -24,6 +24,7 @@
         resolve('/(app)/space/[spaceId]', { spaceId: param }),
         savedSpacePaths()[space.room_id],
         resolve('/(app)/space/[spaceId]/lobby', { spaceId: param }),
+        resolve('/(app)/search'),
         (pathId) => findRoomByPathId(roomList.rooms, pathId)?.state === 'joined'
       );
     });

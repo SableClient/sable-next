@@ -39,9 +39,21 @@ export async function permissionState(): Promise<NotificationGrant | 'unsupporte
   return nativeNotificationPermission();
 }
 
+const grantListeners = new Set<() => void>();
+
+export function onPermissionGranted(listener: () => void): () => void {
+  grantListeners.add(listener);
+  return () => {
+    grantListeners.delete(listener);
+  };
+}
+
 export async function grantPermission(): Promise<boolean> {
-  if (presentsInApp()) return (await requestPermission()) === 'granted';
-  return (await requestNativeNotificationPermission()) === 'granted';
+  const granted = presentsInApp()
+    ? (await requestPermission()) === 'granted'
+    : (await requestNativeNotificationPermission()) === 'granted';
+  if (granted) for (const listener of grantListeners) listener();
+  return granted;
 }
 
 export function title(view: NotificationView): string {

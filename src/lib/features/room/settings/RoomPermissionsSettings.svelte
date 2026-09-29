@@ -25,6 +25,7 @@
 
   import { ancestorSpaceIds, descendantRoomIds } from '../abbreviations.js';
   import MemberIdentityRow from '../members/MemberIdentityRow.svelte';
+  import { FOUNDER_POWER_LEVEL } from '../members/power-tags';
   import ReactionPicker from '../messages/ReactionPicker.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import {
@@ -57,6 +58,7 @@
   const permissionActions = new RoomPermissionActions(core);
 
   const namedLevels: readonly { level: number; label: string }[] = [
+    { level: FOUNDER_POWER_LEVEL, label: 'timeline.powerTagFounder' },
     { level: 100, label: 'timeline.powerLevelAdmin' },
     { level: 50, label: 'timeline.powerLevelModerator' },
     { level: 0, label: 'timeline.powerLevelMember' },

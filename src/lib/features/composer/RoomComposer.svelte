@@ -24,7 +24,7 @@
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
   import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { loadPacks } from '#lib/emoji/load-packs.js';
+  import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
   import { pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
@@ -351,6 +351,8 @@
     return core.subscribeEvents((event) => {
       if (event.type === 'bot_commands_changed' && event.room_id === target) {
         loadedBotCommandsFor = null;
+        botCommandsFor = null;
+        botCommands = [];
       }
     });
   });
@@ -359,6 +361,14 @@
     void roomId;
     activeBotCommand = null;
   });
+
+  $effect(() =>
+    core.subscribeEvents((event) => {
+      if (!isPackChange(event)) return;
+      loadedEmotesFor = null;
+      if (query?.sigil === ':') void loadEmotes();
+    })
+  );
 
   async function loadAdminCatalog(): Promise<void> {
     if (adminCommands) return;
@@ -695,6 +705,18 @@
     if (!matched) return false;
 
     editor.clear();
+    if (matched.command.parameters.length === 0 && matched.args !== '') {
+      const body = `${typed.prefix}${matched.command.command}${matched.rawArgs}`;
+      if (
+        !(await sendBotCommand(matched.command, body, {
+          command: matched.command.command,
+          arguments: {},
+        }))
+      ) {
+        editor.setText(text);
+      }
+      return true;
+    }
     const drafts = draftsFromText(matched.command, matched.args);
     const result = buildInvocation(matched.command, drafts, typed.prefix);
     if (result.ok) {

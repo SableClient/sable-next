@@ -168,8 +168,9 @@ test('places a connected reply preview above the sender header', async () => {
   expect(message?.classList.contains('has-connected-reply')).toBe(true);
   expect(message?.querySelector(':scope > .message-avatar')).not.toBeNull();
   expect(reply?.nextElementSibling?.tagName).toBe('HEADER');
-  expect(reply?.style.getPropertyValue('--reply-name-color')).toBe(senderColor('@bob:example.org'));
-  expect(reply?.querySelector('.reply-name')?.textContent).toBe('Bob');
+  const name = reply?.querySelector<HTMLElement>('.reply-name');
+  expect(name?.style.color).toBe(senderColor('@bob:example.org'));
+  expect(name?.textContent).toBe('Bob');
   await press(reply);
   expect(onJumpToEvent).toHaveBeenCalledWith('$original');
 });
@@ -899,7 +900,10 @@ test('mounts the action bar on hover and keeps it while its menu is open', async
 
 test('opens message actions on right click', async () => {
   render(TimelineItemHarness, {
-    props: { core, item: { item: item(false), collapsed: false, onReply: vi.fn() } },
+    props: {
+      core,
+      item: { item: item(false), collapsed: false, onReply: vi.fn(), onCopyLink: vi.fn() },
+    },
   });
   await tick();
   const message = document.querySelector('.message');
@@ -909,6 +913,30 @@ test('opens message actions on right click', async () => {
   await tick();
 
   expect(menuLabels()).toContain('Reply');
+  expect(menuLabels()).toContain('Copy link to message');
+});
+
+test('copies a message link when it is right-clicked', async () => {
+  const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue();
+  const linked = item(false);
+  if (linked.content.kind !== 'message') throw new Error('expected a message');
+  linked.content.html = '<a href="https://example.org">Link</a>';
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: {
+        item: linked,
+        collapsed: false,
+        onReply: vi.fn(),
+      },
+    },
+  });
+  await tick();
+
+  await openMenu(screen.getByRole('link', { name: 'Link' }));
+  await press(menuItem('Copy link'));
+
+  expect(writeText).toHaveBeenCalledWith('https://example.org/');
 });
 
 test('downloads an image from its message menu, with progress on the message', async () => {

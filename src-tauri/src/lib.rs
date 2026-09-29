@@ -18,9 +18,13 @@ mod map_tiles;
 pub use map_tiles::TILE_URI_SCHEME;
 #[cfg(target_os = "android")]
 mod cold_push;
+#[cfg(target_os = "linux")]
+mod hdr_share;
 #[cfg(target_os = "android")]
 mod mobile;
 mod notifications;
+#[cfg(target_os = "linux")]
+pub mod permission_grants;
 #[cfg(all(feature = "cef", target_os = "linux"))]
 mod portal_theme;
 #[cfg(desktop)]
@@ -337,7 +341,7 @@ async fn register_push(
     app: AppHandle<BrowserEngine>,
     state: State<'_, AppState>,
     config: notifications::PushConfig,
-) -> Result<(), CommandErr> {
+) -> Result<(), notifications::PushRegistrationError> {
     let core = state.core.clone();
     Box::pin(notifications::register_push(&app, &core, config)).await
 }
@@ -579,6 +583,61 @@ fn toggle_devtools(window: tauri::WebviewWindow<BrowserEngine>) {
     }
 }
 
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn hdr_monitors() -> Vec<sable_hdr::share::HdrMonitor> {
+    tauri::async_runtime::spawn_blocking(sable_hdr::share::list)
+        .await
+        .unwrap_or_default()
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn start_hdr_share(app: AppHandle<BrowserEngine>, index: usize) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || sable_hdr::share::start(app, index))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+fn hdr_frame_done(slot: usize) {
+    sable_hdr::share::release(slot);
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+async fn stop_hdr_share() {
+    let _ = tauri::async_runtime::spawn_blocking(sable_hdr::share::stop).await;
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn hdr_monitors() -> Vec<hdr_share::HdrMonitor> {
+    tauri::async_runtime::spawn_blocking(hdr_share::monitors)
+        .await
+        .unwrap_or_default()
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn start_hdr_share(frames: tauri::ipc::Channel<tauri::ipc::Response>) -> Result<(), String> {
+    let _ = tauri::async_runtime::spawn_blocking(hdr_share::stop).await;
+    hdr_share::start(frames).await
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn hdr_frame_done() {
+    hdr_share::release();
+}
+
+#[cfg(target_os = "linux")]
+#[tauri::command]
+async fn stop_hdr_share() {
+    let _ = tauri::async_runtime::spawn_blocking(hdr_share::stop).await;
+}
+
 #[cfg(target_os = "linux")]
 #[tauri::command]
 async fn start_screen_audio(selection: screen_audio::Selection) -> Result<String, String> {
@@ -704,17 +763,20 @@ fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Build
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[expect(clippy::too_many_lines, reason = "the platform-specific builder remains together")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the platform-specific builder remains together"
+)]
 pub fn run() {
     install_logging();
 
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let sentry_guard = sentry::init();
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(desktop)]
     let sentry_minidump_guard = sentry_guard
         .as_ref()
         .map(|guard| tauri_plugin_sentry::minidump::init(guard));
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(desktop)]
     let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
@@ -775,6 +837,14 @@ pub fn run() {
             stop_screen_audio,
             #[cfg(target_os = "linux")]
             screen_audio_apps,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            hdr_monitors,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            start_hdr_share,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            hdr_frame_done,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            stop_hdr_share,
             #[cfg(desktop)]
             toggle_devtools,
             #[cfg(all(feature = "cef", target_os = "linux"))]
@@ -806,12 +876,16 @@ pub fn run() {
             ios::save_media_to_photos,
             #[cfg(target_os = "ios")]
             ios::haptic_feedback,
+            #[cfg(target_os = "ios")]
+            ios::set_system_bars_hidden,
             #[cfg(target_os = "android")]
             mobile::haptic_feedback,
             #[cfg(target_os = "android")]
             mobile::set_status_bar_light,
             #[cfg(target_os = "android")]
             mobile::set_navigation_bar_light,
+            #[cfg(target_os = "android")]
+            mobile::set_system_bars_hidden,
             #[cfg(target_os = "android")]
             mobile::set_window_background
         ])

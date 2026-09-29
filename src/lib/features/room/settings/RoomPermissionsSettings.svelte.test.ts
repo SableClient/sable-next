@@ -45,6 +45,7 @@ const core = Object.assign(baseCore, {
 });
 
 import RoomPermissionsSettings from './RoomPermissionsSettings.svelte';
+import { FOUNDER_POWER_LEVEL } from '../members/power-tags';
 
 const base: RoomPowerLevelsView = {
   ban: 50,
@@ -147,6 +148,34 @@ test('saves a role emoji with its name and colour', async () => {
       }
     );
   });
+});
+
+test('lets a founder add colour and an icon to the founder role', async () => {
+  core.session = { user_id: '@admin:example.org' };
+  core.roomPowerLevels.mockResolvedValue(base);
+  core.roomStateEvent.mockResolvedValue(null);
+  core.sendStateEvent.mockResolvedValue(undefined);
+
+  const user = userEvent.setup();
+  render(RoomPermissionsSettings, {
+    room,
+    permissions: { ...permissions, own_power_level: FOUNDER_POWER_LEVEL },
+  });
+  const founderRow = await screen.findByText(/^Founder \(/);
+  await user.click(
+    within(founderRow.closest('li') ?? document.body).getByRole('button', { name: 'Edit role' })
+  );
+  await user.type(screen.getByRole('textbox', { name: 'Icon' }), '👑');
+  await user.type(screen.getByRole('textbox', { name: 'Role colour' }), '#ff0000{Enter}');
+
+  expect(core.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
+    'in.cinny.room.power_level_tags',
+    '',
+    {
+      [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#ff0000', icon: { key: '👑' } },
+    }
+  );
 });
 
 test('uses tagged default roles in permission controls and opens their editor', async () => {

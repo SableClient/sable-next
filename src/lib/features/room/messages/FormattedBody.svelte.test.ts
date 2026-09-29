@@ -98,6 +98,15 @@ test('turns a room permalink whose label is its href into a room mention', async
   expect(anchor).toHaveAttribute('data-matrix-link', 'room');
 });
 
+test('renders an @room mention as a chip', async () => {
+  render(FormattedBody, {
+    props: { html: 'Heads up <span data-mx-room-mention>@room</span>' },
+  });
+  await tick();
+
+  expect(screen.getByText('@room')).toHaveAttribute('data-mx-room-mention');
+});
+
 test('resolves a room permalink name through its via server', async () => {
   core.roomPreview.mockResolvedValue({ name: 'Sable' });
   const url = 'https://matrix.to/#/!6DYBIzUfDoKmqk53wyRqcod2G7LTcR9fEm9XBfaenNI?via=sable.moe';

@@ -11,6 +11,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { BotCommandInvocation } from './bot-commands';
 import type { ComposerContext } from './composer-context';
+import { invalidatePacks } from '#lib/emoji/load-packs.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 import { REORDER_DRAG_TYPE } from '#lib/ui/drag-list.js';
 import {
@@ -84,6 +85,12 @@ const botCommands: BotCommandDescriptionView[] = [
         { key: 'days', schema: { schema_type: 'primitive', type: 'integer' } },
       ],
     },
+  },
+  {
+    sender: '@bot:example.org',
+    sender_name: 'Bot',
+    sender_avatar: null,
+    content: { command: 'register' },
   },
 ];
 
@@ -1402,6 +1409,106 @@ test('a complete bot command typed in the composer is sent as a structured comma
   });
   expect(onSend).not.toHaveBeenCalled();
   expect(editorText()).toBe('');
+});
+
+test('choosing a bot command suggestion opens its argument form', async () => {
+  draftText('/wa');
+  setup({ roomId: '!room:example.org', onSendBotCommand: async () => {} });
+
+  await press(await screen.findByRole('option', { name: /\/warn/ }));
+
+  expect(await screen.findByRole('form', { name: 'Arguments for /warn' })).toBeTruthy();
+  expect(screen.getByLabelText('user')).toBeTruthy();
+  expect(screen.getByLabelText('days')).toBeTruthy();
+});
+
+test('a bot command change clears stale suggestions', async () => {
+  const listeners: Array<(event: { type: string; room_id?: string }) => void> = [];
+  const client = Object.assign(core(), {
+    subscribeEvents: (listener: (event: { type: string; room_id?: string }) => void) => {
+      listeners.push(listener);
+      return () => {};
+    },
+  });
+  draftText('/wa');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+        onSendBotCommand: async () => {},
+      },
+    },
+  });
+
+  expect(await screen.findByRole('option', { name: /\/warn/ })).toBeTruthy();
+  for (const listener of listeners)
+    listener({ type: 'bot_commands_changed', room_id: '!room:example.org' });
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('option', { name: /\/warn/ })).toBeNull();
+  });
+});
+
+test('a pack change refreshes open emote suggestions', async () => {
+  const listeners: Array<(event: { type: string; room_id?: string }) => void> = [];
+  let listed = packs;
+  const client = core();
+  Object.assign(client, {
+    subscribeEvents: (listener: (event: { type: string; room_id?: string }) => void) => {
+      listeners.push(listener);
+      return () => {};
+    },
+  });
+  Object.assign(client.commands, {
+    imagePackListing: () => Promise.resolve({ packs: listed, complete: true }),
+  });
+  draftText(':wa');
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+
+  expect(await screen.findByRole('option', { name: /:wave:/ })).toBeTruthy();
+  listed = [
+    {
+      ...packs[0],
+      images: [...packs[0].images, { ...packs[0].images[0], shortcode: 'wave2' }],
+    },
+  ];
+  invalidatePacks(client.commands);
+  for (const listener of listeners)
+    listener({ type: 'image_packs_changed', room_id: '!space:example.org' });
+
+  expect(await screen.findByRole('option', { name: /:wave2:/ })).toBeTruthy();
+});
+
+test('a zero-parameter bot command preserves raw trailing input', async () => {
+  const onSendBotCommand = vi.fn(async () => {});
+  draftText('/register ```yaml\nid: bridge\n```');
+  setup({ roomId: '!room:example.org', onSendBotCommand });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/register ```yaml\nid: bridge\n```',
+      { command: 'register', arguments: {} }
+    );
+  });
 });
 
 test('an incomplete bot command opens its form, which sends once it is filled in', async () => {

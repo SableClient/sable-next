@@ -253,6 +253,7 @@
     gap: var(--space-050);
     margin-inline-start: calc(var(--avatar-size-small) + var(--timeline-row-gap));
     min-width: 0;
+    opacity: var(--opacity-p300);
     padding-block: var(--space-050);
   }
 

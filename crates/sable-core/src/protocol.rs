@@ -383,6 +383,10 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    UnjoinedSpaceParents {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     RoomCosmetics {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -448,6 +452,14 @@ pub enum Command {
         event_type: String,
     },
     SetAccountData {
+        event_type: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        content: serde_json::Value,
+    },
+    SealedAccountData {
+        event_type: String,
+    },
+    SetSealedAccountData {
         event_type: String,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
@@ -1372,6 +1384,9 @@ pub enum CommandOk {
     RoomHasSpaceParent {
         has_space_parent: bool,
     },
+    UnjoinedSpaceParents {
+        parents: Vec<SpaceParentView>,
+    },
     RoomCosmetics(RoomCosmeticsView),
     RoomOpen(RoomOpenView),
     RoomSummary {
@@ -1417,6 +1432,10 @@ pub enum CommandOk {
         content: Option<serde_json::Value>,
     },
     SetAccountData,
+    SealedAccountData {
+        document: SealedAccountDataView,
+    },
+    SetSealedAccountData,
     ReportMessage,
     ReportRoom,
     ReportUser,
@@ -1872,6 +1891,11 @@ pub enum CoreEvent {
         room_id: OwnedRoomId,
     },
 
+    ImagePacksChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+
     /// An incoming request arrives unsolicited. There is no other prompt.
     Verification {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -2162,6 +2186,8 @@ pub struct CallMemberView {
     pub device_id: String,
     pub identity: String,
     pub backend_id: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub joined_ts: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -2276,6 +2302,7 @@ pub struct RoomSummary {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EncryptionStatusView {
     /// Whether *this* device is signed by our own identity.
     pub verification: VerificationStateView,
@@ -2283,8 +2310,38 @@ pub struct EncryptionStatusView {
     /// All three keys held locally, so this device can sign others. False means
     /// verification must come from another session.
     pub cross_signing_ready: bool,
+    pub signing_keys: SigningKeysView,
+    pub backup_unlocked: bool,
     /// The default secret storage key can also be unlocked with a passphrase.
     pub recovery_passphrase: bool,
+    pub account_data_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SealedAccountDataView {
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
+    pub content: Option<serde_json::Value>,
+    pub state: SealStateView,
+    pub can_seal: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum SealStateView {
+    Plain,
+    Sealed,
+    Locked,
+}
+
+/// Which private cross-signing keys this device holds.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SigningKeysView {
+    pub master: bool,
+    pub self_signing: bool,
+    pub user_signing: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -2383,6 +2440,8 @@ pub struct EmojiView {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
+// These are independent facts about one device, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 pub struct DeviceView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub device_id: OwnedDeviceId,
@@ -2391,6 +2450,8 @@ pub struct DeviceView {
     /// Signed by the account's own identity, whether or not this device trusts
     /// that identity yet. What a new device can be confirmed from.
     pub cross_signed: bool,
+    /// The device has uploaded device keys, so it can be verified at all.
+    pub has_keys: bool,
     /// The session this core is running in.
     pub is_own: bool,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
@@ -2504,6 +2565,14 @@ pub struct SpaceHierarchyRoomView {
     /// This room's own `m.space.child` edges, already sorted. Empty unless it is
     /// a space.
     pub children: Vec<SpaceChildEdge>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SpaceParentView {
+    #[cfg_attr(feature = "typegen", specta(type = String))]
+    pub room_id: OwnedRoomId,
+    pub via: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -3540,6 +3609,8 @@ pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
     pub room: Option<NotificationModeView>,
     pub default: NotificationModeView,
+    /// A direct chat with a bridge bot or another MSC4171 service member in it.
+    pub bridged: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

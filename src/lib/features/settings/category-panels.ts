@@ -8,6 +8,7 @@ import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
 import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
+import QuickCss from '#lib/features/settings/QuickCss.svelte';
 import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
 import MediaPreviewPrivacy from '#lib/features/settings/MediaPreviewPrivacy.svelte';
 import MentionNotifications from '#lib/features/notifications/MentionNotifications.svelte';
@@ -20,6 +21,7 @@ import PushGateway from '#lib/features/notifications/PushGateway.svelte';
 import PushersSettings from '#lib/features/notifications/PushersSettings.svelte';
 import SettingsFile from '#lib/features/settings/SettingsFile.svelte';
 import SettingsSyncStatus from '#lib/features/settings/SettingsSyncStatus.svelte';
+import SyncEncryption from '#lib/features/settings/SyncEncryption.svelte';
 import StateEventTool from '#lib/features/settings/StateEventTool.svelte';
 import DeveloperAccessToken from '#lib/features/settings/DeveloperAccessToken.svelte';
 import DeveloperAccountData from '#lib/features/settings/DeveloperAccountData.svelte';
@@ -40,6 +42,7 @@ export interface CategoryPanel {
 export const categoryPanels: Record<string, CategoryPanel[]> = {
   appearance: [
     { component: CustomThemes, section: 'themes' },
+    { component: QuickCss, section: 'themes' },
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
@@ -58,6 +61,11 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
   personas: [{ component: PersonaSettings }],
   [SETTINGS_ACCOUNT_SECTION]: [
     { component: SettingsSyncStatus, section: 'sync', when: () => preferences.settingsSync },
+    {
+      component: SyncEncryption,
+      section: 'sync',
+      when: () => preferences.settingsSync && preferences.syncDrafts,
+    },
     { component: SettingsFile, section: 'sync' },
   ],
   developer: [

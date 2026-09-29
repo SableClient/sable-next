@@ -2,6 +2,7 @@
   import { CoreError } from '#src/transport';
   import type { RoomPermissionsView, RoomSummary, SpaceChildEdge } from '#src/generated/protocol';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import IconContext from 'phosphor-svelte/lib/IconContext';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
@@ -14,6 +15,7 @@
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { preferences } from '#lib/settings/preferences.svelte.js';
   import { createDragList, type DropEdge, type DropInstruction } from '#lib/ui/drag-list.js';
   import { joinErrorMessage } from '#lib/rooms/join-errors.js';
   import { copyRoomLink, roomSectionPath, viaFor } from '#lib/rooms/permalink.js';
@@ -58,6 +60,7 @@
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
   import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
+  import { eventTimelinePath } from '../event-timeline.js';
 
   import AddExistingDialog from './AddExistingDialog.svelte';
   import FormattedBody from '../messages/FormattedBody.svelte';
@@ -517,6 +520,18 @@
   >
     {#if space}
       <div class="hero-menu">
+        {#if preferences.developerTools}
+          <IconButton
+            variant="ghost"
+            size="small"
+            label={$i18n.t('timeline.eventTimeline')}
+            onclick={() => {
+              void goto(eventTimelinePath(space.room_id));
+            }}
+          >
+            <ListBulletsIcon />
+          </IconButton>
+        {/if}
         <IconButton
           variant="ghost"
           size="small"

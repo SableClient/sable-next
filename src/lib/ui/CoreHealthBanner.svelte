@@ -9,6 +9,9 @@
     if (core.crashed !== null) {
       return { kind: 'crash' as const, text: $i18n.t('errors.coreCrashed') };
     }
+    if (core.storageInterrupted) {
+      return { kind: 'crash' as const, text: $i18n.t('errors.storageInterrupted') };
+    }
     if (core.unresponsive) {
       return { kind: 'warn' as const, text: $i18n.t('errors.coreUnresponsive') };
     }

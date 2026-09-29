@@ -14,9 +14,9 @@
   import { replyFallbackFromSource } from './reply-fallback';
   import { replyPreviewBody } from './reply-preview';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles';
+  import SenderName from '../members/SenderName.svelte';
   import { reactionKey, stateEventText, type Translate } from '../timeline/state-event-text';
   import type { TimelineEventIndex } from '../timeline/timeline-event-index';
-  import { senderColor } from '../timeline/timeline-format';
 
   interface Props {
     eventId: string;
@@ -64,19 +64,16 @@
   let profile = $state<ProfileView | null>(null);
   let sender = $derived(preview?.sender ?? null);
   let colors = $derived(
-    sender === null
-      ? null
-      : senderDisplayColors(
-          sender,
-          profile,
-          persona,
-          currentUserId !== null && sender === currentUserId,
-          cosmetics,
-          senderRoles?.(sender)?.color ?? null
-        )
+    senderDisplayColors(
+      sender ?? '',
+      profile,
+      persona,
+      currentUserId !== null && sender === currentUserId,
+      cosmetics,
+      sender ? (senderRoles?.(sender)?.color ?? null) : null
+    )
   );
   let replyStyle = $derived(reply ? preferences.replyPreviewStyle : null);
-  let nameColor = $derived(colors?.nameColor ?? senderColor(null));
 
   $effect(() => {
     const userId = sender;
@@ -124,11 +121,8 @@
 </script>
 
 <button
-  class={['target-preview', replyStyle && `target-${replyStyle}`, { tinted: colors?.tinted }]}
+  class={['target-preview', replyStyle && `target-${replyStyle}`]}
   type="button"
-  style:--target-name-color={nameColor}
-  style:--target-on-light={colors?.nameColorLight ?? undefined}
-  style:--target-on-dark={colors?.nameColorDark ?? undefined}
   disabled={!onJump}
   onclick={() => {
     onJump?.(eventId);
@@ -136,7 +130,13 @@
 >
   {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
-    <span class="target-name" style:font-family={cosmetics?.font ?? undefined}>{name}</span>
+    <SenderName
+      displayName={name}
+      {colors}
+      font={cosmetics?.font ?? null}
+      nameClass="target-name"
+      compact
+    />
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
   </span>
 </button>
@@ -187,25 +187,6 @@
 
   .target-preview:not(:disabled):is(:hover, :focus-visible) .target-copy > :not(.target-name) {
     filter: brightness(var(--opacity-p500));
-  }
-
-  .target-name {
-    color: var(--target-name-color);
-    font-weight: var(--font-weight-medium);
-  }
-
-  .tinted {
-    --target-name-color: var(--target-on-light);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not(.light) .tinted {
-      --target-name-color: var(--target-on-dark);
-    }
-  }
-
-  :root.dark .tinted {
-    --target-name-color: var(--target-on-dark);
   }
 
   .target-compact {

@@ -107,6 +107,8 @@
     syncPushSubscription,
   } from '#lib/features/notifications/web-push.js';
   import { answerPushEvent, sharePushSession } from '#lib/features/notifications/push-session.js';
+  import { onPermissionGranted } from '#lib/features/notifications/present.js';
+  import { clearPushFailure, recordPushFailure } from '#lib/features/notifications/push-failure.js';
   import CommandPalette from '#lib/ui/shortcuts/CommandPalette.svelte';
   import ToastRegion from '#lib/ui/ToastRegion.svelte';
   import ShareTargetSheet from '#lib/features/share/ShareTargetSheet.svelte';
@@ -545,13 +547,15 @@
     const override = pushOverride();
 
     const resync = (): void => {
-      void syncPushSubscription(core, override).catch((error: unknown) => {
+      void syncPushSubscription(core, override).then(clearPushFailure, (error: unknown) => {
+        recordPushFailure(error);
         console.debug('[sable notifications] push not registered', error);
       });
     };
     resync();
 
-    return on(navigator.serviceWorker, 'message', (event) => {
+    const stopGranted = onPermissionGranted(resync);
+    const stopMessages = on(navigator.serviceWorker, 'message', (event) => {
       const message = (event as MessageEvent).data as
         | { type?: string; appId?: string; ackToken?: string }
         | undefined;
@@ -563,6 +567,10 @@
         }
       }
     });
+    return () => {
+      stopGranted();
+      stopMessages();
+    };
   });
 
   let pushedRoom = $state<{
@@ -898,6 +906,18 @@
     <AppShell>
       {@render children()}
     </AppShell>
+    {#if preferences.callScreenPreview && callSession.active && callSession.views === 0 && callSession.rooms.length > 0}
+      {#await import('#lib/features/call/ScreenSharePreview.svelte') then { default: ScreenSharePreview }}
+        <ScreenSharePreview
+          session={callSession}
+          onReturn={() => {
+            if (callSession.roomId !== null) {
+              void goto(roomSectionPath(roomList.rooms, callSession.roomId));
+            }
+          }}
+        />
+      {/await}
+    {/if}
     {#if callSession.rooms.length > 0}
       {#await import('#lib/features/call/CallAudio.svelte') then { default: CallAudio }}
         {#each callSession.rooms as entry (entry.backendId)}
@@ -908,6 +928,18 @@
             volumeOf={callVolumeOf}
           />
         {/each}
+      {/await}
+    {/if}
+    {#if callSession.choosingScreenSource}
+      {@const monitors = callSession.choosingScreenSource}
+      {#await import('#lib/features/call/ScreenShareSourceDialog.svelte') then { default: ScreenShareSourceDialog }}
+        <ScreenShareSourceDialog
+          {monitors}
+          onShare={(source) => void callSession.shareScreenFrom(source)}
+          onCancel={() => {
+            callSession.choosingScreenSource = null;
+          }}
+        />
       {/await}
     {/if}
     {#if callSession.choosingScreenAudio}

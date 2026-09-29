@@ -48,6 +48,10 @@ time = "0.3"
 base64 = "0.23"
 sha2 = "0.11"
 getrandom = "0.4"
+aes = { version = "0.9.3", default-features = false }
+ctr = { version = "0.10.1", default-features = false }
+hkdf = "0.13"
+hmac = "0.13"
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 reqwest = { version = "0.13", default-features = false, features = ["socks"] }
@@ -62,7 +66,7 @@ webpki-roots = "1"
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 matrix-sdk = { workspace = true, features = ["indexeddb", "js"] }
-matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83", default-features = false, features = [
+matrix-sdk-indexeddb = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e", default-features = false, features = [
   "e2e-encryption",
   "state-store",
   "event-cache-store",
@@ -75,11 +79,12 @@ getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 matrix-sdk = { workspace = true, features = ["testing"] }
-matrix-sdk-test = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83" }
-matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "16f2683c89f837c9be7500d76c79a7c77e860f83" }
+matrix-sdk-test = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e" }
+matrix-sdk-test-utils = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e" }
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wiremock = "0.6"
+bs58 = "0.5"
 
 [lints]
 workspace = true

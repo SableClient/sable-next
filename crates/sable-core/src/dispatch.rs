@@ -1136,6 +1136,14 @@ impl Core {
                 })
             }
 
+            Command::UnjoinedSpaceParents { room_id } => {
+                let client = self.client().await?;
+                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                Ok(CommandOk::UnjoinedSpaceParents {
+                    parents: crate::cosmetics::unjoined_space_parents(&client, &room).await,
+                })
+            }
+
             Command::RoomCosmetics { room_id, space_id } => Ok(CommandOk::RoomCosmetics(
                 self.room_cosmetics(&room_id, space_id).await?,
             )),
@@ -1260,6 +1268,22 @@ impl Core {
                     .forget_account_data(&event_type);
 
                 Ok(CommandOk::SetAccountData)
+            }
+
+            Command::SealedAccountData { event_type } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                Ok(CommandOk::SealedAccountData {
+                    document: self.sealed_account_data(&event_type).await?,
+                })
+            }
+
+            Command::SetSealedAccountData {
+                event_type,
+                content,
+            } => {
+                self.remember_account_data_type(event_type.as_str()).await;
+                self.set_sealed_account_data(&event_type, &content).await?;
+                Ok(CommandOk::SetSealedAccountData)
             }
 
             Command::SetRoomAccountData {
@@ -1690,13 +1714,14 @@ impl Core {
             }
 
             Command::RecoverIdentity { recovery_key } => {
-                self.client()
-                    .await?
+                let client = self.client().await?;
+                client
                     .encryption()
                     .recovery()
                     .recover(&recovery_key)
                     .await
                     .map_err(|error| self.recovery_error(error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::RecoverIdentity)
             }
@@ -1711,6 +1736,7 @@ impl Core {
                     None => enable.await,
                 }
                 .map_err(|error| self.failed("enable_recovery", error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::EnableRecovery { recovery_key })
             }
@@ -1725,6 +1751,7 @@ impl Core {
                     None => reset.await,
                 }
                 .map_err(|error| self.failed("reset_recovery_key", error))?;
+                self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::ResetRecoveryKey { recovery_key })
             }
@@ -2014,17 +2041,19 @@ impl Core {
                 Ok(CommandOk::NotificationSettings(push_rules::room_settings(
                     &rules,
                     &room_id,
-                    notifications::is_one_to_one(&room),
+                    notifications::room_shape(&room).await,
                 )))
             }
 
             Command::RoomNotificationModes { room_ids } => {
                 let client = self.client().await?;
                 let rules = self.push_rules().await?.snapshot().await;
-                let rooms = room_ids.into_iter().filter_map(|room_id| {
-                    let direct = notifications::is_one_to_one(&client.get_room(&room_id)?);
-                    Some((room_id, direct))
-                });
+                let mut rooms = Vec::with_capacity(room_ids.len());
+                for room_id in room_ids {
+                    if let Some(room) = client.get_room(&room_id) {
+                        rooms.push((room_id, notifications::room_shape(&room).await));
+                    }
+                }
 
                 Ok(CommandOk::RoomNotificationModes {
                     modes: push_rules::room_modes(&rules, rooms),
@@ -2171,29 +2200,34 @@ impl Core {
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
                 let rules = self.push_rules().await?;
+                let shape = notifications::room_shape(&room).await;
                 let writes = push_rules::plan_room_mode(
                     &rules.snapshot().await,
                     &room_id,
-                    notifications::is_one_to_one(&room),
+                    shape.direct,
                     mode,
                 );
                 rules
                     .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_room_notification_mode", error))?;
+                if shape.bridged {
+                    self.align_bridged_dms(None).await;
+                }
 
                 Ok(CommandOk::SetRoomNotificationMode)
             }
 
             Command::SetDefaultNotificationMode { direct, mode } => {
                 let rules = self.push_rules().await?;
-                let writes =
-                    push_rules::plan_default_mode(&rules.snapshot().await, direct, mode)
-                        .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                let before = rules.snapshot().await;
+                let writes = push_rules::plan_default_mode(&before, direct, mode)
+                    .map_err(|error| self.failed("set_default_notification_mode", error))?;
                 rules
                     .apply(writes)
                     .await
                     .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                self.align_bridged_dms(Some(&before)).await;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
             }
@@ -2468,7 +2502,9 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("request_verification: device", error))?
                         .ok_or(CommandErr::Unavailable)?
-                        .request_verification()
+                        .request_verification_with_methods(
+                            crate::verification::VERIFICATION_METHODS.to_vec(),
+                        )
                         .await
                         .map_err(|error| self.failed("request_verification", error))?,
                     None => encryption
@@ -2476,10 +2512,19 @@ impl Core {
                         .await
                         .map_err(|error| self.failed("request_verification: identity", error))?
                         .ok_or(CommandErr::Unavailable)?
-                        .request_verification()
+                        .request_verification_with_methods(
+                            crate::verification::VERIFICATION_METHODS.to_vec(),
+                        )
                         .await
                         .map_err(|error| self.failed("request_verification", error))?,
                 };
+
+                if request.is_cancelled() {
+                    return Err(self.failed(
+                        "request_verification",
+                        "cancelled on creation by another ongoing request",
+                    ));
+                }
 
                 let flow_id = request.flow_id().to_owned();
                 self.watch_verification(request);
@@ -2535,7 +2580,7 @@ impl Core {
                 let request = self.verification_request(&user_id, &flow_id).await?;
 
                 request
-                    .accept()
+                    .accept_with_methods(crate::verification::VERIFICATION_METHODS.to_vec())
                     .await
                     .map_err(|error| self.failed("accept_verification", error))?;
 

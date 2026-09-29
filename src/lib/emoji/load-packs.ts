@@ -1,7 +1,7 @@
 import QuickLRU from 'quick-lru';
 
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
-import type { ImagePackView } from '#src/generated/protocol';
+import type { CoreEvent, ImagePackView } from '#src/generated/protocol';
 
 type PackCommands = Pick<CoreCommands, 'imagePackListing'>;
 
@@ -52,6 +52,13 @@ export function invalidatePacks(commands: PackCommands): void {
 
 export function isPackAccountDataEvent(eventType: string): boolean {
   return packAccountDataEvents.has(eventType);
+}
+
+export function isPackChange(event: CoreEvent): boolean {
+  return (
+    event.type === 'image_packs_changed' ||
+    (event.type === 'account_data_changed' && isPackAccountDataEvent(event.event_type))
+  );
 }
 
 export async function loadPacks(

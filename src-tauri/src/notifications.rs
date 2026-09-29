@@ -44,6 +44,22 @@ static CONVERSATIONS: LazyLock<Mutex<HashMap<String, Vec<Line>>>> =
 
 static PUSH_REGISTRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
+#[derive(Debug, serde::Serialize)]
+#[serde(tag = "stage", rename_all = "snake_case")]
+#[cfg_attr(
+    desktop,
+    expect(dead_code, reason = "only a mobile registration can fail")
+)]
+pub enum PushRegistrationError {
+    NoSession,
+    Capabilities,
+    Platform { message: String },
+    NoGateway,
+    NoAppId,
+    Homeserver { error: CommandErr },
+    Ledger,
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct RegisteredPusher {
     user_id: String,
@@ -157,16 +173,23 @@ pub async fn maintain_background_push(
     let pushers = registered_pushers(root)?;
     match operation {
         BackgroundPush::Activate { app_id, ack_token } => {
-            let current = pushers
+            for pusher in pushers
                 .iter()
                 .rev()
-                .find(|pusher| pusher.app_id == app_id)
-                .ok_or(CommandErr::Unavailable)?;
-            let client = pusher_client(root, current).await?;
-            client
-                .retry(|| sable_core::webpush::ack(&client, app_id.clone(), ack_token.clone()))
-                .await
-                .map_err(|_| CommandErr::Unavailable)
+                .filter(|pusher| pusher.app_id == app_id)
+            {
+                let Ok(client) = pusher_client(root, pusher).await else {
+                    continue;
+                };
+                if client
+                    .retry(|| sable_core::webpush::ack(&client, app_id.clone(), ack_token.clone()))
+                    .await
+                    .is_ok()
+                {
+                    return Ok(());
+                }
+            }
+            Err(CommandErr::Unavailable)
         }
         BackgroundPush::Rotate {
             user_id,
@@ -737,14 +760,15 @@ pub async fn register_push<R: Runtime>(
     app: &AppHandle<R>,
     core: &Arc<sable_core::Core>,
     config: PushConfig,
-) -> Result<(), CommandErr> {
+) -> Result<(), PushRegistrationError> {
     use sable_core::protocol::{Command, PusherView};
     let _guard = PUSH_REGISTRATION_LOCK.lock().await;
-    let root = push_store(app)?;
-    let identity = (
-        config.user_id.clone().ok_or(CommandErr::Unavailable)?,
-        config.device_id.clone().ok_or(CommandErr::Unavailable)?,
-    );
+    let root = push_store(app).map_err(|_| PushRegistrationError::Ledger)?;
+    let (Some(user_id), Some(device_id)) = (config.user_id.clone(), config.device_id.clone())
+    else {
+        return Err(PushRegistrationError::NoSession);
+    };
+    let identity = (user_id, device_id);
     declare_push_accounts(app, &config, &identity).await;
 
     // MSC4174 makes the homeserver the push gateway. Query before creating the
@@ -752,7 +776,8 @@ pub async fn register_push<R: Runtime>(
     let server_vapid = if config.gateway_override || cfg!(target_os = "ios") {
         None
     } else {
-        server_vapid_from_response(Box::pin(core.dispatch(Command::WebPusherSupport)).await)?
+        server_vapid_from_response(Box::pin(core.dispatch(Command::WebPusherSupport)).await)
+            .map_err(|_| PushRegistrationError::Capabilities)?
     };
     let registered = app
         .notifications()
@@ -771,7 +796,9 @@ pub async fn register_push<R: Runtime>(
         .await
         .map_err(|error| {
             log::warn!("could not register for push: {error}");
-            CommandErr::Unavailable
+            PushRegistrationError::Platform {
+                message: error.to_string(),
+            }
         })?;
 
     let registration = Registration {
@@ -796,7 +823,7 @@ pub async fn register_push<R: Runtime>(
     let gateway_url = registration_gateway(&registration, &config)
         .ok_or_else(|| {
             log::warn!("no UnifiedPush gateway is configured for this distributor");
-            CommandErr::Unavailable
+            PushRegistrationError::NoGateway
         })?
         .to_owned();
 
@@ -809,7 +836,7 @@ pub async fn register_push<R: Runtime>(
         },
         Some(&config.web_app_id),
     ) else {
-        return Err(CommandErr::Unavailable);
+        return Err(PushRegistrationError::NoAppId);
     };
 
     let command = Command::SetPusher {
@@ -824,7 +851,9 @@ pub async fn register_push<R: Runtime>(
         },
     };
 
-    Box::pin(core.dispatch(command)).await.map(|_| ())?;
+    Box::pin(core.dispatch(command))
+        .await
+        .map_err(|error| PushRegistrationError::Homeserver { error })?;
     remember_pusher(
         &root,
         &identity,
@@ -832,7 +861,8 @@ pub async fn register_push<R: Runtime>(
         app_id,
         Some(gateway_url),
         config.event_id_only,
-    )?;
+    )
+    .map_err(|_| PushRegistrationError::Ledger)?;
     retire_old_pushers(&root, &identity).await;
     Ok(())
 }
@@ -863,17 +893,18 @@ async fn register_server_pusher(
     identity: &(String, String),
     pusher: WebPusherView,
     event_id_only: bool,
-) -> Result<(), CommandErr> {
+) -> Result<(), PushRegistrationError> {
     let pushkey = pusher.pushkey.clone();
     let app_id = pusher.app_id.clone();
     if let Err(error) =
         Box::pin(core.dispatch(sable_core::protocol::Command::SetWebPusher { pusher })).await
     {
         log::warn!("homeserver rejected the MSC4174 pusher: {error:?}");
-        return Err(error);
+        return Err(PushRegistrationError::Homeserver { error });
     }
     log::debug!("registered an MSC4174 pusher through the homeserver");
-    remember_pusher(root, identity, pushkey, app_id, None, event_id_only)?;
+    remember_pusher(root, identity, pushkey, app_id, None, event_id_only)
+        .map_err(|_| PushRegistrationError::Ledger)?;
     retire_old_pushers(root, identity).await;
     Ok(())
 }
@@ -979,7 +1010,7 @@ pub async fn register_push<R: Runtime>(
     _app: &AppHandle<R>,
     _core: &Arc<sable_core::Core>,
     _config: PushConfig,
-) -> Result<(), CommandErr> {
+) -> Result<(), PushRegistrationError> {
     Ok(())
 }
 

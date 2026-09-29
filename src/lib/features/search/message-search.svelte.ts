@@ -17,6 +17,12 @@ const DEBOUNCE_MS = 200;
 
 export const MESSAGE_SEARCH_FIELD_ID = 'message-search-field';
 
+function uniqueHits(hits: SearchHitView[]): SearchHitView[] {
+  return hits.filter(
+    (hit, index) => hits.findIndex((other) => other.event_id === hit.event_id) === index
+  );
+}
+
 export interface RoomGroup {
   key: string;
   roomId: string;
@@ -136,7 +142,7 @@ export class MessageSearch {
       if (generation !== this.#generation) return;
 
       if (offset === 0) {
-        this.hits = page.hits;
+        this.hits = uniqueHits(page.hits);
         this.#olderCursor = page.older;
       } else {
         this.#append(page.hits);
@@ -182,8 +188,6 @@ export class MessageSearch {
   }
 
   #append(hits: SearchHitView[]): void {
-    const loaded = this.hits;
-    const unseen = hits.filter((hit) => !loaded.some((kept) => kept.event_id === hit.event_id));
-    this.hits = [...loaded, ...unseen];
+    this.hits = uniqueHits([...this.hits, ...hits]);
   }
 }

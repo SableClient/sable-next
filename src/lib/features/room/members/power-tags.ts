@@ -4,10 +4,10 @@ import {
   type PowerLevelTagMap,
 } from '../settings/power-level-tags';
 
-const INFINITE_POWER_LEVEL = Number.MAX_SAFE_INTEGER + 1;
+export const FOUNDER_POWER_LEVEL = Number.MAX_SAFE_INTEGER + 1;
 
 const DEFAULT_TAGS: readonly { level: number; key: string }[] = [
-  { level: INFINITE_POWER_LEVEL, key: 'timeline.powerTagFounder' },
+  { level: FOUNDER_POWER_LEVEL, key: 'timeline.powerTagFounder' },
   { level: 150, key: 'timeline.powerTagManager' },
   { level: 101, key: 'timeline.powerTagFounder' },
   { level: 100, key: 'timeline.powerLevelAdmin' },

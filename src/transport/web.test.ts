@@ -107,6 +107,17 @@ test('uses a WASM-specific worker URL', async () => {
   expect(FakeSharedWorker.last?.url.searchParams.get('wasm')).toBeTruthy();
 }, 20_000);
 
+test('uses an in-memory event cache in an iOS PWA', async () => {
+  vi.stubGlobal('navigator', {
+    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X)',
+    standalone: true,
+  });
+  const transport = await load();
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never);
+
+  expect(FakeSharedWorker.last?.url.searchParams.get('event-cache')).toBe('memory');
+});
+
 test('preserves rich attachment captions and mentions across the worker transport', async () => {
   const transport = await load();
   const attachment = {
@@ -210,6 +221,21 @@ test('a slow media fetch does not report the core as unresponsive', async () => 
       void transport.fetchMedia('mxc://example.org/abc', 96, 96);
     })
   ).toBe(false);
+});
+
+test('an interrupted IndexedDB transaction requests explicit recovery', async () => {
+  const transport = await load();
+  const interrupted = vi.fn();
+  transport.subscribeStorageFailure?.(interrupted);
+  void transport.send({ type: 'room_members', room_id: '!r:example.org' } as never).catch(() => {});
+
+  FakeSharedWorker.last?.port.receive({
+    logs: [
+      'ERROR IndexedDB: Attempt to get records from database without an in-progress transaction',
+    ],
+  });
+
+  expect(interrupted).toHaveBeenCalledOnce();
 });
 
 test('resetCaches terminates the worker and drops the cached stores', async () => {

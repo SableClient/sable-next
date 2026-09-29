@@ -71,7 +71,7 @@
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import { profileFieldJson, profileFieldMap, profileFieldPreview } from './profile-field-map.js';
   import { MemberProfileRelations } from './member-profile-relations.svelte';
-  import { MemberProfileActions } from './member-profile-actions';
+  import { MemberProfileActions, moderationErrorMessage } from './member-profile-actions';
 
   interface Props {
     userId: string;
@@ -191,7 +191,10 @@
   );
   let elevated = $derived(member !== null && member.power_level >= 50);
   let outranks = $derived(!isSelf && ownPowerLevel > (member?.power_level ?? 0));
-  let canKick = $derived(outranks && (permissions?.can_kick ?? false));
+  // Kicking requires the target to be in the room and outranked (spec rule
+  // 4.5.4), so it stays hidden while the target's membership is unknown: the
+  // server refuses to kick someone who is not in the room regardless of level.
+  let canKick = $derived(outranks && member !== null && (permissions?.can_kick ?? false));
   let canBan = $derived(outranks && (permissions?.can_ban ?? false));
   let canInvite = $derived(!isSelf && member === null && (permissions?.can_invite ?? false));
   let canUnban = $derived(!isSelf && member === null && (permissions?.can_ban ?? false));
@@ -320,13 +323,13 @@
   let moderationAction = $state<'kick' | 'ban' | null>(null);
   let moderationReason = $state('');
   let moderationBusy = $state(false);
-  let moderationFailed = $state(false);
+  let moderationError = $state<string | null>(null);
   const moderationFieldId = $props.id();
 
   function openModeration(action: 'kick' | 'ban'): void {
     moderationAction = action;
     moderationReason = '';
-    moderationFailed = false;
+    moderationError = null;
   }
 
   function cancelModeration(): void {
@@ -340,14 +343,14 @@
 
     const reason = moderationReason.trim();
     moderationBusy = true;
-    moderationFailed = false;
+    moderationError = null;
     try {
       await profileActions.moderate(roomId, userId, action, reason || null);
       moderationAction = null;
       moderationReason = '';
     } catch (error) {
       console.warn('[sable profile] moderation action failed', error);
-      moderationFailed = true;
+      moderationError = moderationErrorMessage(error);
     } finally {
       moderationBusy = false;
     }
@@ -819,8 +822,8 @@
           ? $i18n.t('timeline.profileBanConfirm', { name: displayName })
           : $i18n.t('timeline.profileKickConfirm', { name: displayName })}
       </h2>
-      {#if moderationFailed}
-        <Alert variant="critical" role="alert">{$i18n.t('timeline.profileModerationFailed')}</Alert>
+      {#if moderationError}
+        <Alert variant="critical" role="alert">{moderationError}</Alert>
       {/if}
       <FormField fieldId={moderationFieldId} label={$i18n.t('timeline.deleteReason')}>
         <TextInput id={moderationFieldId} bind:value={moderationReason} autocomplete="off" />

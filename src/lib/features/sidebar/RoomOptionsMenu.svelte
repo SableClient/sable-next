@@ -6,10 +6,13 @@
   import CircleDashedIcon from 'phosphor-svelte/lib/CircleDashedIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
+  import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import StarIcon from 'phosphor-svelte/lib/StarIcon';
   import UserPlusIcon from 'phosphor-svelte/lib/UserPlusIcon';
@@ -21,6 +24,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
   import { copyRoomLink } from '#lib/rooms/permalink.js';
+  import { isQuiet, setQuiet } from '#lib/rooms/quiet-rooms.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -28,6 +32,7 @@
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
+  import { untrack } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import IconContext from 'phosphor-svelte/lib/IconContext';
@@ -91,6 +96,8 @@
   let unread = $derived(
     readable.some((entry) => entry.unread > 0 || entry.highlight > 0 || entry.marked_unread)
   );
+  let quiet = $derived(isQuiet(room.room_id));
+  let quietBySpace = $derived(!quiet && roomList.quietRoomIds.has(room.room_id));
 
   const manageable = new SvelteSet<string>();
   let manageableRun = 0;
@@ -134,6 +141,40 @@
     parentSpace !== null && manageable.has(parentSpace.room_id) ? parentSpace : null
   );
 
+  let joinableParents = $state<{ room_id: string; via: string[]; name: string | null }[]>([]);
+  let parentsRun = 0;
+
+  function readParents(): void {
+    const run = ++parentsRun;
+    joinableParents = [];
+    void core.commands
+      .unjoinedSpaceParents(room.room_id)
+      .then((parents) => {
+        if (run !== parentsRun) return;
+        joinableParents = parents.map((parent) => ({ ...parent, name: null }));
+        for (const parent of parents) {
+          void core.commands
+            .roomPreview(parent.room_id, parent.via)
+            .then((preview) => {
+              if (run !== parentsRun) return;
+              joinableParents = joinableParents.map((entry) =>
+                entry.room_id === parent.room_id ? { ...entry, name: preview.name } : entry
+              );
+            })
+            .catch((error: unknown) => {
+              console.debug('[sable room] parent space preview unavailable', error);
+            });
+        }
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable room] parent spaces unavailable', error);
+      });
+  }
+
+  function joinParent(parent: { room_id: string; via: string[] }): void {
+    void core.commands.joinRoom(parent.room_id, parent.via).catch(report);
+  }
+
   let opened = $state(false);
   let addToSpaceOpen = $state(false);
   let inviteOpen = $state(false);
@@ -143,8 +184,9 @@
   $effect(() => {
     if (!open) return;
     opened = true;
-    readManageableSpaces();
-    readInvitePermission();
+    untrack(readManageableSpaces);
+    untrack(readInvitePermission);
+    untrack(readParents);
   });
 
   function report(error: unknown): void {
@@ -231,6 +273,23 @@
       <StarIcon weight={favourite ? 'fill' : 'regular'} />
       {$i18n.t('room.menuFavourite')}
     </ActionMenuItem>
+    <ActionMenuItem
+      disabled={quietBySpace}
+      onSelect={() => {
+        setQuiet(room.room_id, !quiet);
+      }}
+    >
+      {#if quiet || quietBySpace}
+        <EyeIcon />
+      {:else}
+        <EyeSlashIcon />
+      {/if}
+      {quietBySpace
+        ? $i18n.t('room.menuUnreadHiddenBySpace')
+        : quiet
+          ? $i18n.t('room.menuShowUnread')
+          : $i18n.t('room.menuHideUnread')}
+    </ActionMenuItem>
 
     {#if room.is_direct}
       <ActionMenuItem onSelect={convertToGroup}>
@@ -306,6 +365,17 @@
         {$i18n.t('room.menuAddToSpace')}
       </ActionMenuItem>
     {/if}
+
+    {#each joinableParents as parent (parent.room_id)}
+      <ActionMenuItem
+        onSelect={() => {
+          joinParent(parent);
+        }}
+      >
+        <SignInIcon />
+        {$i18n.t('room.menuJoinParentSpace', { space: parent.name ?? parent.room_id })}
+      </ActionMenuItem>
+    {/each}
 
     {#if !room.is_space && removableParent}
       <ActionMenuItem

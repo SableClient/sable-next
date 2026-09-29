@@ -450,9 +450,31 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
 
 pub use crate::push_rules::notifies;
 
-#[must_use]
-pub fn is_one_to_one(room: &matrix_sdk::Room) -> bool {
-    room.active_members_count() == 2
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoomShape {
+    pub direct: bool,
+    pub bridged: bool,
+}
+
+pub async fn room_shape(room: &matrix_sdk::Room) -> RoomShape {
+    let by_count = RoomShape {
+        direct: room.active_members_count() == 2,
+        bridged: false,
+    };
+    let Some(service) = room.service_members().filter(|service| !service.is_empty()) else {
+        return by_count;
+    };
+    let Ok(members) = room.members(matrix_sdk::RoomMemberships::ACTIVE).await else {
+        return by_count;
+    };
+    let people = members
+        .iter()
+        .filter(|member| !service.contains(member.user_id()))
+        .count();
+    RoomShape {
+        direct: people == 2,
+        bridged: people == 2 && people < members.len(),
+    }
 }
 
 pub async fn every_encrypted_event_pushed(client: &Client) -> bool {

@@ -134,6 +134,17 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
             line: String::new(),
         }
     }
+
+    /// Error lines always reach the page: the `Failed` command error only
+    /// carries a `log_id`, and the real cause lives in the log line that
+    /// Sentry's `reportCoreError` feeds on.
+    fn make_writer_for(&'a self, meta: &tracing::Metadata<'_>) -> Self::Writer {
+        JsLogWriter {
+            capturing: LOG_CAPTURE.load(Ordering::Relaxed)
+                || meta.level() == &tracing::Level::ERROR,
+            line: String::new(),
+        }
+    }
 }
 
 #[wasm_bindgen(js_name = setPanicHandler)]
@@ -181,7 +192,9 @@ impl SableCore {
     /// `store_id` names the `IndexedDB` database, and the three functions are the
     /// session store, each of which must return a Promise.
     ///
-    /// `log_filter` is an `EnvFilter` directive.
+    /// `log_filter` is an `EnvFilter` directive. `persistent_event_cache` keeps
+    /// timeline history in `IndexedDB`; iOS PWAs disable it after `WebKit` loses
+    /// `IndexedDB` transactions while backgrounded.
     /// `"info,matrix_sdk::http_client=debug"` is the only way to see the SDK's
     /// requests at all: a `SharedWorker`'s never reach the page's network panel.
     #[wasm_bindgen(constructor)]
@@ -193,11 +206,16 @@ impl SableCore {
         save: Function,
         clear: Function,
         log_filter: Option<String>,
+        persistent_event_cache: bool,
     ) -> SableCore {
         console_error_panic_hook::set_once();
         init_tracing(log_filter.as_deref().unwrap_or(DEFAULT_LOG_FILTER));
 
-        let (core, events) = Core::new(store_id, Box::new(JsSessionStore::new(load, save, clear)));
+        let (core, events) = Core::new_with_event_cache(
+            store_id,
+            Box::new(JsSessionStore::new(load, save, clear)),
+            persistent_event_cache,
+        );
 
         SableCore {
             core,
@@ -409,6 +427,7 @@ mod tests {
             Function::new_with_args("bytes", "return Promise.resolve();"),
             Function::new_no_args("return Promise.resolve();"),
             None,
+            true,
         )
     }
 

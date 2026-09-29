@@ -21,36 +21,48 @@ export function cameraVisible(participant: CallParticipant): boolean {
   return visible(participant, participant.camera);
 }
 
-export function callTiles(participants: readonly CallParticipant[]): CallTile[] {
+export function callTiles(
+  participants: readonly CallParticipant[],
+  watchedScreenShareIds: readonly string[] = []
+): CallTile[] {
   const tiles: CallTile[] = [];
   for (const participant of participants) {
     const base = `${participant.backendId ?? 'legacy'}:${participant.identity}`;
     tiles.push({ key: `${base}:camera`, participant, source: 'camera' });
-    if (screenShareVisible(participant)) {
+    const screenShare = participant.screenShare;
+    if (
+      screenShareVisible(participant) &&
+      screenShare &&
+      (participant.local === true || watchedScreenShareIds.includes(screenShare.id))
+    ) {
       tiles.push({ key: `${base}:screen`, participant, source: 'screen' });
     }
   }
   return tiles;
 }
 
-export function spotlightTile(tiles: readonly CallTile[], pinned: string | null): CallTile | null {
+export function featuredTiles(tiles: readonly CallTile[], pinned: string | null): CallTile[] {
   if (pinned !== null) {
     const tile = tiles.find((candidate) => candidate.key === pinned);
-    if (tile) return tile;
+    if (tile) return [tile];
   }
   const screens = tiles.filter((tile) => tile.source === 'screen');
-  return screens.find((tile) => !tile.participant.local) ?? screens.at(0) ?? null;
+  const remote = screens.filter((tile) => !tile.participant.local);
+  return remote.length > 0 ? remote : screens;
 }
 
 export type CallPin = { pinned: string | null; gridForced: boolean };
 
+const only = (tiles: readonly CallTile[], tile: CallTile): boolean =>
+  tiles.length === 1 && tiles[0].key === tile.key;
+
 export function togglePin(
   tiles: readonly CallTile[],
-  spotlight: CallTile | null,
+  featured: readonly CallTile[],
   tile: CallTile
 ): CallPin {
-  if (spotlight?.key !== tile.key) return { pinned: tile.key, gridForced: false };
-  return { pinned: null, gridForced: spotlightTile(tiles, null)?.key === tile.key };
+  if (!only(featured, tile)) return { pinned: tile.key, gridForced: false };
+  return { pinned: null, gridForced: only(featuredTiles(tiles, null), tile) };
 }
 
 export const GRID_GAP_PX = 8;

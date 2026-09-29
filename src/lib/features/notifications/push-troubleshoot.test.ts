@@ -43,6 +43,7 @@ function deps(overrides: Partial<TroubleshootDeps> = {}): TroubleshootDeps {
       return Promise.resolve(arrived);
     },
     wait: () => Promise.resolve(),
+    registrationFailure: () => null,
     ...overrides,
   };
 }
@@ -166,4 +167,39 @@ test('an iPhone without a push token says why instead of blaming the homeserver'
     message: 'settings.troubleshootTransportAppleNoToken',
   });
   expect(results.pusher?.state).toBe('skip');
+});
+
+test('a missing pusher says why the last registration failed', async () => {
+  const results = await run(
+    deps({
+      pushers: () => Promise.resolve([]),
+      registrationFailure: () => ({ stage: 'homeserver', code: 'denied' }),
+    })
+  );
+
+  expect(results.pusher?.detail).toEqual({
+    message: 'settings.troubleshootFailureHomeserver',
+    params: { code: 'denied' },
+  });
+});
+
+test('an iPhone with no token says what the system refused', async () => {
+  const results = await run(
+    deps({
+      platform: 'ios',
+      ownPushkey: () => Promise.resolve(null),
+      registrationFailure: () => ({ stage: 'platform', message: 'no aps-environment' }),
+    })
+  );
+
+  expect(results.transport?.state).toBe('fail');
+  expect(results.transport?.detail?.params).toEqual({ message: 'no aps-environment' });
+});
+
+test('a passing pusher carries no failure detail', async () => {
+  const results = await run(
+    deps({ registrationFailure: () => ({ stage: 'platform', message: 'stale' }) })
+  );
+
+  expect(results.pusher?.detail).toBeUndefined();
 });

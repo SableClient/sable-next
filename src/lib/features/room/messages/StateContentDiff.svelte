@@ -21,7 +21,7 @@
     <p class="unchanged">{$i18n.t('timeline.stateUnchanged')}</p>
   {:else}
     <ul>
-      {#each shown as change (change.path.join('\u0000'))}
+      {#each shown as change, index (change.path.join('\u0000') + index)}
         <li>
           <code class="path">{change.path.join(' › ')}</code>
           {#if change.before !== undefined}<del>{stateValueText(change.before)}</del>{/if}

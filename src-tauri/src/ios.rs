@@ -26,9 +26,9 @@ pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     let release = NSString::from_str(option_env!("SENTRY_APP_VERSION").unwrap_or_default());
     unsafe {
         let _: () = msg_send![class,
-            setEnabled: enabled
-            dsn: &*dsn
-            environment: &*environment
+            setEnabled: enabled,
+            dsn: &*dsn,
+            environment: &*environment,
             release: &*release
         ];
     }
@@ -215,6 +215,17 @@ pub fn hide_form_accessory_bar(window: &tauri::WebviewWindow) {
             AnyObject::set_class(&*subview, subclass);
         }
     });
+}
+
+#[tauri::command]
+pub fn set_system_bars_hidden(window: tauri::WebviewWindow, hidden: bool) -> Result<(), String> {
+    window
+        .with_webview(move |webview| unsafe {
+            let controller: *mut AnyObject = webview.view_controller().cast();
+            let _: () = msg_send![&*controller, setPrefersStatusBarHidden: hidden];
+            let _: () = msg_send![&*controller, setPrefersHomeIndicatorAutoHidden: hidden];
+        })
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

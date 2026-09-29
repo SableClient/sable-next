@@ -44,13 +44,17 @@ const status = (
   verification,
   recovery,
   cross_signing_ready: false,
+  backup_unlocked: false,
+  signing_keys: { master: false, self_signing: false, user_signing: false },
   recovery_passphrase: false,
+  account_data_key: false,
 });
 
 const device = (device_id: string, is_own: boolean, cross_signed: boolean): DeviceView => ({
   device_id,
   display_name: null,
   is_verified: false,
+  has_keys: true,
   cross_signed,
   is_own,
   last_seen_ts: null,

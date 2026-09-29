@@ -369,9 +369,13 @@ impl Core {
         if let Some(client) = cached {
             return Ok(client);
         }
-        let client = session::restore_client(&account.store_id, &account.session)
-            .await
-            .map_err(|error| self.failed("restore: build_client", error))?;
+        let client = session::restore_client(
+            &account.store_id,
+            &account.session,
+            self.persistent_event_cache,
+        )
+        .await
+        .map_err(|error| self.failed("restore: build_client", error))?;
         match account.session.credentials.clone() {
             Credentials::Password(matrix) => client
                 .restore_session(matrix)
@@ -627,7 +631,9 @@ impl Core {
         self.watch_calendars(&client, generation);
         self.watch_cosmetics(&client, generation);
         self.watch_bot_commands(&client, generation);
+        self.watch_image_packs(&client, generation);
         self.watch_joined_invites(&client);
+        self.watch_bridged_dms(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         self.watch_search_index(&client);
@@ -659,6 +665,7 @@ impl Core {
                         core.reconcile_memberships().await;
                         core.fill_own_members().await;
                         core.align_encrypted_defaults().await;
+                        core.align_bridged_dms(None).await;
                     }
 
                     if stalled {

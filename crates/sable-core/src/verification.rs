@@ -25,12 +25,20 @@ use qrcode::{Color, EcLevel, QrCode, Version};
 
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
-    QrCodeView, RecoveryStateView, SignOutSafetyView, VerificationStateView, VerificationView,
+    QrCodeView, RecoveryStateView, SignOutSafetyView, SigningKeysView, VerificationStateView,
+    VerificationView,
 };
 
 use crate::Core;
 
 const BACKUP_SETTLE_TIMEOUT: Duration = Duration::from_secs(5);
+
+pub(crate) const VERIFICATION_METHODS: [VerificationMethod; 4] = [
+    VerificationMethod::SasV1,
+    VerificationMethod::QrCodeShowV1,
+    VerificationMethod::QrCodeScanV1,
+    VerificationMethod::ReciprocateV1,
+];
 
 pub(crate) struct PendingIdentityReset {
     generation: u64,
@@ -144,12 +152,14 @@ impl Core {
         &self,
         client: &matrix_sdk::Client,
     ) -> Result<String, CommandErr> {
-        client
+        let recovery_key = client
             .encryption()
             .recovery()
             .enable()
             .await
-            .map_err(|error| self.failed("reset_identity: enable_recovery", error))
+            .map_err(|error| self.failed("reset_identity: enable_recovery", error))?;
+        self.adopt_account_data_key(client, &recovery_key).await;
+        Ok(recovery_key)
     }
 
     /// Self-verification travels to-device, verifying someone else as a DM
@@ -176,7 +186,7 @@ impl Core {
                     );
 
                     if let Some(request) = request {
-                        core.watch_verification(request);
+                        core.receive_verification_request(request);
                     }
                 }
             }
@@ -206,6 +216,10 @@ impl Core {
         self.track_session_handler(client, handle);
     }
 
+    fn receive_verification_request(self: &Arc<Self>, request: VerificationRequest) {
+        self.watch_verification(request);
+    }
+
     /// The request and the SAS it becomes are two objects with two state enums.
     /// Both funnel into one event stream keyed by the flow id.
     pub(crate) fn watch_verification(self: &Arc<Self>, request: VerificationRequest) {
@@ -214,8 +228,8 @@ impl Core {
             let user_id = request.other_user_id().to_owned();
             let flow_id = request.flow_id().to_owned();
 
-            let mut changes = request.changes();
-            core.emit_verification(&user_id, &flow_id, request_view(&request, &request.state()));
+            let changes = request.changes();
+            let mut changes = futures_util::stream::iter([request.state()]).chain(changes);
 
             while let Some(state) = changes.next().await {
                 match state {
@@ -535,6 +549,7 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
                     cross_signed: crypto.as_ref().is_some_and(
                         matrix_sdk::encryption::identities::Device::is_cross_signed_by_owner,
                     ),
+                    has_keys: crypto.is_some(),
                     display_name: device.display_name,
                     device_id: device.device_id,
                     last_seen_ts: device.last_seen_ts.map(|ts| u64::from(ts.get())),
@@ -552,6 +567,7 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
                             is_own: Some(device.device_id()) == own_device_id,
                             is_verified: device.is_verified(),
                             cross_signed: device.is_cross_signed_by_owner(),
+                            has_keys: true,
                             display_name: device.display_name().map(str::to_owned),
                             device_id: device.device_id().to_owned(),
                             last_seen_ts: None,
@@ -574,6 +590,22 @@ pub(crate) async fn own_devices(client: &matrix_sdk::Client) -> Vec<DeviceView> 
 
 pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> EncryptionStatusView {
     let encryption = client.encryption();
+    let cross_signing = encryption.cross_signing_status().await;
+    let cross_signing_ready = cross_signing
+        .as_ref()
+        .is_some_and(matrix_sdk::encryption::CrossSigningStatus::is_complete);
+    let signing_keys = cross_signing
+        .map(|status| SigningKeysView {
+            master: status.has_master,
+            self_signing: status.has_self_signing,
+            user_signing: status.has_user_signing,
+        })
+        .unwrap_or_default();
+    let backup_unlocked = encryption.backups().are_enabled().await;
+    let recovery_passphrase = recovery_passphrase(client).await;
+    let account_data_key = crate::sealed_account_data::cached_key(client)
+        .await
+        .is_some();
 
     EncryptionStatusView {
         verification: match encryption.verification_state().get() {
@@ -587,12 +619,11 @@ pub(crate) async fn encryption_status(client: &matrix_sdk::Client) -> Encryption
             RecoveryState::Incomplete => RecoveryStateView::Incomplete,
             RecoveryState::Unknown => RecoveryStateView::Unknown,
         },
-        // A partial set cannot sign another device, so it does not count.
-        cross_signing_ready: encryption
-            .cross_signing_status()
-            .await
-            .is_some_and(|status| status.is_complete()),
-        recovery_passphrase: recovery_passphrase(client).await,
+        cross_signing_ready,
+        signing_keys,
+        backup_unlocked,
+        recovery_passphrase,
+        account_data_key,
     }
 }
 

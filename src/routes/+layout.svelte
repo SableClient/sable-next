@@ -41,6 +41,7 @@
   import {
     applyCustomTheme,
     applyCustomTweaks,
+    applyQuickCss,
     applyTheme,
     resolveTheme,
   } from '#lib/settings/theme.js';
@@ -140,6 +141,10 @@
 
   $effect(() => {
     applyCustomTweaks(activeTweakCss());
+  });
+
+  $effect(() => {
+    applyQuickCss(preferences.quickCss);
   });
 </script>
 

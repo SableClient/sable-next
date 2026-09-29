@@ -48,6 +48,7 @@ import type {
   RoomAttachmentKind,
   RoomAttachmentView,
   RoomCosmeticsView,
+  SpaceParentView,
   RoomNotificationModeView,
   RoomOpenView,
   RoomPermissionsView,
@@ -58,6 +59,7 @@ import type {
   RoomTag,
   RoomVersionsView,
   ScheduledMessageView,
+  SealedAccountDataView,
   SearchFilter,
   SearchHitView,
   SearchMetricsView,
@@ -370,6 +372,14 @@ export function createCommands(transport: () => Transport) {
       return response.has_space_parent;
     },
 
+    async unjoinedSpaceParents(roomId: string): Promise<SpaceParentView[]> {
+      const response = await transport().send({
+        type: 'unjoined_space_parents',
+        room_id: roomId,
+      });
+      return response.parents;
+    },
+
     async roomCosmetics(roomId: string, spaceId: string | null): Promise<RoomCosmeticsView> {
       const response = await transport().send({
         type: 'room_cosmetics',
@@ -482,7 +492,27 @@ export function createCommands(transport: () => Transport) {
     },
 
     async setAccountData(eventType: string, content: unknown): Promise<void> {
-      await transport().send({ type: 'set_account_data', event_type: eventType, content });
+      await transport().send({
+        type: 'set_account_data',
+        event_type: eventType,
+        content: $state.snapshot(content),
+      });
+    },
+
+    async sealedAccountData(eventType: string): Promise<SealedAccountDataView> {
+      const response = await transport().send({
+        type: 'sealed_account_data',
+        event_type: eventType,
+      });
+      return response.document;
+    },
+
+    async setSealedAccountData(eventType: string, content: unknown): Promise<void> {
+      await transport().send({
+        type: 'set_sealed_account_data',
+        event_type: eventType,
+        content: $state.snapshot(content),
+      });
     },
 
     async setRoomAccountData(roomId: string, eventType: string, content: unknown): Promise<void> {
@@ -490,7 +520,7 @@ export function createCommands(transport: () => Transport) {
         type: 'set_room_account_data',
         room_id: roomId,
         event_type: eventType,
-        content,
+        content: $state.snapshot(content),
       });
     },
 
@@ -513,7 +543,7 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'search_messages',
         query,
-        filter: options.filter ?? EMPTY_SEARCH_FILTER,
+        filter: $state.snapshot(options.filter ?? EMPTY_SEARCH_FILTER),
         order: options.order ?? 'rank',
         limit: options.limit ?? 30,
         offset: options.offset ?? 0,
@@ -614,7 +644,7 @@ export function createCommands(transport: () => Transport) {
         kind: options.kind ?? 'text',
         public: options.public ?? false,
         encrypted: options.encrypted ?? true,
-        invite: options.invite ?? [],
+        invite: [...(options.invite ?? [])],
         parent_space: options.parentSpace ?? null,
         alias: options.alias ?? null,
         room_version: options.roomVersion ?? null,
@@ -636,7 +666,7 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'room_preview',
         address,
-        via,
+        via: [...via],
       });
       return response.preview;
     },
@@ -645,7 +675,7 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'join_room',
         address,
-        via,
+        via: [...via],
       });
       return response.room_id;
     },
@@ -654,7 +684,7 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'knock_room',
         address,
-        via,
+        via: [...via],
         reason: reason ?? null,
       });
       return response.room_id;
@@ -755,7 +785,7 @@ export function createCommands(transport: () => Transport) {
         kind: options.kind ?? 'text',
         thread_root: options.threadRoot ?? null,
         in_reply_to: options.inReplyTo ?? null,
-        mentions: mentions.userIds,
+        mentions: [...mentions.userIds],
         mentions_room: mentions.room,
         silent_reply: options.silentReply ?? false,
         persona: $state.snapshot(options.persona ?? null),
@@ -770,7 +800,7 @@ export function createCommands(transport: () => Transport) {
         type: 'send_raw_event',
         room_id: roomId,
         event_type: eventType,
-        content,
+        content: $state.snapshot(content),
       });
     },
 
@@ -787,7 +817,12 @@ export function createCommands(transport: () => Transport) {
       event: unknown,
       replaces: string | null
     ): Promise<void> {
-      await transport().send({ type: 'save_calendar_event', room_id: roomId, event, replaces });
+      await transport().send({
+        type: 'save_calendar_event',
+        room_id: roomId,
+        event: $state.snapshot(event),
+        replaces,
+      });
     },
 
     async sendSticker(
@@ -874,7 +909,7 @@ export function createCommands(transport: () => Transport) {
         kind: options.kind ?? 'text',
         media_caption: options.mediaCaption ?? false,
         thread_root: options.threadRoot ?? null,
-        mentions: mentions.userIds,
+        mentions: [...mentions.userIds],
         mentions_room: mentions.room,
         persona: $state.snapshot(options.persona ?? null),
       });
@@ -944,9 +979,9 @@ export function createCommands(transport: () => Transport) {
       const response = await transport().send({
         type: 'bulk_redact',
         room_id: roomId,
-        senders,
+        senders: [...senders],
         after_ts: afterTs,
-        event_types: eventTypes,
+        event_types: [...eventTypes],
         reason,
       });
       return response.redacted;
@@ -1033,7 +1068,7 @@ export function createCommands(transport: () => Transport) {
     ): Promise<PersonaView[]> {
       const response = await transport().send({
         type: 'save_persona',
-        persona,
+        persona: $state.snapshot(persona),
         previous_id: previousId,
       });
       return response.personas;
@@ -1050,7 +1085,7 @@ export function createCommands(transport: () => Transport) {
     async reorderPersonas(ids: string[]): Promise<PersonaView[]> {
       const response = await transport().send({
         type: 'reorder_personas',
-        ids,
+        ids: [...ids],
       });
       return response.personas;
     },
@@ -1297,7 +1332,7 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         event_id: eventId,
         thread_root: threadRoot,
-        answers,
+        answers: [...answers],
       });
     },
 
@@ -1355,12 +1390,12 @@ export function createCommands(transport: () => Transport) {
         bytes,
         caption: options.caption ?? null,
         formattedCaption: options.formattedCaption ?? null,
-        mentions: options.mentions?.userIds ?? [],
+        mentions: [...(options.mentions?.userIds ?? [])],
         mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
         info,
         threadRoot: options.threadRoot ?? null,
-        persona: options.persona ?? null,
+        persona: $state.snapshot(options.persona ?? null),
         spoiler: options.spoiler ?? false,
       });
     },
@@ -1389,7 +1424,7 @@ export function createCommands(transport: () => Transport) {
         attachments,
         caption: options.caption ?? null,
         formattedCaption: options.formattedCaption ?? null,
-        mentions: options.mentions?.userIds ?? [],
+        mentions: [...(options.mentions?.userIds ?? [])],
         mentionsRoom: options.mentions?.room ?? false,
         inReplyTo: options.inReplyTo ?? null,
         threadRoot: options.threadRoot ?? null,
@@ -1619,7 +1654,7 @@ export function createCommands(transport: () => Transport) {
     async fetchPresence(userIds: string[]): Promise<void> {
       await transport().send({
         type: 'fetch_presence',
-        user_ids: userIds,
+        user_ids: [...userIds],
       });
     },
 
@@ -1873,7 +1908,7 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         event_type: eventType,
         state_key: stateKey,
-        content,
+        content: $state.snapshot(content),
       });
     },
 

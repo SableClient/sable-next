@@ -53,7 +53,8 @@ export function registrationMarker(
   accountId: string,
   endpoint: string,
   target: Pick<PushTarget, 'gateway' | 'appId' | 'vapid'>,
-  eventIdOnly: boolean
+  eventIdOnly: boolean,
+  name = ''
 ): string {
   return [
     accountId,
@@ -62,7 +63,15 @@ export function registrationMarker(
     endpoint,
     String(eventIdOnly),
     target.vapid,
+    name,
   ].join('\n');
+}
+
+export function pusherDisplayName(core: Pick<CoreClient, 'session' | 'deviceList'>): string {
+  const deviceName = core.deviceList.find((device) => device.is_own)?.display_name?.trim();
+  const name = deviceName || 'Sable';
+  const deviceId = core.session?.device_id;
+  return deviceId ? `${name} (${deviceId})` : name;
 }
 
 export function needsRegistering(marker: string, registered: string | null): boolean {
@@ -153,7 +162,8 @@ export async function syncPushSubscription(
 
   const registered = localStorage.getItem(REGISTERED_ENDPOINT);
   const eventIdOnly = !preferences.richPushPayloads;
-  const marker = registrationMarker(accountId, endpoint, target, eventIdOnly);
+  const name = pusherDisplayName(core);
+  const marker = registrationMarker(accountId, endpoint, target, eventIdOnly, name);
 
   if (target.gateway !== null) {
     if (!needsRegistering(marker, registered)) return;
@@ -165,7 +175,7 @@ export async function syncPushSubscription(
       pushkey: keys.p256dh,
       app_id: target.appId,
       url: target.gateway,
-      device_display_name: 'This browser',
+      device_display_name: name,
       web_push: { endpoint, p256dh: keys.p256dh, auth: keys.auth },
       event_id_only: eventIdOnly,
       append: false,
@@ -186,7 +196,7 @@ export async function syncPushSubscription(
   await core.commands.setWebPusher({
     pushkey: keys.p256dh,
     app_id: target.appId,
-    device_display_name: 'This browser',
+    device_display_name: name,
     endpoint,
     auth: keys.auth,
     event_id_only: eventIdOnly,

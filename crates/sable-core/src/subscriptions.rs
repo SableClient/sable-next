@@ -347,7 +347,7 @@ impl Core {
             })
             .collect::<std::collections::BTreeSet<_>>();
         drop(subscriptions);
-        if room_ids.is_empty() || room_ids == *subscribed {
+        if room_ids == *subscribed {
             return Ok(());
         }
 

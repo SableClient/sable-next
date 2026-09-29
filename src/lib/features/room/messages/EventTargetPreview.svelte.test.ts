@@ -31,9 +31,11 @@ test('a target names its sender in the colour of their profile', async () => {
   await tick();
   await tick();
 
-  const preview = container.querySelector<HTMLElement>('.target-preview');
+  const name = container.querySelector<HTMLElement>('.target-preview .target-name');
   expect(core.userProfile).toHaveBeenCalledWith('@bob:example.org');
-  expect(preview?.classList.contains('tinted')).toBe(true);
-  expect(preview?.style.getPropertyValue('--target-on-light')).not.toBe('');
-  expect(preview?.style.getPropertyValue('--target-on-dark')).not.toBe('');
+  expect(name?.classList.contains('sender-identity-name')).toBe(true);
+  expect(name?.classList.contains('tinted')).toBe(true);
+  expect(name?.style.getPropertyValue('--name-color-on-light')).toBe('#2244aa');
+  expect(name?.style.getPropertyValue('--name-color-on-dark')).toBe('#88aaff');
+  expect(name?.style.color).toBe('');
 });

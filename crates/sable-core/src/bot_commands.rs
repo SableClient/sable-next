@@ -1,5 +1,3 @@
-//! In-room bot commands (MSC4391).
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -89,7 +87,10 @@ impl Core {
                 let core = core.clone();
                 async move {
                     let kind = raw.get_field::<String>("type").ok().flatten();
-                    if kind.as_deref() == Some(COMMAND_DESCRIPTION_EVENT) {
+                    if matches!(
+                        kind.as_deref(),
+                        Some(COMMAND_DESCRIPTION_EVENT | MEMBER_EVENT)
+                    ) {
                         core.emit_if_current(
                             generation,
                             CoreEvent::BotCommandsChanged {
@@ -180,7 +181,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_synced_description_is_announced() {
+    async fn synced_command_descriptions_and_member_changes_are_announced() {
         let server = MatrixMockServer::new().await;
         let room_id = room_id!("!room:example.org");
         let client = server.client_builder().build().await;
@@ -191,16 +192,27 @@ mod tests {
         server
             .sync_room(
                 &client,
-                JoinedRoomBuilder::new(room_id).add_timeline_event(
-                    Raw::new(&state(
-                        COMMAND_DESCRIPTION_EVENT,
-                        "ban",
-                        BOT,
-                        &json!({ "command": "ban" }),
-                    ))
-                    .unwrap()
-                    .cast_unchecked(),
-                ),
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(
+                        Raw::new(&state(
+                            COMMAND_DESCRIPTION_EVENT,
+                            "ban",
+                            BOT,
+                            &json!({ "command": "ban" }),
+                        ))
+                        .unwrap()
+                        .cast_unchecked(),
+                    )
+                    .add_timeline_event(
+                        Raw::new(&state(
+                            MEMBER_EVENT,
+                            BOT,
+                            BOT,
+                            &json!({ "membership": "leave" }),
+                        ))
+                        .unwrap()
+                        .cast_unchecked(),
+                    ),
             )
             .await;
 
@@ -210,6 +222,6 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(announced, [room_id.to_owned()]);
+        assert_eq!(announced, [room_id.to_owned(), room_id.to_owned()]);
     }
 }

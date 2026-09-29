@@ -158,8 +158,14 @@
     object-position: center;
   }
 
+  :global(.avatar-root .media-image.avatar-image) {
+    container-type: normal;
+  }
+
   :global(.avatar-image .media-image-placeholder),
-  :global(.avatar-image .media-image-unavailable) {
+  :global(.avatar-image .media-image-unavailable),
+  :global(.avatar-image .media-image-progress),
+  :global(.avatar-image .media-image-size) {
     display: none;
   }
 

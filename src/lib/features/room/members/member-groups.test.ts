@@ -66,23 +66,31 @@ test('a run of two or more member events becomes one unit keyed on its newest ev
   expect(units[0].group).toBeNull();
 });
 
-test('a lone member event, a moderated one, a reason or reactions stay their own row', () => {
+test('a lone member event, a moderated one or reactions stay their own row', () => {
   const items = [
     member('a', 'joined'),
     member('b', 'banned'),
-    member('c', 'left', {
-      content: {
-        kind: 'membership',
-        user_id: '@c:x',
-        change: 'left',
-        display_name: null,
-        reason: 'bye',
-      },
-    }),
-    member('d', 'joined', { reactions: [{ key: '👍', senders: ['@a:x'] }] as never }),
+    member('c', 'joined', { reactions: [{ key: '👍', senders: ['@a:x'] }] as never }),
   ];
 
   expect(groupMemberEvents(items).every((unit) => unit.group === null)).toBe(true);
+});
+
+test('membership events with reasons are grouped', () => {
+  const items = [
+    member('a', 'left', {
+      content: {
+        kind: 'membership',
+        user_id: '@a:x',
+        change: 'left',
+        display_name: 'A',
+        reason: 'IRC quit',
+      },
+    }),
+    member('b', 'joined'),
+  ];
+
+  expect(groupMemberEvents(items)).toEqual([{ item: items[1], index: 1, group: items }]);
 });
 
 test('lists up to three names and folds the rest into a count', () => {

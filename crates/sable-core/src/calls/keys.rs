@@ -353,6 +353,7 @@ mod tests {
             identity: format!("@erwan:localhost:{device}"),
             mode: crate::protocol::CallMode::Legacy,
             created_ts,
+            joined_ts: created_ts,
             expires_at_ms: None,
             foci: Vec::new(),
         }

@@ -217,6 +217,7 @@ fn member_views(members: &[CallMember]) -> Vec<CallMemberView> {
             device_id: member.device_id.to_string(),
             identity: member.identity.clone(),
             backend_id: None,
+            joined_ts: member.joined_ts,
         })
         .collect()
 }
@@ -700,6 +701,7 @@ mod tests {
             identity: "@erwan:localhost:LAPTOP".to_owned(),
             mode: crate::protocol::CallMode::Legacy,
             created_ts: 0,
+            joined_ts: 0,
             expires_at_ms: None,
             foci: Vec::new(),
         }]);

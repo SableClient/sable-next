@@ -80,6 +80,7 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
                 "data-mx-color",
                 "data-mx-spoiler",
                 "data-mx-maths",
+                "data-mx-room-mention",
             ]),
         ),
         ("div", HashSet::from(["data-mx-maths"])),
@@ -189,6 +190,10 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
                 PropertiesNames {
                     parent: "sub",
                     properties: &["data-md"],
+                },
+                PropertiesNames {
+                    parent: "span",
+                    properties: &["data-mx-room-mention"],
                 },
                 PropertiesNames {
                     parent: "time",
@@ -332,6 +337,24 @@ enum SpanKind {
     Url,
     Email,
     Msc,
+    RoomMention,
+}
+
+fn room_mention_spans(text: &str) -> Vec<(usize, usize)> {
+    text.match_indices("@room")
+        .filter_map(|(start, mention)| {
+            let end = start + mention.len();
+            let bounded = text
+                .get(..start)
+                .and_then(|before| before.chars().next_back())
+                .is_none_or(|character| !character.is_alphanumeric() && character != '_')
+                && text
+                    .get(end..)
+                    .and_then(|after| after.chars().next())
+                    .is_none_or(|character| !character.is_alphanumeric() && character != '_');
+            bounded.then_some((start, end))
+        })
+        .collect()
 }
 
 fn linkify_urls(text: &str) -> String {
@@ -354,6 +377,11 @@ fn linkify_urls(text: &str) -> String {
             msc_spans(text)
                 .into_iter()
                 .map(|(start, end)| (start, end, SpanKind::Msc)),
+        )
+        .chain(
+            room_mention_spans(text)
+                .into_iter()
+                .map(|(start, end)| (start, end, SpanKind::RoomMention)),
         )
         .collect();
     spans.sort_unstable();
@@ -385,6 +413,7 @@ fn linkify_urls(text: &str) -> String {
                     link,
                 ));
             }
+            SpanKind::RoomMention => html.push_str("<span data-mx-room-mention>@room</span>"),
         }
         offset = end;
     }
@@ -1211,6 +1240,19 @@ mod tests {
 
         assert!(html.starts_with("Use &lt;b&gt;text&lt;/b&gt;"));
         assert!(html.contains("href=\"https://example.org/a\""));
+    }
+
+    #[test]
+    fn marks_standalone_room_mentions() {
+        let plain = display_html("tell @room now", None);
+        assert!(plain.contains("<span data-mx-room-mention>@room</span>"));
+        assert!(!display_html("email me@room", None).contains("data-mx-room-mention"));
+
+        let formatted = display_html("tell @room now", Some("tell @room now"));
+        assert!(
+            formatted.contains("data-mx-room-mention=\"\""),
+            "{formatted}"
+        );
     }
 
     #[test]

@@ -11,9 +11,15 @@
     weight?: 'regular' | 'fill';
   };
 
-  let { isSpace = false, isVoice = false, joinRule = null, weight = 'regular' }: Props = $props();
+  let {
+    isCalendar = false,
+    isSpace = false,
+    isVoice = false,
+    joinRule = null,
+    weight = 'regular',
+  }: Props = $props();
 
-  let room = $derived({ isSpace, isVoice, joinRule });
+  let room = $derived({ isCalendar, isSpace, isVoice, joinRule });
   let overlay = $derived(roomIconOverlay(room));
   let Glyph = $derived(roomIconComponent(room));
   let glyphWeight = $derived(roomIconWeight(room, weight));

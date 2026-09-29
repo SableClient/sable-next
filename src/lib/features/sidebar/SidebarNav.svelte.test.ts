@@ -114,7 +114,7 @@ test('adds an incoming unread DM to the navbar and removes it when read', async 
     },
     commands: {
       subscribeRoomList: () => Promise.resolve({ subscription: 1, rooms: [room] }),
-      notificationSettings: () => Promise.resolve({ room: null, default: 'all' }),
+      notificationSettings: () => Promise.resolve({ room: null, default: 'all', bridged: false }),
       unsubscribe: () => Promise.resolve(),
     },
   } as unknown as CoreClient;

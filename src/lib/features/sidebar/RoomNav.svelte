@@ -71,6 +71,7 @@
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
+  import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
@@ -213,7 +214,9 @@
   let searchHref = $derived(
     activeSpace === null
       ? resolve('/(app)/search')
-      : scopedSearchPath('space', activeSpace, activeSpace.room_id)
+      : `${scopedSearchPath('space', activeSpace, activeSpace.room_id)}&space=${encodeURIComponent(
+          activeSpace.room_id
+        )}`
   );
   const joinHref = `${resolve('explore')}#explore-join-by-address`;
   let createSpaceHref = $derived(
@@ -392,7 +395,7 @@
     const room = item.room;
     if (room === undefined) return false;
     if (page.url.pathname === roomHref(item)) return true;
-    return hasUnread(roomList.unreadFor(room));
+    return hasUnread(roomList.badgeUnreadFor(room));
   }
 
   function isFavourite(row: RoomNavRow): boolean {
@@ -530,7 +533,7 @@
   let sectionUnread = $derived(
     sectionRooms.some((item) => {
       const room = item.room;
-      return room !== undefined && hasUnread(roomList.unreadFor(room));
+      return room !== undefined && hasUnread(roomList.badgeUnreadFor(room));
     })
   );
 
@@ -698,7 +701,7 @@
     {@const avatarUrl = room ? roomAvatarUrl(room) : null}
     {@const href = roomHref(item)}
     {@const active = page.url.pathname === href}
-    {@const counts = room ? roomList.unreadFor(room) : NO_UNREAD}
+    {@const counts = room ? roomList.badgeUnreadFor(room) : NO_UNREAD}
     {@const mentions = counts.highlight}
     {@const unread = counts.unread}
     {@const marked = counts.marked ?? false}
@@ -752,6 +755,7 @@
                 uniform
               >
                 <RoomIcon
+                  isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
                   isSpace={room?.is_space ?? false}
                   isVoice={room?.is_voice ?? false}
                   joinRule={room?.join_rule ?? null}
@@ -770,6 +774,7 @@
           {:else}
             <span class="room-icon" aria-hidden="true">
               <RoomIcon
+                isCalendar={room?.room_type === CALENDAR_ROOM_TYPE}
                 isSpace={room?.is_space ?? false}
                 isVoice={room?.is_voice ?? false}
                 joinRule={room?.join_rule ?? null}
@@ -1051,8 +1056,6 @@
       {:else}
         {#if canCreateHere}
           {@render createMenu()}
-        {:else}
-          {@render action(joinHref, $i18n.t('nav.joinWithAddress'), LinkIcon)}
         {/if}
         {@render action(browseHref, browseLabel, activeSpace === null ? CompassIcon : FlagIcon)}
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
@@ -1906,8 +1909,8 @@
 
   .call-participant-list li.speaking :global(.avatar-root) {
     box-shadow:
-      0 0 0 0.125rem var(--bg-container),
-      0 0 0 0.3125rem var(--success-main);
+      0 0 0 var(--border-width-300) var(--bg-container),
+      0 0 0 calc(var(--border-width-300) + var(--border-width-500)) var(--success-main);
   }
 
   .voice-badges {

@@ -223,11 +223,10 @@ struct SpaceParentContent {
     via: Vec<String>,
 }
 
-async fn first_space_parent(room: &matrix_sdk::Room) -> Option<OwnedRoomId> {
-    let events = room
-        .get_state_events(StateEventType::SpaceParent)
-        .await
-        .ok()?;
+pub(crate) async fn space_parents(room: &matrix_sdk::Room) -> Vec<(OwnedRoomId, Vec<String>)> {
+    let Ok(events) = room.get_state_events(StateEventType::SpaceParent).await else {
+        return Vec::new();
+    };
     let mut parents: Vec<SpaceParent> = events
         .iter()
         .filter_map(|event| {
@@ -248,7 +247,36 @@ async fn first_space_parent(room: &matrix_sdk::Room) -> Option<OwnedRoomId> {
     });
     parents
         .into_iter()
-        .find_map(|parent| RoomId::parse(parent.state_key).ok())
+        .filter_map(|parent| {
+            RoomId::parse(&parent.state_key)
+                .ok()
+                .map(|room_id| (room_id, parent.content.via))
+        })
+        .collect()
+}
+
+pub(crate) async fn unjoined_space_parents(
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+) -> Vec<crate::protocol::SpaceParentView> {
+    space_parents(room)
+        .await
+        .into_iter()
+        .filter(|(parent, _)| {
+            client
+                .get_room(parent)
+                .is_none_or(|space| space.state() != matrix_sdk::RoomState::Joined)
+        })
+        .map(|(room_id, via)| crate::protocol::SpaceParentView { room_id, via })
+        .collect()
+}
+
+async fn first_space_parent(room: &matrix_sdk::Room) -> Option<OwnedRoomId> {
+    space_parents(room)
+        .await
+        .into_iter()
+        .next()
+        .map(|(room_id, _)| room_id)
 }
 
 async fn stored_layer(room: &matrix_sdk::Room) -> Result<Layer, matrix_sdk::Error> {
@@ -587,6 +615,53 @@ mod tests {
             assert_eq!(found.users[0].font.as_deref(), Some("Georgia"));
             assert_eq!(found.users[0].pronouns, [pronoun("they/them", Some("en"))]);
         }
+    }
+
+    #[tokio::test]
+    async fn only_parents_we_are_not_in_are_offered_canonical_first() {
+        let server = MatrixMockServer::new().await;
+        let room_id = room_id!("!room:example.org");
+        let joined_space = room_id!("!joined:example.org");
+        let client = joined(&server, &[joined_space]).await;
+        let parent = |space: &str, content: Value| {
+            Raw::new(&state("m.space.parent", space, &content))
+                .unwrap()
+                .cast_unchecked()
+        };
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_bulk([
+                    parent(joined_space.as_str(), json!({ "via": ["example.org"] })),
+                    parent("!other:example.org", json!({ "via": ["other.org"] })),
+                    parent(
+                        "!canonical:example.org",
+                        json!({ "via": ["example.org"], "canonical": true }),
+                    ),
+                    parent("!stale:example.org", json!({ "via": [] })),
+                ]),
+            )
+            .await;
+        let room = client.get_room(room_id).unwrap();
+
+        let offered: Vec<(String, Vec<String>)> = super::unjoined_space_parents(&client, &room)
+            .await
+            .into_iter()
+            .map(|parent| (parent.room_id.to_string(), parent.via))
+            .collect();
+        assert_eq!(
+            offered,
+            [
+                (
+                    "!canonical:example.org".to_owned(),
+                    vec!["example.org".to_owned()]
+                ),
+                (
+                    "!other:example.org".to_owned(),
+                    vec!["other.org".to_owned()]
+                ),
+            ]
+        );
     }
 
     #[tokio::test]

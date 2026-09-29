@@ -32,6 +32,7 @@ const otherSession: SessionInfo = {
 
 function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
+  const storageFailureListeners = new Set<() => void>();
   const sent: { type: string }[] = [];
   const close = vi.fn();
   const resetCaches = vi.fn().mockResolvedValue(undefined);
@@ -49,6 +50,10 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
       return () => listeners.delete(listener);
     },
     subscribeCrash: () => () => {},
+    subscribeStorageFailure: (listener: () => void) => {
+      storageFailureListeners.add(listener);
+      return () => storageFailureListeners.delete(listener);
+    },
     subscribeStall: () => () => {},
     setDebugLogs: vi.fn(),
     close,
@@ -66,6 +71,9 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
+    emitStorageFailure: () => {
+      for (const listener of storageFailureListeners) listener();
+    },
   };
 }
 
@@ -78,6 +86,16 @@ test('a restore that returns a session leaves the client ready', async () => {
   expect(core.status).toBe('ready');
   expect(core.session?.user_id).toBe('@erwan:example.org');
   expect(core.accounts).toHaveLength(1);
+});
+
+test('an interrupted storage connection requires an explicit reload', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  fake.emitStorageFailure();
+
+  expect(core.storageInterrupted).toBe(true);
 });
 
 test('resetting caches also drops the persisted room list snapshot', async () => {
@@ -214,6 +232,25 @@ test('commands dispatch through the transport the client was given', async () =>
 
   await expect(core.commands.roomAliases('!room:example.org')).resolves.toEqual(['#a:b']);
   expect(fake.sent).toContainEqual({ type: 'room_aliases', room_id: '!room:example.org' });
+});
+
+test('commands copy caller-provided arrays, so reactive proxies cannot reach the transport', async () => {
+  const fake = fakeTransport({ restore: { session: null }, join_room: { room_id: '!x:b' } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+
+  // Any Proxy stands in for a `$state` array, which structured clone refuses.
+  const via = new Proxy(['example.org'], {});
+  await core.commands.joinRoom('!room:example.org', via);
+
+  const sent = fake.sent.find((command) => command.type === 'join_room');
+  expect(sent).toEqual({
+    type: 'join_room',
+    address: '!room:example.org',
+    via: ['example.org'],
+  });
+  expect(() => structuredClone(sent)).not.toThrow();
 });
 
 test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {
@@ -486,6 +523,32 @@ test('a cancellation for an unknown verification flow does not open the verifica
   unsubscribe();
 });
 
+test('verifying while another device is asking accepts its request instead of crossing it', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  const unsubscribe = core.subscribeEvents(() => {});
+
+  fake.emit({
+    type: 'verification',
+    user_id: session.user_id,
+    flow_id: 'incoming-flow',
+    state: { phase: 'requested', is_self: true, initiated_by_us: false },
+  });
+
+  await expect(core.requestVerification(session.user_id, 'NEWDEVICE')).resolves.toBe(
+    'incoming-flow'
+  );
+  expect(fake.sent).toContainEqual({
+    type: 'accept_verification',
+    user_id: session.user_id,
+    flow_id: 'incoming-flow',
+  });
+  expect(fake.sent.some((command) => command.type === 'request_verification')).toBe(false);
+  unsubscribe();
+});
+
 test('a session ending clears the session and looks for a fallback account', async () => {
   const fake = fakeTransport({
     restore: { session },
@@ -640,4 +703,84 @@ test('an onion homeserver leaves discovery to the Matrix core without a browser 
 
   expect(fetchMock).not.toHaveBeenCalled();
   expect(fake.sent).toContainEqual({ type: 'login_flows', homeserver });
+});
+
+test('a status reported while the first read is in flight is not overwritten by it', async () => {
+  const unknown = {
+    verification: 'unknown',
+    recovery: 'unknown',
+    cross_signing_ready: false,
+    backup_unlocked: false,
+    signing_keys: { master: false, self_signing: false, user_signing: false },
+    recovery_passphrase: false,
+  } as const;
+  const known = { ...unknown, verification: 'verified', recovery: 'enabled' } as const;
+  let answer: (value: object) => void = () => {};
+  const device = { device_id: 'LAPTOP' };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session] },
+    devices: { devices: [device] },
+  });
+  const plain = fake.send.getMockImplementation();
+  fake.send.mockImplementation((command: { type: string }) =>
+    command.type === 'encryption_status'
+      ? new Promise<object>((resolve) => {
+          answer = resolve;
+        })
+      : (plain?.(command) ?? Promise.resolve({}))
+  );
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  fake.emit({ type: 'encryption_status', status: known } as unknown as CoreEvent);
+  answer({ status: unknown });
+  await vi.waitFor(() => {
+    expect(core.deviceList).toEqual([device]);
+  });
+
+  expect(core.encryption).toEqual(known);
+  core.stop();
+});
+
+test('a stale login callback that fails does not discard the first status read', async () => {
+  const known = {
+    verification: 'unverified',
+    recovery: 'enabled',
+    cross_signing_ready: true,
+    backup_unlocked: false,
+    signing_keys: { master: true, self_signing: true, user_signing: true },
+    recovery_passphrase: false,
+  } as const;
+  let answer: (value: object) => void = () => {};
+  const device = { device_id: 'LAPTOP' };
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session] },
+    devices: { devices: [device] },
+  });
+  const plain = fake.send.getMockImplementation();
+  fake.send.mockImplementation((command: { type: string }) => {
+    if (command.type === 'encryption_status')
+      return new Promise<object>((resolve) => {
+        answer = resolve;
+      });
+    if (command.type === 'complete_oidc_login')
+      return Promise.reject(new CoreError({ code: 'unavailable' }));
+    return plain?.(command) ?? Promise.resolve({});
+  });
+  const core = createCoreClient(() => fake.transport);
+
+  await core.start();
+  await expect(core.completeOidcLogin('sable://oauth/callback?code=used')).rejects.toBeInstanceOf(
+    CoreError
+  );
+  answer({ status: known });
+  await vi.waitFor(() => {
+    expect(core.encryption).toEqual(known);
+  });
+
+  expect(core.deviceList).toEqual([device]);
+  expect(core.status).toBe('ready');
+  core.stop();
 });
