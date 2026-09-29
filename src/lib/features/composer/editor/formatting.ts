@@ -36,7 +36,10 @@ function markRule(pattern: RegExp, type: MarkType): InputRule {
 }
 
 const URL_PATTERN =
-  /(?:^|[\s(])((?:https?:\/\/|www\.)[^\s<>()]*[^\s<>().,;:!?'"])[.,;:!?'"]*([\s)])$/;
+  /(?:^|[\p{White_Space}(])((?:https?:\/\/|www\.)[^\p{White_Space}\uFFFC<>()]*[^\p{White_Space}\uFFFC<>().,;:!?'"])[.,;:!?'"]*([\p{White_Space})\uFFFC])$/u;
+
+const URL_AT_CURSOR =
+  /(?:^|[\p{White_Space}(])((?:https?:\/\/|www\.)[^\p{White_Space}<>()]*[^\p{White_Space}<>().,;:!?'"])[.,;:!?'"]*$/u;
 
 const LINE_BREAK = '\uFFFC';
 
@@ -167,6 +170,22 @@ function autolinkRule(): InputRule {
     },
     { inCodeMark: false }
   );
+}
+
+export function autolinkAtCursor(state: EditorState): Transaction | null {
+  if (!state.selection.empty) return null;
+  const { $from } = state.selection;
+  const text = $from.parent.textBetween(0, $from.parentOffset, '', '');
+  const match = URL_AT_CURSOR.exec(text);
+  const url = match?.[1];
+  if (!match || !url) return null;
+
+  const from = $from.start() + match.index + match[0].indexOf(url);
+  const to = from + url.length;
+  if (state.doc.rangeHasMark(from, to, marks.link)) return null;
+
+  const href = url.startsWith('www.') ? `https://${url}` : url;
+  return state.tr.addMark(from, to, marks.link.create({ href })).removeStoredMark(marks.link);
 }
 
 function isInside(state: EditorState, type: NodeType): boolean {

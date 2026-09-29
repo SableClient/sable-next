@@ -66,6 +66,17 @@ function view(editor: ComposerEditor): EditorView {
   return (editor as unknown as { view: EditorView }).view;
 }
 
+function typeAfterBreak(editor: ComposerEditor, text: string): void {
+  const target = view(editor);
+  for (const char of text) {
+    const { from, to } = target.state.selection;
+    const handled = target.someProp('handleTextInput', (handler) =>
+      handler(target, from, to, char, () => target.state.tr)
+    );
+    if (!handled) target.dispatch(target.state.tr.insertText(char, from, to));
+  }
+}
+
 function surface(): HTMLElement {
   const element = document.querySelector<HTMLElement>('[contenteditable]');
   if (!element) throw new Error('editor surface not found');
@@ -497,6 +508,23 @@ test('a lone newline committed by an IME is an Enter press', () => {
   expect(event.defaultPrevented).toBe(true);
   expect(submit).toHaveBeenCalledTimes(1);
   expect(editor.doc()?.textContent).toBe('hi');
+});
+
+test('a soft line break ends an autolink', () => {
+  const editor = open();
+  editor.setText('https://example.org');
+  const target = view(editor);
+  target.someProp('handleKeyDown', (handler) =>
+    handler(target, new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true }))
+  );
+  typeAfterBreak(editor, 'next ');
+
+  const marks: Record<string, string[]> = {};
+  editor.doc()?.descendants((node) => {
+    if (node.isText) marks[node.text ?? ''] = node.marks.map((mark) => mark.type.name);
+  });
+
+  expect(marks).toMatchObject({ 'https://example.org': ['link'], 'next ': [] });
 });
 
 describe('Android enter', () => {

@@ -446,6 +446,13 @@ describe('activeMarks reports the block the caret is in', () => {
 });
 
 describe('autolink edge cases', () => {
+  test('a Unicode whitespace character ends an address', () => {
+    open();
+    type('https://a.b/c\u0085');
+
+    expect(marksOn('https://a.b/c')).toEqual(['link']);
+  });
+
   test('an address already inside a link is not linked again', () => {
     open();
     const editor = view;
