@@ -721,6 +721,8 @@
     "userIdPlaceholder": "@someone:server",
     "invalid": "A user id looks like @someone:server.",
     "failed": "The chat could not be created.",
+    "encryptionLabel": "End-to-end encryption",
+    "encryptionHint": "Turn off for bridged contacts. Cannot be turned on later.",
     "submit": "Start chat"
   },
   "userLink": {

@@ -41,10 +41,21 @@ test('creates the chat and navigates to it under the direct section', async () =
 
   await submit('@alice:example.org');
   await vi.waitFor(() => {
-    expect(core.createDm).toHaveBeenCalledWith('@alice:example.org');
+    expect(core.createDm).toHaveBeenCalledWith('@alice:example.org', true);
   });
 
   expect(goto).toHaveBeenCalledWith('/(app)/direct/!dm%3Aexample.org');
+});
+
+test('creates an unencrypted chat when the switch is turned off', async () => {
+  core.createDm.mockResolvedValue('!dm:example.org');
+  render(CreateChatForm);
+
+  await userEvent.setup().click(screen.getByRole('switch', { name: 'direct.encryptionLabel' }));
+  await submit('@alice:example.org');
+  await vi.waitFor(() => {
+    expect(core.createDm).toHaveBeenCalledWith('@alice:example.org', false);
+  });
 });
 
 test('rejects an input that is not a user id without calling the core', async () => {

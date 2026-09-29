@@ -654,10 +654,11 @@ export function createCommands(transport: () => Transport) {
       return response.room_id;
     },
 
-    async createDm(userId: string): Promise<string> {
+    async createDm(userId: string, encrypted?: boolean): Promise<string> {
       const response = await transport().send({
         type: 'create_dm',
         user_id: userId,
+        encrypted: encrypted ?? null,
       });
       return response.room_id;
     },

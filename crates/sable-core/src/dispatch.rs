@@ -2799,13 +2799,25 @@ impl Core {
                 })
             }
 
-            Command::CreateDm { user_id } => {
+            Command::CreateDm { user_id, encrypted } => {
                 let client = self.client().await?;
-                let existing = client
-                    .get_dm_rooms(&user_id)
-                    .find(|room| !room.is_tombstoned());
+                let existing = client.get_dm_rooms(&user_id).find(|room| {
+                    !room.is_tombstoned()
+                        && encrypted
+                            .is_none_or(|wanted| room.encryption_state().is_encrypted() == wanted)
+                });
                 let room = match existing {
                     Some(room) => room,
+                    None if encrypted == Some(false) => {
+                        let mut request = create_room::v3::Request::new();
+                        request.invite = vec![user_id];
+                        request.is_direct = true;
+                        request.preset = Some(RoomPreset::TrustedPrivateChat);
+                        client
+                            .create_room(request)
+                            .await
+                            .map_err(|error| self.failed("create_dm", error))?
+                    }
                     None => client
                         .create_dm(&user_id)
                         .await

@@ -461,6 +461,33 @@ async fn messaging_a_user_reuses_the_dm_that_already_exists() {
 }
 
 #[tokio::test]
+async fn an_unencrypted_dm_request_reuses_an_unencrypted_dm() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!plain-dm:example.org");
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder
+                .add_joined_room(JoinedRoomBuilder::new(room_id))
+                .add_custom_global_account_data(json!({
+                    "type": "m.direct",
+                    "content": { "@bob:example.org": [room_id] }
+                }));
+        })
+        .await;
+    let core = core(&server, client).await;
+    let command = serde_json::from_value(
+        json!({"type": "create_dm", "user_id": "@bob:example.org", "encrypted": false}),
+    )
+    .unwrap();
+    let CommandOk::CreateDm { room_id: found } = core.dispatch(command).await.unwrap() else {
+        panic!("wrong response")
+    };
+    assert_eq!(found, room_id);
+}
+
+#[tokio::test]
 async fn memberships_follow_the_server_joined_rooms() {
     use matrix_sdk::RoomState;
     use matrix_sdk_test::{InvitedRoomBuilder, LeftRoomBuilder};

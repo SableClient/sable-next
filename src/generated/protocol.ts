@@ -139,8 +139,11 @@ public: boolean;
 encrypted: boolean; invite: string[];
 /**  Adds an `m.space.child` edge from this space. */
 parent_space: string | null; alias: string | null; room_version: string | null; join_rule: CreateJoinRuleView | null; federate: boolean } |
-/**  Reuses an existing DM with this user if there is one. */
-{ type: "create_dm"; user_id: string } | { type: "add_to_space"; space_id: string; room_id: string; suggested: boolean | null } | { type: "set_space_child_order"; space_id: string; room_id: string; order: string | null } | { type: "set_space_child_suggested"; space_id: string; room_id: string; suggested: boolean } | { type: "space_hierarchy"; space_id: string; from: string | null } | { type: "remove_from_space"; space_id: string; room_id: string } | { type: "space_sidebar" } | { type: "set_space_sidebar"; items: SidebarItemView[] } |
+/**
+ *  Reuses an existing DM with this user if there is one. `encrypted` picks
+ *  which kind to reuse or create; `None` reuses any and creates an encrypted one.
+ */
+{ type: "create_dm"; user_id: string; encrypted: boolean | null } | { type: "add_to_space"; space_id: string; room_id: string; suggested: boolean | null } | { type: "set_space_child_order"; space_id: string; room_id: string; order: string | null } | { type: "set_space_child_suggested"; space_id: string; room_id: string; suggested: boolean } | { type: "space_hierarchy"; space_id: string; from: string | null } | { type: "remove_from_space"; space_id: string; room_id: string } | { type: "space_sidebar" } | { type: "set_space_sidebar"; items: SidebarItemView[] } |
 /**
  *  Accepting an invite is `JoinRoom`, declining it `LeaveRoom`.
  *

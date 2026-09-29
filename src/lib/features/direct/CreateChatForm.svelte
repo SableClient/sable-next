@@ -7,12 +7,14 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   const core = useCoreClient();
   const userIdPattern = /^@[^:\s]+:\S+$/;
 
   let userId = $state('');
+  let encrypted = $state(true);
   let opening = $state(false);
   let invalid = $state(false);
   let failed = $state(false);
@@ -28,7 +30,7 @@
 
     opening = true;
     try {
-      const roomId = await core.commands.createDm(candidate);
+      const roomId = await core.commands.createDm(candidate, encrypted);
       await goto(resolve('/(app)/direct/[roomId]', { roomId: roomPathParamFromId(roomId) }));
     } catch (error) {
       console.warn('[sable direct] could not create a chat', error);
@@ -57,6 +59,20 @@
     />
   </FormField>
 
+  <div class="row">
+    <div class="row-text">
+      <span class="field-label">{$i18n.t('direct.encryptionLabel')}</span>
+      <p class="hint">{$i18n.t('direct.encryptionHint')}</p>
+    </div>
+    <Switch
+      checked={encrypted}
+      label={$i18n.t('direct.encryptionLabel')}
+      onCheckedChange={(next: boolean) => {
+        encrypted = next;
+      }}
+    />
+  </div>
+
   {#if failed}
     <Alert variant="critical" role="alert">{$i18n.t('direct.failed')}</Alert>
   {/if}
@@ -70,5 +86,32 @@
   .create-chat {
     display: grid;
     gap: var(--space-500);
+  }
+
+  .row {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-400);
+    justify-content: space-between;
+  }
+
+  .row-text {
+    display: grid;
+    gap: var(--space-100);
+    min-width: 0;
+  }
+
+  .field-label {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-heading);
+  }
+
+  .hint {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-body);
+    margin: 0;
   }
 </style>
