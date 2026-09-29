@@ -51,6 +51,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Pill from '#lib/ui/primitives/Pill.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -385,10 +386,10 @@
 {#snippet actionRow()}
   <ActionMenu label={$i18n.t('timeline.profileShare')} align="start">
     {#snippet trigger({ props })}
-      <button {...props} type="button" class="profile-action selection-open">
+      <Pill {...props}>
         <ShareNetworkIcon size={14} />
         {$i18n.t('timeline.profileShare')}
-      </button>
+      </Pill>
     {/snippet}
     <IconContext values={{ 'aria-hidden': 'true' }}>
       <ActionMenuItem onSelect={copyUserId}>
@@ -402,10 +403,10 @@
   {#if !isSelf}
     <ActionMenu label={mutualLabel} class="profile-mutual-menu" align="start">
       {#snippet trigger({ props })}
-        <button {...props} class="profile-action selection-open" type="button">
+        <Pill {...props}>
           <ChatsIcon size={14} />
           {mutualLabel}
-        </button>
+        </Pill>
       {/snippet}
       {#if sharedSpaces.length > 0}
         {@render mutualRows(sharedSpaces)}
@@ -418,14 +419,9 @@
   {/if}
   <ActionMenu label={$i18n.t('timeline.profileMoreActions')}>
     {#snippet trigger({ props })}
-      <button
-        {...props}
-        type="button"
-        class="profile-action profile-action-overflow selection-open"
-        aria-label={$i18n.t('timeline.profileMoreActions')}
-      >
+      <Pill {...props} iconOnly aria-label={$i18n.t('timeline.profileMoreActions')}>
         <DotsThreeIcon size={14} />
-      </button>
+      </Pill>
     {/snippet}
     <IconContext values={{ 'aria-hidden': 'true' }}>
       <ActionMenuItem onSelect={copyServer}>
@@ -522,15 +518,10 @@
 {/snippet}
 
 {#snippet messageAction()}
-  <Button
-    class="profile-message"
-    variant="primary"
-    size="small"
-    onclick={() => void openDirectMessage('')}
-  >
-    <ChatCircleIcon weight="fill" />
+  <Pill variant="primary" onclick={() => void openDirectMessage('')}>
+    <ChatCircleIcon size={14} weight="fill" />
     {$i18n.t('timeline.profileMessage')}
-  </Button>
+  </Pill>
 {/snippet}
 
 {#snippet profileBelow()}
@@ -818,25 +809,6 @@
     color: var(--profile-text-muted, var(--surface-var-on-container));
   }
 
-  :global(.profile-action) {
-    align-items: center;
-    background: none;
-    border: var(--border-width) solid var(--profile-chip-line, var(--surface-container-line));
-    border-radius: var(--radius-pill);
-    color: var(--profile-ink, var(--bg-on-container));
-    cursor: pointer;
-    display: inline-flex;
-    font: inherit;
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    gap: var(--space-100);
-    justify-content: center;
-    max-width: 100%;
-    min-height: var(--profile-action-size);
-    padding: 0 var(--profile-action-padding);
-    white-space: nowrap;
-  }
-
   :global(.profile-card-actions) {
     align-items: center;
     display: flex;
@@ -846,66 +818,8 @@
     width: 100%;
   }
 
-  :global(.profile-action svg) {
-    color: var(--profile-icon, var(--sec-main));
-    flex: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    :global(.profile-action:hover:not([aria-expanded='true'])) {
-      background: color-mix(
-        in oklab,
-        var(--profile-chip-state, var(--bg-on-container)) 12%,
-        transparent
-      );
-    }
-  }
-
-  :global(.profile-action.selection-open.selection-open[aria-expanded='true']),
-  :global(.profile-action.selection-open.selection-open[data-state='open']) {
-    background: color-mix(
-      in oklab,
-      var(--profile-chip-state, var(--bg-on-container)) 22%,
-      transparent
-    );
-    color: var(--profile-ink, var(--bg-on-container));
-  }
-
-  :global(.profile-action.selection-open[aria-expanded='true'] svg),
-  :global(.profile-action.selection-open[data-state='open'] svg) {
-    color: currentcolor;
-  }
-
-  :global(.profile-action:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: var(--focus-ring-offset);
-  }
-
-  :global(.btn.profile-message) {
-    border-radius: var(--radius-pill);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-medium);
-    height: auto;
-    min-height: var(--profile-action-size);
-    padding: 0 var(--profile-action-padding);
-  }
-
-  :global(.profile-card.tinted .btn.profile-message) {
-    background: none;
-    border: var(--border-width) solid var(--profile-chip-line);
-    color: var(--profile-ink);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    :global(.profile-card.tinted .btn.profile-message:hover) {
-      background: color-mix(in oklab, var(--profile-chip-state) 12%, transparent);
-    }
-  }
-
-  :global(.profile-action-overflow) {
+  :global(.profile-card-actions > .pill-icon-only) {
     margin-left: auto;
-    min-width: var(--profile-action-size);
-    padding: 0;
   }
 
   :global(.profile-power-name) {
@@ -956,7 +870,7 @@
     border: 0;
   }
 
-  .profile-extra {
+  :global(.btn.profile-extra) {
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
   }

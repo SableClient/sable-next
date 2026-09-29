@@ -288,8 +288,12 @@
     --profile-bio-lines: 4;
     --profile-card-ground: var(--surface-container);
     --profile-chip-line: var(--profile-line);
-    --profile-action-size: 1.5rem;
-    --profile-action-padding: var(--space-250);
+    --pill-size: 1.5rem;
+    --pill-padding: var(--space-250);
+    --pill-line: var(--profile-chip-line);
+    --pill-ink: var(--profile-ink, var(--bg-on-container));
+    --pill-icon: var(--profile-icon);
+    --pill-state: var(--profile-chip-state);
     --profile-chip-state: var(--bg-on-container);
     --profile-panel-ground: var(--surface-var-container);
 
@@ -307,6 +311,10 @@
     --profile-text-muted: var(--profile-hero-muted);
     --profile-icon: var(--profile-text-muted);
     --profile-chip-line: color-mix(in oklab, var(--profile-ink) 45%, var(--profile-panel-ground));
+    --pill-primary-ground: transparent;
+    --pill-primary-ink: var(--profile-ink);
+    --pill-primary-line: var(--profile-chip-line);
+    --pill-primary-hover: color-mix(in oklab, var(--profile-chip-state) 12%, transparent);
     --profile-line: color-mix(in oklab, var(--profile-ink) 20%, var(--profile-hero));
 
     color: var(--profile-ink);
