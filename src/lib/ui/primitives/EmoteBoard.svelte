@@ -153,7 +153,6 @@
     searching
       ? sections.flatMap((section) =>
           section.images.map((image) => ({
-            key: `${sectionId(section.pack)}-${image.shortcode}`,
             image,
             pack: section.pack,
           }))
@@ -532,7 +531,7 @@
                 </h3>
               {:else}
                 <ul>
-                  {#each row.images as image (image.shortcode)}
+                  {#each row.images as image, index (index)}
                     <li>
                       <button
                         type="button"

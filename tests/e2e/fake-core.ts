@@ -5,6 +5,7 @@ import type {
   CommandOk,
   CoreEvent,
   EncryptionStatusView,
+  ImagePackView,
   KeywordNotificationView,
   MentionNotificationsView,
   ProfileView,
@@ -857,7 +858,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       ping_push_gateway: () => ({ type: 'ping_push_gateway', reached: null }),
       send_diagnostic_push: () => ({ type: 'send_diagnostic_push', push: { kind: 'no_pusher' } }),
       notification: () => ({ type: 'notification', notification: null }),
-      image_packs: () => ({ type: 'image_packs', packs: [], complete: true }),
+      image_packs: () => ({
+        type: 'image_packs',
+        packs: (window as { __e2eImagePacks?: ImagePackView[] }).__e2eImagePacks ?? [],
+        complete: true,
+      }),
       all_image_packs: () => ({ type: 'all_image_packs', packs: [] }),
       user_profile: (command) => {
         const localpart = command.user_id.replace(/^@/, '').split(':')[0];
