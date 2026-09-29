@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 
-import type { MutualRoomView, ProfileView } from '#src/generated/protocol';
+import type { MemberView, MutualRoomView, ProfileView } from '#src/generated/protocol';
 
 vi.mock('#lib/core/context.js');
 
@@ -21,6 +21,9 @@ const core = Object.assign(baseCore, {
   kickUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
   banUser: vi.fn<(roomId: string, userId: string, reason?: string | null) => Promise<void>>(),
   setUserPowerLevel: vi.fn<(roomId: string, userId: string, level: number) => Promise<void>>(),
+  roomMembers: vi.fn<(roomId: string, memberships?: readonly string[]) => Promise<MemberView[]>>(
+    () => Promise.resolve([])
+  ),
 });
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
@@ -521,6 +524,65 @@ test('hides the kick action while the target membership is unknown', async () =>
   await user.click(screen.getByRole('button', { name: 'More actions' }));
 
   expect(screen.queryByRole('menuitem', { name: /Remove from room/ })).toBeNull();
+});
+
+test('offers to remove a user whose pending invite is loaded from the room', async () => {
+  core.roomMembers.mockResolvedValueOnce([
+    {
+      user_id: '@alice:example.org',
+      display_name: 'Alice',
+      avatar_url: null,
+      power_level: 0,
+      membership: 'invite',
+      member_ts: null,
+      kicked: false,
+      service: false,
+    },
+  ]);
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '!room:example.org',
+      ownPowerLevel: 100,
+      permissions: {
+        own_power_level: 100,
+        can_post: true,
+        can_react: true,
+        can_redact_own: true,
+        can_redact_others: false,
+        can_invite: false,
+        can_kick: true,
+        can_ban: false,
+        can_change_settings: false,
+        can_pin: false,
+        can_change_join_rule: false,
+        can_change_power_levels: false,
+        can_manage_children: false,
+      },
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+
+  await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+  expect(await screen.findByRole('menuitem', { name: /Remove from room/ })).toBeInTheDocument();
+  expect(core.roomMembers).toHaveBeenCalledWith('!room:example.org', ['invite']);
+});
+
+test('does not load room membership outside a room profile', async () => {
+  core.roomMembers.mockClear();
+  render(MentionProfileCard, {
+    props: {
+      userId: '@alice:example.org',
+      roomId: '',
+      member: null,
+      profile: emptyProfile,
+    },
+  });
+  await tick();
+
+  expect(core.roomMembers).not.toHaveBeenCalled();
 });
 
 test('shows a permission message when the kick is refused', async () => {
