@@ -13,7 +13,6 @@ use matrix_sdk::{
     encryption::{BackupDownloadStrategy, EncryptionSettings},
     ruma::serde::Raw,
 };
-use matrix_sdk_base::crypto::{CollectStrategy, DecryptionSettings, TrustRequirement};
 use matrix_sdk_ui::sync_service::SyncService;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -340,10 +339,6 @@ async fn build_account_client(
             backup_download_strategy: BackupDownloadStrategy::AfterDecryptionFailure,
             auto_enable_cross_signing: true,
             auto_enable_backups: true,
-        })
-        .with_room_key_recipient_strategy(CollectStrategy::IdentityBasedStrategy)
-        .with_decryption_settings(DecryptionSettings {
-            sender_device_trust_requirement: TrustRequirement::CrossSignedOrLegacy,
         });
 
     #[cfg(not(target_family = "wasm"))]
@@ -572,9 +567,12 @@ fn apply_server(builder: ClientBuilder, homeserver: &str) -> ClientBuilder {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(not(target_family = "wasm"))]
+    use matrix_sdk_base::crypto::TrustRequirement;
+
     use super::{
         AccountRegistry, PROXIED_SESSION_TIMEOUT, SESSION_TIMEOUT, account_store_id,
-        removable_account_store, session_timeout,
+        build_account_client, removable_account_store, session_timeout,
     };
 
     #[test]
@@ -653,6 +651,25 @@ mod tests {
         );
         drop(client);
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn account_clients_decrypt_messages_from_all_devices() {
+        let store = tempfile::tempdir().unwrap();
+        let client = build_account_client(
+            matrix_sdk::Client::builder().homeserver_url("https://example.org"),
+            store.path().to_str().unwrap(),
+            false,
+            true,
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(
+            client.decryption_settings().sender_device_trust_requirement,
+            TrustRequirement::Untrusted
+        ));
     }
 
     #[test]
