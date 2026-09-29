@@ -2163,6 +2163,7 @@
     "pushersRemoveFailed": "That app could not be removed.",
     "pushersThisDevice": "This device",
     "pushersCopyAppId": "Copy the application ID",
+    "pushersCopyGateway": "Copy the push gateway URL",
     "pushersCopyKey": "Copy the push key",
     "pushersActive": "Active",
     "pushersPending": "Awaiting confirmation",

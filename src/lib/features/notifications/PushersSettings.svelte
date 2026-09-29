@@ -1,5 +1,8 @@
 <script lang="ts">
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import CopyIcon from 'phosphor-svelte/lib/CopyIcon';
+  import LinkSimpleIcon from 'phosphor-svelte/lib/LinkSimpleIcon';
 
   import type { RegisteredPusherView } from '#src/generated/protocol';
   import { runtimeConfig } from '#lib/config/runtime-config.js';
@@ -167,6 +170,7 @@
       {#each pushers as pusher (keyOf(pusher))}
         {@const key = keyOf(pusher)}
         {@const name = nameOf(pusher)}
+        {@const gateway = pusher.gateway}
         <li class="pusher" tabindex="-1">
           <div class="pusher-summary">
             <div class="pusher-info">
@@ -219,6 +223,36 @@
                   {/if}
                 </button>
               </div>
+              {#if gateway !== null}
+                <button
+                  class="pusher-gateway"
+                  type="button"
+                  title={gateway}
+                  aria-label={$i18n.t(
+                    copied === `gateway\u0000${key}`
+                      ? 'settings.copied'
+                      : 'settings.pushersCopyGateway'
+                  )}
+                  onclick={() => void copyValue(`gateway\u0000${key}`, gateway)}
+                >
+                  <LinkSimpleIcon class="pusher-gateway-link" aria-hidden="true" />
+                  <span class="pusher-gateway-copy">
+                    <span class="pusher-gateway-label">
+                      {$i18n.t(
+                        copied === `gateway\u0000${key}`
+                          ? 'settings.copied'
+                          : 'settings.pushGateway'
+                      )}
+                    </span>
+                    <code>{gateway}</code>
+                  </span>
+                  {#if copied === `gateway\u0000${key}`}
+                    <CheckIcon class="pusher-gateway-action" weight="bold" aria-hidden="true" />
+                  {:else}
+                    <CopyIcon class="pusher-gateway-action" aria-hidden="true" />
+                  {/if}
+                </button>
+              {/if}
             </div>
             {#if confirming !== key}
               <Button
@@ -374,10 +408,6 @@
     font-size: var(--font-size-small);
   }
 
-  .pusher-value:hover code {
-    text-decoration: underline;
-  }
-
   .pusher-key {
     flex: 0 1 10rem;
   }
@@ -396,5 +426,65 @@
   .pusher-confirm-actions {
     display: flex;
     gap: var(--space-200);
+  }
+
+  .pusher-gateway {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-inner);
+    color: var(--surface-var-on-container);
+    cursor: copy;
+    display: grid;
+    gap: var(--space-200);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    margin-top: var(--space-100);
+    padding: var(--space-200);
+    text-align: left;
+    width: 100%;
+  }
+
+  .pusher-gateway:hover {
+    background: var(--surface-container-hover);
+    color: inherit;
+  }
+
+  .pusher-gateway:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  .pusher-gateway-copy {
+    display: grid;
+    gap: var(--space-050);
+    min-width: 0;
+  }
+
+  .pusher-gateway-label {
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-600);
+  }
+
+  .pusher-gateway code {
+    color: inherit;
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pusher-value:hover code {
+    text-decoration: underline;
+  }
+
+  .pusher-gateway :global(.pusher-gateway-link) {
+    color: var(--primary-main);
+    height: var(--icon-size-medium);
+    width: var(--icon-size-medium);
+  }
+
+  .pusher-gateway :global(.pusher-gateway-action) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 </style>

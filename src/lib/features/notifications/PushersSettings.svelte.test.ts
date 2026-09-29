@@ -38,7 +38,7 @@ const gateway: RegisteredPusherView = {
   kind: 'http',
   device_display_name: 'Element on phone',
   activated: null,
-  gateway: null,
+  gateway: 'https://ntfy.example.org/_matrix/push/v1/notify',
 };
 
 const ownServer: RegisteredPusherView = {
@@ -81,6 +81,9 @@ test('lists registered pushers and marks the Sable ones', async () => {
   expect(phone.querySelector('.pusher-name')).toHaveTextContent('Element on phone');
   expect(browser.querySelector('.pusher-name')).toHaveTextContent('This browser');
   expect(email.querySelector('.pusher-name')).toHaveTextContent('im.example.email');
+  expect(
+    within(phone).getByRole('button', { name: 'Copy the push gateway URL' })
+  ).toHaveTextContent('https://ntfy.example.org/_matrix/push/v1/notify');
   expect(within(browser).getByText('Sable')).toHaveClass('status-badge-neutral');
   expect(screen.queryByText('This device')).not.toBeInTheDocument();
   expect(within(browser).getByText('Awaiting confirmation')).toHaveClass('status-badge-warning');
@@ -154,6 +157,19 @@ test('copies the cropped value in full on click', async () => {
 
   expect(await navigator.clipboard.readText()).toBe('KEY-GATEWAY');
   expect(await within(phone).findByText('Copied')).toBeInTheDocument();
+});
+
+test('copies the full push gateway URL', async () => {
+  const user = userEvent.setup();
+  core.webPushers.mockResolvedValue([gateway]);
+
+  const [phone] = await pushers(1);
+  await user.click(within(phone).getByRole('button', { name: 'Copy the push gateway URL' }));
+
+  expect(await navigator.clipboard.readText()).toBe(
+    'https://ntfy.example.org/_matrix/push/v1/notify'
+  );
+  expect(await within(phone).findByRole('button', { name: 'Copied' })).toBeInTheDocument();
 });
 
 test('reports a load failure instead of an empty list', async () => {
