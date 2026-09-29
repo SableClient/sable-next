@@ -7,9 +7,10 @@
   import HeartIcon from 'phosphor-svelte/lib/HeartIcon';
   import PlusCircleIcon from 'phosphor-svelte/lib/PlusCircleIcon';
 
-  import { SABLE_DONATE_URL, SABLE_SOURCE_URL, SABLE_SUPPORT_URL } from '#lib/config/links.js';
+  import { SABLE_DONATE_URL, SABLE_SOURCE_URL, SABLE_SUPPORT_ROOM } from '#lib/config/links.js';
   import { readReturningUser } from '#lib/features/auth/flow/auth-flow.svelte.js';
   import { i18n } from '#lib/i18n.js';
+  import { roomPathParamFromId } from '#lib/rooms/room-list.svelte.js';
   import ActionCard from '#lib/ui/ActionCard.svelte';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
@@ -20,6 +21,9 @@
 
   let { titleKey = 'nav.home' }: Props = $props();
   let hasLoggedInBefore = $state(false);
+  const supportHref = resolve('/(app)/to/[...permalink]', {
+    permalink: roomPathParamFromId(SABLE_SUPPORT_ROOM),
+  });
 
   const startCards = [
     {
@@ -59,12 +63,7 @@
     </h1>
 
     <div class="hero-actions" aria-label={$i18n.t('home.resourcesLabel')}>
-      <LinkButton
-        href={SABLE_SUPPORT_URL}
-        target="_blank"
-        rel="noreferrer noopener"
-        variant="primary"
-      >
+      <LinkButton href={supportHref} variant="primary">
         <ChatCircleDotsIcon aria-hidden="true" />
         {$i18n.t('home.getSupport')}
       </LinkButton>

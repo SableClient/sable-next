@@ -5,11 +5,12 @@ import { expect, test } from 'vitest';
 
 import HomeLanding from './HomeLanding.svelte';
 
-test('links Get support to the Sable general room', () => {
+test('opens Get support in the Sable general room', () => {
   render(HomeLanding, { titleKey: 'nav.unspaced' });
 
   expect(screen.getByRole('link', { name: 'Get support' })).toHaveAttribute(
     'href',
-    'https://matrix.to/#/%23general%3Asable.moe'
+    '/to/%23general%3Asable.moe'
   );
+  expect(screen.getByRole('link', { name: 'Get support' })).not.toHaveAttribute('target');
 });
