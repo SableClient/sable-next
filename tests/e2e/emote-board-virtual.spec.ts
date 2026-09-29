@@ -10,12 +10,12 @@ const packs: ImagePackView[] = ['alpha', 'beta', 'gamma'].map((id) => ({
   name: id,
   avatar_url: null,
   attribution: null,
-  usage: ['emoticon'],
+  usage: ['emoticon', 'sticker'],
   images: Array.from({ length: 80 }, (_, index) => ({
     shortcode: `${id}${String(index)}`,
     url: `mxc://example.test/${id}${String(index)}`,
     body: null,
-    usage: ['emoticon'],
+    usage: ['emoticon', 'sticker'],
     info: null,
     source_pack: null,
   })),
@@ -91,4 +91,27 @@ test('unicode search results replace the groups', async ({ page }) => {
   await expect(page.getByRole('button', { name: /fire/i }).first()).toBeVisible();
   await expect(page.locator('[data-section="people"]')).toHaveCount(0);
   await expect(page.locator('[data-section="search"] [data-cell]').first()).toBeVisible();
+});
+
+test('sticker rows keep every cell whole on one line', async ({ page }) => {
+  await page.getByRole('button', { name: 'Stickers', exact: true }).click();
+  await expect(page.getByRole('button', { name: ':alpha0:', exact: true })).toBeVisible();
+
+  const rows = await page.locator('.grids ul').evaluateAll((lists) =>
+    lists.map((list) =>
+      [...list.children].map((cell) => {
+        const box = cell.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      })
+    )
+  );
+  expect(rows.length).toBeGreaterThan(1);
+  for (const [index, cells] of rows.entries()) {
+    expect(new Set(cells.map((cell) => cell.top)).size, `row ${String(index)}`).toBe(1);
+  }
+  for (let index = 1; index < rows.length; index += 1) {
+    const bottom = Math.max(...(rows[index - 1] ?? []).map((cell) => cell.bottom));
+    const top = Math.min(...(rows[index] ?? []).map((cell) => cell.top));
+    expect(bottom, `row ${String(index)}`).toBeLessThanOrEqual(top);
+  }
 });
