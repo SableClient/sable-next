@@ -4,7 +4,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
-  import Button from '#lib/ui/primitives/Button.svelte';
+  import Pill from '#lib/ui/primitives/Pill.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
 
   import { senderColor } from '../timeline/timeline-format';
@@ -47,9 +47,7 @@
     {/if}
   {/snippet}
   {#snippet actions()}
-    <Button variant="secondary" size="small" onclick={onOpenAccount}>
-      {$i18n.t('timeline.openAccount')}
-    </Button>
+    <Pill onclick={onOpenAccount}>{$i18n.t('timeline.openAccount')}</Pill>
   {/snippet}
 </ProfileCard>
 

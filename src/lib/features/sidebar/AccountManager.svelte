@@ -21,6 +21,7 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Pill from '#lib/ui/primitives/Pill.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import type { OptionCard } from '#lib/ui/primitives/option-card.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
@@ -140,12 +141,8 @@
 </svelte:head>
 
 {#snippet profileActions()}
-  <Button variant="secondary" size="small" onclick={() => void goto(resolve('settings'))}
-    >{$i18n.t('nav.settings')}</Button
-  >
-  <Button variant="secondary" size="small" onclick={() => void goto(resolve('settings/account'))}
-    >{$i18n.t('nav.editProfile')}</Button
-  >
+  <Pill onclick={() => void goto(resolve('settings'))}>{$i18n.t('nav.settings')}</Pill>
+  <Pill onclick={() => void goto(resolve('settings/account'))}>{$i18n.t('nav.editProfile')}</Pill>
 {/snippet}
 
 {#snippet statusBubble()}
