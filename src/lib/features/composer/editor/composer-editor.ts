@@ -456,6 +456,15 @@ function atDocumentEdge(direction: 'up' | 'down'): Command {
   };
 }
 
+function moveToDocumentEdge(direction: 'up' | 'down'): Command {
+  return (state, dispatch, view) => {
+    if (!atDocumentEdge(direction)(state, undefined, view)) return false;
+    const target = direction === 'up' ? Selection.atStart(state.doc) : Selection.atEnd(state.doc);
+    if (dispatch && !state.selection.eq(target)) dispatch(state.tr.setSelection(target));
+    return true;
+  };
+}
+
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape';
 
 export interface ComposerChange {
@@ -616,9 +625,9 @@ export class ComposerEditor {
           headingToParagraphBackward
         ),
         ArrowUp: (state, dispatch, view) =>
-          this.options.onNavigate('ArrowUp') || atDocumentEdge('up')(state, dispatch, view),
+          this.options.onNavigate('ArrowUp') || moveToDocumentEdge('up')(state, dispatch, view),
         ArrowDown: (state, dispatch, view) =>
-          this.options.onNavigate('ArrowDown') || atDocumentEdge('down')(state, dispatch, view),
+          this.options.onNavigate('ArrowDown') || moveToDocumentEdge('down')(state, dispatch, view),
         'Shift-ArrowUp': chainCommands(escapeCodeBlock(-1), enterCodeBlock(-1)),
         'Shift-ArrowDown': chainCommands(escapeCodeBlock(1), enterCodeBlock(1)),
         Tab: (state, dispatch, view) =>

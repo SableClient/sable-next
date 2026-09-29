@@ -1671,6 +1671,26 @@ describe('arrow keys at the edge of the document', () => {
     expect(pressSurface('ArrowUp').defaultPrevented).toBe(true);
   });
 
+  test('up on the first line moves the caret to the start', () => {
+    const editor = open();
+    editor.setText('one');
+    caretAt(editor, 3);
+    onLineEdge(editor, true);
+
+    pressSurface('ArrowUp');
+    expect(view(editor).state.selection.from).toBe(1);
+  });
+
+  test('down on the last line moves the caret to the end', () => {
+    const editor = open();
+    editor.setText('one\n\ntwo');
+    caretAt(editor, 7);
+    onLineEdge(editor, true);
+
+    pressSurface('ArrowDown');
+    expect(view(editor).state.selection.from).toBe(Selection.atEnd(view(editor).state.doc).from);
+  });
+
   test('up on a wrapped line below the first is left to the browser', () => {
     const editor = open();
     editor.setText('one');
