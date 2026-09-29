@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
+  import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
   import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
@@ -54,6 +55,7 @@
     onMoveUp?: () => void;
     onMoveDown?: () => void;
     onUnpin?: () => void;
+    onRemoveFromFolder?: () => void;
   }
 
   let {
@@ -69,6 +71,7 @@
     onMoveUp,
     onMoveDown,
     onUnpin,
+    onRemoveFromFolder,
   }: Props = $props();
   const core = useCoreClient();
   const roomList = useRoomList();
@@ -348,6 +351,12 @@
       <ActionMenuItem onSelect={onUnpin}>
         <PushPinSlashIcon />
         {$i18n.t('nav.unpinFromSidebar')}
+      </ActionMenuItem>
+    {/if}
+    {#if onRemoveFromFolder}
+      <ActionMenuItem onSelect={onRemoveFromFolder}>
+        <ArrowLineUpIcon />
+        {$i18n.t('nav.folderRemoveSpace')}
       </ActionMenuItem>
     {/if}
 

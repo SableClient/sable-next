@@ -40,7 +40,6 @@
   import UnreadBadge from '#lib/ui/primitives/UnreadBadge.svelte';
   import { resolveUnreadBadge } from '#lib/ui/primitives/unread-badge.js';
   import '#lib/ui/primitives/nav-tab.css';
-  import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
   import CaretUpIcon from 'phosphor-svelte/lib/CaretUpIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -267,9 +266,7 @@
   let folderMenu = $state.raw<SidebarFolder | null>(null);
   let folderAnchor = $state.raw<CursorAnchor | null>(null);
   let folderOptionsOpen = $state(false);
-  let removeTarget = $state.raw<{ roomId: string; folderId: string } | null>(null);
-  let removeAnchor = $state.raw<CursorAnchor | null>(null);
-  let removeOpen = $state(false);
+  let contextFolderId = $state<string | null>(null);
   let settingsRoomId = $state<string | null>(null);
   let leaveRoomId = $state<string | null>(null);
 
@@ -282,6 +279,7 @@
     event.preventDefault();
     event.stopPropagation();
     contextSpace = space;
+    contextFolderId = null;
     contextAnchor = cursorAnchor(event);
     contextOpen = true;
   }
@@ -329,9 +327,12 @@
   function openRemoveMenu(event: MouseEvent, roomId: string, folderId: string): void {
     event.preventDefault();
     event.stopPropagation();
-    removeTarget = { roomId, folderId };
-    removeAnchor = cursorAnchor(event);
-    removeOpen = true;
+    const space = spacesById.get(roomId);
+    if (space === undefined) return;
+    contextSpace = space;
+    contextFolderId = folderId;
+    contextAnchor = cursorAnchor(event);
+    contextOpen = true;
   }
 
   function spaceItem(roomId: string): RailItem | null {
@@ -870,26 +871,6 @@
   </ActionMenu>
 {/if}
 
-{#if removeTarget}
-  {@const target = removeTarget}
-  <ActionMenu
-    bind:open={removeOpen}
-    label={$i18n.t('nav.listOptions')}
-    anchor={removeAnchor}
-    side="right"
-    align="start"
-  >
-    <ActionMenuItem
-      onSelect={() => {
-        onRemoveFromFolder?.(target.roomId, target.folderId);
-      }}
-    >
-      <ArrowLineUpIcon />
-      {$i18n.t('nav.folderRemoveSpace')}
-    </ActionMenuItem>
-  </ActionMenu>
-{/if}
-
 {#if contextSpace}
   <RoomOptionsMenu
     room={contextSpace}
@@ -911,6 +892,12 @@
     onMoveDown={mobile && contextIndex !== -1 && contextIndex < entries.length - 1
       ? () => {
           moveContextSpace('down');
+        }
+      : undefined}
+    onRemoveFromFolder={contextFolderId !== null
+      ? () => {
+          if (contextSpace && contextFolderId !== null)
+            onRemoveFromFolder?.(contextSpace.room_id, contextFolderId);
         }
       : undefined}
     onUnpin={onUnpin && pinnedSpaceIds.has(contextSpace.room_id)
