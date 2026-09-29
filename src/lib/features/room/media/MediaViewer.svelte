@@ -297,6 +297,12 @@
       if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
       if (event.key === 'ArrowDown') return panBy(0, -PAN_STEP);
     }
+    if (isPdf && pdfPages > 1) {
+      if (event.key === 'PageDown') return void (pdfPage = Math.min(pdfPages, pdfPage + 1));
+      if (event.key === 'PageUp') return void (pdfPage = Math.max(1, pdfPage - 1));
+      if (event.key === 'Home') return void (pdfPage = 1);
+      if (event.key === 'End') return void (pdfPage = pdfPages);
+    }
     if (event.key === 'ArrowLeft') previous();
     if (event.key === 'ArrowRight') next();
     if (event.key === '+' || event.key === '=') setZoom(zoom * (1 + ZOOM_STEP));
@@ -321,6 +327,12 @@
   }
 
   function handleWheel(event: WheelEvent): void {
+    if (isPdf) {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      setZoom(zoom * (1 - event.deltaY * 0.01));
+      return;
+    }
     if (!isImage) return;
     event.preventDefault();
     zoomTowards(event, zoom * (1 - event.deltaY * 0.001));
@@ -358,6 +370,11 @@
       { x: number; y: number },
     ];
     return Math.hypot(second.x - first.x, second.y - first.y);
+  }
+
+  function toggleFileZoom(event: MouseEvent): void {
+    if (!isPdf || event.button !== 0 || event.target instanceof HTMLButtonElement) return;
+    setZoom(zoom === 1 ? 2 : 1);
   }
 
   function startPan(event: PointerEvent): void {
@@ -633,6 +650,7 @@
           bind:this={stageEl}
           onwheel={handleWheel}
           onpointerdown={startPan}
+          ondblclick={toggleFileZoom}
           onpointermove={movePan}
           onpointerup={endPan}
           onpointercancel={endPan}
