@@ -47,13 +47,16 @@
   let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
+  let pinnedClosed = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
   let showMobileQuickTools = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
   let showMobileBackBar = $derived(
     !appLayout.matches && !pinnedOpen && !showMobileQuickTools && page.params.roomId === undefined
   );
   let open = $derived(
-    pinnedOpen ||
-      (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
+    pinnedClosed
+      ? false
+      : pinnedOpen ||
+          (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
   );
   const pageMeta = $state({
     title: '',
@@ -125,6 +128,9 @@
 
     const swipe = startSwipeGesture(event, open ? 0 : -width);
     if (!swipe) return;
+
+    if (pinnedClosed) return;
+
     gesture = { ...swipe, width };
   }
 
