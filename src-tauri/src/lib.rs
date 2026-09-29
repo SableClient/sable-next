@@ -41,6 +41,7 @@ mod snap_layouts;
 mod tray;
 #[cfg(all(feature = "cef", target_os = "linux"))]
 mod video_transcode;
+mod web_resources;
 #[cfg(all(not(feature = "cef"), target_os = "linux"))]
 mod webkit;
 #[cfg(desktop)]
@@ -368,7 +369,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     }
 
     for config in &app.config().app.windows {
-        let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
+        let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?
+            .on_web_resource_request(web_resources::fix_content_type);
         #[cfg(desktop)]
         let builder = window_geometry::restore(app.handle(), builder, &config.label);
         #[cfg(all(desktop, not(all(feature = "cef", target_os = "linux"))))]

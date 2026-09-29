@@ -11,7 +11,10 @@ export class FormattedBodyImages {
   ) {}
 
   defer(html: string): string {
-    return html.replace(/(<img\b[^>]*?)\s+src=(["'])([^"']*)\2/gi, '$1 data-sable-src=$2$3$2');
+    return html.replace(
+      /(<img\b(?:[^>"']|"[^"]*"|'[^']*')*?)\s+src\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi,
+      '$1 data-sable-src=$2'
+    );
   }
 
   attach(node: HTMLElement, concealed: boolean): () => void {
