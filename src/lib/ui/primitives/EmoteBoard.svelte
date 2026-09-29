@@ -18,6 +18,7 @@
     trackBoardSize,
   } from '#lib/ui/primitives/board-size.svelte.js';
   import { on } from 'svelte/events';
+  import { tick } from 'svelte';
 
   import { emojiGroups, searchReactionEmoji, shortcodeFor } from '#lib/emoji/emoji.js';
   import { readRecentReactions, rememberReaction } from '#lib/emoji/recents.svelte.js';
@@ -56,7 +57,17 @@
 
   type Cell = { emoji: string } | { image: PackImageView };
   type PickerRow =
-    | { id: string; kind: 'header'; pack: ImagePackView }
+    | { id: string; kind: 'lead' }
+    | { id: string; kind: 'header'; label: string; pack: ImagePackView | null }
+    | {
+        id: string;
+        kind: 'cells';
+        section: string;
+        label: string;
+        start: number;
+        total: number;
+        cells: Cell[];
+      }
     | { id: string; kind: 'images'; images: PackImageView[]; pack: ImagePackView | null };
   const PACK_HEADER_HEIGHT = 52;
   const GRID_GAP = 4;
@@ -89,6 +100,11 @@
   let gridWidth = $state(0);
   let gridHeight = $state(0);
   let scrollToRow = $state(-1);
+  let leadHeight = $state(0);
+  let cellRowHeight = $state(48 + GRID_GAP);
+  let scrollAlign = $state<'start' | 'auto'>('start');
+  let mounted = $state.raw({ start: 0, end: 0 });
+  let pendingFocus: { section: string; index: number } | null = null;
 
   $effect(() => {
     let cancelled = false;
@@ -208,11 +224,28 @@
       : groupSections
   );
 
+  let showFreeText = $derived(onPickUnicode !== undefined && searching);
   let imageColumns = $derived(
     Math.max(1, Math.floor((gridWidth + GRID_GAP) / (cellSize + GRID_GAP)))
   );
   let pickerRows = $derived.by((): PickerRow[] => {
     const rows: PickerRow[] = [];
+    if (showFreeText) rows.push({ id: 'lead', kind: 'lead' });
+    const addCells = (id: string, label: string, cells: Cell[]): void => {
+      if (cells.length === 0) return;
+      rows.push({ id: `emoji-${id}`, kind: 'header', label, pack: null });
+      for (let start = 0; start < cells.length; start += emojiColumns) {
+        rows.push({
+          id: `cells-${id}-${String(start)}`,
+          kind: 'cells',
+          section: id,
+          label,
+          start,
+          total: cells.length,
+          cells: cells.slice(start, start + emojiColumns),
+        });
+      }
+    };
     const addImages = (id: string, images: PackImageView[], pack: ImagePackView | null): void => {
       for (let start = 0; start < images.length; start += imageColumns) {
         rows.push({
@@ -230,21 +263,27 @@
         matchedImages.map(({ image }) => image),
         null
       );
-      return rows;
+    } else {
+      addCells('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells);
+      for (const section of sections) {
+        const id = sectionId(section.pack);
+        rows.push({ id, kind: 'header', label: packName(section.pack), pack: section.pack });
+        addImages(id, section.images, section.pack);
+      }
     }
-
-    for (const section of sections) {
-      const id = sectionId(section.pack);
-      rows.push({ id, kind: 'header', pack: section.pack });
-      addImages(id, section.images, section.pack);
-    }
+    for (const section of unicodeSections) addCells(section.id, section.label, section.cells);
     return rows;
   });
   let rowSize = $derived.by(() => {
     const rows = pickerRows;
     const imageRowHeight = cellSize + GRID_GAP;
-    return (index: number): number =>
-      rows[index]?.kind === 'header' ? PACK_HEADER_HEIGHT : imageRowHeight;
+    const lead = leadHeight;
+    return (index: number): number => {
+      const kind = rows[index]?.kind;
+      if (kind === 'lead') return lead;
+      if (kind === 'cells') return cellRowHeight;
+      return kind === 'header' ? PACK_HEADER_HEIGHT : imageRowHeight;
+    };
   });
   let rowIndex = $derived(new Map(pickerRows.map((row, index) => [row.id, index])));
 
@@ -267,13 +306,21 @@
   function jumpTo(id: string): void {
     const index = rowIndex.get(id);
     if (index !== undefined) {
-      scrollToRow = index;
+      requestScroll(index, 'start');
       return;
     }
     const reduced = shouldReduceMotion();
     document
       .getElementById(id)
       ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  function requestScroll(index: number, align: 'start' | 'auto'): void {
+    scrollAlign = align;
+    scrollToRow = index;
+    void tick().then(() => {
+      scrollToRow = -1;
+    });
   }
 
   function sectionId(pack: ImagePackView): string {
@@ -297,14 +344,6 @@
 
   function uniqueReactions(): string[] {
     return [...new Set(readRecentReactions())];
-  }
-
-  function emojiRows(cells: Cell[]): Cell[][] {
-    const rows: Cell[][] = [];
-    for (let start = 0; start < cells.length; start += emojiColumns) {
-      rows.push(cells.slice(start, start + emojiColumns));
-    }
-    return rows;
   }
 
   function cellLabel(cell: Cell): string {
@@ -342,7 +381,35 @@
     event.preventDefault();
     const index = Math.min(Math.max(target, 0), count - 1);
     activeCell = { section: id, index };
-    event.currentTarget.querySelector<HTMLElement>(`[data-cell="${String(index)}"]`)?.focus();
+    const grid = event.currentTarget.closest('.grids');
+    const cell = grid?.querySelector<HTMLElement>(
+      `[data-section="${id}"] [data-cell="${String(index)}"]`
+    );
+    if (cell) {
+      cell.focus();
+      return;
+    }
+    pendingFocus = { section: id, index };
+    const start = Math.floor(index / emojiColumns) * emojiColumns;
+    const row = rowIndex.get(`cells-${id}-${String(start)}`);
+    if (row !== undefined) requestScroll(row, 'auto');
+  }
+
+  function focusWhenPending(section: string, index: number) {
+    return (element: HTMLElement): void => {
+      if (pendingFocus?.section !== section || pendingFocus.index !== index) return;
+      pendingFocus = null;
+      element.focus();
+    };
+  }
+
+  function tabStop(section: string, index: number, column: number): boolean {
+    const cursor = activeCell.section === section ? activeCell.index : 0;
+    if (index === cursor) return true;
+    if (column !== 0) return false;
+    const start = Math.floor(cursor / emojiColumns) * emojiColumns;
+    const row = rowIndex.get(`cells-${section}-${String(start)}`);
+    return row === undefined || row < mounted.start || row > mounted.end;
   }
 
   /** Clicking a cell moves focus too, so the roving tab stop follows it. */
@@ -497,85 +564,135 @@
         class={['grids', { sticker: tab === 'sticker', emoji: tab === 'emoticon' }]}
         {@attach trackGridSize}
       >
-        {#if onPickUnicode && query.trim() !== ''}
-          {@const text = query.trim()}
-          <button
-            type="button"
-            class="free-text"
-            onclick={() => {
-              onPickUnicode(text);
+        {#key `${tab}:${query.trim()}`}
+          <VirtualList
+            height={gridHeight}
+            width="100%"
+            itemCount={pickerRows.length}
+            itemSize={rowSize}
+            estimatedItemSize={cellSize + GRID_GAP}
+            overscanCount={2}
+            getKey={pickerRowKey}
+            scrollToIndex={scrollToRow === -1 ? undefined : scrollToRow}
+            scrollToAlignment={scrollAlign}
+            onItemsUpdated={(range) => {
+              mounted = range;
             }}
+            scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
           >
-            {$i18n.t('composer.reactWithText', { text })}
-          </button>
-        {/if}
-        <VirtualList
-          height={gridHeight}
-          width="100%"
-          itemCount={pickerRows.length}
-          itemSize={rowSize}
-          estimatedItemSize={cellSize + GRID_GAP}
-          overscanCount={2}
-          getKey={pickerRowKey}
-          scrollToIndex={scrollToRow === -1 ? undefined : scrollToRow}
-          scrollToAlignment="start"
-          scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
-        >
-          {#snippet header()}
-            {#if frequentCells.length > 0}
-              {@render cellGrid('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells)}
-            {/if}
-          {/snippet}
-          {#snippet item({ index, style })}
-            {@const row = pickerRows[index]}
-            <div {style} class="virtual-row">
-              {#if row.kind === 'header'}
-                <h3>
-                  {packName(row.pack)}
-                  <span class="section-origin">{originLabels[row.pack.origin]}</span>
-                  {#if row.pack.attribution}
-                    <span class="section-attribution">{row.pack.attribution}</span>
-                  {/if}
-                </h3>
-              {:else}
-                <ul>
-                  {#each row.images as image, index (index)}
-                    <li>
+            {#snippet item({ index, style })}
+              {@const row = pickerRows[index]}
+              <div {style} class="virtual-row">
+                {#if row.kind === 'lead'}
+                  <div bind:clientHeight={leadHeight}>
+                    {#if showFreeText}
+                      {@const text = query.trim()}
                       <button
                         type="button"
-                        title=":{image.shortcode}:"
-                        aria-label=":{image.shortcode}:"
+                        class="free-text"
                         onclick={() => {
-                          pick(image);
-                        }}
-                        onpointerenter={() => {
-                          if (row.pack) preview = { image, pack: row.pack };
-                        }}
-                        onfocus={() => {
-                          if (row.pack) preview = { image, pack: row.pack };
+                          onPickUnicode?.(text);
                         }}
                       >
-                        <MediaImage
-                          source={image.url}
-                          alt={image.body ?? image.shortcode}
-                          width={cellSize}
-                          height={cellSize}
-                          original
-                        />
+                        {$i18n.t('composer.reactWithText', { text })}
                       </button>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </div>
-          {/snippet}
-
-          {#snippet footer()}
-            {#each unicodeSections as section (section.id)}
-              {@render cellGrid(section.id, section.label, section.cells)}
-            {/each}
-          {/snippet}
-        </VirtualList>
+                    {/if}
+                  </div>
+                {:else if row.kind === 'header'}
+                  <h3>
+                    {row.label}
+                    {#if row.pack}
+                      <span class="section-origin">{originLabels[row.pack.origin]}</span>
+                      {#if row.pack.attribution}
+                        <span class="section-attribution">{row.pack.attribution}</span>
+                      {/if}
+                    {/if}
+                  </h3>
+                {:else if row.kind === 'cells'}
+                  <div
+                    class="unicode"
+                    role="grid"
+                    tabindex={-1}
+                    aria-label={row.label}
+                    data-section={row.section}
+                    onkeydown={(event) => {
+                      moveCell(event, row.section, row.total);
+                    }}
+                    onfocusin={(event) => {
+                      trackCell(event, row.section);
+                    }}
+                  >
+                    <div
+                      class="row"
+                      role="row"
+                      bind:clientHeight={cellRowHeight}
+                      style={`grid-template-columns: repeat(${String(emojiColumns)}, minmax(0, 1fr))`}
+                    >
+                      {#each row.cells as cell, column (column)}
+                        {@const index = row.start + column}
+                        {@const source = 'image' in cell ? cell.image.url : cell.emoji}
+                        <button
+                          type="button"
+                          role="gridcell"
+                          data-cell={index}
+                          tabindex={tabStop(row.section, index, column) ? 0 : -1}
+                          title={cellLabel(cell)}
+                          aria-label={cellLabel(cell)}
+                          onclick={() => {
+                            pickCell(cell);
+                          }}
+                          {@attach focusWhenPending(row.section, index)}
+                        >
+                          {#if source.startsWith('mxc://')}
+                            <MediaImage
+                              class="unicode-image"
+                              {source}
+                              alt=""
+                              width={64}
+                              height={64}
+                              original
+                            />
+                          {:else}
+                            <span class="unicode-text">{source}</span>
+                          {/if}
+                        </button>
+                      {/each}
+                    </div>
+                  </div>
+                {:else}
+                  <ul>
+                    {#each row.images as image, column (column)}
+                      <li>
+                        <button
+                          type="button"
+                          title=":{image.shortcode}:"
+                          aria-label=":{image.shortcode}:"
+                          onclick={() => {
+                            pick(image);
+                          }}
+                          onpointerenter={() => {
+                            if (row.pack) preview = { image, pack: row.pack };
+                          }}
+                          onfocus={() => {
+                            if (row.pack) preview = { image, pack: row.pack };
+                          }}
+                        >
+                          <MediaImage
+                            source={image.url}
+                            alt={image.body ?? image.shortcode}
+                            width={cellSize}
+                            height={cellSize}
+                            original
+                          />
+                        </button>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </div>
+            {/snippet}
+          </VirtualList>
+        {/key}
       </div>
 
       <nav class="rail" class:hidden={searching} aria-label={$i18n.t('composer.packs')}>
@@ -655,55 +772,6 @@
     </div>
   {/if}
 </div>
-
-{#snippet cellGrid(id: string, label: string, cells: Cell[])}
-  {@const cursor = activeCell.section === id ? activeCell.index : 0}
-  <section class="unicode" id={`emoji-${id}`}>
-    <h3 id={`emoji-head-${id}`}>{label}</h3>
-    <div
-      class="grid"
-      role="grid"
-      tabindex={-1}
-      aria-labelledby={`emoji-head-${id}`}
-      onkeydown={(event) => {
-        moveCell(event, id, cells.length);
-      }}
-      onfocusin={(event) => {
-        trackCell(event, id);
-      }}
-    >
-      {#each emojiRows(cells) as row, rowIndex (rowIndex)}
-        <div
-          class="row"
-          role="row"
-          style={`grid-template-columns: repeat(${emojiColumns}, minmax(0, 1fr))`}
-        >
-          {#each row as cell, columnIndex (columnIndex)}
-            {@const index = rowIndex * emojiColumns + columnIndex}
-            {@const source = 'image' in cell ? cell.image.url : cell.emoji}
-            <button
-              type="button"
-              role="gridcell"
-              data-cell={index}
-              tabindex={index === cursor ? 0 : -1}
-              title={cellLabel(cell)}
-              aria-label={cellLabel(cell)}
-              onclick={() => {
-                pickCell(cell);
-              }}
-            >
-              {#if source.startsWith('mxc://')}
-                <MediaImage class="unicode-image" {source} alt="" width={64} height={64} original />
-              {:else}
-                <span class="unicode-text">{source}</span>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      {/each}
-    </div>
-  </section>
-{/snippet}
 
 <style>
   .board {
@@ -940,15 +1008,10 @@
   }
 
   /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
-  .grids .unicode .grid {
-    display: grid;
-    gap: var(--space-100);
-    margin-bottom: var(--space-300);
-  }
-
   .grids .unicode .row {
     display: grid;
     gap: var(--space-100);
+    padding-bottom: var(--space-100);
   }
 
   .rail-glyph {

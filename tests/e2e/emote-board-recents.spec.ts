@@ -21,7 +21,7 @@ test('frequently used keeps custom emotes and text reactions inside their cells'
   await app.openRoom('!room:example.test');
 
   await page.getByRole('button', { name: 'Emotes and stickers' }).click();
-  const recents = page.locator('#emoji-recent [role="gridcell"]');
+  const recents = page.locator('[data-section="recent"] [role="gridcell"]');
   await expect(recents.first()).toBeVisible();
 
   await expect(recents.nth(0).locator('.unicode-image')).toHaveCount(1);
@@ -30,8 +30,13 @@ test('frequently used keeps custom emotes and text reactions inside their cells'
   );
   expect(overflowing).toBe(0);
 
+  await page
+    .getByRole('navigation', { name: 'Packs' })
+    .getByRole('button', { name: 'Smileys and people' })
+    .click();
+  await expect(page.locator('[data-section="people"] .unicode-text').first()).toBeVisible();
   const clippedGlyphs = await page
-    .locator('#emoji-people .unicode-text')
+    .locator('[data-section="people"] .unicode-text')
     .evaluateAll(
       (glyphs) => glyphs.filter((glyph) => glyph.scrollWidth > glyph.clientWidth + 1).length
     );
