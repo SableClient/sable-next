@@ -19,6 +19,7 @@ test('a space and a voice room carry the join rule in the glyph, not a badge', (
   expect(roomIconComponent({ isSpace: true })).toBe(SquaresFourIcon);
   expect(roomIconComponent({ isSpace: true, joinRule: 'public' })).toBe(GlobeSimpleIcon);
   expect(roomIconComponent({ isVoice: true })).toBe(SpeakerHighIcon);
+  expect(roomIconComponent({ isVoice: true, joinRule: 'public' })).toBe(SpeakerHighIcon);
   expect(roomIconComponent({ isVoice: true, joinRule: 'knock' })).toBe(LockSimpleIcon);
   expect(roomIconOverlay({ isSpace: true, joinRule: 'public' })).toBeUndefined();
   expect(roomIconOverlay({ isVoice: true, joinRule: 'invite' })).toBeUndefined();

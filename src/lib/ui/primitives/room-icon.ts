@@ -40,7 +40,6 @@ export function roomIconComponent(room: RoomIconShape): Component {
   }
 
   if (room.isVoice === true) {
-    if (room.joinRule === 'public') return GlobeSimpleIcon;
     if (isRestricted(room.joinRule)) return LockSimpleIcon;
     return SpeakerHighIcon;
   }
