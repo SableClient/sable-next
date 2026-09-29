@@ -16,6 +16,7 @@ use matrix_sdk_ui::timeline::{
 
 use matrix_sdk_base::event_cache::Event;
 
+use crate::ResultExt;
 use crate::protocol::{CommandErr, TimelineFocusView, TimelineItemView};
 use crate::view::aggregation_item;
 
@@ -70,7 +71,7 @@ impl Core {
         let timeline = Arc::new(
             build_room_timeline(&room, &TimelineFocusView::Live, hidden_events)
                 .await
-                .map_err(|error| self.failed("build timeline", error))?,
+                .or_failed(self, "build_timeline")?,
         );
 
         let subscribed_room_ids = self
@@ -157,7 +158,7 @@ impl Core {
         let timeline = Arc::new(
             build_room_timeline(&room, &focus, false)
                 .await
-                .map_err(|error| self.failed("build thread timeline", error))?,
+                .or_failed(self, "build_thread_timeline")?,
         );
 
         let mut threads = self.thread_timelines.lock().await;

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+use crate::ResultExt;
 use crate::protocol::{
     ImagePackOriginView, ImagePackView, ImageSourcePackView, ImageUsageView, PackImageInfoView,
     PackImageView,
@@ -373,10 +374,9 @@ impl Core {
             self.subscribed_pack_rooms(&client, network),
         )
         .await;
-        let (own, own_complete) = own.map_err(|error| self.failed("image_packs_account", error))?;
-        let own_room = own_room.map_err(|error| self.failed("image_packs_room", error))?;
-        let (subscribed, subscribed_complete) =
-            subscribed.map_err(|error| self.failed("image_packs_global", error))?;
+        let (own, own_complete) = own.or_failed(self, "image_packs_account")?;
+        let own_room = own_room.or_failed(self, "image_packs_room")?;
+        let (subscribed, subscribed_complete) = subscribed.or_failed(self, "image_packs_global")?;
         let mut complete = network && own_complete && own_room.complete && subscribed_complete;
 
         let mut packs = Vec::new();
@@ -509,7 +509,7 @@ impl Core {
         let (own, _) = self
             .pack_account_data(&client, USER_EMOTES, false)
             .await
-            .map_err(|error| self.failed("all_image_packs_account", error))?;
+            .or_failed(self, "all_image_packs_account")?;
         if let Some(content) =
             own.and_then(|raw| raw.deserialize_as_unchecked::<PackContent>().ok())
         {

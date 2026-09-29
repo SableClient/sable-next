@@ -21,8 +21,10 @@ use matrix_sdk::ruma::{
 use matrix_sdk_base::media::store::IgnoreMediaRetentionPolicy;
 use mime::Mime;
 
+use crate::ResultExt;
 use crate::media_health::Admission;
 use crate::messages::outgoing_mentions;
+use crate::outgoing::thread_reply;
 use crate::personas::profile_extra_content;
 use crate::protocol::{
     AttachmentInfoView, AudioMetadataView, CommandErr, CoreEvent, PerMessageProfileView,
@@ -198,7 +200,7 @@ impl Core {
             .media()
             .remove_media_content_for_uri(&uri)
             .await
-            .map_err(|error| self.failed("forget_media", error))
+            .or_failed(self, "forget_media")
     }
 
     async fn original_media(
@@ -325,7 +327,7 @@ impl Core {
             .media()
             .upload(&mime, bytes, None)
             .await
-            .map_err(|error| self.failed("upload_media", error))?;
+            .or_failed(self, "upload_media")?;
 
         Ok(response.content_uri.to_string())
     }
@@ -346,7 +348,7 @@ impl Core {
             return Err(CommandErr::InvalidMedia);
         }
         let mime: Mime = request.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
-        let reply = crate::dispatch::thread_reply(
+        let reply = thread_reply(
             request.outgoing.in_reply_to.clone(),
             request.outgoing.thread_root.clone(),
             request.outgoing.silent_reply,
@@ -413,7 +415,7 @@ impl Core {
             .send_queue()
             .send_attachment(request.filename, mime, bytes, config)
             .await
-            .map_err(|error| self.failed("send_attachment", error))?;
+            .or_failed(self, "send_attachment")?;
 
         Ok(())
     }
@@ -444,7 +446,7 @@ impl Core {
                 request.outgoing.mentions,
                 request.outgoing.mentions_room,
             )))
-            .reply(crate::dispatch::thread_reply(
+            .reply(thread_reply(
                 request.outgoing.in_reply_to,
                 request.outgoing.thread_root,
                 request.outgoing.silent_reply,
@@ -467,7 +469,7 @@ impl Core {
             .send_queue()
             .send_gallery(gallery)
             .await
-            .map_err(|error| self.failed("send_gallery", error))?;
+            .or_failed(self, "send_gallery")?;
         Ok(())
     }
 }
@@ -563,11 +565,10 @@ impl Core {
                 .client()
                 .upload_encrypted_file(&mut reader)
                 .await
-                .map_err(|error| self.failed("send_attachment", error))?;
+                .or_failed(self, "send_attachment")?;
             serde_json::Map::from_iter([(
                 "file".to_owned(),
-                serde_json::to_value(file)
-                    .map_err(|error| self.failed("send_attachment", error))?,
+                serde_json::to_value(file).or_failed(self, "send_attachment")?,
             )])
         } else {
             let response = room
@@ -575,7 +576,7 @@ impl Core {
                 .media()
                 .upload(&audio.mime, bytes, None)
                 .await
-                .map_err(|error| self.failed("send_attachment", error))?;
+                .or_failed(self, "send_attachment")?;
             serde_json::Map::from_iter([(
                 "url".to_owned(),
                 serde_json::Value::String(response.content_uri.to_string()),
@@ -584,11 +585,11 @@ impl Core {
         let content = tagged_audio_content(&audio, source, size);
         let raw = serde_json::value::to_raw_value(&content)
             .map(Raw::from_json)
-            .map_err(|error| self.failed("send_attachment", error))?;
+            .or_failed(self, "send_attachment")?;
         room.send_queue()
             .send_raw(raw, "m.room.message".to_owned())
             .await
-            .map_err(|error| self.failed("send_attachment", error))?;
+            .or_failed(self, "send_attachment")?;
         Ok(())
     }
 }

@@ -11,6 +11,7 @@ use mime::Mime;
 use serde_json::{Map, Value, json};
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::{AttachmentInfoView, CommandErr, ScheduledMessageView};
 
 const MSC4140: &str = "org.matrix.msc4140";
@@ -21,7 +22,7 @@ impl Core {
         let features = client
             .unstable_features()
             .await
-            .map_err(|error| self.failed("delayed_events_supported", error))?;
+            .or_failed(self, "delayed_events_supported")?;
         Ok(features.contains(&FeatureFlag::from(MSC4140)))
     }
 
@@ -47,14 +48,14 @@ impl Core {
             },
             &AnyMessageLikeEventContent::RoomMessage(content),
         )
-        .map_err(|error| self.failed("schedule_message", error))?;
+        .or_failed(self, "schedule_message")?;
 
         let response = self
             .client()
             .await?
             .send(request)
             .await
-            .map_err(|error| self.failed("schedule_message", error))?;
+            .or_failed(self, "schedule_message")?;
         Ok(response.delay_id)
     }
 
@@ -113,7 +114,7 @@ impl Core {
             );
         }
         let content = serde_json::from_value::<RoomMessageEventContent>(Value::Object(value))
-            .map_err(|error| self.failed("schedule_attachment", error))?;
+            .or_failed(self, "schedule_attachment")?;
         self.schedule_message(room_id, content, delay_ms).await
     }
 
@@ -129,7 +130,7 @@ impl Core {
             .await?
             .send(request)
             .await
-            .map_err(|error| self.failed("cancel_scheduled_message", error))?;
+            .or_failed(self, "cancel_scheduled_message")?;
         Ok(())
     }
 
@@ -145,7 +146,7 @@ impl Core {
             .await?
             .send(request)
             .await
-            .map_err(|error| self.failed("send_scheduled_message", error))?;
+            .or_failed(self, "send_scheduled_message")?;
         Ok(())
     }
 

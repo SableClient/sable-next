@@ -3,6 +3,7 @@ use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 use serde_json::{Value, json};
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::BookmarkView;
 use crate::protocol::CommandErr;
 
@@ -26,12 +27,8 @@ fn item_event(id: &str) -> GlobalAccountDataEventType {
 }
 
 impl Core {
-    async fn account_data(&self, event_type: GlobalAccountDataEventType) -> Option<Value> {
-        self.client()
-            .await
-            .ok()?
-            .account()
-            .fetch_account_data(event_type)
+    async fn bookmark_account_data(&self, event_type: GlobalAccountDataEventType) -> Option<Value> {
+        self.global_account_data(event_type, "bookmarks")
             .await
             .ok()
             .flatten()
@@ -39,7 +36,7 @@ impl Core {
     }
 
     async fn bookmark_ids(&self) -> Vec<String> {
-        self.account_data(GlobalAccountDataEventType::from(INDEX_EVENT))
+        self.bookmark_account_data(GlobalAccountDataEventType::from(INDEX_EVENT))
             .await
             .and_then(|index| {
                 index.get("bookmark_ids")?.as_array().map(|ids| {
@@ -58,7 +55,7 @@ impl Core {
         let mut bookmarks = Vec::new();
 
         for id in self.bookmark_ids().await {
-            let Some(item) = self.account_data(item_event(&id)).await else {
+            let Some(item) = self.bookmark_account_data(item_event(&id)).await else {
                 continue;
             };
             let (Some(room_id), Some(event_id)) = (
@@ -124,7 +121,7 @@ impl Core {
         }
 
         let revision = self
-            .account_data(GlobalAccountDataEventType::from(INDEX_EVENT))
+            .bookmark_account_data(GlobalAccountDataEventType::from(INDEX_EVENT))
             .await
             .and_then(|index| index.get("revision").and_then(Value::as_u64))
             .unwrap_or(0);
@@ -156,7 +153,7 @@ impl Core {
         let event = room
             .event(event_id, None)
             .await
-            .map_err(|error| self.failed("set_bookmark", error))?;
+            .or_failed(self, "set_bookmark")?;
         let raw = event.raw().deserialize_as::<Value>().ok();
 
         let body = raw

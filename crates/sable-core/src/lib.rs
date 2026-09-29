@@ -11,6 +11,7 @@ mod calls;
 mod cosmetics;
 mod dispatch;
 mod errors;
+pub(crate) use errors::ResultExt;
 pub mod image_packs;
 mod inbox;
 mod invites;
@@ -20,10 +21,12 @@ mod media_health;
 pub use media::GalleryAttachment;
 mod messages;
 pub mod notifications;
+mod outgoing;
 mod password_reset;
 mod personas;
 pub mod polls;
 mod presence;
+mod preview;
 pub mod profiles;
 pub mod protocol;
 pub mod push_check;
@@ -370,22 +373,22 @@ impl Core {
             .sessions
             .load()
             .await
-            .map_err(|error| self.failed("restore: read session file", error))?;
+            .or_failed(self, "restore_read_session_file")?;
         let Some(bytes) = stored else {
             let registry = AccountRegistry::empty();
             *accounts = Some(registry.clone());
             return Ok(registry);
         };
         let (mut registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
-            .map_err(|error| self.failed("restore: parse session file", error))?;
+            .or_failed(self, "restore_parse_session_file")?;
         let reanchored = registry.reanchor_stores(&self.store_id);
         if migrated || reanchored {
-            let bytes = serde_json::to_vec(&registry)
-                .map_err(|error| self.failed("migrate session registry", error))?;
+            let bytes =
+                serde_json::to_vec(&registry).or_failed(self, "migrate_session_registry")?;
             self.sessions
                 .save(bytes)
                 .await
-                .map_err(|error| self.failed("migrate session registry", error))?;
+                .or_failed(self, "migrate_session_registry")?;
         }
         *accounts = Some(registry.clone());
         Ok(registry)
@@ -426,7 +429,7 @@ impl Core {
             accounts = self.accounts.lock().await;
         }
         let Some(accounts) = accounts.as_mut() else {
-            return Err(self.failed("allocate account", "account registry is not initialized"));
+            return Err(self.failed("allocate_account", "account registry is not initialized"));
         };
         Ok(accounts.allocate_account(&self.store_id))
     }
@@ -506,7 +509,7 @@ impl Core {
             .account()
             .fetch_account_data(event_type)
             .await
-            .map_err(|error| self.failed(label, error))
+            .or_failed(self, label)
     }
 
     pub(crate) async fn put_global_account_data(
@@ -516,14 +519,14 @@ impl Core {
         label: &str,
     ) -> Result<(), CommandErr> {
         let raw = Raw::<AnyGlobalAccountDataEventContent>::from_json_string(content.to_string())
-            .map_err(|error| self.failed(label, error))?;
+            .or_failed(self, label)?;
 
         self.client()
             .await?
             .account()
             .set_account_data_raw(event_type, raw)
             .await
-            .map_err(|error| self.failed(label, error))?;
+            .or_failed(self, label)?;
 
         Ok(())
     }

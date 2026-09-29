@@ -8,6 +8,7 @@ use matrix_sdk::ruma::api::client::uiaa::{
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 use matrix_sdk::ruma::{ClientSecret, OwnedClientSecret, OwnedSessionId, UInt};
 
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CommandOk, RegistrationResultView};
 use crate::session::{Credentials, PersistedSession};
 use crate::{Core, protocol, session};
@@ -252,10 +253,10 @@ impl Core {
             .client
             .homeserver()
             .join("_matrix/client/v3/auth/")
-            .map_err(|error| self.failed("register: fallback URL", error))?;
+            .or_failed(self, "register_fallback_url")?;
         fallback_url
             .path_segments_mut()
-            .map_err(|()| self.failed("register: fallback URL", "invalid homeserver URL"))?
+            .map_err(|()| self.failed("register_fallback_url", "invalid homeserver URL"))?
             .push(stage)
             .push("fallback")
             .push("web");
@@ -368,7 +369,7 @@ impl Core {
         let client = self
             .build_account_client(&store_id, &homeserver)
             .await
-            .map_err(|error| self.failed("register: build_client", error))?;
+            .or_failed(self, "register_build_client")?;
 
         let registration_email = registration_email
             .map(|email| email.trim().to_owned())
@@ -684,7 +685,7 @@ impl Core {
 
         let Some(email) = pending.email.as_mut() else {
             self.restore_pending_registration(pending).await;
-            return Err(self.failed("register email", "email UIAA state was not initialized"));
+            return Err(self.failed("register_email", "email UIAA state was not initialized"));
         };
         let client_secret = email
             .client_secret
@@ -713,7 +714,7 @@ impl Core {
         {
             let Some(email) = pending.email.as_mut() else {
                 self.restore_pending_registration(pending).await;
-                return Err(self.failed("register email", "email UIAA state was lost"));
+                return Err(self.failed("register_email", "email UIAA state was lost"));
             };
             email.address = Some(address);
             email.sid = Some(response.sid);
@@ -726,7 +727,7 @@ impl Core {
                 .is_ok_and(|versions| can_complete_email_out_of_band(&versions));
         let Some(email) = pending.email.as_mut() else {
             self.restore_pending_registration(pending).await;
-            return Err(self.failed("register email", "email UIAA state was lost"));
+            return Err(self.failed("register_email", "email UIAA state was lost"));
         };
         email.submit_url = response.submit_url;
         email.can_complete_out_of_band = can_complete_out_of_band;
@@ -755,7 +756,7 @@ impl Core {
         let (submit_url, sid, client_secret) = {
             let Some(email) = pending.email.as_ref() else {
                 self.restore_pending_registration(pending).await;
-                return Err(self.failed("register email", "email UIAA state was not initialized"));
+                return Err(self.failed("register_email", "email UIAA state was not initialized"));
             };
             let Some(submit_url) = email.submit_url.clone() else {
                 self.restore_pending_registration(pending).await;

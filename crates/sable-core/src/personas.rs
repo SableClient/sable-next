@@ -11,6 +11,7 @@ use matrix_sdk::send_queue::LocalEchoContent;
 use serde_json::{Map, Value, json};
 
 use crate::Core;
+use crate::ResultExt;
 use crate::profiles::pronoun_sets;
 use crate::protocol::{
     CommandErr, PerMessageProfileView, PersonaCatalogView, PersonaSelectionView,
@@ -480,7 +481,7 @@ impl Core {
             .send_queue()
             .subscribe()
             .await
-            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+            .or_failed(self, "edit_local_with_persona")?;
 
         let Some((serialized, handle)) = echoes.into_iter().find_map(|echo| {
             if echo.transaction_id != *transaction_id {
@@ -502,9 +503,9 @@ impl Core {
             .raw()
             .0
             .deserialize_as_unchecked::<Value>()
-            .map_err(|error| self.failed("edit_local_with_persona", error))?;
-        let mut value = serde_json::to_value(&message)
-            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+            .or_failed(self, "edit_local_with_persona")?;
+        let mut value =
+            serde_json::to_value(&message).or_failed(self, "edit_local_with_persona")?;
         if let Some(object) = value.as_object_mut()
             && let Some(relation) = previous.get("m.relates_to")
         {
@@ -514,12 +515,12 @@ impl Core {
         ensure_empty_mentions(&mut value);
 
         let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
-            .map_err(|error| self.failed("edit_local_with_persona", error))?;
+            .or_failed(self, "edit_local_with_persona")?;
 
         handle
             .edit_raw(raw, "m.room.message".to_owned())
             .await
-            .map_err(|error| self.failed("edit_local_with_persona", error))
+            .or_failed(self, "edit_local_with_persona")
     }
 
     pub(crate) async fn edit_with_persona(
@@ -529,8 +530,7 @@ impl Core {
         profile: Option<&PerMessageProfileView>,
     ) -> Result<(), CommandErr> {
         let event_type = content.event_type().to_string();
-        let mut value = serde_json::to_value(content)
-            .map_err(|error| self.failed("edit_with_persona", error))?;
+        let mut value = serde_json::to_value(content).or_failed(self, "edit_with_persona")?;
 
         let update = |content: &mut Value| {
             if let Some(profile) = profile {
@@ -547,12 +547,12 @@ impl Core {
         }
 
         let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(value.to_string())
-            .map_err(|error| self.failed("edit_with_persona", error))?;
+            .or_failed(self, "edit_with_persona")?;
 
         room.send_queue()
             .send_raw(raw, event_type)
             .await
-            .map_err(|error| self.failed("edit_with_persona", error))?;
+            .or_failed(self, "edit_with_persona")?;
 
         Ok(())
     }
@@ -570,7 +570,7 @@ impl Core {
 
         raw.deserialize_as::<Value>()
             .map(Some)
-            .map_err(|error| self.failed("personas: deserialize", error))
+            .or_failed(self, "personas_deserialize")
     }
 
     async fn load_personas(&self) -> Result<Vec<PersonaView>, CommandErr> {

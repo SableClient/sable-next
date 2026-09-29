@@ -55,6 +55,10 @@ fn err_json(error: impl std::fmt::Display) -> String {
     .unwrap_or_else(|_| r#"{"code":"failed","log_id":"serialization failed"}"#.to_owned())
 }
 
+fn js_err(error: &CommandErr) -> String {
+    serde_json::to_string(error).unwrap_or_else(err_json)
+}
+
 const DEFAULT_LOG_FILTER: &str = "info,matrix_sdk::http_client=off,matrix_sdk::latest_events::latest_event::builder=off,matrix_sdk_base::room::display_name=off";
 
 /// Without this the core's `tracing` output is discarded and a
@@ -234,7 +238,7 @@ impl SableCore {
 
         match Box::pin(self.core.dispatch(command)).await {
             Ok(response) => serde_json::to_string(&response).map_err(err_json),
-            Err(error) => Err(serde_json::to_string(&error).unwrap_or_else(err_json)),
+            Err(error) => Err(js_err(&error)),
         }
     }
 
@@ -253,7 +257,7 @@ impl SableCore {
         self.core
             .media_thumbnail(source, width, height)
             .await
-            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+            .map_err(|error| js_err(&error))
     }
 
     /// Resolves once every stored copy of the source is gone.
@@ -266,7 +270,7 @@ impl SableCore {
         self.core
             .forget_media(source)
             .await
-            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+            .map_err(|error| js_err(&error))
     }
 
     /// Resolves once the event is queued, not once the upload completes.
@@ -281,7 +285,7 @@ impl SableCore {
         self.core
             .send_attachment(request, bytes)
             .await
-            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+            .map_err(|error| js_err(&error))
     }
 
     /// # Errors
@@ -296,7 +300,7 @@ impl SableCore {
         self.core
             .send_gallery(request, items)
             .await
-            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+            .map_err(|error| js_err(&error))
     }
 
     /// # Errors
@@ -307,7 +311,7 @@ impl SableCore {
         self.core
             .upload_media(mime, bytes)
             .await
-            .map_err(|error| serde_json::to_string(&error).unwrap_or_else(err_json))
+            .map_err(|error| js_err(&error))
     }
 
     /// Called once. Each call carries the JSON of a `CoreEvent[]`: whatever had

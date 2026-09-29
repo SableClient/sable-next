@@ -12,6 +12,7 @@ use matrix_sdk_ui::room_list_service::filters::{
 };
 use matrix_sdk_ui::timeline::{EventSendState, SendTarget, Timeline, TimelineItem};
 
+use crate::ResultExt;
 use crate::protocol::{
     CommandErr, CommandOk, CoreEvent, SubscriptionId, TimelineFocusView, TimelineItemView,
 };
@@ -154,7 +155,7 @@ impl Core {
             TimelineFocusView::Event { .. } => Arc::new(
                 build_room_timeline(&room, &focus, hidden_events)
                     .await
-                    .map_err(|error| self.failed("build focused timeline", error))?,
+                    .or_failed(self, "build_focused_timeline")?,
             ),
         };
         fill_sender_profiles(&room, &timeline);

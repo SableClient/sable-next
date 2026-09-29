@@ -13,7 +13,9 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::Core;
+use crate::ResultExt;
 use crate::notifications;
+use crate::preview;
 use crate::protocol::{CommandErr, CoreEvent, InboxFilter, InboxItemView};
 
 const SCHEMA: u32 = 1;
@@ -300,7 +302,7 @@ impl Core {
         ) {
             return None;
         }
-        Some(preview(notifications::timeline_body(event)))
+        Some(preview(preview::describe(event)))
     }
 
     async fn inbox_entry(
@@ -446,7 +448,7 @@ impl Core {
         let client = self.client().await?;
         crate::rooms::fill_own_members(&client)
             .await
-            .map_err(|error| self.failed("inbox_memberships", error))?;
+            .or_failed(self, "inbox_memberships")?;
         let stored = load(&client).await?;
         let every_encrypted = notifications::every_encrypted_event_pushed(&client).await;
         let candidates = backfill_candidates(&client, &stored, include_read).await?;

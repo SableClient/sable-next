@@ -23,6 +23,7 @@ use matrix_sdk::ruma::{OwnedUserId, UserId};
 use qrcode::bits::Bits;
 use qrcode::{Color, EcLevel, QrCode, Version};
 
+use crate::ResultExt;
 use crate::protocol::{
     CommandErr, CoreEvent, DeviceView, EmojiView, EncryptionStatusView, IdentityResetStep,
     QrCodeView, RecoveryStateView, SignOutSafetyView, SigningKeysView, VerificationStateView,
@@ -56,7 +57,7 @@ impl Core {
             .recovery()
             .reset_identity()
             .await
-            .map_err(|error| self.failed("reset_identity", error))?
+            .or_failed(self, "reset_identity")?
         else {
             return Ok(IdentityResetStep::Done {
                 recovery_key: self.enable_reset_recovery(&client).await?,
@@ -124,7 +125,7 @@ impl Core {
 
         handle.reset(auth).await.map_err(|error| match &error {
             RecoveryError::Sdk(sdk) if sdk.as_uiaa_response().is_some() => CommandErr::Denied,
-            _ => self.failed("reset_identity: auth", error),
+            _ => self.failed("reset_identity_auth", error),
         })?;
 
         {
@@ -157,7 +158,7 @@ impl Core {
             .recovery()
             .enable()
             .await
-            .map_err(|error| self.failed("reset_identity: enable_recovery", error))?;
+            .or_failed(self, "reset_identity_enable_recovery")?;
         self.adopt_account_data_key(client, &recovery_key).await;
         Ok(recovery_key)
     }
@@ -245,7 +246,7 @@ impl Core {
                         let qr = match request.generate_qr_code().await {
                             Ok(qr) => qr,
                             Err(error) => {
-                                core.failed("verification: generate_qr_code", error);
+                                core.failed("verification_generate_qr_code", error);
                                 None
                             }
                         };
@@ -254,7 +255,7 @@ impl Core {
                             if request.we_started()
                                 && let Err(error) = request.start_sas().await
                             {
-                                core.failed("verification: start_sas", error);
+                                core.failed("verification_start_sas", error);
                             }
 
                             core.emit_verification(&user_id, &flow_id, VerificationView::Waiting);
@@ -311,7 +312,7 @@ impl Core {
             if !sas.we_started()
                 && let Err(error) = sas.accept().await
             {
-                core.failed("verification: accept_sas", error);
+                core.failed("verification_accept_sas", error);
             }
 
             while let Some(state) = changes.next().await {
@@ -410,7 +411,7 @@ impl Core {
             .await?
             .scan_qr_code(data)
             .await
-            .map_err(|error| self.failed("scan_verification_qr", error))?
+            .or_failed(self, "scan_verification_qr")?
             .ok_or(CommandErr::Unavailable)?;
         self.watch_qr(user_id, flow_id, qr);
         Ok(())

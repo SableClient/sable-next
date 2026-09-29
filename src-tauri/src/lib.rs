@@ -190,7 +190,12 @@ struct Base64Invoke {
     headers: HashMap<String, String>,
 }
 
-impl Base64Invoke {
+trait Carried {
+    fn header(&self, name: &str) -> Option<String>;
+    fn bytes(&self) -> Result<Vec<u8>, CommandErr>;
+}
+
+impl Carried for Base64Invoke {
     fn bytes(&self) -> Result<Vec<u8>, CommandErr> {
         STANDARD
             .decode(&self.bytes)
@@ -202,6 +207,38 @@ impl Base64Invoke {
             .get(name)
             .and_then(|value| decode_header_value(value))
     }
+}
+
+impl Carried for Request<'_> {
+    fn header(&self, name: &str) -> Option<String> {
+        decode_header(self, name)
+    }
+
+    fn bytes(&self) -> Result<Vec<u8>, CommandErr> {
+        let InvokeBody::Raw(bytes) = self.body() else {
+            return Err(CommandErr::InvalidMedia);
+        };
+        Ok(bytes.clone())
+    }
+}
+
+async fn carried_attachment(
+    core: &sable_core::Core,
+    request: &impl Carried,
+) -> Result<(), CommandErr> {
+    let attachment = request
+        .header("request")
+        .and_then(|json| serde_json::from_str(&json).ok())
+        .ok_or(CommandErr::InvalidMedia)?;
+    core.send_attachment(attachment, request.bytes()?).await
+}
+
+async fn carried_upload(
+    core: &sable_core::Core,
+    request: &impl Carried,
+) -> Result<String, CommandErr> {
+    let mime = request.header("mime").ok_or(CommandErr::InvalidMedia)?;
+    core.upload_media(mime, request.bytes()?).await
 }
 
 #[tauri::command]
@@ -218,15 +255,7 @@ async fn send_attachment(
     state: State<'_, AppState>,
     request: Request<'_>,
 ) -> Result<(), CommandErr> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(CommandErr::InvalidMedia);
-    };
-
-    let request = decode_header(&request, "request")
-        .and_then(|json| serde_json::from_str(&json).ok())
-        .ok_or(CommandErr::InvalidMedia)?;
-
-    state.core.send_attachment(request, bytes.clone()).await
+    carried_attachment(&state.core, &request).await
 }
 
 /// Returns the `mxc:` URI.
@@ -235,13 +264,7 @@ async fn upload_media(
     state: State<'_, AppState>,
     request: Request<'_>,
 ) -> Result<String, CommandErr> {
-    let InvokeBody::Raw(bytes) = request.body() else {
-        return Err(CommandErr::InvalidMedia);
-    };
-
-    let mime = decode_header(&request, "mime").ok_or(CommandErr::InvalidMedia)?;
-
-    state.core.upload_media(mime, bytes.clone()).await
+    carried_upload(&state.core, &request).await
 }
 
 #[tauri::command]
@@ -249,16 +272,7 @@ async fn send_attachment_base64(
     state: State<'_, AppState>,
     request: Base64Invoke,
 ) -> Result<(), CommandErr> {
-    state
-        .core
-        .send_attachment(
-            request
-                .header("request")
-                .and_then(|json| serde_json::from_str(&json).ok())
-                .ok_or(CommandErr::InvalidMedia)?,
-            request.bytes()?,
-        )
-        .await
+    carried_attachment(&state.core, &request).await
 }
 
 #[tauri::command]
@@ -266,8 +280,7 @@ async fn upload_media_base64(
     state: State<'_, AppState>,
     request: Base64Invoke,
 ) -> Result<String, CommandErr> {
-    let mime = request.header("mime").ok_or(CommandErr::InvalidMedia)?;
-    state.core.upload_media(mime, request.bytes()?).await
+    carried_upload(&state.core, &request).await
 }
 
 #[tauri::command]

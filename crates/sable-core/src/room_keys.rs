@@ -3,6 +3,7 @@ use matrix_sdk::encryption::{KeyExportError, RoomKeyImportError};
 use tempfile::NamedTempFile;
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CommandOk};
 
 impl Core {
@@ -15,11 +16,11 @@ impl Core {
             .encryption()
             .export_room_keys(file.path().to_owned(), passphrase, |_| true)
             .await
-            .map_err(|error| self.failed("export_room_keys", error))?;
+            .or_failed(self, "export_room_keys")?;
 
         let export = tokio::fs::read_to_string(file.path())
             .await
-            .map_err(|error| self.failed("export_room_keys", error))?;
+            .or_failed(self, "export_room_keys")?;
 
         Ok(CommandOk::ExportRoomKeys { export })
     }
@@ -35,7 +36,7 @@ impl Core {
 
         tokio::fs::write(file.path(), export)
             .await
-            .map_err(|error| self.failed("import_room_keys", error))?;
+            .or_failed(self, "import_room_keys")?;
 
         let result = client
             .encryption()
@@ -59,9 +60,9 @@ impl Core {
             .store()
             .export_room_keys(|_| true)
             .await
-            .map_err(|error| self.failed("export_room_keys", error))?;
+            .or_failed(self, "export_room_keys")?;
         let export = matrix_sdk_base::crypto::encrypt_room_key_export(&keys, passphrase, 500_000)
-            .map_err(|error| self.failed("export_room_keys", error))?;
+            .or_failed(self, "export_room_keys")?;
 
         Ok(CommandOk::ExportRoomKeys { export })
     }
@@ -82,7 +83,7 @@ impl Core {
             .store()
             .import_exported_room_keys(keys, |_, _| {})
             .await
-            .map_err(|error| self.failed("import_room_keys", error))?;
+            .or_failed(self, "import_room_keys")?;
 
         Ok(CommandOk::ImportRoomKeys {
             imported: result.imported_count as u64,
@@ -121,7 +122,7 @@ impl Core {
         tempfile::Builder::new()
             .prefix(".room-keys-")
             .tempfile_in(&self.store_id)
-            .map_err(|error| self.failed("room_key_file", error))
+            .or_failed(self, "room_key_file")
     }
 
     fn room_key_import_error(&self, error: RoomKeyImportError) -> CommandErr {

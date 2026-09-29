@@ -5,6 +5,7 @@ use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId};
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CommandOk, ReactionShortcodeView};
 
 const MAX_SHORTCODE_BYTES: usize = 100;
@@ -25,11 +26,11 @@ impl Core {
         let (cache, _handles) = room
             .event_cache()
             .await
-            .map_err(|error| self.failed("reaction_shortcodes", error))?;
+            .or_failed(self, "reaction_shortcodes")?;
         let related = cache
             .find_event_with_relations(event_id, Some(vec![RelationType::Annotation]))
             .await
-            .map_err(|error| self.failed("reaction_shortcodes", error))?
+            .or_failed(self, "reaction_shortcodes")?
             .map(|(_, related)| related)
             .unwrap_or_default();
         Ok(shortcodes(&related))

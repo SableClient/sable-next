@@ -1,8 +1,11 @@
 use std::sync::{Arc, atomic::Ordering};
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
+use matrix_sdk::ruma::OwnedDeviceId;
+use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk_ui::sync_service::State as SyncState;
 
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 
 use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
@@ -26,6 +29,62 @@ impl SessionGeneration<'_> {
 }
 
 impl Core {
+    pub(crate) async fn delete_device(
+        &self,
+        device_id: OwnedDeviceId,
+        password: Option<String>,
+    ) -> Result<Option<String>, CommandErr> {
+        let client = self.client().await?;
+        let devices = [device_id];
+
+        if client.oauth().full_session().is_some()
+            && let Ok(metadata) = client.oauth().server_metadata().await
+            && let Some(url) = metadata.account_management_url_with_action(
+                matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
+                    matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
+                ),
+            )
+        {
+            return Ok(Some(url.to_string()));
+        }
+
+        let Err(error) = client.delete_devices(&devices, None).await else {
+            return Ok(None);
+        };
+        let Some(uiaa) = error.as_uiaa_response() else {
+            return Err(self.failed("delete_device", error));
+        };
+        let password_only = uiaa
+            .flows
+            .iter()
+            .any(|flow| flow.stages == [AuthType::Password]);
+        let password = match password {
+            Some(password) if password_only => password,
+            _ => {
+                return Err(CommandErr::InteractiveAuthRequired {
+                    stages: uiaa
+                        .flows
+                        .iter()
+                        .flat_map(|flow| &flow.stages)
+                        .map(|stage| stage.as_str().to_owned())
+                        .collect(),
+                });
+            }
+        };
+
+        let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
+        let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);
+        auth.session.clone_from(&uiaa.session);
+        client
+            .delete_devices(&devices, Some(AuthData::Password(auth)))
+            .await
+            .map_err(|error| match error.as_uiaa_response() {
+                Some(_) => CommandErr::Denied,
+                None => self.failed("delete_device_auth", error),
+            })?;
+        Ok(None)
+    }
+
     pub(crate) async fn claim_session_generation(&self) -> SessionGeneration<'_> {
         let guard = self.session_activation_lock.lock().await;
         SessionGeneration {
@@ -68,7 +127,7 @@ impl Core {
                 .credentials
                 .user_id()
                 .parse()
-                .map_err(|error| self.failed("restore: user id", error))?,
+                .or_failed(self, "restore_user_id")?,
             device_id: persisted.credentials.device_id(),
             homeserver: persisted.homeserver.clone(),
             needs_reauth: false,
@@ -113,7 +172,7 @@ impl Core {
                         .credentials
                         .user_id()
                         .parse()
-                        .map_err(|error| self.failed("list accounts: user id", error))?,
+                        .or_failed(self, "list_accounts_user_id")?,
                     device_id: account.session.credentials.device_id(),
                     homeserver: account.session.homeserver,
                     needs_reauth: account.needs_reauth,
@@ -150,7 +209,7 @@ impl Core {
                 .credentials
                 .user_id()
                 .parse()
-                .map_err(|error| self.failed("switch account: user id", error))?,
+                .or_failed(self, "switch_account_user_id")?,
             device_id: persisted.credentials.device_id(),
             homeserver: persisted.homeserver.clone(),
             needs_reauth: false,
@@ -259,7 +318,7 @@ impl Core {
             for account in &accounts.accounts {
                 self.invalidate_account_client(&account.account_id).await;
                 if let Err(error) = reset_account_cache(account).await {
-                    outcome = Err(self.failed("reset local cache", error));
+                    outcome = Err(self.failed("reset_local_cache", error));
                 }
             }
             outcome
@@ -295,12 +354,11 @@ impl Core {
             session: persisted.clone(),
             needs_reauth: false,
         });
-        let bytes = serde_json::to_vec(&updated)
-            .map_err(|error| self.failed("persist: serialize", error))?;
+        let bytes = serde_json::to_vec(&updated).or_failed(self, "persist_serialize")?;
         self.sessions
             .save(bytes)
             .await
-            .map_err(|error| self.failed("persist: save", error))?;
+            .or_failed(self, "persist_save")?;
         self.invalidate_account_client(account_id).await;
         *accounts = Some(updated);
         Ok(())
@@ -346,12 +404,11 @@ impl Core {
             return Ok(());
         };
         account.session = persisted.keeping_endpoint_of(&account.session);
-        let bytes = serde_json::to_vec(&updated)
-            .map_err(|error| self.failed("refresh: serialize", error))?;
+        let bytes = serde_json::to_vec(&updated).or_failed(self, "refresh_serialize")?;
         self.sessions
             .save(bytes)
             .await
-            .map_err(|error| self.failed("refresh: save", error))?;
+            .or_failed(self, "refresh_save")?;
         *accounts = Some(updated);
         Ok(())
     }
@@ -375,12 +432,12 @@ impl Core {
             self.persistent_event_cache,
         )
         .await
-        .map_err(|error| self.failed("restore: build_client", error))?;
+        .or_failed(self, "restore_build_client")?;
         match account.session.credentials.clone() {
             Credentials::Password(matrix) => client
                 .restore_session(matrix)
                 .await
-                .map_err(|error| self.failed("restore_session", error))?,
+                .or_failed(self, "restore_session")?,
             Credentials::OAuth { client_id, user } => client
                 .oauth()
                 .restore_session(
@@ -388,7 +445,7 @@ impl Core {
                     matrix_sdk::store::RoomLoadSettings::default(),
                 )
                 .await
-                .map_err(|error| self.failed("restore_session: oauth", error))?,
+                .or_failed(self, "restore_session_oauth")?,
         }
         Ok(client)
     }
@@ -434,22 +491,18 @@ impl Core {
             .ok_or(CommandErr::NotLoggedIn)?
             .keeping_endpoint_of(&account.session);
         updated.active_account_id = Some(account_id.to_owned());
-        let bytes = serde_json::to_vec(&updated)
-            .map_err(|error| self.failed("activate account: serialize", error))?;
+        let bytes = serde_json::to_vec(&updated).or_failed(self, "activate_account_serialize")?;
         self.sessions
             .save(bytes)
             .await
-            .map_err(|error| self.failed("activate account: save", error))?;
+            .or_failed(self, "activate_account_save")?;
         *accounts = Some(updated);
         Ok(())
     }
 
     pub(crate) async fn clear_persisted_session(&self) -> Result<(), CommandErr> {
         let _guard = self.session_store_lock.lock().await;
-        self.sessions
-            .clear()
-            .await
-            .map_err(|error| self.failed("clear session", error))
+        self.sessions.clear().await.or_failed(self, "clear_session")
     }
 
     pub(crate) async fn mark_account_needs_reauth(
@@ -463,7 +516,7 @@ impl Core {
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_mut() else {
-            return Err(self.failed("soft logout", "account registry is not initialized"));
+            return Err(self.failed("soft_logout", "account registry is not initialized"));
         };
         let Some(account) = registry
             .accounts
@@ -477,12 +530,12 @@ impl Core {
         if registry.active_account_id.as_deref() == Some(account_id) {
             registry.active_account_id = None;
         }
-        let bytes = serde_json::to_vec(registry)
-            .map_err(|error| self.failed("soft logout: serialize accounts", error))?;
+        let bytes =
+            serde_json::to_vec(registry).or_failed(self, "soft_logout_serialize_accounts")?;
         self.sessions
             .save(bytes)
             .await
-            .map_err(|error| self.failed("soft logout: save accounts", error))
+            .or_failed(self, "soft_logout_save_accounts")
     }
 
     async fn remove_account(&self, account_id: Option<&str>) -> Result<(), CommandErr> {
@@ -493,7 +546,7 @@ impl Core {
         let _guard = self.session_store_lock.lock().await;
         let mut accounts = self.accounts.lock().await;
         let Some(registry) = accounts.as_mut() else {
-            return Err(self.failed("remove account", "account registry is not initialized"));
+            return Err(self.failed("remove_account", "account registry is not initialized"));
         };
         self.invalidate_account_client(account_id).await;
         let store_id = registry
@@ -507,12 +560,11 @@ impl Core {
         if registry.active_account_id.as_deref() == Some(account_id) {
             registry.active_account_id = None;
         }
-        let bytes = serde_json::to_vec(registry)
-            .map_err(|error| self.failed("logout: serialize accounts", error))?;
+        let bytes = serde_json::to_vec(registry).or_failed(self, "logout_serialize_accounts")?;
         self.sessions
             .save(bytes)
             .await
-            .map_err(|error| self.failed("logout: save accounts", error))?;
+            .or_failed(self, "logout_save_accounts")?;
         if let Some(store_id) = store_id {
             self.discard_account_store(&store_id);
         }
@@ -583,12 +635,12 @@ impl Core {
         client
             .event_cache()
             .subscribe()
-            .map_err(|error| self.failed("subscribe_event_cache", error))?;
+            .or_failed(self, "subscribe_event_cache")?;
 
         let session_changes = client.subscribe_to_session_changes();
         let sync_service = session::build_sync(client.clone())
             .await
-            .map_err(|error| self.failed("start_sync", error))?;
+            .or_failed(self, "start_sync")?;
 
         let _swap = self.session_swap_lock.lock().await;
         if self.session_attempt_generation.load(Ordering::SeqCst) != generation {

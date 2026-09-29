@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CoreEvent, SealStateView, SealedAccountDataView};
 
 pub(crate) const ADK_SECRET: &str = "dev.zirco.msc4483.account_data.key";
@@ -243,7 +244,7 @@ impl Core {
         let content = match cached_key(&client).await {
             Some(key) => key
                 .seal(event_type, content)
-                .map_err(|error| self.failed("set_sealed_account_data: seal", error))?,
+                .or_failed(self, "set_sealed_account_data_seal")?,
             None => content.clone(),
         };
         self.put_global_account_data(event_type.into(), &content, "set_sealed_account_data")

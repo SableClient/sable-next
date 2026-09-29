@@ -4,6 +4,7 @@ use matrix_sdk::ruma::api::client::user_directory::search_users;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, UInt};
 
 use crate::Core;
+use crate::ResultExt;
 use crate::protocol::{CommandErr, OpenIdTokenView, UserDirectoryEntryView};
 
 const MAX_TIMELINE_EVENTS: usize = 500;
@@ -79,7 +80,7 @@ impl Core {
         let events = room
             .get_state_events(event_type.into())
             .await
-            .map_err(|error| self.failed("room_state_events_raw", error))?;
+            .or_failed(self, "room_state_events_raw")?;
 
         Ok(events
             .into_iter()

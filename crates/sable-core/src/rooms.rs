@@ -6,13 +6,15 @@ use matrix_sdk::ruma::api::client::directory::get_public_rooms_filtered;
 use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
+use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
 use matrix_sdk::{Client, RoomMemberships, RoomState};
 use matrix_sdk_base::{RoomInfo, RoomInfoNotableUpdateReasons};
 
-use crate::protocol::{CommandErr, CommandOk, DirectoryRoomType};
+use crate::ResultExt;
+use crate::protocol::{CommandErr, CommandOk, DirectoryRoomType, JoinRuleView};
 
 use crate::Core;
 use crate::view;
@@ -131,6 +133,93 @@ pub(crate) async fn align_bridged_dms_on_change(core: std::sync::Arc<Core>, clie
 }
 
 impl Core {
+    pub(crate) async fn set_direct(
+        &self,
+        room_id: &OwnedRoomId,
+        direct: bool,
+        user_id: Option<matrix_sdk::ruma::OwnedUserId>,
+    ) -> Result<(), CommandErr> {
+        let client = self.client().await?;
+        let room = self.room(room_id).await?;
+
+        if direct {
+            let members = room
+                .members(RoomMemberships::ACTIVE)
+                .await
+                .or_failed(self, "set_direct_members")?;
+            let others = match user_id {
+                Some(user_id)
+                    if Some(user_id.as_ref()) != client.user_id()
+                        && members.iter().any(|member| member.user_id() == user_id) =>
+                {
+                    vec![user_id]
+                }
+                Some(_) => return Err(CommandErr::Denied),
+                None => members
+                    .iter()
+                    .map(|member| member.user_id().to_owned())
+                    .filter(|user_id| Some(user_id.as_ref()) != client.user_id())
+                    .collect(),
+            };
+            client
+                .account()
+                .mark_as_dm(room_id, &others)
+                .await
+                .or_failed(self, "set_direct")?;
+        } else {
+            room.set_is_direct(false)
+                .await
+                .or_failed(self, "unset_direct")?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn set_room_join_rule(
+        &self,
+        room_id: &OwnedRoomId,
+        rule: JoinRuleView,
+    ) -> Result<(), CommandErr> {
+        let room = self.room(room_id).await?;
+        let (supports_knock, supports_restricted, supports_knock_restricted) =
+            join_rule_support(&room);
+        let content = match rule {
+            JoinRuleView::Public => RoomJoinRulesEventContent::new(JoinRule::Public),
+            JoinRuleView::Invite => RoomJoinRulesEventContent::new(JoinRule::Invite),
+            JoinRuleView::Knock if supports_knock => {
+                RoomJoinRulesEventContent::new(JoinRule::Knock)
+            }
+            JoinRuleView::Knock => return Err(CommandErr::Unsupported),
+            JoinRuleView::Restricted if !supports_restricted => {
+                return Err(CommandErr::Unsupported);
+            }
+            JoinRuleView::KnockRestricted if !supports_knock_restricted => {
+                return Err(CommandErr::Unsupported);
+            }
+            JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
+                let client = self.client().await?;
+                let allow: Vec<_> = view::restricted_parents(&client, &room)
+                    .await
+                    .into_iter()
+                    .map(AllowRule::room_membership)
+                    .collect();
+                if allow.is_empty() {
+                    return Err(CommandErr::Denied);
+                }
+                if matches!(rule, JoinRuleView::Restricted) {
+                    RoomJoinRulesEventContent::restricted(allow)
+                } else {
+                    RoomJoinRulesEventContent::knock_restricted(allow)
+                }
+            }
+        };
+
+        room.send_state_event(content)
+            .await
+            .map_err(|error| self.room_error("set_room_join_rule", error))?;
+        Ok(())
+    }
+
     pub(crate) async fn align_bridged_dms(&self, before: Option<&matrix_sdk::ruma::push::Ruleset>) {
         let (Ok(client), Ok(rules)) = (self.client().await, self.push_rules().await) else {
             return;
@@ -230,7 +319,7 @@ impl Core {
         space
             .send_state_event_for_key(room_id, content)
             .await
-            .map_err(|error| self.failed("add_to_space", error))?;
+            .or_failed(self, "add_to_space")?;
 
         Ok(())
     }
@@ -258,7 +347,7 @@ impl Core {
         let members = room
             .members(RoomMemberships::JOIN)
             .await
-            .map_err(|error| self.failed("room_via_servers", error))?;
+            .or_failed(self, "room_via_servers")?;
 
         let ranked: Vec<(String, i64)> = members
             .iter()
@@ -282,7 +371,7 @@ impl Core {
         let Some(raw) = space
             .get_state_event_static_for_key::<SpaceChildEventContent, _>(room_id)
             .await
-            .map_err(|error| self.failed(context, error))?
+            .or_failed(self, context)?
         else {
             return Ok(None);
         };
@@ -313,7 +402,7 @@ impl Core {
         content.order = match order {
             Some(order) => Some(
                 SpaceChildOrder::parse(order)
-                    .map_err(|error| self.failed("set_space_child_order: invalid order", error))?,
+                    .or_failed(self, "set_space_child_order_invalid_order")?,
             ),
             None => None,
         };
@@ -365,7 +454,7 @@ impl Core {
             .await?
             .knock(address, reason, via)
             .await
-            .map_err(|error| self.failed("knock_room", error))?;
+            .or_failed(self, "knock_room")?;
 
         Ok(CommandOk::KnockRoom {
             room_id: room.room_id().to_owned(),
@@ -388,7 +477,7 @@ impl Core {
             .await?
             .get_room_preview(&address, via)
             .await
-            .map_err(|error| self.failed("room_preview", error))?;
+            .or_failed(self, "room_preview")?;
 
         Ok(CommandOk::RoomPreview {
             preview: view::room_preview_view(&preview),
@@ -453,7 +542,7 @@ impl Core {
             .send(request)
             .with_request_config(RequestConfig::short_retry())
             .await
-            .map_err(|error| self.failed("space_hierarchy", error))?;
+            .or_failed(self, "space_hierarchy")?;
 
         // Ordering lives on each parent's `m.space.child` edges, so the chunks
         // are passed through unsorted.

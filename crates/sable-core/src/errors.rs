@@ -10,6 +10,16 @@ use crate::protocol::CommandErr;
 
 use crate::Core;
 
+pub(crate) trait ResultExt<T> {
+    fn or_failed(self, core: &Core, label: &str) -> Result<T, CommandErr>;
+}
+
+impl<T, E: Display> ResultExt<T> for Result<T, E> {
+    fn or_failed(self, core: &Core, label: &str) -> Result<T, CommandErr> {
+        self.map_err(|error| core.failed(label, error))
+    }
+}
+
 impl Core {
     pub(crate) fn failed(&self, context: &str, error: impl Display) -> CommandErr {
         let log_id = format!("e{}", self.next_log_id.fetch_add(1, Ordering::Relaxed));
@@ -179,9 +189,66 @@ impl Core {
     pub(crate) fn discovery_error(&self, error: matrix_sdk::ClientBuildError) -> CommandErr {
         match error {
             matrix_sdk::ClientBuildError::Http(error) => {
-                self.homeserver_http_error("login_flows: discovery", error)
+                self.homeserver_http_error("login_flows_discovery", error)
             }
             _ => CommandErr::UnknownHomeserver,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io::{self, Write},
+        sync::{Arc, Mutex, PoisonError},
+    };
+
+    use crate::Core;
+    use crate::protocol::CommandErr;
+    use crate::store::MemorySessionStore;
+
+    use super::ResultExt;
+
+    #[derive(Clone)]
+    struct TestWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl Write for TestWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .write(bytes)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            self.0
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .flush()
+        }
+    }
+
+    #[test]
+    fn or_failed_records_the_given_label() {
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+        let output = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::fmt()
+            .with_ansi(false)
+            .without_time()
+            .with_writer({
+                let output = output.clone();
+                move || TestWriter(output.clone())
+            })
+            .finish();
+        let result = tracing::subscriber::with_default(subscriber, || {
+            Err::<(), _>("problem").or_failed(&core, "test_label")
+        });
+
+        assert!(matches!(result, Err(CommandErr::Failed { .. })));
+        assert!(
+            String::from_utf8(output.lock().unwrap().clone())
+                .unwrap()
+                .contains("context=\"test_label\"")
+        );
     }
 }

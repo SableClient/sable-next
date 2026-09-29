@@ -25,6 +25,7 @@ use matrix_sdk::ruma::{DeviceId, EventId, OwnedRoomId, OwnedUserId, UserId};
 use matrix_sdk::{Client, Room};
 use serde_json::Value;
 
+use crate::ResultExt;
 use crate::protocol::{
     CallMemberView, CallMode, CallSessionId, CallSupportView, CommandErr, CommandOk, CoreEvent,
 };
@@ -444,14 +445,12 @@ impl Core {
         room_id: OwnedRoomId,
         notification_event_id: String,
     ) -> Result<CommandOk, CommandErr> {
-        let event_id = EventId::parse(&notification_event_id)
-            .map_err(|error| self.failed("decline_call", error))?;
+        let event_id = EventId::parse(&notification_event_id).or_failed(self, "decline_call")?;
         let room = self.room(&room_id).await?;
         let content = notify::make_decline_event(&room, &event_id)
             .await
-            .map_err(|error| self.failed("decline_call", error))?;
-        let mut content =
-            serde_json::to_value(content).map_err(|error| self.failed("decline_call", error))?;
+            .or_failed(self, "decline_call")?;
+        let mut content = serde_json::to_value(content).or_failed(self, "decline_call")?;
         if let Some(object) = content.as_object_mut() {
             object
                 .entry("m.mentions")
@@ -461,11 +460,11 @@ impl Core {
             Raw::<matrix_sdk::ruma::events::AnyMessageLikeEventContent>::from_json_string(
                 content.to_string(),
             )
-            .map_err(|error| self.failed("decline_call", error))?
+            .or_failed(self, "decline_call")?
             .cast_unchecked();
         room.send_raw(notify::DECLINE_EVENT_TYPE, content)
             .await
-            .map_err(|error| self.failed("decline_call", error))?;
+            .or_failed(self, "decline_call")?;
 
         Ok(CommandOk::DeclineCall)
     }
@@ -478,7 +477,7 @@ impl Core {
                 CommandErr::Unavailable
             }
             ProvisionError::Refused(_) | ProvisionError::MalformedResponse => {
-                self.failed("join_call: provision", format!("{service_url}: {error}"))
+                self.failed("join_call_provision", format!("{service_url}: {error}"))
             }
         }
     }
@@ -535,7 +534,7 @@ impl Core {
                 update_delayed_event::UpdateAction::Send,
             ))
             .await
-            .map_err(|error| self.failed("leave_call", error))?;
+            .or_failed(self, "leave_call")?;
 
         Ok(CommandOk::LeaveCall)
     }

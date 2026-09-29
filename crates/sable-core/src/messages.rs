@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use futures_util::future::join_all;
 use matrix_sdk::deserialized_responses::TimelineEvent;
+use matrix_sdk::room::edit::EditedContent;
 use matrix_sdk::room::{IncludeRelations, MessagesOptions, RelationsOptions};
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::reporting::report_user;
@@ -14,21 +15,46 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     EventId, MilliSecondsSinceUnixEpoch, OwnedEventId, OwnedRoomId, OwnedUserId, UInt,
 };
+use matrix_sdk_ui::timeline::TimelineEventItemId;
 
 use crate::Core;
+use crate::ResultExt;
 use crate::dispatch::BUNDLED_LINK_PREVIEWS;
 use crate::matrix_html::{
     display_html, has_profile_fallback_html, strip_profile_fallback_body,
     strip_profile_fallback_html,
 };
+use crate::outgoing::message_content;
 use crate::personas::PER_MESSAGE_PROFILE;
-use crate::protocol::{CommandErr, EditVersionView, TimelineItemView};
+use crate::protocol::{
+    CommandErr, EditVersionView, MessageKind, PerMessageProfileView, TimelineItemView,
+};
 use crate::view::{per_message_profile, standalone_item};
 
 pub(crate) fn outgoing_mentions(user_ids: Vec<OwnedUserId>, room: bool) -> Mentions {
     let mut mentions = Mentions::with_user_ids(user_ids);
     mentions.room = room;
     mentions
+}
+
+pub(crate) fn edit_content(
+    body: String,
+    formatted: Option<String>,
+    kind: MessageKind,
+    media_caption: bool,
+    mentions: Vec<OwnedUserId>,
+    room: bool,
+) -> EditedContent {
+    if media_caption {
+        EditedContent::MediaCaption {
+            caption: (!body.is_empty()).then_some(body),
+            formatted_caption: formatted
+                .map(matrix_sdk::ruma::events::room::message::FormattedBody::html),
+            mentions: Some(outgoing_mentions(mentions, room)),
+        }
+    } else {
+        EditedContent::RoomMessage(message_content(body, formatted, kind, mentions, room).into())
+    }
 }
 
 fn unique_pins(events: Vec<OwnedEventId>) -> Vec<OwnedEventId> {
@@ -84,6 +110,66 @@ pub(crate) fn previews_removed_edit(
 }
 
 impl Core {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn edit_message(
+        &self,
+        room_id: &OwnedRoomId,
+        event_id: Option<OwnedEventId>,
+        transaction_id: Option<String>,
+        body: String,
+        formatted: Option<String>,
+        kind: MessageKind,
+        media_caption: bool,
+        thread_root: Option<OwnedEventId>,
+        mentions: Vec<OwnedUserId>,
+        mentions_room: bool,
+        persona: Option<PerMessageProfileView>,
+    ) -> Result<(), CommandErr> {
+        let edited = edit_content(
+            body,
+            formatted,
+            kind,
+            media_caption,
+            mentions,
+            mentions_room,
+        );
+
+        let item_id = match (event_id, transaction_id) {
+            (Some(event_id), None) => TimelineEventItemId::EventId(event_id),
+            (None, Some(transaction_id)) => {
+                TimelineEventItemId::TransactionId(transaction_id.into())
+            }
+            _ => return Err(CommandErr::Unsupported),
+        };
+        if let TimelineEventItemId::TransactionId(transaction_id) = &item_id {
+            let queued = match (&persona, &edited) {
+                (Some(persona), EditedContent::RoomMessage(message)) => {
+                    let room = self.room(room_id).await?;
+                    self.edit_local_with_persona(&room, transaction_id, message.clone(), persona)
+                        .await?
+                }
+                _ => false,
+            };
+            if !queued {
+                self.timeline_for(room_id, thread_root.as_ref())
+                    .await?
+                    .edit(&item_id, edited)
+                    .await
+                    .or_failed(self, "edit_message")?;
+            }
+        } else if let TimelineEventItemId::EventId(event_id) = item_id {
+            let room = self.room(room_id).await?;
+            let content = room
+                .make_edit_event(&event_id, edited)
+                .await
+                .or_failed(self, "edit_message")?;
+            self.edit_with_persona(&room, &content, persona.as_ref())
+                .await?;
+        }
+
+        Ok(())
+    }
+
     pub(crate) async fn remove_link_previews(
         &self,
         room_id: &OwnedRoomId,
@@ -106,13 +192,13 @@ impl Core {
             .ok_or(CommandErr::Unsupported)?;
         let edit = previews_removed_edit(event_id, &event).ok_or(CommandErr::Unsupported)?;
         let raw = Raw::<AnyMessageLikeEventContent>::from_json_string(edit.to_string())
-            .map_err(|error| self.failed("remove_link_previews", error))?;
+            .or_failed(self, "remove_link_previews")?;
         self.room(room_id)
             .await?
             .send_queue()
             .send_raw(raw, "m.room.message".to_owned())
             .await
-            .map_err(|error| self.failed("remove_link_previews", error))?;
+            .or_failed(self, "remove_link_previews")?;
         Ok(())
     }
 
@@ -140,7 +226,7 @@ impl Core {
                     },
                 )
                 .await
-                .map_err(|error| self.failed("delete_thread", error))?;
+                .or_failed(self, "delete_thread")?;
 
             for event in relations.chunk {
                 let Ok(raw) = serde_json::from_str::<serde_json::Value>(event.raw().json().get())
@@ -157,8 +243,7 @@ impl Core {
                 let Some(event_id) = raw.get("event_id").and_then(serde_json::Value::as_str) else {
                     continue;
                 };
-                let event_id = EventId::parse(event_id)
-                    .map_err(|error| self.failed("delete_thread", error))?;
+                let event_id = EventId::parse(event_id).or_failed(self, "delete_thread")?;
                 if seen.insert(event_id.clone()) {
                     event_ids.push(event_id);
                 }
@@ -173,7 +258,7 @@ impl Core {
         for event_id in event_ids {
             room.redact(&event_id, reason, None)
                 .await
-                .map_err(|error| self.failed("delete_thread", error))?;
+                .or_failed(self, "delete_thread")?;
         }
         Ok(())
     }
@@ -196,7 +281,7 @@ impl Core {
             let messages = room
                 .messages(options)
                 .await
-                .map_err(|error| self.failed("bulk_redact", error))?;
+                .or_failed(self, "bulk_redact")?;
             if messages.chunk.is_empty() {
                 break;
             }
@@ -233,11 +318,10 @@ impl Core {
                 let Some(event_id) = raw.get("event_id").and_then(serde_json::Value::as_str) else {
                     continue;
                 };
-                let event_id =
-                    EventId::parse(event_id).map_err(|error| self.failed("bulk_redact", error))?;
+                let event_id = EventId::parse(event_id).or_failed(self, "bulk_redact")?;
                 room.redact(&event_id, reason, None)
                     .await
-                    .map_err(|error| self.failed("bulk_redact", error))?;
+                    .or_failed(self, "bulk_redact")?;
                 redacted += 1;
             }
 
@@ -272,7 +356,7 @@ impl Core {
         let events = unique_pins(
             room.load_pinned_events()
                 .await
-                .map_err(|error| self.failed("pinned_events", error))?
+                .or_failed(self, "pinned_events")?
                 .unwrap_or_default(),
         );
         self.remember_pinned(room_id, &events);
@@ -304,7 +388,7 @@ impl Core {
         let events = unique_pins(
             room.load_pinned_events()
                 .await
-                .map_err(|error| self.failed("set_pinned", error))?
+                .or_failed(self, "set_pinned")?
                 .unwrap_or_default(),
         );
         self.remember_pinned(room_id, &events);
@@ -324,7 +408,7 @@ impl Core {
         room.client()
             .send(request)
             .await
-            .map_err(|error| self.failed("report_message", error))?;
+            .or_failed(self, "report_message")?;
 
         Ok(())
     }
@@ -365,7 +449,7 @@ impl Core {
             .await?
             .event(event_id, None)
             .await
-            .map_err(|error| self.failed("event_source", error))?;
+            .or_failed(self, "event_source")?;
 
         let raw = event.raw().json().get().to_owned();
         Ok(serde_json::from_str::<serde_json::Value>(&raw)
@@ -388,12 +472,12 @@ impl Core {
                 None,
             )
             .await
-            .map_err(|error| self.failed("forward_message", error))?;
+            .or_failed(self, "forward_message")?;
 
         let raw = event
             .raw()
             .deserialize()
-            .map_err(|error| self.failed("forward_message", error))?;
+            .or_failed(self, "forward_message")?;
 
         let AnySyncTimelineEvent::MessageLike(message) = raw else {
             return Err(CommandErr::Unsupported);
@@ -424,8 +508,7 @@ impl Core {
             })
             .max_by_key(|(timestamp, _)| *timestamp);
         let original = latest.map_or(original, |(_, content)| content.with_relation(None));
-        let mut content = serde_json::to_value(&original)
-            .map_err(|error| self.failed("forward_message", error))?;
+        let mut content = serde_json::to_value(&original).or_failed(self, "forward_message")?;
         let Some(object) = content.as_object_mut() else {
             return Err(CommandErr::Unsupported);
         };
@@ -460,7 +543,7 @@ impl Core {
             .await?
             .send_raw("m.room.message", content)
             .await
-            .map_err(|error| self.failed("forward_message", error))?;
+            .or_failed(self, "forward_message")?;
 
         Ok(())
     }
@@ -479,7 +562,7 @@ impl Core {
                 None,
             )
             .await
-            .map_err(|error| self.failed("edit_history", error))?;
+            .or_failed(self, "edit_history")?;
 
         let mut edits: Vec<EditVersionView> = valid_replacements(&event, &replacements)
             .filter_map(|replacement| edit_version(replacement, true))

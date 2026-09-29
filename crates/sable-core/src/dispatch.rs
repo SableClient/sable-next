@@ -4,8 +4,6 @@ use matrix_sdk::RoomMemberships;
 use matrix_sdk::deserialized_responses::RawAnySyncOrStrippedState;
 use matrix_sdk::room::ListThreadsOptions;
 use matrix_sdk::room::Receipts;
-use matrix_sdk::room::edit::EditedContent;
-use matrix_sdk::room::reply::{EnforceThread, Reply as SdkReply};
 use matrix_sdk::ruma::RoomAliasId;
 use matrix_sdk::ruma::api::Direction;
 use matrix_sdk::ruma::api::client::alias::{create_alias, delete_alias};
@@ -19,21 +17,15 @@ use matrix_sdk::ruma::api::client::room::create_room::{self, v3::RoomPreset};
 use matrix_sdk::ruma::api::client::room::get_event_by_timestamp;
 use matrix_sdk::ruma::api::client::room::upgrade_room;
 use matrix_sdk::ruma::api::client::state::{get_state_event_for_key, get_state_events};
-use matrix_sdk::ruma::api::client::uiaa::{AuthData, AuthType, Password, UserIdentifier};
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
-use matrix_sdk::ruma::events::location::LocationContent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
-use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
-use matrix_sdk::ruma::events::room::message::{
-    AddMentions, ImageMessageEventContent, LocationMessageEventContent, MessageType, Relation,
-    ReplyWithinThread,
-};
+use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -42,7 +34,6 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{
     MilliSecondsSinceUnixEpoch, OwnedMxcUri, OwnedRoomId, OwnedUserId, RoomId, RoomOrAliasId,
     ServerName, UInt, events::room::member::MembershipState,
-    events::room::message::RoomMessageEventContent,
 };
 use matrix_sdk::ruma::{
     RoomVersionId, api::client::discovery::get_capabilities::v3::RoomVersionStability,
@@ -51,12 +42,12 @@ use matrix_sdk_ui::timeline::{
     Error as TimelineError, RedactError, RoomExt, TimelineEventItemId, TimelineFocus,
 };
 
+use crate::ResultExt;
 use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
-    HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, JoinRuleView,
-    MembershipView, MessageKind, MutualRoomView, PackImageInfoView, PaginationDirection,
-    ProfilePropagationView, RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView,
-    RoomVersionsView, UrlPreviewView,
+    HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, MembershipView,
+    MessageKind, MutualRoomView, PackImageInfoView, PaginationDirection, ProfilePropagationView,
+    RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -64,13 +55,12 @@ const POWER_LEVEL_TAGS_EVENT_TYPE: &str = "in.cinny.room.power_level_tags";
 const WIDGETS_EVENT_TYPE: &str = "im.vector.modular.widgets";
 
 use crate::media::mxc_uri;
-use crate::messages::outgoing_mentions;
+use crate::outgoing::{gif_content, location_content, message_content, reply_to, thread_reply};
 use crate::presence;
 use crate::profiles::profile_view;
-use crate::rooms::join_rule_support;
 use crate::verification::{encryption_status, sign_out_safety};
 use crate::{Core, SubscriptionKind};
-use crate::{notifications, push_check, push_rules, session, spaces, view, webpush};
+use crate::{notifications, push_check, push_rules, session, view, webpush};
 
 const MAX_SEARCH_RESULTS: usize = 200;
 const MAX_SEARCH_CONTEXT: usize = 3;
@@ -363,7 +353,7 @@ impl Core {
                     PaginationDirection::Backward => timeline.paginate_backwards(count).await,
                     PaginationDirection::Forward => timeline.paginate_forwards(count).await,
                 }
-                .map_err(|error| self.failed("paginate", error))?;
+                .or_failed(self, "paginate")?;
 
                 Ok(CommandOk::Paginate {
                     direction,
@@ -397,26 +387,10 @@ impl Core {
                 };
                 let content = message_content(body, formatted, kind, mentions, mentions_room);
 
-                let content = match thread_reply(in_reply_to, thread_root.clone(), silent_reply) {
-                    Some(reply) => {
-                        let fallback = content.clone();
-                        let event_id = reply.event_id.clone();
-                        let thread_root = thread_root.clone();
-                        match self
-                            .room(&room_id)
-                            .await?
-                            .make_reply_event(content.into(), reply)
-                            .await
-                        {
-                            Ok(content) => content,
-                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
-                                reply_relation_fallback(fallback, event_id, thread_root)
-                            }
-                            Err(error) => return Err(self.failed("send_reply", error)),
-                        }
-                    }
-                    None => content,
-                };
+                let reply = thread_reply(in_reply_to, thread_root.clone(), silent_reply);
+                let content = self
+                    .with_reply(&room_id, content, reply, thread_root.clone(), "send_reply")
+                    .await?;
 
                 let extra = extra_content(
                     persona.as_ref().map(crate::personas::profile_extra_content),
@@ -432,7 +406,7 @@ impl Core {
                 timeline
                     .send_with_extra_content(content.into(), extra)
                     .await
-                    .map_err(|error| self.failed("send_message", error))?;
+                    .or_failed(self, "send_message")?;
 
                 Ok(CommandOk::SendMessage)
             }
@@ -447,7 +421,7 @@ impl Core {
                     .await?
                     .send_raw(&event_type, content)
                     .await
-                    .map_err(|error| self.failed("send_raw_event", error))?;
+                    .or_failed(self, "send_raw_event")?;
 
                 Ok(CommandOk::SendRawEvent)
             }
@@ -543,7 +517,7 @@ impl Core {
                 timeline
                     .send_with_extra_content(content.into(), extra)
                     .await
-                    .map_err(|error| self.failed("send_sticker", error))?;
+                    .or_failed(self, "send_sticker")?;
 
                 Ok(CommandOk::SendSticker)
             }
@@ -574,25 +548,10 @@ impl Core {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = gif_content(body, url, info);
 
-                let content = match thread_reply(in_reply_to, thread_root.clone(), false) {
-                    Some(reply) => {
-                        let fallback = content.clone();
-                        let event_id = reply.event_id.clone();
-                        match self
-                            .room(&room_id)
-                            .await?
-                            .make_reply_event(content.into(), reply)
-                            .await
-                        {
-                            Ok(content) => content,
-                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
-                                reply_relation_fallback(fallback, event_id, thread_root)
-                            }
-                            Err(error) => return Err(self.failed("send_gif_reply", error)),
-                        }
-                    }
-                    None => content,
-                };
+                let reply = thread_reply(in_reply_to, thread_root.clone(), false);
+                let content = self
+                    .with_reply(&room_id, content, reply, thread_root, "send_gif_reply")
+                    .await?;
                 timeline
                     .send_with_extra_content(
                         content.into(),
@@ -603,7 +562,7 @@ impl Core {
                         }),
                     )
                     .await
-                    .map_err(|error| self.failed("send_gif", error))?;
+                    .or_failed(self, "send_gif")?;
 
                 Ok(CommandOk::SendGif)
             }
@@ -631,52 +590,20 @@ impl Core {
                 mentions_room,
                 persona,
             } => {
-                let edited = edit_content(
+                self.edit_message(
+                    &room_id,
+                    event_id,
+                    transaction_id,
                     body,
                     formatted,
                     kind,
                     media_caption,
+                    thread_root,
                     mentions,
                     mentions_room,
-                );
-
-                let item_id = match (event_id, transaction_id) {
-                    (Some(event_id), None) => TimelineEventItemId::EventId(event_id),
-                    (None, Some(transaction_id)) => {
-                        TimelineEventItemId::TransactionId(transaction_id.into())
-                    }
-                    _ => return Err(CommandErr::Unsupported),
-                };
-                if let TimelineEventItemId::TransactionId(transaction_id) = &item_id {
-                    let queued = match (&persona, &edited) {
-                        (Some(persona), EditedContent::RoomMessage(message)) => {
-                            let room = self.room(&room_id).await?;
-                            self.edit_local_with_persona(
-                                &room,
-                                transaction_id,
-                                message.clone(),
-                                persona,
-                            )
-                            .await?
-                        }
-                        _ => false,
-                    };
-                    if !queued {
-                        self.timeline_for(&room_id, thread_root.as_ref())
-                            .await?
-                            .edit(&item_id, edited)
-                            .await
-                            .map_err(|error| self.failed("edit_message", error))?;
-                    }
-                } else if let TimelineEventItemId::EventId(event_id) = item_id {
-                    let room = self.room(&room_id).await?;
-                    let content = room
-                        .make_edit_event(&event_id, edited)
-                        .await
-                        .map_err(|error| self.failed("edit_message", error))?;
-                    self.edit_with_persona(&room, &content, persona.as_ref())
-                        .await?;
-                }
+                    persona,
+                )
+                .await?;
                 Ok(CommandOk::EditMessage)
             }
 
@@ -689,7 +616,7 @@ impl Core {
                     .await?
                     .fetch_details_for_event(&event_id)
                     .await
-                    .map_err(|error| self.failed("fetch_event_details", error))?;
+                    .or_failed(self, "fetch_event_details")?;
 
                 Ok(CommandOk::FetchEventDetails)
             }
@@ -763,7 +690,7 @@ impl Core {
                 let members = room
                     .members(membership_filter(&memberships))
                     .await
-                    .map_err(|error| self.failed("room_members", error))?;
+                    .or_failed(self, "room_members")?;
 
                 Ok(CommandOk::RoomMembers {
                     members: members.iter().map(view::member_view).collect(),
@@ -864,7 +791,7 @@ impl Core {
                     .await?
                     .send(get_capabilities::v3::Request::new())
                     .await
-                    .map_err(|error| self.failed("room_versions", error))?;
+                    .or_failed(self, "room_versions")?;
 
                 let versions = response.capabilities.room_versions;
                 Ok(CommandOk::RoomVersions(RoomVersionsView {
@@ -887,8 +814,7 @@ impl Core {
             } => {
                 let mut request = upgrade_room::v3::Request::new(
                     room_id,
-                    RoomVersionId::try_from(new_version)
-                        .map_err(|error| self.failed("upgrade_room", error))?,
+                    RoomVersionId::try_from(new_version).or_failed(self, "upgrade_room")?,
                 );
                 request.additional_creators = additional_creators;
 
@@ -922,8 +848,7 @@ impl Core {
             }
 
             Command::CreateRoomAlias { room_id, alias } => {
-                let alias = RoomAliasId::parse(alias)
-                    .map_err(|error| self.failed("create_room_alias", error))?;
+                let alias = RoomAliasId::parse(alias).or_failed(self, "create_room_alias")?;
 
                 self.client()
                     .await?
@@ -935,8 +860,7 @@ impl Core {
             }
 
             Command::DeleteRoomAlias { alias } => {
-                let alias = RoomAliasId::parse(alias)
-                    .map_err(|error| self.failed("delete_room_alias", error))?;
+                let alias = RoomAliasId::parse(alias).or_failed(self, "delete_room_alias")?;
 
                 self.client()
                     .await?
@@ -992,11 +916,11 @@ impl Core {
             Command::AddNotificationKeyword { keyword } => {
                 let rules = self.push_rules().await?;
                 let writes = push_rules::plan_add_keyword(&rules.snapshot().await, &keyword)
-                    .map_err(|error| self.failed("add_notification_keyword", error))?;
+                    .or_failed(self, "add_notification_keyword")?;
                 rules
                     .apply(writes)
                     .await
-                    .map_err(|error| self.failed("add_notification_keyword", error))?;
+                    .or_failed(self, "add_notification_keyword")?;
 
                 Ok(CommandOk::AddNotificationKeyword)
             }
@@ -1009,7 +933,7 @@ impl Core {
                         &keyword,
                     ))
                     .await
-                    .map_err(|error| self.failed("remove_notification_keyword", error))?;
+                    .or_failed(self, "remove_notification_keyword")?;
 
                 Ok(CommandOk::RemoveNotificationKeyword)
             }
@@ -1023,14 +947,13 @@ impl Core {
                         mode,
                     ))
                     .await
-                    .map_err(|error| self.failed("set_notification_keyword_mode", error))?;
+                    .or_failed(self, "set_notification_keyword_mode")?;
 
                 Ok(CommandOk::SetNotificationKeywordMode)
             }
 
             Command::ListThreads { room_id, from } => {
-                let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let room = self.room(&room_id).await?;
                 let options = ListThreadsOptions {
                     from,
                     ..ListThreadsOptions::default()
@@ -1108,7 +1031,7 @@ impl Core {
 
             Command::BotCommands { room_id } => {
                 let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let room = self.room(&room_id).await?;
                 Ok(CommandOk::BotCommands {
                     commands: self
                         .bot_commands_for(&client, &room)
@@ -1129,7 +1052,7 @@ impl Core {
 
             Command::RoomHasSpaceParent { room_id } => {
                 let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let room = self.room(&room_id).await?;
                 Ok(CommandOk::RoomHasSpaceParent {
                     has_space_parent: !view::restricted_parents(&client, &room).await.is_empty(),
                 })
@@ -1137,7 +1060,7 @@ impl Core {
 
             Command::UnjoinedSpaceParents { room_id } => {
                 let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let room = self.room(&room_id).await?;
                 Ok(CommandOk::UnjoinedSpaceParents {
                     parents: crate::cosmetics::unjoined_space_parents(&client, &room).await,
                 })
@@ -1159,9 +1082,9 @@ impl Core {
                     self.pinned_events(&room_id),
                 );
                 let predecessor = self
-                    .client()
-                    .await?
-                    .get_room(&room_id)
+                    .room(&room_id)
+                    .await
+                    .ok()
                     .and_then(|room| view::predecessor(&room));
                 Ok(CommandOk::RoomOpen(RoomOpenView {
                     permissions: permissions?,
@@ -1182,8 +1105,7 @@ impl Core {
             }
 
             Command::RoomSummary { room_id } => {
-                let client = self.client().await?;
-                let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+                let room = self.room(&room_id).await?;
                 Ok(CommandOk::RoomSummary {
                     room: view::listless_room_summary(room).await,
                 })
@@ -1291,7 +1213,7 @@ impl Core {
                 content,
             } => {
                 let raw = Raw::new(&content)
-                    .map_err(|error| self.failed("set_room_account_data", error))?
+                    .or_failed(self, "set_room_account_data")?
                     .cast_unchecked();
                 self.room(&room_id)
                     .await?
@@ -1395,9 +1317,9 @@ impl Core {
                             .await?
                             .redact(&event_id, reason.as_deref(), None)
                             .await
-                            .map_err(|error| self.failed("redact", error))?;
+                            .or_failed(self, "redact")?;
                     }
-                    other => other.map_err(|error| self.failed("redact", error))?,
+                    other => other.or_failed(self, "redact")?,
                 }
 
                 Ok(CommandOk::Redact)
@@ -1466,7 +1388,7 @@ impl Core {
                             ),
                         )
                         .await
-                        .map_err(|error| self.failed("react", error))?;
+                        .or_failed(self, "react")?;
                 } else {
                     timeline
                         .toggle_reaction_with_extra_content(
@@ -1478,7 +1400,7 @@ impl Core {
                             ),
                         )
                         .await
-                        .map_err(|error| self.failed("react", error))?;
+                        .or_failed(self, "react")?;
                 }
 
                 Ok(CommandOk::React)
@@ -1515,7 +1437,7 @@ impl Core {
                 let response = client
                     .send(get_state_events::v3::Request::new(room_id))
                     .await
-                    .map_err(|error| self.failed("room_full_state", error))?;
+                    .or_failed(self, "room_full_state")?;
                 Ok(CommandOk::RoomFullState {
                     events: response
                         .room_state
@@ -1586,31 +1508,15 @@ impl Core {
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = location_content(body, geo_uri);
-                let content = match in_reply_to {
-                    Some(event_id) => {
-                        let fallback = content.clone();
-                        match self
-                            .room(&room_id)
-                            .await?
-                            .make_reply_event(
-                                content.into(),
-                                reply_to(event_id.clone(), thread_root.is_some(), false),
-                            )
-                            .await
-                        {
-                            Ok(content) => content,
-                            Err(matrix_sdk::room::reply::ReplyError::StateEvent) => {
-                                reply_relation_fallback(fallback, event_id, thread_root)
-                            }
-                            Err(error) => return Err(self.failed("send_location", error)),
-                        }
-                    }
-                    None => content,
-                };
+                let reply =
+                    in_reply_to.map(|event_id| reply_to(event_id, thread_root.is_some(), false));
+                let content = self
+                    .with_reply(&room_id, content, reply, thread_root, "send_location")
+                    .await?;
                 timeline
                     .send(content.into())
                     .await
-                    .map_err(|error| self.failed("send_location", error))?;
+                    .or_failed(self, "send_location")?;
 
                 Ok(CommandOk::SendLocation)
             }
@@ -1631,7 +1537,7 @@ impl Core {
                     .await?
                     .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
-                    .map_err(|error| self.failed("create poll", error))?;
+                    .or_failed(self, "create_poll")?;
 
                 Ok(CommandOk::CreatePoll)
             }
@@ -1650,7 +1556,7 @@ impl Core {
                     .await?
                     .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
-                    .map_err(|error| self.failed("vote poll", error))?;
+                    .or_failed(self, "vote_poll")?;
 
                 Ok(CommandOk::VotePoll)
             }
@@ -1670,7 +1576,7 @@ impl Core {
                     .await?
                     .send_with_extra_content(content.into(), empty_mentions_extra())
                     .await
-                    .map_err(|error| self.failed("end poll", error))?;
+                    .or_failed(self, "end_poll")?;
 
                 Ok(CommandOk::EndPoll)
             }
@@ -1735,7 +1641,7 @@ impl Core {
                     Some(passphrase) => enable.with_passphrase(passphrase).await,
                     None => enable.await,
                 }
-                .map_err(|error| self.failed("enable_recovery", error))?;
+                .or_failed(self, "enable_recovery")?;
                 self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::EnableRecovery { recovery_key })
@@ -1750,7 +1656,7 @@ impl Core {
                     Some(passphrase) => reset.with_passphrase(passphrase).await,
                     None => reset.await,
                 }
-                .map_err(|error| self.failed("reset_recovery_key", error))?;
+                .or_failed(self, "reset_recovery_key")?;
                 self.adopt_account_data_key(&client, &recovery_key).await;
 
                 Ok(CommandOk::ResetRecoveryKey { recovery_key })
@@ -1777,72 +1683,9 @@ impl Core {
             Command::DeleteDevice {
                 device_id,
                 password,
-            } => {
-                let client = self.client().await?;
-                let devices = [device_id];
-
-                if client.oauth().full_session().is_some()
-                && let Ok(metadata) = client.oauth().server_metadata().await
-                && let Some(url) = metadata.account_management_url_with_action(
-                    matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
-                        matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
-                    ),
-                )
-            {
-                return Ok(CommandOk::DeleteDevice {
-                    management_url: Some(url.to_string()),
-                });
-            }
-
-                // The flows cannot be asked for up front.
-                let Err(error) = client.delete_devices(&devices, None).await else {
-                    return Ok(CommandOk::DeleteDevice {
-                        management_url: None,
-                    });
-                };
-
-                let Some(uiaa) = error.as_uiaa_response() else {
-                    return Err(self.failed("delete_device", error));
-                };
-
-                // Recaptcha, SSO and terms need the server's fallback page.
-                let password_only = uiaa
-                    .flows
-                    .iter()
-                    .any(|flow| flow.stages == [AuthType::Password]);
-
-                let password = match password {
-                    Some(password) if password_only => password,
-                    _ => {
-                        return Err(CommandErr::InteractiveAuthRequired {
-                            stages: uiaa
-                                .flows
-                                .iter()
-                                .flat_map(|flow| &flow.stages)
-                                .map(|stage| stage.as_str().to_owned())
-                                .collect(),
-                        });
-                    }
-                };
-
-                let user_id = client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned();
-                let mut auth = Password::new(UserIdentifier::Matrix(user_id.into()), password);
-                // Without the session id this starts a new flow.
-                auth.session.clone_from(&uiaa.session);
-
-                client
-                    .delete_devices(&devices, Some(AuthData::Password(auth)))
-                    .await
-                    .map_err(|error| match error.as_uiaa_response() {
-                        // A wrong password comes back as another challenge.
-                        Some(_) => CommandErr::Denied,
-                        None => self.failed("delete_device: auth", error),
-                    })?;
-
-                Ok(CommandOk::DeleteDevice {
-                    management_url: None,
-                })
-            }
+            } => Ok(CommandOk::DeleteDevice {
+                management_url: self.delete_device(device_id, password).await?,
+            }),
 
             Command::RenameDevice {
                 device_id,
@@ -1852,7 +1695,7 @@ impl Core {
                     .await?
                     .rename_device(&device_id, &display_name)
                     .await
-                    .map_err(|error| self.failed("rename_device", error))?;
+                    .or_failed(self, "rename_device")?;
 
                 Ok(CommandOk::RenameDevice)
             }
@@ -1862,7 +1705,7 @@ impl Core {
                     .await?
                     .discard_room_key()
                     .await
-                    .map_err(|error| self.failed("discard_room_key", error))?;
+                    .or_failed(self, "discard_room_key")?;
 
                 Ok(CommandOk::DiscardRoomKey)
             }
@@ -1872,7 +1715,7 @@ impl Core {
                 if client
                     .unstable_features()
                     .await
-                    .map_err(|error| self.failed("set_display_name", error))?
+                    .or_failed(self, "set_display_name")?
                     .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
                         "computer.gingershaped.msc4466",
                     ))
@@ -1881,7 +1724,7 @@ impl Core {
                         "displayname",
                         serde_json::Value::String(name.unwrap_or_default()),
                     )
-                    .map_err(|error| self.failed("set_display_name", error))?;
+                    .or_failed(self, "set_display_name")?;
                     let mut request = set_profile_field::v3::Request::new(
                         client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
                         value,
@@ -1890,13 +1733,13 @@ impl Core {
                     client
                         .send(request)
                         .await
-                        .map_err(|error| self.failed("set_display_name", error))?;
+                        .or_failed(self, "set_display_name")?;
                 } else {
                     client
                         .account()
                         .set_display_name(name.as_deref())
                         .await
-                        .map_err(|error| self.failed("set_display_name", error))?;
+                        .or_failed(self, "set_display_name")?;
                 }
 
                 Ok(CommandOk::SetDisplayName)
@@ -1912,7 +1755,7 @@ impl Core {
                 if client
                     .unstable_features()
                     .await
-                    .map_err(|error| self.failed("set_avatar_url", error))?
+                    .or_failed(self, "set_avatar_url")?
                     .contains(&matrix_sdk::ruma::api::FeatureFlag::from(
                         "computer.gingershaped.msc4466",
                     ))
@@ -1923,7 +1766,7 @@ impl Core {
                             url.map(|url| url.to_string()).unwrap_or_default(),
                         ),
                     )
-                    .map_err(|error| self.failed("set_avatar_url", error))?;
+                    .or_failed(self, "set_avatar_url")?;
                     let mut request = set_profile_field::v3::Request::new(
                         client.user_id().ok_or(CommandErr::NotLoggedIn)?.to_owned(),
                         value,
@@ -1932,13 +1775,13 @@ impl Core {
                     client
                         .send(request)
                         .await
-                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                        .or_failed(self, "set_avatar_url")?;
                 } else {
                     client
                         .account()
                         .set_avatar_url(url.as_deref())
                         .await
-                        .map_err(|error| self.failed("set_avatar_url", error))?;
+                        .or_failed(self, "set_avatar_url")?;
                 }
 
                 Ok(CommandOk::SetAvatarUrl)
@@ -1949,18 +1792,18 @@ impl Core {
                 match value {
                     Some(value) => {
                         let value = ProfileFieldValue::new(&field, value).map_err(|error| {
-                            self.failed("set_profile_field: invalid value", error)
+                            self.failed("set_profile_field_invalid_value", error)
                         })?;
                         account
                             .set_profile_field(value)
                             .await
-                            .map_err(|error| self.failed("set_profile_field", error))?;
+                            .or_failed(self, "set_profile_field")?;
                     }
                     None => {
                         account
                             .delete_profile_field(ProfileFieldName::from(field.as_str()))
                             .await
-                            .map_err(|error| self.failed("delete_profile_field", error))?;
+                            .or_failed(self, "delete_profile_field")?;
                     }
                 }
 
@@ -1974,7 +1817,7 @@ impl Core {
                     .account()
                     .get_3pids()
                     .await
-                    .map_err(|error| self.failed("account_contacts", error))?
+                    .or_failed(self, "account_contacts")?
                     .threepids
                     .into_iter()
                     .filter(|identifier| identifier.medium.as_str() == "email")
@@ -2008,7 +1851,7 @@ impl Core {
                     .account()
                     .ignore_user(&user_id)
                     .await
-                    .map_err(|error| self.failed("ignore_user", error))?;
+                    .or_failed(self, "ignore_user")?;
 
                 Ok(CommandOk::IgnoreUser)
             }
@@ -2019,7 +1862,7 @@ impl Core {
                     .account()
                     .unignore_user(&user_id)
                     .await
-                    .map_err(|error| self.failed("unignore_user", error))?;
+                    .or_failed(self, "unignore_user")?;
 
                 Ok(CommandOk::UnignoreUser)
             }
@@ -2029,7 +1872,7 @@ impl Core {
                     .await?
                     .typing_notice(typing)
                     .await
-                    .map_err(|error| self.failed("set_typing", error))?;
+                    .or_failed(self, "set_typing")?;
 
                 Ok(CommandOk::SetTyping)
             }
@@ -2046,11 +1889,10 @@ impl Core {
             }
 
             Command::RoomNotificationModes { room_ids } => {
-                let client = self.client().await?;
                 let rules = self.push_rules().await?.snapshot().await;
                 let mut rooms = Vec::with_capacity(room_ids.len());
                 for room_id in room_ids {
-                    if let Some(room) = client.get_room(&room_id) {
+                    if let Ok(room) = self.room(&room_id).await {
                         rooms.push((room_id, notifications::room_shape(&room).await));
                     }
                 }
@@ -2079,7 +1921,7 @@ impl Core {
             Command::SetPusher { pusher } => {
                 notifications::set_pusher(&self.client().await?, pusher)
                     .await
-                    .map_err(|error| self.failed("set_pusher", error))?;
+                    .or_failed(self, "set_pusher")?;
 
                 Ok(CommandOk::SetPusher)
             }
@@ -2087,7 +1929,7 @@ impl Core {
             Command::RemovePusher { pushkey, app_id } => {
                 notifications::remove_pusher(&self.client().await?, pushkey, app_id)
                     .await
-                    .map_err(|error| self.failed("remove_pusher", error))?;
+                    .or_failed(self, "remove_pusher")?;
 
                 Ok(CommandOk::RemovePusher)
             }
@@ -2095,13 +1937,13 @@ impl Core {
             Command::WebPusherSupport => Ok(CommandOk::WebPusherSupport {
                 vapid: webpush::support(&self.client().await?)
                     .await
-                    .map_err(|error| self.failed("webpusher_support", error))?,
+                    .or_failed(self, "webpusher_support")?,
             }),
 
             Command::SetWebPusher { pusher } => {
                 webpush::set_pusher(&self.client().await?, pusher)
                     .await
-                    .map_err(|error| self.failed("set_webpusher", error))?;
+                    .or_failed(self, "set_webpusher")?;
 
                 Ok(CommandOk::SetWebPusher)
             }
@@ -2109,7 +1951,7 @@ impl Core {
             Command::WebPushers => Ok(CommandOk::WebPushers {
                 pushers: webpush::pushers(&self.client().await?)
                     .await
-                    .map_err(|error| self.failed("webpushers", error))?,
+                    .or_failed(self, "webpushers")?,
             }),
 
             Command::PingPushGateway { url } => Ok(CommandOk::PingPushGateway {
@@ -2119,13 +1961,13 @@ impl Core {
             Command::SendDiagnosticPush { pushkey, app_id } => Ok(CommandOk::SendDiagnosticPush {
                 push: push_check::send_diagnostic_push(&self.client().await?, &pushkey, &app_id)
                     .await
-                    .map_err(|error| self.failed("send_diagnostic_push", error))?,
+                    .or_failed(self, "send_diagnostic_push")?,
             }),
 
             Command::AckWebPusher { app_id, ack_token } => {
                 webpush::ack(&self.client().await?, app_id, ack_token)
                     .await
-                    .map_err(|error| self.failed("ack_webpusher", error))?;
+                    .or_failed(self, "ack_webpusher")?;
 
                 Ok(CommandOk::AckWebPusher)
             }
@@ -2193,7 +2035,7 @@ impl Core {
                     .await?
                     .set_presence(presence::state(presence), status_message, true)
                     .await
-                    .map_err(|error| self.failed("set_presence", error))?;
+                    .or_failed(self, "set_presence")?;
 
                 Ok(CommandOk::SetPresence)
             }
@@ -2217,7 +2059,7 @@ impl Core {
                 rules
                     .apply(writes)
                     .await
-                    .map_err(|error| self.failed("set_room_notification_mode", error))?;
+                    .or_failed(self, "set_room_notification_mode")?;
                 if shape.bridged {
                     self.align_bridged_dms(None).await;
                 }
@@ -2229,11 +2071,11 @@ impl Core {
                 let rules = self.push_rules().await?;
                 let before = rules.snapshot().await;
                 let writes = push_rules::plan_default_mode(&before, direct, mode)
-                    .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                    .or_failed(self, "set_default_notification_mode")?;
                 rules
                     .apply(writes)
                     .await
-                    .map_err(|error| self.failed("set_default_notification_mode", error))?;
+                    .or_failed(self, "set_default_notification_mode")?;
                 self.align_bridged_dms(Some(&before)).await;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
@@ -2242,11 +2084,11 @@ impl Core {
             Command::SetMentionNotifications { rule, mode } => {
                 let rules = self.push_rules().await?;
                 let writes = push_rules::plan_mention(&rules.snapshot().await, rule, mode)
-                    .map_err(|error| self.failed("set_mention_notifications", error))?;
+                    .or_failed(self, "set_mention_notifications")?;
                 rules
                     .apply(writes)
                     .await
-                    .map_err(|error| self.failed("set_mention_notifications", error))?;
+                    .or_failed(self, "set_mention_notifications")?;
 
                 Ok(CommandOk::SetMentionNotifications)
             }
@@ -2256,7 +2098,7 @@ impl Core {
                     .await?
                     .apply(push_rules::plan_membership(enabled))
                     .await
-                    .map_err(|error| self.failed("set_membership_notifications", error))?;
+                    .or_failed(self, "set_membership_notifications")?;
 
                 Ok(CommandOk::SetMembershipNotifications)
             }
@@ -2312,86 +2154,12 @@ impl Core {
                 direct,
                 user_id,
             } => {
-                let client = self.client().await?;
-                let room = self.room(&room_id).await?;
-
-                if direct {
-                    // `m.direct` is keyed by the other user, not by the room.
-                    let members = room
-                        .members(RoomMemberships::ACTIVE)
-                        .await
-                        .map_err(|error| self.failed("set_direct: members", error))?;
-
-                    let others = match user_id {
-                        Some(user_id)
-                            if Some(user_id.as_ref()) != client.user_id()
-                                && members.iter().any(|member| member.user_id() == user_id) =>
-                        {
-                            vec![user_id]
-                        }
-                        Some(_) => return Err(CommandErr::Denied),
-                        None => members
-                            .iter()
-                            .map(|member| member.user_id().to_owned())
-                            .filter(|user_id| Some(user_id.as_ref()) != client.user_id())
-                            .collect(),
-                    };
-
-                    client
-                        .account()
-                        .mark_as_dm(&room_id, &others)
-                        .await
-                        .map_err(|error| self.failed("set_direct", error))?;
-                } else {
-                    room.set_is_direct(false)
-                        .await
-                        .map_err(|error| self.failed("unset_direct", error))?;
-                }
-
+                self.set_direct(&room_id, direct, user_id).await?;
                 Ok(CommandOk::SetDirect)
             }
 
             Command::SetRoomJoinRule { room_id, rule } => {
-                let room = self.room(&room_id).await?;
-                let (supports_knock, supports_restricted, supports_knock_restricted) =
-                    join_rule_support(&room);
-                let content = match rule {
-                    JoinRuleView::Public => RoomJoinRulesEventContent::new(JoinRule::Public),
-                    JoinRuleView::Invite => RoomJoinRulesEventContent::new(JoinRule::Invite),
-                    JoinRuleView::Knock if supports_knock => {
-                        RoomJoinRulesEventContent::new(JoinRule::Knock)
-                    }
-                    JoinRuleView::Knock => return Err(CommandErr::Unsupported),
-                    JoinRuleView::Restricted if !supports_restricted => {
-                        return Err(CommandErr::Unsupported);
-                    }
-                    JoinRuleView::KnockRestricted if !supports_knock_restricted => {
-                        return Err(CommandErr::Unsupported);
-                    }
-                    JoinRuleView::Restricted | JoinRuleView::KnockRestricted => {
-                        let client = self.client().await?;
-                        let allow: Vec<_> = view::restricted_parents(&client, &room)
-                            .await
-                            .into_iter()
-                            .map(AllowRule::room_membership)
-                            .collect();
-
-                        if allow.is_empty() {
-                            return Err(CommandErr::Denied);
-                        }
-
-                        if matches!(rule, JoinRuleView::Restricted) {
-                            RoomJoinRulesEventContent::restricted(allow)
-                        } else {
-                            RoomJoinRulesEventContent::knock_restricted(allow)
-                        }
-                    }
-                };
-
-                room.send_state_event(content)
-                    .await
-                    .map_err(|error| self.room_error("set_room_join_rule", error))?;
-
+                self.set_room_join_rule(&room_id, rule).await?;
                 Ok(CommandOk::SetRoomJoinRule)
             }
 
@@ -2520,23 +2288,23 @@ impl Core {
                     Some(device_id) => encryption
                         .get_device(&user_id, &device_id)
                         .await
-                        .map_err(|error| self.failed("request_verification: device", error))?
+                        .or_failed(self, "request_verification_device")?
                         .ok_or(CommandErr::Unavailable)?
                         .request_verification_with_methods(
                             crate::verification::VERIFICATION_METHODS.to_vec(),
                         )
                         .await
-                        .map_err(|error| self.failed("request_verification", error))?,
+                        .or_failed(self, "request_verification")?,
                     None => encryption
                         .get_user_identity(&user_id)
                         .await
-                        .map_err(|error| self.failed("request_verification: identity", error))?
+                        .or_failed(self, "request_verification_identity")?
                         .ok_or(CommandErr::Unavailable)?
                         .request_verification_with_methods(
                             crate::verification::VERIFICATION_METHODS.to_vec(),
                         )
                         .await
-                        .map_err(|error| self.failed("request_verification", error))?,
+                        .or_failed(self, "request_verification")?,
                 };
 
                 if request.is_cancelled() {
@@ -2558,11 +2326,11 @@ impl Core {
                     .encryption()
                     .get_user_identity(&user_id)
                     .await
-                    .map_err(|error| self.failed("withdraw_verification: identity", error))?
+                    .or_failed(self, "withdraw_verification_identity")?
                     .ok_or(CommandErr::Unavailable)?
                     .withdraw_verification()
                     .await
-                    .map_err(|error| self.failed("withdraw_verification", error))?;
+                    .or_failed(self, "withdraw_verification")?;
                 Ok(CommandOk::WithdrawVerification)
             }
 
@@ -2602,7 +2370,7 @@ impl Core {
                 request
                     .accept_with_methods(crate::verification::VERIFICATION_METHODS.to_vec())
                     .await
-                    .map_err(|error| self.failed("accept_verification", error))?;
+                    .or_failed(self, "accept_verification")?;
 
                 Ok(CommandOk::AcceptVerification)
             }
@@ -2622,7 +2390,7 @@ impl Core {
                     .await?
                     .start_sas()
                     .await
-                    .map_err(|error| self.failed("start_sas_verification", error))?
+                    .or_failed(self, "start_sas_verification")?
                     .ok_or(CommandErr::Unavailable)?;
 
                 Ok(CommandOk::StartSasVerification)
@@ -2633,7 +2401,7 @@ impl Core {
                     Ok(sas) => sas.confirm().await,
                     Err(_) => self.qr(&user_id, &flow_id).await?.confirm().await,
                 }
-                .map_err(|error| self.failed("confirm_verification", error))?;
+                .or_failed(self, "confirm_verification")?;
 
                 Ok(CommandOk::ConfirmVerification)
             }
@@ -2648,22 +2416,22 @@ impl Core {
                     Ok(sas) if mismatch => sas
                         .mismatch()
                         .await
-                        .map_err(|error| self.failed("cancel_verification: mismatch", error))?,
+                        .or_failed(self, "cancel_verification_mismatch")?,
                     Ok(sas) => sas
                         .cancel()
                         .await
-                        .map_err(|error| self.failed("cancel_verification: sas", error))?,
+                        .or_failed(self, "cancel_verification_sas")?,
                     Err(_) if let Ok(qr) = self.qr(&user_id, &flow_id).await => {
                         qr.cancel()
                             .await
-                            .map_err(|error| self.failed("cancel_verification: qr", error))?;
+                            .or_failed(self, "cancel_verification_qr")?;
                     }
                     Err(_) => self
                         .verification_request(&user_id, &flow_id)
                         .await?
                         .cancel()
                         .await
-                        .map_err(|error| self.failed("cancel_verification", error))?,
+                        .or_failed(self, "cancel_verification")?,
                 }
 
                 Ok(CommandOk::CancelVerification)
@@ -2691,7 +2459,7 @@ impl Core {
                 request.room_version = room_version
                     .map(RoomVersionId::try_from)
                     .transpose()
-                    .map_err(|error| self.failed("create_room: room version", error))?;
+                    .or_failed(self, "create_room_room_version")?;
                 request.visibility = if public {
                     Visibility::Public
                 } else {
@@ -2718,7 +2486,7 @@ impl Core {
                     creation.federate = federate;
                     request.creation_content = Some(
                         Raw::new(&creation)
-                            .map_err(|error| self.failed("create_room: creation content", error))?
+                            .or_failed(self, "create_room_creation_content")?
                             .cast_unchecked(),
                     );
                 }
@@ -2726,7 +2494,7 @@ impl Core {
                 if let Some(rule) = join_rule_content(join_rule, parent_space.as_deref()) {
                     request.initial_state.push(
                         Raw::new(&rule)
-                            .map_err(|error| self.failed("create_room: join rule", error))?
+                            .or_failed(self, "create_room_join_rule")?
                             .cast_unchecked(),
                     );
                 }
@@ -2750,7 +2518,7 @@ impl Core {
                                 (view::CALL_MEMBER_TYPE): 0,
                             },
                         }))
-                        .map_err(|error| self.failed("create_room: call power levels", error))?
+                        .or_failed(self, "create_room_call_power_levels")?
                         .cast_unchecked(),
                     );
                     request.initial_state.push(
@@ -2759,7 +2527,7 @@ impl Core {
                             "state_key": "",
                             "content": {},
                         }))
-                        .map_err(|error| self.failed("create_room: call state", error))?
+                        .or_failed(self, "create_room_call_state")?
                         .cast_unchecked(),
                     );
                     let mut slot = serde_json::Map::new();
@@ -2780,7 +2548,7 @@ impl Core {
                             "state_key": view::CALL_SLOT_ID,
                             "content": slot,
                         }))
-                        .map_err(|error| self.failed("create_room: call slot", error))?
+                        .or_failed(self, "create_room_call_slot")?
                         .cast_unchecked(),
                     );
                 }
@@ -2799,7 +2567,7 @@ impl Core {
                 let room = client
                     .create_room(request)
                     .await
-                    .map_err(|error| self.failed("create_room", error))?;
+                    .or_failed(self, "create_room")?;
 
                 if matches!(kind, CreateRoomKind::Calendar)
                     && let Err(error) = self.calendar_id(&room).await
@@ -2833,12 +2601,12 @@ impl Core {
                         client
                             .create_room(request)
                             .await
-                            .map_err(|error| self.failed("create_dm", error))?
+                            .or_failed(self, "create_dm")?
                     }
                     None => client
                         .create_dm(&user_id)
                         .await
-                        .map_err(|error| self.failed("create_dm", error))?,
+                        .or_failed(self, "create_dm")?,
                 };
 
                 Ok(CommandOk::CreateDm {
@@ -2888,15 +2656,11 @@ impl Core {
             }
 
             Command::SpaceSidebar => Ok(CommandOk::SpaceSidebar {
-                items: spaces::sidebar(&self.client().await?)
-                    .await
-                    .map_err(|error| self.failed("space_sidebar", error))?,
+                items: self.space_sidebar().await?,
             }),
 
             Command::SetSpaceSidebar { items } => {
-                spaces::set_sidebar(&self.client().await?, &items)
-                    .await
-                    .map_err(|error| self.failed("set_space_sidebar", error))?;
+                self.set_space_sidebar(&items).await?;
 
                 Ok(CommandOk::SetSpaceSidebar)
             }
@@ -2983,11 +2747,11 @@ impl Core {
                         })
                         .build()
                         .await
-                        .map_err(|error| self.failed("build mark-read timeline", error))?;
+                        .or_failed(self, "build_mark_read_timeline")?;
                     timeline
                         .mark_as_read(receipt_type.clone())
                         .await
-                        .map_err(|error| self.failed("mark_read", error))?;
+                        .or_failed(self, "mark_read")?;
                     let main = room
                         .timeline_builder()
                         .with_focus(TimelineFocus::Live {
@@ -2995,16 +2759,16 @@ impl Core {
                         })
                         .build()
                         .await
-                        .map_err(|error| self.failed("build mark-read timeline", error))?;
+                        .or_failed(self, "build_mark_read_timeline")?;
                     main.mark_as_read(receipt_type)
                         .await
-                        .map_err(|error| self.failed("mark_read", error))?;
+                        .or_failed(self, "mark_read")?;
                     timeline
                         .mark_as_read(
                             matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::FullyRead,
                         )
                         .await
-                        .map_err(|error| self.failed("mark_read", error))?;
+                        .or_failed(self, "mark_read")?;
                     return Ok(CommandOk::MarkRead);
                 };
 
@@ -3027,12 +2791,12 @@ impl Core {
                 timeline
                     .send_single_receipt(receipt_type, event_id.clone())
                     .await
-                    .map_err(|error| self.failed("mark_read", error))?;
+                    .or_failed(self, "mark_read")?;
                 if thread_root.is_none() {
                     timeline
                         .send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
                         .await
-                        .map_err(|error| self.failed("mark_read", error))?;
+                        .or_failed(self, "mark_read")?;
                 }
                 Ok(CommandOk::MarkRead)
             }
@@ -3067,7 +2831,7 @@ impl Core {
                     .await?
                     .unwedge()
                     .await
-                    .map_err(|error| self.failed("retry_send", error))?;
+                    .or_failed(self, "retry_send")?;
 
                 Ok(CommandOk::RetrySend)
             }
@@ -3082,7 +2846,7 @@ impl Core {
                     .await?
                     .abort()
                     .await
-                    .map_err(|error| self.failed("cancel_send", error))?;
+                    .or_failed(self, "cancel_send")?;
 
                 self.client().await?.send_queue().set_enabled(true).await;
 
@@ -3090,86 +2854,6 @@ impl Core {
             }
         }
     }
-}
-
-pub(crate) fn thread_reply(
-    in_reply_to: Option<matrix_sdk::ruma::OwnedEventId>,
-    thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
-    silent: bool,
-) -> Option<SdkReply> {
-    match (in_reply_to, thread_root) {
-        (Some(event_id), thread_root) => Some(reply_to(event_id, thread_root.is_some(), silent)),
-        (None, Some(root)) => Some(SdkReply {
-            enforce_thread: EnforceThread::Threaded(ReplyWithinThread::No),
-            ..reply_to(root, false, silent)
-        }),
-        (None, None) => None,
-    }
-}
-
-const fn reply_to(
-    event_id: matrix_sdk::ruma::OwnedEventId,
-    in_thread: bool,
-    silent: bool,
-) -> SdkReply {
-    SdkReply {
-        event_id,
-        enforce_thread: if in_thread {
-            EnforceThread::Threaded(ReplyWithinThread::Yes)
-        } else {
-            EnforceThread::MaybeThreaded
-        },
-        add_mentions: if silent {
-            AddMentions::No
-        } else {
-            AddMentions::Yes
-        },
-    }
-}
-
-fn reply_relation_fallback(
-    mut content: RoomMessageEventContent,
-    event_id: matrix_sdk::ruma::OwnedEventId,
-    thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
-) -> RoomMessageEventContent {
-    content.relates_to = Some(match thread_root {
-        Some(root) => Relation::Thread(Thread::plain(root, event_id)),
-        None => Relation::Reply(Reply::with_event_id(event_id)),
-    });
-    content
-}
-
-fn message_content(
-    body: String,
-    formatted: Option<String>,
-    kind: MessageKind,
-    mentions: Vec<OwnedUserId>,
-    room: bool,
-) -> RoomMessageEventContent {
-    let content = match (kind, formatted) {
-        (MessageKind::Text, Some(html)) => RoomMessageEventContent::text_html(body, html),
-        (MessageKind::Text, None) => RoomMessageEventContent::text_plain(body),
-        (MessageKind::Emote, Some(html)) => RoomMessageEventContent::emote_html(body, html),
-        (MessageKind::Emote, None) => RoomMessageEventContent::emote_plain(body),
-        (MessageKind::Notice, Some(html)) => RoomMessageEventContent::notice_html(body, html),
-        (MessageKind::Notice, None) => RoomMessageEventContent::notice_plain(body),
-    };
-
-    content.add_mentions(outgoing_mentions(mentions, room))
-}
-
-fn gif_content(body: String, url: OwnedMxcUri, info: ImageInfo) -> RoomMessageEventContent {
-    RoomMessageEventContent::new(MessageType::Image(
-        ImageMessageEventContent::plain(body, url).info(Box::new(info)),
-    ))
-    .add_mentions(outgoing_mentions(Vec::new(), false))
-}
-
-fn location_content(body: String, geo_uri: String) -> RoomMessageEventContent {
-    let mut location = LocationMessageEventContent::new(body, geo_uri.clone());
-    location.location = Some(LocationContent::new(geo_uri));
-    RoomMessageEventContent::new(MessageType::Location(location))
-        .add_mentions(outgoing_mentions(Vec::new(), false))
 }
 
 pub(crate) const BUNDLED_LINK_PREVIEWS: &str = "com.beeper.linkpreviews";
@@ -3275,26 +2959,6 @@ fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Valu
     })
 }
 
-fn edit_content(
-    body: String,
-    formatted: Option<String>,
-    kind: MessageKind,
-    media_caption: bool,
-    mentions: Vec<OwnedUserId>,
-    room: bool,
-) -> EditedContent {
-    if media_caption {
-        EditedContent::MediaCaption {
-            caption: (!body.is_empty()).then_some(body),
-            formatted_caption: formatted
-                .map(matrix_sdk::ruma::events::room::message::FormattedBody::html),
-            mentions: Some(outgoing_mentions(mentions, room)),
-        }
-    } else {
-        EditedContent::RoomMessage(message_content(body, formatted, kind, mentions, room).into())
-    }
-}
-
 fn sticker_info(declared: Option<PackImageInfoView>) -> ImageInfo {
     let mut info = ImageInfo::new();
     let Some(declared) = declared else {
@@ -3359,7 +3023,7 @@ impl Core {
         event_type: &str,
     ) -> Result<Vec<RoomStateEventView>, CommandErr> {
         let client = self.client().await?;
-        let room = client.get_room(room_id).ok_or(CommandErr::UnknownRoom)?;
+        let room = self.room(room_id).await?;
         let stored = room
             .get_state_events(event_type.into())
             .await
@@ -3403,7 +3067,7 @@ impl Core {
         state_key: String,
     ) -> Result<Option<serde_json::Value>, CommandErr> {
         let client = self.client().await?;
-        let room = client.get_room(&room_id).ok_or(CommandErr::UnknownRoom)?;
+        let room = self.room(&room_id).await?;
         let event = room
             .get_state_event(event_type.clone().into(), &state_key)
             .await
@@ -3510,12 +3174,15 @@ mod tests {
         assert_eq!(shortcode.len(), 2 + 49 * 2);
     }
 
-    use super::{
-        edit_content, empty_mentions_extra, ensure_empty_mentions, gif_content, location_content,
-        message_content, state_event_content,
-    };
+    use super::{empty_mentions_extra, ensure_empty_mentions, state_event_content};
+    use matrix_sdk::room::edit::EditedContent;
     use matrix_sdk::ruma::RoomId;
+    use matrix_sdk::ruma::events::room::message::AddMentions;
 
+    use crate::messages::edit_content;
+    use crate::outgoing::{
+        gif_content, location_content, message_content, reply_relation_fallback, thread_reply,
+    };
     use crate::protocol::{CreateJoinRuleView, MessageKind};
 
     #[test]
@@ -3524,11 +3191,11 @@ mod tests {
             .expect("an event id")
             .to_owned();
 
-        let loud = super::thread_reply(Some(event_id.clone()), None, false).expect("a reply");
-        assert_eq!(loud.add_mentions, super::AddMentions::Yes);
+        let loud = thread_reply(Some(event_id.clone()), None, false).expect("a reply");
+        assert_eq!(loud.add_mentions, AddMentions::Yes);
 
-        let silent = super::thread_reply(Some(event_id), None, true).expect("a reply");
-        assert_eq!(silent.add_mentions, super::AddMentions::No);
+        let silent = thread_reply(Some(event_id), None, true).expect("a reply");
+        assert_eq!(silent.add_mentions, AddMentions::No);
     }
 
     #[test]
@@ -3544,7 +3211,7 @@ mod tests {
             false,
         );
 
-        let content = super::reply_relation_fallback(content, event_id.clone(), None);
+        let content = reply_relation_fallback(content, event_id.clone(), None);
         assert!(matches!(
             content.relates_to,
             Some(super::Relation::Reply(super::Reply { in_reply_to, .. }))
@@ -3732,7 +3399,7 @@ mod tests {
             vec![matrix_sdk::ruma::user_id!("@alice:example.org").to_owned()],
             true,
         );
-        let super::EditedContent::MediaCaption {
+        let EditedContent::MediaCaption {
             caption,
             formatted_caption,
             mentions,

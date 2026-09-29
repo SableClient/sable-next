@@ -2,12 +2,10 @@ use matrix_sdk::Client;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::OwnedEventId;
 use matrix_sdk::ruma::api::client::push::{PusherIds, PusherInit, PusherKind};
-use matrix_sdk::ruma::events::AnySyncMessageLikeEvent;
 use matrix_sdk::ruma::events::AnySyncTimelineEvent;
 use matrix_sdk::ruma::events::TimelineEventType;
 #[cfg(not(target_family = "wasm"))]
 use matrix_sdk::ruma::events::room::encrypted::OriginalSyncRoomEncryptedEvent;
-use matrix_sdk::ruma::events::room::message::{MessageType, RoomMessageEventContent};
 use matrix_sdk::ruma::push::{Action, HttpPusherData, PushFormat};
 use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{EventId, MilliSecondsSinceUnixEpoch, OwnedUserId, RoomId};
@@ -18,6 +16,7 @@ use matrix_sdk_ui::notification_client::{
 
 use url::Url;
 
+use crate::preview;
 use crate::protocol::{NotificationView, PushEventView, PushFetchView, PusherView};
 #[cfg(not(target_family = "wasm"))]
 use crate::session::{AccountRegistry, PersistedAccount};
@@ -681,45 +680,7 @@ fn view(
 fn body(event: &NotificationEvent) -> String {
     match event {
         NotificationEvent::Invite(_) => "invited you".to_owned(),
-        NotificationEvent::Timeline(event) => timeline_body(event),
-    }
-}
-
-const FALLBACK_BODY: &str = "sent a message";
-
-pub(crate) fn timeline_body(event: &AnySyncTimelineEvent) -> String {
-    let AnySyncTimelineEvent::MessageLike(message) = event else {
-        return FALLBACK_BODY.to_owned();
-    };
-
-    match message {
-        AnySyncMessageLikeEvent::RoomMessage(message) => message.as_original().map_or_else(
-            || FALLBACK_BODY.to_owned(),
-            |event| room_message_body(&event.content),
-        ),
-        AnySyncMessageLikeEvent::RoomEncrypted(_) => "sent an encrypted message".to_owned(),
-        AnySyncMessageLikeEvent::Sticker(_) => "sent a sticker".to_owned(),
-        AnySyncMessageLikeEvent::Reaction(reaction) => reaction.as_original().map_or_else(
-            || FALLBACK_BODY.to_owned(),
-            |event| format!("reacted with {}", event.content.relates_to.key),
-        ),
-        AnySyncMessageLikeEvent::UnstablePollStart(poll) => poll.as_original().map_or_else(
-            || FALLBACK_BODY.to_owned(),
-            |event| event.content.poll_start().question.text.clone(),
-        ),
-        AnySyncMessageLikeEvent::CallInvite(_) => "started a call".to_owned(),
-        _ => FALLBACK_BODY.to_owned(),
-    }
-}
-
-fn room_message_body(content: &RoomMessageEventContent) -> String {
-    match &content.msgtype {
-        MessageType::Image(_) => "sent an image".to_owned(),
-        MessageType::Video(_) => "sent a video".to_owned(),
-        MessageType::Audio(_) => "sent an audio file".to_owned(),
-        MessageType::File(_) => "sent a file".to_owned(),
-        MessageType::Gallery(_) => "sent a gallery".to_owned(),
-        _ => content.body().to_owned(),
+        NotificationEvent::Timeline(event) => preview::describe(event.as_ref()),
     }
 }
 
@@ -739,8 +700,9 @@ mod tests {
 
     use super::{
         ColdPush, cold_push_store_dir, decrypt_cold_push, fetch_cold_push_event, gateway,
-        is_backfill, push_account, restore_push_client, timeline_body,
+        is_backfill, push_account, restore_push_client,
     };
+    use crate::preview::describe;
     use crate::protocol::PushFetchView;
     use crate::session::{PersistedSession, restore_authenticated_client};
     use crate::store::{FileSessionStore, SessionStore};
@@ -1307,44 +1269,12 @@ mod tests {
         ];
 
         for case in cases {
-            let body = timeline_body(&event(&case));
+            let body = describe(&event(&case));
             assert!(
                 !body.is_empty(),
                 "a notification for {case} would read as a bare sender name"
             );
         }
-    }
-
-    #[test]
-    fn the_body_describes_what_arrived() {
-        assert_eq!(
-            timeline_body(&event(&stub(
-                "m.room.message",
-                &json!({"msgtype": "m.text", "body": "hello"})
-            ))),
-            "hello"
-        );
-        assert_eq!(
-            timeline_body(&event(&stub(
-                "m.room.encrypted",
-                &json!({"algorithm": "m.megolm.v1.aes-sha2", "ciphertext": "x", "sender_key": "k", "device_id": "D", "session_id": "s"})
-            ))),
-            "sent an encrypted message"
-        );
-        assert_eq!(
-            timeline_body(&event(&stub(
-                "m.reaction",
-                &json!({"m.relates_to": {"rel_type": "m.annotation", "event_id": "$0:example.org", "key": "👍"}})
-            ))),
-            "reacted with 👍"
-        );
-        assert_eq!(
-            timeline_body(&event(&stub(
-                "org.matrix.msc3381.poll.start",
-                &json!({"org.matrix.msc3381.poll.start": {"question": {"org.matrix.msc1767.text": "Lunch?"}, "answers": [{"id": "a", "org.matrix.msc1767.text": "Yes"}]}})
-            ))),
-            "Lunch?"
-        );
     }
 
     #[test]

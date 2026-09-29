@@ -8,6 +8,7 @@ use matrix_sdk::ruma::api::client::uiaa::{
 use matrix_sdk::utils::UrlOrQuery;
 use url::Url;
 
+use crate::ResultExt;
 use crate::protocol::{AuthIntent, CommandErr, CommandOk, LoginIdentifier};
 
 use crate::session::{Credentials, PersistedSession};
@@ -103,7 +104,7 @@ impl Core {
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
-            .map_err(|error| self.failed("build_client", error))?;
+            .or_failed(self, "build_client")?;
         let endpoint = client.homeserver();
 
         tracing::info!(
@@ -213,7 +214,7 @@ impl Core {
                 tracing::debug!("homeserver has no legacy login flows: {error}");
             }
             Err(error) => {
-                return Err(self.homeserver_http_error("login_flows: legacy", error));
+                return Err(self.homeserver_http_error("login_flows_legacy", error));
             }
         }
 
@@ -229,10 +230,10 @@ impl Core {
             }
             Err(OAuthDiscoveryError::NotSupported) => {}
             Err(OAuthDiscoveryError::Http(error)) if !flows.password && !flows.sso => {
-                return Err(self.homeserver_http_error("login_flows: oauth", error));
+                return Err(self.homeserver_http_error("login_flows_oauth", error));
             }
             Err(error) if !flows.password && !flows.sso => {
-                return Err(self.failed("login_flows: oauth", error));
+                return Err(self.failed("login_flows_oauth", error));
             }
             Err(error) => tracing::debug!("OAuth login is unavailable: {error}"),
         }
@@ -269,13 +270,13 @@ impl Core {
             None => self.allocate_account().await?,
         };
         tracing::info!(operation = "oidc_login", intent = ?intent, "starting OAuth login");
-        let redirect_uri = Url::parse(&redirect_uri)
-            .map_err(|error| self.failed("start_oidc_login: redirect_uri", error))?;
+        let redirect_uri =
+            Url::parse(&redirect_uri).or_failed(self, "start_oidc_login_redirect_uri")?;
 
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
-            .map_err(|error| self.failed("start_oidc_login: build_client", error))?;
+            .or_failed(self, "start_oidc_login_build_client")?;
 
         let registration = session::client_metadata(&redirect_uri).into();
         if let Some(account) = &reauth {
@@ -302,7 +303,7 @@ impl Core {
                 .credentials
                 .user_id()
                 .parse()
-                .map_err(|error| self.failed("reauth user", error))?;
+                .or_failed(self, "reauth_user")?;
             login = login.user_id_hint(&user_id);
         }
         if matches!(intent, AuthIntent::Register) {
@@ -349,8 +350,7 @@ impl Core {
         callback_url: String,
     ) -> Result<CommandOk, CommandErr> {
         tracing::info!(operation = "oidc_login", "completing OAuth login callback");
-        let url = Url::parse(&callback_url)
-            .map_err(|error| self.failed("complete_oidc_login: callback_url", error))?;
+        let url = Url::parse(&callback_url).or_failed(self, "complete_oidc_login_callback_url")?;
 
         let mut pending = self.pending_login.lock().await;
         let Some(PendingLogin::Oidc(_, _, _, expected_redirect_uri, client, _)) = pending.as_ref()
@@ -362,7 +362,7 @@ impl Core {
         if !same_redirect_target(expected_redirect_uri, &url) {
             unexpected_callback("oidc_login", expected_redirect_uri, &url);
             return Err(self.failed(
-                "complete_oidc_login: callback_url",
+                "complete_oidc_login_callback_url",
                 "callback URL does not match the redirect URI used to start OAuth",
             ));
         }
@@ -371,7 +371,7 @@ impl Core {
             .oauth()
             .finish_login(authorization_response(&url))
             .await
-            .map_err(|error| self.failed("complete_oidc_login", error))?;
+            .or_failed(self, "complete_oidc_login")?;
 
         let Some(PendingLogin::Oidc(account_id, account_store_id, homeserver, _, client, reauth)) =
             pending.take()
@@ -429,8 +429,8 @@ impl Core {
             return Err(CommandErr::Denied);
         }
         tracing::info!(operation = "sso_login", intent = ?intent, "starting SSO login");
-        let redirect_uri = Url::parse(&redirect_uri)
-            .map_err(|error| self.failed("start_sso_login: redirect_uri", error))?;
+        let redirect_uri =
+            Url::parse(&redirect_uri).or_failed(self, "start_sso_login_redirect_uri")?;
         if !has_single_nonempty_query_parameter(&redirect_uri, "sable_sso_state") {
             return Err(CommandErr::Denied);
         }
@@ -438,16 +438,16 @@ impl Core {
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
             .await
-            .map_err(|error| self.failed("start_sso_login: build_client", error))?;
+            .or_failed(self, "start_sso_login_build_client")?;
 
         let authorization_url = client
             .matrix_auth()
             .get_sso_login_url(redirect_uri.as_str(), idp_id.as_deref())
             .await
-            .map_err(|error| self.failed("start_sso_login", error))?;
+            .or_failed(self, "start_sso_login")?;
 
-        let mut authorization_url = Url::parse(&authorization_url)
-            .map_err(|error| self.failed("start_sso_login: authorization_url", error))?;
+        let mut authorization_url =
+            Url::parse(&authorization_url).or_failed(self, "start_sso_login_authorization_url")?;
         authorization_url.query_pairs_mut().append_pair(
             "action",
             if matches!(intent, AuthIntent::Register) {
@@ -486,8 +486,8 @@ impl Core {
         tracing::info!(operation = "sso_login", "completing SSO login callback");
         // The login token is single-use, so keep the client that created the
         // redirect and consume the pending flow exactly once.
-        let callback_url = Url::parse(&callback_url)
-            .map_err(|error| self.failed("complete_sso_login: callback_url", error))?;
+        let callback_url =
+            Url::parse(&callback_url).or_failed(self, "complete_sso_login_callback_url")?;
         if !has_single_nonempty_query_parameter(&callback_url, "loginToken") {
             return Err(CommandErr::Denied);
         }
@@ -501,7 +501,7 @@ impl Core {
         if !same_redirect_target(expected_redirect_uri, &callback_url) {
             unexpected_callback("sso_login", expected_redirect_uri, &callback_url);
             return Err(self.failed(
-                "complete_sso_login: callback_url",
+                "complete_sso_login_callback_url",
                 "callback URL does not match the redirect URI used to start SSO",
             ));
         }
@@ -517,14 +517,12 @@ impl Core {
         let mut login = client
             .matrix_auth()
             .login_with_sso_callback(callback_url.into())
-            .map_err(|error| self.failed("complete_sso_login: callback_url", error))?
+            .or_failed(self, "complete_sso_login_callback_url")?
             .initial_device_display_name("Sable");
         if let Some(account) = &reauth {
             login = login.device_id(&account.session.credentials.device_id());
         }
-        login
-            .await
-            .map_err(|error| self.failed("complete_sso_login", error))?;
+        login.await.or_failed(self, "complete_sso_login")?;
 
         let matrix = client.matrix_auth().session().ok_or_else(|| {
             self.failed("complete_sso_login", "no session after a successful login")

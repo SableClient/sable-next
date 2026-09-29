@@ -9,6 +9,7 @@ use matrix_sdk::authentication::oauth::qrcode::{
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use url::Url;
 
+use crate::ResultExt;
 use crate::protocol::{CommandErr, CoreEvent, QrLoginFailureView, QrLoginProgressView};
 use crate::session::{self, Credentials, PersistedSession};
 use crate::verification::level_h_code;
@@ -208,13 +209,13 @@ impl Core {
             Some(data) => reciprocating_homeserver(data).ok_or(CommandErr::Denied)?,
             None => homeserver.ok_or(CommandErr::Denied)?,
         };
-        let redirect_uri = Url::parse(&redirect_uri)
-            .map_err(|error| self.failed("start_qr_login: redirect_uri", error))?;
+        let redirect_uri =
+            Url::parse(&redirect_uri).or_failed(self, "start_qr_login_redirect_uri")?;
         let (account_id, store_id) = self.allocate_account().await?;
         let client = self
             .build_account_client(&store_id, &homeserver)
             .await
-            .map_err(|error| self.failed("start_qr_login: build_client", error))?;
+            .or_failed(self, "start_qr_login_build_client")?;
 
         let slots = Arc::new(QrSlots::default());
         let core = self.clone();
@@ -345,10 +346,7 @@ impl Core {
             .await?
             .take_check_code()
             .ok_or(CommandErr::Unavailable)?;
-        sender
-            .send(code)
-            .await
-            .map_err(|error| self.failed("qr_check_code", error))
+        sender.send(code).await.or_failed(self, "qr_check_code")
     }
 
     pub(crate) async fn qr_grant_continue(&self, confirm: bool) -> Result<(), CommandErr> {
@@ -362,7 +360,7 @@ impl Core {
         } else {
             sender.cancel().await
         };
-        sent.map_err(|error| self.failed("qr_grant_continue", error))
+        sent.or_failed(self, "qr_grant_continue")
     }
 
     pub(crate) async fn cancel_qr(&self) {

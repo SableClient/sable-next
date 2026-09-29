@@ -5,7 +5,9 @@ use matrix_sdk::ruma::serde::Raw;
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use serde::{Deserialize, Serialize};
 
-use crate::protocol::SidebarItemView;
+use crate::Core;
+use crate::ResultExt;
+use crate::protocol::{CommandErr, SidebarItemView};
 
 const SIDEBAR_EVENT_TYPE: &str = "in.cinny.spaces";
 
@@ -103,6 +105,23 @@ fn stored_items(items: &[SidebarItemView]) -> Vec<StoredItem> {
             },
         })
         .collect()
+}
+
+impl Core {
+    pub(crate) async fn space_sidebar(&self) -> Result<Vec<SidebarItemView>, CommandErr> {
+        sidebar(&self.client().await?)
+            .await
+            .or_failed(self, "space_sidebar")
+    }
+
+    pub(crate) async fn set_space_sidebar(
+        &self,
+        items: &[SidebarItemView],
+    ) -> Result<(), CommandErr> {
+        set_sidebar(&self.client().await?, items)
+            .await
+            .or_failed(self, "set_space_sidebar")
+    }
 }
 
 /// # Errors
