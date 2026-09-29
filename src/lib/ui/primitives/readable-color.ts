@@ -139,25 +139,14 @@ export interface ProfilePalette {
 }
 
 export function profilePalette(hero: string, ink: string): ProfilePalette | null {
-  const inkRgb = parseHex(ink);
   const rgb = parseHex(hero);
-  if (!rgb || !inkRgb) return null;
-  const inkLab = toOklab(inkRgb);
-  const derive = (ground: Rgb): [Rgb, Rgb] => {
-    const lab = toOklab(ground);
-    return [rounded(fromOklab(mix(lab, inkLab, 0.12))), rounded(fromOklab(mix(lab, inkLab, 0.75)))];
-  };
-  const ground = shift(rgb, inkFor(ink) === WHITE, (candidate) => {
-    const [panel, muted] = derive(candidate);
-    return [
-      ratio(inkRgb, candidate),
-      ratio(inkRgb, panel),
-      ratio(muted, candidate),
-      ratio(muted, panel),
-    ].every((value) => value >= TEXT_RATIO);
-  });
-  const [panel, muted] = derive(ground);
-  return { ground: toHex(ground), panel: toHex(panel), muted: toHex(muted) };
+  if (!rgb || !parseHex(ink)) return null;
+  const ground = toOklab(rgb);
+  const opposite = parseHex(inkFor(ink));
+  if (!opposite) return null;
+  const oppositeInk = toOklab(opposite);
+  const panel = rounded(fromOklab(mix(ground, oppositeInk, 0.08)));
+  return { ground: hero, panel: toHex(panel), muted: ink };
 }
 
 export function nameColorOn(color: string, ground: string): string {

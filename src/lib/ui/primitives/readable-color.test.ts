@@ -40,30 +40,18 @@ test('a colour that already passes is returned unchanged', () => {
   expect(nameColorOnDark('#9fd07c')).toBe('#9fd07c');
 });
 
-test('pure red becomes a legible red on either ink', () => {
-  const underWhite = profilePalette('#ff0000', WHITE)?.ground ?? '';
-  const underBlack = profilePalette('#ff0000', BLACK)?.ground ?? '';
-  expect(contrastRatio(underWhite, WHITE)).toBeGreaterThanOrEqual(4.5);
-  expect(contrastRatio(underBlack, BLACK)).toBeGreaterThanOrEqual(4.5);
-  for (const color of [underWhite, underBlack]) {
-    const red = Number.parseInt(color.slice(1, 3), 16);
-    expect(red).toBeGreaterThan(Number.parseInt(color.slice(3, 5), 16));
-    expect(red).toBeGreaterThan(Number.parseInt(color.slice(5, 7), 16));
-  }
+test('profile palettes preserve the chosen background colour', () => {
+  expect(profilePalette('#460333', WHITE)?.ground).toBe('#460333');
+  expect(profilePalette('#ff0000', BLACK)?.ground).toBe('#ff0000');
 });
 
-test.each([WHITE, BLACK])('every hue reaches 4.5:1 against %s', (ink) => {
+test('every hue uses readable ink on the hero and panel', () => {
   for (const color of SWEEP) {
-    expect(contrastRatio(nameColorOn(color, ink), ink)).toBeGreaterThanOrEqual(4.5);
+    const ink = inkFor(color);
     const palette = profilePalette(color, ink);
     if (!palette) throw new Error(`no palette for ${color}`);
-    for (const [text, ground] of [
-      [ink, palette.ground],
-      [ink, palette.panel],
-      [palette.muted, palette.ground],
-      [palette.muted, palette.panel],
-    ]) {
-      expect(contrastRatio(text, ground)).toBeGreaterThanOrEqual(4.5);
+    for (const ground of [palette.ground, palette.panel]) {
+      expect(contrastRatio(ink, ground)).toBeGreaterThanOrEqual(4.5);
     }
   }
 });

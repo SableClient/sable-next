@@ -14,6 +14,7 @@
   import {
     BLACK,
     WHITE,
+    contrastRatio,
     inkFor,
     nameColorOn,
     nameColorOnDark,
@@ -86,15 +87,12 @@
   }: Props = $props();
   let banner = $derived(bannerUrl?.startsWith('mxc://') ? bannerUrl : null);
   let cover = $derived(banner ?? (avatarUrl?.startsWith('mxc://') ? avatarUrl : null));
-  let ink = $derived(
-    !heroColor
-      ? null
-      : heroBrightness === 'light'
-        ? BLACK
-        : heroBrightness === 'dark'
-          ? WHITE
-          : inkFor(heroColor)
-  );
+  let ink = $derived.by(() => {
+    if (!heroColor) return null;
+    const requested =
+      heroBrightness === 'light' ? BLACK : heroBrightness === 'dark' ? WHITE : inkFor(heroColor);
+    return contrastRatio(heroColor, requested) >= 4.5 ? requested : inkFor(heroColor);
+  });
   let palette = $derived(heroColor && ink ? profilePalette(heroColor, ink) : null);
   let tinted = $derived(palette !== null);
   let nameColor = $derived(nameColorOnLight(nameColorLight ?? nameColorDark));
