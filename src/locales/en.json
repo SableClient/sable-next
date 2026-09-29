@@ -1479,6 +1479,8 @@
     "profilePreview": "Profile preview",
     "matrixId": "Matrix ID",
     "avatar": "Avatar",
+    "aboutResetCacheConfirmTitle": "Reset the local cache?",
+    "aboutResetCacheConfirmDescription": "Everything stored on this device is deleted and downloaded again, including the room list, unread counts, message history and the search index. Large accounts can take a while to load. You stay signed in.",
     "changeAvatar": "Change avatar",
     "uploadAvatar": "Upload avatar",
     "removeAvatar": "Remove avatar",

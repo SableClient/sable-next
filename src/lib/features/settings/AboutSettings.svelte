@@ -18,6 +18,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import SableBrandMark from '#lib/ui/SableBrandMark.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
+  import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -30,6 +31,7 @@
   const version = `v${import.meta.env.VITE_APP_VERSION ?? 'dev'}`;
   const automaticUpdateChecksSupported = supportsAutoUpdate() || hostsServiceWorker();
   let info = $state<{ homeserver: string; server: HomeserverSoftwareView | null } | null>(null);
+  let confirmingReset = $state(false);
   let resetting = $state(false);
   let resetFailed = $state(false);
   let restarting = $state(false);
@@ -226,7 +228,13 @@
         title={$i18n.t('settings.aboutResetCache')}
         description={$i18n.t('settings.aboutResetCacheHint')}
       >
-        <Button size="small" loading={resetting} onclick={resetCaches}>
+        <Button
+          size="small"
+          loading={resetting}
+          onclick={() => {
+            confirmingReset = true;
+          }}
+        >
           {$i18n.t('settings.aboutReset')}
         </Button>
       </SettingsRow>
@@ -236,6 +244,15 @@
     </ul>
   </SettingsSection>
 </div>
+
+<ConfirmDialog
+  bind:open={confirmingReset}
+  title={$i18n.t('settings.aboutResetCacheConfirmTitle')}
+  description={$i18n.t('settings.aboutResetCacheConfirmDescription')}
+  confirmLabel={$i18n.t('settings.aboutReset')}
+  busy={resetting}
+  onConfirm={() => void resetCaches()}
+/>
 
 <style>
   .about-page {
