@@ -388,7 +388,7 @@ html {
   --room-column-min-width: 24rem;
   --side-panel-min-width: 14rem;
   --resize-handle: 4px;
-  --mac-traffic-lights: 4.5rem;
+  --mac-traffic-lights: 5.5rem;
 
   /* Keep rem-based geometry independent of Android Chrome's text-size default. */
   font-size: calc(16px * var(--font-scale));
