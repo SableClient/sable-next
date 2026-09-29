@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Component } from 'svelte';
   import { resolve } from '$app/paths';
-  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import type {
     NotificationModeView,
@@ -70,7 +69,7 @@
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
   import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
-  import { scopedSearchPath } from '#lib/features/room/room-navigation.js';
+  import { goToPage, scopedSearchPath } from '#lib/features/room/room-navigation.js';
   import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
@@ -239,7 +238,7 @@
     if (onNavigate) {
       onNavigate(href);
     } else {
-      void goto(href);
+      goToPage(href);
     }
   }
 

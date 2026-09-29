@@ -148,6 +148,12 @@
     settleDrawer();
   }
 
+  function revealCurrentPage(event: MouseEvent) {
+    if (appLayout.matches || !(event.target instanceof Element)) return;
+    const link = event.target.closest('a[href]');
+    if (link instanceof HTMLAnchorElement && link.pathname === pathname) setOpen(false);
+  }
+
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -196,7 +202,12 @@
       ? undefined
       : `translate3d(${String(position)}px, 0, 0)`}
   >
-    <section class="drawer-panel navigation-panel" inert={!open || appLayout.matches}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <section
+      class="drawer-panel navigation-panel"
+      inert={!open || appLayout.matches}
+      onclick={revealCurrentPage}
+    >
       {#if !appLayout.matches}
         <SidebarNav mobile />
       {/if}

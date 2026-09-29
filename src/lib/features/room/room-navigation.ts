@@ -45,6 +45,15 @@ export function backToRoomList(): void {
   void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'open' } });
 }
 
+export function goToPage(href: string): void {
+  const samePage = new URL(href, page.url.href).pathname === page.url.pathname;
+  if (samePage && !window.matchMedia(BREAKPOINTS.appLayout).matches) {
+    void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'closed' } });
+    return;
+  }
+  void goto(href);
+}
+
 export function scopedSearchQuery(
   operator: 'in' | 'space',
   room: RoomSummary | undefined,

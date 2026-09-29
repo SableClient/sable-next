@@ -127,3 +127,17 @@ test('mobile: scrolling a page into view behind the open list cannot shift the d
 
   expect(await page.locator('.drawer-viewport').evaluate((node) => node.scrollLeft)).toBe(0);
 });
+
+test('mobile: tapping the current page in the list closes the list', async ({
+  page,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.goto('/direct');
+  const drawer = page.locator('#drawer-toggle');
+  await expect(drawer).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 });
+
+  await page.locator('.navigation-panel a[href="/direct"]').first().click();
+  await expect(drawer).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByLabel('User id')).toBeVisible();
+});
