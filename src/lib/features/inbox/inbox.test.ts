@@ -181,7 +181,7 @@ test('an invite without a sender still lists', () => {
     inviter(
       room({
         state: 'invited',
-        latest_event: { sender: '@a:x', body: null, timestamp: 1, sending: false, event_id: null },
+        latest_event: { sender: '@a:x', body: '', timestamp: 1, sending: false, event_id: null },
       })
     )
   ).toBe('@a:x');
