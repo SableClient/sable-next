@@ -205,7 +205,7 @@ set: boolean } | { type: "set_pusher"; pusher: PusherView } | { type: "remove_pu
 /**  The homeserver's web push support: a VAPID key means server delivery. */
 { type: "web_pusher_support" } | { type: "set_web_pusher"; pusher: WebPusherView } | { type: "web_pushers" } | { type: "ping_push_gateway"; url: string } | { type: "send_diagnostic_push"; pushkey: string; app_id: string } | { type: "ack_web_pusher"; app_id: string; ack_token: string } |
 /**  Mirrors the reader's choice so a native shell can apply it too. */
-{ type: "set_notification_content"; visible: boolean; encrypted: boolean } | { type: "set_notification_sounds"; enabled: boolean } | { type: "set_notify_once"; enabled: boolean } | { type: "set_notifications_enabled"; enabled: boolean } | { type: "set_search_options"; disk_budget_mb: number; crawler: boolean; server_search: boolean } | { type: "set_read_room"; room_id: string | null } | { type: "set_presence"; presence: PresenceView; status_message: string | null } |
+{ type: "set_notification_content"; visible: boolean; encrypted: boolean } | { type: "set_notification_sounds"; enabled: boolean } | { type: "set_notify_once"; enabled: boolean } | { type: "set_notifications_enabled"; enabled: boolean } | { type: "set_search_options"; disk_budget_mb: number; crawler: boolean; server_search: boolean; tuning: SearchTuning; foreground: boolean } | { type: "set_read_room"; room_id: string | null } | { type: "set_presence"; presence: PresenceView; status_message: string | null } |
 /**  Fills in users the presence poll has not pushed yet. */
 { type: "fetch_presence"; user_ids: string[] } | { type: "set_room_notification_mode"; room_id: string;
 /**  `null` drops the room's own rules so it follows the default again. */
@@ -1019,7 +1019,7 @@ export type SearchCoverageView = {
 	state: SearchCoverageState,
 };
 
-export type SearchCrawlPhase = "starting" | "crawling" | "trickling" | "yielding" | "backing_off" | "idle" | "budget_spent" | "index_full";
+export type SearchCrawlPhase = "starting" | "crawling" | "trickling" | "yielding" | "paused" | "backing_off" | "idle" | "budget_spent" | "index_full";
 
 export type SearchFilter = {
 	rooms: string[],
@@ -1078,6 +1078,15 @@ export type SearchMetricsView = {
 };
 
 export type SearchOrder = "rank" | "recent" | "oldest";
+
+export type SearchTuning = {
+	crawl_pause_ms: number,
+	trickle_pause_ms: number,
+	flush_interval_secs: number,
+	batch: number,
+	base_events: number,
+	max_events: number,
+};
 
 export type SendBlockView = { kind: "identity_changed"; user_ids: string[] } | { kind: "verify_this_device" };
 

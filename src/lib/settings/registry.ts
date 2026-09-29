@@ -72,7 +72,17 @@ import { presentsInApp } from '#lib/platform/notifications.js';
 import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
-import { SEARCH_INDEX_LIMITS, setPreference, SUBSPACE_DEPTHS } from './preferences.svelte';
+import {
+  SEARCH_BASE_EVENTS,
+  SEARCH_BATCH_SIZES,
+  SEARCH_CRAWL_PAUSES,
+  SEARCH_FLUSH_INTERVALS,
+  SEARCH_INDEX_LIMITS,
+  SEARCH_MAX_EVENTS,
+  SEARCH_TRICKLE_PAUSES,
+  setPreference,
+  SUBSPACE_DEPTHS,
+} from './preferences.svelte';
 import type { FreeTextPreference, Preferences, RangePreference } from './preferences.svelte';
 
 export type BooleanPreference = {
@@ -1413,6 +1423,90 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.developerTools',
         description: 'settings.developerToolsHint',
         type: 'boolean',
+      },
+      {
+        key: 'searchCrawlPause',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchCrawlPause',
+        description: 'settings.searchCrawlPauseHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_CRAWL_PAUSES.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchTricklePause',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchTricklePause',
+        description: 'settings.searchTricklePauseHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_TRICKLE_PAUSES.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchFlushInterval',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchFlushInterval',
+        description: 'settings.searchFlushIntervalHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_FLUSH_INTERVALS.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchBatchSize',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchBatchSize',
+        description: 'settings.searchBatchSizeHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_BATCH_SIZES.map((value) => ({
+          value,
+          label: `${value} events`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchBaseEvents',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchBaseEvents',
+        description: 'settings.searchBaseEventsHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_BASE_EVENTS.map((value) => ({
+          value,
+          label: `${value} events`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchMaxEvents',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchMaxEvents',
+        description: 'settings.searchMaxEventsHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_MAX_EVENTS.map((value) => ({
+          value,
+          label: `${value} events`,
+          literal: true,
+        })),
       },
       {
         key: 'showHiddenEvents',

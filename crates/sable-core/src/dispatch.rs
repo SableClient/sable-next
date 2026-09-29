@@ -2160,7 +2160,11 @@ impl Core {
                 disk_budget_mb,
                 crawler,
                 server_search,
+                tuning,
+                foreground,
             } => {
+                self.search_foreground.store(foreground, Ordering::Relaxed);
+                self.search_crawl.lock().await.tuning = tuning.clamped();
                 self.search_crawler_enabled
                     .store(crawler, Ordering::Relaxed);
                 self.server_search_enabled

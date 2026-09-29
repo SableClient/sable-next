@@ -44,6 +44,7 @@
     crawling: 'settings.developerSearchPhaseCrawling',
     trickling: 'settings.developerSearchPhaseTrickling',
     yielding: 'settings.developerSearchPhaseYielding',
+    paused: 'settings.developerSearchPhasePaused',
     backing_off: 'settings.developerSearchPhaseBackingOff',
     idle: 'settings.developerSearchPhaseIdle',
     budget_spent: 'settings.developerSearchPhaseBudgetSpent',

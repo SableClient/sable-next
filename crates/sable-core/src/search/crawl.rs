@@ -14,11 +14,12 @@ use super::persist::{self, StoredCrawlRoom};
 use crate::Core;
 use crate::protocol::{
     CoreEvent, SearchCoverageState, SearchCoverageView, SearchCrawlPhase, SearchMetricsView,
+    SearchTuning,
 };
 
 const CRAWL_BATCH: u16 = 100;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
-const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(2);
+const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 200_000;
@@ -26,6 +27,43 @@ const CRAWL_TRICKLE_PAUSE: Duration = Duration::from_secs(10);
 const BLIND_EVENTS_BEFORE_SKIP: usize = 200;
 const CRAWL_BACKOFF_CAP: Duration = Duration::from_mins(5);
 const PUSHBACKS_BEFORE_SKIP: u32 = 5;
+
+const PERSIST_INTERVAL_SECS: u32 = 60;
+
+impl Default for SearchTuning {
+    fn default() -> Self {
+        Self {
+            crawl_pause_ms: duration_ms(CRAWL_READABLE_PAUSE),
+            trickle_pause_ms: duration_ms(CRAWL_TRICKLE_PAUSE),
+            flush_interval_secs: PERSIST_INTERVAL_SECS,
+            batch: u32::from(CRAWL_BATCH),
+            base_events: u32::try_from(CRAWL_BASE_EVENTS).unwrap_or(u32::MAX),
+            max_events: u32::try_from(MAX_CRAWLED_EVENTS).unwrap_or(u32::MAX),
+        }
+    }
+}
+
+fn duration_ms(duration: Duration) -> u32 {
+    u32::try_from(duration.as_millis()).unwrap_or(u32::MAX)
+}
+
+impl SearchTuning {
+    pub(crate) fn clamped(self) -> Self {
+        let base_events = self.base_events.clamp(1_000, 1_000_000);
+        Self {
+            crawl_pause_ms: self.crawl_pause_ms.clamp(500, 60_000),
+            trickle_pause_ms: self.trickle_pause_ms.clamp(1_000, 300_000),
+            flush_interval_secs: self.flush_interval_secs.clamp(10, 3_600),
+            batch: self.batch.clamp(10, u32::from(CRAWL_BATCH)),
+            base_events,
+            max_events: self.max_events.clamp(base_events, 2_000_000),
+        }
+    }
+
+    pub(crate) fn flush_interval(&self) -> Duration {
+        Duration::from_secs(u64::from(self.flush_interval_secs))
+    }
+}
 
 enum Pushback {
     Transient(Option<Duration>),
@@ -65,6 +103,7 @@ pub(crate) struct CrawlProgress {
     events: usize,
     changed: bool,
     metrics: CrawlMetrics,
+    pub(crate) tuning: SearchTuning,
 }
 
 #[derive(Default)]
@@ -99,16 +138,18 @@ impl CrawlProgress {
     }
 
     const fn spent(&self) -> bool {
-        self.events >= MAX_CRAWLED_EVENTS
+        self.events >= self.tuning.max_events as usize
     }
 
     const fn trickling(&self) -> bool {
-        self.events >= CRAWL_BASE_EVENTS
+        self.events >= self.tuning.base_events as usize
     }
 
     fn paced(&self, pause: Duration) -> Duration {
         if self.trickling() {
-            pause.max(CRAWL_TRICKLE_PAUSE)
+            pause.max(Duration::from_millis(u64::from(
+                self.tuning.trickle_pause_ms,
+            )))
         } else {
             pause
         }
@@ -268,7 +309,7 @@ impl CrawlProgress {
 
     #[cfg(test)]
     pub(super) const fn exhaust_budget_for_test(&mut self) {
-        self.events = MAX_CRAWLED_EVENTS;
+        self.events = self.tuning.max_events as usize;
     }
 }
 
@@ -303,6 +344,18 @@ impl Core {
             }
 
             self.save_changed_checkpoints(client).await;
+
+            if !self
+                .search_foreground
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                self.search_crawl
+                    .lock()
+                    .await
+                    .enter(SearchCrawlPhase::Paused);
+                matrix_sdk::sleep::sleep(CRAWL_PAUSE).await;
+                continue;
+            }
 
             if self.foreground_paginations() > 0 {
                 self.search_crawl
@@ -346,7 +399,7 @@ impl Core {
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
                     progress.settle(room_id, outcome.exhausted);
-                    outcome.pause()
+                    outcome.pause(&progress.tuning)
                 }
                 Ok(outcome) => {
                     let mut progress = self.search_crawl.lock().await;
@@ -354,7 +407,7 @@ impl Core {
                     if progress.blinded(&room_id, outcome.undecryptable) {
                         progress.settle(room_id, false);
                     }
-                    outcome.pause()
+                    outcome.pause(&progress.tuning)
                 }
                 Err(error) => {
                     if let Some(delay) = self.settle_pushback(&room_id, &error).await {
@@ -513,7 +566,7 @@ impl Core {
             rooms_blind: progress.blind_rooms(),
             rooms_unreadable,
             events_crawled: progress.events,
-            event_budget: MAX_CRAWLED_EVENTS,
+            event_budget: progress.tuning.max_events as usize,
             batches: metrics.batches,
             pushbacks: metrics.pushbacks,
             last_request_ms: metrics.last_request_ms,
@@ -594,14 +647,16 @@ impl Core {
             return Ok(CrawlOutcome::gone());
         };
 
-        let from = self
-            .search_crawl
-            .lock()
-            .await
-            .token_or(room_id, room.last_prev_batch());
+        let (from, batch) = {
+            let progress = self.search_crawl.lock().await;
+            (
+                progress.token_or(room_id, room.last_prev_batch()),
+                progress.tuning.batch,
+            )
+        };
 
         let mut options = MessagesOptions::backward().from(from.as_deref());
-        options.limit = UInt::from(CRAWL_BATCH);
+        options.limit = UInt::from(batch);
         let requested = now_ms();
         let messages = room.messages(options).await?;
 
@@ -693,11 +748,12 @@ impl CrawlOutcome {
         }
     }
 
-    const fn pause(&self) -> Duration {
+    fn pause(&self, tuning: &SearchTuning) -> Duration {
+        let readable = Duration::from_millis(u64::from(tuning.crawl_pause_ms));
         if self.readable {
-            CRAWL_READABLE_PAUSE
+            readable
         } else {
-            CRAWL_PAUSE
+            CRAWL_PAUSE.max(readable)
         }
     }
 }
@@ -741,10 +797,39 @@ mod tests {
     }
 
     #[test]
+    fn test_tuning_is_clamped_so_the_crawl_cannot_be_driven_out_of_bounds() {
+        let wild = crate::protocol::SearchTuning {
+            crawl_pause_ms: 0,
+            trickle_pause_ms: u32::MAX,
+            flush_interval_secs: 0,
+            batch: 5_000,
+            base_events: 10,
+            max_events: 1,
+        };
+        let tuning = wild.clamped();
+        assert_eq!(tuning.crawl_pause_ms, 500);
+        assert_eq!(tuning.trickle_pause_ms, 300_000);
+        assert_eq!(tuning.flush_interval_secs, 10);
+        assert_eq!(tuning.batch, u32::from(CRAWL_BATCH));
+        assert!(tuning.max_events >= tuning.base_events);
+        assert_eq!(
+            crate::protocol::SearchTuning::default().clamped(),
+            crate::protocol::SearchTuning::default()
+        );
+    }
+
+    #[test]
     fn test_only_a_batch_with_an_undecryptable_event_earns_the_long_pause() {
-        assert_eq!(outcome(true).pause(), CRAWL_READABLE_PAUSE);
-        assert_eq!(outcome(false).pause(), CRAWL_PAUSE);
-        assert!(CRAWL_READABLE_PAUSE < CRAWL_PAUSE);
+        let tuning = crate::protocol::SearchTuning {
+            crawl_pause_ms: 1_000,
+            ..crate::protocol::SearchTuning::default()
+        };
+        assert_eq!(outcome(true).pause(&tuning), Duration::from_secs(1));
+        assert_eq!(outcome(false).pause(&tuning), CRAWL_PAUSE);
+        assert_eq!(
+            outcome(true).pause(&crate::protocol::SearchTuning::default()),
+            CRAWL_READABLE_PAUSE
+        );
     }
 
     #[test]

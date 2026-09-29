@@ -426,7 +426,16 @@
       .setSearchOptions(
         Number(preferences.searchIndexLimit),
         preferences.searchCrawler,
-        preferences.serverSearch
+        preferences.serverSearch,
+        {
+          crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,
+          trickle_pause_ms: Number(preferences.searchTricklePause) * 1000,
+          flush_interval_secs: Number(preferences.searchFlushInterval),
+          batch: Number(preferences.searchBatchSize),
+          base_events: Number(preferences.searchBaseEvents),
+          max_events: Number(preferences.searchMaxEvents),
+        },
+        documentVisible
       )
       .catch(() => {});
   });

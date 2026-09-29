@@ -62,7 +62,6 @@ const CLASSIFIED_OVERHEAD: usize = 96;
 const PINNED_FETCH_CONCURRENCY: usize = 4;
 
 const INITIAL_DOCUMENTS: usize = 64;
-const PERSIST_INTERVAL: Duration = Duration::from_secs(60);
 const CHANGES_BEFORE_FLUSH: usize = 32;
 const TICKS_BEFORE_FLUSH: u32 = 5;
 const CHUNK_WEIGHT: usize = 8_000;
@@ -2577,7 +2576,8 @@ impl Core {
         self.track_session_task(
             spawn(async move {
                 loop {
-                    matrix_sdk::sleep::sleep(PERSIST_INTERVAL).await;
+                    let interval = core.search_crawl.lock().await.tuning.flush_interval();
+                    matrix_sdk::sleep::sleep(interval).await;
                     core.flush_due_search_index(&client).await;
                 }
             })

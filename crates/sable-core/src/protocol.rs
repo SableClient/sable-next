@@ -962,6 +962,8 @@ pub enum Command {
         disk_budget_mb: u32,
         crawler: bool,
         server_search: bool,
+        tuning: SearchTuning,
+        foreground: bool,
     },
     SetReadRoom {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
@@ -2087,6 +2089,17 @@ pub struct SearchCoverageView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub rooms_failed: usize,
     pub state: SearchCoverageState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct SearchTuning {
+    pub crawl_pause_ms: u32,
+    pub trickle_pause_ms: u32,
+    pub flush_interval_secs: u32,
+    pub batch: u32,
+    pub base_events: u32,
+    pub max_events: u32,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]

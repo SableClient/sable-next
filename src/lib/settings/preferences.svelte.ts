@@ -25,6 +25,12 @@ export const SEARCH_INDEX_LIMITS: readonly SearchIndexLimit[] = [
   '2048',
   '4096',
 ];
+export const SEARCH_CRAWL_PAUSES = ['1', '2', '3', '5', '10', '30'] as const;
+export const SEARCH_TRICKLE_PAUSES = ['5', '10', '30', '60'] as const;
+export const SEARCH_FLUSH_INTERVALS = ['20', '60', '120', '300'] as const;
+export const SEARCH_BATCH_SIZES = ['25', '50', '100'] as const;
+export const SEARCH_BASE_EVENTS = ['5000', '10000', '20000', '50000'] as const;
+export const SEARCH_MAX_EVENTS = ['50000', '100000', '200000', '500000'] as const;
 export type SubspaceDepth = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10';
 export const SUBSPACE_DEPTHS = [
   '2',
@@ -80,6 +86,12 @@ export interface Preferences {
   roomBannerHeight: number;
   subspaceHierarchyLimit: SubspaceDepth;
   searchIndexLimit: SearchIndexLimit;
+  searchCrawlPause: (typeof SEARCH_CRAWL_PAUSES)[number];
+  searchTricklePause: (typeof SEARCH_TRICKLE_PAUSES)[number];
+  searchFlushInterval: (typeof SEARCH_FLUSH_INTERVALS)[number];
+  searchBatchSize: (typeof SEARCH_BATCH_SIZES)[number];
+  searchBaseEvents: (typeof SEARCH_BASE_EVENTS)[number];
+  searchMaxEvents: (typeof SEARCH_MAX_EVENTS)[number];
   searchCrawler: boolean;
   serverSearch: boolean;
   showHome: boolean;
@@ -243,6 +255,12 @@ const ENUMS = {
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   subspaceHierarchyLimit: SUBSPACE_DEPTHS,
   searchIndexLimit: SEARCH_INDEX_LIMITS,
+  searchCrawlPause: SEARCH_CRAWL_PAUSES,
+  searchTricklePause: SEARCH_TRICKLE_PAUSES,
+  searchFlushInterval: SEARCH_FLUSH_INTERVALS,
+  searchBatchSize: SEARCH_BATCH_SIZES,
+  searchBaseEvents: SEARCH_BASE_EVENTS,
+  searchMaxEvents: SEARCH_MAX_EVENTS,
   pixelatedImages: ['always', 'smart', 'never'],
   nameColorCorrection: ['strong', 'weak', 'off'],
   pronounPillLimit: ['1', '2', '3', 'all'],
@@ -310,6 +328,12 @@ const DEFAULTS: Preferences = {
   roomBannerHeight: 190,
   subspaceHierarchyLimit: '3',
   searchIndexLimit: '512',
+  searchCrawlPause: '3',
+  searchTricklePause: '10',
+  searchFlushInterval: '60',
+  searchBatchSize: '100',
+  searchBaseEvents: '20000',
+  searchMaxEvents: '200000',
   searchCrawler: true,
   serverSearch: true,
   showHome: false,

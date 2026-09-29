@@ -63,6 +63,7 @@ import type {
   SearchFilter,
   SearchHitView,
   SearchMetricsView,
+  SearchTuning,
   SearchOrder,
   SidebarItemView,
   SignOutSafetyView,
@@ -1607,7 +1608,9 @@ export function createCommands(transport: () => Transport) {
     async setSearchOptions(
       diskBudgetMb: number,
       crawler: boolean,
-      serverSearch: boolean
+      serverSearch: boolean,
+      tuning: SearchTuning,
+      foreground: boolean
     ): Promise<void> {
       await transport().send({
         type: 'set_search_options',
