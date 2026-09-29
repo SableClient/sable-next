@@ -4,6 +4,7 @@
     ImageSourcePackView,
     MemberView,
     MessageKind,
+    PerMessageProfileView,
     PersonaView,
     TimelineItemView,
   } from '#src/generated/protocol';
@@ -42,7 +43,11 @@
     canRedactOwn?: boolean;
     canRedactOthers?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onSenderProfile?: (
+      userId: string,
+      anchor: HTMLElement,
+      pmp?: PerMessageProfileView | null
+    ) => void;
     onToggleReaction?: (
       eventId: string,
       key: string,

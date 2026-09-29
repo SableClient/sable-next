@@ -4,7 +4,11 @@
   import { fade } from 'svelte/transition';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type {
+    MemberView,
+    PerMessageProfileView,
+    TimelineItemView,
+  } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
@@ -72,7 +76,11 @@
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onSenderProfile?: (
+      userId: string,
+      anchor: HTMLElement,
+      pmp?: PerMessageProfileView | null
+    ) => void;
     onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -82,7 +90,6 @@
     onJumpToEvent?: (eventId: string) => void;
     onJumpToLive?: () => void;
     onOpenMedia?: (eventId: string) => void;
-    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
@@ -126,7 +133,6 @@
     onJumpToEvent,
     onJumpToLive,
     onOpenMedia,
-    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     readOnly = false,
@@ -714,7 +720,6 @@
                     alignOwn={preferences.alignOwnMessages}
                     {onJumpToEvent}
                     {onOpenMedia}
-                    {onPersonaAvatarClick}
                     {onVotePoll}
                     {onEndPoll}
                     {events}

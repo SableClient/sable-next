@@ -47,7 +47,6 @@
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { useMessageMenu } from '../messages/message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
-  import PersonaProfile from '../members/PersonaProfile.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
   import { trailingReceipt } from './receipt-fit';
   import SenderName from '../members/SenderName.svelte';
@@ -80,7 +79,11 @@
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onSenderProfile?: (
+      userId: string,
+      anchor: HTMLElement,
+      pmp?: PerMessageProfileView | null
+    ) => void;
     onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -99,11 +102,10 @@
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
-    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     events?: TimelineEventIndex;
-    onPersonaOpenChange?: (open: boolean) => void;
+    onPersonaOpenChange?: (open: boolean) => void; // TODO: Misleading Name
     placeholder?: boolean;
     placeholderCharacters?: number;
   }
@@ -143,7 +145,6 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
-    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     events,
@@ -448,7 +449,7 @@
   });
 
   function openSenderProfileAt(anchor: HTMLElement): void {
-    if (item.sender) onSenderProfile?.(item.sender, anchor);
+    if (item.sender) onSenderProfile?.(item.sender, anchor, persona);
   }
 
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
@@ -464,11 +465,6 @@
 
   function mentionSender(): void {
     if (item.sender) onMentionUser?.(item.sender, accountName);
-  }
-
-  function openAccountFromPersona(anchor: HTMLElement | null): void {
-    const target = anchor ?? messageRow;
-    if (item.sender && target) onSenderProfile?.(item.sender, target);
   }
 </script>
 
@@ -613,25 +609,7 @@
         {/if}
       </div>
     {:else if !collapsed}
-      {#if persona && item.sender}
-        <PersonaProfile
-          profile={persona}
-          accountId={item.sender}
-          {accountName}
-          label={$i18n.t('timeline.personaProfile', { name: senderName })}
-          onOpenAccount={openAccountFromPersona}
-          onAvatarClick={onPersonaAvatarClick}
-          onOpenChange={onPersonaOpenChange}
-        >
-          <Avatar
-            class="message-avatar"
-            src={senderAvatar}
-            size="small"
-            id={personaTint ? null : item.sender}
-            name={senderName}
-          />
-        </PersonaProfile>
-      {:else if item.sender && onSenderProfile}
+      {#if item.sender && onSenderProfile}
         <button
           class="avatar-button"
           type="button"

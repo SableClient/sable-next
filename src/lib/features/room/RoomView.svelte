@@ -6,6 +6,7 @@
     MembershipView,
     RoomSummary,
     CallSupportView,
+    PerMessageProfileView,
   } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -555,9 +556,17 @@
     composer?.insertMention(userId, name);
   }
 
-  function openProfile(userId: string, anchor: HTMLElement): void {
-    void loadMembers();
-    void memberProfile.show(userId, anchor);
+  function openProfile(
+    userId: string,
+    anchor: HTMLElement,
+    pmp?: PerMessageProfileView | null
+  ): void {
+    if (pmp) {
+      memberProfile.showPmp(userId, anchor, pmp);
+    } else {
+      void loadMembers();
+      void memberProfile.show(userId, anchor);
+    }
   }
 
   function handleMatrixLink(link: MatrixLink, anchor: HTMLAnchorElement): void {
@@ -821,7 +830,6 @@
       onJumpToEvent={jumpToEvent}
       onJumpToLive={jumpToLive}
       onOpenMedia={openMedia}
-      onPersonaAvatarClick={openProfileAvatar}
       onVotePoll={conversation.votePoll}
       onEndPoll={conversation.endPoll}
       readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
@@ -1271,6 +1279,7 @@
     permissions={roomSession.permissions}
     powerTags={roomSession.powerTags}
     profile={memberProfile.profile}
+    pmp={memberProfile.pmp}
     failed={memberProfile.failed}
     onAvatarClick={openProfileAvatar}
     onMatrixLink={handleMatrixLink}
