@@ -50,7 +50,7 @@
   }
 
   @media (hover: hover) and (pointer: fine) {
-    li:hover {
+    .row:hover {
       background: var(--bg-container-hover);
     }
   }
