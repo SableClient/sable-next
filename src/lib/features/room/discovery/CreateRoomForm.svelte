@@ -67,8 +67,8 @@
 
   let spaces = $derived(roomList.rooms.filter((room) => room.is_space && room.state === 'joined'));
   let effectiveKind = $derived(mode === 'space' ? 'space' : kind);
-  // The core ignores `encrypted` for a space or a public room.
-  let encryptable = $derived(effectiveKind !== 'space' && access === 'private');
+  // Encryption is unavailable only to public rooms.
+  let encryptable = $derived(access === 'private');
   let parentSpaceSummary = $derived(spaces.find((space) => space.room_id === parentSpace) ?? null);
   let knockSupported = $derived(roomList.rooms.some((room) => room.supports_knock));
   let restrictedSupported = $derived(parentSpaceSummary?.supports_restricted ?? false);

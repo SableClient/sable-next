@@ -23,7 +23,7 @@ use matrix_sdk_ui::sync_service::{State as SyncState, SyncService};
 use serde_json::json;
 use wiremock::{
     Mock, ResponseTemplate,
-    matchers::{method, path, path_regex},
+    matchers::{body_partial_json, method, path, path_regex},
 };
 
 use super::{
@@ -3038,6 +3038,57 @@ async fn a_new_calendar_room_is_set_up_by_its_creator() {
             kind: crate::protocol::CreateRoomKind::Calendar,
             public: false,
             encrypted: false,
+            invite: Vec::new(),
+            parent_space: None,
+            alias: None,
+            room_version: None,
+            join_rule: None,
+            federate: true,
+        })
+        .await
+        .unwrap();
+
+    assert!(matches!(response, CommandOk::CreateRoom { .. }));
+}
+
+#[tokio::test]
+async fn an_encrypted_private_space_includes_encryption_in_its_creation_request() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    Mock::given(method("POST"))
+        .and(path("/_matrix/client/v3/createRoom"))
+        .and(body_partial_json(json!({
+            "creation_content": { "type": "m.space" },
+            "initial_state": [{
+                "type": "m.room.encryption",
+                "state_key": "",
+                "content": { "algorithm": "m.megolm.v1.aes-sha2" }
+            }]
+        })))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(json!({ "room_id": "!space:example.org" })),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".to_owned(),
+        client,
+        sync_service,
+        homeserver: server.server().uri(),
+        oauth: false,
+    });
+
+    let response = core
+        .dispatch(Command::CreateRoom {
+            name: Some("Private space".to_owned()),
+            topic: None,
+            kind: crate::protocol::CreateRoomKind::Space,
+            public: false,
+            encrypted: true,
             invite: Vec::new(),
             parent_space: None,
             alias: None,

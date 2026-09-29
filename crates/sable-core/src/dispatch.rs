@@ -2787,7 +2787,7 @@ impl Core {
 
                 // Anyone can join and read a public room, so encryption only
                 // breaks previews.
-                if encrypted && !public && !matches!(kind, CreateRoomKind::Space) {
+                if encrypted && !public {
                     request.initial_state.push(
                         InitialStateEvent::with_empty_state_key(
                             RoomEncryptionEventContent::with_recommended_defaults(),
