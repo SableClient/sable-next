@@ -28,7 +28,6 @@
   import HashIcon from 'phosphor-svelte/lib/HashIcon';
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import HouseIcon from 'phosphor-svelte/lib/HouseIcon';
-  import ListMagnifyingGlassIcon from 'phosphor-svelte/lib/ListMagnifyingGlassIcon';
   import MagnifyingGlassIcon from 'phosphor-svelte/lib/MagnifyingGlassIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
@@ -67,7 +66,6 @@
     showsRoomAvatar,
   } from '#lib/features/room/settings/room-appearance.svelte.js';
   import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
-  import { paletteState } from '#lib/ui/shortcuts/palette-state.svelte.js';
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { goToPage, scopedSearchPath } from '#lib/features/room/room-navigation.js';
   import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
@@ -621,14 +619,6 @@
               <LockSimpleIcon />
             </span>
           {/if}
-          <button
-            type="button"
-            class="room-nav-menu"
-            aria-label={$i18n.t('shortcuts.openRoomSearch')}
-            onclick={() => (paletteState.open = true)}
-          >
-            <ListMagnifyingGlassIcon />
-          </button>
           <ActionMenu label={$i18n.t('nav.listOptions')}>
             {#snippet trigger({ props })}
               <button
