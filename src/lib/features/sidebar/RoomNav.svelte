@@ -10,6 +10,7 @@
   } from '#src/generated/protocol';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
   import {
     findRoomByPathId,
     roomAvatarUrl,
@@ -20,6 +21,7 @@
   } from '#lib/rooms/room-list.svelte.js';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
+  import ChatCircleIcon from 'phosphor-svelte/lib/ChatCircleIcon';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import CompassIcon from 'phosphor-svelte/lib/CompassIcon';
   import BellIcon from 'phosphor-svelte/lib/BellIcon';
@@ -841,6 +843,20 @@
         {@render roomTrigger({ props: {} })}
         {#if room}
           <span class="room-options-slot">
+            {#if room.is_voice}
+              <button
+                class="room-options-trigger"
+                type="button"
+                aria-label={$i18n.t(active && voiceChat.open ? 'call.hideChat' : 'call.showChat')}
+                aria-pressed={active && voiceChat.open}
+                onclick={() => {
+                  voiceChat.open = !(active && voiceChat.open);
+                  if (!active) navigateTo(href);
+                }}
+              >
+                <ChatCircleIcon weight={active && voiceChat.open ? 'fill' : 'regular'} />
+              </button>
+            {/if}
             <RoomOptionsMenu
               {room}
               parentSpaceId={item.parentSpaceId ?? null}

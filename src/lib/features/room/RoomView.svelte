@@ -11,6 +11,7 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
 
+  import { voiceChat } from '#lib/features/room/voice-chat.svelte.js';
   import ChatsIcon from 'phosphor-svelte/lib/ChatsIcon';
   import ImagesIcon from 'phosphor-svelte/lib/ImagesIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
@@ -344,7 +345,6 @@
   let callStageRatio = $state(CALL_STAGE_DEFAULT_RATIO);
   let timelineHeight = $state(0);
   let isVoiceRoom = $derived(resolvedRoom?.is_voice ?? false);
-  let voiceChatOpen = $state(false);
   let voiceChatWidth = $state(VOICE_CHAT_DEFAULT_WIDTH);
   let callShown = $derived(call.roomId === resolvedRoomId && (call.active || call.failure));
   let roomName = $derived(resolvedRoom ? roomLabel(resolvedRoom) : roomId);
@@ -416,8 +416,8 @@
   let pinsOpen = $state(false);
   let pinsUnread = $state(0);
   let desktop = $derived(sidePanels.matches);
-  let voiceView = $derived(isVoiceRoom && (!voiceChatOpen || desktop));
-  let voiceChatBeside = $derived(isVoiceRoom && voiceChatOpen && desktop);
+  let voiceView = $derived(isVoiceRoom && (!voiceChat.open || desktop));
+  let voiceChatBeside = $derived(isVoiceRoom && voiceChat.open && desktop);
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
   let typingLabel = $derived.by(() => {
     if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
@@ -940,8 +940,8 @@
       membersOpen={desktop ? panels.desktopMembersOpen : panels.membersOpen}
       searchOpen={panels.searchOpen}
       onCall={callOffered && !isVoiceRoom ? startCall : null}
-      onToggleChat={isVoiceRoom ? () => (voiceChatOpen = !voiceChatOpen) : null}
-      chatOpen={voiceChatOpen}
+      onToggleChat={isVoiceRoom ? () => (voiceChat.open = !voiceChat.open) : null}
+      chatOpen={voiceChat.open}
       chatBeside={desktop}
       onBack={backToRoomList}
       onMembers={toggleMembers}
@@ -1053,7 +1053,7 @@
         {#snippet suffix()}
           <PanelHeaderButton
             label={$i18n.t('call.closeChat')}
-            onclick={() => (voiceChatOpen = false)}
+            onclick={() => (voiceChat.open = false)}
           >
             <XIcon />
           </PanelHeaderButton>
