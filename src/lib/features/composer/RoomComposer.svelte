@@ -22,7 +22,7 @@
   import type { ConversationSendResult } from '#lib/features/room/conversation/conversation.svelte.js';
   import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
-  import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, SCHEDULE_PRESS_MS, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
@@ -300,6 +300,7 @@
 
   const sendPress = new LongPress({
     enabled: () => canSchedule,
+    delayMs: SCHEDULE_PRESS_MS,
     onPress: () => {
       scheduleOpen = true;
     },
@@ -1449,6 +1450,8 @@
                     variant="ghost"
                     size="small"
                     class="composer-send"
+                    data-pressing={sendPress.pressing || undefined}
+                    style="--press-ms: {SCHEDULE_PRESS_MS}ms"
                     disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
                     label={sendLabel}
                     onpointercancel={sendPress.end}
@@ -1779,6 +1782,10 @@
     background: var(--surface-container-hover);
   }
 
+  :global(.composer-send[data-pressing]) {
+    background: var(--surface-container-hover);
+  }
+
   :global(.composer-send svg) {
     display: block;
     height: var(--icon-size-small);
@@ -1791,6 +1798,15 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    :global(.composer-send svg) {
+      transition: transform var(--motion-fast) var(--motion-easing-standard);
+    }
+
+    :global(.composer-send[data-pressing] svg) {
+      transform: scale(1.3);
+      transition: transform var(--press-ms) linear;
+    }
+
     .composer {
       transition: border-color var(--motion-fast) var(--motion-easing-standard);
     }

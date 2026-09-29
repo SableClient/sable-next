@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
-import { LONG_PRESS_MS } from '#lib/ui/long-press.svelte.js';
+import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import { cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
@@ -1102,7 +1102,7 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   const button = document.querySelector('.composer-send');
   if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
   await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
-  await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
+  await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
   await tick();
 
   expect(document.body.textContent).toContain('Schedule this message');

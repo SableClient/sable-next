@@ -2,11 +2,13 @@ import { hapticFeedback } from '#lib/platform/haptics.js';
 import { armTrailingClickSwallow, touchActive } from '#lib/ui/trailing-click.js';
 
 export const LONG_PRESS_MS = 600;
+export const SCHEDULE_PRESS_MS = 800;
 const LONG_PRESS_SLOP_PX = 10;
 
 export interface LongPressOptions {
   enabled?: () => boolean;
   stopPropagation?: boolean;
+  delayMs?: number;
   onPress: (event: MouseEvent) => void;
 }
 
@@ -79,7 +81,7 @@ export class LongPress {
       this.#timer = undefined;
       this.#origin = null;
       this.fire(event);
-    }, LONG_PRESS_MS);
+    }, this.options.delayMs ?? LONG_PRESS_MS);
   };
 
   fire(event: MouseEvent): void {
