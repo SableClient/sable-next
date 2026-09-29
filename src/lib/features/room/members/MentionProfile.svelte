@@ -68,6 +68,7 @@
   handleColor="var(--bg-container)"
   handleOpacity={1}
   contentInset={false}
+  class="mention-profile-popover"
   {onOpenChange}
   onCloseAutoFocus={handleCloseAutoFocus}
 >
@@ -90,3 +91,9 @@
     {/if}
   {/snippet}
 </ResponsivePopover>
+
+<style>
+  :global(.responsive-popover.mention-profile-popover) {
+    width: min(21rem, calc(100vw - 2rem));
+  }
+</style>

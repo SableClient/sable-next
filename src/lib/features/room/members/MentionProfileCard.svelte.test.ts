@@ -190,7 +190,7 @@ test('loads a member card avatar from the original media', async () => {
   });
 });
 
-test('sends a direct message from the composer', async () => {
+test('sends a direct message from the sheet composer', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   core.sendMessage.mockResolvedValue(undefined);
   render(MentionProfileCard, {
@@ -199,6 +199,7 @@ test('sends a direct message from the composer', async () => {
       roomId: '!room:example.org',
       member: null,
       profile: emptyProfile,
+      variant: 'sheet',
     },
   });
   await tick();
@@ -214,7 +215,7 @@ test('sends a direct message from the composer', async () => {
   });
 });
 
-test('opens the chat without sending when the composer is empty', async () => {
+test('opens the chat without sending from the Message button', async () => {
   core.createDm.mockResolvedValue('!dm:example.org');
   render(MentionProfileCard, {
     props: {
@@ -226,9 +227,7 @@ test('opens the chat without sending when the composer is empty', async () => {
   });
   await tick();
 
-  const submit = screen.getByRole('button', { name: 'Open chat' });
-  expect(submit).toBeEnabled();
-  await user.click(submit);
+  await user.click(screen.getByRole('button', { name: 'Message' }));
   await vi.waitFor(() => {
     expect(goto).toHaveBeenCalledWith(expect.stringContaining('/direct/'));
   });
@@ -708,65 +707,15 @@ test('lists mutual rooms in a menu of their own, with direct messages last', asy
       profile: emptyProfile,
     },
   });
-  await user.click(await screen.findByRole('button', { name: /2 mutual rooms/ }));
+  await user.click(await screen.findByRole('button', { name: /3 mutual rooms/ }));
   await tick();
   await tick();
 
   const names = [...document.querySelectorAll('.profile-mutual-name')].map(
     (node) => node.textContent
   );
-  expect(names).toEqual(['General', 'Alice']);
+  expect(names).toEqual(['Space', 'General', 'Alice']);
   expect(document.querySelector('.profile-card-bio')).toBeNull();
-});
-
-test('moves the mutual rooms and spaces into the overflow menu when the row cannot fit them', async () => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      constructor(private readonly callback: () => void) {}
-      observe(target: Element): void {
-        if (target.classList.contains('profile-card-actions')) this.callback();
-      }
-      unobserve(): void {}
-      disconnect(): void {}
-    }
-  );
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
-    this: HTMLElement
-  ) {
-    return this.classList.contains('profile-card-actions') ? 300 : 0;
-  });
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-    const width = this.classList.contains('profile-action') ? 120 : 0;
-    return DOMRect.fromRect({ width, height: 32 });
-  });
-  core.userRelations.mockResolvedValueOnce({
-    mutualRooms: [
-      { room_id: '!general:example.org', name: 'General', is_space: false },
-      { room_id: '!space:example.org', name: 'Space', is_space: true },
-    ],
-    ignored: false,
-  });
-  render(MentionProfileCard, {
-    props: {
-      userId: '@alice:example.org',
-      roomId: '!room:example.org',
-      member: null,
-      profile: emptyProfile,
-    },
-  });
-
-  await vi.waitFor(() => {
-    expect(core.userRelations).toHaveBeenCalled();
-  });
-  await user.click(screen.getByRole('button', { name: 'More actions' }));
-
-  expect(await screen.findByRole('menuitem', { name: /1 mutual room/ })).toBeTruthy();
-  expect(screen.getByRole('menuitem', { name: /1 mutual space/ })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: /1 mutual room/ })).toBeNull();
-  expect(screen.queryByRole('button', { name: /1 mutual space/ })).toBeNull();
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
 
 test('shows a misc field in full as JSON with developer tools on, and a preview without', async () => {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
+  import type { PresenceView } from '#src/generated/protocol';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import CopySimpleIcon from 'phosphor-svelte/lib/CopySimpleIcon';
 
@@ -9,6 +10,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import Avatar from './Avatar.svelte';
+  import PresenceDot from './PresenceDot.svelte';
   import {
     BLACK,
     WHITE,
@@ -33,13 +35,18 @@
     bannerUrl?: string | null;
     status?: string | null;
     statusEmoji?: string | null;
+    presence?: PresenceView | null;
+    presenceLabel?: string;
     nameColorLight?: string | null;
     nameColorDark?: string | null;
     nameFont?: string | null;
     variant?: 'popover' | 'sheet';
+    insetBody?: boolean;
     class?: ClassValue;
     meta?: Snippet;
     actions?: Snippet;
+    below?: Snippet;
+    headerAction?: Snippet;
     crest?: Snippet;
     pronouns?: Snippet;
     children?: Snippet;
@@ -60,13 +67,18 @@
     bannerUrl = null,
     status = null,
     statusEmoji = null,
+    presence = null,
+    presenceLabel = '',
     nameColorLight = null,
     nameColorDark = null,
     nameFont = null,
     variant = 'popover',
+    insetBody = false,
     class: className = '',
     meta,
     actions,
+    below,
+    headerAction,
     crest,
     children,
     footer,
@@ -100,6 +112,7 @@
     if (banner) onAvatarClick?.(banner, displayName);
   }
 
+  const nameId = $props.id();
   let copied = $state(false);
   async function copyUserId(): Promise<void> {
     await navigator.clipboard.writeText(userId);
@@ -111,7 +124,13 @@
 </script>
 
 <section
-  class={['profile-card', `profile-card-${variant}`, className]}
+  aria-labelledby={nameId}
+  class={[
+    'profile-card',
+    `profile-card-${variant}`,
+    { 'profile-card-inset-body': insetBody },
+    className,
+  ]}
   class:tinted
   class:tint-light={ink === BLACK}
   class:tint-dark={ink === WHITE}
@@ -152,13 +171,25 @@
     {/if}
   </div>
   <div class="profile-card-crest">
-    {#if canOpenAvatar}
-      <button
-        class="profile-card-avatar-button"
-        type="button"
-        aria-label={avatarLabel ?? displayName}
-        onclick={openAvatar}
-      >
+    <div class="profile-card-avatar-wrap">
+      {#if canOpenAvatar}
+        <button
+          class="profile-card-avatar-button"
+          type="button"
+          aria-label={avatarLabel ?? displayName}
+          onclick={openAvatar}
+        >
+          <Avatar
+            class="profile-card-avatar"
+            size="large"
+            src={avatarUrl}
+            name={displayName}
+            {color}
+            original
+            decorative
+          />
+        </button>
+      {:else}
         <Avatar
           class="profile-card-avatar"
           size="large"
@@ -166,20 +197,16 @@
           name={displayName}
           {color}
           original
-          decorative
+          alt={displayName}
         />
-      </button>
-    {:else}
-      <Avatar
-        class="profile-card-avatar"
-        size="large"
-        src={avatarUrl}
-        name={displayName}
-        {color}
-        original
-        alt={displayName}
-      />
-    {/if}
+      {/if}
+      {#if presence}<PresenceDot
+          class="profile-card-presence"
+          {presence}
+          label={presenceLabel}
+          size="medium"
+        />{/if}
+    </div>
     {#if crest}
       {@render crest()}
     {:else if status}
@@ -188,50 +215,65 @@
       </p>
     {/if}
   </div>
-  <div class="profile-card-identity">
-    <div class="profile-card-heading">
-      <h2
-        class="profile-card-name"
-        class:tinted={nameColor}
-        style:font-family={nameFont ?? undefined}
+  <div class="profile-card-body">
+    <div class="profile-card-identity">
+      <div class="profile-card-heading">
+        <h2
+          id={nameId}
+          class="profile-card-name"
+          class:tinted={nameColor}
+          style:font-family={nameFont ?? undefined}
+        >
+          {displayName}
+        </h2>
+        {#if pronouns}{@render pronouns()}{/if}
+        {#if headerAction}{@render headerAction()}{/if}
+      </div>
+      <button
+        class="profile-card-user-id"
+        type="button"
+        title={$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
+        onclick={() => void copyUserId()}
       >
-        {displayName}
-      </h2>
-      {#if pronouns}{@render pronouns()}{/if}
-    </div>
-    <button
-      class="profile-card-user-id"
-      type="button"
-      title={$i18n.t(copied ? 'settings.copied' : 'settings.copy')}
-      onclick={() => void copyUserId()}
-    >
-      {userId}
-      {#if copied}
-        <CheckIcon size="1em" aria-hidden="true" />
-      {:else}
-        <CopySimpleIcon size="1em" aria-hidden="true" />
+        {userId}
+        {#if copied}
+          <CheckIcon size="1em" aria-hidden="true" />
+        {:else}
+          <CopySimpleIcon size="1em" aria-hidden="true" />
+        {/if}
+      </button>
+      {#if meta}
+        <div class="profile-card-meta">{@render meta()}</div>
       {/if}
-    </button>
-    {#if meta}
-      <div class="profile-card-meta">{@render meta()}</div>
+      {#if actions}
+        <div class="profile-card-actions">{@render actions()}</div>
+      {/if}
+    </div>
+    {#if children || footer}
+      <div class="profile-card-panel" class:framed={children}>
+        {#if children}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <div
+            class="profile-card-bio explicit-scrollbar"
+            role="region"
+            aria-labelledby={nameId}
+            tabindex="0"
+          >
+            {@render children()}
+          </div>
+        {/if}
+        {#if footer}
+          <div class="profile-card-footer" class:divided={children}>{@render footer()}</div>
+        {/if}
+      </div>
     {/if}
-    {#if actions}
-      <div class="profile-card-actions">{@render actions()}</div>
+    {#if below}
+      <div class="profile-card-below">{@render below()}</div>
+    {/if}
+    {#if composer}
+      <div class="profile-card-composer">{@render composer()}</div>
     {/if}
   </div>
-  {#if children || footer}
-    <div class="profile-card-panel" class:framed={children}>
-      {#if children}
-        <div class="profile-card-bio explicit-scrollbar">{@render children()}</div>
-      {/if}
-      {#if footer}
-        <div class="profile-card-footer" class:divided={children}>{@render footer()}</div>
-      {/if}
-    </div>
-  {/if}
-  {#if composer}
-    <div class="profile-card-composer">{@render composer()}</div>
-  {/if}
 </section>
 
 <style>
@@ -245,6 +287,8 @@
     --profile-cover-height: var(--avatar-size-large);
     --profile-bio-lines: 4;
     --profile-card-ground: var(--surface-container);
+    --profile-chip-line: var(--profile-line);
+    --profile-chip-state: var(--bg-on-container);
     --profile-panel-ground: var(--surface-var-container);
 
     background: var(--profile-card-ground);
@@ -260,6 +304,7 @@
     --profile-panel-ground: var(--profile-hero-panel);
     --profile-text-muted: var(--profile-hero-muted);
     --profile-icon: var(--profile-text-muted);
+    --profile-chip-line: color-mix(in oklab, var(--profile-ink) 45%, var(--profile-panel-ground));
     --profile-line: color-mix(in oklab, var(--profile-ink) 20%, var(--profile-hero));
 
     color: var(--profile-ink);
@@ -267,9 +312,11 @@
 
   .profile-card.tinted.tint-dark {
     --profile-ink: var(--profile-ink-light);
+    --profile-chip-state: var(--profile-ink-dark);
   }
 
   .profile-card.tinted.tint-light {
+    --profile-chip-state: var(--profile-ink-light);
     --profile-ink: var(--profile-ink-dark);
   }
 
@@ -306,10 +353,10 @@
   }
 
   .profile-card-crest {
-    align-items: flex-end;
+    align-items: flex-start;
     display: flex;
     gap: var(--space-300);
-    margin-top: calc(var(--profile-avatar-size) / -2);
+    height: calc(var(--profile-avatar-size) / 2);
     padding: 0 var(--space-400);
     pointer-events: none;
     position: relative;
@@ -319,7 +366,13 @@
     pointer-events: auto;
   }
 
-  .profile-card-crest :global(.avatar-root.profile-card-avatar) {
+  .profile-card-avatar-wrap {
+    flex: 0 0 var(--profile-avatar-size);
+    position: relative;
+    transform: translateY(-50%);
+  }
+
+  .profile-card-avatar-wrap :global(.avatar-root.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
@@ -352,6 +405,15 @@
     width: var(--profile-avatar-size);
   }
 
+  :global(.profile-card-presence) {
+    --presence-ring: var(--profile-card-ground);
+
+    bottom: var(--space-050);
+    position: absolute;
+    right: 0;
+    z-index: 1;
+  }
+
   .profile-card-avatar-button:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: var(--focus-ring-offset);
@@ -363,16 +425,18 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
     font-size: var(--font-size-label);
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     line-height: var(--line-height-small);
-    margin: 0 0 var(--space-200);
-    max-height: calc(
-      var(--line-height-body) * 3em + 2 * var(--space-200) + 2 * var(--border-width)
-    );
+    margin: 0;
     min-width: 0;
+    overflow: hidden;
     overflow-wrap: anywhere;
-    overflow-y: auto;
     padding: var(--space-200) var(--space-300);
+    transform: translateY(-50%);
   }
 
   .profile-card-status-emoji {
@@ -384,11 +448,33 @@
     padding: var(--space-300) var(--space-400) var(--space-400);
   }
 
+  .profile-card-popover.tinted.profile-card-inset-body {
+    padding-bottom: var(--space-200);
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-identity {
+    padding-inline: 0;
+    padding-bottom: 0;
+    padding-top: 0;
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-body {
+    background: var(--profile-panel-ground);
+    border: var(--border-width) solid var(--profile-line);
+    border-radius: var(--radius-inner);
+    margin: 0 var(--space-200);
+    padding: var(--space-200) var(--space-300);
+  }
+
   .profile-card-heading {
     align-items: baseline;
     display: flex;
-    flex-flow: row nowrap;
+    flex-flow: row wrap;
     gap: var(--space-200);
+  }
+
+  .profile-card-heading :global(.btn:last-child) {
+    margin-left: auto;
   }
 
   .profile-card-name,
@@ -400,6 +486,7 @@
     font-size: var(--font-size-heading);
     font-weight: var(--font-weight-bold);
     letter-spacing: -0.01em;
+    min-width: 0;
     overflow-wrap: anywhere;
   }
 
@@ -419,7 +506,6 @@
     font: inherit;
     font-size: var(--font-size-small);
     gap: var(--space-100);
-    margin-top: var(--space-050);
     overflow-wrap: anywhere;
     padding: 0;
     text-align: start;
@@ -427,6 +513,23 @@
 
   .profile-card-user-id :global(svg) {
     flex: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .profile-card-popover.profile-card-inset-body .profile-card-user-id :global(svg) {
+      opacity: 0;
+    }
+
+    .profile-card-popover.profile-card-inset-body .profile-card-user-id:hover :global(svg),
+    .profile-card-popover.profile-card-inset-body .profile-card-user-id:focus-visible :global(svg) {
+      opacity: 1;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .profile-card-user-id {
+      min-height: var(--control-height-300);
+    }
   }
 
   .profile-card-user-id:focus-visible {
@@ -442,10 +545,9 @@
     display: flex;
     flex-wrap: wrap;
     font-size: var(--font-size-small);
-    gap: var(--space-200) var(--space-300);
+    gap: var(--space-100) var(--space-300);
     line-height: var(--line-height-small);
-    margin-top: var(--space-300);
-    opacity: var(--opacity-p400);
+    margin-top: var(--space-150);
   }
 
   .profile-card-meta :global(svg) {
@@ -459,6 +561,11 @@
     margin: 0 var(--space-400) var(--space-300);
   }
 
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel {
+    margin-inline: 0;
+    margin-top: var(--space-200);
+  }
+
   /* Padding sits on the rows, not here, so the divider between them can reach
      both edges of the panel. */
   .profile-card-panel.framed {
@@ -466,6 +573,19 @@
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius-inner);
     overflow: clip;
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel.framed {
+    background: var(--profile-hero);
+    border: 0;
+    border-radius: var(--radii-400);
+    box-shadow: inset 0 1px 2px color-mix(in srgb, var(--profile-ink) 12%, transparent);
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-footer {
+    display: flex;
+    flex-direction: column;
+    text-align: center;
   }
 
   /* One toolbar of equal targets, which is what separates verbs from the facts
@@ -487,6 +607,17 @@
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-inline: var(--space-300);
+  }
+
+  .profile-card-bio:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-bio {
+    margin-block: 0;
+    max-height: 12.5rem;
+    padding: var(--space-200);
   }
 
   .profile-card-bio :global(.formatted-body) {
@@ -513,8 +644,20 @@
     padding: 0 var(--space-400) var(--space-400);
   }
 
+  .profile-card-below {
+    padding: 0 var(--space-400) var(--space-400);
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-below {
+    padding: var(--space-200) 0 0;
+  }
+
   .profile-card-footer.divided {
     border-top: var(--border-width) solid var(--profile-line);
+  }
+
+  .profile-card-popover.tinted.profile-card-inset-body .profile-card-footer.divided {
+    border-top: 0;
   }
 
   @media (prefers-color-scheme: dark) {

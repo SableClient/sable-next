@@ -1040,6 +1040,7 @@
     "profileUnblock": "Unblock user",
     "messageUser": "Message {{name}}",
     "openChat": "Open chat",
+    "profileMessage": "Message",
     "openChatFailed": "Could not open the chat",
     "animalBoth": "{{is}} with {{has}}",
     "animalIs": "Is {{is}}",

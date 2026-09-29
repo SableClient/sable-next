@@ -29,7 +29,7 @@
   .presence-dot {
     background: var(--sec-main);
     border-radius: var(--radii-round);
-    box-shadow: 0 0 0 var(--border-width-500) var(--bg-container);
+    box-shadow: 0 0 0 var(--border-width-500) var(--presence-ring, var(--bg-container));
     display: inline-block;
     flex: none;
     height: var(--space-150);

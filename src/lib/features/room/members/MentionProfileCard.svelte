@@ -26,9 +26,8 @@
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
   import ShareNetworkIcon from 'phosphor-svelte/lib/ShareNetworkIcon';
   import ShieldIcon from 'phosphor-svelte/lib/ShieldIcon';
-  import UsersThreeIcon from 'phosphor-svelte/lib/UsersThreeIcon';
 
-  import { onDestroy, tick } from 'svelte';
+  import { onDestroy } from 'svelte';
 
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -52,7 +51,6 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import ProfileCard from '#lib/ui/primitives/ProfileCard.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
@@ -186,10 +184,10 @@
   let sending = $state(false);
   let sendFailed = $state<'send' | 'open' | null>(null);
   let homeserver = $derived(userId.slice(userId.indexOf(':') + 1));
+  let elevated = $derived(member !== null && member.power_level >= 50);
   let roleTag = $derived(
     member && powerTags !== null ? powerTag(member.power_level, $i18n.t, powerTags) : null
   );
-  let elevated = $derived(member !== null && member.power_level >= 50);
   let outranks = $derived(!isSelf && ownPowerLevel > (member?.power_level ?? 0));
   // Kicking requires the target to be in the room and outranked (spec rule
   // 4.5.4), so it stays hidden while the target's membership is unknown: the
@@ -227,16 +225,8 @@
   let sharedGroups = $derived(
     sharedRooms.filter((room) => roomList.byId(room.room_id)?.is_direct !== true)
   );
-  let roomsLabel = $derived($i18n.t('timeline.profileMutualRooms', { count: sharedRooms.length }));
-  let spacesLabel = $derived(
-    $i18n.t('timeline.profileMutualSpaces', { count: sharedSpaces.length })
-  );
-  let actionRowEl = $state<HTMLElement | null>(null);
-  let actionRowWidth = $state(0);
-  let actionsWidth = $state(0);
-  let measuringActions = $state(false);
-  let mutualInOverflow = $derived(!measuringActions && actionsWidth > actionRowWidth);
-  let hasMeta = $derived(Boolean(localTime || animalText || roleTag || presenceLabel));
+  let mutualLabel = $derived($i18n.t('timeline.profileMutualRooms', { count: mutualRooms.length }));
+  let hasMeta = $derived(Boolean(localTime || animalText || roleTag || lastSeenText));
   let activeExtra = $state<ProfileFieldView | null>(null);
 
   $effect(() => {
@@ -244,44 +234,6 @@
   });
 
   onDestroy(() => relations.dispose());
-
-  $effect(() => {
-    const row = actionRowEl;
-    void roomsLabel;
-    void spacesLabel;
-    if (!row) return;
-
-    let cancelled = false;
-    measuringActions = true;
-    void tick().then(() => {
-      if (cancelled) return;
-      const widths = [...row.children]
-        .map((child) => child.getBoundingClientRect().width)
-        .filter((width) => width > 0);
-      const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
-      actionsWidth =
-        widths.reduce((sum, width) => sum + width, 0) + gap * Math.max(0, widths.length - 1);
-      measuringActions = false;
-    });
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  function watchActionRow(node: HTMLElement): (() => void) | undefined {
-    const row = node.parentElement;
-    if (!row) return;
-
-    actionRowEl = row;
-    const observer = new ResizeObserver(() => {
-      actionRowWidth = row.clientWidth;
-    });
-    observer.observe(row);
-    return () => {
-      observer.disconnect();
-      actionRowEl = null;
-    };
-  }
 
   async function copyUserId(): Promise<void> {
     await profileActions.copy(userId);
@@ -325,6 +277,7 @@
   let moderationBusy = $state(false);
   let moderationError = $state<string | null>(null);
   const moderationFieldId = $props.id();
+  const miscId = `${moderationFieldId}-misc`;
 
   function openModeration(action: 'kick' | 'ban'): void {
     moderationAction = action;
@@ -372,11 +325,9 @@
     void goto(roomSectionPath(roomList.rooms, target));
   }
 
-  async function sendDirectMessage(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
+  async function openDirectMessage(body: string): Promise<void> {
     if (sending) return;
 
-    const body = draft.trim();
     let step: 'send' | 'open' = 'open';
     sending = true;
     sendFailed = null;
@@ -396,6 +347,11 @@
       sending = false;
     }
   }
+
+  function sendDirectMessage(event: SubmitEvent): void {
+    event.preventDefault();
+    void openDirectMessage(draft.trim());
+  }
 </script>
 
 {#snippet pronounRow()}
@@ -404,10 +360,14 @@
   {/if}
 {/snippet}
 {#snippet metaRow()}
-  {#if presenceLabel}
+  {#if lastSeenText}
+    <span class="profile-meta-item">{lastSeenText}</span>
+  {/if}
+  {#if localTime}
     <span class="profile-meta-item">
-      <PresenceDot presence={presence?.presence ?? 'offline'} label={presenceLabel} />
-      {lastSeenText || presenceLabel}
+      <ClockIcon />
+      {localTime.time}
+      <span class="profile-meta-aside">({localTime.timezone})</span>
     </span>
   {/if}
   {#if roleTag}
@@ -415,13 +375,6 @@
       <ShieldIcon />
       {#if roleTag.icon}<RoleTagIcon icon={roleTag.icon} class="profile-role-icon" />{/if}
       {roleTag.name}
-    </span>
-  {/if}
-  {#if localTime}
-    <span class="profile-meta-item">
-      <ClockIcon />
-      {localTime.time}
-      <span class="profile-meta-aside">({localTime.timezone})</span>
     </span>
   {/if}
   {#if animalText}
@@ -432,12 +385,7 @@
 {#snippet actionRow()}
   <ActionMenu label={$i18n.t('timeline.profileShare')} align="start">
     {#snippet trigger({ props })}
-      <button
-        {...props}
-        type="button"
-        class="profile-action selection-open"
-        {@attach watchActionRow}
-      >
+      <button {...props} type="button" class="profile-action selection-open">
         <ShareNetworkIcon size={14} />
         {$i18n.t('timeline.profileShare')}
       </button>
@@ -456,26 +404,21 @@
       {/if}
     </IconContext>
   </ActionMenu>
-  {#if sharedRooms.length > 0 && !mutualInOverflow}
-    <ActionMenu label={roomsLabel} class="profile-mutual-menu" align="start">
+  {#if !isSelf}
+    <ActionMenu label={mutualLabel} class="profile-mutual-menu" align="start">
       {#snippet trigger({ props })}
         <button {...props} class="profile-action selection-open" type="button">
           <ChatsIcon size={14} />
-          {roomsLabel}
+          {mutualLabel}
         </button>
       {/snippet}
+      {#if sharedSpaces.length > 0}
+        {@render mutualRows(sharedSpaces)}
+      {/if}
+      {#if sharedSpaces.length > 0 && sharedRooms.length > 0}
+        <ActionMenuSeparator />
+      {/if}
       {@render mutualRoomRows()}
-    </ActionMenu>
-  {/if}
-  {#if sharedSpaces.length > 0 && !mutualInOverflow}
-    <ActionMenu label={spacesLabel} class="profile-mutual-menu" align="start">
-      {#snippet trigger({ props })}
-        <button {...props} class="profile-action selection-open" type="button">
-          <UsersThreeIcon size={14} />
-          {spacesLabel}
-        </button>
-      {/snippet}
-      {@render mutualRows(sharedSpaces)}
     </ActionMenu>
   {/if}
   <ActionMenu label={$i18n.t('timeline.profileMoreActions')}>
@@ -490,27 +433,6 @@
       </button>
     {/snippet}
     <IconContext values={{ 'aria-hidden': 'true' }}>
-      {#if mutualInOverflow && sharedRooms.length > 0}
-        <ActionMenuSub label={roomsLabel} class="profile-mutual-menu">
-          {#snippet trigger()}
-            <ChatsIcon />
-            {roomsLabel}
-          {/snippet}
-          {@render mutualRoomRows()}
-        </ActionMenuSub>
-      {/if}
-      {#if mutualInOverflow && sharedSpaces.length > 0}
-        <ActionMenuSub label={spacesLabel} class="profile-mutual-menu">
-          {#snippet trigger()}
-            <UsersThreeIcon />
-            {spacesLabel}
-          {/snippet}
-          {@render mutualRows(sharedSpaces)}
-        </ActionMenuSub>
-      {/if}
-      {#if mutualInOverflow && mutualRooms.length > 0}
-        <ActionMenuSeparator />
-      {/if}
       <ActionMenuItem onSelect={copyServer}>
         <CopyIcon />
         {$i18n.t('timeline.profileCopyServer')}
@@ -519,6 +441,9 @@
         <ArrowSquareOutIcon />
         {$i18n.t('timeline.profileOpenServer')}
       </ActionMenuItem>
+      {#if !isSelf}
+        <ActionMenuSeparator />
+      {/if}
       {#if canInvite}
         <ActionMenuItem onSelect={moderate(core.commands.inviteUser)}>
           <UserPlusIcon />
@@ -554,7 +479,6 @@
       {#if canKick}
         <ActionMenuItem
           destructive
-          class="profile-menu-destructive"
           onSelect={() => {
             openModeration('kick');
           }}
@@ -566,7 +490,6 @@
       {#if canBan}
         <ActionMenuItem
           destructive
-          class={['profile-menu-destructive', canKick && 'profile-menu-grouped']}
           onSelect={() => {
             openModeration('ban');
           }}
@@ -576,29 +499,41 @@
         </ActionMenuItem>
       {/if}
       {#if !isSelf}
+        {#if canKick || canBan}
+          <ActionMenuSeparator />
+        {/if}
         <ActionMenuItem onSelect={() => (overrideOpen = true)}>
           <PencilSimpleIcon />
           {$i18n.t('timeline.profileOverride')}
         </ActionMenuItem>
-        <ActionMenuItem
-          destructive
-          class={['profile-menu-destructive', (canKick || canBan) && 'profile-menu-grouped']}
-          onSelect={toggleIgnored}
-        >
+        <ActionMenuSeparator />
+        <ActionMenuItem destructive onSelect={toggleIgnored}>
           <ProhibitIcon />
           {ignored ? $i18n.t('timeline.profileUnblock') : $i18n.t('timeline.profileBlock')}
         </ActionMenuItem>
-        <ActionMenuItem
-          destructive
-          class="profile-menu-destructive"
-          onSelect={() => (reportOpen = true)}
-        >
+        <ActionMenuItem destructive onSelect={() => (reportOpen = true)}>
           <FlagIcon />
           {$i18n.t('timeline.profileReport')}
         </ActionMenuItem>
       {/if}
     </IconContext>
   </ActionMenu>
+{/snippet}
+
+{#snippet messageAction()}
+  <Button
+    class="profile-message"
+    variant="primary"
+    size="small"
+    onclick={() => void openDirectMessage('')}
+  >
+    <ChatCircleIcon weight="fill" />
+    {$i18n.t('timeline.profileMessage')}
+  </Button>
+{/snippet}
+
+{#snippet profileBelow()}
+  <div class="profile-card-actions">{@render actionRow()}</div>
 {/snippet}
 
 {#snippet metaPlaceholder()}
@@ -683,16 +618,12 @@
   <Button
     class="profile-extra"
     aria-expanded={miscOpen}
+    aria-controls={miscId}
     onclick={() => {
       miscOpen = !miscOpen;
       activeExtra = null;
     }}
     block
-    style="background: transparent; 
-          border: 0;
-          border-bottom: var(--border-width) solid var(--profile-line, var(--surface-container-line));
-          border-radius: 0;
-          "
   >
     {#if miscOpen}
       <CaretDownIcon />
@@ -707,7 +638,7 @@
     {/if}
   </Button>
   {#if miscOpen}
-    <div class="profile-extra-open">
+    <div class="profile-extra-open" id={miscId}>
       {#if activeExtra === null}
         <div class="profile-keys">
           {#each extra as field (field.key)}
@@ -715,18 +646,12 @@
               size="small"
               class="choice"
               block
-              style="background: transparent; 
-            border: 0;
-            border-bottom: var(--border-width) solid var(--profile-line, var(--surface-container-line));
-            border-radius: 0;
-            "
               onclick={() => {
                 activeExtra = field;
               }}
             >
               {field.key}
             </Button>
-            <div class="profile-menu-key"></div>
           {/each}
         </div>
       {:else if preferences.developerTools}
@@ -735,7 +660,7 @@
         {@const value = profileFieldPreview(activeExtra.value)}
         {@const map = profileFieldMap(value)}
         {#if map}
-          <table class="profile-key-table">
+          <table class="profile-key-table" aria-label={activeExtra.key}>
             <tbody>
               {#each map as [key, value] (key)}
                 <tr>
@@ -765,6 +690,8 @@
   bannerUrl={currentProfile?.banner_url}
   status={userStatus?.text}
   statusEmoji={userStatus?.emoji}
+  presence={presence?.presence}
+  presenceLabel={presenceLabel ?? ''}
   nameColorLight={overrideColors === null
     ? null
     : (overrideColors?.light ??
@@ -779,11 +706,13 @@
       roleTag?.color)}
   nameFont={cosmetics?.font}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
-  actions={actionRow}
+  below={profileBelow}
   pronouns={pronounRow}
   children={showFailure || currentProfile?.bio ? bioPanel : undefined}
   footer={extra.length > 0 ? miscData : undefined}
-  composer={canMessage ? composer : undefined}
+  headerAction={variant === 'popover' && canMessage ? messageAction : undefined}
+  composer={variant === 'sheet' && canMessage ? composer : undefined}
+  insetBody={variant === 'popover'}
   {variant}
 />
 
@@ -875,10 +804,6 @@
     margin: var(--space-100);
   }
 
-  .profile-meta-aside {
-    color: var(--profile-icon, var(--sec-main));
-  }
-
   .profile-meta-elevated {
     color: var(--profile-ink, var(--bg-on-container));
     font-weight: var(--font-weight-medium);
@@ -888,10 +813,14 @@
     color: var(--profile-ink, var(--bg-on-container));
   }
 
+  .profile-meta-aside {
+    color: var(--profile-text-muted, var(--surface-var-on-container));
+  }
+
   :global(.profile-action) {
     align-items: center;
     background: none;
-    border: var(--border-width) solid var(--profile-line, var(--surface-container-line));
+    border: var(--border-width) solid var(--profile-chip-line, var(--surface-container-line));
     border-radius: var(--radius-pill);
     color: var(--profile-ink, var(--bg-on-container));
     cursor: pointer;
@@ -901,13 +830,21 @@
     font-weight: var(--font-weight-medium);
     gap: var(--space-100);
     justify-content: center;
+    max-width: 100%;
     min-height: var(--profile-action-size);
-    padding: 0 var(--space-300);
+    padding: 0 var(--space-250);
     white-space: nowrap;
   }
 
   :global(.profile-card-actions) {
-    --profile-action-size: var(--control-height-300);
+    --profile-action-size: 1.5rem;
+
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-100);
+    justify-content: flex-start;
+    width: 100%;
   }
 
   :global(.profile-card-sheet .profile-card-actions) {
@@ -921,13 +858,21 @@
 
   @media (hover: hover) and (pointer: fine) {
     :global(.profile-action:hover:not([aria-expanded='true'])) {
-      background: color-mix(in oklab, var(--profile-ink, var(--bg-on-container)) 7%, transparent);
+      background: color-mix(
+        in oklab,
+        var(--profile-chip-state, var(--bg-on-container)) 12%,
+        transparent
+      );
     }
   }
 
   :global(.profile-action.selection-open.selection-open[aria-expanded='true']),
   :global(.profile-action.selection-open.selection-open[data-state='open']) {
-    background: color-mix(in oklab, var(--profile-ink, var(--bg-on-container)) 14%, transparent);
+    background: color-mix(
+      in oklab,
+      var(--profile-chip-state, var(--bg-on-container)) 22%,
+      transparent
+    );
     color: var(--profile-ink, var(--bg-on-container));
   }
 
@@ -941,6 +886,18 @@
     outline-offset: var(--focus-ring-offset);
   }
 
+  :global(.profile-card.tinted .btn.profile-message) {
+    background: none;
+    border: var(--border-width) solid var(--profile-chip-line);
+    color: var(--profile-ink);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    :global(.profile-card.tinted .btn.profile-message:hover) {
+      background: color-mix(in oklab, var(--profile-chip-state) 12%, transparent);
+    }
+  }
+
   :global(.profile-action-overflow) {
     margin-left: auto;
     min-width: var(--profile-action-size);
@@ -952,19 +909,9 @@
   }
 
   :global(.profile-power-level) {
-    color: var(--profile-icon, var(--sec-main));
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
-  }
-
-  :global(.profile-menu-destructive) {
-    border-top: var(--border-width) solid var(--bg-container-line);
-    margin-top: var(--space-100);
-  }
-
-  :global(.profile-menu-grouped) {
-    border-top: 0;
-    margin-top: 0;
   }
 
   .profile-composer {
@@ -1000,6 +947,9 @@
   :global(.btn.profile-extra),
   .profile-keys :global(.btn) {
     --button-on-container: var(--profile-ink, var(--sec-on-container));
+
+    background: transparent;
+    border: 0;
   }
 
   .profile-extra {
