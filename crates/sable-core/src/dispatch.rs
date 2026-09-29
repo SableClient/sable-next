@@ -3092,7 +3092,7 @@ impl Core {
     }
 }
 
-fn thread_reply(
+pub(crate) fn thread_reply(
     in_reply_to: Option<matrix_sdk::ruma::OwnedEventId>,
     thread_root: Option<matrix_sdk::ruma::OwnedEventId>,
     silent: bool,
