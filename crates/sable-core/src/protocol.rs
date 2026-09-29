@@ -957,6 +957,7 @@ pub enum Command {
     },
     SetSearchOptions {
         disk_budget_mb: u32,
+        crawler: bool,
         server_search: bool,
     },
     SetReadRoom {

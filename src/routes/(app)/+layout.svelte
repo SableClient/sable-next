@@ -423,7 +423,11 @@
     if (core.status !== 'ready') return;
 
     void core.commands
-      .setSearchOptions(Number(preferences.searchIndexLimit), preferences.serverSearch)
+      .setSearchOptions(
+        Number(preferences.searchIndexLimit),
+        preferences.searchCrawler,
+        preferences.serverSearch
+      )
       .catch(() => {});
   });
 

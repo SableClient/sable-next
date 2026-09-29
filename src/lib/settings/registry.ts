@@ -985,6 +985,14 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'searchCrawler',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchCrawler',
+        description: 'settings.searchCrawlerHint',
+        type: 'boolean',
+      },
+      {
         key: 'serverSearch',
         section: 'message-search',
         icon: MagnifyingGlassIcon,

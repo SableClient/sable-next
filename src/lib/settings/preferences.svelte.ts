@@ -80,6 +80,7 @@ export interface Preferences {
   roomBannerHeight: number;
   subspaceHierarchyLimit: SubspaceDepth;
   searchIndexLimit: SearchIndexLimit;
+  searchCrawler: boolean;
   serverSearch: boolean;
   showSearch: boolean;
   showUnreadCounts: boolean;
@@ -308,6 +309,7 @@ const DEFAULTS: Preferences = {
   roomBannerHeight: 190,
   subspaceHierarchyLimit: '3',
   searchIndexLimit: '512',
+  searchCrawler: true,
   serverSearch: true,
   showSearch: false,
   showUnreadCounts: false,

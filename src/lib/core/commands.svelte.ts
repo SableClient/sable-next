@@ -1603,10 +1603,15 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_notifications_enabled', enabled });
     },
 
-    async setSearchOptions(diskBudgetMb: number, serverSearch: boolean): Promise<void> {
+    async setSearchOptions(
+      diskBudgetMb: number,
+      crawler: boolean,
+      serverSearch: boolean
+    ): Promise<void> {
       await transport().send({
         type: 'set_search_options',
         disk_budget_mb: diskBudgetMb,
+        crawler,
         server_search: serverSearch,
       });
     },

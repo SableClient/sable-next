@@ -292,6 +292,16 @@ impl Core {
 
         loop {
             self.report_coverage(client, &mut reported).await;
+
+            if !self
+                .search_crawler_enabled
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                self.search_crawl.lock().await.enter(SearchCrawlPhase::Idle);
+                matrix_sdk::sleep::sleep(CRAWL_IDLE).await;
+                continue;
+            }
+
             self.save_changed_checkpoints(client).await;
 
             if self.foreground_paginations() > 0 {
@@ -444,7 +454,11 @@ impl Core {
             .count();
         let rooms_failed = progress.failed.len();
         let rooms_blind = progress.blind_rooms();
-        let stopped = full || progress.spent();
+        let stopped = full
+            || progress.spent()
+            || !self
+                .search_crawler_enabled
+                .load(std::sync::atomic::Ordering::Relaxed);
         drop(progress);
 
         let state = if stopped {
@@ -697,6 +711,7 @@ fn crawls_first(room: &Room) -> bool {
 #[allow(clippy::large_futures)]
 mod tests {
     use std::collections::HashSet;
+    use std::sync::atomic::Ordering;
     use std::time::Duration;
 
     use matrix_sdk::ruma::{OwnedRoomId, room_id, user_id};
@@ -801,6 +816,24 @@ mod tests {
 
         assert_eq!(progress.metrics.batches, 1);
         assert_eq!(progress.metrics.last_request_ms, Some(40));
+    }
+
+    #[async_test]
+    async fn test_disabling_the_crawler_stops_search_coverage() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let (core, _events) = crate::Core::new(
+            "disabled-search-crawler",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.search_crawler_enabled.store(false, Ordering::Relaxed);
+
+        let coverage = core.search_coverage(&client).await;
+
+        assert_eq!(
+            coverage.state,
+            crate::protocol::SearchCoverageState::Stopped
+        );
     }
 
     #[async_test]

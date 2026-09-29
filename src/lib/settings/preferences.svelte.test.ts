@@ -12,6 +12,10 @@ test('keeps quick CSS', () => {
   );
 });
 
+test('keeps the search crawler preference', () => {
+  expect(sanitize({ searchCrawler: false }, preferences).searchCrawler).toBe(false);
+});
+
 test('keeps a notification volume inside its range', () => {
   expect(sanitize({ notificationSoundVolume: 0.4 }, preferences).notificationSoundVolume).toBe(0.4);
   expect(sanitize({ notificationSoundVolume: 3 }, preferences).notificationSoundVolume).toBe(1);

@@ -2158,8 +2158,11 @@ impl Core {
 
             Command::SetSearchOptions {
                 disk_budget_mb,
+                crawler,
                 server_search,
             } => {
+                self.search_crawler_enabled
+                    .store(crawler, Ordering::Relaxed);
                 self.server_search_enabled
                     .store(server_search, Ordering::Relaxed);
                 self.search_index
