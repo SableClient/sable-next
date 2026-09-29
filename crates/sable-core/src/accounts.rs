@@ -785,16 +785,34 @@ impl Core {
             let Some(core) = saver.upgrade() else {
                 return Ok(());
             };
-            drop(spawn(async move {
-                if let Err(error) = core
-                    .persist_refreshed(&client, &homeserver, &account_id, generation)
-                    .await
-                {
-                    tracing::error!("could not persist refreshed session: {error:?}");
-                }
-            }));
 
-            Ok(())
+            #[cfg(not(target_family = "wasm"))]
+            {
+                let handle = tokio::runtime::Handle::current();
+                tokio::task::block_in_place(|| {
+                    handle.block_on(async move {
+                        core.persist_refreshed(&client, &homeserver, &account_id, generation)
+                            .await
+                            .map_err(|error| {
+                                format!("could not persist refreshed session: {error:?}").into()
+                            })
+                    })
+                })
+            }
+
+            #[cfg(target_family = "wasm")]
+            {
+                drop(spawn(async move {
+                    if let Err(error) = core
+                        .persist_refreshed(&client, &homeserver, &account_id, generation)
+                        .await
+                    {
+                        tracing::error!("could not persist refreshed session: {error:?}");
+                    }
+                }));
+
+                Ok(())
+            }
         };
 
         let reload = move |client: matrix_sdk::Client| {
@@ -876,12 +894,19 @@ impl Core {
                 tracing::error!(soft_logout, "could not retire rejected session: {error:?}");
             }
 
+            let reason = if soft_logout {
+                "soft_logout"
+            } else {
+                "token_rejected"
+            };
+            #[cfg(not(target_family = "wasm"))]
+            tracing::error!(
+                reason,
+                "session ended after the homeserver rejected its token"
+            );
+
             core.emit(CoreEvent::SessionEnded {
-                reason: if soft_logout {
-                    "soft_logout".to_owned()
-                } else {
-                    "token_rejected".to_owned()
-                },
+                reason: reason.to_owned(),
             });
         }));
         true
@@ -957,6 +982,44 @@ mod regression_tests {
     use crate::{
         CachedTimeline, Core, protocol::CommandErr, session::Session, store::MemorySessionStore,
     };
+
+    struct DelayedSecondSave {
+        attempts: Arc<std::sync::atomic::AtomicUsize>,
+        bytes: Arc<std::sync::Mutex<Option<Vec<u8>>>>,
+        started: Arc<tokio::sync::Notify>,
+        release: Arc<tokio::sync::Notify>,
+    }
+
+    #[async_trait::async_trait]
+    impl crate::store::SessionStore for DelayedSecondSave {
+        async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+            Ok(self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone())
+        }
+
+        async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+            if self
+                .attempts
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                == 1
+            {
+                self.started.notify_one();
+                self.release.notified().await;
+            }
+            *self
+                .bytes
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(bytes);
+            Ok(())
+        }
+
+        async fn clear(&self) -> Result<(), String> {
+            Ok(())
+        }
+    }
 
     #[allow(clippy::unwrap_used, clippy::expect_used)]
     async fn core_with_room() -> (MatrixMockServer, Arc<Core>, Room) {
@@ -1199,9 +1262,17 @@ mod regression_tests {
         })).unwrap();
         client.restore_session(matrix).await.unwrap();
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        let persisted = Arc::new(std::sync::Mutex::new(None));
+        let persistence_started = Arc::new(tokio::sync::Notify::new());
+        let release_persistence = Arc::new(tokio::sync::Notify::new());
         let (core, _events) = Core::new(
             "refresh-regression",
-            Box::new(MemorySessionStore::default()),
+            Box::new(DelayedSecondSave {
+                attempts: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                bytes: persisted.clone(),
+                started: persistence_started.clone(),
+                release: release_persistence.clone(),
+            }),
         );
         let mut registry = AccountRegistry::empty();
         registry.upsert(PersistedAccount {
@@ -1256,23 +1327,29 @@ mod regression_tests {
         let account = core.accounts().await.unwrap().accounts.remove(0);
         let resumed = core.saved_account_client(&account).await.unwrap();
         release.send(()).unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            persistence_started.notified(),
+        )
+        .await
+        .unwrap();
+        assert!(!refresh.is_finished());
+        release_persistence.notify_one();
         refresh.await.unwrap().unwrap();
         assert_eq!(
             resumed.session_tokens().unwrap().refresh_token.as_deref(),
             Some("new-refresh")
         );
-        tokio::time::timeout(std::time::Duration::from_secs(5), async {
-            loop {
-                let saved = core.accounts().await.unwrap();
-                let stored = serde_json::to_value(&saved.accounts[0].session).unwrap();
-                if stored["credentials"]["refresh_token"] == "new-refresh" {
-                    break;
-                }
-                tokio::task::yield_now().await;
-            }
-        })
-        .await
-        .unwrap();
+        let bytes = persisted
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+            .unwrap();
+        let stored: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            stored["accounts"][0]["session"]["credentials"]["refresh_token"],
+            "new-refresh"
+        );
     }
 
     struct RejectSaves {
