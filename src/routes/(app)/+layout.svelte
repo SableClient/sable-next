@@ -105,6 +105,7 @@
   } from '#lib/features/notifications/room-names.js';
   import {
     dropPushSubscription,
+    pusherDisplayName,
     syncPushSubscription,
   } from '#lib/features/notifications/web-push.js';
   import { answerPushEvent, sharePushSession } from '#lib/features/notifications/push-session.js';
@@ -454,8 +455,11 @@
       .catch(() => {});
   });
 
+  const pushDeviceName = $derived(pusherDisplayName(core));
+
   $effect(() => {
     void core.accountRevision;
+    void pushDeviceName;
     if (core.status !== 'ready') return;
 
     if (!preferences.systemNotifications) {
@@ -559,6 +563,7 @@
 
     // Read before the first await, or a retargeted gateway never re-registers.
     const override = pushOverride();
+    void pushDeviceName;
 
     const resync = (): void => {
       void syncPushSubscription(core, override).then(clearPushFailure, (error: unknown) => {

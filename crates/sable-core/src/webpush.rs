@@ -61,7 +61,9 @@ pub async fn support(client: &Client) -> Result<Option<String>, String> {
 /// # Errors
 ///
 /// When the homeserver rejects the registration.
-pub async fn set_pusher(client: &Client, pusher: WebPusherView) -> Result<(), String> {
+pub async fn set_pusher(client: &Client, mut pusher: WebPusherView) -> Result<(), String> {
+    pusher.device_display_name =
+        crate::notifications::pusher_display_name(client, pusher.device_display_name).await;
     let body = pusher_body(&pusher, client.user_id().map(ToString::to_string));
 
     client

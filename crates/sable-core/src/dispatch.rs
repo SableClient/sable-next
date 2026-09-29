@@ -1697,11 +1697,13 @@ impl Core {
                 device_id,
                 display_name,
             } => {
-                self.client()
-                    .await?
+                let client = self.client().await?;
+                let generation = self.session_generation.load(Ordering::SeqCst);
+                client
                     .rename_device(&device_id, &display_name)
                     .await
                     .or_failed(self, "rename_device")?;
+                self.emit_devices(generation, &client).await;
 
                 Ok(CommandOk::RenameDevice)
             }

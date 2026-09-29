@@ -4,12 +4,15 @@ import { runtimeConfig } from '#lib/config/runtime-config.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { nativeVoipToken } from '#lib/platform/calls.js';
 
+import { pusherDisplayName } from './web-push';
+
 const REGISTERED_KEY = 'sable.push.voip';
 
 interface Registered {
   userId: string;
   appId: string;
   pushkey: string;
+  deviceDisplayName: string;
 }
 
 function registered(): Registered | null {
@@ -39,26 +42,32 @@ export async function registerVoipPusher(
   if (!details || !appId || !pushkey || !session) return;
 
   const previous = registered();
-  if (
+  const deviceDisplayName = pusherDisplayName(core);
+  const samePusher =
     previous?.userId === session.user_id &&
     previous.appId === appId &&
-    previous.pushkey === pushkey
-  ) {
+    previous.pushkey === pushkey;
+  if (samePusher && previous.deviceDisplayName === deviceDisplayName) {
     return;
   }
-  if (previous) await unregisterVoipPusher(core);
+  if (previous && !samePusher) await unregisterVoipPusher(core);
 
   await core.commands.setPusher({
     pushkey,
     app_id: appId,
     url: details.pushNotifyUrl,
-    device_display_name: 'Sable calls',
+    device_display_name: deviceDisplayName,
     web_push: null,
     event_id_only: false,
     append: true,
   });
   localStorage.setItem(
     REGISTERED_KEY,
-    JSON.stringify({ userId: session.user_id, appId, pushkey } satisfies Registered)
+    JSON.stringify({
+      userId: session.user_id,
+      appId,
+      pushkey,
+      deviceDisplayName,
+    } satisfies Registered)
   );
 }

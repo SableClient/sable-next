@@ -25,6 +25,24 @@ use crate::store::{FileSessionStore, SessionStore};
 
 const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
 
+pub(crate) async fn pusher_display_name(client: &Client, fallback: String) -> String {
+    let Some(device_id) = client.device_id() else {
+        return fallback;
+    };
+    let Ok(devices) = client.devices().await else {
+        return fallback;
+    };
+    devices
+        .devices
+        .iter()
+        .find(|device| device.device_id == device_id)
+        .and_then(|device| device.display_name.as_deref())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .unwrap_or("Sable")
+        .to_owned()
+}
+
 /// Resolve Android's app-data root to the session and SDK stores under `files`.
 #[cfg(not(target_family = "wasm"))]
 #[must_use]
@@ -586,6 +604,7 @@ pub(crate) fn gateway(url: &str) -> Result<String, String> {
 /// When the gateway is not a push gateway, or the server rejects the registration.
 pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), String> {
     let mut pusher_data = HttpPusherData::new(gateway(&pusher.url)?);
+    let device_display_name = pusher_display_name(client, pusher.device_display_name).await;
     if pusher.event_id_only {
         pusher_data.format = Some(PushFormat::EventIdOnly);
     }
@@ -615,7 +634,7 @@ pub async fn set_pusher(client: &Client, pusher: PusherView) -> Result<(), Strin
                 ids: PusherIds::new(pusher.pushkey, pusher.app_id),
                 kind: PusherKind::Http(pusher_data),
                 app_display_name: "Sable".to_owned(),
-                device_display_name: pusher.device_display_name,
+                device_display_name,
                 profile_tag: None,
                 lang: "en".to_owned(),
             }
@@ -709,6 +728,105 @@ mod tests {
 
     fn ts(millis: u32) -> MilliSecondsSinceUnixEpoch {
         MilliSecondsSinceUnixEpoch(UInt::from(millis))
+    }
+
+    #[tokio::test]
+    async fn pushers_use_the_current_device_name() {
+        use crate::protocol::{PusherView, WebPusherView};
+        use matrix_sdk::test_utils::client::MockClientBuilder;
+        use wiremock::matchers::{body_partial_json, method, path};
+        use wiremock::{Mock, ResponseTemplate};
+
+        let server = MatrixMockServer::new().await;
+        let client = MockClientBuilder::new(Some(&server.uri()))
+            .logged_in_with_token(
+                "token".to_owned(),
+                user_id!("@alice:example.org").to_owned(),
+                owned_device_id!("PHONE"),
+            )
+            .build()
+            .await;
+
+        for (display_name, expected) in [
+            (Some("  Personal phone  "), "Personal phone"),
+            (Some("Work phone"), "Work phone"),
+            (Some("  "), "Sable"),
+            (None, "Sable"),
+        ] {
+            let devices = Mock::given(method("GET"))
+                .and(path("/_matrix/client/v3/devices"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                    "devices": [
+                        {"device_id": "OTHER", "display_name": "Other session"},
+                        {"device_id": "PHONE", "display_name": display_name},
+                    ]
+                })))
+                .expect(2)
+                .mount_as_scoped(server.server())
+                .await;
+            let registration = Mock::given(method("POST"))
+                .and(path("/_matrix/client/v3/pushers/set"))
+                .and(body_partial_json(json!({
+                    "app_display_name": "Sable",
+                    "device_display_name": expected,
+                })))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+                .expect(2)
+                .mount_as_scoped(server.server())
+                .await;
+
+            super::set_pusher(
+                &client,
+                PusherView {
+                    pushkey: "token".to_owned(),
+                    app_id: "moe.sable.android".to_owned(),
+                    url: "https://push.example/_matrix/push/v1/notify".to_owned(),
+                    device_display_name: "Sable on Android".to_owned(),
+                    web_push: None,
+                    event_id_only: false,
+                    append: false,
+                },
+            )
+            .await
+            .expect("register gateway pusher");
+            crate::webpush::set_pusher(
+                &client,
+                WebPusherView {
+                    pushkey: "key".to_owned(),
+                    app_id: "moe.sable.webpush".to_owned(),
+                    device_display_name: "Sable on Android".to_owned(),
+                    endpoint: "https://push.example/sub".to_owned(),
+                    auth: "auth".to_owned(),
+                    event_id_only: true,
+                },
+            )
+            .await
+            .expect("register server pusher");
+            drop(registration);
+            drop(devices);
+        }
+    }
+
+    #[tokio::test]
+    async fn pusher_name_lookup_failure_uses_the_fallback() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, ResponseTemplate};
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/devices"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+                "errcode": "M_FORBIDDEN", "error": "Device list unavailable"
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+
+        assert_eq!(
+            super::pusher_display_name(&client, "Known phone".to_owned()).await,
+            "Known phone"
+        );
     }
 
     fn event(value: &serde_json::Value) -> AnySyncTimelineEvent {

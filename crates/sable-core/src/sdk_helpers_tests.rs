@@ -36,6 +36,53 @@ async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core
 }
 
 #[tokio::test]
+async fn device_rename_updates_pusher_state() {
+    use wiremock::matchers::body_json;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let device_id = client.device_id().unwrap().to_owned();
+    Mock::given(method("PUT"))
+        .and(path(format!("/_matrix/client/v3/devices/{device_id}")))
+        .and(body_json(json!({"display_name": "Work phone"})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/devices"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "devices": [{"device_id": device_id, "display_name": "Work phone"}]
+        })))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+    let (core, mut events) = Core::new("rename-test", Box::new(MemorySessionStore::default()));
+    *core.session.write().await = Some(Session {
+        account_id: "test".into(),
+        client,
+        sync_service,
+        homeserver: server.uri(),
+        oauth: false,
+    });
+
+    core.dispatch(Command::RenameDevice {
+        device_id: device_id.clone(),
+        display_name: "Work phone".to_owned(),
+    })
+    .await
+    .unwrap();
+
+    let CoreEvent::DevicesChanged { devices } = events.try_recv().unwrap() else {
+        panic!("expected refreshed devices after renaming");
+    };
+    let device = devices.iter().find(|device| device.is_own).unwrap();
+    assert_eq!(device.device_id, device_id);
+    assert_eq!(device.display_name.as_deref(), Some("Work phone"));
+}
+
+#[tokio::test]
 async fn devices_without_uploaded_crypto_keys_remain_visible() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
