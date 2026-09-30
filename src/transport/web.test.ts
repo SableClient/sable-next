@@ -3,12 +3,14 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 vi.mock('../worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
 
-const { captureException } = vi.hoisted(() => ({
+const { captureException, captureMessage } = vi.hoisted(() => ({
   captureException: vi.fn<(error: unknown, context?: unknown) => void>(),
+  captureMessage: vi.fn(),
 }));
 vi.mock('@sentry/sveltekit', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sentry/sveltekit')>()),
   captureException,
+  captureMessage,
 }));
 
 class FakePort {
@@ -303,4 +305,20 @@ test('a worker startup failure rejects restore and allows a new worker', async (
   expect(crashed).toHaveBeenCalledTimes(1);
   transport.close();
   await retry;
+});
+
+test('reports new core errors after twenty distinct failures', async () => {
+  const transport = await load();
+  const restored = transport.send({ type: 'restore' }).catch(() => undefined);
+  captureMessage.mockClear();
+  const logs = Array.from(
+    { length: 26 },
+    (_, index) => `ERROR failure_${String.fromCharCode(97 + index)}`
+  );
+  FakeSharedWorker.last?.port.receive({ logs });
+  expect(captureMessage).toHaveBeenCalledTimes(26);
+  FakeSharedWorker.last?.port.receive({ logs });
+  expect(captureMessage).toHaveBeenCalledTimes(26);
+  transport.close();
+  await restored;
 });

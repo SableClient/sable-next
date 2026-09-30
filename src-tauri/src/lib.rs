@@ -698,7 +698,6 @@ fn with_updates(builder: tauri::Builder<BrowserEngine>) -> tauri::Builder<Browse
 /// more than they are worth: heroes it cannot name, and the latest-event
 /// builder choking on the bare `{}` a space child removal carries.
 fn install_logging() {
-    use ::sentry::integrations::tracing::EventFilter;
     use tracing_subscriber::prelude::*;
 
     let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
@@ -707,15 +706,7 @@ fn install_logging() {
         )
     });
     let sentry = ::sentry::integrations::tracing::layer()
-        .event_filter(|metadata| match *metadata.level() {
-            tracing::Level::ERROR if metadata.target().starts_with("sable_core") => {
-                EventFilter::Event
-            }
-            tracing::Level::WARN if metadata.target().starts_with("sable_core") => {
-                EventFilter::Breadcrumb
-            }
-            _ => EventFilter::Ignore,
-        })
+        .event_filter(sentry::tracing_filter)
         .span_filter(|_| false);
     let subscriber = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_filter(filter))
@@ -758,13 +749,24 @@ pub fn run() {
     let sentry_guard = sentry::init();
     install_logging();
     #[cfg(desktop)]
-    let sentry_minidump_guard = sentry_guard
-        .as_ref()
-        .map(|guard| tauri_plugin_sentry::minidump::init(guard));
+    let sentry_minidump_guard =
+        sentry_guard
+            .as_ref()
+            .and_then(|guard| match tauri_plugin_sentry::minidump::init(guard) {
+                Ok(handle) => Some(handle),
+                Err(error) => {
+                    tracing::error!(%error, "native crash reporter could not start");
+                    None
+                }
+            });
     #[cfg(desktop)]
     let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let builder = builder.on_web_content_process_terminate(|_| {
+        tracing::error!("webview content process terminated");
+    });
     let builder = if let Some(client) = sentry_guard.as_ref() {
         builder.plugin(tauri_plugin_sentry::init_with_no_injection(client))
     } else {

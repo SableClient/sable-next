@@ -32,10 +32,10 @@ export function createTauriTransport(): Transport {
         try {
           listener(event);
         } catch (error) {
-          console.error('[sable transport] event listener failed', { event: event.type, error });
           Sentry.captureException(error, {
             tags: { source: 'tauri-event', event: event.type },
           });
+          console.error('[sable transport] event listener failed', error, event.type);
         }
       }
     }
@@ -191,8 +191,8 @@ export function createTauriTransport(): Transport {
         await invoke('submit_command', { command: { type: 'reset_local_cache' } });
         await resetWebStorage(accountIds);
       } catch (error) {
-        console.error('[sable transport] the local caches were not fully cleared', error);
         Sentry.captureException(error, { tags: { source: 'cache-reset' } });
+        console.error('[sable transport] the local caches were not fully cleared', error);
       }
     },
 

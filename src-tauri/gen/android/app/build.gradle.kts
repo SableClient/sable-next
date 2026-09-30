@@ -5,6 +5,18 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("rust")
+    id("io.sentry.android.gradle") version "6.19.0"
+}
+
+sentry {
+    org.set(System.getenv("SENTRY_ORG"))
+    projectName.set(System.getenv("SENTRY_PROJECT"))
+    authToken.set(System.getenv("SENTRY_AUTH_TOKEN"))
+    autoUploadProguardMapping.set(!System.getenv("SENTRY_AUTH_TOKEN").isNullOrBlank())
+    tracingInstrumentation { enabled.set(false) }
+    autoInstallation { enabled.set(false) }
+    telemetry.set(false)
+    ignoredBuildTypes.set(setOf("debug"))
 }
 
 val tauriProperties = Properties().apply {
@@ -114,6 +126,7 @@ configurations.all {
 
 dependencies {
     implementation("io.sentry:sentry-android:8.58.0")
+    implementation("io.sentry:sentry-android-ndk:8.58.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")

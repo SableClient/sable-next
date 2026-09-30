@@ -69,7 +69,7 @@ import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
-import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
+import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import {
@@ -219,7 +219,7 @@ const telemetrySettings: SettingDefinition[] = import.meta.env.VITE_SENTRY_DSN
         requiresReload: true,
         onChange: (value) => {
           setPreference('telemetryAsked', true);
-          syncNativeTelemetryConsent(value);
+          syncTelemetryConsent(value);
         },
       },
       {

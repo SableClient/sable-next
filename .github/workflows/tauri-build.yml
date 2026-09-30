@@ -15,6 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 env:
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_RELEASE_DEBUG: '1'
+  CARGO_PROFILE_RELEASE_STRIP: none
   CARGO_TERM_COLOR: always
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: SableClient/sable-next
@@ -127,6 +129,9 @@ jobs:
       VERSION_ARGS: ${{ matrix.version-args }}
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
@@ -169,6 +174,11 @@ jobs:
           [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] \
             && config_args+=(--config '{"bundle":{"createUpdaterArtifacts":false}}')
           pnpm tauri build "${config_args[@]}" ${{ matrix.tauri-args }}
+      - name: Upload native symbols to Sentry
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ matrix.bundle-path }}
+        run: node scripts/ci/upload-sentry-symbols.mjs "$(dirname "$BUNDLE_PATH")"
       - name: Normalize bundle names
         shell: bash
         env:
@@ -224,6 +234,9 @@ jobs:
       RUST_TARGETS: aarch64-apple-ios
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
@@ -270,6 +283,7 @@ jobs:
           config_args=(--config src-tauri/tauri.ci.conf.json)
           [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
           pnpm tauri ios build "${config_args[@]}" --no-sign --ci
+          node scripts/ci/upload-sentry-symbols.mjs --ios
           ipa="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
           [ -n "$ipa" ] || { echo 'No iOS IPA found' >&2; exit 1; }
           target="$(dirname "$ipa")/sable-next-${VERSION}-ios-arm64.ipa"
@@ -310,6 +324,9 @@ jobs:
       VERSION: ${{ needs.setup-release.outputs.version }}
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
@@ -365,6 +382,7 @@ jobs:
             display_name='Sable Next Nightly'
           fi
           pnpm tauri:cef build "${config_args[@]}"
+          node scripts/ci/upload-sentry-symbols.mjs target/release
           mise run cef:package "$VERSION" "$display_name"
       - name: Check the packages carry what they should
         run: |

@@ -151,6 +151,7 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
+        DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         ARCHS: [{{join ios-valid-archs}}]
         VALID_ARCHS: {{~#each ios-valid-archs}} {{this}} {{/each}}
         # Force LiveKit's Objective-C delegate categories out of its static archive.

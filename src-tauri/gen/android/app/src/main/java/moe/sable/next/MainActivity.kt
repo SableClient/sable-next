@@ -5,6 +5,7 @@ import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.core.content.IntentCompat
 import androidx.core.view.WindowCompat
@@ -22,11 +23,30 @@ class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    applySentryConsent(getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     instance = this
     runCatching { nativeInitSystemBars() }
     stageShareIntent(intent)
+  }
+
+  private fun applySentryConsent(enabled: Boolean) {
+    runCatching {
+      if (!enabled) {
+        Sentry.close()
+        return@runCatching
+      }
+      if (Sentry.isEnabled() || BuildConfig.SENTRY_DSN.isBlank()) return@runCatching
+      SentryAndroid.init(applicationContext) { options ->
+        options.dsn = BuildConfig.SENTRY_DSN
+        options.environment = BuildConfig.SENTRY_ENVIRONMENT.ifBlank { null }
+        options.release = BuildConfig.SENTRY_RELEASE.ifBlank { null }
+        options.isSendDefaultPii = false
+      }
+    }.onFailure { error ->
+      Log.e("SableSentry", "Sentry setup failed", error)
+    }
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -191,17 +211,8 @@ class MainActivity : TauriActivity() {
     fun setSentryEnabledNative(enabled: Boolean) {
       val activity = instance ?: return
       activity.runOnUiThread {
-        if (!enabled) {
-          Sentry.close()
-          return@runOnUiThread
-        }
-        if (Sentry.isEnabled() || BuildConfig.SENTRY_DSN.isBlank()) return@runOnUiThread
-        SentryAndroid.init(activity.applicationContext) { options ->
-          options.dsn = BuildConfig.SENTRY_DSN
-          options.environment = BuildConfig.SENTRY_ENVIRONMENT.ifBlank { null }
-          options.release = BuildConfig.SENTRY_RELEASE.ifBlank { null }
-          options.isSendDefaultPii = false
-        }
+        activity.getSharedPreferences("sentry", MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply()
+        activity.applySentryConsent(enabled)
       }
     }
   }

@@ -57,6 +57,7 @@ PKGROOT="$WORK/pkgroot"
 mkdir -p "$PKGROOT/opt/sable-next" "$PKGROOT/usr/bin"
 cp -a "$WORK/stage/runtime/." "$PKGROOT/opt/sable-next/"
 cp -f "$BIN_PATH" "$PKGROOT/opt/sable-next/sable-next"
+strip --strip-debug "$PKGROOT/opt/sable-next/sable-next"
 chmod 755 "$PKGROOT/opt/sable-next/sable-next"
 cat > "$PKGROOT/usr/bin/sable-next" <<'EOF'
 #!/bin/sh
@@ -74,6 +75,7 @@ PKGROOT="$PKGROOT" PKG_ARCH="$NFPM_ARCH" PKG_VERSION="$RPM_VERSION" PKG_RELEASE=
 TARROOT="$WORK/tarball"
 mkdir -p "$TARROOT"
 cp -f "$BIN_PATH" "$TARROOT/sable-next"
+strip --strip-debug "$TARROOT/sable-next"
 chmod 755 "$TARROOT/sable-next"
 cp -a "$WORK/stage/runtime" "$WORK/stage/share" "$TARROOT/"
 tar -C "$TARROOT" -czf "$OUT/sable-next-${VERSION}-linux-${ARCH}.tar.gz" \
@@ -83,6 +85,7 @@ APPDIR="$WORK/SableNext.AppDir"
 mkdir -p "$APPDIR/usr/bin"
 cp -a "$WORK/stage/runtime/." "$APPDIR/usr/bin/"
 cp -f "$BIN_PATH" "$APPDIR/usr/bin/sable-next"
+strip --strip-debug "$APPDIR/usr/bin/sable-next"
 chmod 755 "$APPDIR/usr/bin/sable-next"
 stage_appindicator() {
   local dest="$1" main dep

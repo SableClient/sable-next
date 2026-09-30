@@ -16,6 +16,8 @@ concurrency:
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_RELEASE_DEBUG: '1'
+  CARGO_PROFILE_RELEASE_STRIP: none
   CARGO_TERM_COLOR: always
   FORGEJO_URL: https://git.sable.moe
   FORGEJO_REPOSITORY: ${{ github.repository }}
@@ -196,6 +198,9 @@ jobs:
       VERSION: ${{ needs.setup-release.outputs.version }}
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
@@ -251,6 +256,7 @@ jobs:
             display_name='Sable Next Nightly'
           fi
           pnpm tauri:cef build "${config_args[@]}"
+          node scripts/ci/upload-sentry-symbols.mjs target/release
           mise run cef:package "$VERSION" "$display_name"
       - name: Check the packages carry what they should
         run: |
@@ -296,6 +302,9 @@ jobs:
       RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
       # Read by src-tauri/build.rs, which bakes them into the binary.
       VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
       VITE_SENTRY_ENVIRONMENT: ${{ needs.setup-release.outputs.nightly == 'true' && 'preview' || 'production' }}
       VITE_APP_VERSION: ${{ needs.setup-release.outputs.version }}
       SABLE_BUILD_FLAVOR: ${{ needs.setup-release.outputs.nightly == 'true' && 'nightly' || 'stable' }}
@@ -370,6 +379,8 @@ jobs:
           config_args=(--config src-tauri/tauri.ci.conf.json)
           [ "$IS_NIGHTLY" = 'true' ] && config_args+=(--config src-tauri/tauri.nightly.conf.json)
           pnpm tauri android build "${config_args[@]}" --apk --aab --target aarch64 armv7
+          node scripts/ci/upload-sentry-symbols.mjs \
+            target/aarch64-linux-android/release target/armv7-linux-androideabi/release
           out='src-tauri/gen/android/app/build/outputs'
           apk="$(find "$out/apk/universal/release" -name '*.apk' -type f | head -n 1)"
           aab="$(find "$out/bundle/universalRelease" -name '*.aab' -type f | head -n 1)"

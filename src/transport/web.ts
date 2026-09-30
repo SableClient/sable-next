@@ -23,7 +23,6 @@ const QUIET_COMMAND_FAILURES = new Set([
   'unsubscribe:unknown_subscription',
 ]);
 
-const MAX_REPORTED_CORE_ERRORS = 20;
 const reportedCoreErrors = new Set<string>();
 
 function isStorageFailure(line: string): boolean {
@@ -34,7 +33,6 @@ function isStorageFailure(line: string): boolean {
 
 function reportCoreError(line: string, onStorageFailure: () => void): void {
   if (isStorageFailure(line)) onStorageFailure();
-  if (reportedCoreErrors.size >= MAX_REPORTED_CORE_ERRORS) return;
   const fingerprint = wasmErrorFingerprint(line);
   if (fingerprint === '' || reportedCoreErrors.has(fingerprint)) return;
   reportedCoreErrors.add(fingerprint);
@@ -80,6 +78,14 @@ export function createWebTransport(): Transport {
   function reportStall(next: boolean): void {
     if (stalled === next) return;
     stalled = next;
+    if (next) {
+      Sentry.captureMessage('Core worker stopped responding', {
+        level: 'error',
+        fingerprint: ['wasm-core-stall'],
+        tags: { source: 'wasm-core' },
+        extra: { pendingRequests: pending.size },
+      });
+    }
     for (const listener of stallListeners) listener(next);
   }
 
@@ -144,6 +150,7 @@ export function createWebTransport(): Transport {
       fingerprint: ['wasm-core-crash', message],
       tags: { source: 'wasm-core' },
     });
+    console.error('[sable transport] core panicked', error);
     worker?.port.close();
     worker = null;
     clearHealthProbe();
@@ -184,8 +191,8 @@ export function createWebTransport(): Transport {
       handleCrash(`shared worker failed to start: ${message || 'unknown error'}`);
     });
 
-    nextWorker.port.onmessageerror = (event) => {
-      console.error('[sable transport] worker message could not be decoded', event);
+    nextWorker.port.onmessageerror = () => {
+      handleCrash('worker message could not be decoded');
     };
 
     nextWorker.port.onmessage = (message: MessageEvent<WorkerMessage>) => {
@@ -213,7 +220,6 @@ export function createWebTransport(): Transport {
       }
 
       if ('panic' in data) {
-        console.error('[sable transport] core panicked', data.panic.message);
         handleCrash(data.panic.message, data.panic.stack);
         return;
       }
@@ -455,8 +461,8 @@ export function createWebTransport(): Transport {
       try {
         await resetWebStorage(accountIds);
       } catch (error) {
-        console.error('[sable transport] the local caches were not fully cleared', error);
         Sentry.captureException(error, { tags: { source: 'cache-reset' } });
+        console.error('[sable transport] the local caches were not fully cleared', error);
       }
     },
 
