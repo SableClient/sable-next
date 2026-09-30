@@ -19,6 +19,12 @@ settingGroups:
       {{#if apple.development-team}}
       DEVELOPMENT_TEAM: {{apple.development-team}}
       {{/if}}
+    configs:
+      release:
+        DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+        DEPLOYMENT_POSTPROCESSING: YES
+        STRIP_INSTALLED_PRODUCT: YES
+        STRIP_STYLE: all
 targetTemplates:
   app:
     type: application

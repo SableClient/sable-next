@@ -31,6 +31,7 @@ fun sentryBuildConfigValue(name: String): String =
 
 android {
     compileSdk = 36
+    System.getenv("ANDROID_NDK_VERSION")?.let { ndkVersion = it }
     namespace = "moe.sable.next"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
@@ -66,11 +67,6 @@ android {
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
-            packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
-            }
         }
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
@@ -107,6 +103,17 @@ android {
             "String",
             "SENTRY_RELEASE",
             "\"${sentryBuildConfigValue("VITE_APP_VERSION")}\""
+        )
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.packaging.jniLibs.keepDebugSymbols.addAll(
+            "*/arm64-v8a/*.so",
+            "*/armeabi-v7a/*.so",
+            "*/x86/*.so",
+            "*/x86_64/*.so"
         )
     }
 }
