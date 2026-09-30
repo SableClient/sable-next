@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { readText } from '#lib/platform/local-json.js';
 
 import {
   accountFinishedFrom,
@@ -31,6 +32,30 @@ afterEach(() => {
 });
 
 describe('the device record', () => {
+  test('the app-entry storage adapter tolerates a getter that throws', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get() {
+        throw new Error('storage denied');
+      },
+    });
+    try {
+      expect(hasPendingSetup({ getItem: readText }, '@a:x', 'ONE')).toBe(false);
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+    }
+  });
+  test('a failed preference write does not interrupt setup', () => {
+    const storage = {
+      setItem: () => {
+        throw new Error('quota');
+      },
+    };
+    expect(() => {
+      writeSetupRecord(storage, 'key', record());
+    }).not.toThrow();
+  });
   test('is keyed by account and device, so another device starts its own', () => {
     writeSetupRecord(localStorage, setupRecordKey('@a:x', 'ONE'), record());
     expect(hasPendingSetup(localStorage, '@a:x', 'ONE')).toBe(true);

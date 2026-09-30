@@ -105,6 +105,8 @@ pub struct PersistedAccount {
     pub session: PersistedSession,
     #[serde(default)]
     pub needs_reauth: bool,
+    #[serde(default)]
+    pub device_invalidated: bool,
 }
 
 impl AccountRegistry {
@@ -141,6 +143,7 @@ impl AccountRegistry {
                     store_id: legacy_store_id.to_owned(),
                     session,
                     needs_reauth: false,
+                    device_invalidated: false,
                 }],
             },
             true,
@@ -178,7 +181,16 @@ impl AccountRegistry {
             {
                 continue;
             }
-            account.store_id = anchored;
+            // Allocated stores are siblings of the base directory. Older
+            // single-account installs keep their database in the base itself.
+            account.store_id = if account
+                .store_id
+                .ends_with(&format!("-account-{}", account.account_id))
+            {
+                anchored
+            } else {
+                base_store_id.to_owned()
+            };
             changed = true;
         }
         changed
@@ -198,6 +210,13 @@ pub fn removable_account_store(base_store_id: &str, store_id: &str) -> bool {
 }
 
 impl Credentials {
+    #[must_use]
+    pub fn tokens(&self) -> matrix_sdk::SessionTokens {
+        match self {
+            Self::Password(session) => session.tokens.clone(),
+            Self::OAuth { user, .. } => user.tokens.clone(),
+        }
+    }
     #[must_use]
     pub fn oauth(session: OAuthSession) -> Self {
         Self::OAuth {
@@ -278,6 +297,7 @@ pub async fn restore_authenticated_client(
     store_id: &str,
     persisted: &PersistedSession,
 ) -> Result<Client, String> {
+    validate_saved_crypto_store(store_id, persisted).await?;
     let client = restore_client(store_id, persisted, true)
         .await
         .map_err(|error| error.to_string())?;
@@ -291,6 +311,12 @@ pub(crate) async fn restore_notification_client(
     store_id: &str,
     persisted: &PersistedSession,
 ) -> Result<Client, String> {
+    validate_saved_crypto_store(store_id, persisted)
+        .await
+        .map_err(|error| {
+            tracing::error!(context = "notification_restore_crypto_store", "{error}");
+            error
+        })?;
     let builder = persisted.resolved_homeserver.as_ref().map_or_else(
         || apply_server(Client::builder(), &persisted.homeserver),
         |url| crate::tls::apply_sdk(Client::builder()).homeserver_url(url.as_str()),
@@ -302,7 +328,10 @@ pub(crate) async fn restore_notification_client(
     Ok(client)
 }
 
-async fn restore_credentials(client: &Client, persisted: &PersistedSession) -> Result<(), String> {
+pub(crate) async fn restore_credentials(
+    client: &Client,
+    persisted: &PersistedSession,
+) -> Result<(), String> {
     match persisted.credentials.clone() {
         Credentials::Password(matrix) => client
             .restore_session(matrix)
@@ -318,6 +347,46 @@ async fn restore_credentials(client: &Client, persisted: &PersistedSession) -> R
             .map_err(|error| error.to_string())?,
     }
 
+    Ok(())
+}
+
+/// An existing device must retain its original encryption identity. Opening a
+/// missing or empty store and restoring credentials would create a new one.
+pub(crate) async fn validate_saved_crypto_store(
+    store_id: &str,
+    persisted: &PersistedSession,
+) -> Result<(), String> {
+    use matrix_sdk_base::crypto::store::CryptoStore;
+
+    #[cfg(not(target_family = "wasm"))]
+    let store = {
+        let path = std::path::Path::new(store_id).join("store");
+        let metadata = tokio::fs::metadata(path.join("matrix-sdk-crypto.sqlite3"))
+            .await
+            .map_err(|error| format!("saved crypto database is unavailable: {error}"))?;
+        if !metadata.is_file() {
+            return Err("saved crypto database is not a file".to_owned());
+        }
+        matrix_sdk::SqliteCryptoStore::open(path, None)
+            .await
+            .map_err(|error| format!("saved crypto database could not be opened: {error}"))?
+    };
+    #[cfg(target_family = "wasm")]
+    let store = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None)
+        .await
+        .map_err(|error| format!("saved crypto database could not be opened: {error}"))?
+        .crypto;
+
+    let account = store
+        .load_account()
+        .await
+        .map_err(|error| format!("saved crypto identity could not be read: {error}"))?
+        .ok_or_else(|| "saved crypto identity is missing".to_owned())?;
+    if account.user_id().as_str() != persisted.credentials.user_id()
+        || account.device_id().as_str() != persisted.credentials.device_id()
+    {
+        return Err("saved crypto identity does not match the session".to_owned());
+    }
     Ok(())
 }
 
@@ -383,7 +452,11 @@ async fn build_account_client(
             NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         );
         builder
-            .sqlite_store(std::path::Path::new(store_id).join("store"), None)
+            .sqlite_store_with_cache_path(
+                std::path::Path::new(store_id).join("store"),
+                std::path::Path::new(store_id).join("cache"),
+                None,
+            )
             .cross_process_store_config(
                 matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
                     holder,
@@ -808,5 +881,130 @@ mod tests {
         assert!(!accounts.reanchor_stores("sable-next"));
         assert_eq!(accounts.accounts[0].store_id, "sable-next-account-a1");
         Ok(())
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn offline_session() -> super::PersistedSession {
+        let (mut registry, _) =
+            AccountRegistry::from_bytes(&registry_json("unused"), "unused").unwrap();
+        let mut persisted = registry.accounts.remove(0).session;
+        persisted.resolved_homeserver = Some(url::Url::parse("https://endpoint.invalid").unwrap());
+        persisted
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    async fn seed_crypto(
+        store_id: &str,
+        persisted: &super::PersistedSession,
+    ) -> matrix_sdk::Client {
+        let client = super::build_client_at(
+            store_id,
+            persisted.resolved_homeserver.as_ref().unwrap(),
+            true,
+        )
+        .await
+        .unwrap();
+        super::restore_credentials(&client, persisted)
+            .await
+            .unwrap();
+        client
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn relocated_legacy_store_preserves_the_device_encryption_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let old = root.path().join("old");
+        let new = root.path().join("new");
+        let old_store = old.join("Sable");
+        let new_store = new.join("Sable");
+        let persisted = offline_session();
+        let client = seed_crypto(old_store.to_str().unwrap(), &persisted).await;
+        let key = client.encryption().curve25519_key().await.unwrap();
+        drop(client);
+        std::fs::rename(&old, &new).unwrap();
+        let (mut registry, _) = AccountRegistry::from_bytes(
+            &registry_json(old_store.to_str().unwrap()),
+            old_store.to_str().unwrap(),
+        )
+        .unwrap();
+        registry.accounts[0].session = persisted.clone();
+        assert!(registry.reanchor_stores(new_store.to_str().unwrap()));
+        let restored =
+            super::restore_authenticated_client(&registry.accounts[0].store_id, &persisted)
+                .await
+                .unwrap();
+        assert_eq!(
+            restored.device_id().unwrap().as_str(),
+            persisted.credentials.device_id()
+        );
+        assert_eq!(restored.encryption().curve25519_key().await.unwrap(), key);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn missing_crypto_store_does_not_recreate_an_existing_device() {
+        let root = tempfile::tempdir().unwrap();
+        let missing = root.path().join("missing");
+        let result =
+            super::restore_authenticated_client(missing.to_str().unwrap(), &offline_session())
+                .await;
+        result.unwrap_err();
+        assert!(!missing.exists());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn empty_crypto_store_does_not_recreate_an_existing_device() {
+        let root = tempfile::tempdir().unwrap();
+        let client = super::build_client_at(
+            root.path().to_str().unwrap(),
+            &url::Url::parse("https://endpoint.invalid").unwrap(),
+            true,
+        )
+        .await
+        .unwrap();
+        drop(client);
+        super::restore_authenticated_client(root.path().to_str().unwrap(), &offline_session())
+            .await
+            .unwrap_err();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn clearing_disposable_cache_keeps_the_encryption_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let store_id = root.path().to_str().unwrap();
+        let persisted = offline_session();
+        let client = seed_crypto(store_id, &persisted).await;
+        let key = client.encryption().curve25519_key().await.unwrap();
+        drop(client);
+        std::fs::remove_dir_all(root.path().join("cache")).unwrap();
+        let client = super::restore_authenticated_client(store_id, &persisted)
+            .await
+            .unwrap();
+        assert_eq!(client.encryption().curve25519_key().await.unwrap(), key);
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn restoring_a_different_device_refuses_the_saved_crypto_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let store_id = root.path().to_str().unwrap();
+        let persisted = offline_session();
+        let client = seed_crypto(store_id, &persisted).await;
+        let key = client.encryption().curve25519_key().await.unwrap();
+        drop(client);
+        let mut wrong = persisted.clone();
+        if let super::Credentials::Password(session) = &mut wrong.credentials {
+            session.meta.device_id = "OTHER".into();
+        }
+        super::restore_authenticated_client(store_id, &wrong)
+            .await
+            .unwrap_err();
+        let restored = super::restore_authenticated_client(store_id, &persisted)
+            .await
+            .unwrap();
+        assert_eq!(restored.encryption().curve25519_key().await.unwrap(), key);
     }
 }

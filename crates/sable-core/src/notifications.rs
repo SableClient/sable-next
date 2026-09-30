@@ -723,7 +723,7 @@ mod tests {
     };
     use crate::preview::describe;
     use crate::protocol::PushFetchView;
-    use crate::session::{PersistedSession, restore_authenticated_client};
+    use crate::session::PersistedSession;
     use crate::store::{FileSessionStore, SessionStore};
 
     fn ts(millis: u32) -> MilliSecondsSinceUnixEpoch {
@@ -895,7 +895,11 @@ mod tests {
                 .save(serde_json::to_vec(&persisted).unwrap())
                 .await
                 .unwrap();
-            let client = restore_authenticated_client(store_dir.to_str().unwrap(), &persisted)
+            let client =
+                crate::session::restore_client(store_dir.to_str().unwrap(), &persisted, true)
+                    .await
+                    .unwrap();
+            crate::session::restore_credentials(&client, &persisted)
                 .await
                 .unwrap();
             server
@@ -1242,6 +1246,13 @@ mod tests {
                 "device_id": "A", "access_token": "old-access", "refresh_token": "old-refresh"}
         }))
         .unwrap();
+        let seeded = crate::session::restore_client(store_dir.to_str().unwrap(), &persisted, true)
+            .await
+            .unwrap();
+        crate::session::restore_credentials(&seeded, &persisted)
+            .await
+            .unwrap();
+        drop(seeded);
         let store = FileSessionStore::new(&store_dir);
         store
             .save(serde_json::to_vec(&persisted).unwrap())
@@ -1316,6 +1327,13 @@ mod tests {
                 "device_id": "A", "access_token": "old-access", "refresh_token": "old-refresh"}
         }))
         .unwrap();
+        let seeded = crate::session::restore_client(dir.path().to_str().unwrap(), &persisted, true)
+            .await
+            .unwrap();
+        crate::session::restore_credentials(&seeded, &persisted)
+            .await
+            .unwrap();
+        drop(seeded);
         let bytes = serde_json::to_vec(&persisted).unwrap();
         store.save(bytes.clone()).await.unwrap();
         Mock::given(method("GET"))

@@ -36,14 +36,17 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   const sent: { type: string }[] = [];
   const close = vi.fn();
   const resetCaches = vi.fn().mockResolvedValue(undefined);
+  const deleteAccountStore = vi.fn().mockResolvedValue(undefined);
   const send = vi.fn((command: { type: string }) => {
     sent.push(command);
-    return Promise.resolve(responses[command.type] ?? {});
+    return Promise.resolve(
+      responses[command.type] ?? (command.type === 'list_accounts' ? { accounts: [] } : {})
+    );
   });
   const transport = {
     send,
     resetCaches,
-    deleteAccountStore: vi.fn().mockResolvedValue(undefined),
+    deleteAccountStore,
     subscribe: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
 
@@ -68,6 +71,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     sent,
     close,
     resetCaches,
+    deleteAccountStore,
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
@@ -233,7 +237,7 @@ test("a restore that fails keeps every account's recent searches", async () => {
 
   await core.start();
 
-  expect(core.status).toBe('signed-out');
+  expect(core.status).toBe('error');
   expect(recentSearches(session.user_id)).toContain('rollback plan');
 });
 
@@ -247,16 +251,143 @@ test('a restore that returns no session reports signed out, not an error', async
   expect(core.session).toBeNull();
 });
 
-test('a transport that refuses to restore leaves the client signed out for relogin', async () => {
+test('a failed restore can retry without logging in or deleting stores', async () => {
   const fake = fakeTransport();
   fake.transport.send = vi.fn(() => Promise.reject(new Error('worker gone')));
-  const core = createCoreClient(() => fake.transport);
+  const recovered = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const open = vi.fn().mockReturnValueOnce(fake.transport).mockReturnValue(recovered.transport);
+  const core = createCoreClient(open);
 
   await core.start();
 
+  expect(core.status).toBe('error');
+  expect(core.session).toBeNull();
+  expect(fake.close).toHaveBeenCalledOnce();
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+  await core.start();
+  expect(core.status).toBe('ready');
+  expect(core.session?.device_id).toBe(session.device_id);
+  expect(recovered.sent.map((command) => command.type)).not.toContain('login');
+});
+
+test('a restored session survives an account-list failure and a retry', async () => {
+  const fake = fakeTransport({ restore: { session } });
+  fake.send.mockImplementation((command) =>
+    command.type === 'list_accounts'
+      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      : Promise.resolve({ session })
+  );
+  const recovered = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(
+    vi.fn().mockReturnValueOnce(fake.transport).mockReturnValue(recovered.transport)
+  );
+  await core.start();
+  expect(core.status).toBe('error');
+  expect(core.session?.device_id).toBe(session.device_id);
+  await core.start();
+  expect(core.status).toBe('ready');
+  expect(core.session?.device_id).toBe(session.device_id);
+});
+
+test.each(['list_accounts', 'switch_account'])(
+  'retry resumes fallback selection after a failed %s',
+  async (failedCommand) => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const retired = { ...session, needs_reauth: true };
+    const initial = fakeTransport({
+      restore: { session },
+      list_accounts: { accounts: [session, otherSession] },
+    });
+    const retry = fakeTransport({
+      restore: { session: null },
+      list_accounts: { accounts: [retired, otherSession] },
+      switch_account: { session: otherSession },
+    });
+    const core = createCoreClient(
+      vi.fn().mockReturnValueOnce(initial.transport).mockReturnValue(retry.transport)
+    );
+    await core.start();
+    initial.send.mockImplementation((command) =>
+      command.type === failedCommand
+        ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+        : Promise.resolve({ accounts: [retired, otherSession] })
+    );
+    initial.emit({ type: 'session_ended', reason: 'soft_logout' });
+    await vi.waitFor(() => {
+      expect(core.status).toBe('error');
+    });
+    await core.start();
+    expect(core.status).toBe('ready');
+    expect(core.session).toEqual(otherSession);
+    expect(core.restoreFailed).toBe(false);
+    expect(retry.sent).toContainEqual({
+      type: 'switch_account',
+      account_id: otherSession.account_id,
+    });
+  }
+);
+
+test('failed crypto restoration exposes saved accounts for deliberate recovery', async () => {
+  vi.stubGlobal('BroadcastChannel', undefined);
+  const fake = fakeTransport({ list_accounts: { accounts: [session, otherSession] } });
+  fake.send.mockImplementation((command) =>
+    command.type === 'restore'
+      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      : Promise.resolve({ accounts: [session, otherSession] })
+  );
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  expect(core.restoreFailed).toBe(true);
+  expect(core.accounts).toEqual([session, otherSession]);
+});
+
+test('fresh sign-in recovery keeps saved account data and avoids old-device reauthentication', async () => {
+  vi.stubGlobal('BroadcastChannel', undefined);
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  core.restoreFailed = true;
+  core.reauthenticationAccountId = session.account_id;
+  core.beginSignInRecovery();
   expect(core.status).toBe('signed-out');
   expect(core.session).toBeNull();
+  expect(core.restoreFailed).toBe(false);
+  expect(core.reauthenticationAccountId).toBeNull();
+  expect(core.accounts).toEqual([session]);
+  expect(fake.sent).not.toContainEqual({ type: 'logout' });
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+  expect(fake.resetCaches).not.toHaveBeenCalled();
 });
+
+test.each(['password', 'oidc', 'sso', 'qr'])(
+  '%s recovery selects the new device when the old account belongs to the same user',
+  async (method) => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const fresh = { ...session, account_id: 'new-device', device_id: 'NEW' };
+    const fake = fakeTransport({
+      restore: { session: fresh },
+      list_accounts: { accounts: [session, fresh] },
+      login: { user_id: session.user_id },
+      complete_oidc_login: { user_id: session.user_id },
+      complete_sso_login: { user_id: session.user_id },
+    });
+    const core = createCoreClient(() => fake.transport);
+    if (method === 'password') {
+      await core.login(session.homeserver, { kind: 'user', user: session.user_id }, 'password');
+    } else if (method === 'oidc') {
+      await core.completeOidcLogin('sable://oauth/callback?code=new');
+    } else if (method === 'sso') {
+      await core.completeSsoLogin('sable://sso/callback?loginToken=new');
+    } else {
+      await core.finishQrLogin(session.user_id);
+    }
+    expect(core.session).toEqual(fresh);
+    expect(core.status).toBe('ready');
+    expect(core.accounts).toEqual([session, fresh]);
+    expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+    core.stop();
+  }
+);
 
 test('concurrent starts share one restore', async () => {
   const fake = fakeTransport({ restore: { session: null } });

@@ -9,7 +9,7 @@
   /* The root layout starts the core after this page has mounted, so the landing
      decision has to wait for the status to settle rather than sample it once. */
   $effect(() => {
-    if (core.status === 'idle' || core.status === 'starting') return;
+    if (core.status !== 'ready' && core.status !== 'signed-out') return;
     void goto(
       core.status === 'ready' ? takeAfterLogin(resolve('/(app)/rooms')) : resolve('login'),
       {

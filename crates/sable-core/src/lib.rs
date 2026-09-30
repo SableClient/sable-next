@@ -780,7 +780,9 @@ mod tests {
         );
 
         core.accounts().await.unwrap();
-        core.mark_account_needs_reauth(Some("a1")).await.unwrap();
+        core.mark_account_needs_reauth(Some("a1"), false)
+            .await
+            .unwrap();
 
         let stored: serde_json::Value =
             serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();

@@ -36,6 +36,7 @@
   import { resetUrlPreviews } from '#lib/features/room/media/link-preview-cache.js';
   import { rememberAfterLogin } from '#lib/auth/after-login.js';
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
+  import { readText } from '#lib/platform/local-json.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import {
     alertsNatively,
@@ -297,7 +298,7 @@
   $effect(() => {
     const session = core.session;
     if (core.status !== 'ready' || !session) return;
-    if (hasPendingSetup(localStorage, session.user_id, session.device_id)) {
+    if (hasPendingSetup({ getItem: readText }, session.user_id, session.device_id)) {
       void goto(resolve('setup'));
     }
   });

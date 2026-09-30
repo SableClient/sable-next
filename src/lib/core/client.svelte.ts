@@ -26,6 +26,7 @@ import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
 import { clearRoomListSnapshot } from '#lib/rooms/room-list-snapshot.js';
 import { clearRecentSearches } from '#lib/features/search/recent-searches.svelte.js';
+import { reportSessionFailure } from '#lib/observability/session-telemetry.js';
 import {
   browserGatesCoreNetwork,
   localNetworkDenied,
@@ -128,6 +129,7 @@ export class CoreClient {
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
   storageInterrupted = $state(false);
+  restoreFailed = $state(false);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -228,11 +230,7 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      await this.refreshAccounts();
-      this.replaceSession(
-        this.accounts.find((account) => account.user_id === response.user_id) ?? null
-      );
-      this.status = 'ready';
+      await this.finishAuthentication(response.user_id, generation);
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
         this.replaceSession(previousSession);
@@ -327,11 +325,7 @@ export class CoreClient {
       });
       const result = response.result;
       if (result.state === 'complete') {
-        await this.refreshAccounts();
-        this.replaceSession(
-          this.accounts.find((account) => account.user_id === result.user_id) ?? null
-        );
-        this.status = 'ready';
+        await this.finishAuthentication(result.user_id);
       } else {
         this.replaceSession(previousSession);
         this.status = previousSession ? 'ready' : 'signed-out';
@@ -350,11 +344,7 @@ export class CoreClient {
     });
     const result = response.result;
     if (result.state === 'complete') {
-      await this.refreshAccounts();
-      this.replaceSession(
-        this.accounts.find((account) => account.user_id === result.user_id) ?? null
-      );
-      this.status = 'ready';
+      await this.finishAuthentication(result.user_id);
     }
     return result;
   }
@@ -398,11 +388,7 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      await this.refreshAccounts();
-      this.replaceSession(
-        this.accounts.find((account) => account.user_id === response.user_id) ?? null
-      );
-      this.status = 'ready';
+      await this.finishAuthentication(response.user_id, generation);
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
         this.replaceSession(previousSession);
@@ -431,9 +417,7 @@ export class CoreClient {
   }
 
   async finishQrLogin(userId: string): Promise<void> {
-    await this.refreshAccounts();
-    this.replaceSession(this.accounts.find((account) => account.user_id === userId) ?? null);
-    this.status = 'ready';
+    await this.finishAuthentication(userId);
   }
 
   async startQrGrant(scanned: string | null): Promise<void> {
@@ -493,11 +477,7 @@ export class CoreClient {
 
       if (generation !== this.generation || transport !== this.transport) return;
 
-      await this.refreshAccounts();
-      this.replaceSession(
-        this.accounts.find((account) => account.user_id === response.user_id) ?? null
-      );
-      this.status = 'ready';
+      await this.finishAuthentication(response.user_id, generation);
     } catch (error) {
       if (generation === this.generation && transport === this.transport) {
         this.replaceSession(previousSession);
@@ -600,13 +580,30 @@ export class CoreClient {
   }
 
   async switchAccount(accountId: string): Promise<void> {
-    const response = await this.ensureTransport().send({
+    const generation = this.generation;
+    const transport = this.ensureTransport();
+    const response = await transport.send({
       type: 'switch_account',
       account_id: accountId,
     });
-    this.replaceSession(response.session);
+    if (generation !== this.generation || transport !== this.transport) return;
     await this.refreshAccounts();
+    if (generation !== this.generation || transport !== this.transport) return;
+    this.replaceSession(response.session);
+    this.restoreFailed = false;
+    this.crashed = null;
+    this.storageInterrupted = false;
     this.status = 'ready';
+  }
+
+  beginSignInRecovery(): void {
+    this.generation += 1;
+    this.startPromise = null;
+    this.cleanupTransport();
+    this.replaceSession(null, false);
+    this.reauthenticationAccountId = null;
+    this.restoreFailed = false;
+    this.status = 'signed-out';
   }
 
   async removeAccount(accountId: string): Promise<void> {
@@ -737,6 +734,7 @@ export class CoreClient {
     this.replaceSession(null, false);
     this.verification = null;
     this.resetCachedState();
+    this.restoreFailed = false;
     this.status = 'idle';
     this.stopAccountChannel?.();
     this.stopAccountChannel = null;
@@ -821,19 +819,40 @@ export class CoreClient {
       if (response.session) {
         this.replaceSession(response.session);
         await this.refreshAccounts();
+        if (generation !== this.generation) return;
+        this.restoreFailed = false;
+        this.crashed = null;
+        this.storageInterrupted = false;
         this.status = 'ready';
       } else {
-        console.warn('[sable core] no session to restore');
+        await this.refreshAccounts();
+        if (generation !== this.generation) return;
+        const fallback = this.accounts.find((account) => !account.needs_reauth);
+        if (fallback) {
+          await this.switchAccount(fallback.account_id);
+          return;
+        }
         this.replaceSession(null);
-        this.accounts = [];
+        this.reauthenticationAccountId =
+          this.accounts.find((account) => account.needs_reauth)?.account_id ?? null;
+        this.restoreFailed = false;
         this.status = 'signed-out';
       }
     } catch (error) {
       if (generation !== this.generation) return;
 
       console.error('[sable core] restore failed', error);
-      this.replaceSession(null);
-      this.status = 'signed-out';
+      reportSessionFailure('restore', error);
+      if (error instanceof CoreError) {
+        try {
+          await this.refreshAccounts();
+        } catch {
+          // Keep the last known accounts if storage is unavailable.
+        }
+        if (generation !== this.generation) return;
+      }
+      this.restoreFailed = true;
+      this.status = 'error';
       this.cleanupTransport();
     }
   }
@@ -944,6 +963,7 @@ export class CoreClient {
         invalidatePacks(this.commands);
         return;
       case 'session_ended':
+        reportSessionFailure('session_ended', undefined, event.reason);
         this.reauthenticationAccountId = this.session?.account_id ?? null;
         this.replaceSession(null);
         this.status = 'authenticating';
@@ -961,17 +981,36 @@ export class CoreClient {
     this.accounts = response.accounts;
   }
 
+  private async finishAuthentication(userId: string, generation = this.generation): Promise<void> {
+    const transport = this.ensureTransport();
+    const response = await transport.send({ type: 'restore' });
+    if (generation !== this.generation || transport !== this.transport) return;
+    if (!response.session || response.session.user_id !== userId) {
+      throw new CoreError({ code: 'not_logged_in' });
+    }
+    await this.refreshAccounts();
+    if (generation !== this.generation || transport !== this.transport) return;
+    this.replaceSession(response.session);
+    this.status = 'ready';
+  }
+
   private async restoreFallbackAccount(): Promise<void> {
+    const generation = this.generation;
     try {
       await this.refreshAccounts();
+      if (generation !== this.generation) return;
       const fallbackAccountId = this.accounts.find((account) => !account.needs_reauth)?.account_id;
       if (fallbackAccountId === undefined) {
         this.status = 'signed-out';
         return;
       }
       await this.switchAccount(fallbackAccountId);
-    } catch {
-      this.status = 'signed-out';
+    } catch (error) {
+      if (generation !== this.generation) return;
+      reportSessionFailure('restore_fallback', error);
+      this.restoreFailed = true;
+      this.status = 'error';
+      this.cleanupTransport();
     }
   }
 

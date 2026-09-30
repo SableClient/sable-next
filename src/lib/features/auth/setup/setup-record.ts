@@ -34,7 +34,10 @@ function stepList(value: unknown): SetupStep[] | null {
   return steps.length === value.length ? steps : null;
 }
 
-export function readSetupRecord(storage: Storage, key: string): SetupRecord | null {
+export function readSetupRecord(
+  storage: Pick<Storage, 'getItem'>,
+  key: string
+): SetupRecord | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(storage.getItem(key) ?? 'null');
@@ -55,8 +58,16 @@ export function readSetupRecord(storage: Storage, key: string): SetupRecord | nu
   };
 }
 
-export function writeSetupRecord(storage: Storage, key: string, record: SetupRecord): void {
-  storage.setItem(key, JSON.stringify(record));
+export function writeSetupRecord(
+  storage: Pick<Storage, 'setItem'>,
+  key: string,
+  record: SetupRecord
+): void {
+  try {
+    storage.setItem(key, JSON.stringify(record));
+  } catch {
+    /* The in-memory setup record remains usable. */
+  }
 }
 
 export function pendingStep(record: SetupRecord): SetupStep | null {
@@ -70,7 +81,11 @@ function finishedNames(content: unknown): string[] {
   return finished.filter((step): step is string => typeof step === 'string');
 }
 
-export function hasPendingSetup(storage: Storage, userId: string, deviceId: string): boolean {
+export function hasPendingSetup(
+  storage: Pick<Storage, 'getItem'>,
+  userId: string,
+  deviceId: string
+): boolean {
   const record = readSetupRecord(storage, setupRecordKey(userId, deviceId));
   return record !== null && pendingStep(record) !== null;
 }
@@ -97,7 +112,7 @@ export async function markAccountFinished(core: CoreClient, step: AccountStep): 
 
 export async function restartSetup(
   core: CoreClient,
-  storage: Storage,
+  storage: Pick<Storage, 'setItem'>,
   userId: string,
   deviceId: string
 ): Promise<void> {

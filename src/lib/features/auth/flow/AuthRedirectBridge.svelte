@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { on } from 'svelte/events';
+  import { removeLocalValue } from '#lib/platform/local-json.js';
 
   import {
     callbackChannelName,
@@ -53,7 +54,7 @@
   onMount(() => {
     const offStorage = on(window, 'storage', (event: StorageEvent) => {
       if (event.key !== 'sable-registration-complete' || !event.newValue) return;
-      localStorage.removeItem(event.key);
+      removeLocalValue(event.key);
       onRegistrationComplete();
     });
 

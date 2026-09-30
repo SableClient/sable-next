@@ -1,6 +1,6 @@
 import { createSubscriber } from 'svelte/reactivity';
 
-import { readJson } from '#lib/platform/local-json.js';
+import { readJson, readText, writeJson, writeText } from '#lib/platform/local-json.js';
 
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
 
@@ -36,7 +36,7 @@ const consoleMethods = ['error', 'warn', 'info', 'debug'] as const;
 type ConsoleMethod = (typeof consoleMethods)[number];
 
 function readEnabled(): boolean {
-  return typeof localStorage !== 'undefined' && localStorage.getItem(ENABLED_KEY) === '1';
+  return readText(ENABLED_KEY) === '1';
 }
 
 function readDisabledCategories(): DebugLogCategory[] {
@@ -165,9 +165,7 @@ export function setDebugLogging(next: boolean): void {
   enabled = next;
   if (next) interceptConsole();
   else restoreConsole();
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(ENABLED_KEY, next ? '1' : '0');
-  }
+  writeText(ENABLED_KEY, next ? '1' : '0');
   notify?.();
   for (const listener of captureListeners) listener(next);
 }
@@ -185,9 +183,7 @@ if (enabled) interceptConsole();
 export function setDebugCategoryEnabled(category: DebugLogCategory, next: boolean): void {
   if (next) disabledCategories.delete(category);
   else disabledCategories.add(category);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(DISABLED_CATEGORIES_KEY, JSON.stringify([...disabledCategories]));
-  }
+  writeJson(DISABLED_CATEGORIES_KEY, [...disabledCategories]);
   notify?.();
 }
 

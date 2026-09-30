@@ -750,9 +750,10 @@
   "app": {
     "starting": "Starting Sable…",
     "pettingAnimal": "Petting {{animal}}",
-    "unableToStart": "Sable could not start. Check your connection and try again.",
-    "startFailed": "The client could not connect to its core or restore your session.",
-    "tryAgain": "Try again"
+    "unableToStart": "Unable to restore your session.",
+    "startFailed": "Check your connection and device storage, then try again.",
+    "tryAgain": "Try again",
+    "signInRecoveryHint": "Signing in creates a new device and keeps your saved account data."
   },
   "home": {
     "resourcesLabel": "Sable resources",
