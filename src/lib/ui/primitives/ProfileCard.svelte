@@ -119,6 +119,18 @@
       copied = false;
     }, 2000);
   }
+  let statusHovered = $state(false);
+  function enterStatusHover(): void {
+    statusHovered = true;
+  }
+  function exitstatusHover(e: { currentTarget: HTMLElement }): void {
+    statusHovered = false;
+    const element = e.currentTarget.querySelector('.profile-card-status-text') as HTMLElement;
+    element.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    });
+  }
 </script>
 
 <section
@@ -208,9 +220,26 @@
     {#if crest}
       <div class="profile-card-crest-content">{@render crest()}</div>
     {:else if status}
-      <p class="profile-card-status">
-        {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
-      </p>
+      <div
+        class="profile-card-status"
+        role="button"
+        tabindex="0"
+        onpointerenter={enterStatusHover}
+        onpointerover={enterStatusHover}
+        onmouseleave={exitstatusHover}
+        onblur={exitstatusHover}
+        data-ui-before
+        data-ui-after
+      >
+        <p
+          class="profile-card-status-text"
+          style={!statusHovered
+            ? '-webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;'
+            : 'overflow: auto'}
+        >
+          {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
+        </p>
+      </div>
     {/if}
   </div>
   <div class="profile-card-body">
@@ -433,24 +462,58 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  /* Rounded like the bio panel, not pill like the action row: this is something
-     the owner wrote, not a control. */
+  /* Make status more unique type thing. */
   .profile-card-status {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
+    flex-shrink: 1;
     font-size: var(--font-size-label);
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    line-height: var(--line-height-small);
+    left: calc(var(--avatar-size-large) + var(--space-600));
+    max-height: var(--space-1100);
+    max-width: calc(100% - var(--avatar-size-large) - var(--space-700));
+    min-width: var(--space-700);
+    padding: var(--space-200) var(--space-200);
+    position: absolute;
+    top: calc(-1 * var(--space-600));
+    z-index: 1;
+  }
+
+  .profile-card-status::before {
+    background: inherit;
+    border: var(--border-width) solid var(--profile-line);
+    border-bottom-width: 0;
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    content: '';
+    height: 0.4rem;
+    left: 0.25rem;
+    position: absolute;
+    top: calc(-1 * var(--space-150));
+    width: 0.8rem;
+    z-index: -1;
+  }
+
+  .profile-card-status::after {
+    background: inherit;
+    border: var(--border-width) solid var(--profile-line);
+    border-radius: var(--radius-pill);
+    content: '';
+    height: 8px;
+    left: -3px;
+    position: absolute;
+    top: -12px;
+    width: 8px;
+    z-index: -1;
+  }
+
+  .profile-card-status-text {
+    -webkit-box-orient: vertical;
+    box-orient: vertical;
+    display: -webkit-box;
     margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    padding: var(--space-200) var(--space-300);
-    transform: translateY(-50%);
+    max-height: var(--space-1000);
+    overflow-wrap: break-word;
+    padding: 0;
   }
 
   .profile-card-status-emoji {
