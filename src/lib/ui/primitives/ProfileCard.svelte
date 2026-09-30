@@ -119,17 +119,11 @@
       copied = false;
     }, 2000);
   }
-  let statusHovered = $state(false);
-  function enterStatusHover(): void {
-    statusHovered = true;
-  }
-  function exitstatusHover(e: { currentTarget: HTMLElement }): void {
-    statusHovered = false;
-    const element = e.currentTarget.querySelector('.profile-card-status-text') as HTMLElement;
-    element.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
+  function resetStatusScroll(e: { currentTarget: HTMLElement }): void {
+    const text = e.currentTarget.querySelector('.profile-card-status-text');
+    if (text instanceof HTMLElement && !text.matches(':hover, :focus')) {
+      text.scrollTop = 0;
+    }
   }
 </script>
 
@@ -222,20 +216,18 @@
     {:else if status}
       <div
         class="profile-card-status"
-        role="button"
-        tabindex="0"
-        onpointerenter={enterStatusHover}
-        onpointerover={enterStatusHover}
-        onmouseleave={exitstatusHover}
-        onblur={exitstatusHover}
+        role="group"
+        onpointerleave={resetStatusScroll}
+        onfocusout={resetStatusScroll}
         data-ui-before
         data-ui-after
       >
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <p
-          class="profile-card-status-text"
-          style={!statusHovered
-            ? '-webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;'
-            : 'overflow: auto'}
+          class="profile-card-status-text explicit-scrollbar"
+          role="region"
+          aria-label={$i18n.t('settings.status')}
+          tabindex="0"
         >
           {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
         </p>
@@ -462,20 +454,18 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  /* Make status more unique type thing. */
+  /* Keep the bubble in the crest's flow so expansion clears the identity row. */
   .profile-card-status {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
     flex-shrink: 1;
     font-size: var(--font-size-label);
-    left: calc(var(--avatar-size-large) + var(--space-600));
-    max-height: var(--space-1100);
-    max-width: calc(100% - var(--avatar-size-large) - var(--space-700));
+    margin-left: var(--space-100);
+    margin-top: calc(-1 * var(--space-600));
     min-width: var(--space-700);
     padding: var(--space-200) var(--space-200);
-    position: absolute;
-    top: calc(-1 * var(--space-600));
+    position: relative;
     z-index: 1;
   }
 
@@ -510,10 +500,27 @@
     -webkit-box-orient: vertical;
     box-orient: vertical;
     display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     margin: 0;
     max-height: var(--space-1000);
-    overflow-wrap: break-word;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    overscroll-behavior: contain;
     padding: 0;
+  }
+
+  .profile-card-status-text:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  .profile-card-status:hover .profile-card-status-text,
+  .profile-card-status:focus-within .profile-card-status-text {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow-y: auto;
   }
 
   .profile-card-status-emoji {
