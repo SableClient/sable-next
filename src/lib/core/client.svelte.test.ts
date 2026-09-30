@@ -6,6 +6,7 @@ import { CoreError, type Transport } from '#src/transport';
 import { recentSearches, rememberSearch } from '#lib/features/search/recent-searches.svelte.js';
 
 import { createCoreClient } from './client.svelte.js';
+import { markVoiceRecording } from './attachment-info.js';
 
 const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
 
@@ -481,6 +482,24 @@ test.each(['attachment', 'gallery', 'scheduled'] as const)(
     expect(uploadMedia).not.toHaveBeenCalled();
   }
 );
+
+test('sending a voice recording forwards its MIME type, duration, waveform and voice marker', async () => {
+  const fake = fakeTransport();
+  const sendAttachment = vi.fn<Transport['sendAttachment']>();
+  fake.transport.sendAttachment = sendAttachment;
+  const core = createCoreClient(() => fake.transport);
+  const recording = new File(['recording'], 'voice.ogg', { type: 'audio/ogg' });
+  markVoiceRecording(recording, [0, 0.5, 1], 1250);
+
+  await core.commands.sendAttachment('!room:example.org', recording);
+
+  expect(sendAttachment).toHaveBeenCalledOnce();
+  expect(sendAttachment.mock.calls[0][0]).toMatchObject({
+    filename: 'voice.ogg',
+    mime: 'audio/ogg',
+    info: { voice: true, duration_ms: 1250, waveform: [0, 0.5, 1] },
+  });
+});
 
 test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {
   const fake = fakeTransport();

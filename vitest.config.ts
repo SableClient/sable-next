@@ -28,6 +28,8 @@ export default mergeConfig(
             environment: 'node',
             include: ['src/**/*.test.ts'],
             exclude: [
+              'src/lib/features/composer/VoiceRecorder.svelte.test.ts',
+              'src/lib/features/composer/voice-recorder-encoder.test.ts',
               'src/lib/features/room/timeline/TimelineReadReceipt.svelte.test.ts',
               'src/lib/ui/long-press.svelte.test.ts',
               'src/lib/features/room/messages/message-swipe.svelte.test.ts',
@@ -52,6 +54,8 @@ export default mergeConfig(
             name: 'happy-dom',
             environment: 'happy-dom',
             include: [
+              'src/lib/features/composer/VoiceRecorder.svelte.test.ts',
+              'src/lib/features/composer/voice-recorder-encoder.test.ts',
               'src/lib/features/room/timeline/TimelineReadReceipt.svelte.test.ts',
               'src/lib/ui/long-press.svelte.test.ts',
               'src/lib/features/room/messages/message-swipe.svelte.test.ts',

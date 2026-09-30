@@ -143,10 +143,10 @@ test('media the browser rejects measures nothing rather than throwing', async ()
 });
 
 test('a file marked as a voice recording carries its waveform', async () => {
-  stubMediaElement({ duration: 5 });
+  const createElement = vi.spyOn(document, 'createElement');
 
   const recording = new File([new Uint8Array([1, 2, 3])], 'voice.webm', { type: 'audio/webm' });
-  markVoiceRecording(recording, [0, 0.5, 1]);
+  markVoiceRecording(recording, [0, 0.5, 1], 5000);
 
   await expect(measureAttachment(recording)).resolves.toEqual({
     width: null,
@@ -157,6 +157,19 @@ test('a file marked as a voice recording carries its waveform', async () => {
     waveform: [0, 0.5, 1],
     voice: true,
     audio_metadata: null,
+  });
+  expect(createElement).not.toHaveBeenCalled();
+});
+
+test('a recording with an unreadable duration keeps its voice marker and waveform', async () => {
+  stubMediaElement({ duration: Number.POSITIVE_INFINITY });
+  const recording = new File([new Uint8Array([1, 2, 3])], 'voice.webm', { type: 'audio/webm' });
+  markVoiceRecording(recording, [0, 0.5, 1], 5000);
+
+  await expect(measureAttachment(recording)).resolves.toMatchObject({
+    voice: true,
+    waveform: [0, 0.5, 1],
+    duration_ms: 5000,
   });
 });
 
