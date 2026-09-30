@@ -216,6 +216,19 @@ export class TimelineWindow<T> {
     return this.drain();
   }
 
+  holdAnchor(): void {
+    this.pinned = false;
+    this.publish(this.capture());
+  }
+
+  anchorKey(accept: (value: T) => boolean = () => true): string | null {
+    const anchor = this.anchors.find(({ key }) => {
+      const row = this.rows.find((candidate) => candidate.key === key);
+      return row !== undefined && accept(row.value);
+    });
+    return anchor?.key ?? null;
+  }
+
   async jumpTo(
     key: string | null,
     align: 'start' | 'center' = 'center',
@@ -423,17 +436,21 @@ export class TimelineWindow<T> {
     return visible;
   }
 
-  private setHeight(height: number): void {
+  private setHeight(height: number, top?: number): void {
     height = Math.ceil(height);
-    if (Math.abs(height - this.height) < EPSILON) return;
+    if (Math.abs(height - this.height) < EPSILON) {
+      if (top !== undefined) this.setTop(top);
+      return;
+    }
     this.height = Math.max(0, height);
     this.options.canvas.style.height = `${this.height}px`;
-    this.setTop(this.top);
+    this.setTop(top ?? this.top);
   }
 
   private setTop(top: number): void {
     this.top = top;
-    this.options.content.style.bottom = `${this.height - this.contentHeight - top}px`;
+    const bottom = `${this.height - this.contentHeight - top}px`;
+    if (this.options.content.style.bottom !== bottom) this.options.content.style.bottom = bottom;
   }
 
   private bucketOf(value: T): string {
@@ -529,8 +546,9 @@ export class TimelineWindow<T> {
     const canFollowLatest = this.options.canFollowLatest?.() ?? true;
     if (!canFollowLatest) this.pinned = false;
     const viewport = this.options.viewport;
-    this.top =
-      this.height - this.contentHeight - Number.parseFloat(this.options.content.style.bottom);
+    const viewportHeight = viewport.clientHeight;
+    const contentHeight = this.contentHeight;
+    this.top = this.height - contentHeight - Number.parseFloat(this.options.content.style.bottom);
     if (this.active) this.trackMovement();
     const elements = this.elements();
     for (const element of elements) {
@@ -539,30 +557,26 @@ export class TimelineWindow<T> {
       if (key && height > 0) this.setSize(key, height, this.rowBuckets.get(key) ?? '');
     }
     const contentFits =
-      this.start === 0 &&
-      this.end === this.items.length &&
-      this.contentHeight <= viewport.clientHeight;
+      this.start === 0 && this.end === this.items.length && contentHeight <= viewportHeight;
     const reachedEnd =
       canFollowLatest &&
-      (contentFits || (this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd()));
+      (contentFits || (this.ready && viewportHeight > this.viewportHeight && this.atEnd()));
     if (reachedEnd) this.pinned = true;
-    this.viewportHeight = viewport.clientHeight;
+    this.viewportHeight = viewportHeight;
     if (this.pinned && this.active && !this.jumping) {
       // Follow keyboard resizing without writing scrollTop during a gesture.
       this.setHeight(
-        contentFits ? viewport.clientHeight : Math.max(this.height, viewport.clientHeight)
+        contentFits ? viewportHeight : Math.max(this.height, viewportHeight),
+        (contentFits ? 0 : viewport.scrollTop) + viewportHeight - contentHeight
       );
-      this.setTop(viewport.scrollTop + viewport.clientHeight - this.contentHeight);
     } else if (reachedEnd && this.active) {
-      this.setHeight(
-        contentFits ? viewport.clientHeight : Math.max(this.height, viewport.clientHeight)
-      );
-      this.setTop(this.height - this.contentHeight);
+      const height = contentFits ? viewportHeight : Math.max(this.height, viewportHeight);
+      this.setHeight(height, height - contentHeight);
     } else if (this.pinned && !this.active) {
-      this.setTop(Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight));
-      this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
-      this.setTop(this.height - this.contentHeight);
-      this.writeOffset(viewport.scrollHeight - viewport.clientHeight);
+      const top = Math.max(this.estimatePrefix(), viewportHeight - contentHeight);
+      const height = Math.ceil(Math.max(top + contentHeight, viewportHeight));
+      this.setHeight(height, height - contentHeight);
+      this.writeOffset(viewport.scrollHeight - viewportHeight);
     } else {
       const anchor = this.anchors
         .map((candidate) => ({
@@ -570,21 +584,22 @@ export class TimelineWindow<T> {
           element: elements.find((node) => node.dataset.timelineKey === candidate.key),
         }))
         .find((candidate) => candidate.element);
+      let top = this.top;
       if (anchor?.element) {
         const element = anchor.element;
-        const top =
+        const measuredTop =
           (element.firstElementChild ?? element).getBoundingClientRect().top -
           viewport.getBoundingClientRect().top;
-        this.setTop(this.top + anchor.top - top);
+        top += anchor.top - measuredTop;
       }
-      if (!this.active || (this.scrollingUp && !this.jumping && this.top < -EPSILON)) {
-        const top = Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight);
-        const shift = Math.ceil(top - this.top);
-        this.setTop(this.top + shift);
-        this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
+      if (!this.active || (this.scrollingUp && !this.jumping && top < -EPSILON)) {
+        const shift = Math.ceil(
+          Math.max(this.estimatePrefix(), viewportHeight - contentHeight) - top
+        );
+        top += shift;
+        this.setHeight(Math.max(top + contentHeight, viewportHeight), top);
         this.writeOffset(viewport.scrollTop + shift);
-      }
-      this.setHeight(Math.max(this.top + this.contentHeight, viewport.clientHeight));
+      } else this.setHeight(Math.max(top + contentHeight, viewportHeight), top);
       if (anchor?.element) {
         const element = anchor.element;
         const residual =

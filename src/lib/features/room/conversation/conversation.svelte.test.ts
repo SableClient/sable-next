@@ -25,7 +25,12 @@ function item(eventId: string, sender: string): TimelineItemView {
   } as unknown as TimelineItemView;
 }
 
-function setup(items: TimelineItemView[], userId: string, store: Partial<PersonaStore> = {}) {
+function setup(
+  items: TimelineItemView[],
+  userId: string,
+  store: Partial<PersonaStore> = {},
+  beforeSend?: () => Promise<void>
+) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
   const sendAttachment = vi.fn(() => Promise.resolve());
@@ -53,9 +58,47 @@ function setup(items: TimelineItemView[], userId: string, store: Partial<Persona
     sendGif,
     sendLocation,
     timeline,
-    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM }),
+    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM, beforeSend }),
   };
 }
+
+test.each(['message', 'attachment'] as const)(
+  'switches to live before sending a %s',
+  async (kind) => {
+    const live = Promise.withResolvers<undefined>();
+    const beforeSend = vi.fn(() => live.promise);
+    const { conversation, sendMessage, sendAttachment } = setup(
+      [],
+      '@kris:example.org',
+      {},
+      beforeSend
+    );
+    const sending =
+      kind === 'message'
+        ? conversation.sendMessage(ROOM, 'hello')
+        : conversation.sendAttachment(ROOM, new File(['hello'], 'hello.txt'));
+    expect(beforeSend).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendAttachment).not.toHaveBeenCalled();
+    live.resolve(undefined);
+    await sending;
+    expect(kind === 'message' ? sendMessage : sendAttachment).toHaveBeenCalledTimes(1);
+  }
+);
+
+test('a failed switch keeps the reply and prevents sending', async () => {
+  const beforeSend = () => Promise.reject(new Error('live unavailable'));
+  const { conversation, sendMessage } = setup(
+    [item('$one', '@ana:example.org')],
+    '@kris:example.org',
+    {},
+    beforeSend
+  );
+  conversation.reply('$one');
+  await expect(conversation.sendMessage(ROOM, 'hello')).rejects.toThrow('live unavailable');
+  expect(sendMessage).not.toHaveBeenCalled();
+  expect(conversation.context?.eventId).toBe('$one');
+});
 
 test('a reply notifies the author it answers', async () => {
   const { conversation, sendMessage } = setup(
@@ -263,6 +306,33 @@ test('editing a pending message uses its transaction ID', async () => {
     null,
     'corrected',
     expect.objectContaining({ transactionId: 'transaction-1' })
+  );
+});
+
+test('keeps an edited message kind and persona when returning to live drops its row', async () => {
+  const original = {
+    ...item('$original', '@kris:example.org'),
+    content: {
+      kind: 'message',
+      body: 'before',
+      html: 'before',
+      emote: true,
+      notice: false,
+      edited: false,
+    },
+    per_message_profile: { display_name: 'Ghost', avatar_url: null },
+  } as TimelineItemView;
+  const fixture = setup([original], '@kris:example.org', {}, () => {
+    fixture.timeline.items = [];
+    return Promise.resolve();
+  });
+  fixture.conversation.edit('$original', 'before');
+  await fixture.conversation.sendMessage(ROOM, 'after');
+  expect(fixture.editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$original',
+    'after',
+    expect.objectContaining({ kind: 'emote', persona: original.per_message_profile })
   );
 });
 

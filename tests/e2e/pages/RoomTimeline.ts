@@ -181,6 +181,10 @@ export class RoomTimeline {
     await this.page.mouse.wheel(0, -distance);
   }
 
+  async wheelDown(distance: number): Promise<void> {
+    await this.wheelUp(-distance);
+  }
+
   async dispatchWheel(deltaY: number): Promise<void> {
     await this.viewport.dispatchEvent('wheel', { deltaY });
   }

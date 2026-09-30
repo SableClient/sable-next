@@ -135,6 +135,16 @@ function fixture(
   };
 }
 
+test('holding an anchor skips rows the caller cannot restore', async () => {
+  const { window } = fixture();
+  await window.update(entries(200));
+  await window.jumpTo('80', 'start');
+  window.holdAnchor();
+  expect(window.state.pinned).toBe(false);
+  expect(window.anchorKey()).toBe('80');
+  expect(window.anchorKey((value) => value !== 80)).toBe('81');
+});
+
 test('the end of a historical snapshot preserves the reader when newer pages append', async () => {
   const { window, content } = fixture(undefined, undefined, () => false);
   await window.update(entries(2));
@@ -986,6 +996,22 @@ test('a room opened on its last unread stays flush when the marker row is remove
   );
 });
 
+test('a pinned gesture stays flush when shrinking the canvas clamps its scroll offset', async () => {
+  const f = fixture();
+  await f.window.update(entries(10));
+  const offset = f.viewport.scrollTop;
+  expect(offset).toBeGreaterThan(0);
+  Object.defineProperty(f.viewport, 'scrollTop', {
+    configurable: true,
+    get: () => Math.min(offset, f.viewport.scrollHeight - f.viewport.clientHeight),
+    set: () => {},
+  });
+  f.viewport.dispatchEvent(new Event('touchstart'));
+  f.resize(20);
+  expect(f.viewport.scrollTop).toBe(0);
+  expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(f.viewport.clientHeight);
+});
+
 test('repeated content height reads in one task measure the DOM once', async () => {
   const { window, content } = fixture();
   await window.update(entries(100));
@@ -1016,6 +1042,37 @@ test('scrolling measures each rendered row once', async () => {
   expect(bounds).toHaveBeenCalledTimes(1);
   for (const row of rows) expect(row).toHaveBeenCalledTimes(1);
 });
+
+test.each(['latest', 'reader', 'gesture'])(
+  'resizing rows avoids intermediate positions while preserving %s',
+  async (mode) => {
+    const { window, viewport, content, resize } = fixture();
+    await window.update(entries(200));
+    if (mode !== 'latest') await window.jumpTo('80', 'start');
+    if (mode === 'gesture') viewport.dispatchEvent(new Event('touchstart'));
+    const anchor = content.querySelector('[data-timeline-key="80"]');
+    const top = anchor?.getBoundingClientRect().top;
+    const writes = vi.spyOn(content.style, 'setProperty');
+
+    for (const height of [65.25, 50.125, 65.25]) {
+      await Promise.resolve();
+      writes.mockClear();
+      resize(height);
+
+      expect(writes.mock.calls.filter(([name]) => name === 'bottom').length).toBeLessThanOrEqual(2);
+      if (mode === 'latest') {
+        expect(content.lastElementChild?.getBoundingClientRect().bottom).toBeCloseTo(
+          viewport.clientHeight,
+          5
+        );
+        expect(window.state.pinned).toBe(true);
+      } else {
+        expect(anchor?.getBoundingClientRect().top).toBeCloseTo(top ?? 0, 5);
+        expect(window.state.pinned).toBe(false);
+      }
+    }
+  }
+);
 
 test('repeated wheel input without movement skips row measurements', async () => {
   const { window, viewport, content, onChange } = fixture();

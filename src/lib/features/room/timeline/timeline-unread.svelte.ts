@@ -12,6 +12,10 @@ export class TimelineUnread {
   #disposed = false;
   #task: Promise<void> | null = null;
 
+  get readEventId(): string | null {
+    return this.#readEventId;
+  }
+
   get blocking(): boolean {
     return !this.initialized || this.loading || (this.active && !this.reached);
   }

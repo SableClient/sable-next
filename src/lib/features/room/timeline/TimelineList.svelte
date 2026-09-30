@@ -12,7 +12,7 @@
     TimelineItemView,
   } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
-  import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import type { ResumeAnchor, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
@@ -81,6 +81,8 @@
     onRead: (eventId: string) => Promise<void>;
     hasUnread?: boolean;
     onLoadReadMarker?: () => Promise<string | null>;
+    onRequestUnread?: (eventId: string) => Promise<void>;
+    onResumeLive?: (anchor: ResumeAnchor) => Promise<void>;
     onMarkRead?: () => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onSenderProfile?: (
@@ -124,6 +126,8 @@
     onRead,
     hasUnread = false,
     onLoadReadMarker,
+    onRequestUnread,
+    onResumeLive,
     onMarkRead,
     onMatrixLink,
     onCopyLink,
@@ -176,6 +180,9 @@
   let jumpingUnread = $state(false);
   let markingRead = $state(false);
   let unreadError = $state<'jump' | 'read' | null>(null);
+  let switchingToUnread = false;
+  let resumeTask: Promise<void> | null = null;
+  let resumeFailed = $state(false);
   onDestroy(() => {
     unreadNavigation?.abort();
     unread.destroy();
@@ -428,7 +435,7 @@
       },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
-      canFollowLatest: () => untrack(() => live || timeline.forwardPagination === 'end'),
+      canFollowLatest: () => untrack(() => timeline.reachesLatest),
     });
     controller = engine;
     return () => {
@@ -452,6 +459,7 @@
     if (
       live ||
       timeline.loading ||
+      timeline.resumingLive ||
       !timeline.hasSnapshot ||
       timeline.error !== null ||
       !revealed ||
@@ -484,7 +492,19 @@
       return;
     }
     await engine.update(entries);
-    await unread.initialize(timeline.items, hasUnread, onLoadReadMarker, eventItems);
+    const initializingUnread = unread.initialize(
+      timeline.items,
+      hasUnread,
+      onLoadReadMarker,
+      eventItems
+    );
+    if (
+      !entries.some(({ value }) => value.item.content.kind === 'read_marker') &&
+      !entryFor(landingEventId)
+    ) {
+      revealed = true;
+    }
+    await initializingUnread;
     if (disposed) return;
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (focusEventId) {
@@ -497,7 +517,7 @@
     }
     const landingEntry = () => entryFor(landingEventId);
     const unreadEntry = entries.find(({ value }) => value.item.content.kind === 'read_marker');
-    if (!unreadEntry && !unread.active && !landingEntry()) revealed = true;
+    if (!unreadEntry && !landingEntry()) revealed = true;
     filling = true;
     try {
       while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
@@ -522,7 +542,7 @@
       if (landing && !disposed && engine.state.pinned) {
         if (notified) markLanded(landingEventId);
         await engine.jumpTo(landing.key, landing === unreadEntry ? 'start' : 'center');
-      } else if (!notified && unread.active && !disposed) {
+      } else if (!notified && unread.active && unread.firstEventId !== null && !disposed) {
         await jumpToUnread();
       }
     } catch {
@@ -539,6 +559,7 @@
     const node = viewport;
     if (
       timeline.loading ||
+      timeline.resumingLive ||
       timeline.mode.kind === 'focused' ||
       timeline.error !== null ||
       !engine ||
@@ -580,11 +601,58 @@
   }
   let handledFocus: string | null = null;
   $effect(() => {
+    if (
+      timeline.mode.kind !== 'unread' ||
+      timeline.forwardPagination !== 'end' ||
+      timeline.loading ||
+      timeline.resumingLive ||
+      !revealed ||
+      !onResumeLive
+    )
+      return;
+    void resumeLive().catch(() => {});
+  });
+  export function resumeLive(keepAnchor = true): Promise<void> {
+    if (resumeTask) {
+      if (keepAnchor) return resumeTask;
+      return resumeTask
+        .catch(() => {})
+        .then(() => (timeline.canResumeLive ? resumeLive(false) : jumpToLiveEnd()));
+    }
+    if (!onResumeLive || !timeline.canResumeLive) return Promise.resolve();
+    if (keepAnchor) controller?.holdAnchor();
+    const anchor = () => {
+      const key = keepAnchor && !disposed ? controller?.anchorKey(restorableAnchor) : null;
+      return entries.find((entry) => entry.key === key)?.value.item.event_id ?? null;
+    };
+    resumeFailed = false;
+    const task = onResumeLive(anchor)
+      .then(async () => {
+        if (!keepAnchor) await jumpToLiveEnd();
+      })
+      .catch((error: unknown) => {
+        if (!disposed) resumeFailed = true;
+        throw error;
+      })
+      .finally(() => {
+        if (resumeTask === task) resumeTask = null;
+      });
+    resumeTask = task;
+    return task;
+  }
+  function restorableAnchor({ item }: RowValue): boolean {
+    return item.thread_root === null;
+  }
+  async function jumpToLiveEnd(): Promise<void> {
+    await tick();
+    if (!disposed) await controller?.jumpTo(null, 'start');
+  }
+  $effect(() => {
     void focusEventId;
     void timeline.mode;
     untrack(() => {
       focus.cancel();
-      unreadNavigation?.abort();
+      if (!switchingToUnread) unreadNavigation?.abort();
       future.reset();
     });
   });
@@ -651,9 +719,9 @@
     };
   }
   async function markRead(eventId: string): Promise<void> {
+    if (windowState.pinned) followingRead = true;
     await onRead(eventId);
     if (disposed) return;
-    if (windowState.pinned) followingRead = true;
     if (eventId === latestEventId(timeline.items)) unread.dismiss();
   }
   async function jumpToUnread(): Promise<void> {
@@ -666,7 +734,7 @@
     unreadNavigation = navigation;
     jumpingUnread = true;
     unreadError = null;
-    const mode = timeline.mode;
+    let mode = timeline.mode;
     const current = () => !disposed && !navigation.signal.aborted && timeline.mode === mode;
     const deadline = performance.now() + 30_000;
     let emptyPages = 0;
@@ -675,6 +743,15 @@
       if (unread.failed) {
         unreadError = 'jump';
         return;
+      }
+      if (current() && !entryFor(unread.firstEventId) && unread.readEventId && onRequestUnread) {
+        switchingToUnread = true;
+        try {
+          await onRequestUnread(unread.readEventId);
+          mode = timeline.mode;
+        } finally {
+          switchingToUnread = false;
+        }
       }
       while (current()) {
         unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
@@ -753,6 +830,10 @@
     focus.cancel();
     unreadNavigation?.abort();
     historyController.finishHistoryFill();
+    if (timeline.canResumeLive) {
+      void resumeLive(false).catch(() => {});
+      return;
+    }
     if (!live) {
       onJumpToLive?.();
       return;
@@ -764,7 +845,7 @@
 <TimelineReadReceipt
   {timeline}
   visibleEventId={readEventId}
-  enabled={!unread.blocking && !markingRead}
+  enabled={!unread.blocking && !markingRead && !timeline.resumingLive}
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
@@ -791,6 +872,14 @@
   <Alert class="timeline-error" variant="critical" role="alert"
     >{$i18n.t('timeline.loadFailed')}</Alert
   >
+{/if}
+{#if resumeFailed}
+  <Alert variant="critical" role="alert">
+    {$i18n.t('timeline.loadFailed')}
+    <Button type="button" onclick={() => void resumeLive().catch(() => {})}
+      >{$i18n.t('timeline.resumeLiveRetry')}</Button
+    >
+  </Alert>
 {/if}
 
 <div

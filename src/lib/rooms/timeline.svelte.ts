@@ -12,10 +12,13 @@ export type BackwardPaginationState = 'idle' | 'loading' | 'end';
 export type ForwardPaginationState = 'idle' | 'loading' | 'end';
 export type TimelineMode =
   | { kind: 'live' }
+  | { kind: 'unread'; eventId: string }
   | { kind: 'focused'; eventId: string }
   | { kind: 'thread'; rootEventId: string };
 type SubscriptionState = 'pending' | 'active' | 'stopped';
 const PAGINATION_DIFF_SETTLE_TIMEOUT = 2_000;
+const RESUME_PAGE_SIZE = 25;
+const MAX_EMPTY_RESUME_PAGES = 5;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -24,6 +27,7 @@ function focusFor(mode: TimelineMode): TimelineFocusView {
     case 'live':
       return { kind: 'live' };
     case 'focused':
+    case 'unread':
       return { kind: 'event', event_id: mode.eventId };
     case 'thread':
       return { kind: 'thread', root_event_id: mode.rootEventId };
@@ -33,11 +37,15 @@ function focusFor(mode: TimelineMode): TimelineFocusView {
 function sameMode(left: TimelineMode, right: TimelineMode): boolean {
   if (left.kind !== right.kind) return false;
   if (left.kind === 'focused' && right.kind === 'focused') return left.eventId === right.eventId;
+  if (left.kind === 'unread' && right.kind === 'unread') return left.eventId === right.eventId;
   if (left.kind === 'thread' && right.kind === 'thread') {
     return left.rootEventId === right.rootEventId;
   }
   return true;
 }
+
+export type ResumeAnchor = () => string | null;
+const noAnchor: ResumeAnchor = () => null;
 
 function lastEventId(items: readonly TimelineItemView[]): string | null {
   for (let index = items.length - 1; index >= 0; index--) {
@@ -58,15 +66,31 @@ export class ActiveRoomTimeline {
     owner: symbol,
     roomId: string,
     eventId: string | null,
-    hiddenEvents = false
+    hiddenEvents = false,
+    unread = false
   ): Promise<void> {
     this.owner = owner;
-    await this.timeline.start(roomId, eventId, hiddenEvents);
+    await this.timeline.start(roomId, eventId, hiddenEvents, unread);
   }
 
   async startThread(owner: symbol, roomId: string, rootEventId: string): Promise<void> {
     this.owner = owner;
     await this.timeline.startThread(roomId, rootEventId);
+  }
+
+  resumeLive(owner: symbol, anchor: ResumeAnchor = noAnchor): Promise<void> {
+    if (this.owner !== owner) return Promise.reject(new Error('Timeline owner changed'));
+    return this.timeline.resumeLive(anchor);
+  }
+
+  async startUnread(
+    owner: symbol,
+    roomId: string,
+    eventId: string,
+    hiddenEvents = false
+  ): Promise<void> {
+    this.owner = owner;
+    await this.timeline.startUnread(roomId, eventId, hiddenEvents);
   }
 
   stop(owner: symbol): Promise<void> {
@@ -94,14 +118,34 @@ export class RoomTimeline {
   items = $state.raw<TimelineItemView[]>([]);
   aggregations = $state.raw<TimelineItemView[]>([]);
   loading = $state(false);
+  resumingLive = $state(false);
   hasSnapshot = $state(false);
-  backwardPagination = $state<BackwardPaginationState>('idle');
   forwardPagination = $state<ForwardPaginationState>('idle');
   error = $state<string | null>(null);
   mode = $state<TimelineMode>({ kind: 'live' });
+  private backwardPaginationState = $state<BackwardPaginationState>('idle');
+  private readonly backwardPaginationWaiters: (() => void)[] = [];
 
   get subscriptionId(): SubscriptionId | null {
     return this.subscription;
+  }
+
+  get backwardPagination(): BackwardPaginationState {
+    return this.backwardPaginationState;
+  }
+
+  set backwardPagination(state: BackwardPaginationState) {
+    this.backwardPaginationState = state;
+    if (state !== 'loading')
+      for (const resolve of this.backwardPaginationWaiters.splice(0)) resolve();
+  }
+
+  get canResumeLive(): boolean {
+    return this.mode.kind === 'unread' || this.resumingLive;
+  }
+
+  get reachesLatest(): boolean {
+    return !this.resumingLive && (this.mode.kind === 'live' || this.forwardPagination === 'end');
   }
 
   private subscription: SubscriptionId | null = null;
@@ -124,6 +168,9 @@ export class RoomTimeline {
   private forwardPaginationCompletion: ForwardPaginationState | null = null;
   private forwardPaginationStartLastEventId: string | null = null;
   private forwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private resumePromise: Promise<void> | null = null;
+  private stagedItems: TimelineItemView[] | null = null;
+  private stagedAggregations: TimelineItemView[] | null = null;
   constructor(private readonly core: CoreClient) {}
 
   provideReplyFallback(eventId: string, fallback: ReplyFallback): void {
@@ -148,11 +195,17 @@ export class RoomTimeline {
     return next ?? items;
   }
 
-  start(roomId: string, eventId: string | null = null, hiddenEvents = false): Promise<void> {
+  start(
+    roomId: string,
+    eventId: string | null = null,
+    hiddenEvents = false,
+    unread = false
+  ): Promise<void> {
     return this.open(
       roomId,
       eventId === null ? { kind: 'live' } : { kind: 'focused', eventId },
-      hiddenEvents
+      hiddenEvents,
+      unread
     );
   }
 
@@ -160,9 +213,54 @@ export class RoomTimeline {
     return this.open(roomId, { kind: 'thread', rootEventId }, false);
   }
 
-  private async open(roomId: string, mode: TimelineMode, hiddenEvents: boolean): Promise<void> {
+  startUnread(roomId: string, eventId: string, hiddenEvents = false): Promise<void> {
+    return this.open(roomId, { kind: 'unread', eventId }, hiddenEvents);
+  }
+
+  resumeLive(anchor: ResumeAnchor = noAnchor): Promise<void> {
+    if (this.resumePromise) return this.resumePromise;
+    if (!this.canResumeLive) return Promise.resolve();
+    const target = this.target;
+    if (!target) return Promise.resolve();
+    this.resumingLive = true;
+    this.error = null;
+    const request =
+      this.stagedItems === null || this.subscription === null
+        ? this.open(target.roomId, { kind: 'live' }, target.hiddenEvents, false, true)
+        : Promise.resolve();
+    const session = this.session;
+    const startRequest = this.startRequest;
+    const current = () => session === this.session && startRequest === this.startRequest;
+    const task = request
+      .then(async () => {
+        if (!current()) throw new Error('Room changed while returning to live');
+        if (this.error !== null) throw new Error('Unable to load live messages');
+        const restored = await this.pageToAnchor(anchor, current);
+        if (!current()) throw new Error('Room changed while returning to live');
+        this.items = this.stagedItems ?? this.items;
+        this.aggregations = this.stagedAggregations ?? this.aggregations;
+        this.stagedItems = null;
+        this.stagedAggregations = null;
+        if (!restored) throw new Error('Unable to restore the reader position');
+      })
+      .finally(() => {
+        if (this.resumePromise === task) this.resumePromise = null;
+        if (current()) this.resumingLive = this.stagedItems !== null;
+      });
+    this.resumePromise = task;
+    return task;
+  }
+
+  private async open(
+    roomId: string,
+    mode: TimelineMode,
+    hiddenEvents: boolean,
+    unread = false,
+    preserveSnapshot = false
+  ): Promise<void> {
     const target = { roomId, mode, hiddenEvents };
     if (
+      !preserveSnapshot &&
       this.target?.roomId === roomId &&
       sameMode(this.target.mode, mode) &&
       this.target.hiddenEvents === hiddenEvents
@@ -172,16 +270,22 @@ export class RoomTimeline {
     }
 
     const request = ++this.startRequest;
-    if (this.target !== null) await this.stopCurrent(false);
+    if (this.target !== null || this.resumingLive) {
+      await this.stopCurrent(false, preserveSnapshot);
+    }
     if (this.hasPendingUnsubscribe) await this.unsubscribePromise;
     if (request !== this.startRequest) return;
 
     const session = this.session;
     this.target = target;
+    if (preserveSnapshot) {
+      this.stagedItems = [];
+      this.stagedAggregations = [];
+    }
     this.mode = mode;
     this.loading = true;
     this.error = null;
-    const promise = this.startSubscription(roomId, mode, hiddenEvents);
+    const promise = this.startSubscription(roomId, mode, hiddenEvents, unread);
     this.startPromise = promise;
 
     try {
@@ -205,7 +309,7 @@ export class RoomTimeline {
     this.backwardPaginationPending = true;
     this.backwardPaginationCompletion = null;
     this.backwardPaginationStartFirstEventId =
-      this.items.find((item) => item.event_id)?.event_id ?? null;
+      (this.stagedItems ?? this.items).find((item) => item.event_id)?.event_id ?? null;
     this.backwardPaginationBoundaryChanged = false;
     this.backwardPagination = 'loading';
 
@@ -214,7 +318,7 @@ export class RoomTimeline {
       if (session === this.session && subscription === this.subscription) {
         this.error = null;
         const state = response.reached_end ? 'end' : 'idle';
-        if (this.mode.kind === 'focused') {
+        if (this.mode.kind === 'focused' || this.mode.kind === 'unread') {
           this.backwardPaginationPending = false;
           this.backwardPaginationStartFirstEventId = null;
           this.backwardPaginationBoundaryChanged = false;
@@ -284,15 +388,21 @@ export class RoomTimeline {
     return this.stopCurrent(true);
   }
 
-  private stopCurrent(invalidateStart: boolean): Promise<void> {
+  private stopCurrent(invalidateStart: boolean, preserveSnapshot = false): Promise<void> {
     if (invalidateStart) this.startRequest += 1;
     this.session += 1;
     this.state = 'stopped';
     this.startPromise = null;
-    this.items = [];
-    this.replyFallbacks.clear();
-    this.aggregations = [];
-    this.hasSnapshot = false;
+    if (!preserveSnapshot) {
+      this.items = [];
+      this.replyFallbacks.clear();
+      this.aggregations = [];
+      this.hasSnapshot = false;
+      this.resumingLive = false;
+    }
+    this.stagedItems = null;
+    this.stagedAggregations = null;
+    this.resumePromise = null;
     this.loading = false;
     this.backwardPaginationPending = false;
     this.backwardPaginationCompletion = null;
@@ -327,7 +437,8 @@ export class RoomTimeline {
   private async startSubscription(
     roomId: string,
     mode: TimelineMode,
-    hiddenEvents: boolean
+    hiddenEvents: boolean,
+    unread = false
   ): Promise<void> {
     const session = this.session;
     this.state = 'pending';
@@ -350,12 +461,17 @@ export class RoomTimeline {
       )
         return;
       if (event.type === 'timeline_diff') {
-        const before = this.items;
+        const before = this.stagedItems ?? this.items;
         const items = this.withReplyFallbacks(applyDiffs(before, event.diffs));
-        this.items = items;
+        if (this.stagedItems !== null) this.stagedItems = items;
+        else this.items = items;
         if (event.diffs.some((diff) => diff.op === 'clear' || diff.op === 'reset')) {
           const oldest = items.find((item) => item.event_id !== null)?.timestamp ?? Infinity;
-          this.aggregations = this.aggregations.filter((item) => item.timestamp >= oldest);
+          if (this.stagedAggregations !== null) {
+            this.stagedAggregations = this.stagedAggregations.filter(
+              (item) => item.timestamp >= oldest
+            );
+          } else this.aggregations = this.aggregations.filter((item) => item.timestamp >= oldest);
         }
         if (before.length > 0 && items.length === 0) {
           this.backwardPaginationPending = false;
@@ -372,13 +488,16 @@ export class RoomTimeline {
         this.settleForwardPagination();
       }
       if (event.type === 'timeline_aggregations') {
-        const next = [...this.aggregations];
+        const next = [...(this.stagedAggregations ?? this.aggregations)];
         for (const item of event.items) {
           const index = next.findIndex((entry) => entry.id === item.id);
           if (index === -1) next.push(item);
           else next[index] = item;
         }
-        if (event.items.length > 0) this.aggregations = next;
+        if (event.items.length > 0) {
+          if (this.stagedAggregations !== null) this.stagedAggregations = next;
+          else this.aggregations = next;
+        }
       }
       if (event.type === 'timeline_pagination' && this.mode.kind === 'live') {
         if (event.loading || !this.backwardPaginationPending) {
@@ -393,7 +512,34 @@ export class RoomTimeline {
 
     let response;
     try {
-      response = await this.core.commands.subscribeTimeline(roomId, focusFor(mode), hiddenEvents);
+      response =
+        mode.kind === 'unread'
+          ? await this.subscribeUnreadContext(roomId, mode.eventId, hiddenEvents, session, pending)
+          : await this.core.commands.subscribeTimeline(roomId, focusFor(mode), hiddenEvents);
+      if (
+        unread &&
+        mode.kind === 'live' &&
+        session === this.session &&
+        !response.items.some((item) => item.content.kind === 'read_marker')
+      ) {
+        const eventId = await this.unloadedReadMarker(roomId, response.items);
+        if (session === this.session && eventId !== null) {
+          await this.core.commands.unsubscribe(response.subscription);
+          if (session !== this.session) {
+            stopEvents();
+            return;
+          }
+          pending.length = 0;
+          this.mode = { kind: 'unread', eventId };
+          response = await this.subscribeUnreadContext(
+            roomId,
+            eventId,
+            hiddenEvents,
+            session,
+            pending
+          );
+        }
+      }
     } catch (error) {
       stopEvents();
       if (session === this.session) this.state = 'stopped';
@@ -407,7 +553,7 @@ export class RoomTimeline {
     }
 
     this.subscription = response.subscription;
-    this.items = this.withReplyFallbacks(
+    const items = this.withReplyFallbacks(
       applyDiffs(
         response.items,
         pending
@@ -415,7 +561,13 @@ export class RoomTimeline {
           .flatMap((event) => event.diffs)
       )
     );
-    this.aggregations = response.aggregations;
+    if (this.stagedItems !== null) {
+      this.stagedItems = items;
+      this.stagedAggregations = response.aggregations;
+    } else {
+      this.items = items;
+      this.aggregations = response.aggregations;
+    }
     this.hasSnapshot = true;
     this.state = 'active';
     this.unsubscribeEvents = stopEvents;
@@ -433,6 +585,64 @@ export class RoomTimeline {
     this.clearBackwardPaginationSettleTimer();
     this.backwardPagination = completion;
     return true;
+  }
+
+  private async pageToAnchor(anchor: ResumeAnchor, current: () => boolean): Promise<boolean> {
+    const missing = () => {
+      const eventId = anchor();
+      return eventId !== null && !this.stagedItems?.some((item) => item.event_id === eventId);
+    };
+    let emptyPages = 0;
+    while (missing()) {
+      if (this.backwardPagination === 'end' || emptyPages >= MAX_EMPTY_RESUME_PAGES) return false;
+      const before = this.stagedItems?.find((item) => item.event_id)?.event_id;
+      await this.paginateBackward(RESUME_PAGE_SIZE);
+      await this.backwardPaginationSettled();
+      if (!current()) return false;
+      const after = this.stagedItems?.find((item) => item.event_id)?.event_id;
+      emptyPages = before === after ? emptyPages + 1 : 0;
+    }
+    return true;
+  }
+
+  private async unloadedReadMarker(
+    roomId: string,
+    items: readonly TimelineItemView[]
+  ): Promise<string | null> {
+    const content = await this.core.commands
+      .roomAccountData(roomId, 'm.fully_read')
+      .catch(() => null);
+    const eventId = (content as { event_id?: unknown } | null)?.event_id;
+    if (typeof eventId !== 'string' || items.some((item) => item.event_id === eventId)) {
+      return null;
+    }
+    return eventId;
+  }
+
+  private async subscribeUnreadContext(
+    roomId: string,
+    eventId: string,
+    hiddenEvents: boolean,
+    session: number,
+    pending: unknown[]
+  ): ReturnType<CoreClient['commands']['subscribeTimeline']> {
+    try {
+      return await this.core.commands.subscribeTimeline(
+        roomId,
+        { kind: 'event', event_id: eventId },
+        hiddenEvents
+      );
+    } catch (error) {
+      if (session !== this.session) throw error;
+      pending.length = 0;
+      this.mode = { kind: 'live' };
+      return this.core.commands.subscribeTimeline(roomId, { kind: 'live' }, hiddenEvents);
+    }
+  }
+
+  private backwardPaginationSettled(): Promise<void> {
+    if (this.backwardPagination !== 'loading') return Promise.resolve();
+    return new Promise((resolve) => this.backwardPaginationWaiters.push(resolve));
   }
 
   private clearBackwardPaginationSettleTimer(): void {

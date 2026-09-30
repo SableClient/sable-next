@@ -24,6 +24,8 @@ export type RoomCoreMode =
   | 'delayed_history'
   | 'unread'
   | 'unread_history'
+  | 'unread_context_error'
+  | 'unread_catchup'
   | 'forward_history'
   | 'delayed_media'
   | 'delayed_pagination'
@@ -45,6 +47,9 @@ declare global {
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
+    __e2ePaginationDirections: string[];
+    __e2eRefreshRoom: () => void;
+    __e2eReceiveMessage: (body: string) => void;
     __e2eEmitTimelineEvent: (event: unknown) => void;
     __e2eTimelineRebuilds: number;
   }
@@ -52,6 +57,7 @@ declare global {
 
 export async function installFakeCore(page: Page, mode: WorkerMode): Promise<void> {
   await page.addInitScript((workerMode: WorkerMode) => {
+    window.__e2ePaginationDirections = [];
     type CommandType = Command['type'];
     type CommandFor<T extends CommandType> = Extract<Command, { type: T }>;
     type OkFor<T extends CommandType> = Extract<CommandOk, { type: T }>;
@@ -135,7 +141,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       supports_restricted: false,
       supports_knock_restricted: false,
       space_children: [],
-      unread: 2,
+      unread:
+        workerMode === 'unread_history' || workerMode === 'unread_context_error'
+          ? 9_995
+          : workerMode === 'unread_catchup'
+            ? 75
+            : 2,
       notifying: 2,
       highlight: 1,
       marked_unread: false,
@@ -360,36 +371,42 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       sessionStorage.setItem(BOOKMARKS_KEY, JSON.stringify(entries));
     };
 
-    const timelineItems = (roomName: string): TimelineItemView[] =>
-      Array.from({ length: workerMode === 'forward_history' ? 80 : 20 }, (_, index) => ({
-        id: `${roomName.toLowerCase()}-${String(index)}`,
-        event_id: `$${roomName.toLowerCase()}-${String(index)}:example.test`,
-        transaction_id: null,
-        send_state: null,
-        sender: '@alice:example.test',
-        sender_name: 'Alice',
-        sender_avatar: null,
-        timestamp: 1_700_000_000_000 + index,
-        content: {
-          kind: 'message',
-          body: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
-          html: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
-          emote: false,
-          notice: false,
-          edited: false,
-        },
-        in_reply_to: null,
-        thread_root: null,
-        thread_summary: null,
-        reactions: [],
-        is_own: false,
-        read_by: [],
-        per_message_profile: null,
-        bundled_link_previews: [],
-        link_previews_removed: null,
-        mention: 'none',
-        forwarded: null,
-      }));
+    const timelineItems = (roomName: string, offset = 0): TimelineItemView[] =>
+      Array.from(
+        { length: workerMode === 'forward_history' || workerMode === 'unread_catchup' ? 80 : 20 },
+        (_, relativeIndex) => {
+          const index = offset + relativeIndex;
+          return {
+            id: `${roomName.toLowerCase()}-${String(index)}`,
+            event_id: `$${roomName.toLowerCase()}-${String(index)}:example.test`,
+            transaction_id: null,
+            send_state: null,
+            sender: '@alice:example.test',
+            sender_name: 'Alice',
+            sender_avatar: null,
+            timestamp: 1_700_000_000_000 + index,
+            content: {
+              kind: 'message',
+              body: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
+              html: index === 0 ? `Welcome to ${roomName}` : `${roomName} message ${String(index)}`,
+              emote: false,
+              notice: false,
+              edited: false,
+            },
+            in_reply_to: null,
+            thread_root: null,
+            thread_summary: null,
+            reactions: [],
+            is_own: false,
+            read_by: [],
+            per_message_profile: null,
+            bundled_link_previews: [],
+            link_previews_removed: null,
+            mention: 'none',
+            forwarded: null,
+          };
+        }
+      );
 
     const searchHits = (payload: CommandFor<'search_messages'>) => {
       const query = payload.query.toLowerCase();
@@ -469,7 +486,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       recovery_passphrase: false,
       account_data_key: false,
     });
-    const subscriptions = new Map<number, { roomId: string; page: number }>();
+    const subscriptions = new Map<
+      number,
+      { roomId: string; page: number; live: boolean; oldest: number }
+    >();
+    const arrivals: TimelineItemView[] = [];
+    let unreadContextOpened = false;
     const notificationKeywords: KeywordNotificationView[] = [];
     let defaultGroupMode: 'all' | 'mentions' = 'mentions';
     let membershipNotifications: boolean | null = false;
@@ -570,7 +592,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         case 'unread':
           return [...items.slice(0, 5), readMarker, ...items.slice(5)];
         case 'unread_history':
-          return items.slice(10);
+        case 'unread_context_error':
+          return timelineItems(roomName, 9_980);
+        case 'unread_catchup':
+          return [...items.slice(60), ...arrivals];
         case 'forward_history':
           return items.slice(0, 5);
         default:
@@ -757,22 +782,98 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         rooms: joinedRooms,
       }),
       subscribe_timeline: (command) => {
+        if (workerMode === 'unread_context_error' && command.focus.kind === 'event') {
+          throw new FakeCoreError('load_failed');
+        }
         const subscription = nextSubscription++;
-        subscriptions.set(subscription, { roomId: command.room_id, page: 0 });
+        subscriptions.set(subscription, {
+          roomId: command.room_id,
+          page: 0,
+          live: command.focus.kind === 'live',
+          oldest: workerMode === 'unread_catchup' ? 60 : 0,
+        });
         timelineRooms.push(command.room_id);
         timelineSubscriptions.push(subscription);
+        const roomName = subscriptionRoom(subscription).name ?? '';
+        const items = timelineItems(roomName);
+        const unreadContext =
+          (workerMode === 'unread_history' || workerMode === 'unread_catchup') &&
+          command.focus.kind === 'event';
+        if (unreadContext) unreadContextOpened = true;
+        const marker: TimelineItemView = {
+          ...items[0],
+          id: `${roomName.toLowerCase()}-read-marker`,
+          event_id: null,
+          sender: null,
+          sender_name: null,
+          content: { kind: 'read_marker' },
+        };
         return {
           type: 'subscribe_timeline',
           subscription,
-          items: timelineSnapshot(subscriptionRoom(subscription).name ?? ''),
+          items: unreadContext
+            ? [...items.slice(0, 5), marker, ...items.slice(5, 20)]
+            : timelineSnapshot(roomName),
           aggregations: [],
         };
       },
       paginate: (command, port) => {
+        window.__e2ePaginationDirections.push(command.direction);
         const state = subscriptions.get(command.subscription);
         if (!state) throw new Error('unknown timeline subscription');
         const paginated = subscriptionRoom(command.subscription);
         const roomName = paginated.name ?? '';
+        if (workerMode === 'unread_catchup') {
+          const items = timelineItems(roomName);
+          if (command.direction === 'backward') {
+            const previous = state.oldest;
+            state.oldest = Math.max(0, previous - 20);
+            port.emit({
+              type: 'timeline_diff',
+              subscription: command.subscription,
+              diffs: items
+                .slice(state.oldest, previous)
+                .map((value, index) => ({ op: 'insert' as const, index, value })),
+            });
+            return {
+              type: 'paginate',
+              direction: command.direction,
+              reached_end: state.oldest === 0,
+            };
+          }
+          state.page += 1;
+          if (state.page === 3) {
+            arrivals.push({
+              ...items[79],
+              id: 'during-handoff',
+              event_id: '$during-handoff:example.test',
+              content: messageContent('Arrived during handoff'),
+            });
+          }
+          window.setTimeout(() => {
+            port.emit({
+              type: 'timeline_diff',
+              subscription: command.subscription,
+              diffs: [
+                { op: 'append', values: items.slice(state.page * 20, (state.page + 1) * 20) },
+              ],
+            });
+          }, 50);
+          return { type: 'paginate', direction: command.direction, reached_end: state.page >= 3 };
+        }
+        if (workerMode === 'unread_history' || workerMode === 'unread_context_error') {
+          if (command.direction === 'backward') {
+            throw new FakeCoreError('load_failed');
+          }
+          state.page += 1;
+          const values = timelineItems(roomName, state.page * 20);
+          port.emit({
+            type: 'timeline_diff',
+            subscription: command.subscription,
+            diffs: [{ op: 'append', values }],
+          });
+          return { type: 'paginate', direction: command.direction, reached_end: false };
+        }
         if (workerMode === 'forward_history') {
           if (command.direction === 'backward') {
             return { type: 'paginate', direction: command.direction, reached_end: true };
@@ -847,6 +948,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           },
         ],
       }),
+      unsubscribe: (command) => {
+        subscriptions.delete(command.subscription);
+        return { type: 'unsubscribe' };
+      },
+      send_message: (command) => {
+        receiveMessage(command.body, true);
+        return { type: 'send_message' };
+      },
       search_messages: (command) => ({
         type: 'search_messages',
         hits: searchHits(command),
@@ -1065,7 +1174,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         content:
           command.event_type === 'm.fully_read'
             ? {
-                event_id: `$${(joinedRooms.find((room) => room.room_id === command.room_id)?.name ?? 'General').toLowerCase()}-${workerMode === 'unread' || workerMode === 'unread_history' ? '4' : '19'}:example.test`,
+                event_id: `$${(joinedRooms.find((room) => room.room_id === command.room_id)?.name ?? 'General').toLowerCase()}-${workerMode === 'unread' || workerMode === 'unread_history' || workerMode === 'unread_context_error' || workerMode === 'unread_catchup' ? '4' : '19'}:example.test`,
               }
             : null,
       }),
@@ -1419,8 +1528,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       return handler(command, port);
     };
 
-    const replyDelay = (type: CommandType): number => {
+    const replyDelay = (command: Command): number => {
+      const type = command.type;
       if (workerMode === 'forward_history' && type === 'paginate') return 0;
+      if (
+        type === 'subscribe_timeline' &&
+        workerMode === 'unread_catchup' &&
+        command.focus.kind === 'live' &&
+        unreadContextOpened
+      )
+        return 1_500;
       if (type === 'paginate') return 500;
       if (
         type === 'subscribe_timeline' &&
@@ -1520,13 +1637,48 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
               ],
             });
           }, 750);
-        }, replyDelay(command.type));
+        }, replyDelay(command));
       }
     }
 
     Object.defineProperty(window, '__e2eEmitTimelineEvent', {
       configurable: true,
       value: (event: unknown) => activePort?.emit(event as CoreEvent),
+    });
+    function receiveMessage(body: string, own = false): void {
+      const id = `live-arrival-${arrivals.length}`;
+      const item: TimelineItemView = {
+        ...timelineItems('General')[0],
+        id,
+        event_id: own ? null : `$${id}:example.test`,
+        transaction_id: own ? id : null,
+        sender: own ? session.user_id : '@alice:example.test',
+        is_own: own,
+        content: messageContent(body),
+      };
+      arrivals.push(item);
+      for (const [subscription, state] of subscriptions) {
+        if (state.roomId === room.room_id && state.live) {
+          activePort?.emit({
+            type: 'timeline_diff',
+            subscription,
+            diffs: [{ op: 'push_back', value: item }],
+          });
+        }
+      }
+    }
+    Object.defineProperty(window, '__e2eReceiveMessage', {
+      configurable: true,
+      value: receiveMessage,
+    });
+    Object.defineProperty(window, '__e2eRefreshRoom', {
+      configurable: true,
+      value: () =>
+        activePort?.emit({
+          type: 'room_list_diff',
+          subscription: 1,
+          diffs: [{ op: 'set', index: 0, value: { ...room, unread: room.unread + 1 } }],
+        }),
     });
 
     class FakeSharedWorker {

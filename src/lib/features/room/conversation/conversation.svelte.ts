@@ -48,6 +48,7 @@ export type ConversationDeps = {
   timeline: RoomTimeline;
   roomId: () => string;
   encrypted?: () => boolean | null;
+  beforeSend?: () => Promise<void>;
   threadRoot?: string | null;
 };
 
@@ -67,6 +68,7 @@ export class Conversation {
   readonly #roomId: () => string;
   readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
+  readonly #beforeSend: () => Promise<void>;
   /* eslint-disable-next-line svelte/prefer-svelte-reactivity */
   readonly #requestedDetails = new Set<string>();
 
@@ -76,6 +78,7 @@ export class Conversation {
     timeline,
     roomId,
     encrypted,
+    beforeSend = () => Promise.resolve(),
     threadRoot = null,
   }: ConversationDeps) {
     this.#core = core;
@@ -84,6 +87,7 @@ export class Conversation {
     this.#roomId = roomId;
     this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
+    this.#beforeSend = beforeSend;
   }
 
   get threadRoot(): string | null {
@@ -118,6 +122,7 @@ export class Conversation {
           entry.event_id === pending.eventId ||
           entry.transaction_id === pending.eventId
       );
+      await this.#beforeSend();
       await this.#core.commands.editMessage(
         targetRoomId,
         edited?.event_id ?? (pending.eventId.startsWith('$') ? pending.eventId : null),
@@ -136,6 +141,7 @@ export class Conversation {
       return;
     }
 
+    await this.#beforeSend();
     const outcome = await runSlash(body, {
       roomId: targetRoomId,
       userId: this.#core.session?.user_id ?? null,
@@ -185,6 +191,7 @@ export class Conversation {
     invocation: BotCommandInvocation
   ): Promise<void> => {
     const pending = this.context?.kind === 'reply' ? this.context : null;
+    await this.#beforeSend();
     await this.#core.commands.sendMessage(targetRoomId, body, {
       inReplyTo: pending?.eventId ?? null,
       threadRoot: this.#threadRoot,
@@ -200,6 +207,7 @@ export class Conversation {
     file: File,
     options: SendAttachmentOptions = {}
   ): Promise<void> => {
+    await this.#beforeSend();
     const persona = this.#personaFor(targetRoomId, '', null).persona;
     const reply = this.#consumeReply();
     await this.#core.commands.sendAttachment(targetRoomId, file, {
@@ -216,6 +224,7 @@ export class Conversation {
     files: readonly File[],
     options: SendGalleryOptions = {}
   ): Promise<void> => {
+    await this.#beforeSend();
     const reply = this.#consumeReply();
     await this.#core.commands.sendGallery(targetRoomId, files, {
       ...options,
@@ -232,6 +241,7 @@ export class Conversation {
     info: PackImageInfoView | null = null,
     sourcePack: ImageSourcePackView | null = null
   ): Promise<void> => {
+    await this.#beforeSend();
     await this.#core.commands.sendSticker(
       targetRoomId,
       url,
@@ -245,6 +255,7 @@ export class Conversation {
   };
 
   readonly sendGif = async (targetRoomId: string, gif: GifResult): Promise<void> => {
+    await this.#beforeSend();
     const { gifs } = await runtimeConfig();
     const proxied = proxiedGif(gif, gifs.proxyUrl);
     if (!proxied) throw new Error('no GIF proxy route for this result');
@@ -272,6 +283,7 @@ export class Conversation {
     undisclosed: boolean,
     maxSelections: number = 1
   ): Promise<void> => {
+    await this.#beforeSend();
     await this.#core.commands.createPoll(
       targetRoomId,
       question,
@@ -287,6 +299,7 @@ export class Conversation {
     body: string,
     geoUri: string
   ): Promise<void> => {
+    await this.#beforeSend();
     const reply = this.#consumeReply();
     await this.#core.commands.sendLocation(
       targetRoomId,

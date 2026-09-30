@@ -53,7 +53,7 @@
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { provideRoomCosmetics, RoomCosmetics } from '#lib/rooms/room-cosmetics.svelte.js';
-  import { activeRoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import { activeRoomTimeline, type ResumeAnchor } from '#lib/rooms/timeline.svelte.js';
   import ScheduledMessages from '#lib/features/composer/ScheduledMessages.svelte';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { composerClearance } from '#lib/ui/composer-clearance.svelte.js';
@@ -140,6 +140,7 @@
     timeline,
     roomId: () => resolvedRoomId,
     encrypted: () => resolvedRoom?.encrypted ?? null,
+    beforeSend: () => timelineList?.resumeLive(false) ?? resumeLive(),
   });
   let settingsOpen = $state(false);
   let topicOpen = $state(false);
@@ -485,6 +486,13 @@
   // restarts at the present.
   /** The `?event=` the effect below has handed to the timeline. */
   let appliedEventId: string | null = null;
+  let openedRoomId: string | null = null;
+  let timelineRoomId = $derived(resolvedRoom?.room_id);
+  let roomHasUnread = $derived(
+    (resolvedRoom?.unread ?? 0) > 0 ||
+      (resolvedRoom?.highlight ?? 0) > 0 ||
+      (resolvedRoom?.marked_unread ?? false)
+  );
 
   $effect(() => {
     // Waiting for the target to have been applied matters as much as waiting
@@ -497,7 +505,7 @@
   });
 
   $effect(() => {
-    const activeRoomId = resolvedRoom?.room_id;
+    const activeRoomId = timelineRoomId;
     if (!activeRoomId) return;
     const anchor = untrack(() => {
       // An event already in the loaded range is reached by scrolling, so only a
@@ -508,9 +516,16 @@
       return loaded && timeline.mode.kind === 'live' ? null : eventId;
     });
     appliedEventId = eventId;
+    const openAtUnread = untrack(() => {
+      if (openedRoomId === activeRoomId) return false;
+      openedRoomId = activeRoomId;
+      return eventId === null && notifiedEventId === null && roomHasUnread;
+    });
     // Read outside `untrack`: the toggle only takes effect by re-subscribing.
     const hiddenEvents = preferences.showHiddenEvents;
-    void untrack(() => activeTimeline.start(timelineOwner, activeRoomId, anchor, hiddenEvents));
+    void untrack(() =>
+      activeTimeline.start(timelineOwner, activeRoomId, anchor, hiddenEvents, openAtUnread)
+    );
     void untrack(() => loadMembers());
   });
 
@@ -620,6 +635,7 @@
   }
 
   function jumpToLive(): void {
+    void activeTimeline.start(timelineOwner, resolvedRoomId, null, preferences.showHiddenEvents);
     void goto(roomUrl(null), { replace: true });
   }
 
@@ -670,6 +686,19 @@
     const content = await core.commands.roomAccountData(resolvedRoomId, 'm.fully_read');
     const eventId = (content as { event_id?: unknown } | null)?.event_id;
     return typeof eventId === 'string' ? eventId : null;
+  }
+
+  function requestUnread(eventId: string): Promise<void> {
+    return activeTimeline.startUnread(
+      timelineOwner,
+      resolvedRoomId,
+      eventId,
+      preferences.showHiddenEvents
+    );
+  }
+
+  function resumeLive(anchor?: ResumeAnchor): Promise<void> {
+    return activeTimeline.resumeLive(timelineOwner, anchor);
   }
 
   function markRoomUnread(): void {
@@ -821,11 +850,10 @@
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}
-      hasUnread={resolvedRoom === undefined ||
-        (resolvedRoom?.unread ?? 0) > 0 ||
-        (resolvedRoom?.highlight ?? 0) > 0 ||
-        (resolvedRoom?.marked_unread ?? false)}
+      hasUnread={resolvedRoom === undefined || roomHasUnread}
       onLoadReadMarker={loadReadMarker}
+      onRequestUnread={requestUnread}
+      onResumeLive={resumeLive}
       onMarkRead={markAllRead}
       onMarkUnread={markUnreadFrom}
       onMatrixLink={handleMatrixLink}

@@ -948,6 +948,7 @@
     "markRead": "Mark as read",
     "markReadFailed": "Could not mark this room as read. Try again.",
     "unreadJumpFailed": "Could not load unread messages. Try again.",
+    "resumeLiveRetry": "Try again",
     "jumpToLatest": "Jump to latest",
     "powerLevelAdmin": "Admin",
     "powerTagManager": "Manager",
