@@ -2,9 +2,15 @@ const HEIGHT_EPSILON = 1;
 const TRAILING_SPACE_SENTINEL = '\u200B';
 
 const COPIED_PROPERTIES = [
-  'font',
+  'fontFamily',
+  'fontSize',
+  'fontStretch',
+  'fontStyle',
+  'fontVariant',
+  'fontWeight',
   'fontFeatureSettings',
   'fontKerning',
+  'fontOpticalSizing',
   'fontVariationSettings',
   'letterSpacing',
   'lineHeight',
