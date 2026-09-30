@@ -15,6 +15,8 @@
   }
 
   let { room, telemetry, deafened = false, volumeOf = () => 1 }: Props = $props();
+  // Keep participant updates from restarting playback.
+  let playbackRoom = $derived(room);
   let node = $state<HTMLDivElement>();
 
   type Filtered = { source: AudioNode; gain: GainNode; filter?: AudioWorkletNode };
@@ -34,7 +36,7 @@
   $effect(() => {
     const currentNode = node;
     const currentTelemetry = telemetry;
-    const currentRoom = room;
+    const currentRoom = playbackRoom;
     if (!currentRoom || !currentNode) return;
 
     const bank: VoiceFilterBank | undefined =

@@ -2,11 +2,19 @@
 
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
-import { expect, test, vi } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { RoomEvent, Track, type RemoteTrack, type Room } from 'livekit-client';
 
 import CallAudio from './CallAudio.svelte';
 import CallAudioHarness from './CallAudioHarness.test.svelte';
+import CallAudioUpdatesHarness from './CallAudioUpdatesHarness.test.svelte';
+import { preferences } from '#lib/settings/preferences.svelte.js';
+import * as voiceFilter from './voice-filter';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 type FakeRoom = {
   room: Room;
@@ -152,4 +160,68 @@ test('replaces room listeners and tracks with the current room', async () => {
   expect(secondTrack.attach).toHaveBeenCalledOnce();
   expect(first.listenerCount(RoomEvent.TrackSubscribed)).toBe(0);
   expect(second.listenerCount(RoomEvent.TrackSubscribed)).toBe(1);
+});
+
+test('keeps audio attached across participant updates', async () => {
+  const track = fakeTrack('voice');
+  const room = fakeRoom(track);
+  const user = userEvent.setup();
+  const instance = render(CallAudioUpdatesHarness, { room: room.room });
+
+  for (let update = 0; update < 5; update += 1) {
+    await user.click(screen.getByRole('button', { name: 'update participants' }));
+  }
+
+  expect(track.attach).toHaveBeenCalledOnce();
+  expect(track.detach).not.toHaveBeenCalled();
+  expect(room.listenerCount(RoomEvent.TrackSubscribed)).toBe(1);
+  instance.unmount();
+  expect(track.detach).toHaveBeenCalledOnce();
+});
+
+test('keeps incoming filters across participant updates', async () => {
+  const source = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
+  const gain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+  const filter = { connect: vi.fn((node: AudioNode) => node), disconnect: vi.fn() };
+  const bank = {
+    context: {
+      destination: {},
+      createMediaStreamSource: vi.fn(() => source),
+      createGain: vi.fn(() => gain),
+      resume: vi.fn(() => Promise.resolve()),
+    },
+    create: vi.fn(() => Promise.resolve(filter)),
+    close: vi.fn(),
+  };
+  vi.spyOn(voiceFilter, 'supportsVoiceFilter').mockReturnValue(true);
+  const createBank = vi
+    .spyOn(voiceFilter, 'createVoiceFilterBank')
+    .mockReturnValue(bank as unknown as voiceFilter.VoiceFilterBank);
+  vi.stubGlobal('MediaStream', vi.fn());
+  const previousIsolation = preferences.incomingVoiceIsolation;
+  preferences.incomingVoiceIsolation = true;
+
+  const track = fakeTrack('voice');
+  const room = fakeRoom(track);
+  const user = userEvent.setup();
+  const instance = render(CallAudioUpdatesHarness, { room: room.room });
+
+  try {
+    for (let update = 0; update < 5; update += 1) {
+      await user.click(screen.getByRole('button', { name: 'update participants' }));
+    }
+
+    expect(createBank).toHaveBeenCalledOnce();
+    expect(bank.create).toHaveBeenCalledOnce();
+    expect(bank.close).not.toHaveBeenCalled();
+    expect(track.detach).not.toHaveBeenCalled();
+    expect(document.querySelector('audio')?.muted).toBe(true);
+    expect(source.connect).toHaveBeenLastCalledWith(filter);
+  } finally {
+    instance.unmount();
+    preferences.incomingVoiceIsolation = previousIsolation;
+  }
+
+  expect(bank.close).toHaveBeenCalledOnce();
+  expect(filter.disconnect).toHaveBeenCalledOnce();
 });
