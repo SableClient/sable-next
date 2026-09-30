@@ -9,11 +9,22 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import { memberName } from '#lib/features/room/members/members.js';
-  import { backToRoomList, trackRoomEntry } from '#lib/features/room/room-navigation.js';
+  import LeaveRoomDialog from '#lib/features/room/LeaveRoomDialog.svelte';
+  import RoomHeaderMenu from '#lib/features/room/RoomHeaderMenu.svelte';
+  import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
+  import MessageReportDialog from '#lib/features/room/messages/MessageReportDialog.svelte';
+  import { sendReport } from '#lib/features/room/messages/report.js';
+  import {
+    backToRoomList,
+    leaveRoomView,
+    trackRoomEntry,
+  } from '#lib/features/room/room-navigation.js';
+  import RoomSettingsDialog from '#lib/features/room/settings/RoomSettingsDialog.svelte';
+  import type { RoomSettingsSectionId } from '#lib/features/room/settings/room-settings-sections.js';
   import { formatDate, formatTime } from '#lib/ui/date-time.js';
   import { currentLocale, i18n } from '#lib/i18n.js';
   import { findRoomByPathId, useRoomList } from '#lib/rooms/room-list.svelte.js';
-  import { preferences } from '#lib/settings/preferences.svelte.js';
+  import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -65,6 +76,11 @@
   let deleting = $state<CalendarItem | null>(null);
   let deleteBusy = $state(false);
   let now = $state(Date.now());
+  let settingsOpen = $state(false);
+  let settingsSection = $state<RoomSettingsSectionId | null>(null);
+  let inviteOpen = $state(false);
+  let reportOpen = $state(false);
+  let leaveOpen = $state(false);
 
   let items = $derived(
     (view?.entries ?? []).flatMap((entry) => {
@@ -162,6 +178,25 @@
   function openNew(): void {
     editing = null;
     dialogOpen = true;
+  }
+
+  function openSettings(section: RoomSettingsSectionId | null = null): void {
+    settingsSection = section;
+    settingsOpen = true;
+  }
+
+  function markRead(): void {
+    void core.commands
+      .markRead(resolvedRoomId, null, readReceiptIsPrivate())
+      .catch((error: unknown) => {
+        console.warn('[sable calendar] mark as read failed', error);
+      });
+  }
+
+  function markUnread(): void {
+    void core.commands.markUnread(resolvedRoomId).catch((error: unknown) => {
+      console.warn('[sable calendar] mark as unread failed', error);
+    });
   }
 
   function openEdit(item: CalendarItem): void {
@@ -263,6 +298,18 @@
           <PlusIcon />
         </PanelHeaderButton>
       {/if}
+      <RoomHeaderMenu
+        room={resolvedRoom ?? null}
+        canInvite={permissions?.can_invite ?? false}
+        compact
+        onMarkRead={markRead}
+        onMarkUnread={markUnread}
+        onInvite={() => (inviteOpen = true)}
+        onMembers={() => openSettings('members')}
+        onSettings={() => openSettings()}
+        onReport={() => (reportOpen = true)}
+        onLeave={() => (leaveOpen = true)}
+      />
     {/snippet}
   </PanelHeader>
 
@@ -355,6 +402,33 @@
     {/if}
   </div>
 </main>
+
+<RoomSettingsDialog
+  open={settingsOpen}
+  room={resolvedRoom ?? null}
+  initialSection={settingsSection}
+  onOpenChange={(open) => (settingsOpen = open)}
+/>
+<RoomInviteDialog
+  open={inviteOpen}
+  room={resolvedRoom ?? null}
+  onOpenChange={(open) => (inviteOpen = open)}
+/>
+<MessageReportDialog
+  bind:open={reportOpen}
+  title={$i18n.t('room.reportTitle')}
+  hint={$i18n.t('room.reportHint')}
+  onReport={(reason) => {
+    const target = resolvedRoomId;
+    void sendReport(() => core.commands.reportRoom(target, reason ?? ''));
+  }}
+/>
+<LeaveRoomDialog
+  open={leaveOpen}
+  room={resolvedRoom ?? null}
+  onOpenChange={(open) => (leaveOpen = open)}
+  onLeft={leaveRoomView}
+/>
 
 <CalendarEventDialog
   open={dialogOpen}

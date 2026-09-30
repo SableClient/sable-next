@@ -31,10 +31,11 @@
   interface Props {
     open: boolean;
     room: RoomSummary | null;
+    initialSection?: RoomSettingsSectionId | null;
     onOpenChange: (open: boolean) => void;
   }
 
-  let { open, room, onOpenChange }: Props = $props();
+  let { open, room, initialSection = null, onOpenChange }: Props = $props();
   const core = useCoreClient();
 
   let permissions = $state<RoomPermissionsView | null>(null);
@@ -65,7 +66,7 @@
     void roomId;
     if (!open) return;
     untrack(() => {
-      section = null;
+      section = initialSection;
     });
   });
 

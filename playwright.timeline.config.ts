@@ -38,6 +38,7 @@ export default defineConfig({
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',
     'voice-room-chat.spec.ts',
+    'calendar-room-menu.spec.ts',
     'room-icon-badge.spec.ts',
     'space-search-navigation.spec.ts',
     'verification-qr.spec.ts',

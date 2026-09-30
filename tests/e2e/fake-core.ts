@@ -36,6 +36,7 @@ export type RoomCoreMode =
   | 'spaces'
   | 'tombstoned'
   | 'voice'
+  | 'calendar'
   | 'unverified'
   | 'onboarding';
 
@@ -137,7 +138,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
-      room_type: null,
+      room_type: workerMode === 'calendar' ? 'chat.commet.calendar' : null,
       supports_knock: false,
       supports_restricted: false,
       supports_knock_restricted: false,
