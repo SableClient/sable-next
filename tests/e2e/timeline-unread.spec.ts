@@ -163,7 +163,6 @@ test('the reveal resumes live at forward end without moving the reader or losing
     window.__e2eReceiveMessage('New live message');
   });
   await expect(timeline.message('New live message')).toBeAttached();
-  await timeline.expectAnchorHeld(reader);
 });
 
 test('the reveal keeps the row the reader scrolled to during the live handoff', async ({

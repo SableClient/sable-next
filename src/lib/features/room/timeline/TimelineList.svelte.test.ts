@@ -2043,8 +2043,10 @@ test('a slow marker lookup leaves messages visible and receipts blocked', async 
   await runAnimationFrames();
   expect(timelineViewport()).not.toHaveClass('initial');
   expect(read).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: 'Jump to unread' })).not.toBeInTheDocument();
   marker.resolve('$old-marker');
   await runAnimationFrames();
+  expect(screen.getByRole('button', { name: 'Jump to unread' })).toBeInTheDocument();
 });
 
 test('jumping to an unloaded marker requests event context instead of scanning history', async () => {

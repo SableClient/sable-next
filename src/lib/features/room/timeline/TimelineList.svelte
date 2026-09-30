@@ -886,7 +886,7 @@
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
   style={TIMELINE_LAYOUT_STYLE}
 >
-  {#if revealed && unread.active && (!unreadInView || unreadError !== null)}
+  {#if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
     <div class="unread-bar">
       <Button
         class="jump-to-unread"
