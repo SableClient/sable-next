@@ -37,6 +37,7 @@ export default defineConfig({
     'sheet-swipe.spec.ts',
     'voice-room-chat.spec.ts',
     'room-icon-badge.spec.ts',
+    'space-search-navigation.spec.ts',
     'verification-qr.spec.ts',
     'onboarding.spec.ts',
   ],

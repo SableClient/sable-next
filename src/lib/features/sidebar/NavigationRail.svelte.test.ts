@@ -350,6 +350,44 @@ test('records the active desktop space route without its event anchor', async ()
   });
 });
 
+test.each(['lobby', '!room%3Aexample.org'])(
+  'reopening a space after search returns to its previous %s view',
+  async (view) => {
+    const rail = renderRail({ spaces: [space()] });
+    await tick();
+
+    const previous = `/space/!space%3Aexample.org/${view}`;
+    visit(previous);
+    navigated();
+    await tick();
+
+    visit('/search?q=hello&space=!space%3Aexample.org');
+    navigated();
+    await tick();
+
+    visit('/rooms');
+    navigated();
+    await tick();
+    expect(tab('Space')).toHaveAttribute('href', previous);
+
+    rail.unmount();
+    renderRail({ spaces: [space()] });
+    await tick();
+    expect(tab('Space')).toHaveAttribute('href', previous);
+  }
+);
+
+test('opens the lobby when a search route was saved by an older client', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ '!space:example.org': '/search?q=hello&space=!space%3Aexample.org' })
+  );
+  renderRail({ spaces: [space()] });
+  await tick();
+
+  expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org/lobby');
+});
+
 test('opens a space root on mobile even when it has a saved route', async () => {
   localStorage.setItem(
     'sable-space-paths',
