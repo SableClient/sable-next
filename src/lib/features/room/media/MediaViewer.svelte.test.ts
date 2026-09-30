@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { tick } from 'svelte';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -238,6 +238,51 @@ test('escape in the image menu closes the menu, not the viewer', async () => {
   expect(onClose).not.toHaveBeenCalled();
 });
 
+test('backdrop click closes the viewer', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const img = await openImage([imageItem], onClose);
+
+  await user.click(img);
+  await user.click(screen.getByText('Alice'));
+  await user.pointer({ keys: '[MouseRight]', target: stage() });
+  expect(onClose).not.toHaveBeenCalled();
+
+  await user.click(stage());
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+test('backdrop drag keeps the viewer open', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  const img = await openImage([imageItem], onClose);
+
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: stage(), coords: { clientX: 50, clientY: 50 } },
+    { target: stage(), coords: { clientX: 150, clientY: 50 } },
+    { target: stage(), coords: { clientX: 50, clientY: 50 } },
+    { keys: '[/MouseLeft]', target: stage() },
+  ]);
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: img },
+    { keys: '[/MouseLeft]', target: stage() },
+  ]);
+
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+test('cancelled backdrop press keeps the viewer open', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onClose = vi.fn();
+  await openImage([imageItem], onClose);
+
+  await fireEvent.pointerDown(stage(), { pointerId: 1, pointerType: 'mouse', button: 0 });
+  await fireEvent.pointerCancel(stage(), { pointerId: 1, pointerType: 'mouse' });
+  await fireEvent.pointerUp(stage(), { pointerId: 1, pointerType: 'mouse', button: 0 });
+
+  expect(onClose).not.toHaveBeenCalled();
+});
+
 test('clamps pointer drag panning to the zoomed overflow', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
@@ -302,7 +347,7 @@ test('double click zooms in, and again returns to the fitted size', async () => 
   const img = await openImage();
 
   const tap = () =>
-    user.pointer({ keys: '[MouseLeft]', target: stage(), coords: { clientX: 400, clientY: 300 } });
+    user.pointer({ keys: '[MouseLeft]', target: img, coords: { clientX: 400, clientY: 300 } });
 
   await tap();
   clock.mockReturnValue(1_100);
@@ -329,7 +374,7 @@ test('a single tap goes immersive, and another brings the bars back', async () =
     expect(toolbar).toHaveClass('chrome-hidden');
   });
   expect(stage()).toHaveClass('chrome-hidden');
-  expect(document.querySelector('.bottom-bar')).toHaveClass('chrome-hidden');
+  expect(document.querySelector('.bottom-bar')).not.toBeInTheDocument();
   expect(document.querySelector('.viewer')).toHaveClass('immersive');
   expect(setSystemBarsHidden).toHaveBeenLastCalledWith(true);
 

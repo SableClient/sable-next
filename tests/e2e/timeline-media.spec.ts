@@ -44,6 +44,84 @@ function undecodablePicture() {
 }
 
 for (const mobile of [false, true]) {
+  test(`viewer backdrop clicks${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const item = picture(800, 600);
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...item,
+      content: {
+        ...item.content,
+        source: JSON.stringify({ Plain: 'mxc://example.test/spoiler-preview-backdrop' }),
+      },
+    });
+    const open = timeline.container.getByRole('button', { name: 'Open shot.png' });
+    await open.click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    const image = viewer.locator('.stage img');
+    const stage = viewer.locator('.stage');
+    await expect(image).toBeVisible(MEDIA_LOADED);
+    await expect(image).toHaveCSS('opacity', '1');
+    await expect(viewer.locator('footer')).toHaveCount(0);
+    await expect(viewer.locator('.heading')).toContainText('shot.png');
+    const alpha = await viewer.evaluate((element) =>
+      Number(getComputedStyle(element).backgroundColor.match(/\/\s*([\d.]+)/)?.[1] ?? 1)
+    );
+    expect(alpha).toBe(mobile ? 1 : 0.9);
+    await page.screenshot({ path: testInfo.outputPath('viewer-backdrop.png') });
+
+    if (mobile) {
+      const bounds = await stage.boundingBox();
+      if (!bounds) throw new Error('viewer stage missing');
+      await page.touchscreen.tap(bounds.x + 20, bounds.y + bounds.height / 2);
+      await expect(viewer.locator('header')).toHaveClass(/chrome-hidden/);
+      await expect(viewer).toBeVisible();
+    } else {
+      await image.click();
+      await viewer.getByRole('button', { name: 'Zoom in', exact: true }).click();
+      await expect(image).toHaveAttribute('style', /scale\(1\.2\)/);
+
+      await image.hover();
+      await page.mouse.down();
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.up();
+      await expect(viewer).toBeVisible();
+
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.down();
+      await stage.hover({ position: { x: 100, y: 30 } });
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.up();
+      await expect(viewer).toBeVisible();
+      await stage.click({ position: { x: 30, y: 30 }, button: 'right' });
+      await expect(viewer).toBeVisible();
+
+      await stage.dispatchEvent('pointerdown', {
+        pointerId: 5,
+        pointerType: 'touch',
+        button: 0,
+        clientX: 30,
+        clientY: 100,
+      });
+      await stage.dispatchEvent('pointerup', { pointerId: 5, pointerType: 'touch' });
+      await expect(viewer).toBeVisible();
+
+      await stage.click({ position: { x: 30, y: 30 } });
+      await expect(viewer).toHaveCount(0);
+      await expect(open).toBeFocused();
+    }
+  });
+
   test(`viewer header and menu actions${mobile ? ' on mobile' : ''}`, async ({
     page,
     app,

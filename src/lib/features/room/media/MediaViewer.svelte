@@ -91,6 +91,9 @@
   let mediaLabel = $derived(
     item === undefined ? '' : item.kind === 'sticker' ? item.body : (item.caption ?? item.filename)
   );
+  let visibleLabel = $derived(
+    spoilerHidden ? $i18n.t('composer.spoiler') : mediaLabel || $i18n.t('viewer.untitled')
+  );
   const resource = new MediaViewerResource(core, () => videoEl?.currentTime ?? 0);
   let url = $derived(resource.url);
   const mediaActions = new MediaViewerActions(
@@ -130,6 +133,7 @@
   let swipeY = $state(0);
   let chromeHidden = $state(false);
   let tap: { pointerId: number; x: number; y: number } | null = null;
+  let backdropPress: { pointerId: number; x: number; y: number } | null = null;
   let tapTimer: ReturnType<typeof setTimeout> | undefined;
   let swipe: {
     pointerId: number;
@@ -385,10 +389,18 @@
   }
 
   function startPan(event: PointerEvent): void {
+    backdropPress =
+      event.target === stageEl &&
+      event.pointerType === 'mouse' &&
+      event.button === 0 &&
+      !imageMenuOpen &&
+      window.matchMedia('(width >= 48rem)').matches
+        ? { pointerId: event.pointerId, x: event.clientX, y: event.clientY }
+        : null;
     if (!isImage || spoilerHidden) return;
     if (event.button !== 0) return;
     clearTimeout(tapTimer);
-    if (handleDoubleTap(event)) return;
+    if (!backdropPress && handleDoubleTap(event)) return;
     if (event.pointerType === 'touch') {
       tap =
         touches.size === 0 && !(event.target instanceof Element && event.target.closest('button'))
@@ -424,6 +436,13 @@
   }
 
   function movePan(event: PointerEvent): void {
+    if (
+      backdropPress?.pointerId === event.pointerId &&
+      Math.hypot(event.clientX - backdropPress.x, event.clientY - backdropPress.y) >
+        AXIS_LOCK_THRESHOLD
+    ) {
+      backdropPress = null;
+    }
     if (!isImage) return;
     if (
       tap?.pointerId === event.pointerId &&
@@ -495,6 +514,10 @@
   }
 
   function endPan(event: PointerEvent): void {
+    if (backdropPress?.pointerId === event.pointerId) {
+      backdropPress = null;
+      if (event.type === 'pointerup' && event.target === stageEl) onClose();
+    }
     if (!isImage) return;
     if (tap?.pointerId === event.pointerId) {
       if (event.type === 'pointerup') {
@@ -572,7 +595,9 @@
         <header class="toolbar" class:chrome-hidden={chromeHidden}>
           <div class="heading">
             <strong>{item.sender}</strong>
-            <span>{$i18n.t('viewer.position', { index: index + 1, total: items.length })}</span>
+            <span title={visibleLabel}
+              >{$i18n.t('viewer.position', { index: index + 1, total: items.length })} · {visibleLabel}</span
+            >
           </div>
           <div class="actions">
             {#if isImage || isPdf}
@@ -853,8 +878,8 @@
           {/if}
         </main>
 
-        <footer class="bottom-bar" class:chrome-hidden={chromeHidden}>
-          {#if isPdf && pdfPages > 1}
+        {#if isPdf && pdfPages > 1}
+          <footer class="bottom-bar" class:chrome-hidden={chromeHidden}>
             <div class="zoom-controls">
               <IconButton
                 label={$i18n.t('pdf.previousPage')}
@@ -872,11 +897,8 @@
                 onclick={() => (pdfPage += 1)}><CaretRightIcon /></IconButton
               >
             </div>
-          {/if}
-          <p>
-            {spoilerHidden ? $i18n.t('composer.spoiler') : mediaLabel || $i18n.t('viewer.untitled')}
-          </p>
-        </footer>
+          </footer>
+        {/if}
       </Dialog.Content>
     </Dialog.Portal>
   </Dialog.Root>
@@ -952,18 +974,15 @@
   }
 
   .heading strong,
-  .heading span,
-  .bottom-bar p {
+  .heading span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .heading span,
-  .bottom-bar p {
+  .heading span {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .actions {
@@ -975,8 +994,7 @@
     margin-inline-start: var(--space-200);
   }
 
-  .zoom-controls,
-  .bottom-bar p {
+  .zoom-controls {
     display: none;
   }
 
@@ -1166,19 +1184,23 @@
   }
 
   @media (width >= 48rem) {
+    :global(.viewer) {
+      background: color-mix(in srgb, var(--viewer-immersive) 90%, transparent);
+    }
+
+    .error,
+    .error span {
+      color: var(--media-on-scrim);
+    }
+
     .toolbar {
       padding: calc(var(--space-300) + var(--safe-top)) max(var(--space-400), var(--safe-left))
         var(--space-300);
     }
 
     .bottom-bar {
-      gap: var(--space-400);
       padding: var(--space-300) max(var(--space-400), var(--safe-left))
         calc(var(--space-300) + var(--safe-bottom));
-    }
-
-    .bottom-bar p {
-      display: initial;
     }
 
     .zoom-controls {
