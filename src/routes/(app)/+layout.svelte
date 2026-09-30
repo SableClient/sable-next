@@ -172,7 +172,14 @@
   );
   const callVolumeOf = (identity: string, screen: boolean): number => {
     const userId = callUserIds.get(identity) ?? identity;
-    return effectiveVolume(screen ? screenVolumeKey(userId) : userId);
+    if (!screen) return effectiveVolume(userId);
+    const watched = callSession.transport.participants.some(
+      (participant) =>
+        participant.identity === identity &&
+        participant.screenShare !== undefined &&
+        callSession.watchedScreenShareIds.includes(participant.screenShare.id)
+    );
+    return watched ? effectiveVolume(screenVolumeKey(userId)) : 0;
   };
   const shareInbox = new ShareInbox();
 
