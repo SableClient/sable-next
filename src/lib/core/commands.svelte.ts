@@ -13,6 +13,8 @@ import type {
   DirectoryRoomType,
   EditVersionView,
   EncryptionStatusView,
+  KeyBackupStatusView,
+  KeyBackupDownloadView,
   HomeserverSoftwareView,
   IdentityResetStep,
   ImagePackView,
@@ -1709,6 +1711,19 @@ export function createCommands(transport: () => Transport) {
         type: 'encryption_status',
       });
       return response.status;
+    },
+
+    async keyBackupStatus(): Promise<KeyBackupStatusView> {
+      const response = await transport().send({ type: 'key_backup_status' });
+      return response.status;
+    },
+
+    async downloadKeyBackup(requestId: string): Promise<KeyBackupDownloadView> {
+      const response = await transport().send({
+        type: 'download_key_backup',
+        request_id: requestId,
+      });
+      return response.download;
     },
 
     async signOutSafety(): Promise<SignOutSafetyView> {

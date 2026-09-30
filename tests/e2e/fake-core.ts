@@ -705,6 +705,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }
     };
 
+    let backupDownload: Extract<CommandOk, { type: 'download_key_backup' }>['download'] | null =
+      null;
+
     const handlers: Handlers = {
       discover_homeserver: () => ({
         type: 'discover_homeserver',
@@ -1353,6 +1356,28 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         status: { state: 'live' },
       }),
       encryption_status: () => ({ type: 'encryption_status', status: encryption() }),
+      key_backup_status: () => ({
+        type: 'key_backup_status',
+        status: {
+          local_keys: backupDownload?.state === 'complete' ? 200 : 120,
+          backed_up_keys: backupDownload?.state === 'complete' ? 200 : 120,
+          cloud_keys: 200,
+          can_restore: true,
+          download: backupDownload,
+        },
+      }),
+      download_key_backup: (command) => {
+        backupDownload = {
+          account_id: session.account_id,
+          request_id: command.request_id,
+          state: 'complete',
+          total: 200,
+          processed: 200,
+          imported: 80,
+          failed: 0,
+        };
+        return { type: 'download_key_backup', download: backupDownload };
+      },
       sign_out_safety: () => ({
         type: 'sign_out_safety',
         safety: {

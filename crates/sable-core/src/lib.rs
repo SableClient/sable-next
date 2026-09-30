@@ -19,6 +19,7 @@ pub mod matrix_html;
 mod media;
 mod media_health;
 pub use media::GalleryAttachment;
+mod key_backup;
 mod messages;
 pub mod notifications;
 mod outgoing;
@@ -101,6 +102,8 @@ pub struct Core {
     cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
     media_health: std::sync::Mutex<media_health::MediaHealth>,
     media_downloads: tokio::sync::Semaphore,
+    key_backup_downloads: tokio::sync::Semaphore,
+    key_backup_download: std::sync::Mutex<Option<protocol::KeyBackupDownloadView>>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
@@ -241,6 +244,8 @@ impl Core {
             next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
+            key_backup_downloads: tokio::sync::Semaphore::new(1),
+            key_backup_download: std::sync::Mutex::new(None),
             session_attempt_generation: AtomicU64::new(1),
             session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
