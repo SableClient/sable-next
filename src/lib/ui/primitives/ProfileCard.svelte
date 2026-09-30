@@ -208,7 +208,13 @@
     {#if crest}
       <div class="profile-card-crest-content">{@render crest()}</div>
     {:else if status}
-      <p class="profile-card-status">
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <p
+        class="profile-card-status explicit-scrollbar"
+        role="region"
+        aria-label={$i18n.t('settings.status')}
+        tabindex="0"
+      >
         {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
       </p>
     {/if}
@@ -439,18 +445,21 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
     font-size: var(--font-size-label);
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
     line-height: var(--line-height-small);
     margin: 0;
+    max-height: calc(2 * var(--line-height-small) + 2 * var(--space-200) + 2 * var(--border-width));
     min-width: 0;
-    overflow: hidden;
     overflow-wrap: anywhere;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: var(--space-200) var(--space-300);
     transform: translateY(-50%);
+  }
+
+  .profile-card-status:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   .profile-card-status-emoji {
