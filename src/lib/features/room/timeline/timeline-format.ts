@@ -122,7 +122,7 @@ function isVisibleEvent(
       return preferences.showTombstoneEvents;
     case 'state_event':
       if (item.content.change) return true;
-      return preferences.showHiddenEvents;
+      return preferences.showHiddenEvents && preferences.hiddenEventOther;
     case 'hidden_event':
       return preferences.showHiddenEvents && preferences.hiddenEventOther;
     default:

@@ -253,9 +253,62 @@ test('drops member events in a read-only room', () => {
   ).toEqual([joined, message]);
 });
 
-test('gates raw state events behind the developer switch', () => {
+test('gates raw state events behind the hidden-event switches', () => {
   expect(visibleTimelineItems([topic], defaults)).toEqual([]);
   expect(visibleTimelineItems([topic], { ...defaults, showHiddenEvents: true })).toEqual([topic]);
+  expect(
+    visibleTimelineItems([topic], {
+      ...defaults,
+      showHiddenEvents: true,
+      hiddenEventOther: false,
+    })
+  ).toEqual([]);
+});
+
+test.each(['m.room.server_acl', 'com.example.custom_state'])(
+  'gates raw %s state events behind both hidden-event switches',
+  (eventType) => {
+    const state = item({
+      kind: 'state_event',
+      event_type: eventType,
+      state_key: '',
+      content: {},
+      prev_content: null,
+      change: null,
+    });
+
+    for (const showHiddenEvents of [false, true]) {
+      for (const hiddenEventOther of [false, true]) {
+        expect(
+          visibleTimelineItems([state, message], {
+            ...defaults,
+            showHiddenEvents,
+            hiddenEventOther,
+          })
+        ).toEqual(showHiddenEvents && hiddenEventOther ? [state, message] : [message]);
+      }
+    }
+  }
+);
+
+test('keeps described room changes visible with other hidden events disabled', () => {
+  const changes = [
+    stateChange({ kind: 'room_name', name: 'Lobby', previous: null }),
+    stateChange({ kind: 'room_topic', topic: 'hi' }),
+    stateChange({ kind: 'room_avatar', removed: true }),
+    stateChange({ kind: 'pinned_events', added: ['$pin'], removed: [], total: 1 }),
+    stateChange({ kind: 'call_membership', joined: true }),
+  ];
+
+  for (const showHiddenEvents of [false, true]) {
+    expect(
+      visibleTimelineItems(changes, {
+        ...defaults,
+        showHiddenEvents,
+        hiddenEventOther: false,
+      })
+    ).toEqual(changes);
+  }
 });
 
 test("keeps a persona message out of the account's collapsed run", () => {
