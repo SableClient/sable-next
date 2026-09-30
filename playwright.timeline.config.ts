@@ -13,6 +13,7 @@ export default defineConfig({
     'timeline-notified.spec.ts',
     'timeline-row-height.spec.ts',
     'composer-alignment.spec.ts',
+    'composer-scheduling.spec.ts',
     'composer-autocomplete.spec.ts',
     'composer-paste.spec.ts',
     'emote-board-glyphs.spec.ts',

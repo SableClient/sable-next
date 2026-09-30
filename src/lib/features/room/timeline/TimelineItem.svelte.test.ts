@@ -717,8 +717,12 @@ test('opens an image from a mobile pointer interaction', async () => {
   const image = document.querySelector<HTMLButtonElement>('.media-image-activation');
   if (!image) throw new Error('media trigger was not rendered');
 
-  image.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
-  image.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
+  image.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
+  image.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
   await press(image);
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item');
@@ -1006,7 +1010,7 @@ test('long pressing a reaction opens its people list without toggling it', async
   const reaction = document.querySelector<HTMLButtonElement>('.reaction');
   if (!reaction) throw new Error('reaction was not rendered');
 
-  await fireEvent.pointerDown(reaction, { pointerType: 'touch' });
+  await fireEvent.pointerDown(reaction, { pointerType: 'touch', isPrimary: true });
   await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
   await fireEvent.click(reaction);
@@ -1187,7 +1191,13 @@ test('a touch long press opens the sheet without also opening the context menu',
   expect(article).not.toBeNull();
 
   article?.dispatchEvent(
-    new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, clientX: 0, clientY: 0 })
+    new PointerEvent('pointerdown', {
+      pointerType: 'touch',
+      isPrimary: true,
+      bubbles: true,
+      clientX: 0,
+      clientY: 0,
+    })
   );
   await vi.advanceTimersByTimeAsync(1000);
   await tick();

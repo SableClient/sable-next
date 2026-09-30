@@ -2,6 +2,7 @@
 
 import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
 import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
+import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import { cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
@@ -1085,7 +1086,52 @@ test('a document carries no spoiler control', async () => {
   expect(document.querySelector('.staged-spoiler')).toBeNull();
 });
 
-test('holding the send button opens the schedule dialog instead of sending', async () => {
+test('a send tap sends immediately', async () => {
+  vi.useFakeTimers();
+  const stopGuard = guardTouchClicks();
+  const send = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('now')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = setup({
+    roomId: '!room:example.org',
+    onSend: send,
+    onSchedule: async () => {},
+  });
+
+  try {
+    await tick();
+    const button = sendButton();
+    const down = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'touch',
+      isPrimary: true,
+    });
+    button.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+    await fireEvent.click(button);
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]).toEqual([
+      '!room:example.org',
+      'now',
+      null,
+      { userIds: [], room: false },
+    ]);
+    await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+    expect(document.body.textContent).not.toContain('Schedule this message');
+  } finally {
+    instance.unmount();
+    stopGuard();
+    vi.useRealTimers();
+  }
+});
+
+test('a send hold schedules after 800ms', async () => {
   vi.useFakeTimers();
   const send = vi.fn(async () => {});
   const draft = composerSchema.node('doc', null, [
@@ -1102,7 +1148,9 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   const button = document.querySelector('.composer-send');
   if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
   await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
-  await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+  await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS - 1);
+  expect(document.body.textContent).not.toContain('Schedule this message');
+  await vi.advanceTimersByTimeAsync(1);
   await tick();
 
   expect(document.body.textContent).toContain('Schedule this message');
@@ -1136,24 +1184,90 @@ test('a touch contextmenu leaves the schedule dialog to the long press', async (
   expect(document.body.textContent).not.toContain('Schedule this message');
 });
 
-test('right-clicking the send button opens the schedule dialog', async () => {
-  const send = vi.fn(async () => {});
+for (const [pointerType, afterReleaseMs] of [
+  ['', 0],
+  [undefined, 500],
+] as const) {
+  test(`an untyped touch contextmenu cannot schedule (${afterReleaseMs}ms after release)`, async () => {
+    vi.useFakeTimers();
+    const stopGuard = guardTouchClicks();
+    const draft = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+    ]);
+    writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+    const instance = setup({ roomId: '!room:example.org', onSchedule: async () => {} });
+
+    try {
+      await tick();
+      const button = sendButton();
+      await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+      await vi.advanceTimersByTimeAsync(100);
+      await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+      await vi.advanceTimersByTimeAsync(afterReleaseMs);
+
+      const init = { bubbles: true, cancelable: true };
+      const menu =
+        pointerType === undefined
+          ? new MouseEvent('contextmenu', init)
+          : new PointerEvent('contextmenu', { ...init, pointerType });
+      button.dispatchEvent(menu);
+      await tick();
+
+      expect(menu.defaultPrevented).toBe(true);
+      expect(document.body.textContent).not.toContain('Schedule this message');
+      await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+      expect(document.body.textContent).not.toContain('Schedule this message');
+    } finally {
+      instance.unmount();
+      stopGuard();
+      vi.useRealTimers();
+    }
+  });
+}
+
+test.each([false, true])(
+  'a send right-click schedules (previous touch: %s)',
+  async (previousTouch) => {
+    const send = vi.fn(async () => {});
+    const draft = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+    ]);
+    writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+    setup({
+      roomId: '!room:example.org',
+      onSend: send,
+      onSchedule: async () => {},
+    });
+    await tick();
+
+    const button = document.querySelector('.composer-send');
+    if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+    if (previousTouch) {
+      await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+      await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+      await fireEvent.pointerDown(button, { pointerType: 'mouse', button: 2, isPrimary: true });
+    }
+    expect(await fireEvent.contextMenu(button)).toBe(false);
+    expect(document.body).toHaveTextContent('Schedule this message');
+    expect(send).not.toHaveBeenCalled();
+  }
+);
+
+test.each(['ContextMenu', 'F10'])('the %s key opens scheduling after a touch', async (key) => {
   const draft = composerSchema.node('doc', null, [
     composerSchema.node('paragraph', null, [composerSchema.text('later')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  setup({
-    roomId: '!room:example.org',
-    onSend: send,
-    onSchedule: async () => {},
-  });
+  setup({ roomId: '!room:example.org', onSchedule: async () => {} });
   await tick();
 
-  const button = document.querySelector('.composer-send');
-  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
-  expect(await fireEvent.contextMenu(button)).toBe(false);
+  const button = sendButton();
+  await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+  await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+  await fireEvent.keyDown(button, { key, shiftKey: key === 'F10' });
+  await fireEvent.contextMenu(button);
+
   expect(document.body).toHaveTextContent('Schedule this message');
-  expect(send).not.toHaveBeenCalled();
 });
 
 function sendButton(): HTMLButtonElement {

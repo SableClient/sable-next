@@ -22,7 +22,7 @@
   import type { ConversationSendResult } from '#lib/features/room/conversation/conversation.svelte.js';
   import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
-  import { LongPress, SCHEDULE_PRESS_MS, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, SCHEDULE_PRESS_MS, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
@@ -1439,12 +1439,17 @@
                               recording = true;
                             }
                           : undefined,
-                      onpointerdown: (event: PointerEvent) => {
-                        if (hasContent) event.preventDefault();
-                        sendPress.start(event);
-                      },
+                      onpointerdown: sendPress.start,
                       onpointermove: sendPress.move,
-                      onpointerup: sendPress.end,
+                      onpointerup: sendPress.lift,
+                      onkeydown: (event: KeyboardEvent) => {
+                        if (
+                          event.key === 'ContextMenu' ||
+                          (event.key === 'F10' && event.shiftKey)
+                        ) {
+                          sendPress.touch = false;
+                        }
+                      },
                     })}
                     type={primaryAction === 'record' ? 'button' : 'submit'}
                     variant="ghost"
@@ -1455,11 +1460,15 @@
                     disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
                     label={sendLabel}
                     onpointercancel={sendPress.end}
-                    oncontextmenu={mouseContextMenu((event: MouseEvent) => {
+                    oncontextmenu={(event: MouseEvent) => {
+                      if (sendPress.touch || touchContextMenu(event)) {
+                        event.preventDefault();
+                        return;
+                      }
                       if (!canSchedule) return;
                       event.preventDefault();
                       scheduleOpen = true;
-                    })}
+                    }}
                     onmousedown={(event: MouseEvent) => {
                       if (hasContent) event.preventDefault();
                     }}
