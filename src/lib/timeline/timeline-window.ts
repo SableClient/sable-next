@@ -180,7 +180,10 @@ export class TimelineWindow<T> {
   }
 
   get state(): TimelineWindowState {
-    const visible = this.visibleRows();
+    return this.stateFor(this.visibleRows());
+  }
+
+  private stateFor(visible: readonly TimelineRow<T>[]): TimelineWindowState {
     return {
       start: this.start,
       end: this.end,
@@ -285,8 +288,7 @@ export class TimelineWindow<T> {
     this.writeOffset(target, smooth);
     if (!smooth && this.atEnd()) this.pinned = true;
     if (smooth) this.scheduleSettle();
-    this.capture();
-    this.publish();
+    this.publish(this.capture());
     if (this.pending) this.scheduleSettle();
     return true;
   }
@@ -401,20 +403,24 @@ export class TimelineWindow<T> {
     });
   }
 
-  private capture(): void {
+  private capture(): TimelineRow<T>[] {
     const viewport = this.options.viewport;
     const bounds = viewport.getBoundingClientRect();
+    const visible: TimelineRow<T>[] = [];
     const entries = this.elements().flatMap((element, index) => {
       const row = this.rows.at(index);
-      if (!row || (this.options.isAnchor && !this.options.isAnchor(row.value))) return [];
+      if (!row) return [];
       const rect = element.getBoundingClientRect();
       if (rect.bottom <= bounds.top || rect.top >= bounds.bottom) return [];
-      const top = (element.firstElementChild ?? element).getBoundingClientRect().top;
+      visible.push(row);
+      if (this.options.isAnchor && !this.options.isAnchor(row.value)) return [];
+      const top = element.firstElementChild?.getBoundingClientRect().top ?? rect.top;
       return [{ key: row.key, top: top - bounds.top, full: rect.top >= bounds.top }];
     });
     this.anchors = entries
       .filter((entry) => entry.full)
       .concat(entries.filter((entry) => !entry.full));
+    return visible;
   }
 
   private setHeight(height: number): void {
@@ -494,25 +500,27 @@ export class TimelineWindow<T> {
     this.offset = viewport.scrollTop;
   }
 
-  private atEnd(tolerance = EPSILON): boolean {
+  private atEnd(tolerance = EPSILON, offset?: number): boolean {
     if (this.options.canFollowLatest?.() === false) return false;
     const viewport = this.options.viewport;
     return (
       this.end === this.items.length &&
-      viewport.scrollTop >= viewport.scrollHeight - viewport.clientHeight - tolerance
+      (offset ?? viewport.scrollTop) >= viewport.scrollHeight - viewport.clientHeight - tolerance
     );
   }
 
   private trackMovement(): number {
     const viewport = this.options.viewport;
-    const delta = viewport.scrollTop - this.offset;
-    this.offset = viewport.scrollTop;
+    const offset = viewport.scrollTop;
+    const delta = offset - this.offset;
+    this.offset = offset;
     if (delta === 0) return delta;
     this.scrollingUp = delta < 0;
     for (const anchor of this.anchors) anchor.top -= delta;
     const resized = this.ready && !this.active && viewport.clientHeight !== this.viewportHeight;
     if (!this.jumping)
-      this.pinned = this.atEnd(delta > 0 ? 2 : EPSILON) || (this.pinned && (delta > 0 || resized));
+      this.pinned =
+        this.atEnd(delta > 0 ? 2 : EPSILON, offset) || (this.pinned && (delta > 0 || resized));
     return delta;
   }
 
@@ -589,8 +597,7 @@ export class TimelineWindow<T> {
     this.offset = viewport.scrollTop;
     this.ready = true;
     this.scrollHeight = viewport.scrollHeight;
-    this.capture();
-    this.publish();
+    this.publish(this.capture());
     this.flushMissedScroll();
   }
 
@@ -614,19 +621,20 @@ export class TimelineWindow<T> {
         this.missedDelta += delta;
         return;
       }
+      let visible: readonly TimelineRow<T>[] | undefined;
       if (this.scrollingUp && !this.jumping && this.top < -EPSILON) this.layout();
       else {
-        this.capture();
-        this.publish();
+        visible = this.capture();
+        this.publish(visible);
       }
-      this.pursueScroll(delta);
+      this.pursueScroll(delta, visible);
     }
   }
 
-  private pursueScroll(delta: number): void {
+  private pursueScroll(delta: number, visible?: readonly TimelineRow<T>[]): void {
     if (this.jumping) return;
     this.options.onScroll(delta);
-    void this.extendWindow();
+    void this.extendWindow(visible);
   }
 
   private flushMissedScroll(): void {
@@ -638,13 +646,14 @@ export class TimelineWindow<T> {
 
   private interact(): void {
     this.options.onInteraction?.();
-    if (!this.active) this.scrollingUp = false;
+    const wasActive = this.active;
+    if (!wasActive) this.scrollingUp = false;
     this.jumpVersion++;
     this.jumping = false;
     this.scrolled();
     this.active = true;
     this.scheduleSettle();
-    this.publish();
+    if (!wasActive) this.publish();
   }
 
   private scheduleSettle(): void {
@@ -680,20 +689,21 @@ export class TimelineWindow<T> {
     if (this.pending) await this.drain();
   }
 
-  private async extendWindow(): Promise<void> {
+  private async extendWindow(visible?: readonly TimelineRow<T>[]): Promise<void> {
     if (this.rendering || this.disposed) return;
-    const visible = this.visibleRows();
-    const first = visible.at(0)?.index;
-    const last = visible.at(-1)?.index;
+    const rows = visible ?? this.visibleRows();
+    const first = rows.at(0)?.index;
+    const last = rows.at(-1)?.index;
     if (first === undefined || last === undefined) {
       let top = 0;
       let index = 0;
+      const offset = this.options.viewport.scrollTop;
       while (index < this.items.length - 1) {
         const entry = this.items[index];
         const size =
           this.sizes.get(entry.key)?.height ??
           this.estimatedSize(this.bucketOf(entry.value), this.options.estimateSize?.(entry.value));
-        if (top + size > this.options.viewport.scrollTop) break;
+        if (top + size > offset) break;
         top += size;
         index++;
       }
@@ -743,7 +753,7 @@ export class TimelineWindow<T> {
       .flatMap((element) => (element.dataset.timelineKey ? [element.dataset.timelineKey] : []));
   }
 
-  private publish(): void {
-    if (!this.disposed) this.options.onChange(this.state);
+  private publish(visible?: readonly TimelineRow<T>[]): void {
+    if (!this.disposed) this.options.onChange(visible ? this.stateFor(visible) : this.state);
   }
 }

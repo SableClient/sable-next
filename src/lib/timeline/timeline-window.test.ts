@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { TimelineWindow, type TimelineRow } from './timeline-window';
+import { TimelineWindow, type TimelineRow, type TimelineWindowState } from './timeline-window';
 
 const windows: TimelineWindow<number>[] = [];
 type Fixture = ReturnType<typeof fixture>;
@@ -82,7 +82,7 @@ function fixture(
         content.insertBefore(node, content.children[index] ?? null);
     });
   });
-  const onChange = vi.fn();
+  const onChange = vi.fn<(state: TimelineWindowState) => void>();
   const onScroll = vi.fn();
   const window = new TimelineWindow({
     viewport,
@@ -999,6 +999,37 @@ test('repeated content height reads in one task measure the DOM once', async () 
   await Promise.resolve();
   expect(window.contentHeight).toBe(first);
   expect(measure).toHaveBeenCalledTimes(2);
+});
+
+test('scrolling measures each rendered row once', async () => {
+  const { window, viewport, content, render, onChange } = fixture();
+  await window.update(entries(200));
+  const bounds = vi.spyOn(viewport, 'getBoundingClientRect');
+  const rows = Array.from(content.children).map((row) => vi.spyOn(row, 'getBoundingClientRect'));
+  render.mockClear();
+
+  viewport.scrollTop -= 50;
+  viewport.dispatchEvent(new Event('scroll'));
+
+  expect(onChange.mock.lastCall?.[0].pinned).toBe(false);
+  expect(render).not.toHaveBeenCalled();
+  expect(bounds).toHaveBeenCalledTimes(1);
+  for (const row of rows) expect(row).toHaveBeenCalledTimes(1);
+});
+
+test('repeated wheel input without movement skips row measurements', async () => {
+  const { window, viewport, content, onChange } = fixture();
+  await window.update(entries(200));
+  viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20 }));
+  const bounds = vi.spyOn(viewport, 'getBoundingClientRect');
+  const rows = Array.from(content.children).map((row) => vi.spyOn(row, 'getBoundingClientRect'));
+  onChange.mockClear();
+
+  viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20 }));
+
+  expect(onChange).not.toHaveBeenCalled();
+  expect(bounds).not.toHaveBeenCalled();
+  for (const row of rows) expect(row).not.toHaveBeenCalled();
 });
 
 test('scrolling while a render is in flight still asks for history', async () => {

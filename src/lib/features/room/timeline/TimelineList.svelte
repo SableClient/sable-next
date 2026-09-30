@@ -352,20 +352,16 @@
     isScrolling: () => windowState.scrolling,
     requestHistory,
   });
-  function measureMediaColumn(node: HTMLElement): number {
-    const main = node.querySelector<HTMLElement>('.message-main');
-    return mediaColumnPx(main?.clientWidth ?? estimatedColumnPx(node.clientWidth));
-  }
   function windowChanged(state: TimelineWindowState): void {
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
-    if (node !== null) mediaColumn = measureMediaColumn(node);
-    const distance = node === null ? 0 : node.scrollHeight - node.clientHeight - node.scrollTop;
+    const height = node?.clientHeight ?? 0;
+    const distance = node === null ? 0 : node.scrollHeight - height - node.scrollTop;
     jumpToLatestVisible =
       !state.pinned &&
       (state.end !== entries.length ||
-        (node !== null && distance >= node.clientHeight * TIMELINE_LAYOUT.jumpToLatestPages));
+        (node !== null && distance >= height * TIMELINE_LAYOUT.jumpToLatestPages));
     nearLatest =
       state.end === entries.length &&
       node !== null &&
@@ -390,10 +386,20 @@
     const canvas = node.querySelector<HTMLElement>('.items');
     const content = node.querySelector<HTMLElement>('.window-rows');
     if (!canvas || !content) throw new Error('Timeline window elements are missing');
-    mediaColumn = measureMediaColumn(node);
+    let column: HTMLElement | null = null;
     const widths = new ResizeObserver(() => {
-      mediaColumn = measureMediaColumn(node);
+      measureMediaColumn();
     });
+    function measureMediaColumn(): void {
+      const main = node.querySelector<HTMLElement>('.message-main');
+      if (main !== column) {
+        if (column) widths.unobserve(column);
+        column = main;
+        if (column) widths.observe(column);
+      }
+      mediaColumn = mediaColumnPx(main?.clientWidth ?? estimatedColumnPx(node.clientWidth));
+    }
+    measureMediaColumn();
     widths.observe(node);
     const engine = new TimelineWindow<RowValue>({
       viewport: node,
@@ -402,6 +408,7 @@
       render: async (next) => {
         rows = next;
         await tick();
+        if (!disposed) measureMediaColumn();
       },
       onChange: windowChanged,
       onScroll: readerScrolled,

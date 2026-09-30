@@ -1176,6 +1176,57 @@ async function mountLive(roomTimeline: RoomTimeline): Promise<LiveTimeline> {
   };
 }
 
+test('scrolling reuses media width until the column resizes', async () => {
+  const observers: { targets: Set<Element>; resize: () => void }[] = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      targets = new Set<Element>();
+      constructor(callback: ResizeObserverCallback) {
+        observers.push({
+          targets: this.targets,
+          resize: () => {
+            callback([], this);
+          },
+        });
+      }
+      observe(target: Element): void {
+        this.targets.add(target);
+      }
+      unobserve(target: Element): void {
+        this.targets.delete(target);
+      }
+      disconnect(): void {
+        this.targets.clear();
+      }
+    }
+  );
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(100);
+  const { element } = await mountLive(roomTimeline);
+  vi.useFakeTimers();
+  const main = element.querySelector<HTMLElement>('.message-main');
+  if (!main) throw new Error('message column not found');
+  const width = vi.fn(() => 280);
+  Object.defineProperty(main, 'clientWidth', { configurable: true, get: width });
+  const observer = observers.find(({ targets }) => targets.has(element) && targets.has(main));
+  if (!observer) throw new Error('media width observer not found');
+  observer.resize();
+  expect(width).toHaveBeenCalledOnce();
+  width.mockClear();
+
+  for (let index = 0; index < 3; index++) {
+    element.scrollTop -= 50;
+    element.dispatchEvent(new Event('scroll'));
+    await tick();
+  }
+  expect(width).not.toHaveBeenCalled();
+
+  width.mockReturnValue(200);
+  observer.resize();
+  expect(width).toHaveBeenCalledOnce();
+});
+
 test('a backward pagination keeps its loading pill between pages, then fades it away', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = liveItems(20);
