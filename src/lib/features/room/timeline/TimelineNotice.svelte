@@ -85,7 +85,7 @@
 </script>
 
 {#snippet targetDetail(target: string)}
-  <div class="state-detail">
+  <div class={['state-detail', { 'target-above': targetAbove }]}>
     {#if isEditEvent(item)}
       <EventTargetPreview
         eventId={target}
@@ -256,6 +256,7 @@
     display: flex;
     flex: 0 0 var(--avatar-size-small);
     justify-content: center;
+    translate: 0 var(--space-100);
   }
 
   .state-icon :global(svg) {
@@ -270,6 +271,11 @@
     min-width: 0;
     opacity: var(--opacity-p300);
     padding-block: var(--space-050);
+  }
+
+  .state-detail.target-above,
+  .state-detail:has(:global(.target-connected)) {
+    padding-block: 0;
   }
 
   .state :global(.state-emote) {

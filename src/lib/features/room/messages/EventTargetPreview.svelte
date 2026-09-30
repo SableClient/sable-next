@@ -203,8 +203,10 @@
     --target-connector-width: var(--border-width-500);
 
     grid-template-columns: minmax(0, 1fr);
+    margin-bottom: var(--space-100);
     min-height: var(--space-500);
     overflow: visible;
+    padding-block: 0;
     padding-inline: 0;
     position: relative;
   }
