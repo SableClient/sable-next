@@ -40,7 +40,12 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   const send = vi.fn((command: { type: string }) => {
     sent.push(command);
     return Promise.resolve(
-      responses[command.type] ?? (command.type === 'list_accounts' ? { accounts: [] } : {})
+      responses[command.type] ??
+        (command.type === 'list_accounts'
+          ? { accounts: [] }
+          : command.type === 'media_config'
+            ? { upload_size: 100 * 1024 * 1024 }
+            : {})
     );
   });
   const transport = {
@@ -426,6 +431,56 @@ test('commands copy caller-provided arrays, so reactive proxies cannot reach the
   });
   expect(() => structuredClone(sent)).not.toThrow();
 });
+
+test.each(['attachment', 'gallery', 'scheduled'] as const)(
+  '%s uploads use the server limit instead of 100 MiB',
+  async (kind) => {
+    const fake = fakeTransport({
+      media_config: { upload_size: 500 * 1024 * 1024 },
+      delayed_events_supported: { supported: true },
+      schedule_attachment: { delay_id: 'delayed' },
+    });
+    fake.transport.sendGallery = vi.fn();
+    const core = createCoreClient(() => fake.transport);
+    const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+    Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+    if (kind === 'attachment') await core.commands.sendAttachment('!room:example.org', file);
+    if (kind === 'gallery') await core.commands.sendGallery('!room:example.org', [file, file]);
+    if (kind === 'scheduled')
+      await core.commands.scheduleAttachment('!room:example.org', file, Date.now() + 30_000);
+
+    expect(fake.sent).toContainEqual({ type: 'media_config' });
+  }
+);
+
+test.each(['attachment', 'gallery', 'scheduled'] as const)(
+  '%s uploads reject files above a smaller server limit before reading them',
+  async (kind) => {
+    const fake = fakeTransport({ media_config: { upload_size: 10_000_000 } });
+    const sendAttachment = vi.spyOn(fake.transport, 'sendAttachment');
+    const uploadMedia = vi.spyOn(fake.transport, 'uploadMedia');
+    const sendGallery = vi.fn<Transport['sendGallery']>();
+    fake.transport.sendGallery = sendGallery;
+    const core = createCoreClient(() => fake.transport);
+    const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+    Object.defineProperty(file, 'size', { value: 10_000_001 });
+    const read = vi.spyOn(file, 'arrayBuffer');
+
+    const sending =
+      kind === 'attachment'
+        ? core.commands.sendAttachment('!room:example.org', file)
+        : kind === 'gallery'
+          ? core.commands.sendGallery('!room:example.org', [file, file])
+          : core.commands.scheduleAttachment('!room:example.org', file, Date.now() + 30_000);
+
+    await expect(sending).rejects.toThrow('10 MB');
+    expect(read).not.toHaveBeenCalled();
+    expect(sendAttachment).not.toHaveBeenCalled();
+    expect(sendGallery).not.toHaveBeenCalled();
+    expect(uploadMedia).not.toHaveBeenCalled();
+  }
+);
 
 test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {
   const fake = fakeTransport();

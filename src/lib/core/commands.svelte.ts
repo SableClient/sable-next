@@ -78,7 +78,7 @@ import type {
   WebPusherView,
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
-import { maxAttachmentBytes } from './limits';
+import { formatByteSize } from '#lib/ui/byte-size.js';
 import { CoreError, type Transport } from '../../transport';
 
 export type CallGrant = {
@@ -168,6 +168,18 @@ const EMPTY_SEARCH_FILTER: SearchFilter = {
 };
 
 export function createCommands(transport: () => Transport) {
+  async function mediaConfig(): Promise<{ upload_size: number }> {
+    const response = await transport().send({ type: 'media_config' });
+    return { upload_size: response.upload_size };
+  }
+
+  async function validateAttachments(files: readonly File[]): Promise<void> {
+    const { upload_size } = await mediaConfig();
+    if (files.some((file) => file.size > upload_size)) {
+      throw new Error(`Attachment exceeds the ${formatByteSize(upload_size)} limit`);
+    }
+  }
+
   async function imagePackListing(
     roomId: string,
     cachedOnly = false
@@ -181,6 +193,8 @@ export function createCommands(transport: () => Transport) {
   }
 
   return {
+    mediaConfig,
+
     async requestRegistrationEmail(email: string): Promise<RegistrationResultView> {
       const response = await transport().send({
         type: 'request_registration_email',
@@ -1249,7 +1263,7 @@ export function createCommands(transport: () => Transport) {
       dueTs: number,
       spoiler = false
     ): Promise<string> {
-      if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      await validateAttachments([file]);
       const support = await transport().send({ type: 'delayed_events_supported' });
       if (!support.supported) throw new CoreError({ code: 'delayed_events_unsupported' });
       const [info, bytes] = await Promise.all([
@@ -1397,7 +1411,7 @@ export function createCommands(transport: () => Transport) {
       file: File,
       options: SendAttachmentOptions = {}
     ): Promise<void> {
-      if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      await validateAttachments([file]);
       const info = await measureAttachment(file);
       const bytes = new Uint8Array(await file.arrayBuffer());
       await transport().sendAttachment({
@@ -1424,18 +1438,15 @@ export function createCommands(transport: () => Transport) {
       options: SendGalleryOptions = {}
     ): Promise<void> {
       if (files.length < 2) throw new Error('A gallery needs at least two attachments');
+      await validateAttachments(files);
       const attachments = await Promise.all(
-        files.map(async (file) => {
-          if (file.size > maxAttachmentBytes)
-            throw new Error('Attachment exceeds the 100 MiB limit');
-          return {
-            roomId,
-            filename: file.name,
-            mime: file.type || 'application/octet-stream',
-            bytes: new Uint8Array(await file.arrayBuffer()),
-            info: await measureAttachment(file),
-          };
-        })
+        files.map(async (file) => ({
+          roomId,
+          filename: file.name,
+          mime: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          info: await measureAttachment(file),
+        }))
       );
       await transport().sendGallery({
         roomId,

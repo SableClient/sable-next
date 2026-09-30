@@ -34,7 +34,7 @@ use crate::view::SPOILER_PROPERTY;
 
 use crate::{Core, MatrixClient};
 
-const MAX_ATTACHMENT_BYTES: usize = 100 * 1024 * 1024;
+const MAX_INITIAL_DOWNLOAD_CAPACITY: usize = 100 * 1024 * 1024;
 const MAX_CACHED_PREVIEW_ORIGINAL_BYTES: usize = 1024 * 1024;
 pub(crate) const MAX_MEDIA_DOWNLOADS: usize = 6;
 const MEDIA_DOWNLOAD_TIMEOUT: Duration = Duration::from_hours(1);
@@ -50,6 +50,20 @@ pub struct GalleryAttachment {
 }
 
 impl Core {
+    /// The server's upload limit in bytes, cached by the SDK.
+    ///
+    /// # Errors
+    ///
+    /// Fails when logged out or when the server configuration is unavailable.
+    pub(crate) async fn max_upload_size(&self) -> Result<u64, CommandErr> {
+        self.client()
+            .await?
+            .load_or_fetch_max_upload_size()
+            .await
+            .map(u64::from)
+            .or_failed(self, "media_config")
+    }
+
     /// Downloads a persona avatar over native HTTP and uploads it to Matrix.
     ///
     /// # Errors
@@ -305,7 +319,7 @@ impl Core {
         let mut content = Vec::with_capacity(
             usize::try_from(total)
                 .unwrap_or(0)
-                .min(MAX_ATTACHMENT_BYTES),
+                .min(MAX_INITIAL_DOWNLOAD_CAPACITY),
         );
         let mut chunks = response.bytes_stream();
         let mut reported = 0;
@@ -381,7 +395,7 @@ impl Core {
         request: SendAttachmentRequest,
         bytes: Vec<u8>,
     ) -> Result<(), CommandErr> {
-        if bytes.len() > MAX_ATTACHMENT_BYTES {
+        if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > self.max_upload_size().await? {
             return Err(CommandErr::InvalidMedia);
         }
         let mime: Mime = request.mime.parse().map_err(|_| CommandErr::InvalidMedia)?;
@@ -466,11 +480,13 @@ impl Core {
         request: SendGalleryRequest,
         attachments: Vec<GalleryAttachment>,
     ) -> Result<(), CommandErr> {
-        if attachments.len() != request.attachments.len()
-            || attachments.len() < 2
-            || attachments
-                .iter()
-                .any(|item| item.bytes.len() > MAX_ATTACHMENT_BYTES)
+        if attachments.len() != request.attachments.len() || attachments.len() < 2 {
+            return Err(CommandErr::InvalidMedia);
+        }
+        let max_upload_size = self.max_upload_size().await?;
+        if attachments
+            .iter()
+            .any(|item| u64::try_from(item.bytes.len()).unwrap_or(u64::MAX) > max_upload_size)
         {
             return Err(CommandErr::InvalidMedia);
         }

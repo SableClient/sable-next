@@ -1493,6 +1493,9 @@ impl Core {
                 self.send_scheduled_message_now(delay_id).await?;
                 Ok(CommandOk::SendScheduledMessage)
             }
+            Command::MediaConfig => Ok(CommandOk::MediaConfig {
+                upload_size: self.max_upload_size().await?,
+            }),
             Command::DelayedEventsSupported => Ok(CommandOk::DelayedEventsSupported {
                 supported: self.delayed_events_supported().await?,
             }),

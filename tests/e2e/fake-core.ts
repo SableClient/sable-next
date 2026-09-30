@@ -1206,6 +1206,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       schedule_message: () => ({ type: 'schedule_message', delay_id: 'e2e-delay' }),
       schedule_attachment: () => ({ type: 'schedule_attachment', delay_id: 'e2e-attachment' }),
       scheduled_messages: () => ({ type: 'scheduled_messages', messages: [] }),
+      media_config: () => ({ type: 'media_config', upload_size: 100 * 1024 * 1024 }),
       delayed_events_supported: () => ({ type: 'delayed_events_supported', supported: true }),
       cancel_send: () => ({ type: 'cancel_send', cancelled: true }),
       create_room: () => ({ type: 'create_room', room_id: '!created:example.test' }),

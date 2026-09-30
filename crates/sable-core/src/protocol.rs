@@ -708,6 +708,7 @@ pub enum Command {
     SendScheduledMessage {
         delay_id: String,
     },
+    MediaConfig,
     DelayedEventsSupported,
     /// MSC3381.
     CreatePoll {
@@ -1601,6 +1602,10 @@ pub enum CommandOk {
     },
     CancelScheduledMessage,
     SendScheduledMessage,
+    MediaConfig {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        upload_size: u64,
+    },
     DelayedEventsSupported {
         supported: bool,
     },

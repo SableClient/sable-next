@@ -844,6 +844,89 @@ async fn media_replies_preserve_silent_mentions_on_the_wire() {
 }
 
 #[tokio::test]
+async fn media_config_is_cached_per_account_and_supports_legacy_servers() {
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    for (version, upload_size) in [("v1.11", 500_000_000), ("v1.1", 10_000_000)] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().no_server_versions().build().await;
+        server
+            .mock_versions()
+            .with_versions(vec![version])
+            .ok()
+            .mount()
+            .await;
+        if version == "v1.11" {
+            server
+                .mock_authenticated_media_config()
+                .ok(upload_size.try_into().unwrap())
+                .expect(1)
+                .mount()
+                .await;
+        } else {
+            server
+                .mock_media_config()
+                .ok(upload_size.try_into().unwrap())
+                .expect(1)
+                .mount()
+                .await;
+        }
+        let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        *core.session.write().await = Some(Session {
+            account_id: version.to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        for _ in 0..2 {
+            let response = core.dispatch(Command::MediaConfig).await.unwrap();
+            assert!(
+                matches!(response, CommandOk::MediaConfig { upload_size: size } if size == upload_size)
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn attachments_use_the_server_upload_limit_instead_of_100_mib() {
+    for (upload_size, file_size) in [(2_u64, 3_usize), (200 * 1024 * 1024, 100 * 1024 * 1024 + 1)] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.send_queue().set_enabled(false).await;
+        let room_id = room_id!("!upload-limit:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .mock_authenticated_media_config()
+            .ok(upload_size.try_into().unwrap())
+            .expect(1)
+            .mount()
+            .await;
+        let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "test".to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let request = serde_json::from_value(json!({
+            "room_id": room_id,
+            "filename": "large.bin",
+            "mime": "application/octet-stream",
+        }))
+        .unwrap();
+        let result = core.send_attachment(request, vec![0; file_size]).await;
+        if u64::try_from(file_size).unwrap() > upload_size {
+            assert!(matches!(result, Err(CommandErr::InvalidMedia)));
+        } else {
+            result.unwrap();
+        }
+    }
+}
+
+#[tokio::test]
 async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -853,7 +936,7 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     server.mock_room_state_encryption().plain().mount().await;
     server
         .mock_authenticated_media_config()
-        .ok_default()
+        .ok(matrix_sdk::ruma::uint!(4))
         .mount()
         .await;
     server

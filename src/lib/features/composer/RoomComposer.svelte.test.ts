@@ -28,6 +28,8 @@ import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
   cleanup();
+  mediaConfig.mockReset();
+  mediaConfig.mockResolvedValue({ upload_size: 100 * 1024 * 1024 });
   clearDrafts();
   setPreference('formattingToolbar', false);
   setPreference('composerFormatButton', true);
@@ -72,6 +74,8 @@ const packs: ImagePackView[] = [
   },
 ];
 
+const mediaConfig = vi.fn(() => Promise.resolve({ upload_size: 100 * 1024 * 1024 }));
+
 const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
 
 const botCommands: BotCommandDescriptionView[] = [
@@ -100,6 +104,7 @@ function core(): CoreClient {
     subscribeEvents: () => () => {},
     commands: {
       scheduleAttachment,
+      mediaConfig,
       botCommands: () => Promise.resolve(botCommands),
       personas: () => Promise.resolve({ personas: [], selections: [] }),
       roomMembers: () => Promise.resolve(members),
@@ -983,9 +988,31 @@ test('an oversized file is refused before it is staged', async () => {
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('huge.bin');
 });
 
-test('a batch over the limit is refused as a batch', async () => {
+test('stages a file above 100 MiB when the server allows it', async () => {
+  mediaConfig.mockResolvedValue({ upload_size: 500 * 1024 * 1024 });
   setup({ roomId: '!room:example.org' });
-  await tick();
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+  await pick(file);
+
+  expect(stagedNames()).toEqual(['large.bin']);
+});
+
+test('shows the server limit when refusing an oversized file', async () => {
+  mediaConfig.mockResolvedValue({ upload_size: 10_000_000 });
+  setup({ roomId: '!room:example.org' });
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 20_000_000 });
+
+  await pick(file);
+
+  expect(stagedNames()).toEqual([]);
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('10 MB');
+});
+
+test('stages files whose combined size exceeds the per-upload limit', async () => {
+  setup({ roomId: '!room:example.org' });
   const half = (): File => {
     const file = new File(['x'], 'half.bin', { type: 'application/octet-stream' });
     Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024 });
@@ -993,12 +1020,82 @@ test('a batch over the limit is refused as a batch', async () => {
   };
 
   await pick(half());
-  expect(stagedNames()).toEqual(['half.bin']);
-
   await pick(half());
 
-  expect(stagedNames()).toEqual(['half.bin']);
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain('more than');
+  expect(stagedNames()).toEqual(['half.bin', 'half.bin']);
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+test('a failed media config lookup can be retried', async () => {
+  mediaConfig.mockRejectedValueOnce(new Error('offline'));
+  mediaConfig.mockResolvedValue({ upload_size: 500 * 1024 * 1024 });
+  setup({ roomId: '!room:example.org' });
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+  await pick(file);
+  expect(stagedNames()).toEqual([]);
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
+
+  await pick(file);
+  expect(stagedNames()).toEqual(['large.bin']);
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+test('files awaiting the server limit do not move into another room', async () => {
+  let resolveConfig: ((config: { upload_size: number }) => void) | undefined;
+  mediaConfig.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveConfig = resolve;
+      })
+  );
+  let switchRoom: ((roomId: string) => void) | undefined;
+  setup({
+    roomId: '!first:example.org',
+    registerRoom: (set) => {
+      switchRoom = set;
+    },
+  });
+
+  await pick(new File(['x'], 'private.bin'));
+  switchRoom?.('!second:example.org');
+  await tick();
+  resolveConfig?.({ upload_size: 500 * 1024 * 1024 });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
+});
+
+test('files awaiting the server limit do not move into another account', async () => {
+  let resolveConfig: ((config: { upload_size: number }) => void) | undefined;
+  mediaConfig.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveConfig = resolve;
+      })
+  );
+  const session = $state({ account_id: 'a' });
+  const client = Object.assign(core(), { session }) as unknown as CoreClient;
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+
+  await pick(new File(['x'], 'private.bin'));
+  session.account_id = 'b';
+  await tick();
+  resolveConfig?.({ upload_size: 500 * 1024 * 1024 });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
 });
 
 function formattingToggle(): HTMLElement {
