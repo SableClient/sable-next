@@ -31,6 +31,25 @@ function fakeCore(submitCommand: WorkerCore['submitCommand']): WorkerCore {
   };
 }
 
+test.each([undefined, false, true])(
+  'passes background=%s through to WASM media downloads',
+  async (background) => {
+    const core = fakeCore(() => Promise.resolve(''));
+    const bytes = new Uint8Array([7]);
+    const fetchMedia = vi.fn(() => Promise.resolve(bytes));
+    core.fetchMedia = fetchMedia;
+    const boundary = createCoreWorkerBoundary(Promise.resolve(core));
+    const port = new FakePort();
+    boundary.connect(port);
+    await port.send({
+      id: 1,
+      media: { source: 'mxc://example.org/emote', width: 0, height: 0, background },
+    });
+    expect(fetchMedia).toHaveBeenCalledWith('mxc://example.org/emote', 0, 0, background ?? false);
+    expect(port.messages).toEqual([{ id: 1, bytes }]);
+  }
+);
+
 test('passes rich attachment captions and mentions to the WASM core', async () => {
   const core = fakeCore(() => Promise.resolve(''));
   const sendAttachment = vi.fn(() => Promise.resolve());

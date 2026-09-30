@@ -328,10 +328,10 @@ export function createWebTransport(): Transport {
       return request<ResponseFor<C['type']>>((id) => ({ id, command }));
     },
 
-    fetchMedia(source, width, height) {
+    fetchMedia(source, width, height, background = false) {
       return request<Uint8Array<ArrayBuffer>>((id) => ({
         id,
-        media: { source, width, height },
+        media: { source, width, height, background },
       }));
     },
 

@@ -23,6 +23,23 @@ function headersOf(call: unknown[]): Record<string, string> {
   return options.headers;
 }
 
+test.each([undefined, false, true])(
+  'passes background=%s for media downloads',
+  async (background) => {
+    invoke.mockResolvedValue(new Uint8Array([7]).buffer);
+    const transport = createTauriTransport();
+    await expect(
+      transport.fetchMedia('mxc://example.org/emote', 0, 0, background)
+    ).resolves.toEqual(new Uint8Array([7]));
+    expect(invoke).toHaveBeenCalledWith('fetch_media', {
+      source: 'mxc://example.org/emote',
+      width: 0,
+      height: 0,
+      background: background ?? false,
+    });
+  }
+);
+
 test('percent-encodes the attachment request header', async () => {
   invoke.mockResolvedValue(undefined);
   const transport = createTauriTransport();

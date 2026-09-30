@@ -118,8 +118,12 @@ async fn fetch_media(
     source: String,
     width: u32,
     height: u32,
+    background: Option<bool>,
 ) -> Result<Response, CommandErr> {
-    let bytes = state.core.media_thumbnail(source, width, height).await?;
+    let bytes = state
+        .core
+        .fetch_media(source, width, height, background.unwrap_or(false))
+        .await?;
     Ok(Response::new(bytes))
 }
 

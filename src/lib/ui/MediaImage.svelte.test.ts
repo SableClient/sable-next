@@ -10,6 +10,7 @@ vi.mock('#lib/core/context.js');
 import { core } from '#lib/core/__mocks__/context.js';
 
 import MediaImage from './MediaImage.svelte';
+import { cachedMediaUrl } from './media-url.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
@@ -64,6 +65,82 @@ test('requests a larger thumbnail without changing its displayed dimensions', as
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/retina-thumbnail', 96, 96);
   expect(document.querySelector('img')).toHaveAttribute('width', '48');
   expect(document.querySelector('img')).toHaveAttribute('height', '48');
+});
+
+test('scrolling back through a sticker pack reuses loaded previews', async () => {
+  const stickerCount = 100;
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const props = (index: number) => ({
+    source: `mxc://example.org/scroll-back-sticker-${String(index)}`,
+    alt: `Sticker ${String(index)}`,
+    width: 72,
+    height: 72,
+    thumbnailWidth: 144,
+    thumbnailHeight: 144,
+  });
+  const first = render(MediaImage, { props: props(0) });
+  await settle();
+  const firstUrl = screen.getByAltText('Sticker 0').getAttribute('src');
+  first.unmount();
+
+  for (let index = 1; index < stickerCount; index += 1) {
+    const row = render(MediaImage, { props: props(index) });
+    await settle();
+    row.unmount();
+  }
+  expect(core.fetchMedia).toHaveBeenCalledTimes(stickerCount);
+
+  render(MediaImage, { props: props(0) });
+  await tick();
+
+  expect(core.fetchMedia).toHaveBeenCalledTimes(stickerCount);
+  expect(screen.getByAltText('Sticker 0')).toHaveAttribute('src', firstUrl);
+});
+
+test('a 2540-emote pack restores an evicted preview while other media is pending', async () => {
+  const props = (index: number) => ({
+    source: `mxc://example.org/large-pack-${String(index)}`,
+    alt: `Large pack emote ${String(index)}`,
+    width: 72,
+    height: 72,
+    thumbnailWidth: 144,
+    thumbnailHeight: 144,
+  });
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  for (let index = 0; index < 2540; index += 1) {
+    const row = render(MediaImage, { props: props(index) });
+    await settle();
+    row.unmount();
+  }
+  expect(core.fetchMedia).toHaveBeenCalledTimes(2540);
+  expect(cachedMediaUrl({ session: null }, props(0).source, 144, 144)).toBeUndefined();
+
+  const finish: (() => void)[] = [];
+  core.fetchMedia.mockImplementation((source: string) =>
+    source === props(0).source
+      ? Promise.resolve(new Uint8Array([1]))
+      : new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
+          finish.push(() => {
+            resolve(new Uint8Array([1]));
+          });
+        })
+  );
+  for (let index = 2540; index < 2546; index += 1) render(MediaImage, { props: props(index) });
+  await settle();
+  expect(finish).toHaveLength(6);
+
+  try {
+    render(MediaImage, { props: props(0) });
+    await settle();
+    expect(screen.getByAltText('Large pack emote 0')).toHaveAttribute(
+      'src',
+      expect.stringContaining('blob:')
+    );
+    expect(core.fetchMedia).toHaveBeenCalledTimes(2547);
+  } finally {
+    for (const resolve of finish) resolve();
+    await settle();
+  }
 });
 
 test('does not re-request media that the homeserver cannot provide', async () => {
@@ -1188,6 +1265,27 @@ test('an encrypted picture loads the sender thumbnail instead of the original', 
 
   expect(core.fetchMedia).toHaveBeenCalledTimes(1);
   expect(core.fetchMedia).toHaveBeenCalledWith(thumbnail, 800, 600);
+});
+
+test('resizing an encrypted picture reuses its original file', async () => {
+  const source = JSON.stringify({ url: 'mxc://example.org/encrypted-resize' });
+  core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
+  const image = render(MediaImage, {
+    props: { source, alt: 'Photo', width: 800, height: 600 },
+  });
+  await settle();
+  const url = document.querySelector('img')?.src;
+  expect(url).toBeTruthy();
+
+  await image.rerender({ source, alt: 'Photo', width: 400, height: 300 });
+  await settle();
+  expect(document.querySelector('img')?.src).toBe(url);
+  expect(core.fetchMedia).toHaveBeenCalledOnce();
+
+  await image.rerender({ source, alt: 'Photo', width: 400, height: 300, original: true });
+  await settle();
+  expect(document.querySelector('img')?.src).toBe(url);
+  expect(core.fetchMedia).toHaveBeenCalledOnce();
 });
 
 test('a plain picture keeps the server thumbnail of the original', async () => {

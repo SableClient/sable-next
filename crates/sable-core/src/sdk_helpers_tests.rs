@@ -788,6 +788,436 @@ fn remote_media_error(status: u16) -> ResponseTemplate {
 
 #[tokio::test]
 #[allow(clippy::unwrap_used)]
+async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let bytes = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/thumbnail/example.org/sticker",
+        ))
+        .respond_with(remote_media_error(404))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/sticker",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let first = core(&server, client).await;
+    let source = "mxc://example.org/sticker".to_owned();
+    assert_eq!(
+        first
+            .media_thumbnail(source.clone(), 144, 144)
+            .await
+            .unwrap(),
+        bytes
+    );
+    drop(first);
+
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let restored = core(&server, client).await;
+
+    for size in [144, 96, 48] {
+        assert_eq!(
+            restored
+                .media_thumbnail(source.clone(), size, size)
+                .await
+                .unwrap(),
+            bytes
+        );
+    }
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn sticker_previews_prefer_the_persisted_thumbnail_over_the_original() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let thumbnail = vec![2_u8; 8];
+    let original = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/thumbnail/example.org/preview",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(thumbnail.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/preview",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(original.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let first = core(&server, client).await;
+    let source = "mxc://example.org/preview".to_owned();
+    assert_eq!(
+        first
+            .media_thumbnail(source.clone(), 144, 144)
+            .await
+            .unwrap(),
+        thumbnail
+    );
+    assert_eq!(
+        first.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        original
+    );
+    drop(first);
+
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let restored = core(&server, client).await;
+    assert_eq!(
+        restored
+            .media_thumbnail(source.clone(), 144, 144)
+            .await
+            .unwrap(),
+        thumbnail
+    );
+    assert_eq!(
+        restored.media_thumbnail(source, 48, 48).await.unwrap(),
+        original
+    );
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn cached_sticker_reads_bypass_six_stalled_downloads() {
+    let server = MatrixMockServer::new().await;
+    let store = tempfile::tempdir().unwrap();
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .on_builder(|builder| builder.sqlite_store(store.path(), None))
+        .build()
+        .await;
+    let bytes = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/cached-sticker",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/download/example\.org/stalled-",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(vec![1_u8])
+                .set_delay(std::time::Duration::from_secs(60)),
+        )
+        .expect(6)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = "mxc://example.org/cached-sticker".to_owned();
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        bytes
+    );
+
+    let downloads = (0..7)
+        .map(|index| {
+            let core = core.clone();
+            tokio::spawn(async move {
+                core.media_thumbnail(format!("mxc://example.org/stalled-{index}"), 0, 0)
+                    .await
+            })
+        })
+        .collect::<Vec<_>>();
+    let cached = async {
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                let requests = server.server().received_requests().await.unwrap();
+                if requests
+                    .iter()
+                    .filter(|request| request.url.path().contains("/stalled-"))
+                    .count()
+                    == 6
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(core.media_downloads.available_permits(), 0);
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            core.media_thumbnail(source, 144, 144),
+        )
+        .await
+    }
+    .await;
+
+    for download in &downloads {
+        download.abort();
+    }
+    for download in downloads {
+        let _ = download.await;
+    }
+    assert_eq!(
+        core.media_downloads.available_permits(),
+        crate::media::MAX_MEDIA_DOWNLOADS
+    );
+    assert_eq!(cached.unwrap().unwrap(), bytes);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn large_cached_photos_do_not_replace_plain_thumbnails() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let original = vec![7_u8; 1024 * 1024 + 1];
+    let thumbnail = vec![2_u8; 8];
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/photo"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(original.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/thumbnail/example.org/photo"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(thumbnail.clone()))
+        .expect(2)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = "mxc://example.org/photo".to_owned();
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        original
+    );
+    for (width, height) in [(800, 600), (144, 144), (800, 600)] {
+        let preview = core
+            .media_thumbnail(source.clone(), width, height)
+            .await
+            .unwrap();
+        assert_eq!(preview.len(), thumbnail.len());
+        assert_eq!(preview, thumbnail);
+    }
+    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), original);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn bulk_original_downloads_leave_all_preview_slots_available() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    Mock::given(method("GET"))
+        .and(path_regex(
+            r"^/_matrix/client/v1/media/download/example\.org/export-",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(60)))
+        .expect(4)
+        .mount(server.server())
+        .await;
+    let thumbnail = vec![2_u8; 8];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/thumbnail/example.org/visible",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(thumbnail.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let downloads = (0..4)
+        .map(|index| {
+            let core = core.clone();
+            tokio::spawn(async move {
+                core.fetch_media(format!("mxc://example.org/export-{index}"), 0, 0, true)
+                    .await
+            })
+        })
+        .collect::<Vec<_>>();
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let requests = server.server().received_requests().await.unwrap();
+            if requests
+                .iter()
+                .filter(|request| request.url.path().contains("/export-"))
+                .count()
+                == 4
+            {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    let slots = core.media_downloads.available_permits();
+    let visible = tokio::time::timeout(
+        std::time::Duration::from_secs(1),
+        core.media_thumbnail("mxc://example.org/visible".to_owned(), 144, 144),
+    )
+    .await;
+    for download in &downloads {
+        download.abort();
+    }
+    for download in downloads {
+        let _ = download.await;
+    }
+    assert_eq!(slots, crate::media::MAX_MEDIA_DOWNLOADS);
+    assert_eq!(visible.unwrap().unwrap(), thumbnail);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn queued_previews_recheck_the_original_cache() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let bytes = vec![7_u8; 1024 * 1024];
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/download/example.org/queued"))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(bytes.clone()))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/thumbnail/example.org/queued",
+        ))
+        .respond_with(ResponseTemplate::new(404))
+        .expect(0)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let slots = core.media_downloads.acquire_many(6).await.unwrap();
+    let source = "mxc://example.org/queued".to_owned();
+    let mut preview = Box::pin(core.media_thumbnail(source.clone(), 144, 144));
+    tokio::time::timeout(std::time::Duration::from_millis(50), &mut preview)
+        .await
+        .unwrap_err();
+    assert_eq!(core.fetch_media(source, 0, 0, true).await.unwrap(), bytes);
+    drop(slots);
+    assert_eq!(
+        tokio::time::timeout(std::time::Duration::from_secs(1), preview)
+            .await
+            .unwrap()
+            .unwrap(),
+        bytes
+    );
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn legacy_original_downloads_can_take_longer_than_thirty_seconds() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_10])
+        .build()
+        .await;
+    let bytes = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path("/_matrix/media/v3/download/example.org/slow"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(bytes.clone())
+                .set_delay(std::time::Duration::from_secs(31)),
+        )
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = "mxc://example.org/slow".to_owned();
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        bytes
+    );
+    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), bytes);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
+async fn sdk_original_retry_can_take_longer_than_thirty_seconds() {
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let bytes = vec![7_u8; 32];
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/slow-retry",
+        ))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(bytes.clone())
+                .set_delay(std::time::Duration::from_secs(31)),
+        )
+        .with_priority(2)
+        .expect(1)
+        .mount(server.server())
+        .await;
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/slow-retry",
+        ))
+        .respond_with(remote_media_error(401))
+        .with_priority(1)
+        .up_to_n_times(1)
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = "mxc://example.org/slow-retry".to_owned();
+    assert_eq!(
+        core.media_thumbnail(source.clone(), 0, 0).await.unwrap(),
+        bytes
+    );
+    assert_eq!(core.media_thumbnail(source, 0, 0).await.unwrap(), bytes);
+}
+
+#[tokio::test]
+#[allow(clippy::unwrap_used)]
 async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
     let server = MatrixMockServer::new().await;
     let client = server

@@ -145,6 +145,26 @@ test('preserves rich attachment captions and mentions across the worker transpor
   transport.close();
 });
 
+test.each([undefined, false, true])(
+  'passes background=%s for media downloads',
+  async (background) => {
+    const transport = await load();
+    const pending = transport.fetchMedia('mxc://example.org/emote', 0, 0, background);
+    expect(FakeSharedWorker.last?.port.posted).toContainEqual({
+      id: 1,
+      media: {
+        source: 'mxc://example.org/emote',
+        width: 0,
+        height: 0,
+        background: background ?? false,
+      },
+    });
+    FakeSharedWorker.last?.port.receive({ id: 1, bytes: new Uint8Array([7]) });
+    await expect(pending).resolves.toEqual(new Uint8Array([7]));
+    transport.close();
+  }
+);
+
 test('sends a gallery as one worker request', async () => {
   const transport = await load();
   const first = new Uint8Array([1]);

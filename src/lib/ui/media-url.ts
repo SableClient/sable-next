@@ -12,12 +12,11 @@ const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
 const holds = new Map<string, number>();
 const displaced = new Map<string, string[]>();
-/* An object URL pins its blob until revoked. Held entries are exempt. */
-const MAX_OBJECT_URLS = 64;
+/* Keep small previews across virtualized rows; the byte cap bounds blob memory.
+   Held entries are exempt from both limits. */
+const MAX_OBJECT_URLS = 512;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
-const MAX_MEDIA_REQUESTS = 6;
-const MEDIA_STALL_TIMEOUT_MS = 30_000;
 const MEDIA_FAILURE_TTL_MS = 30_000;
 /* A deadline, not a verdict: `Unavailable` covers a blip as well as a 404. */
 const unavailable = new QuickLRU<string, true>({
@@ -29,14 +28,6 @@ const refused = new QuickLRU<string, true>({ maxSize: MAX_MEDIA_METADATA });
 const aspectRatios = new QuickLRU<string, number>({ maxSize: MAX_MEDIA_METADATA });
 let objectUrlBytes = 0;
 let evictQueued = false;
-let inflight = 0;
-const waiting: (() => void)[] = [];
-
-function releaseSlot(): void {
-  const next = waiting.shift();
-  if (next) next();
-  else inflight -= 1;
-}
 
 function cacheKey(
   accountId: string | undefined,
@@ -44,6 +35,11 @@ function cacheKey(
   width: number,
   height: number
 ): string {
+  // Encrypted media always returns the original file, regardless of display size.
+  if (isEncryptedMedia(source) || width === 0 || height === 0) {
+    width = 0;
+    height = 0;
+  }
   return `${accountId ?? ''}:${source}:${String(width)}:${String(height)}`;
 }
 
@@ -172,49 +168,9 @@ export function discardMediaUrl(
  * back through a command and get wrapped in an object URL. One URL per source
  * and size, shared by every message referencing it.
  */
-export type MediaFetcher = Pick<CoreClient, 'session' | 'subscribeEvents'> & {
+export type MediaFetcher = Pick<CoreClient, 'session'> & {
   commands: Pick<CoreCommands, 'fetchMedia'>;
 };
-
-function fetchThroughGate(
-  core: MediaFetcher,
-  source: string,
-  width: number,
-  height: number
-): Promise<Uint8Array<ArrayBuffer>> {
-  const fetch = (): Promise<Uint8Array<ArrayBuffer>> =>
-    core.commands.fetchMedia(source, width, height);
-  const withinDeadline = (
-    request: Promise<Uint8Array<ArrayBuffer>>
-  ): Promise<Uint8Array<ArrayBuffer>> => {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    let unsubscribe = (): void => {};
-    const stalled = new Promise<Uint8Array<ArrayBuffer>>((_, reject) => {
-      const arm = (): void => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          reject(new Error('Media request stalled'));
-        }, MEDIA_STALL_TIMEOUT_MS);
-      };
-      arm();
-      unsubscribe = core.subscribeEvents((event) => {
-        if (event.type === 'media_progress' && event.source === source) arm();
-      });
-    });
-    return Promise.race([request, stalled]).finally(() => {
-      clearTimeout(timeout);
-      unsubscribe();
-    });
-  };
-  const guardedFetch = (): Promise<Uint8Array<ArrayBuffer>> => {
-    return withinDeadline(fetch());
-  };
-  if (inflight < MAX_MEDIA_REQUESTS) {
-    inflight += 1;
-    return guardedFetch();
-  }
-  return new Promise<void>((resolve) => waiting.push(resolve)).then(guardedFetch);
-}
 
 export function loadMediaUrl(
   core: MediaFetcher,
@@ -229,7 +185,8 @@ export function loadMediaUrl(
   }
   const request =
     pending.get(key) ??
-    fetchThroughGate(core, source, width, height)
+    core.commands
+      .fetchMedia(source, width, height)
       .then((bytes) => {
         const type = mime ?? imageMime(bytes) ?? '';
         const blob = new Blob([bytes], { type });
@@ -251,7 +208,6 @@ export function loadMediaUrl(
       })
       .finally(() => {
         pending.delete(key);
-        releaseSlot();
       });
   pending.set(key, request);
   void request.catch((error: unknown) => {

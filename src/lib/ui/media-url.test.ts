@@ -1,6 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import type { CoreEvent } from '#src/generated/protocol';
 import { CoreError } from '#src/transport';
 
 import {
@@ -28,6 +27,69 @@ function session(accountId: string, userId: string, deviceId: string) {
   };
 }
 
+test('encrypted media shares one request and URL across display sizes', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:encrypted-sizes');
+  const source = JSON.stringify({ url: 'mxc://example.org/encrypted-sizes' });
+  const core = {
+    session: session('account-encrypted-sizes', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+
+  const urls = await Promise.all([
+    loadMediaUrl(core, source, 96, 96),
+    loadMediaUrl(core, source, 128, 128),
+    loadMediaUrl(core, source, 0, 0),
+  ]);
+
+  expect(core.commands.fetchMedia).toHaveBeenCalledOnce();
+  expect(urls).toEqual(Array(3).fill('blob:encrypted-sizes'));
+  expect(cachedMediaUrl(core, source, 512, 384)).toBe(urls[0]);
+});
+
+test('plain media keeps server thumbnails separate from the original', async () => {
+  let nextUrl = 0;
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:plain-sizes-${nextUrl++}`);
+  const core = {
+    session: session('account-plain-sizes', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+
+  const urls = await Promise.all([
+    loadMediaUrl(core, 'mxc://example.org/plain-sizes', 96, 96),
+    loadMediaUrl(core, 'mxc://example.org/plain-sizes', 128, 128),
+    loadMediaUrl(core, 'mxc://example.org/plain-sizes', 0, 0),
+  ]);
+
+  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(3);
+  expect(new Set(urls).size).toBe(3);
+});
+
+test('an encrypted URL stays held until consumers at every size release it', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:encrypted-holds');
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  const source = JSON.stringify({ url: 'mxc://example.org/encrypted-holds' });
+  const core = {
+    session: session('account-encrypted-holds', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(40 * 1024 * 1024))) },
+  };
+  const releasePreview = holdMediaUrl(core, source, 96, 96);
+  const releaseOriginal = holdMediaUrl(core, source, 0, 0);
+  const url = await loadMediaUrl(core, source, 96, 96);
+
+  releasePreview();
+  await Promise.resolve();
+  expect(revoke).not.toHaveBeenCalledWith(url);
+
+  releaseOriginal();
+  await Promise.resolve();
+  expect(revoke).toHaveBeenCalledWith(url);
+  expect(cachedMediaUrl(core, source, 96, 96)).toBeUndefined();
+  expect(cachedMediaUrl(core, source, 0, 0)).toBeUndefined();
+});
+
 test('evicts object URLs when cached media exceeds the byte budget', async () => {
   let nextUrl = 0;
   const revoke = vi.spyOn(URL, 'revokeObjectURL');
@@ -42,6 +104,26 @@ test('evicts object URLs when cached media exceeds the byte budget', async () =>
   await loadMediaUrl(core, 'mxc://example.org/second', 800, 600);
 
   expect(revoke).toHaveBeenCalledWith('blob:media-0');
+});
+
+test('still evicts old small previews when the entry budget is exceeded', async () => {
+  let nextUrl = 0;
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:entry-budget-${nextUrl++}`);
+  const revoke = vi.spyOn(URL, 'revokeObjectURL');
+  const core = {
+    session: session('account-entry-budget', '@a:example.org', 'device-a'),
+    subscribeEvents: () => () => {},
+    commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array([1]))) },
+  };
+  const source = (index: number) => `mxc://example.org/entry-budget-${String(index)}`;
+  const first = await loadMediaUrl(core, source(0), 144, 144);
+  for (let index = 1; index <= 512; index += 1) {
+    await loadMediaUrl(core, source(index), 144, 144);
+  }
+
+  expect(revoke).toHaveBeenCalledWith(first);
+  expect(cachedMediaUrl(core, source(0), 144, 144)).toBeUndefined();
+  expect(cachedMediaUrl(core, source(512), 144, 144)).toBeDefined();
 });
 
 test('a discarded URL is revoked and not served again until the failure expires', async () => {
@@ -155,17 +237,17 @@ test('a hold released and taken back in one update keeps its url past the cap', 
     subscribeEvents: () => () => {},
     commands: { fetchMedia: vi.fn(() => Promise.resolve(new Uint8Array(8))) },
   };
-  const holds = Array.from({ length: 70 }, (_, index) =>
+  const holds = Array.from({ length: 520 }, (_, index) =>
     holdMediaUrl(core, `mxc://example.org/emote-${String(index)}`, 0, 0)
   );
   await Promise.all(
     holds.map((_, index) => loadMediaUrl(core, `mxc://example.org/emote-${String(index)}`, 0, 0))
   );
-  const source = 'mxc://example.org/emote-69';
+  const source = 'mxc://example.org/emote-519';
   const url = cachedMediaUrl(core, source, 0, 0);
 
-  holds[69]();
-  holds[69] = holdMediaUrl(core, source, 0, 0);
+  holds[519]();
+  holds[519] = holdMediaUrl(core, source, 0, 0);
   await Promise.resolve();
 
   expect(revoke).not.toHaveBeenCalledWith(url);
@@ -264,39 +346,39 @@ test('revokes a replaced URL once the last caller holding it lets go', async () 
   expect(revoke).not.toHaveBeenCalledWith(second);
 });
 
-test('holds media requests at six in flight', async () => {
-  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:gated');
-  const settlers: (() => void)[] = [];
+test('disk-cache reads reach the core while six downloads are stalled', async () => {
+  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:disk-cached');
+  const cachedSource = 'mxc://example.org/disk-cached-sticker';
+  const finish: (() => void)[] = [];
   const core = {
-    session: session('account-gated', '@a:example.org', 'device-a'),
+    session: session('account-disk-cache', '@a:example.org', 'device-a'),
     subscribeEvents: () => () => {},
     commands: {
-      fetchMedia: vi.fn(
-        () =>
-          new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
-            settlers.push(() => {
-              resolve(new Uint8Array([1]));
-            });
-          })
+      fetchMedia: vi.fn((source: string) =>
+        source === cachedSource
+          ? Promise.resolve(new Uint8Array([1]))
+          : new Promise<Uint8Array<ArrayBuffer>>((resolve) => {
+              finish.push(() => {
+                resolve(new Uint8Array([1]));
+              });
+            })
       ),
     },
   };
-
-  const requests = Array.from({ length: 8 }, (_, index) =>
-    loadMediaUrl(core, `mxc://example.org/gated-${String(index)}`, 96, 96)
+  const downloads = Array.from({ length: 6 }, (_, index) =>
+    loadMediaUrl(core, `mxc://example.org/disk-cache-stalled-${String(index)}`, 144, 144)
   );
+  void Promise.allSettled(downloads);
+  const cached = loadMediaUrl(core, cachedSource, 144, 144);
+  void cached.catch(() => {});
 
-  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(6);
-
-  for (let settled = 0; settled < requests.length; settled += 1) {
-    await vi.waitFor(() => {
-      expect(settlers.length).toBeGreaterThan(settled);
-    });
-    settlers[settled]?.();
+  try {
+    expect(core.commands.fetchMedia).toHaveBeenCalledWith(cachedSource, 144, 144);
+    await expect(cached).resolves.toBe('blob:disk-cached');
+  } finally {
+    for (const resolve of finish) resolve();
+    await Promise.allSettled(downloads);
   }
-  await Promise.all(requests);
-
-  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(8);
 });
 
 test('never revokes the URL it is about to return', async () => {
@@ -339,39 +421,13 @@ test('lets a failed source be fetched again once its backoff has elapsed', async
   await expect(loadMediaUrl(core, source, 96, 96)).resolves.toBe('blob:recovered');
 });
 
-test('does not let stalled media requests block later media forever', async () => {
-  vi.useFakeTimers();
-  vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:after-stall');
-  const core = {
-    session: session('account-stalled', '@a:example.org', 'device-a'),
-    subscribeEvents: () => () => {},
-    commands: {
-      fetchMedia: vi.fn(() => new Promise<Uint8Array<ArrayBuffer>>(() => {})),
-    },
-  };
-
-  const requests = Array.from({ length: 7 }, (_, index) =>
-    loadMediaUrl(core, `mxc://example.org/stalled-${String(index)}`, 96, 96)
-  );
-  void Promise.allSettled(requests);
-
-  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(6);
-  await vi.advanceTimersByTimeAsync(30_000);
-  expect(core.commands.fetchMedia).toHaveBeenCalledTimes(7);
-});
-
-test('keeps a download alive while it reports progress', async () => {
+test('does not impose a deadline on requests queued or downloading in the core', async () => {
   vi.useFakeTimers();
   vi.spyOn(URL, 'createObjectURL').mockImplementation(() => 'blob:large');
-  const listeners = new Set<(event: CoreEvent) => void>();
   let finish: (bytes: Uint8Array<ArrayBuffer>) => void = () => {};
   const source = 'mxc://example.org/large';
   const core = {
     session: session('account-large', '@a:example.org', 'device-a'),
-    subscribeEvents: (listener: (event: CoreEvent) => void) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
     commands: {
       fetchMedia: vi.fn(
         () =>
@@ -381,21 +437,12 @@ test('keeps a download alive while it reports progress', async () => {
       ),
     },
   };
-  const progress = (current: number): void => {
-    for (const listener of listeners) {
-      listener({ type: 'media_progress', source, current, total: 100 });
-    }
-  };
-
   const request = loadMediaUrl(core, source, 0, 0);
-  for (const current of [20, 40, 60, 80]) {
-    await vi.advanceTimersByTimeAsync(20_000);
-    progress(current);
-  }
+  void request.catch(() => {});
+  await vi.advanceTimersByTimeAsync(80_000);
   finish(new Uint8Array(100));
 
   await expect(request).resolves.toBe('blob:large');
-  expect(listeners.size).toBe(0);
 });
 
 test('a media server the core refuses is not asked again until it says so, even on retry', async () => {

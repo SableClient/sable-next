@@ -53,10 +53,15 @@ export function createTauriTransport(): Transport {
       }
     },
 
-    async fetchMedia(source, width, height) {
+    async fetchMedia(source, width, height, background = false) {
       try {
         // `Response` on the Rust side makes this an ArrayBuffer rather than JSON.
-        const bytes = await invoke<ArrayBuffer>('fetch_media', { source, width, height });
+        const bytes = await invoke<ArrayBuffer>('fetch_media', {
+          source,
+          width,
+          height,
+          background,
+        });
         return new Uint8Array(bytes);
       } catch (error) {
         throw new CoreError(error as CommandErr);

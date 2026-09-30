@@ -7,7 +7,12 @@ const logBufferLimit = 500;
 
 export type WorkerCore = {
   submitCommand(command: string): Promise<string>;
-  fetchMedia(source: string, width: number, height: number): Promise<Uint8Array>;
+  fetchMedia(
+    source: string,
+    width: number,
+    height: number,
+    background: boolean
+  ): Promise<Uint8Array>;
   forgetMedia(source: string): Promise<void>;
   sendAttachment(request: string, bytes: Uint8Array<ArrayBuffer>): Promise<void>;
   sendGallery(request: string, items: string): Promise<void>;
@@ -165,13 +170,14 @@ export function createCoreWorkerBoundary(
       try {
         const instance = await core;
         if ('media' in request) {
-          const { source, width, height } = request.media;
+          const { source, width, height, background = false } = request.media;
           // wasm-bindgen copies into a fresh, unshared ArrayBuffer but types it
           // only as `ArrayBufferLike`.
           const bytes = (await instance.fetchMedia(
             source,
             width,
-            height
+            height,
+            background
           )) as Uint8Array<ArrayBuffer>;
           port.postMessage({ id, bytes } satisfies WorkerMessage, [bytes.buffer]);
           return;

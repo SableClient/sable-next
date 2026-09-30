@@ -1450,8 +1450,13 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>> {
-      return transport().fetchMedia(source, width, height);
+    fetchMedia(
+      source: string,
+      width: number,
+      height: number,
+      background = false
+    ): Promise<Uint8Array<ArrayBuffer>> {
+      return transport().fetchMedia(source, width, height, background);
     },
 
     forgetMedia(source: string): Promise<void> {
