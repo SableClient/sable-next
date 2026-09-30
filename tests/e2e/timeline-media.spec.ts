@@ -44,6 +44,79 @@ function undecodablePicture() {
 }
 
 for (const mobile of [false, true]) {
+  test(`viewer header and menu actions${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await installRoomCore('ready');
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', { value: async () => {}, configurable: true });
+    });
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', picture(800, 600));
+    await timeline.container.getByRole('button', { name: 'Open shot.png' }).click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    const header = viewer.locator('header');
+    const image = viewer.locator('.stage img');
+    await expect(image).toBeVisible(MEDIA_LOADED);
+    await expect(viewer.locator('.media-image-spoiler')).toHaveCount(0);
+    const buttons = header.locator('.actions > button');
+    await expect(buttons).toHaveCount(4);
+    await expect(buttons.nth(0)).toHaveAccessibleName('Share');
+    await expect(buttons.nth(1)).toHaveAccessibleName('Download image');
+    await expect(buttons.nth(2)).toHaveAccessibleName('More actions');
+    await expect(buttons.nth(3)).toHaveAccessibleName('Close');
+    const zoomIn = header.getByRole('button', { name: 'Zoom in', exact: true });
+    if (mobile) {
+      await expect(zoomIn).toBeHidden();
+    } else {
+      await expect(zoomIn).toBeVisible();
+      await zoomIn.click();
+      await expect(header.getByRole('button', { name: '120%', exact: true })).toBeVisible();
+    }
+    await page.screenshot({ path: testInfo.outputPath('viewer-header.png') });
+
+    const more = header.getByRole('button', { name: 'More actions' });
+    await more.click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByText('Copy image', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Hide image', { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('viewer-more.png') });
+    await menu.getByText('Rotate image', { exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(image).toHaveAttribute('style', /rotate\(90deg\)/);
+
+    await more.click();
+    await menu.getByText('Pixelate', { exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(image).toHaveClass(/pixelated/);
+
+    await more.click();
+    await expect(menu.locator('[aria-checked="true"]')).toHaveText('Pixelate');
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(viewer).toBeVisible();
+    await expect(more).toBeFocused();
+    await more.click();
+    await menu.getByText('Pixelate', { exact: true }).click();
+    await expect(image).not.toHaveClass(/pixelated/);
+    await more.click();
+    await menu.getByText('Reset view', { exact: true }).click();
+    await expect(image).toHaveAttribute('style', /rotate\(0deg\)/);
+    await header.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(viewer).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+  });
+
   test(`image spoilers blur and reveal without opening the viewer${mobile ? ' on mobile' : ''}`, async ({
     page,
     app,
@@ -94,9 +167,12 @@ for (const mobile of [false, true]) {
       'filter',
       'none'
     );
-    await viewer.locator('.stage').hover();
-    await viewer.getByRole('button', { name: 'Hide shot.png' }).click();
+    await expect(viewer.locator('.media-image-spoiler')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('viewer-spoiler-revealed.png') });
+    await viewer.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Hide image', exact: true }).click();
     await expect(viewer.locator('.stage img')).toHaveCSS('filter', 'blur(44px)');
+    await expect(viewer.getByRole('button', { name: 'Reveal shot.png' })).toBeVisible();
   });
 
   test(`inline and link-preview images can be hidden${mobile ? ' on mobile' : ''}`, async ({

@@ -157,11 +157,14 @@ test('an ordinary viewer image can be locally hidden and revealed without closin
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
   const onClose = vi.fn();
   await openImage([imageItem], onClose);
-  await user.click(screen.getByRole('button', { name: 'timeline.hideImage:photo.png' }));
+  expect(document.querySelector('.stage .media-image-spoiler')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'timeline.moreActions' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'timeline.hideImageUnnamed' }));
   expect(document.querySelector('.stage img')).toHaveClass('spoilered');
   expect(screen.queryByRole('img')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: 'timeline.revealImage:photo.png' }));
   expect(await screen.findByRole('img')).not.toHaveClass('spoilered');
+  expect(document.querySelector('.stage .media-image-spoiler')).not.toBeInTheDocument();
   expect(onClose).not.toHaveBeenCalled();
 });
 
@@ -187,6 +190,22 @@ test('renders an audio attachment with a player', async () => {
   });
 
   expect(screen.getByRole('button', { name: 'viewer.downloadAudio' })).toBeInTheDocument();
+});
+
+test('jumps to the selected message from More', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const onJump = vi.fn();
+  render(MediaViewer, {
+    items: [imageItem],
+    selectedEventId: '$image',
+    onClose: vi.fn(),
+    onJump,
+  });
+
+  await user.click(screen.getByRole('button', { name: 'timeline.moreActions' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'viewer.jumpToMessage' }));
+
+  expect(onJump).toHaveBeenCalledExactlyOnceWith('$image');
 });
 
 test('right-clicking the image offers to copy it and confirms the copy', async () => {
@@ -233,7 +252,8 @@ test('clamps pointer drag panning to the zoomed overflow', async () => {
   expect(img.style.transform).toContain('translate(-400px, -300px)');
 
   await user.pointer({ keys: '[/MouseLeft]', target: stage() });
-  await user.click(screen.getByRole('button', { name: 'viewer.reset' }));
+  await user.click(screen.getByRole('button', { name: 'timeline.moreActions' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'viewer.reset' }));
 
   expect(img.style.transform).toContain('translate(0px, 0px)');
 });
@@ -249,7 +269,8 @@ test('arrow keys pan when zoomed and navigate otherwise', async () => {
   expect(img.style.transform).toContain('translate(-40px, 0px)');
   expect(screen.getByText('Alice')).toBeInTheDocument();
 
-  await user.click(screen.getByRole('button', { name: 'viewer.reset' }));
+  await user.click(screen.getByRole('button', { name: 'timeline.moreActions' }));
+  await user.click(await screen.findByRole('menuitem', { name: 'viewer.reset' }));
   await user.keyboard('{ArrowRight}');
 
   await vi.waitFor(() => {
