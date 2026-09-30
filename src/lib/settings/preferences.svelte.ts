@@ -322,7 +322,7 @@ const DEFAULTS: Preferences = {
   highContrast: false,
   alwaysShowAltText: false,
   twitterEmoji: true,
-  pixelatedImages: 'smart',
+  pixelatedImages: 'never',
   nameColorCorrection: 'strong',
   showRoomIcon: 'always',
   showRoomBanners: true,
