@@ -81,7 +81,7 @@
   {#if !supported}
     <Alert variant="info">{$i18n.t('settings.callDevicesUnsupported')}</Alert>
   {:else}
-    {#if denied}
+    {#if denied || devices.length === 0}
       <Alert variant="info">
         <p>{$i18n.t('settings.callDevicesPermission')}</p>
         <div>
