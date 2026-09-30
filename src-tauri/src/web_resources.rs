@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use tauri::http::{Request, Response, header};
 
-pub fn fix_content_type(request: Request<Vec<u8>>, response: &mut Response<Cow<'static, [u8]>>) {
+pub fn fix_content_type(request: &Request<Vec<u8>>, response: &mut Response<Cow<'static, [u8]>>) {
     if request.uri().path() == "/manifest.webmanifest" {
         response.headers_mut().insert(
             header::CONTENT_TYPE,
@@ -27,14 +27,14 @@ mod tests {
             .body(body.clone())
             .unwrap();
 
-        fix_content_type(request, &mut response);
+        fix_content_type(&request, &mut response);
 
         assert_eq!(
             response.headers()[header::CONTENT_TYPE],
             "application/manifest+json"
         );
         assert_eq!(response.body(), &body);
-        assert!(serde_json::from_slice::<serde_json::Value>(response.body()).is_ok());
+        serde_json::from_slice::<serde_json::Value>(response.body()).unwrap();
     }
 
     #[test]
@@ -48,7 +48,7 @@ mod tests {
             .body(Cow::Borrowed(b"<html></html>".as_slice()))
             .unwrap();
 
-        fix_content_type(request, &mut response);
+        fix_content_type(&request, &mut response);
 
         assert_eq!(response.headers()[header::CONTENT_TYPE], "text/html");
     }
