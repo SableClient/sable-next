@@ -317,10 +317,7 @@
       requestScroll(index, 'start');
       return;
     }
-    const reduced = shouldReduceMotion();
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    document.getElementById(id)?.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
 
   function requestScroll(index: number, align: 'start' | 'auto'): void {
@@ -606,7 +603,9 @@
             onItemsUpdated={(range) => {
               mounted = range;
             }}
-            scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
+            scrollToBehaviour={scrollAlign === 'start' || shouldReduceMotion()
+              ? 'instant'
+              : 'smooth'}
           >
             {#snippet item({ index, style })}
               {@const row = pickerRows[index]}
