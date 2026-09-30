@@ -7,6 +7,50 @@ import { appendPushEntry, type PushHistoryEntry, readPushHistory } from './push-
 const DATABASE = 'sable-notifications';
 const STORE = 'room-names';
 
+const TELEMETRY_KEY = '\u0000telemetry-consent';
+
+export async function putTelemetryConsent(enabled: boolean): Promise<void> {
+  const database = await open();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE, 'readwrite');
+      transaction.objectStore(STORE).put(enabled, TELEMETRY_KEY);
+      transaction.oncomplete = () => {
+        resolve();
+      };
+      transaction.onerror = transaction.onabort = () => {
+        reject(transaction.error ?? new Error('telemetry consent unavailable'));
+      };
+    });
+  } finally {
+    database.close();
+  }
+}
+
+export async function telemetryConsent(): Promise<boolean> {
+  try {
+    const database = await open();
+    try {
+      return await new Promise<boolean>((resolve, reject) => {
+        const request = database
+          .transaction(STORE, 'readonly')
+          .objectStore(STORE)
+          .get(TELEMETRY_KEY);
+        request.onsuccess = () => {
+          resolve(request.result === true);
+        };
+        request.onerror = () => {
+          reject(request.error ?? new Error('telemetry consent unavailable'));
+        };
+      });
+    } finally {
+      database.close();
+    }
+  } catch {
+    return false;
+  }
+}
+
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, 1);

@@ -93,6 +93,7 @@ export interface Preferences {
   searchBaseEvents: (typeof SEARCH_BASE_EVENTS)[number];
   searchMaxEvents: (typeof SEARCH_MAX_EVENTS)[number];
   searchCrawler: boolean;
+  searchUnmeteredOnly: boolean;
   serverSearch: boolean;
   showHome: boolean;
   showSearch: boolean;
@@ -321,7 +322,7 @@ const DEFAULTS: Preferences = {
   highContrast: false,
   alwaysShowAltText: false,
   twitterEmoji: true,
-  pixelatedImages: 'smart',
+  pixelatedImages: 'never',
   nameColorCorrection: 'strong',
   showRoomIcon: 'always',
   showRoomBanners: true,
@@ -335,6 +336,7 @@ const DEFAULTS: Preferences = {
   searchBaseEvents: '20000',
   searchMaxEvents: '200000',
   searchCrawler: true,
+  searchUnmeteredOnly: true,
   serverSearch: true,
   showHome: false,
   showSearch: false,

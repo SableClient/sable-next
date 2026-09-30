@@ -4,7 +4,7 @@
 
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap } from 'svelte/reactivity';
   import { flushSync, onDestroy, tick, untrack } from 'svelte';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -13,6 +13,7 @@
   import { isEncryptedMedia } from '#lib/ui/media-url.js';
   import { mediaProgress } from '#lib/ui/media-progress.svelte.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
+  import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
   import { videoStreamingSupported } from '#lib/ui/video-stream.svelte.js';
   import { canPlayVideo } from '#lib/ui/video-support.js';
   import { clampPan, type Vector2 } from '#lib/ui/pan-clamp.js';
@@ -28,6 +29,7 @@
   import { setSystemBarsHidden } from '#lib/platform/system-bars.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
+  import ActionMenuSeparator from '#lib/ui/primitives/ActionMenuSeparator.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -51,6 +53,11 @@
   import FileArrowDownIcon from 'phosphor-svelte/lib/FileArrowDownIcon';
   import ArrowClockwiseIcon from 'phosphor-svelte/lib/ArrowClockwiseIcon';
   import ChatCenteredTextIcon from 'phosphor-svelte/lib/ChatCenteredTextIcon';
+  import DotsThreeIcon from 'phosphor-svelte/lib/DotsThreeIcon';
+  import SquaresFourIcon from 'phosphor-svelte/lib/SquaresFourIcon';
+  import ArrowCounterClockwiseIcon from 'phosphor-svelte/lib/ArrowCounterClockwiseIcon';
+  import EyeIcon from 'phosphor-svelte/lib/EyeIcon';
+  import EyeSlashIcon from 'phosphor-svelte/lib/EyeSlashIcon';
 
   interface Props {
     items: readonly MediaItem[];
@@ -72,11 +79,11 @@
     )
   );
   let item = $derived<MediaItem | undefined>(items[index]);
-  const revealedSpoilers = new SvelteSet<string>();
+  const spoilerVisibility = new SvelteMap<string, boolean>();
   let spoiler = $derived(item?.kind === 'image' || item?.kind === 'video' ? item.spoiler : null);
   let spoilerKey = $derived(JSON.stringify([item?.eventId, item?.source, spoiler]));
-  let spoilerHidden = $derived(spoiler !== null && !revealedSpoilers.has(spoilerKey));
-  let source = $derived(spoilerHidden ? null : (item?.source ?? null));
+  let spoilerHidden = $derived(spoilerVisibility.get(spoilerKey) ?? spoiler !== null);
+  let source = $derived(spoilerHidden && item?.kind === 'video' ? null : (item?.source ?? null));
   let mime = $derived(item?.mime ?? null);
   let fileName = $derived(
     item === undefined ? '' : item.kind === 'sticker' ? item.body : item.filename
@@ -291,7 +298,7 @@
   function handleKeydown(event: KeyboardEvent): void {
     if (event.defaultPrevented || imageMenuOpen) return;
     if (event.key === 'Escape') onClose();
-    if (isImage && pannable) {
+    if (isImage && !spoilerHidden && pannable) {
       if (event.key === 'ArrowLeft') return panBy(PAN_STEP, 0);
       if (event.key === 'ArrowRight') return panBy(-PAN_STEP, 0);
       if (event.key === 'ArrowUp') return panBy(0, PAN_STEP);
@@ -333,7 +340,7 @@
       setZoom(zoom * (1 - event.deltaY * 0.01));
       return;
     }
-    if (!isImage) return;
+    if (!isImage || spoilerHidden) return;
     event.preventDefault();
     zoomTowards(event, zoom * (1 - event.deltaY * 0.001));
   }
@@ -378,7 +385,7 @@
   }
 
   function startPan(event: PointerEvent): void {
-    if (!isImage) return;
+    if (!isImage || spoilerHidden) return;
     if (event.button !== 0) return;
     clearTimeout(tapTimer);
     if (handleDoubleTap(event)) return;
@@ -564,36 +571,56 @@
       >
         <header class="toolbar" class:chrome-hidden={chromeHidden}>
           <div class="heading">
-            <IconButton
-              label={$i18n.t('viewer.close')}
-              size="medium"
-              variant="ghost"
-              onclick={onClose}><XIcon /></IconButton
-            >
-            <div>
-              <strong>{item.sender}</strong>
-              <span>{$i18n.t('viewer.position', { index: index + 1, total: items.length })}</span>
-            </div>
+            <strong>{item.sender}</strong>
+            <span>{$i18n.t('viewer.position', { index: index + 1, total: items.length })}</span>
           </div>
           <div class="actions">
-            {#if onJump}
-              <IconButton
-                label={$i18n.t('viewer.jumpToMessage')}
-                size="medium"
-                variant="ghost"
-                onclick={() => {
-                  if (item) onJump(item.eventId);
-                }}><ChatCenteredTextIcon /></IconButton
-              >
-            {/if}
-            {#if isImage}
-              <IconButton
-                class="desktop-control"
-                label={$i18n.t('viewer.copyImage')}
-                size="medium"
-                variant="ghost"
-                onclick={() => void mediaActions.copyImage()}><CopyIcon /></IconButton
-              >
+            {#if isImage || isPdf}
+              <div class="zoom-controls">
+                {#if isImage && fitRatio !== 1 && zoom !== 1}
+                  <IconButton
+                    label={$i18n.t('viewer.originalSize')}
+                    size="small"
+                    variant="ghost"
+                    onclick={() => setZoom(1)}><ImageSquareIcon /></IconButton
+                  >
+                {/if}
+                <IconButton
+                  label={$i18n.t('viewer.zoomOut')}
+                  size="small"
+                  variant="ghost"
+                  onclick={() => setZoom(zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
+                >
+                {#if editingZoom}
+                  <span class="zoom-level">
+                    <!-- svelte-ignore a11y_autofocus -->
+                    <input
+                      type="text"
+                      inputmode="numeric"
+                      aria-label={$i18n.t('viewer.setZoom')}
+                      autofocus
+                      bind:value={zoomInput}
+                      onblur={commitZoomEdit}
+                      onkeydown={(event) => {
+                        if (event.key === 'Enter') commitZoomEdit();
+                      }}
+                    />%
+                  </span>
+                {:else}
+                  <button
+                    class="zoom-level"
+                    type="button"
+                    title={$i18n.t('viewer.setZoom')}
+                    onclick={beginZoomEdit}>{Math.round(zoom * 100)}%</button
+                  >
+                {/if}
+                <IconButton
+                  label={$i18n.t('viewer.zoomIn')}
+                  size="small"
+                  variant="ghost"
+                  onclick={() => setZoom(zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
+                >
+              </div>
             {/if}
             {#if canShare}
               <IconButton
@@ -624,27 +651,78 @@
                 onclick={() => void mediaActions.download()}><DownloadSimpleIcon /></IconButton
               >
             {/if}
-            {#if isImage}
-              <IconButton
-                label={$i18n.t('viewer.rotate')}
-                size="medium"
-                variant="ghost"
-                onclick={() => rotateBy(90)}><ArrowClockwiseIcon /></IconButton
-              >
-              <button
-                class="pixel-toggle desktop-control choice"
-                type="button"
-                aria-pressed={pixelated}
-                onclick={() => (pixelated = !pixelated)}
-              >
-                {$i18n.t('viewer.pixelate')}
-              </button>
+            {#if isImage || isPdf || onJump}
+              <ActionMenu label={$i18n.t('timeline.moreActions')}>
+                {#snippet trigger({ props })}
+                  <IconButton
+                    {...props}
+                    label={$i18n.t('timeline.moreActions')}
+                    size="medium"
+                    variant="ghost"><DotsThreeIcon /></IconButton
+                  >
+                {/snippet}
+                {#if isImage}
+                  <ActionMenuItem onSelect={() => void mediaActions.copyImage()}>
+                    <CopyIcon />
+                    {$i18n.t('viewer.copyImage')}
+                  </ActionMenuItem>
+                  <ActionMenuItem onSelect={() => rotateBy(90)}>
+                    <ArrowClockwiseIcon />
+                    {$i18n.t('viewer.rotate')}
+                  </ActionMenuItem>
+                  <ActionMenuItem checked={pixelated} onSelect={() => (pixelated = !pixelated)}>
+                    <SquaresFourIcon />
+                    {$i18n.t('viewer.pixelate')}
+                  </ActionMenuItem>
+                  <ActionMenuItem
+                    onSelect={() => spoilerVisibility.set(spoilerKey, !spoilerHidden)}
+                  >
+                    {#if spoilerHidden}<EyeIcon />{:else}<EyeSlashIcon />{/if}
+                    {$i18n.t(
+                      spoilerHidden ? 'timeline.revealImageUnnamed' : 'timeline.hideImageUnnamed'
+                    )}
+                  </ActionMenuItem>
+                {/if}
+                {#if isImage || isPdf}
+                  <ActionMenuItem
+                    onSelect={() => {
+                      rotation = 0;
+                      pan = { x: 0, y: 0 };
+                      fitsWindow = true;
+                      if (isImage) fitToStage();
+                      else zoom = 1;
+                    }}
+                  >
+                    <ArrowCounterClockwiseIcon />
+                    {$i18n.t('viewer.reset')}
+                  </ActionMenuItem>
+                {/if}
+                {#if onJump}
+                  {#if isImage || isPdf}<ActionMenuSeparator />{/if}
+                  <ActionMenuItem
+                    onSelect={() => {
+                      if (item) onJump(item.eventId);
+                    }}
+                  >
+                    <ChatCenteredTextIcon />
+                    {$i18n.t('viewer.jumpToMessage')}
+                  </ActionMenuItem>
+                {/if}
+              </ActionMenu>
             {/if}
+            <IconButton
+              class="close-button"
+              label={$i18n.t('viewer.close')}
+              size="medium"
+              variant="ghost"
+              onclick={onClose}><XIcon /></IconButton
+            >
           </div>
         </header>
 
         <main
           class="stage"
+          class:spoilered={spoilerHidden}
           class:has-nav={items.length > 1}
           class:chrome-hidden={chromeHidden}
           bind:this={stageEl}
@@ -663,8 +741,8 @@
               onclick={previous}><ArrowLeftIcon /></IconButton
             >
           {/if}
-          {#if spoilerHidden}
-            <Button class="spoiler-reveal" onclick={() => revealedSpoilers.add(spoilerKey)}>
+          {#if spoilerHidden && !isImage}
+            <Button class="spoiler-reveal" onclick={() => spoilerVisibility.set(spoilerKey, false)}>
               {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
             </Button>
           {:else if url}
@@ -705,8 +783,10 @@
                 class:pixelated
                 class:dragging
                 class:instant
+                class:spoilered={spoilerHidden}
                 src={url}
-                alt={mediaLabel || $i18n.t('viewer.imageAlt')}
+                alt={spoilerHidden ? '' : mediaLabel || $i18n.t('viewer.imageAlt')}
+                aria-hidden={spoilerHidden ? 'true' : undefined}
                 draggable="false"
                 style:opacity={imageReady ? undefined : 0}
                 style:transform={`translate(${String(pan.x + swipeX)}px, ${String(pan.y + swipeY)}px) scale(${String(zoom)}) rotate(${String(rotation)}deg)`}
@@ -758,6 +838,14 @@
               {/if}
             </span>
           {/if}
+          {#if isImage && spoilerHidden}
+            <ImageSpoilerControl
+              hidden
+              reason={spoiler}
+              name={fileName}
+              ontoggle={() => spoilerVisibility.set(spoilerKey, false)}
+            />
+          {/if}
           {#if index < items.length - 1}
             <IconButton class="nav next" label={$i18n.t('viewer.next')} size="large" onclick={next}
               ><ArrowRightIcon /></IconButton
@@ -785,69 +873,9 @@
               >
             </div>
           {/if}
-          {#if isImage || isPdf}
-            <div class="zoom-controls">
-              {#if isImage && fitRatio !== 1 && zoom !== 1}
-                <IconButton
-                  label={$i18n.t('viewer.originalSize')}
-                  size="small"
-                  variant="ghost"
-                  onclick={() => setZoom(1)}><ImageSquareIcon /></IconButton
-                >
-              {/if}
-              <IconButton
-                label={$i18n.t('viewer.zoomOut')}
-                size="small"
-                variant="ghost"
-                onclick={() => setZoom(zoom / (1 + ZOOM_STEP))}><MinusIcon /></IconButton
-              >
-              {#if editingZoom}
-                <span class="zoom-level">
-                  <!-- svelte-ignore a11y_autofocus -->
-                  <input
-                    type="text"
-                    inputmode="numeric"
-                    aria-label={$i18n.t('viewer.setZoom')}
-                    autofocus
-                    bind:value={zoomInput}
-                    onblur={commitZoomEdit}
-                    onkeydown={(event) => {
-                      if (event.key === 'Enter') commitZoomEdit();
-                    }}
-                  />%
-                </span>
-              {:else}
-                <button
-                  class="zoom-level"
-                  type="button"
-                  title={$i18n.t('viewer.setZoom')}
-                  onclick={beginZoomEdit}>{Math.round(zoom * 100)}%</button
-                >
-              {/if}
-              <IconButton
-                label={$i18n.t('viewer.zoomIn')}
-                size="small"
-                variant="ghost"
-                onclick={() => setZoom(zoom * (1 + ZOOM_STEP))}><PlusIcon /></IconButton
-              >
-            </div>
-          {/if}
           <p>
             {spoilerHidden ? $i18n.t('composer.spoiler') : mediaLabel || $i18n.t('viewer.untitled')}
           </p>
-          {#if isImage || isPdf}
-            <button
-              class="reset"
-              type="button"
-              onclick={() => {
-                rotation = 0;
-                pan = { x: 0, y: 0 };
-                fitsWindow = true;
-                if (isImage) fitToStage();
-                else zoom = 1;
-              }}>{$i18n.t('viewer.reset')}</button
-            >
-          {/if}
         </footer>
       </Dialog.Content>
     </Dialog.Portal>
@@ -891,7 +919,6 @@
       calc(var(--space-200) + var(--safe-bottom));
   }
 
-  .heading,
   .actions,
   .zoom-controls {
     align-items: center;
@@ -918,11 +945,8 @@
   }
 
   .heading {
-    flex: 1;
-  }
-
-  .heading div {
     display: grid;
+    flex: 1;
     gap: var(--space-050);
     min-width: 0;
   }
@@ -947,33 +971,17 @@
     gap: var(--space-100);
   }
 
+  .actions :global(.close-button) {
+    margin-inline-start: var(--space-200);
+  }
+
   .zoom-controls,
-  .bottom-bar p,
-  .reset {
+  .bottom-bar p {
     display: none;
   }
 
-  .pixel-toggle,
-  .reset {
-    background: none;
-    border: 0;
-    color: var(--primary-on-container);
-    cursor: pointer;
-    font: inherit;
-    padding: var(--space-250);
-  }
-
-  .pixel-toggle:hover,
-  .reset:hover {
-    background: var(--surface-container-hover);
-    border-radius: var(--radii-400);
-  }
-
-  .pixel-toggle:focus-visible,
-  .reset:focus-visible {
-    border-radius: var(--radii-400);
-    outline: var(--focus-ring-width) solid var(--focus-ring);
-    outline-offset: 0.15rem;
+  .actions .zoom-controls {
+    margin-inline-end: var(--space-200);
   }
 
   .stage {
@@ -1012,6 +1020,12 @@
 
   .stage img.dragging {
     cursor: grabbing;
+  }
+
+  .stage img.spoilered,
+  .stage.spoilered :global(.viewer-preview) {
+    filter: blur(2.75rem);
+    pointer-events: none;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -1076,10 +1090,6 @@
   }
 
   @media (width < 48rem) {
-    .actions :global(.desktop-control) {
-      display: none;
-    }
-
     .stage.has-nav {
       padding-inline: var(--space-200);
     }
@@ -1163,13 +1173,11 @@
 
     .bottom-bar {
       gap: var(--space-400);
-      justify-content: space-between;
       padding: var(--space-300) max(var(--space-400), var(--safe-left))
         calc(var(--space-300) + var(--safe-bottom));
     }
 
-    .bottom-bar p,
-    .reset {
+    .bottom-bar p {
       display: initial;
     }
 

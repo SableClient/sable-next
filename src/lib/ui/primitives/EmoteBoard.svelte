@@ -102,6 +102,9 @@
   let scrollToRow = $state(-1);
   let leadHeight = $state(0);
   let cellRowHeight = $state(48 + GRID_GAP);
+  let imageMeasure = $state.raw<{ tab: BoardTab; width: number; gap: number; row: number } | null>(
+    null
+  );
   let scrollAlign = $state<'start' | 'auto'>('start');
   let mounted = $state.raw({ start: 0, end: 0 });
   let pendingFocus: { section: string; index: number } | null = null;
@@ -225,8 +228,13 @@
   );
 
   let showFreeText = $derived(onPickUnicode !== undefined && searching);
+  let imageCell = $derived(
+    imageMeasure?.tab === tab
+      ? imageMeasure
+      : { width: cellSize, gap: GRID_GAP, row: cellSize + GRID_GAP }
+  );
   let imageColumns = $derived(
-    Math.max(1, Math.floor((gridWidth + GRID_GAP) / (cellSize + GRID_GAP)))
+    Math.max(1, Math.floor((gridWidth + imageCell.gap) / (imageCell.width + imageCell.gap)))
   );
   let pickerRows = $derived.by((): PickerRow[] => {
     const rows: PickerRow[] = [];
@@ -276,7 +284,7 @@
   });
   let rowSize = $derived.by(() => {
     const rows = pickerRows;
-    const imageRowHeight = cellSize + GRID_GAP;
+    const imageRowHeight = imageCell.row;
     const lead = leadHeight;
     return (index: number): number => {
       const kind = rows[index]?.kind;
@@ -309,10 +317,7 @@
       requestScroll(index, 'start');
       return;
     }
-    const reduced = shouldReduceMotion();
-    document
-      .getElementById(id)
-      ?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+    document.getElementById(id)?.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
 
   function requestScroll(index: number, align: 'start' | 'auto'): void {
@@ -339,6 +344,26 @@
       update(entry.contentBoxSize[0]);
     });
     observer.observe(element);
+    return () => observer.disconnect();
+  }
+
+  function measureImageRow(list: HTMLElement): () => void {
+    const update = (): void => {
+      const cell = list.firstElementChild;
+      if (!(cell instanceof HTMLElement)) return;
+      const style = getComputedStyle(list);
+      const width = cell.offsetWidth;
+      const gap = Number.parseFloat(style.columnGap) || 0;
+      const row = cell.offsetHeight + (Number.parseFloat(style.marginBottom) || 0);
+      const last = imageMeasure;
+      if (last?.tab === tab && last.width === width && last.gap === gap && last.row === row) return;
+      imageMeasure = { tab, width, gap, row };
+    };
+    update();
+    if (typeof ResizeObserver === 'undefined') return () => {};
+
+    const observer = new ResizeObserver(update);
+    observer.observe(list);
     return () => observer.disconnect();
   }
 
@@ -578,7 +603,9 @@
             onItemsUpdated={(range) => {
               mounted = range;
             }}
-            scrollToBehaviour={shouldReduceMotion() ? 'instant' : 'smooth'}
+            scrollToBehaviour={scrollAlign === 'start' || shouldReduceMotion()
+              ? 'instant'
+              : 'smooth'}
           >
             {#snippet item({ index, style })}
               {@const row = pickerRows[index]}
@@ -661,7 +688,7 @@
                     </div>
                   </div>
                 {:else}
-                  <ul>
+                  <ul {@attach measureImageRow}>
                     {#each row.images as image, column (column)}
                       <li>
                         <button

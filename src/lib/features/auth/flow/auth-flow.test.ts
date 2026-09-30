@@ -11,5 +11,13 @@ describe('auth flow state helpers', () => {
 
   it('fails closed when no browser storage is available', () => {
     expect(readReturningUser(undefined)).toBe(false);
+    expect(readReturningUser(null)).toBe(false);
+    expect(
+      readReturningUser({
+        getItem: () => {
+          throw new Error('denied');
+        },
+      } as unknown as Storage)
+    ).toBe(false);
   });
 });

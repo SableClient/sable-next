@@ -21,6 +21,7 @@ const core = Object.assign(baseCore, {
       listener = null;
     };
   }),
+  startQrLogin: vi.fn(() => Promise.resolve()),
   startQrGrant: vi.fn(() => Promise.resolve()),
   qrCheckCode: vi.fn(() => Promise.resolve()),
   cancelQr: vi.fn(() => Promise.resolve()),
@@ -28,10 +29,27 @@ const core = Object.assign(baseCore, {
 
 import QrLinkDialog from './QrLinkDialog.svelte';
 
-async function emit(progress: Extract<CoreEvent, { type: 'qr_login' }>['progress']) {
-  listener?.({ type: 'qr_login', grant: true, progress });
+async function emit(progress: Extract<CoreEvent, { type: 'qr_login' }>['progress'], grant = true) {
+  listener?.({ type: 'qr_login', grant, progress });
   await tick();
 }
+
+test('points QR sign-in instructions to Account settings', async () => {
+  const user = userEvent.setup();
+  render(QrLinkDialog, { open: true, mode: 'login' });
+
+  await user.click(await screen.findByRole('button', { name: 'Scan a QR code' }));
+  expect(screen.getByRole('dialog')).toHaveTextContent(
+    'On your signed-in device, open Settings → Account, choose Link a new device and scan the code it shows.'
+  );
+
+  await user.click(screen.getByRole('button', { name: 'Back' }));
+  await user.click(screen.getByRole('button', { name: 'Show a QR code' }));
+  await emit({ stage: 'show_code', code: { width: 21, modules: '1'.repeat(441) } }, false);
+  expect(screen.getByRole('dialog')).toHaveTextContent(
+    'On your signed-in device, open Settings → Account, choose Link a new device and scan this code.'
+  );
+});
 
 test('links a new device through the code, the check number and a clear failure', async () => {
   const user = userEvent.setup();

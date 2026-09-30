@@ -13,9 +13,14 @@
 
   let { url, preview, mediaHidden }: Props = $props();
   let title = $derived(preview.title ?? preview.site_name ?? url);
+  let imageHidden = $derived.by(() => {
+    void url;
+    void preview.image;
+    return false;
+  });
 </script>
 
-<a class="youtube-preview" href={url} target="_blank" rel="noopener noreferrer" aria-label={title}>
+<div class="youtube-preview">
   {#if preview.image && !mediaHidden}
     <span class="youtube-preview-image">
       <MediaImage
@@ -26,17 +31,27 @@
         intrinsicWidth={preview.image_width}
         intrinsicHeight={preview.image_height}
         mime={preview.image_mime}
+        bind:spoilerHidden={imageHidden}
+        href={url}
       />
-      <span class="youtube-preview-play" aria-hidden="true"><PlayIcon /></span>
+      {#if !imageHidden}
+        <span class="youtube-preview-play" aria-hidden="true"><PlayIcon /></span>
+      {/if}
     </span>
   {/if}
-  <span class="youtube-preview-text">
+  <a
+    class="youtube-preview-text"
+    href={url}
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label={title}
+  >
     <span class="youtube-preview-site">{preview.site_name ?? 'YouTube'}</span>
     <span class="youtube-preview-title">{title}</span>
     {#if preview.description}<span class="youtube-preview-description">{preview.description}</span
       >{/if}
-  </span>
-</a>
+  </a>
+</div>
 
 <style>
   .youtube-preview {
@@ -79,6 +94,7 @@
     display: flex;
     left: 50%;
     padding: var(--space-200);
+    pointer-events: none;
     position: absolute;
     top: 50%;
     transform: translate(-50%, -50%);
@@ -90,10 +106,12 @@
   }
 
   .youtube-preview-text {
+    color: inherit;
     display: flex;
     flex-direction: column;
     gap: var(--space-100);
     padding: var(--space-200) var(--space-250);
+    text-decoration: none;
   }
 
   .youtube-preview-site {

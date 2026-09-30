@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { SessionInfo } from '#src/generated/protocol';
+import type { CoreClient } from '#lib/core/client.svelte.js';
 
 const config = vi.hoisted(() => ({ push: null as Record<string, unknown> | null }));
 const token = vi.hoisted(() => ({ value: null as string | null }));
@@ -18,8 +19,12 @@ import { registerVoipPusher, unregisterVoipPusher } from './voip-push';
 
 const setPusher = vi.fn(() => Promise.resolve());
 const removePusher = vi.fn(() => Promise.resolve());
-const core = { commands: { setPusher, removePusher } } as never;
 const session = { user_id: '@a:example.org', device_id: 'DEV' } as SessionInfo;
+const core = {
+  commands: { setPusher, removePusher },
+  session,
+  deviceList: [{ is_own: true, display_name: 'My phone' }],
+} as unknown as CoreClient;
 
 beforeEach(() => {
   config.push = {
@@ -27,6 +32,7 @@ beforeEach(() => {
     iosVoipPushAppID: 'moe.sable.next.ios.voip',
   };
   token.value = 'voip-1';
+  Object.assign(core, { deviceList: [{ is_own: true, display_name: 'My phone' }] });
 });
 
 afterEach(() => {
@@ -41,7 +47,7 @@ test('nothing registers without a VoIP app id', async () => {
   expect(setPusher).not.toHaveBeenCalled();
 });
 
-test('the VoIP token registers once, with the full event for the gateway to filter', async () => {
+test('registers a VoIP token once with full events', async () => {
   await registerVoipPusher(core, session);
   await registerVoipPusher(core, session);
 
@@ -51,8 +57,35 @@ test('the VoIP token registers once, with the full event for the gateway to filt
       pushkey: 'voip-1',
       app_id: 'moe.sable.next.ios.voip',
       event_id_only: false,
+      device_display_name: 'My phone',
     })
   );
+});
+
+test('updates the VoIP pusher after a device rename', async () => {
+  await registerVoipPusher(core, session);
+  await registerVoipPusher(core, session);
+  Object.assign(core, { deviceList: [{ is_own: true, display_name: 'Work phone' }] });
+  await registerVoipPusher(core, session);
+
+  expect(setPusher).toHaveBeenCalledTimes(2);
+  expect(setPusher).toHaveBeenLastCalledWith(
+    expect.objectContaining({ pushkey: 'voip-1', device_display_name: 'Work phone' })
+  );
+  expect(removePusher).not.toHaveBeenCalled();
+});
+
+test('updates VoIP registrations saved without a device name', async () => {
+  localStorage.setItem(
+    'sable.push.voip',
+    JSON.stringify({ userId: session.user_id, appId: 'moe.sable.next.ios.voip', pushkey: 'voip-1' })
+  );
+  await registerVoipPusher(core, session);
+
+  expect(setPusher).toHaveBeenCalledWith(
+    expect.objectContaining({ device_display_name: 'My phone' })
+  );
+  expect(removePusher).not.toHaveBeenCalled();
 });
 
 test('a rotated token replaces the old pusher, and signing off removes it', async () => {

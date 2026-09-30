@@ -43,6 +43,188 @@ function undecodablePicture() {
   };
 }
 
+for (const mobile of [false, true]) {
+  test(`viewer header and menu actions${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await installRoomCore('ready');
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'share', { value: async () => {}, configurable: true });
+    });
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', picture(800, 600));
+    await timeline.container.getByRole('button', { name: 'Open shot.png' }).click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    const header = viewer.locator('header');
+    const image = viewer.locator('.stage img');
+    await expect(image).toBeVisible(MEDIA_LOADED);
+    await expect(viewer.locator('.media-image-spoiler')).toHaveCount(0);
+    const buttons = header.locator('.actions > button');
+    await expect(buttons).toHaveCount(4);
+    await expect(buttons.nth(0)).toHaveAccessibleName('Share');
+    await expect(buttons.nth(1)).toHaveAccessibleName('Download image');
+    await expect(buttons.nth(2)).toHaveAccessibleName('More actions');
+    await expect(buttons.nth(3)).toHaveAccessibleName('Close');
+    const zoomIn = header.getByRole('button', { name: 'Zoom in', exact: true });
+    if (mobile) {
+      await expect(zoomIn).toBeHidden();
+    } else {
+      await expect(zoomIn).toBeVisible();
+      await zoomIn.click();
+      await expect(header.getByRole('button', { name: '120%', exact: true })).toBeVisible();
+    }
+    await page.screenshot({ path: testInfo.outputPath('viewer-header.png') });
+
+    const more = header.getByRole('button', { name: 'More actions' });
+    await more.click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByText('Copy image', { exact: true })).toBeVisible();
+    await expect(menu.getByText('Hide image', { exact: true })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('viewer-more.png') });
+    await menu.getByText('Rotate image', { exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(image).toHaveAttribute('style', /rotate\(90deg\)/);
+
+    await more.click();
+    await menu.getByText('Pixelate', { exact: true }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(image).toHaveClass(/pixelated/);
+
+    await more.click();
+    await expect(menu.locator('[aria-checked="true"]')).toHaveText('Pixelate');
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(viewer).toBeVisible();
+    await expect(more).toBeFocused();
+    await more.click();
+    await menu.getByText('Pixelate', { exact: true }).click();
+    await expect(image).not.toHaveClass(/pixelated/);
+    await more.click();
+    await menu.getByText('Reset view', { exact: true }).click();
+    await expect(image).toHaveAttribute('style', /rotate\(0deg\)/);
+    await header.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(viewer).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+  });
+
+  test(`image spoilers blur and reveal without opening the viewer${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const photo = picture(800, 600);
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...photo,
+      content: {
+        ...photo.content,
+        source: JSON.stringify({ Plain: 'mxc://example.test/spoiler-preview' }),
+        spoiler: 'Final scene',
+      },
+    });
+    const media = timeline.container.locator('.spoilerable-media');
+    await expect(media.locator('img')).toBeVisible(MEDIA_LOADED);
+    await expect(media.locator('.media-image-visual')).toHaveCSS('filter', 'blur(44px)');
+    const hiddenBox = await media.boundingBox();
+    await page.screenshot({ path: testInfo.outputPath('spoiler-hidden.png') });
+
+    const reveal = media.getByRole('button', { name: 'Reveal shot.png' });
+    await reveal.focus();
+    await reveal.press('Enter');
+    await expect(media).not.toHaveClass(/spoilered/);
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toHaveCount(0);
+    expect(await media.boundingBox()).toEqual(hiddenBox);
+
+    await media.hover();
+    await page.screenshot({ path: testInfo.outputPath('spoiler-revealed.png') });
+    await media.getByRole('button', { name: 'Hide shot.png' }).click();
+    await expect(media).toHaveClass(/spoilered/);
+    await media.getByRole('button', { name: 'Reveal shot.png' }).click();
+    await media.getByRole('button', { name: 'Open shot.png' }).click();
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toBeVisible();
+    const viewer = page.getByRole('dialog', { name: 'Media viewer' });
+    await expect(viewer.locator('.stage img')).toBeVisible(MEDIA_LOADED);
+    await expect(viewer.locator('.stage img')).toHaveCSS('filter', 'blur(44px)');
+    await page.screenshot({ path: testInfo.outputPath('viewer-spoiler-hidden.png') });
+    await viewer.getByRole('button', { name: 'Reveal shot.png' }).click();
+    await expect(viewer.getByRole('img', { name: 'shot.png', exact: true })).toHaveCSS(
+      'filter',
+      'none'
+    );
+    await expect(viewer.locator('.media-image-spoiler')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('viewer-spoiler-revealed.png') });
+    await viewer.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Hide image', exact: true }).click();
+    await expect(viewer.locator('.stage img')).toHaveCSS('filter', 'blur(44px)');
+    await expect(viewer.getByRole('button', { name: 'Reveal shot.png' })).toBeVisible();
+  });
+
+  test(`inline and link-preview images can be hidden${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const message = timelineItem('inline-probe', 'Photo and link');
+    const html =
+      '<p><img src="mxc://example.test/spoiler-preview-inline" alt="Landscape"></p><p><a href="https://example.org/landscape">Landscape link</a></p>';
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...message,
+      content: { ...message.content, html },
+      bundled_link_previews: [
+        {
+          url: 'https://example.org/landscape',
+          title: 'Landscape',
+          description: null,
+          site_name: 'Example',
+          image: 'mxc://example.test/spoiler-preview-link',
+          image_width: 800,
+          image_height: 600,
+          image_mime: 'image/png',
+        },
+      ],
+    });
+    for (const selector of ['.inline-image', '.link-preview-image']) {
+      const media = timeline.container.locator(selector);
+      await expect(media.locator('img')).toBeVisible(MEDIA_LOADED);
+      await media.hover();
+      await media.getByRole('button', { name: 'Hide image' }).click();
+      await expect(media).toHaveClass(/spoilered/);
+      await expect(media.getByRole('button', { name: 'Reveal image' })).toBeVisible();
+    }
+    await page.screenshot({ path: testInfo.outputPath('inline-link-hidden.png') });
+    await expect(page.getByRole('dialog', { name: 'Media viewer' })).toHaveCount(0);
+    for (const selector of ['.inline-image', '.link-preview-image']) {
+      const media = timeline.container.locator(selector);
+      await media.getByRole('button', { name: 'Reveal image' }).click();
+      await expect(media).not.toHaveClass(/spoilered/);
+    }
+    await page.screenshot({ path: testInfo.outputPath('inline-link-revealed.png') });
+  });
+}
+
 function mediaBox(page: Page, selector = '.media-image') {
   return page.evaluate((target: string) => {
     const node = document.querySelector(`.timeline-viewport ${target}`);

@@ -23,17 +23,29 @@ export async function measureAttachment(file: Blob): Promise<AttachmentInfoView 
   }
 
   if (kind === 'video' || kind === 'audio') {
+    const recorded =
+      kind === 'audio' && file instanceof File ? voiceRecordings.get(file) : undefined;
+    if (recorded !== undefined) {
+      return {
+        width: null,
+        height: null,
+        duration_ms: recorded.durationMs,
+        animated: null,
+        blurhash: null,
+        waveform: [...recorded.waveform],
+        voice: true,
+        audio_metadata: null,
+      };
+    }
     const metadata = await mediaMetadata(file, kind);
     if (metadata === null) return null;
-    const recorded = file instanceof File ? voiceWaveforms.get(file) : undefined;
-    const waveform = recorded === undefined ? null : [...recorded];
-    const tags = kind === 'audio' && waveform === null ? await readAudioTags(file) : null;
+    const tags = kind === 'audio' ? await readAudioTags(file) : null;
     return {
       ...metadata,
       animated: null,
       blurhash: null,
-      waveform,
-      voice: waveform !== null,
+      waveform: null,
+      voice: false,
       audio_metadata: tags,
     };
   }
@@ -75,10 +87,14 @@ async function coverBlurhash(data: Uint8Array, format: string): Promise<string |
   }
 }
 
-const voiceWaveforms = new WeakMap<File, readonly number[]>();
+const voiceRecordings = new WeakMap<File, { waveform: readonly number[]; durationMs: number }>();
 
-export function markVoiceRecording(file: File, waveform: readonly number[]): void {
-  voiceWaveforms.set(file, waveform);
+export function markVoiceRecording(
+  file: File,
+  waveform: readonly number[],
+  durationMs: number
+): void {
+  voiceRecordings.set(file, { waveform, durationMs });
 }
 
 function animated(mime: string): boolean | null {

@@ -2,6 +2,7 @@
 
 import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
 import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
+import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import type { SendAttachmentOptions, SendGalleryOptions } from '#lib/core/commands.svelte.js';
 import { cleanup, fireEvent, render, screen, type RenderResult } from '@testing-library/svelte';
@@ -27,6 +28,8 @@ import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
   cleanup();
+  mediaConfig.mockReset();
+  mediaConfig.mockResolvedValue({ upload_size: 100 * 1024 * 1024 });
   clearDrafts();
   setPreference('formattingToolbar', false);
   setPreference('composerFormatButton', true);
@@ -71,6 +74,8 @@ const packs: ImagePackView[] = [
   },
 ];
 
+const mediaConfig = vi.fn(() => Promise.resolve({ upload_size: 100 * 1024 * 1024 }));
+
 const scheduleAttachment = vi.fn(() => Promise.resolve('delayed'));
 
 const botCommands: BotCommandDescriptionView[] = [
@@ -99,6 +104,7 @@ function core(): CoreClient {
     subscribeEvents: () => () => {},
     commands: {
       scheduleAttachment,
+      mediaConfig,
       botCommands: () => Promise.resolve(botCommands),
       personas: () => Promise.resolve({ personas: [], selections: [] }),
       roomMembers: () => Promise.resolve(members),
@@ -982,9 +988,31 @@ test('an oversized file is refused before it is staged', async () => {
   expect(document.querySelector('[role="alert"]')?.textContent).toContain('huge.bin');
 });
 
-test('a batch over the limit is refused as a batch', async () => {
+test('stages a file above 100 MiB when the server allows it', async () => {
+  mediaConfig.mockResolvedValue({ upload_size: 500 * 1024 * 1024 });
   setup({ roomId: '!room:example.org' });
-  await tick();
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+  await pick(file);
+
+  expect(stagedNames()).toEqual(['large.bin']);
+});
+
+test('shows the server limit when refusing an oversized file', async () => {
+  mediaConfig.mockResolvedValue({ upload_size: 10_000_000 });
+  setup({ roomId: '!room:example.org' });
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 20_000_000 });
+
+  await pick(file);
+
+  expect(stagedNames()).toEqual([]);
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('10 MB');
+});
+
+test('stages files whose combined size exceeds the per-upload limit', async () => {
+  setup({ roomId: '!room:example.org' });
   const half = (): File => {
     const file = new File(['x'], 'half.bin', { type: 'application/octet-stream' });
     Object.defineProperty(file, 'size', { value: 60 * 1024 * 1024 });
@@ -992,12 +1020,82 @@ test('a batch over the limit is refused as a batch', async () => {
   };
 
   await pick(half());
-  expect(stagedNames()).toEqual(['half.bin']);
-
   await pick(half());
 
-  expect(stagedNames()).toEqual(['half.bin']);
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain('more than');
+  expect(stagedNames()).toEqual(['half.bin', 'half.bin']);
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+test('a failed media config lookup can be retried', async () => {
+  mediaConfig.mockRejectedValueOnce(new Error('offline'));
+  mediaConfig.mockResolvedValue({ upload_size: 500 * 1024 * 1024 });
+  setup({ roomId: '!room:example.org' });
+  const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+  Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+  await pick(file);
+  expect(stagedNames()).toEqual([]);
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
+
+  await pick(file);
+  expect(stagedNames()).toEqual(['large.bin']);
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+test('files awaiting the server limit do not move into another room', async () => {
+  let resolveConfig: ((config: { upload_size: number }) => void) | undefined;
+  mediaConfig.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveConfig = resolve;
+      })
+  );
+  let switchRoom: ((roomId: string) => void) | undefined;
+  setup({
+    roomId: '!first:example.org',
+    registerRoom: (set) => {
+      switchRoom = set;
+    },
+  });
+
+  await pick(new File(['x'], 'private.bin'));
+  switchRoom?.('!second:example.org');
+  await tick();
+  resolveConfig?.({ upload_size: 500 * 1024 * 1024 });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
+});
+
+test('files awaiting the server limit do not move into another account', async () => {
+  let resolveConfig: ((config: { upload_size: number }) => void) | undefined;
+  mediaConfig.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveConfig = resolve;
+      })
+  );
+  const session = $state({ account_id: 'a' });
+  const client = Object.assign(core(), { session }) as unknown as CoreClient;
+  render(Harness, {
+    props: {
+      core: client,
+      composer: {
+        roomId: '!room:example.org',
+        onSend: async () => {},
+        onSendAttachment: async () => {},
+        onTyping: async () => {},
+      },
+    },
+  });
+
+  await pick(new File(['x'], 'private.bin'));
+  session.account_id = 'b';
+  await tick();
+  resolveConfig?.({ upload_size: 500 * 1024 * 1024 });
+  await tick();
+
+  expect(stagedNames()).toEqual([]);
 });
 
 function formattingToggle(): HTMLElement {
@@ -1085,7 +1183,52 @@ test('a document carries no spoiler control', async () => {
   expect(document.querySelector('.staged-spoiler')).toBeNull();
 });
 
-test('holding the send button opens the schedule dialog instead of sending', async () => {
+test('a send tap sends immediately', async () => {
+  vi.useFakeTimers();
+  const stopGuard = guardTouchClicks();
+  const send = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [composerSchema.text('now')]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  const instance = setup({
+    roomId: '!room:example.org',
+    onSend: send,
+    onSchedule: async () => {},
+  });
+
+  try {
+    await tick();
+    const button = sendButton();
+    const down = new PointerEvent('pointerdown', {
+      bubbles: true,
+      cancelable: true,
+      pointerType: 'touch',
+      isPrimary: true,
+    });
+    button.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+    await fireEvent.click(button);
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]).toEqual([
+      '!room:example.org',
+      'now',
+      null,
+      { userIds: [], room: false },
+    ]);
+    await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+    expect(document.body.textContent).not.toContain('Schedule this message');
+  } finally {
+    instance.unmount();
+    stopGuard();
+    vi.useRealTimers();
+  }
+});
+
+test('a send hold schedules after 800ms', async () => {
   vi.useFakeTimers();
   const send = vi.fn(async () => {});
   const draft = composerSchema.node('doc', null, [
@@ -1102,7 +1245,9 @@ test('holding the send button opens the schedule dialog instead of sending', asy
   const button = document.querySelector('.composer-send');
   if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
   await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
-  await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+  await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS - 1);
+  expect(document.body.textContent).not.toContain('Schedule this message');
+  await vi.advanceTimersByTimeAsync(1);
   await tick();
 
   expect(document.body.textContent).toContain('Schedule this message');
@@ -1136,24 +1281,90 @@ test('a touch contextmenu leaves the schedule dialog to the long press', async (
   expect(document.body.textContent).not.toContain('Schedule this message');
 });
 
-test('right-clicking the send button opens the schedule dialog', async () => {
-  const send = vi.fn(async () => {});
+for (const [pointerType, afterReleaseMs] of [
+  ['', 0],
+  [undefined, 500],
+] as const) {
+  test(`an untyped touch contextmenu cannot schedule (${afterReleaseMs}ms after release)`, async () => {
+    vi.useFakeTimers();
+    const stopGuard = guardTouchClicks();
+    const draft = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+    ]);
+    writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+    const instance = setup({ roomId: '!room:example.org', onSchedule: async () => {} });
+
+    try {
+      await tick();
+      const button = sendButton();
+      await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+      await vi.advanceTimersByTimeAsync(100);
+      await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+      await vi.advanceTimersByTimeAsync(afterReleaseMs);
+
+      const init = { bubbles: true, cancelable: true };
+      const menu =
+        pointerType === undefined
+          ? new MouseEvent('contextmenu', init)
+          : new PointerEvent('contextmenu', { ...init, pointerType });
+      button.dispatchEvent(menu);
+      await tick();
+
+      expect(menu.defaultPrevented).toBe(true);
+      expect(document.body.textContent).not.toContain('Schedule this message');
+      await vi.advanceTimersByTimeAsync(SCHEDULE_PRESS_MS);
+      expect(document.body.textContent).not.toContain('Schedule this message');
+    } finally {
+      instance.unmount();
+      stopGuard();
+      vi.useRealTimers();
+    }
+  });
+}
+
+test.each([false, true])(
+  'a send right-click schedules (previous touch: %s)',
+  async (previousTouch) => {
+    const send = vi.fn(async () => {});
+    const draft = composerSchema.node('doc', null, [
+      composerSchema.node('paragraph', null, [composerSchema.text('later')]),
+    ]);
+    writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+    setup({
+      roomId: '!room:example.org',
+      onSend: send,
+      onSchedule: async () => {},
+    });
+    await tick();
+
+    const button = document.querySelector('.composer-send');
+    if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
+    if (previousTouch) {
+      await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+      await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+      await fireEvent.pointerDown(button, { pointerType: 'mouse', button: 2, isPrimary: true });
+    }
+    expect(await fireEvent.contextMenu(button)).toBe(false);
+    expect(document.body).toHaveTextContent('Schedule this message');
+    expect(send).not.toHaveBeenCalled();
+  }
+);
+
+test.each(['ContextMenu', 'F10'])('the %s key opens scheduling after a touch', async (key) => {
   const draft = composerSchema.node('doc', null, [
     composerSchema.node('paragraph', null, [composerSchema.text('later')]),
   ]);
   writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
-  setup({
-    roomId: '!room:example.org',
-    onSend: send,
-    onSchedule: async () => {},
-  });
+  setup({ roomId: '!room:example.org', onSchedule: async () => {} });
   await tick();
 
-  const button = document.querySelector('.composer-send');
-  if (!(button instanceof HTMLButtonElement)) throw new Error('send button not found');
-  expect(await fireEvent.contextMenu(button)).toBe(false);
+  const button = sendButton();
+  await fireEvent.pointerDown(button, { pointerType: 'touch', isPrimary: true });
+  await fireEvent.pointerUp(button, { pointerType: 'touch', isPrimary: true });
+  await fireEvent.keyDown(button, { key, shiftKey: key === 'F10' });
+  await fireEvent.contextMenu(button);
+
   expect(document.body).toHaveTextContent('Schedule this message');
-  expect(send).not.toHaveBeenCalled();
 });
 
 function sendButton(): HTMLButtonElement {

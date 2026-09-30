@@ -23,6 +23,7 @@ percent-encoding = "2.3"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
+regex-lite = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri = { version = "2.11.3", default-features = false, features = [
@@ -54,6 +55,8 @@ sentry = { version = "0.49", default-features = false, features = [
   "contexts",
   "panic",
   "debug-images",
+  "logs",
+  "tracing",
   "ureq",
 ] }
 tauri-plugin-sentry = "0.6.0"
@@ -98,6 +101,7 @@ enigo = { version = "0.6.1", default-features = false }
 sable-hdr = { path = "../crates/sable-hdr", version = "0.1.0", features = ["tauri"] }
 windows = { version = "0.61", features = [
   "Win32_Foundation",
+  "Win32_System_Console",
   "Win32_System_ProcessStatus",
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
@@ -106,7 +110,7 @@ windows = { version = "0.61", features = [
 [target."cfg(target_os = \"linux\")".dependencies]
 gtk = "0.18"
 webkit2gtk = { version = "2.0", features = ["v2_34"], optional = true }
-tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "b83d02a135781b8d73d8d12d70a590d5063180a1", optional = true }
+tauri-runtime-cef = { version = "0.1.0", git = "https://github.com/SableClient/tauri-runtime-cef", rev = "5dc073b6902f6c372b617ed6b7305d22b849db0e", optional = true }
 # The CEF runtime currently uses the beta.2 drag event API. Keep Cargo from
 # selecting beta.3, which removed its paths and DragMoved payloads.
 winit = { version = "=0.31.0-beta.2", optional = true }

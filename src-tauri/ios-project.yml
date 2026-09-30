@@ -19,6 +19,12 @@ settingGroups:
       {{#if apple.development-team}}
       DEVELOPMENT_TEAM: {{apple.development-team}}
       {{/if}}
+    configs:
+      release:
+        DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+        DEPLOYMENT_POSTPROCESSING: YES
+        STRIP_INSTALLED_PRODUCT: YES
+        STRIP_STYLE: all
 targetTemplates:
   app:
     type: application
@@ -76,6 +82,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios/Network
       - path: Assets.xcassets
       - path: ../../icons/ios/AppIcons.xcassets
       - path: Externals
@@ -151,6 +158,7 @@ targets:
     settings:
       base:
         ENABLE_BITCODE: false
+        DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
         ARCHS: [{{join ios-valid-archs}}]
         VALID_ARCHS: {{~#each ios-valid-archs}} {{this}} {{/each}}
         # Force LiveKit's Objective-C delegate categories out of its static archive.
@@ -196,6 +204,7 @@ targets:
       - sdk: AVFoundation.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
+      - sdk: Network.framework
     preBuildScripts:
       {{~#each ios-pre-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}

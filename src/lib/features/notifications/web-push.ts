@@ -67,11 +67,9 @@ export function registrationMarker(
   ].join('\n');
 }
 
-export function pusherDisplayName(core: Pick<CoreClient, 'session' | 'deviceList'>): string {
+export function pusherDisplayName(core: Pick<CoreClient, 'deviceList'>): string {
   const deviceName = core.deviceList.find((device) => device.is_own)?.display_name?.trim();
-  const name = deviceName || 'Sable';
-  const deviceId = core.session?.device_id;
-  return deviceId ? `${name} (${deviceId})` : name;
+  return deviceName || 'Sable';
 }
 
 export function needsRegistering(marker: string, registered: string | null): boolean {

@@ -1,4 +1,6 @@
 mod crawl;
+mod network;
+pub(crate) use network::CrawlNetwork;
 #[cfg(target_family = "wasm")]
 mod idb;
 mod persist;
@@ -6,6 +8,8 @@ mod server;
 mod tokenize;
 
 pub(crate) use crawl::CrawlProgress;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use persist::reset_state_cache;
 pub(crate) use server::ServerSearch;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -2491,19 +2495,24 @@ impl Core {
     }
 
     pub(crate) async fn restore_persisted_index(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        let joined: Vec<OwnedRoomId> = client
+        let mut rooms: Vec<OwnedRoomId> = client
             .joined_rooms()
             .iter()
             .map(|room| room.room_id().to_owned())
             .collect();
         for room_id in persist::listed_rooms(client).await {
-            if !joined.contains(&room_id) {
+            if client
+                .get_room(&room_id)
+                .is_some_and(|room| room.state() != RoomState::Joined)
+            {
                 let _ = persist::forget(client, &room_id).await;
+            } else if !rooms.contains(&room_id) {
+                rooms.push(room_id);
             }
         }
 
         let mut opened = Vec::new();
-        for room_id in joined {
+        for room_id in rooms {
             match persist::open(client, &room_id).await {
                 persist::Opened::Manifest(manifest) => opened.push((room_id, manifest)),
                 persist::Opened::Legacy(restored) => {
@@ -2882,6 +2891,7 @@ mod tests {
     use wiremock::{Mock, ResponseTemplate};
 
     use super::MessageIndex;
+    use super::crawl::{CrawlBatch, CrawlOutcome};
 
     pub(super) fn in_room(
         index: &MessageIndex,
@@ -4813,7 +4823,13 @@ mod tests {
             .await
             .expect("crawl one batch");
         assert!(
-            !reached_start.reached_start,
+            matches!(
+                reached_start,
+                CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: false,
+                    ..
+                })
+            ),
             "a room with a next token is not exhausted"
         );
 
@@ -4849,7 +4865,14 @@ mod tests {
             .await
             .expect("crawl the resumed batch");
         assert!(
-            reached_start.reached_start && reached_start.exhausted,
+            matches!(
+                reached_start,
+                CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: true,
+                    exhausted: true,
+                    ..
+                })
+            ),
             "no next token means the room is done"
         );
 
@@ -4928,7 +4951,13 @@ mod tests {
         );
         assert_eq!(hits.len(), 1, "the crawler must index what it paginated");
         assert_eq!(hits[0].event_id, event_id!("$older"));
-        assert!(reached_start.reached_start);
+        assert!(matches!(
+            reached_start,
+            CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                ..
+            })
+        ));
 
         drop(room);
     }
@@ -5130,6 +5159,9 @@ mod tests {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let left = room_id!("!left:localhost").to_owned();
+        server
+            .sync_room(&client, matrix_sdk_test::LeftRoomBuilder::new(&left))
+            .await;
 
         let mut index = chunked_room(10);
         let flush = index.take_flush();
@@ -5431,7 +5463,13 @@ mod tests {
             .crawl_once(&client, &room_id)
             .await
             .expect("crawl one batch");
-        assert!(reached_start.reached_start);
+        assert!(matches!(
+            reached_start,
+            CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                ..
+            })
+        ));
         core.search_crawl.lock().await.settle(room_id, true);
 
         let coverage = core.search_coverage(&client).await;

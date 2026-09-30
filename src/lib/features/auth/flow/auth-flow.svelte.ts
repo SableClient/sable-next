@@ -2,6 +2,7 @@ import type { LoginFlowsView, RegistrationFlowsView } from '#src/generated/proto
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { t } from '#lib/i18n.js';
 import { CoreError } from '#src/transport';
+import { readText } from '#lib/platform/local-json.js';
 import {
   authenticationError,
   registrationError,
@@ -11,8 +12,15 @@ import { LEGACY_REGISTRATION_FALLBACK } from '#lib/features/auth/registration/re
 
 export const LOGGED_IN_MARKER = 'sable-has-logged-in';
 
-export function readReturningUser(storage: Storage | undefined): boolean {
-  return storage?.getItem(LOGGED_IN_MARKER) === 'true';
+export function readReturningUser(storage?: Storage | null): boolean {
+  try {
+    return (
+      (storage === undefined ? readText(LOGGED_IN_MARKER) : storage?.getItem(LOGGED_IN_MARKER)) ===
+      'true'
+    );
+  } catch {
+    return false;
+  }
 }
 
 export class AuthFlowController {

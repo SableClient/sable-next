@@ -9,6 +9,7 @@ import type { ReplyFallback, RoomTimeline } from '#lib/rooms/timeline.svelte.js'
 import { adoptQueue, scheduledQueue } from '#lib/features/composer/scheduled-queue.svelte.js';
 import { ScheduledOriginalKept } from '#lib/features/composer/send-failure.js';
 import { setPreference } from '#lib/settings/preferences.svelte.js';
+import * as runtime from '#lib/config/runtime-config.js';
 
 import { Conversation } from './conversation.svelte';
 
@@ -24,12 +25,21 @@ function item(eventId: string, sender: string): TimelineItemView {
   } as unknown as TimelineItemView;
 }
 
-function setup(items: TimelineItemView[], userId: string, store: Partial<PersonaStore> = {}) {
+function setup(
+  items: TimelineItemView[],
+  userId: string,
+  store: Partial<PersonaStore> = {},
+  beforeSend?: () => Promise<void>
+) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
+  const sendAttachment = vi.fn(() => Promise.resolve());
+  const sendGallery = vi.fn(() => Promise.resolve());
+  const sendGif = vi.fn(() => Promise.resolve());
+  const sendLocation = vi.fn(() => Promise.resolve());
   const core = {
     session: { user_id: userId },
-    commands: { sendMessage, editMessage },
+    commands: { sendMessage, editMessage, sendAttachment, sendGallery, sendGif, sendLocation },
   } as unknown as CoreClient;
   const personas = {
     personas: [],
@@ -38,14 +48,57 @@ function setup(items: TimelineItemView[], userId: string, store: Partial<Persona
     select: () => Promise.resolve(),
     ...store,
   } as unknown as PersonaStore;
-  const timeline = { items } as unknown as RoomTimeline;
+  const timeline = { items, aggregations: [] } as unknown as RoomTimeline;
 
   return {
     sendMessage,
     editMessage,
-    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM }),
+    sendAttachment,
+    sendGallery,
+    sendGif,
+    sendLocation,
+    timeline,
+    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM, beforeSend }),
   };
 }
+
+test.each(['message', 'attachment'] as const)(
+  'switches to live before sending a %s',
+  async (kind) => {
+    const live = Promise.withResolvers<undefined>();
+    const beforeSend = vi.fn(() => live.promise);
+    const { conversation, sendMessage, sendAttachment } = setup(
+      [],
+      '@kris:example.org',
+      {},
+      beforeSend
+    );
+    const sending =
+      kind === 'message'
+        ? conversation.sendMessage(ROOM, 'hello')
+        : conversation.sendAttachment(ROOM, new File(['hello'], 'hello.txt'));
+    expect(beforeSend).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendAttachment).not.toHaveBeenCalled();
+    live.resolve(undefined);
+    await sending;
+    expect(kind === 'message' ? sendMessage : sendAttachment).toHaveBeenCalledTimes(1);
+  }
+);
+
+test('a failed switch keeps the reply and prevents sending', async () => {
+  const beforeSend = () => Promise.reject(new Error('live unavailable'));
+  const { conversation, sendMessage } = setup(
+    [item('$one', '@ana:example.org')],
+    '@kris:example.org',
+    {},
+    beforeSend
+  );
+  conversation.reply('$one');
+  await expect(conversation.sendMessage(ROOM, 'hello')).rejects.toThrow('live unavailable');
+  expect(sendMessage).not.toHaveBeenCalled();
+  expect(conversation.context?.eventId).toBe('$one');
+});
 
 test('a reply notifies the author it answers', async () => {
   const { conversation, sendMessage } = setup(
@@ -92,6 +145,71 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
+test.each([false, true])('media replies preserve silentReply=%s', async (silentReply) => {
+  vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
+    runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
+  );
+  const fixture = setup([item('$one:example.org', '@ana:example.org')], '@kris:example.org');
+  const { conversation } = fixture;
+  const file = new File(['picture'], 'picture.png', { type: 'image/png' });
+  const mentions = { userIds: ['@bea:example.org'], room: false };
+
+  for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
+    conversation.reply('$one:example.org');
+    if (silentReply) conversation.toggleSilentReply();
+    if (kind === 'attachment') {
+      await conversation.sendAttachment(ROOM, file, { mentions });
+      expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
+        ROOM,
+        file,
+        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
+      );
+    } else if (kind === 'gallery') {
+      await conversation.sendGallery(ROOM, [file, file], { mentions });
+      expect(fixture.sendGallery).toHaveBeenLastCalledWith(
+        ROOM,
+        [file, file],
+        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
+      );
+    } else if (kind === 'gif') {
+      await conversation.sendGif(ROOM, {
+        id: 'cat',
+        title: 'cat',
+        mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
+        previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
+        width: 320,
+        height: 240,
+        size: 1000,
+        mimetype: 'image/gif',
+      });
+      expect(fixture.sendGif.mock.lastCall).toEqual([
+        ROOM,
+        expect.any(String),
+        'cat.gif',
+        320,
+        240,
+        'image/gif',
+        1000,
+        '$one:example.org',
+        null,
+        null,
+        silentReply,
+      ]);
+    } else {
+      await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
+      expect(fixture.sendLocation).toHaveBeenLastCalledWith(
+        ROOM,
+        'here',
+        'geo:48,2',
+        '$one:example.org',
+        null,
+        silentReply
+      );
+    }
+    expect(conversation.context).toBeNull();
+  }
+});
+
 test('a reply to a persona message names the persona', () => {
   const target = {
     ...item('$one:example.org', '@ana:example.org'),
@@ -101,6 +219,29 @@ test('a reply to a persona message names the persona', () => {
 
   conversation.reply('$one:example.org');
   expect(conversation.context?.sender).toBe('Ghost');
+});
+
+test('a visible reaction aggregation can be replied to', () => {
+  const reaction = {
+    ...item('$reaction:example.org', '@ana:example.org'),
+    content: {
+      kind: 'hidden_event',
+      event_type: 'm.reaction',
+      content: { 'm.relates_to': { event_id: '$message:example.org', key: '🎉' } },
+      redacts: null,
+    },
+  } as TimelineItemView;
+  const { conversation, timeline } = setup([], '@kris:example.org');
+  timeline.aggregations = [reaction];
+
+  conversation.reply('$reaction:example.org');
+
+  expect(conversation.context).toMatchObject({
+    kind: 'reply',
+    eventId: '$reaction:example.org',
+    sender: 'Ana',
+    body: 'm.reaction',
+  });
 });
 
 test('a reply keeps the target formatting for its composer preview', () => {
@@ -165,6 +306,33 @@ test('editing a pending message uses its transaction ID', async () => {
     null,
     'corrected',
     expect.objectContaining({ transactionId: 'transaction-1' })
+  );
+});
+
+test('keeps an edited message kind and persona when returning to live drops its row', async () => {
+  const original = {
+    ...item('$original', '@kris:example.org'),
+    content: {
+      kind: 'message',
+      body: 'before',
+      html: 'before',
+      emote: true,
+      notice: false,
+      edited: false,
+    },
+    per_message_profile: { display_name: 'Ghost', avatar_url: null },
+  } as TimelineItemView;
+  const fixture = setup([original], '@kris:example.org', {}, () => {
+    fixture.timeline.items = [];
+    return Promise.resolve();
+  });
+  fixture.conversation.edit('$original', 'before');
+  await fixture.conversation.sendMessage(ROOM, 'after');
+  expect(fixture.editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$original',
+    'after',
+    expect.objectContaining({ kind: 'emote', persona: original.per_message_profile })
   );
 });
 
@@ -247,6 +415,7 @@ function scheduling() {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   adoptQueue([]);
   setPreference('scheduleInEncryptedRooms', true);
   setPreference('personaProxying', false);

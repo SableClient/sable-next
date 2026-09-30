@@ -12,7 +12,7 @@ export function registerServiceWorker(): Promise<ServiceWorkerRegistration | und
   registering ??= navigator.serviceWorker
     .register('/service-worker.js', { type: 'module' })
     .catch((error: unknown) => {
-      console.debug('[sable] service worker registration failed', error);
+      console.error('[sable] service worker registration failed', error);
       registering = null;
       return undefined;
     });

@@ -32,6 +32,20 @@ import FormattedBodyMediaHarness from './FormattedBodyMediaHarness.test.svelte';
 const user = userEvent.setup();
 const link = () => screen.getByRole('link');
 
+test('keeps table semantics inside a keyboard-accessible scroller', async () => {
+  render(FormattedBody, {
+    props: { html: '<table><tr><th>Name</th></tr><tr><td>Alice</td></tr></table>' },
+  });
+  await tick();
+  const table = screen.getByRole('table');
+  expect(screen.getByRole('columnheader')).toHaveTextContent('Name');
+  expect(screen.getByRole('cell')).toHaveTextContent('Alice');
+  const scroller = table.parentElement;
+  expect(scroller).toHaveClass('table-scroll');
+  scroller?.focus();
+  expect(scroller).toHaveFocus();
+});
+
 afterEach(() => {
   core.fetchMedia.mockReset();
   core.roomPreview.mockReset();
@@ -168,6 +182,76 @@ test('applies Matrix colours and keeps spoilers hidden until asked', async () =>
 
   await user.click(spoiler);
   expect(spoiler.ariaPressed).toBe('false');
+});
+
+test('inline image hiding is local and leaves custom emotes alone', async () => {
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  render(FormattedBody, {
+    html: '<img src="mxc://example.org/local-photo" alt="Photo"><img data-mx-emoticon="" src="mxc://example.org/local-emote" alt=":party:">',
+  });
+  await tick();
+  await user.click(screen.getByRole('button', { name: 'Hide image' }));
+  expect(document.querySelector('.inline-image')).toHaveClass('spoilered');
+  expect(screen.queryByRole('img', { name: 'Photo' })).not.toBeInTheDocument();
+  expect(screen.getByRole('img', { name: ':party:' }).closest('.inline-image')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Reveal image' }));
+  expect(screen.getByRole('img', { name: 'Photo' })).toBeInTheDocument();
+});
+
+test.each([
+  '<span data-mx-spoiler="Ending"><img src="mxc://example.org/ending" alt="Secret ending"></span>',
+  '<a href="https://example.org/photo">Before <span data-mx-spoiler="Ending"><img src="mxc://example.org/ending" alt="Secret ending"></span> after</a>',
+])(
+  'an image-only inline spoiler has a crossed-eye control and a private label: %s',
+  async (html) => {
+    core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+    render(FormattedBody, {
+      html,
+    });
+    await tick();
+    const reveal = screen.getByRole('button', { name: 'Reveal image' });
+    expect(reveal).toHaveAccessibleDescription('Ending');
+    expect(document.querySelector('.inline-image')).toHaveClass('spoilered');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    reveal.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('img', { name: 'Secret ending' })).toBeInTheDocument();
+  }
+);
+
+test.each([
+  '<a href="https://example.org/photo"><img src="https://example.org/photo.png" alt="Photo"></a>',
+  '<a href="https://example.org/photo">Before <img src="https://example.org/photo.png" alt="Photo"> after</a>',
+  '<a href="https://example.org/photo">Before <img src="https://example.org/photo.png" alt="Photo"></a>',
+  '<a href="https://example.org/photo"><img src="https://example.org/photo.png" alt="Photo"> after</a>',
+])('inline linked images keep hide controls outside their links: %s', async (html) => {
+  const view = render(FormattedBody, { html });
+  await tick();
+  const hide = screen.getByRole('button', { name: 'Hide image' });
+  expect(hide.closest('a')).toBeNull();
+  expect([...document.querySelectorAll('a')].every((anchor) => anchor.hasChildNodes())).toBe(true);
+  expect(screen.getByRole('img', { name: 'Photo' }).closest('a')).toHaveAttribute(
+    'href',
+    'https://example.org/photo'
+  );
+  await user.click(hide);
+  expect(document.querySelector('.inline-image')).toHaveClass('spoilered');
+  await view.rerender({ html: '<p>Replacement message</p>' });
+  expect(screen.queryByRole('button', { name: 'Reveal image' })).not.toBeInTheDocument();
+  expect(screen.getByText('Replacement message')).toBeInTheDocument();
+});
+
+test('every image in an inline spoiler starts hidden and reveals independently', async () => {
+  render(FormattedBody, {
+    html: '<span data-mx-spoiler="Ending"><img src="https://example.org/one.png" alt="First secret"><img src="https://example.org/two.png" alt="Second secret"></span>',
+  });
+  await tick();
+  const controls = screen.getAllByRole('button', { name: 'Reveal image' });
+  expect(controls).toHaveLength(2);
+  expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  await user.click(controls[0]);
+  expect(screen.getByRole('img', { name: 'First secret' })).toBeInTheDocument();
+  expect(screen.queryByRole('img', { name: 'Second secret' })).not.toBeInTheDocument();
 });
 
 test('resolves an mxc emoticon through the core media command', async () => {
@@ -565,12 +649,14 @@ test('inline images wait behind a prompt where the media preview setting says so
   const cat = document.querySelector<HTMLImageElement>('img[alt="cat"]');
   expect(cat).not.toHaveAttribute('src');
   expect(cat).not.toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Hide image' })).not.toBeInTheDocument();
   expect(screen.getByText(':party:')).toBeInTheDocument();
 
   await user.click(screen.getByRole('button', { name: 'Show images' }));
 
   expect(cat).toHaveAttribute('src', 'https://example.org/cat.png');
   expect(cat).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Hide image' })).toBeInTheDocument();
   expect(screen.queryByText(':party:')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Show images' })).not.toBeInTheDocument();
   mediaPreviewSettings.global = {};

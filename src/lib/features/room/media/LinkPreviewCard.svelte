@@ -49,6 +49,11 @@
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
   const openMediaViewer = hasMediaViewerOpener() ? useMediaViewerOpener() : null;
   let Presentation = $derived(preview && findLinkPresentation(url, preview));
+  let imageHidden = $derived.by(() => {
+    void url;
+    void preview?.image;
+    return false;
+  });
 
   function openPreviewImage(): void {
     if (openMediaViewer === null || preview === null || preview.image === null) return;
@@ -74,34 +79,21 @@
 {#if preview && Presentation}
   <Presentation {url} {preview} {mediaHidden} />
 {:else if preview?.image && !mediaHidden && preview.title === null && preview.site_name === null}
-  {#if openMediaViewer}
-    <MediaImage
-      class="link-preview-inline"
-      source={preview.image}
-      alt={preview.description ?? ''}
-      width={400}
-      height={300}
-      intrinsicWidth={preview.image_width}
-      intrinsicHeight={preview.image_height}
-      mime={preview.image_mime ?? imageMimeFromUrl(url)}
-      onclick={openPreviewImage}
-    />
-  {:else}
-    <a class="link-preview-link" href={url} target="_blank" rel="noopener noreferrer">
-      <MediaImage
-        class="link-preview-inline"
-        source={preview.image}
-        alt={preview.description ?? ''}
-        width={400}
-        height={300}
-        intrinsicWidth={preview.image_width}
-        intrinsicHeight={preview.image_height}
-        mime={preview.image_mime ?? imageMimeFromUrl(url)}
-      />
-    </a>
-  {/if}
+  <MediaImage
+    class="link-preview-inline"
+    source={preview.image}
+    alt={preview.description ?? ''}
+    width={400}
+    height={300}
+    intrinsicWidth={preview.image_width}
+    intrinsicHeight={preview.image_height}
+    mime={preview.image_mime ?? imageMimeFromUrl(url)}
+    bind:spoilerHidden={imageHidden}
+    href={url}
+    onclick={openMediaViewer ? openPreviewImage : undefined}
+  />
 {:else if preview}
-  <a class="link-preview" href={url} target="_blank" rel="noopener noreferrer" aria-label={title}>
+  <div class="link-preview">
     {#if preview.image && !mediaHidden}
       <MediaImage
         class="link-preview-image"
@@ -111,27 +103,32 @@
         height={225}
         intrinsicWidth={preview.image_width}
         intrinsicHeight={preview.image_height}
+        bind:spoilerHidden={imageHidden}
+        href={url}
+        onclick={openMediaViewer ? openPreviewImage : undefined}
       />
     {/if}
-    <span class="link-preview-text">
+    <a
+      class="link-preview-text"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={title}
+    >
       {#if preview.site_name}<span class="link-preview-site">{preview.site_name}</span>{/if}
       <span class="link-preview-title">{title}</span>
       {#if preview.description}
         <span class="link-preview-description">{preview.description}</span>
       {/if}
-    </span>
-  </a>
+    </a>
+  </div>
 {/if}
 
 <style>
-  .link-preview-link {
-    display: block;
-    margin-top: var(--space-100);
-    max-width: var(--timeline-media-max);
-  }
-
   :global(.link-preview-inline) {
     border-radius: var(--radius);
+    margin-top: var(--space-100);
+    max-width: min(var(--timeline-media-max), 100%);
   }
 
   .link-preview {
@@ -142,7 +139,7 @@
     display: flex;
     flex-direction: column;
     margin-top: var(--space-100);
-    max-width: var(--timeline-media-max);
+    max-width: min(var(--timeline-media-max), 100%);
     overflow: hidden;
     text-decoration: none;
   }
@@ -157,10 +154,12 @@
   }
 
   .link-preview-text {
+    color: inherit;
     display: flex;
     flex-direction: column;
     gap: var(--space-100);
     padding: var(--space-200) var(--space-250);
+    text-decoration: none;
   }
 
   .link-preview-site {

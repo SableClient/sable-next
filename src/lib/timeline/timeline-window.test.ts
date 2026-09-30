@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { TimelineWindow, type TimelineRow } from './timeline-window';
+import { TimelineWindow, type TimelineRow, type TimelineWindowState } from './timeline-window';
 
 const windows: TimelineWindow<number>[] = [];
 type Fixture = ReturnType<typeof fixture>;
@@ -20,7 +20,8 @@ function entries(count: number) {
 
 function fixture(
   heightForRow?: (value: number) => number,
-  estimateForRow?: (value: number) => number | undefined
+  estimateForRow?: (value: number) => number | undefined,
+  canFollowLatest?: () => boolean
 ) {
   let rowHeight = 50;
   let viewportHeight = 300;
@@ -81,7 +82,7 @@ function fixture(
         content.insertBefore(node, content.children[index] ?? null);
     });
   });
-  const onChange = vi.fn();
+  const onChange = vi.fn<(state: TimelineWindowState) => void>();
   const onScroll = vi.fn();
   const window = new TimelineWindow({
     viewport,
@@ -91,6 +92,7 @@ function fixture(
     onChange,
     onScroll,
     estimateSize: estimateForRow,
+    canFollowLatest,
   });
   windows.push(window);
   return {
@@ -132,6 +134,32 @@ function fixture(
     },
   };
 }
+
+test('holding an anchor skips rows the caller cannot restore', async () => {
+  const { window } = fixture();
+  await window.update(entries(200));
+  await window.jumpTo('80', 'start');
+  window.holdAnchor();
+  expect(window.state.pinned).toBe(false);
+  expect(window.anchorKey()).toBe('80');
+  expect(window.anchorKey((value) => value !== 80)).toBe('81');
+});
+
+test('the end of a historical snapshot preserves the reader when newer pages append', async () => {
+  const { window, content } = fixture(undefined, undefined, () => false);
+  await window.update(entries(2));
+  await window.jumpTo('1', 'center');
+  expect(window.state.pinned).toBe(false);
+  const row = () => {
+    const node = content.querySelector<HTMLElement>('[data-timeline-key="1"]');
+    if (!node) throw new Error('Missing reader anchor');
+    return node;
+  };
+  const top = row().getBoundingClientRect().top;
+  await window.update(entries(20));
+  expect(row().getBoundingClientRect().top).toBe(top);
+  expect(window.state.pinned).toBe(false);
+});
 
 test.each([
   { height: 400, touching: false },
@@ -968,6 +996,22 @@ test('a room opened on its last unread stays flush when the marker row is remove
   );
 });
 
+test('a pinned gesture stays flush when shrinking the canvas clamps its scroll offset', async () => {
+  const f = fixture();
+  await f.window.update(entries(10));
+  const offset = f.viewport.scrollTop;
+  expect(offset).toBeGreaterThan(0);
+  Object.defineProperty(f.viewport, 'scrollTop', {
+    configurable: true,
+    get: () => Math.min(offset, f.viewport.scrollHeight - f.viewport.clientHeight),
+    set: () => {},
+  });
+  f.viewport.dispatchEvent(new Event('touchstart'));
+  f.resize(20);
+  expect(f.viewport.scrollTop).toBe(0);
+  expect(f.content.lastElementChild?.getBoundingClientRect().bottom).toBe(f.viewport.clientHeight);
+});
+
 test('repeated content height reads in one task measure the DOM once', async () => {
   const { window, content } = fixture();
   await window.update(entries(100));
@@ -981,6 +1025,68 @@ test('repeated content height reads in one task measure the DOM once', async () 
   await Promise.resolve();
   expect(window.contentHeight).toBe(first);
   expect(measure).toHaveBeenCalledTimes(2);
+});
+
+test('scrolling measures each rendered row once', async () => {
+  const { window, viewport, content, render, onChange } = fixture();
+  await window.update(entries(200));
+  const bounds = vi.spyOn(viewport, 'getBoundingClientRect');
+  const rows = Array.from(content.children).map((row) => vi.spyOn(row, 'getBoundingClientRect'));
+  render.mockClear();
+
+  viewport.scrollTop -= 50;
+  viewport.dispatchEvent(new Event('scroll'));
+
+  expect(onChange.mock.lastCall?.[0].pinned).toBe(false);
+  expect(render).not.toHaveBeenCalled();
+  expect(bounds).toHaveBeenCalledTimes(1);
+  for (const row of rows) expect(row).toHaveBeenCalledTimes(1);
+});
+
+test.each(['latest', 'reader', 'gesture'])(
+  'resizing rows avoids intermediate positions while preserving %s',
+  async (mode) => {
+    const { window, viewport, content, resize } = fixture();
+    await window.update(entries(200));
+    if (mode !== 'latest') await window.jumpTo('80', 'start');
+    if (mode === 'gesture') viewport.dispatchEvent(new Event('touchstart'));
+    const anchor = content.querySelector('[data-timeline-key="80"]');
+    const top = anchor?.getBoundingClientRect().top;
+    const writes = vi.spyOn(content.style, 'setProperty');
+
+    for (const height of [65.25, 50.125, 65.25]) {
+      await Promise.resolve();
+      writes.mockClear();
+      resize(height);
+
+      expect(writes.mock.calls.filter(([name]) => name === 'bottom').length).toBeLessThanOrEqual(2);
+      if (mode === 'latest') {
+        expect(content.lastElementChild?.getBoundingClientRect().bottom).toBeCloseTo(
+          viewport.clientHeight,
+          5
+        );
+        expect(window.state.pinned).toBe(true);
+      } else {
+        expect(anchor?.getBoundingClientRect().top).toBeCloseTo(top ?? 0, 5);
+        expect(window.state.pinned).toBe(false);
+      }
+    }
+  }
+);
+
+test('repeated wheel input without movement skips row measurements', async () => {
+  const { window, viewport, content, onChange } = fixture();
+  await window.update(entries(200));
+  viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20 }));
+  const bounds = vi.spyOn(viewport, 'getBoundingClientRect');
+  const rows = Array.from(content.children).map((row) => vi.spyOn(row, 'getBoundingClientRect'));
+  onChange.mockClear();
+
+  viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -20 }));
+
+  expect(onChange).not.toHaveBeenCalled();
+  expect(bounds).not.toHaveBeenCalled();
+  for (const row of rows) expect(row).not.toHaveBeenCalled();
 });
 
 test('scrolling while a render is in flight still asks for history', async () => {

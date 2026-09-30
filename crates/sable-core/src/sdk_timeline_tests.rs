@@ -28,7 +28,7 @@ use wiremock::{
 
 use super::{
     Core,
-    protocol::{Command, CommandErr, CommandOk, CoreEvent, TimelineFocusView},
+    protocol::{Command, CommandErr, CommandOk, CoreEvent, Outgoing, TimelineFocusView},
     session::{self, Session},
     store::MemorySessionStore,
 };
@@ -655,6 +655,277 @@ async fn a_sticker_reaches_the_server_as_an_m_sticker_event() {
     assert_eq!(sent["body"], "blobwave");
 }
 
+async fn send_media_reply(
+    core: &Arc<Core>,
+    room_id: &matrix_sdk::ruma::RoomId,
+    kind: &str,
+    outgoing: crate::protocol::Outgoing,
+) -> Result<(), CommandErr> {
+    use crate::protocol::{SendAttachmentRequest, SendGalleryRequest};
+
+    match kind {
+        "attachment" => {
+            core.send_attachment(
+                SendAttachmentRequest {
+                    room_id: room_id.to_owned(),
+                    filename: "picture.png".to_owned(),
+                    mime: "image/png".to_owned(),
+                    caption: None,
+                    formatted_caption: None,
+                    info: None,
+                    outgoing,
+                    spoiler: false,
+                },
+                vec![1, 2, 3],
+            )
+            .await?;
+        }
+        "gallery" => {
+            let attachment = || crate::GalleryAttachment {
+                filename: "picture.png".to_owned(),
+                mime: "image/png".to_owned(),
+                bytes: vec![1, 2, 3],
+                info: None,
+            };
+            let view = || crate::protocol::GalleryAttachmentView {
+                filename: "picture.png".to_owned(),
+                mime: "image/png".to_owned(),
+                info: None,
+            };
+            core.send_gallery(
+                SendGalleryRequest {
+                    room_id: room_id.to_owned(),
+                    attachments: vec![view(), view()],
+                    caption: None,
+                    formatted_caption: None,
+                    outgoing,
+                },
+                vec![attachment(), attachment()],
+            )
+            .await?;
+        }
+        "gif" => {
+            core.dispatch(Command::SendGif {
+                room_id: room_id.to_owned(),
+                url: "mxc://example.org/gif".to_owned(),
+                body: "cat.gif".to_owned(),
+                width: None,
+                height: None,
+                mimetype: "image/gif".to_owned(),
+                size: None,
+                in_reply_to: outgoing.in_reply_to,
+                silent_reply: outgoing.silent_reply,
+                thread_root: outgoing.thread_root,
+                persona: None,
+            })
+            .await?;
+        }
+        "location" => {
+            core.dispatch(Command::SendLocation {
+                room_id: room_id.to_owned(),
+                body: "here".to_owned(),
+                geo_uri: "geo:48,2".to_owned(),
+                in_reply_to: outgoing.in_reply_to,
+                silent_reply: outgoing.silent_reply,
+                thread_root: outgoing.thread_root,
+            })
+            .await?;
+        }
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn media_replies_preserve_silent_mentions_on_the_wire() {
+    for kind in ["attachment", "gallery", "gif", "location"] {
+        for (silent_reply, explicit_mention) in [(false, false), (true, false), (true, true)] {
+            if explicit_mention && matches!(kind, "gif" | "location") {
+                continue;
+            }
+            let server = MatrixMockServer::new().await;
+            let client = server.client_builder().build().await;
+            client.event_cache().subscribe().unwrap();
+            let room_id = room_id!("!silent-media:example.org");
+            let target = event_id!("$target");
+            let sender = user_id!("@ana:example.org");
+            let mentioned = user_id!("@bea:example.org");
+            let factory = EventFactory::new().room(room_id).sender(sender);
+            server
+                .sync_room(
+                    &client,
+                    JoinedRoomBuilder::new(room_id)
+                        .add_timeline_event(factory.text_msg("original").event_id(target)),
+                )
+                .await;
+            server.mock_room_state_encryption().plain().mount().await;
+            server
+                .mock_authenticated_media_config()
+                .ok_default()
+                .mount()
+                .await;
+            server
+                .mock_upload()
+                .ok(matrix_sdk::ruma::mxc_uri!("mxc://example.org/uploaded"))
+                .mount()
+                .await;
+            server.mock_room_send().ok(event_id!("$sent")).mount().await;
+
+            let sync_service =
+                Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+            let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+            *core.session.write().await = Some(Session {
+                account_id: "test".to_owned(),
+                client,
+                sync_service,
+                homeserver: server.server().uri(),
+                oauth: false,
+            });
+            core.dispatch(Command::SubscribeTimeline {
+                room_id: room_id.to_owned(),
+                focus: TimelineFocusView::Live,
+                hidden_events: false,
+            })
+            .await
+            .unwrap();
+
+            let outgoing = Outgoing {
+                in_reply_to: Some(target.to_owned()),
+                silent_reply,
+                thread_root: None,
+                mentions: if explicit_mention {
+                    vec![mentioned.to_owned()]
+                } else {
+                    Vec::new()
+                },
+                mentions_room: false,
+                persona: None,
+            };
+            send_media_reply(&core, room_id, kind, outgoing)
+                .await
+                .unwrap();
+
+            let sent = tokio::time::timeout(Duration::from_secs(3), async {
+                loop {
+                    let requests = server
+                        .server()
+                        .received_requests()
+                        .await
+                        .unwrap_or_default();
+                    if let Some(request) = requests
+                        .iter()
+                        .find(|request| request.url.path().contains("/send/m.room.message/"))
+                    {
+                        break request.body_json::<serde_json::Value>().unwrap();
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .expect("the queue flushed the reply");
+            assert_eq!(
+                sent["m.relates_to"]["m.in_reply_to"]["event_id"],
+                target.as_str(),
+                "{kind}"
+            );
+            let expected = if explicit_mention {
+                json!({ "user_ids": [mentioned] })
+            } else if silent_reply {
+                json!({})
+            } else {
+                json!({ "user_ids": [sender] })
+            };
+            assert_eq!(
+                sent["m.mentions"], expected,
+                "{kind}, silent={silent_reply}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn media_config_is_cached_per_account_and_supports_legacy_servers() {
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    for (version, upload_size) in [("v1.11", 500_000_000), ("v1.1", 10_000_000)] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().no_server_versions().build().await;
+        server
+            .mock_versions()
+            .with_versions(vec![version])
+            .ok()
+            .mount()
+            .await;
+        if version == "v1.11" {
+            server
+                .mock_authenticated_media_config()
+                .ok(upload_size.try_into().unwrap())
+                .expect(1)
+                .mount()
+                .await;
+        } else {
+            server
+                .mock_media_config()
+                .ok(upload_size.try_into().unwrap())
+                .expect(1)
+                .mount()
+                .await;
+        }
+        let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        *core.session.write().await = Some(Session {
+            account_id: version.to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        for _ in 0..2 {
+            let response = core.dispatch(Command::MediaConfig).await.unwrap();
+            assert!(
+                matches!(response, CommandOk::MediaConfig { upload_size: size } if size == upload_size)
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn attachments_use_the_server_upload_limit_instead_of_100_mib() {
+    for (upload_size, file_size) in [(2_u64, 3_usize), (200 * 1024 * 1024, 100 * 1024 * 1024 + 1)] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.send_queue().set_enabled(false).await;
+        let room_id = room_id!("!upload-limit:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .mock_authenticated_media_config()
+            .ok(upload_size.try_into().unwrap())
+            .expect(1)
+            .mount()
+            .await;
+        let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "test".to_owned(),
+            client,
+            sync_service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let request = serde_json::from_value(json!({
+            "room_id": room_id,
+            "filename": "large.bin",
+            "mime": "application/octet-stream",
+        }))
+        .unwrap();
+        let result = core.send_attachment(request, vec![0; file_size]).await;
+        if u64::try_from(file_size).unwrap() > upload_size {
+            assert!(matches!(result, Err(CommandErr::InvalidMedia)));
+        } else {
+            result.unwrap();
+        }
+    }
+}
+
 #[tokio::test]
 async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     let server = MatrixMockServer::new().await;
@@ -665,7 +936,7 @@ async fn a_gallery_mixing_a_picture_and_a_pdf_sends_each_as_its_own_itemtype() {
     server.mock_room_state_encryption().plain().mount().await;
     server
         .mock_authenticated_media_config()
-        .ok_default()
+        .ok(matrix_sdk::ruma::uint!(4))
         .mount()
         .await;
     server

@@ -17,6 +17,53 @@ pub struct FileSessionStore {
     owner: Option<std::sync::Arc<std::fs::File>>,
 }
 
+/// Acquire ownership on first use so startup can retry storage failures.
+#[cfg(not(target_family = "wasm"))]
+pub struct ExclusiveFileSessionStore {
+    directory: std::path::PathBuf,
+    store: tokio::sync::Mutex<Option<std::sync::Arc<FileSessionStore>>>,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl ExclusiveFileSessionStore {
+    #[must_use]
+    pub fn new(directory: impl Into<std::path::PathBuf>) -> Self {
+        Self {
+            directory: directory.into(),
+            store: tokio::sync::Mutex::new(None),
+        }
+    }
+
+    async fn store(&self) -> Result<std::sync::Arc<FileSessionStore>, String> {
+        let mut store = self.store.lock().await;
+        if let Some(store) = store.as_ref() {
+            return Ok(store.clone());
+        }
+        let directory = self.directory.clone();
+        let opened = tokio::task::spawn_blocking(move || FileSessionStore::exclusive(directory))
+            .await
+            .map_err(|error| error.to_string())?
+            .map_err(|error| error.to_string())?;
+        let opened = std::sync::Arc::new(opened);
+        *store = Some(opened.clone());
+        Ok(opened)
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+#[async_trait]
+impl SessionStore for ExclusiveFileSessionStore {
+    async fn load(&self) -> Result<Option<Vec<u8>>, String> {
+        self.store().await?.load().await
+    }
+    async fn save(&self, bytes: Vec<u8>) -> Result<(), String> {
+        self.store().await?.save(bytes).await
+    }
+    async fn clear(&self) -> Result<(), String> {
+        self.store().await?.clear().await
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 impl FileSessionStore {
     pub fn new(data_dir: impl Into<std::path::PathBuf>) -> Self {
@@ -176,6 +223,30 @@ impl SessionStore for MemorySessionStore {
 #[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
     use super::{FileSessionStore, SessionStore};
+
+    #[tokio::test]
+    async fn exclusive_store_retries_after_an_unavailable_directory_without_losing_credentials() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = root.path().join("data");
+        std::fs::write(&directory, b"blocked").unwrap();
+        let store = super::ExclusiveFileSessionStore::new(&directory);
+        store.load().await.unwrap_err();
+        std::fs::remove_file(&directory).unwrap();
+        std::fs::create_dir(&directory).unwrap();
+        std::fs::write(directory.join("session.json"), b"saved session").unwrap();
+        assert_eq!(store.load().await.unwrap(), Some(b"saved session".to_vec()));
+        assert!(
+            FileSessionStore::try_exclusive(&directory)
+                .unwrap()
+                .is_none()
+        );
+        drop(store);
+        assert!(
+            FileSessionStore::try_exclusive(&directory)
+                .unwrap()
+                .is_some()
+        );
+    }
 
     #[test]
     fn credential_ownership_excludes_other_clients_until_released() {

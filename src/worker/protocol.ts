@@ -12,7 +12,7 @@ export type WorkerRequest =
   | { disconnect: true }
   | { id: number; reset: true }
   | { debugLogs: boolean }
-  | { id: number; media: { source: string; width: number; height: number } }
+  | { id: number; media: { source: string; width: number; height: number; background?: boolean } }
   | { id: number; forget: { source: string } }
   | { id: number; attachment: AttachmentRequest }
   | { id: number; gallery: GalleryRequest }

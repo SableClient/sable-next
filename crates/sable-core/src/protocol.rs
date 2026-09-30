@@ -295,6 +295,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
         #[serde(default)]
+        silent_reply: bool,
+        #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
         #[serde(default)]
@@ -636,6 +638,8 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         in_reply_to: Option<OwnedEventId>,
         #[serde(default)]
+        silent_reply: bool,
+        #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
     },
@@ -704,6 +708,7 @@ pub enum Command {
     SendScheduledMessage {
         delay_id: String,
     },
+    MediaConfig,
     DelayedEventsSupported,
     /// MSC3381.
     CreatePoll {
@@ -896,6 +901,10 @@ pub enum Command {
     },
 
     EncryptionStatus,
+    KeyBackupStatus,
+    DownloadKeyBackup {
+        request_id: String,
+    },
     SignOutSafety,
     SyncStatus,
     SearchCoverage,
@@ -1039,6 +1048,7 @@ pub enum Command {
     SetSearchOptions {
         disk_budget_mb: u32,
         crawler: bool,
+        unmetered_only: bool,
         server_search: bool,
         tuning: SearchTuning,
         foreground: bool,
@@ -1596,6 +1606,10 @@ pub enum CommandOk {
     },
     CancelScheduledMessage,
     SendScheduledMessage,
+    MediaConfig {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        upload_size: u64,
+    },
     DelayedEventsSupported {
         supported: bool,
     },
@@ -1653,6 +1667,12 @@ pub enum CommandOk {
 
     EncryptionStatus {
         status: EncryptionStatusView,
+    },
+    KeyBackupStatus {
+        status: KeyBackupStatusView,
+    },
+    DownloadKeyBackup {
+        download: KeyBackupDownloadView,
     },
     SignOutSafety {
         safety: SignOutSafetyView,
@@ -1945,6 +1965,9 @@ pub enum CoreEvent {
     /// Pushed on every change, so the UI never polls to notice it is verified.
     EncryptionStatus {
         status: EncryptionStatusView,
+    },
+    KeyBackupDownload {
+        download: KeyBackupDownloadView,
     },
 
     DevicesChanged {
@@ -2423,6 +2446,45 @@ pub struct EncryptionStatusView {
     /// The default secret storage key can also be unlocked with a passphrase.
     pub recovery_passphrase: bool,
     pub account_data_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct KeyBackupStatusView {
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub local_keys: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub backed_up_keys: u64,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub cloud_keys: Option<u64>,
+    pub can_restore: bool,
+    pub download: Option<KeyBackupDownloadView>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct KeyBackupDownloadView {
+    pub account_id: String,
+    pub request_id: String,
+    pub state: KeyBackupDownloadState,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub total: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub processed: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub imported: u64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub failed: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum KeyBackupDownloadState {
+    Downloading,
+    Importing,
+    Complete,
+    Failed,
 }
 
 #[derive(Debug, Clone, Serialize)]

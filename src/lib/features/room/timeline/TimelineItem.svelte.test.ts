@@ -562,7 +562,7 @@ test('with profile on name click, the sender name opens the profile instead', as
 
   await press(document.querySelector<HTMLButtonElement>('header button.sender'));
 
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement));
+  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', expect.any(HTMLElement), null);
   expect(onMentionUser).not.toHaveBeenCalled();
   preferences.usernameClick = 'mention';
 });
@@ -714,52 +714,18 @@ test('opens an image from a mobile pointer interaction', async () => {
     props: { core, item: { item: imageItem(), collapsed: false, onOpenMedia } },
   });
   await tick();
-  const image = document.querySelector<HTMLButtonElement>('.media-image');
+  const image = document.querySelector<HTMLButtonElement>('.media-image-activation');
   if (!image) throw new Error('media trigger was not rendered');
 
-  image.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }));
-  image.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch' }));
+  image.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
+  image.dispatchEvent(
+    new PointerEvent('pointerup', { bubbles: true, pointerType: 'touch', isPrimary: true })
+  );
   await press(image);
 
   expect(onOpenMedia).toHaveBeenCalledWith('$item');
-});
-
-test('opens a per-message profile avatar through viewer callback', async () => {
-  const onPersonaAvatarClick = vi.fn();
-  const persona = {
-    ...item(false),
-    per_message_profile: {
-      id: 'kris',
-      display_name: 'Kris',
-      avatar_url: 'mxc://example.org/kris',
-      pronouns: [],
-      color_on_light: null,
-      color_on_dark: null,
-      has_fallback: false,
-    },
-  };
-  render(TimelineItemHarness, {
-    props: {
-      core,
-      item: { item: persona, collapsed: false, layout: 'modern', onPersonaAvatarClick },
-    },
-  });
-  await tick();
-
-  const profileTrigger = document.querySelector<HTMLButtonElement>('.avatar-button');
-  if (!profileTrigger) throw new Error('persona profile trigger was not rendered');
-  await press(profileTrigger);
-  await tick();
-
-  const avatarButton = document.querySelector<HTMLButtonElement>('.profile-card-avatar-button');
-  if (!avatarButton) throw new Error('persona avatar button was not rendered');
-  await press(avatarButton);
-  await tick();
-
-  expect(onPersonaAvatarClick).toHaveBeenCalledWith('mxc://example.org/kris', 'Kris');
-  expect(
-    profileTrigger.getAttribute('aria-expanded') ?? profileTrigger.getAttribute('data-state')
-  ).toMatch(/false|closed/);
 });
 
 test('a per-message profile takes the sender position and names the account behind it', async () => {
@@ -798,7 +764,11 @@ test('a per-message profile takes the sender position and names the account behi
   const viaButton = via?.querySelector<HTMLButtonElement>('.name-button');
   if (!viaButton) throw new Error('the account behind the persona was not a button');
   await press(viaButton);
-  expect(onSenderProfile).toHaveBeenCalledWith('@alice:example.org', viaButton);
+  expect(onSenderProfile).toHaveBeenCalledWith(
+    '@alice:example.org',
+    viaButton,
+    persona.per_message_profile
+  );
 });
 
 test('without a persona the hover-only via keeps the account MXID', async () => {
@@ -1040,7 +1010,7 @@ test('long pressing a reaction opens its people list without toggling it', async
   const reaction = document.querySelector<HTMLButtonElement>('.reaction');
   if (!reaction) throw new Error('reaction was not rendered');
 
-  await fireEvent.pointerDown(reaction, { pointerType: 'touch' });
+  await fireEvent.pointerDown(reaction, { pointerType: 'touch', isPrimary: true });
   await vi.advanceTimersByTimeAsync(LONG_PRESS_MS);
   await tick();
   await fireEvent.click(reaction);
@@ -1221,7 +1191,13 @@ test('a touch long press opens the sheet without also opening the context menu',
   expect(article).not.toBeNull();
 
   article?.dispatchEvent(
-    new PointerEvent('pointerdown', { pointerType: 'touch', bubbles: true, clientX: 0, clientY: 0 })
+    new PointerEvent('pointerdown', {
+      pointerType: 'touch',
+      isPrimary: true,
+      bubbles: true,
+      clientX: 0,
+      clientY: 0,
+    })
   );
   await vi.advanceTimersByTimeAsync(1000);
   await tick();
@@ -1435,7 +1411,9 @@ test('renders a link preview for every link in a message', async () => {
   });
   await vi.waitFor(() => {
     expect(
-      [...document.querySelectorAll<HTMLAnchorElement>('a.link-preview')].map((link) => link.href)
+      [...document.querySelectorAll<HTMLAnchorElement>('.link-preview > a.link-preview-text')].map(
+        (link) => link.href
+      )
     ).toEqual(['https://example.org/one', 'https://example.org/two']);
   });
   instance.unmount();

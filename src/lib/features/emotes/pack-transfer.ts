@@ -51,7 +51,7 @@ async function collect(
 
   const fetched = await inBatches(
     [...wanted].map(([url, nameFor]) => async () => {
-      const bytes = await core.commands.fetchMedia(url, 0, 0);
+      const bytes = await core.commands.fetchMedia(url, 0, 0, true);
       return [url, { name: nameFor(imageMime(bytes) ?? null), bytes }] as const;
     })
   );

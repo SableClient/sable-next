@@ -105,6 +105,15 @@ test('a folder can be taken apart from its menu', async ({ page }) => {
   await expect(page.getByRole('button', { name: /^Collapse/ })).toHaveCount(0);
 });
 
+test('a folder offers to mark all of its spaces as read', async ({ page }) => {
+  await openRail(page);
+  await group(page);
+
+  await page.getByRole('button', { name: 'Alpha, Beta' }).click({ button: 'right' });
+
+  await expect(page.getByRole('menuitem', { name: 'Mark as read' })).toBeVisible();
+});
+
 test('a space can be lifted out of a folder that holds only it', async ({ page }) => {
   await openRail(page);
   await group(page);

@@ -14,6 +14,7 @@
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
+  import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
   import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
   import RecoveryIncompleteBanner from '#lib/ui/RecoveryIncompleteBanner.svelte';
@@ -168,6 +169,10 @@
   </BannerDock>
 
   <TooltipProvider>
-    {@render children()}
+    {#if core.restoreFailed}
+      <SessionRestoreError />
+    {:else}
+      {@render children()}
+    {/if}
   </TooltipProvider>
 </IconContext>

@@ -18,6 +18,20 @@ use objc2_photos::{
     PHPhotoLibrary,
 };
 
+pub(crate) fn watch_network(core: &std::sync::Arc<sable_core::Core>) -> Result<(), String> {
+    let class = AnyClass::get(c"SableNetwork").ok_or("network monitor bridge is unavailable")?;
+    let core = std::sync::Arc::downgrade(core);
+    let handler = RcBlock::new(move |unmetered: objc2::runtime::Bool| {
+        if let Some(core) = core.upgrade() {
+            core.set_search_network_unmetered(unmetered.as_bool());
+        }
+    });
+    unsafe {
+        let _: () = msg_send![class, startWithHandler: &*handler];
+    }
+    Ok(())
+}
+
 /// Synchronizes the native SDK with the webview's telemetry preference.
 pub fn set_sentry_enabled(enabled: bool) -> Result<(), String> {
     let class = AnyClass::get(c"SableSentry").ok_or("Sentry Cocoa bridge is unavailable")?;

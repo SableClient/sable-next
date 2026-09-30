@@ -29,6 +29,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 vi.mock('#lib/core/context.js');
 
 import { core } from '#lib/core/__mocks__/context.js';
+import type { SidebarFolder } from '#lib/spaces/sidebar-layout.js';
 
 core.roomPermissions.mockResolvedValue({ can_manage_children: false });
 
@@ -349,6 +350,44 @@ test('records the active desktop space route without its event anchor', async ()
   });
 });
 
+test.each(['lobby', '!room%3Aexample.org'])(
+  'reopening a space after search returns to its previous %s view',
+  async (view) => {
+    const rail = renderRail({ spaces: [space()] });
+    await tick();
+
+    const previous = `/space/!space%3Aexample.org/${view}`;
+    visit(previous);
+    navigated();
+    await tick();
+
+    visit('/search?q=hello&space=!space%3Aexample.org');
+    navigated();
+    await tick();
+
+    visit('/rooms');
+    navigated();
+    await tick();
+    expect(tab('Space')).toHaveAttribute('href', previous);
+
+    rail.unmount();
+    renderRail({ spaces: [space()] });
+    await tick();
+    expect(tab('Space')).toHaveAttribute('href', previous);
+  }
+);
+
+test('opens the lobby when a search route was saved by an older client', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ '!space:example.org': '/search?q=hello&space=!space%3Aexample.org' })
+  );
+  renderRail({ spaces: [space()] });
+  await tick();
+
+  expect(tab('Space')).toHaveAttribute('href', '/space/!space%3Aexample.org/lobby');
+});
+
 test('opens a space root on mobile even when it has a saved route', async () => {
   localStorage.setItem(
     'sable-space-paths',
@@ -423,6 +462,26 @@ test('shows the spaces of an open folder, and a way to shut it', async () => {
   expect(collapse).not.toHaveClass('selection-open');
   await user.click(collapse);
   expect(toggled).toEqual(['f']);
+});
+
+test('marks every space in a folder as read even when no badge is shown', async () => {
+  const marked: string[] = [];
+  renderRail({
+    props: {
+      spaces: [space('!a:example.org', 'Alpha'), space('!b:example.org', 'Beta')],
+      layout: [
+        { kind: 'folder', id: 'f', name: null, content: ['!a:example.org', '!b:example.org'] },
+      ],
+      onMarkFolderRead: (folder: SidebarFolder) => marked.push(...folder.content),
+      mobile: true,
+    },
+  });
+  await tick();
+
+  await openMenu(screen.getByRole('button', { name: 'nav.folderExpand:Alpha, Beta' }));
+  await user.click(screen.getByRole('menuitem', { name: 'nav.markSectionRead' }));
+
+  expect(marked).toEqual(['!a:example.org', '!b:example.org']);
 });
 
 test('a space that left the room list drops out of its folder', async () => {

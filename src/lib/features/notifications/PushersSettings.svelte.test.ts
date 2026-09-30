@@ -82,8 +82,9 @@ test('lists registered pushers and marks the Sable ones', async () => {
   expect(browser.querySelector('.pusher-name')).toHaveTextContent('This browser');
   expect(email.querySelector('.pusher-name')).toHaveTextContent('im.example.email');
   expect(
-    within(phone).getByRole('button', { name: 'Copy the push gateway URL' })
+    within(phone).getByRole('button', { name: 'Copy the push provider URL' })
   ).toHaveTextContent('https://ntfy.example.org/_matrix/push/v1/notify');
+  expect(within(phone).getByText('Push provider')).toBeInTheDocument();
   expect(within(browser).getByText('Sable')).toHaveClass('status-badge-neutral');
   expect(screen.queryByText('This device')).not.toBeInTheDocument();
   expect(within(browser).getByText('Awaiting confirmation')).toHaveClass('status-badge-warning');
@@ -159,12 +160,12 @@ test('copies the cropped value in full on click', async () => {
   expect(await within(phone).findByText('Copied')).toBeInTheDocument();
 });
 
-test('copies the full push gateway URL', async () => {
+test('copies the full push provider URL', async () => {
   const user = userEvent.setup();
   core.webPushers.mockResolvedValue([gateway]);
 
   const [phone] = await pushers(1);
-  await user.click(within(phone).getByRole('button', { name: 'Copy the push gateway URL' }));
+  await user.click(within(phone).getByRole('button', { name: 'Copy the push provider URL' }));
 
   expect(await navigator.clipboard.readText()).toBe(
     'https://ntfy.example.org/_matrix/push/v1/notify'

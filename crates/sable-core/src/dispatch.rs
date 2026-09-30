@@ -531,6 +531,7 @@ impl Core {
                 mimetype,
                 size,
                 in_reply_to,
+                silent_reply,
                 thread_root,
                 persona,
             } => {
@@ -548,7 +549,7 @@ impl Core {
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = gif_content(body, url, info);
 
-                let reply = thread_reply(in_reply_to, thread_root.clone(), false);
+                let reply = thread_reply(in_reply_to, thread_root.clone(), silent_reply);
                 let content = self
                     .with_reply(&room_id, content, reply, thread_root, "send_gif_reply")
                     .await?;
@@ -1492,6 +1493,9 @@ impl Core {
                 self.send_scheduled_message_now(delay_id).await?;
                 Ok(CommandOk::SendScheduledMessage)
             }
+            Command::MediaConfig => Ok(CommandOk::MediaConfig {
+                upload_size: self.max_upload_size().await?,
+            }),
             Command::DelayedEventsSupported => Ok(CommandOk::DelayedEventsSupported {
                 supported: self.delayed_events_supported().await?,
             }),
@@ -1500,6 +1504,7 @@ impl Core {
                 body,
                 geo_uri,
                 in_reply_to,
+                silent_reply,
                 thread_root,
             } => {
                 if view::geo_coordinates(&geo_uri).is_none() {
@@ -1508,8 +1513,8 @@ impl Core {
 
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let content = location_content(body, geo_uri);
-                let reply =
-                    in_reply_to.map(|event_id| reply_to(event_id, thread_root.is_some(), false));
+                let reply = in_reply_to
+                    .map(|event_id| reply_to(event_id, thread_root.is_some(), silent_reply));
                 let content = self
                     .with_reply(&room_id, content, reply, thread_root, "send_location")
                     .await?;
@@ -1584,6 +1589,9 @@ impl Core {
             Command::EncryptionStatus => Ok(CommandOk::EncryptionStatus {
                 status: encryption_status(&self.client().await?).await,
             }),
+
+            Command::KeyBackupStatus => self.key_backup_status().await,
+            Command::DownloadKeyBackup { request_id } => self.download_key_backup(request_id).await,
 
             Command::SignOutSafety => Ok(CommandOk::SignOutSafety {
                 safety: sign_out_safety(&self.client().await?).await,
@@ -1695,11 +1703,13 @@ impl Core {
                 device_id,
                 display_name,
             } => {
-                self.client()
-                    .await?
+                let client = self.client().await?;
+                let generation = self.session_generation.load(Ordering::SeqCst);
+                client
                     .rename_device(&device_id, &display_name)
                     .await
                     .or_failed(self, "rename_device")?;
+                self.emit_devices(generation, &client).await;
 
                 Ok(CommandOk::RenameDevice)
             }
@@ -2005,11 +2015,13 @@ impl Core {
             Command::SetSearchOptions {
                 disk_budget_mb,
                 crawler,
+                unmetered_only,
                 server_search,
                 tuning,
                 foreground,
             } => {
                 self.search_foreground.store(foreground, Ordering::Relaxed);
+                self.search_network.set_unmetered_only(unmetered_only);
                 self.search_crawl.lock().await.tuning = tuning.clamped();
                 self.search_crawler_enabled
                     .store(crawler, Ordering::Relaxed);

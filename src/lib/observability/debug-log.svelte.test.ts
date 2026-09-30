@@ -2,6 +2,16 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 const originalConsole = console;
 
+test('debug logging starts and changes settings without localStorage', async () => {
+  vi.stubGlobal('localStorage', null);
+  const { setDebugLogging, setDebugCategoryEnabled } = await import('./debug-log.svelte.js');
+  expect(() => {
+    setDebugLogging(true);
+    setDebugCategoryEnabled('sync', false);
+    setDebugLogging(false);
+  }).not.toThrow();
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();

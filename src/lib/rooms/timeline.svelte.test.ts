@@ -36,6 +36,10 @@ class FakeCore {
   paginateSubscriptions: number[] = [];
   subscribeCalls: Array<{ roomId: string; focus: TimelineFocusView }> = [];
 
+  roomAccountData(_roomId: string, _eventType: string): Promise<{ event_id: string } | null> {
+    return Promise.resolve({ event_id: '$read' });
+  }
+
   subscribeEvents(listener: (event: CoreEvent) => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -64,7 +68,7 @@ class FakeCore {
     this.emit({
       type: 'timeline_diff',
       subscription,
-      diffs: [{ op: 'push_front', value: item('history') }],
+      diffs: [{ op: direction === 'forward' ? 'push_back' : 'push_front', value: item('history') }],
     });
     return Promise.resolve({ direction, reached_end: true });
   }
@@ -169,6 +173,380 @@ test('opens a permalink as a focused timeline without live pagination', async ()
   expect(timeline.mode).toEqual({ kind: 'focused', eventId: '$target' });
 });
 
+test('opens unread at its marker without paginating through the backlog', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  expect(core.subscribeCalls).toEqual([
+    { roomId: '!room:example.org', focus: { kind: 'live' } },
+    { roomId: '!room:example.org', focus: { kind: 'event', event_id: '$read' } },
+  ]);
+  expect(core.paginateCalls).toBe(0);
+  expect(timeline.mode).toEqual({ kind: 'unread', eventId: '$read' });
+  await timeline.paginateForward(25);
+  expect(timeline.forwardPagination).toBe('end');
+  await timeline.resumeLive();
+  expect(core.subscribeCalls.at(-1)?.focus).toEqual({ kind: 'live' });
+});
+
+test('repeating the room opening after a summary update keeps its unread context', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  await timeline.start('!room:example.org', null, false, false);
+  expect(core.subscribeCalls).toHaveLength(2);
+  expect(timeline.mode.kind).toBe('unread');
+});
+
+test('returning from unread preserves the reader and includes arrivals during the reload', async () => {
+  const core = new FakeCore();
+  let subscriptions = 0;
+  vi.spyOn(core, 'subscribeTimeline').mockImplementation((_roomId, focus) => {
+    subscriptions += 1;
+    return Promise.resolve({
+      subscription: subscriptions,
+      items:
+        focus.kind === 'event'
+          ? [item('read'), item('anchor'), item('end')]
+          : subscriptions === 1
+            ? [item('end')]
+            : [item('end'), item('arrived')],
+      aggregations: [],
+    });
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  const paginate = vi.spyOn(core, 'paginate').mockImplementation((subscription, direction) => {
+    expect(timeline.items.map((entry) => entry.id)).toEqual(['read', 'anchor', 'end']);
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item('anchor') }],
+    });
+    return Promise.resolve({ direction, reached_end: false });
+  });
+  await timeline.resumeLive(() => '$anchor');
+  expect(paginate).toHaveBeenCalledTimes(1);
+  expect(timeline.mode).toEqual({ kind: 'live' });
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['anchor', 'end', 'arrived']);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 3,
+    diffs: [{ op: 'push_back', value: item('next') }],
+  });
+  expect(timeline.items.at(-1)?.id).toBe('next');
+});
+
+test('queues live diffs while its replacement snapshot is loading and shares the handoff', async () => {
+  const core = new FakeCore();
+  const snapshot = { subscription: 3, items: [item('anchor'), item('end')], aggregations: [] };
+  const pending = Promise.withResolvers<typeof snapshot>();
+  const subscribe = vi
+    .spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({
+      subscription: 2,
+      items: [item('read'), item('anchor')],
+      aggregations: [],
+    })
+    .mockReturnValueOnce(pending.promise);
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  const handoff = timeline.resumeLive(() => '$anchor');
+  expect(timeline.resumeLive(() => '$anchor')).toBe(handoff);
+  await vi.waitFor(() => {
+    expect(subscribe).toHaveBeenCalledTimes(3);
+  });
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 3,
+    diffs: [{ op: 'push_back', value: item('arrived') }],
+  });
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['read', 'anchor']);
+  pending.resolve(snapshot);
+  await handoff;
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['anchor', 'end', 'arrived']);
+  expect(timeline.resumingLive).toBe(false);
+});
+
+test('keeps the displayed rows after a failed anchor page and retries the same live subscription', async () => {
+  const core = new FakeCore();
+  const subscribe = vi
+    .spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({
+      subscription: 2,
+      items: [item('read'), item('anchor')],
+      aggregations: [],
+    })
+    .mockResolvedValueOnce({ subscription: 3, items: [item('end')], aggregations: [] });
+  vi.spyOn(core, 'paginate')
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockImplementationOnce((subscription, direction) => {
+      core.emit({
+        type: 'timeline_diff',
+        subscription,
+        diffs: [{ op: 'push_front', value: item('anchor') }],
+      });
+      return Promise.resolve({ direction, reached_end: false });
+    });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  await expect(timeline.resumeLive(() => '$anchor')).rejects.toThrow('offline');
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['read', 'anchor']);
+  expect(timeline.resumingLive).toBe(true);
+  await timeline.resumeLive(() => '$anchor');
+  expect(subscribe).toHaveBeenCalledTimes(3);
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['anchor', 'end']);
+  expect(timeline.resumingLive).toBe(false);
+});
+
+test('shows the live rows when the anchor is not in the live history', async () => {
+  const core = new FakeCore();
+  vi.spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({
+      subscription: 2,
+      items: [item('read'), item('anchor')],
+      aggregations: [],
+    })
+    .mockResolvedValueOnce({ subscription: 3, items: [item('end')], aggregations: [] });
+  vi.spyOn(core, 'paginate').mockImplementationOnce((subscription, direction) => {
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item('oldest') }],
+    });
+    return Promise.resolve({ direction, reached_end: true });
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  await expect(timeline.resumeLive(() => '$anchor')).rejects.toThrow('Unable to restore');
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['oldest', 'end']);
+  expect(timeline.mode).toEqual({ kind: 'live' });
+  expect(timeline.resumingLive).toBe(false);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 3,
+    diffs: [{ op: 'push_back', value: item('arrived') }],
+  });
+  expect(timeline.items.at(-1)?.id).toBe('arrived');
+});
+
+test('restoring the anchor waits for the page diff without polling', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new FakeCore();
+    vi.spyOn(core, 'subscribeTimeline')
+      .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+      .mockResolvedValueOnce({ subscription: 2, items: [item('anchor')], aggregations: [] })
+      .mockResolvedValueOnce({ subscription: 3, items: [item('end')], aggregations: [] });
+    vi.spyOn(core, 'paginate').mockImplementationOnce((_subscription, direction) =>
+      Promise.resolve({ direction, reached_end: false })
+    );
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org', null, false, true);
+    const handoff = timeline.resumeLive(() => '$anchor');
+    await vi.waitFor(() => {
+      expect(timeline.backwardPagination).toBe('loading');
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    core.emit({
+      type: 'timeline_diff',
+      subscription: 3,
+      diffs: [{ op: 'push_front', value: item('anchor') }],
+    });
+    await handoff;
+    expect(timeline.items.map((entry) => entry.id)).toEqual(['anchor', 'end']);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('keeps paging for the anchor while history is still loading', async () => {
+  const core = new FakeCore();
+  vi.spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({ subscription: 2, items: [item('anchor')], aggregations: [] })
+    .mockResolvedValueOnce({ subscription: 3, items: [item('end')], aggregations: [] });
+  const paginate = vi.spyOn(core, 'paginate').mockImplementation((subscription, direction) => {
+    const page = paginate.mock.calls.length;
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item(page === 12 ? 'anchor' : `older-${page}`) }],
+    });
+    return Promise.resolve({ direction, reached_end: false });
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  await timeline.resumeLive(() => '$anchor');
+  expect(paginate).toHaveBeenCalledTimes(12);
+  expect(timeline.items[0]?.id).toBe('anchor');
+  expect(timeline.resumingLive).toBe(false);
+});
+
+test('recovers the row the reader scrolled to during the handoff', async () => {
+  const core = new FakeCore();
+  vi.spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({
+      subscription: 2,
+      items: [item('earlier'), item('middle'), item('end')],
+      aggregations: [],
+    })
+    .mockResolvedValueOnce({ subscription: 3, items: [item('end')], aggregations: [] });
+  let reader = '$middle';
+  vi.spyOn(core, 'paginate').mockImplementation((subscription, direction) => {
+    const loaded = reader.slice(1);
+    reader = '$earlier';
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item(loaded) }],
+    });
+    return Promise.resolve({ direction, reached_end: false });
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  await timeline.resumeLive(() => reader);
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['earlier', 'middle', 'end']);
+});
+
+test('opening another room cancels a handoff waiting to unsubscribe', async () => {
+  const core = new FakeCore();
+  const unsubscribed = Promise.withResolvers<undefined>();
+  vi.spyOn(core, 'unsubscribe')
+    .mockResolvedValueOnce(undefined)
+    .mockReturnValueOnce(unsubscribed.promise);
+  vi.spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({ subscription: 2, items: [item('anchor')], aggregations: [] })
+    .mockResolvedValueOnce({ subscription: 3, items: [item('other-room')], aggregations: [] });
+  const paginate = vi.spyOn(core, 'paginate');
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  const handoff = timeline.resumeLive(() => '$anchor');
+  const cancelled = expect(handoff).rejects.toThrow('Room changed');
+  const other = timeline.start('!other:example.org');
+  unsubscribed.resolve(undefined);
+  await other;
+  await cancelled;
+  expect(paginate).not.toHaveBeenCalled();
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['other-room']);
+  expect(timeline.resumingLive).toBe(false);
+});
+
+test('a late live snapshot cannot replace the room opened during a handoff', async () => {
+  const core = new FakeCore();
+  const snapshot = { subscription: 3, items: [item('anchor')], aggregations: [] };
+  const pending = Promise.withResolvers<typeof snapshot>();
+  const subscribe = vi
+    .spyOn(core, 'subscribeTimeline')
+    .mockResolvedValueOnce({ subscription: 1, items: [item('end')], aggregations: [] })
+    .mockResolvedValueOnce({
+      subscription: 2,
+      items: [item('read'), item('anchor')],
+      aggregations: [],
+    })
+    .mockReturnValueOnce(pending.promise)
+    .mockResolvedValueOnce({ subscription: 4, items: [item('other-room')], aggregations: [] });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  const handoff = timeline.resumeLive(() => '$anchor');
+  const cancelled = expect(handoff).rejects.toThrow('Room changed');
+  await vi.waitFor(() => {
+    expect(subscribe).toHaveBeenCalledTimes(3);
+  });
+  await timeline.start('!other:example.org');
+  pending.resolve(snapshot);
+  await cancelled;
+  expect(timeline.items.map((entry) => entry.id)).toEqual(['other-room']);
+  expect(timeline.subscriptionId).toBe(4);
+  expect(timeline.resumingLive).toBe(false);
+});
+
+test.each(['marker', 'event'] as const)(
+  'keeps the cached live window when the read %s is loaded',
+  async (boundary) => {
+    const core = new FakeCore();
+    const subscribe = vi.spyOn(core, 'subscribeTimeline').mockResolvedValue({
+      subscription: 1,
+      items: [
+        boundary === 'marker'
+          ? {
+              ...item('marker'),
+              event_id: null,
+              content: { kind: 'read_marker' },
+            }
+          : item('read'),
+        item('first'),
+      ],
+      aggregations: [],
+    });
+    const marker = vi.spyOn(core, 'roomAccountData');
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org', null, false, true);
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    expect(timeline.mode).toEqual({ kind: 'live' });
+    expect(core.paginateCalls).toBe(0);
+    if (boundary === 'marker') expect(marker).not.toHaveBeenCalled();
+  }
+);
+
+test.each(['missing', 'failure'] as const)(
+  'opens live when the unread marker is %s',
+  async (result) => {
+    const core = new FakeCore();
+    const marker = vi.spyOn(core, 'roomAccountData');
+    if (result === 'missing') marker.mockResolvedValue(null);
+    else marker.mockRejectedValue(new Error('account data unavailable'));
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org', null, false, true);
+    expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', focus: { kind: 'live' } }]);
+    expect(timeline.error).toBeNull();
+    expect(timeline.hasSnapshot).toBe(true);
+  }
+);
+
+test('falls back to live when the unread marker context cannot be loaded', async () => {
+  const core = new FakeCore();
+  const original = core.subscribeTimeline.bind(core);
+  const subscribe = vi
+    .spyOn(core, 'subscribeTimeline')
+    .mockImplementation((roomId, focus) =>
+      focus.kind === 'event' ? Promise.reject(new Error('not found')) : original(roomId, focus)
+    );
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  expect(subscribe.mock.calls.map(([, focus]) => focus)).toEqual([
+    { kind: 'live' },
+    { kind: 'event', event_id: '$read' },
+    { kind: 'live' },
+  ]);
+  expect(timeline.mode).toEqual({ kind: 'live' });
+  expect(timeline.error).toBeNull();
+  expect(timeline.hasSnapshot).toBe(true);
+});
+
+test('a late unread marker lookup cannot reopen the room after switching away', async () => {
+  const core = new FakeCore();
+  const marker = Promise.withResolvers<{ event_id: string }>();
+  vi.spyOn(core, 'roomAccountData').mockReturnValueOnce(marker.promise);
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  const opening = timeline.start('!room:example.org', null, false, true);
+  await Promise.resolve();
+  await timeline.start('!other:example.org');
+  marker.resolve({ event_id: '$old-read' });
+  await opening;
+  expect(core.subscribeCalls).toEqual([
+    { roomId: '!room:example.org', focus: { kind: 'live' } },
+    { roomId: '!other:example.org', focus: { kind: 'live' } },
+  ]);
+  expect(timeline.mode).toEqual({ kind: 'live' });
+});
+
 test('ignores live pagination status for a focused timeline', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
@@ -188,6 +566,64 @@ test('paginates a focused timeline forwards independently', async () => {
 
   expect(core.paginateSubscriptions).toEqual([1]);
   expect(timeline.forwardPagination).toBe('end');
+});
+
+test('forward pagination waits for the newer messages after the command response', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$initial');
+  const paginate = vi
+    .spyOn(core, 'paginate')
+    .mockResolvedValue({ direction: 'forward', reached_end: false });
+  await timeline.paginateForward(25);
+  expect(timeline.forwardPagination).toBe('loading');
+  await timeline.paginateForward(25);
+  expect(paginate).toHaveBeenCalledTimes(1);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('newer') }],
+  });
+  expect(timeline.forwardPagination).toBe('idle');
+  await timeline.stop();
+});
+
+test('the last forward page waits for its messages before treating the snapshot as latest', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$initial');
+  vi.spyOn(core, 'paginate').mockResolvedValue({ direction: 'forward', reached_end: true });
+  await timeline.paginateForward(25);
+  expect(timeline.forwardPagination).toBe('loading');
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('latest') }],
+  });
+  expect(timeline.forwardPagination).toBe('end');
+  await timeline.stop();
+});
+
+test('an empty forward page becomes retryable without leaving a timer in the next room', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new FakeCore();
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org', '$initial');
+    vi.spyOn(core, 'paginate').mockResolvedValue({ direction: 'forward', reached_end: false });
+    await timeline.paginateForward(25);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(timeline.forwardPagination).toBe('idle');
+    await timeline.paginateForward(25);
+    expect(vi.getTimerCount()).toBe(1);
+    await timeline.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await timeline.start('!other:example.org', '$initial');
+    expect(timeline.forwardPagination).toBe('idle');
+    await timeline.stop();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('a failed forward page rejects and remains manually retryable', async () => {

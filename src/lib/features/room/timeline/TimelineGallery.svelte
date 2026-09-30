@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { GalleryItemView } from '#src/generated/protocol';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
@@ -22,6 +22,17 @@
 
   let { items, body, html, senderTimezone = null, onMatrixLink, onOpen }: Props = $props();
   const revealed = new SvelteSet<string>();
+  const imageVisibility = new SvelteMap<string, boolean>();
+
+  function imageKey(item: GalleryItemView, index: number): string {
+    return JSON.stringify([index, item.source, item.kind === 'image' ? item.spoiler : null]);
+  }
+
+  function imageHidden(item: GalleryItemView, index: number): boolean {
+    return (
+      item.kind === 'image' && (imageVisibility.get(imageKey(item, index)) ?? item.spoiler !== null)
+    );
+  }
 </script>
 
 {#if body && preferences.captionPosition === 'above'}
@@ -33,7 +44,7 @@
   {#each items as item, index (index)}
     {@const spoiler = item.kind === 'image' || item.kind === 'video' ? item.spoiler : null}
     <div class="cell">
-      {#if spoiler !== null && !revealed.has(item.source)}
+      {#if item.kind === 'video' && spoiler !== null && !revealed.has(item.source)}
         <Button class="spoiler-reveal" onclick={() => revealed.add(item.source)}>
           {spoiler ? `${spoiler} — ` : ''}{$i18n.t('timeline.spoilerMedia')}
         </Button>
@@ -51,6 +62,12 @@
           mime={item.mime}
           size={item.size}
           blurhash={item.blurhash}
+          spoilerReason={item.spoiler}
+          bind:spoilerHidden={
+            () => imageHidden(item, index),
+            (hidden) => imageVisibility.set(imageKey(item, index), hidden)
+          }
+          spoilerName={item.filename}
           retryable
           onclick={() => onOpen?.(index)}
         />
@@ -71,9 +88,9 @@
           onOpen={() => onOpen?.(index)}
         />
       {/if}
-      {#if item.caption}
+      {#if item.caption && !imageHidden(item, index)}
         <p class="item-caption">{item.caption}</p>
-      {:else if item.kind === 'image' && preferences.alwaysShowAltText}
+      {:else if item.kind === 'image' && !imageHidden(item, index) && preferences.alwaysShowAltText}
         <p class="item-caption">{item.filename}</p>
       {/if}
     </div>

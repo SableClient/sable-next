@@ -49,18 +49,25 @@ export interface DragList<T> {
 export function createDragList<T>(equals: (left: T, right: T) => boolean): DragList<T> {
   let dragged: T | null = null;
   let hovered: T | null = null;
+  let stopDocumentEnd: (() => void) | null = null;
 
   return {
     draggable(item, onDragging) {
       return (node) => {
         const start = (event: DragEvent): void => {
           dragged = item;
+          stopDocumentEnd?.();
+          stopDocumentEnd = on(document, 'dragend', end, { capture: true });
           onDragging(item);
           event.dataTransfer?.setData('text/plain', '');
           event.dataTransfer?.setData(REORDER_DRAG_TYPE, '');
           if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
         };
         const end = (): void => {
+          if (dragged === null || !equals(dragged, item)) return;
+
+          stopDocumentEnd?.();
+          stopDocumentEnd = null;
           dragged = null;
           hovered = null;
           onDragging(null);

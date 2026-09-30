@@ -50,7 +50,7 @@
   });
 
   onMount(() => {
-    hasLoggedInBefore = readReturningUser(localStorage);
+    hasLoggedInBefore = readReturningUser();
   });
 
   function errorFor(field: ResetPasswordField): string | undefined {

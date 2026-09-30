@@ -107,6 +107,28 @@
   const roomCosmetics = useRoomCosmetics();
   const roomList = useRoomList();
   const presenceStore = usePresenceStore();
+  let invitedMember = $state.raw<MemberView | null>(null);
+  let membershipRequest = 0;
+
+  $effect(() => {
+    const request = ++membershipRequest;
+    const targetRoomId = roomId;
+    const targetUserId = userId;
+    invitedMember = null;
+    if (member !== null || targetRoomId === '' || !(permissions?.can_kick ?? false)) return;
+
+    void core.commands
+      .roomMembers(targetRoomId, ['invite'])
+      .then((members) => {
+        if (request !== membershipRequest) return;
+        invitedMember = members.find((entry) => entry.user_id === targetUserId) ?? null;
+      })
+      .catch((error: unknown) => {
+        console.debug('[sable profile] invited member unavailable', error);
+      });
+  });
+
+  let roomMember = $derived(member ?? invitedMember);
   let currentProfile = $derived(profile?.user_id === userId ? profile : null);
   let presence = $derived(presenceStore.get(userId));
   let presenceLabel = $derived(presence ? $i18n.t(`presence.${presence.presence}`) : null);
@@ -129,8 +151,8 @@
     }
   });
 
-  let realName = $derived(member?.display_name ?? currentProfile?.display_name ?? userId);
-  let realAvatar = $derived(member?.avatar_url ?? currentProfile?.avatar_url ?? null);
+  let realName = $derived(roomMember?.display_name ?? currentProfile?.display_name ?? userId);
+  let realAvatar = $derived(roomMember?.avatar_url ?? currentProfile?.avatar_url ?? null);
   let displayName = $derived(profileOverrides.name(userId, realName));
   let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
   let overrideColors = $derived(profileOverrides.colors(userId));
@@ -178,7 +200,7 @@
     return $i18n.t('timeline.animalNeed', { identity, need: animal.animal_need });
   });
   let extra = $derived(currentProfile?.extra ?? []);
-  let showFailure = $derived(failed && !currentProfile && member === null);
+  let showFailure = $derived(failed && !currentProfile && roomMember === null);
   let profileLoading = $derived(!currentProfile && !failed);
   let isSelf = $derived(core.session?.user_id === userId);
   let canMessage = $derived(core.session !== null && !isSelf);
@@ -188,30 +210,31 @@
   let sending = $state(false);
   let sendFailed = $state<'send' | 'open' | null>(null);
   let homeserver = $derived(userId.slice(userId.indexOf(':') + 1));
-  let elevated = $derived(member !== null && member.power_level >= 50);
+  let elevated = $derived(roomMember !== null && roomMember.power_level >= 50);
   let roleTag = $derived(
-    member && powerTags !== null ? powerTag(member.power_level, $i18n.t, powerTags) : null
+    roomMember && powerTags !== null ? powerTag(roomMember.power_level, $i18n.t, powerTags) : null
   );
-  let outranks = $derived(!isSelf && ownPowerLevel > (member?.power_level ?? 0));
-  // Kicking requires the target to be in the room and outranked (spec rule
-  // 4.5.4), so it stays hidden while the target's membership is unknown: the
-  // server refuses to kick someone who is not in the room regardless of level.
-  let canKick = $derived(outranks && member !== null && (permissions?.can_kick ?? false));
+  let outranks = $derived(!isSelf && ownPowerLevel > (roomMember?.power_level ?? 0));
+  let canKick = $derived(
+    outranks &&
+      (roomMember?.membership === 'join' || roomMember?.membership === 'invite') &&
+      (permissions?.can_kick ?? false)
+  );
   let canBan = $derived(
-    outranks && member?.membership !== 'ban' && (permissions?.can_ban ?? false)
+    outranks && roomMember?.membership !== 'ban' && (permissions?.can_ban ?? false)
   );
   let canInvite = $derived(
     !isSelf &&
-      (member === null || member.membership === 'leave') &&
+      (roomMember === null || roomMember.membership === 'leave') &&
       (permissions?.can_invite ?? false)
   );
   let canUnban = $derived(
-    !isSelf && member?.membership === 'ban' && (permissions?.can_ban ?? false)
+    !isSelf && roomMember?.membership === 'ban' && (permissions?.can_ban ?? false)
   );
   let canSetPower = $derived(
     !isSelf &&
       (permissions?.can_change_power_levels ?? false) &&
-      ownPowerLevel > (member?.power_level ?? 0)
+      ownPowerLevel > (roomMember?.power_level ?? 0)
   );
   // The spec caps what you may grant at your own level.
   let powerRoles = $derived(
@@ -220,7 +243,7 @@
       { level: 50, label: powerTag(50, $i18n.t, powerTags ?? {}).name },
       { level: 0, label: powerTag(0, $i18n.t, powerTags ?? {}).name },
       { level: -1, label: powerTag(-1, $i18n.t, powerTags ?? {}).name },
-    ].filter((role) => role.level <= ownPowerLevel && role.level !== (member?.power_level ?? 0))
+    ].filter((role) => role.level <= ownPowerLevel && role.level !== (roomMember?.power_level ?? 0))
   );
   let profileLink = $derived(`https://matrix.to/#/${userId}`);
   const canShareLink = typeof navigator !== 'undefined' && 'share' in navigator;

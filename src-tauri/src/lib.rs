@@ -22,6 +22,8 @@ mod cold_push;
 mod hdr_share;
 #[cfg(target_os = "android")]
 mod mobile;
+#[cfg(mobile)]
+mod network;
 mod notifications;
 #[cfg(target_os = "linux")]
 pub mod permission_grants;
@@ -39,8 +41,11 @@ mod share_inbox;
 mod snap_layouts;
 #[cfg(desktop)]
 mod tray;
+#[cfg(desktop)]
+pub mod verbose;
 #[cfg(all(feature = "cef", target_os = "linux"))]
 mod video_transcode;
+mod web_resources;
 #[cfg(all(not(feature = "cef"), target_os = "linux"))]
 mod webkit;
 #[cfg(desktop)]
@@ -115,8 +120,12 @@ async fn fetch_media(
     source: String,
     width: u32,
     height: u32,
+    background: Option<bool>,
 ) -> Result<Response, CommandErr> {
-    let bytes = state.core.media_thumbnail(source, width, height).await?;
+    let bytes = state
+        .core
+        .fetch_media(source, width, height, background.unwrap_or(false))
+        .await?;
     Ok(Response::new(bytes))
 }
 
@@ -368,7 +377,10 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     }
 
     for config in &app.config().app.windows {
-        let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?;
+        let builder = tauri::WebviewWindowBuilder::from_config(app.handle(), config)?
+            .on_web_resource_request(|request, response| {
+                web_resources::fix_content_type(&request, response);
+            });
         #[cfg(desktop)]
         let builder = window_geometry::restore(app.handle(), builder, &config.label);
         #[cfg(all(desktop, not(all(feature = "cef", target_os = "linux"))))]
@@ -427,9 +439,11 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
     app.manage(notifications::PushStore(data_dir.clone()));
     let (core, events) = Core::new(
         data_dir.to_string_lossy().into_owned(),
-        Box::new(sable_core::store::FileSessionStore::exclusive(&data_dir)?),
+        Box::new(sable_core::store::ExclusiveFileSessionStore::new(&data_dir)),
     );
     let event_sink = Arc::new(EventSink::default());
+    #[cfg(mobile)]
+    network::attach(&core);
     let pushing = core.clone();
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());
@@ -488,6 +502,18 @@ fn hide_to_tray_on_close(window: &tauri::Window<BrowserEngine>, event: &tauri::W
     if tray::hides_to_tray(window.app_handle()) {
         api.prevent_close();
         tray::hide_to_tray(window);
+    }
+}
+
+#[cfg(mobile)]
+fn update_mobile_activity(window: &tauri::Window<BrowserEngine>, event: &tauri::WindowEvent) {
+    let active = match event {
+        tauri::WindowEvent::Suspended => false,
+        tauri::WindowEvent::Resumed => true,
+        _ => return,
+    };
+    if let Some(state) = window.try_state::<AppState>() {
+        state.core.set_app_active(active);
     }
 }
 
@@ -682,12 +708,20 @@ fn with_updates(builder: tauri::Builder<BrowserEngine>) -> tauri::Builder<Browse
 /// more than they are worth: heroes it cannot name, and the latest-event
 /// builder choking on the bare `{}` a space child removal carries.
 fn install_logging() {
+    use tracing_subscriber::prelude::*;
+
     let filter = tracing_subscriber::EnvFilter::try_from_env("SABLE_LOG").unwrap_or_else(|_| {
         tracing_subscriber::EnvFilter::new(
             "info,matrix_sdk_base::room::display_name=error,matrix_sdk::latest_events=off,matrix_sdk::http_client=off",
         )
     });
-    if let Err(error) = tracing_subscriber::fmt().with_env_filter(filter).try_init() {
+    let sentry = ::sentry::integrations::tracing::layer()
+        .event_filter(sentry::tracing_filter)
+        .span_filter(|_| false);
+    let subscriber = tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_filter(filter))
+        .with(sentry);
+    if let Err(error) = subscriber.try_init() {
         eprintln!("could not install the log subscriber: {error}");
     }
 }
@@ -721,18 +755,28 @@ fn with_platform_plugins(builder: tauri::Builder<BrowserEngine>) -> tauri::Build
     reason = "the platform-specific builder remains together"
 )]
 pub fn run() {
-    install_logging();
-
     // Before the threads Tauri spawns, so they inherit the panic handler.
     let sentry_guard = sentry::init();
+    install_logging();
     #[cfg(desktop)]
-    let sentry_minidump_guard = sentry_guard
-        .as_ref()
-        .map(|guard| tauri_plugin_sentry::minidump::init(guard));
+    let sentry_minidump_guard =
+        sentry_guard
+            .as_ref()
+            .and_then(|guard| match tauri_plugin_sentry::minidump::init(guard) {
+                Ok(handle) => Some(handle),
+                Err(error) => {
+                    tracing::error!(%error, "native crash reporter could not start");
+                    None
+                }
+            });
     #[cfg(desktop)]
     let _ = &sentry_minidump_guard;
 
     let builder = tauri::Builder::<BrowserEngine>::new();
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    let builder = builder.on_web_content_process_terminate(|_| {
+        tracing::error!("webview content process terminated");
+    });
     let builder = if let Some(client) = sentry_guard.as_ref() {
         builder.plugin(tauri_plugin_sentry::init_with_no_injection(client))
     } else {
@@ -748,10 +792,20 @@ pub fn run() {
         }
     }));
 
+    #[cfg(desktop)]
+    let builder = if verbose::enabled() {
+        builder.plugin(verbose::plugin())
+    } else {
+        builder
+    };
+
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = builder
         .plugin(window_geometry::plugin())
         .on_window_event(hide_to_tray_on_close);
+
+    #[cfg(mobile)]
+    let builder = builder.on_window_event(update_mobile_activity);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     let builder = with_updates(builder);
@@ -800,6 +854,8 @@ pub fn run() {
             stop_hdr_share,
             #[cfg(desktop)]
             toggle_devtools,
+            #[cfg(desktop)]
+            verbose::log_console,
             #[cfg(all(feature = "cef", target_os = "linux"))]
             pending_deep_links,
             register_push,

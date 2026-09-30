@@ -51,7 +51,7 @@ test('renders the resolved preview as a link', async () => {
 
   const link = screen.getByRole('link', { name: /Example/ });
   expect(link).toHaveAttribute('href', 'https://example.org/render');
-  expect(link).toHaveClass('link-preview');
+  expect(link.parentElement).toHaveClass('link-preview');
 });
 
 test('a second card for the same url does not re-request it', async () => {
@@ -147,7 +147,7 @@ test('an image-only preview renders inline instead of as a card', async () => {
   const link = screen.getByRole('link');
   expect(link).not.toHaveClass('link-preview');
   expect(link).toHaveAttribute('href', 'https://media.example/anim.gif');
-  expect(link.querySelector('.link-preview-inline')).toBeInTheDocument();
+  expect(link.closest('.link-preview-inline')).toBeInTheDocument();
 });
 
 test('an image-only preview opens the media viewer instead of the url', async () => {
@@ -175,7 +175,7 @@ test('an image-only preview opens the media viewer instead of the url', async ()
   await tick();
 
   expect(screen.queryByRole('link')).toBeNull();
-  await userEvent.click(screen.getByRole('button'));
+  await userEvent.click(screen.getByRole('button', { name: /Open/ }));
   expect(opener).toHaveBeenCalledWith({
     kind: 'image',
     filename: 'https://media.example/anim.gif',
@@ -206,7 +206,7 @@ test('a preview carrying a title stays a card even with an image', async () => {
   await tick();
 
   const link = screen.getByRole('link', { name: /Example/ });
-  expect(link).toHaveClass('link-preview');
+  expect(link.parentElement).toHaveClass('link-preview');
   expect(link).not.toHaveClass('link-preview-link');
 });
 
@@ -221,7 +221,9 @@ test('uses a site-specific presentation for a recognised URL', () => {
     }),
   });
 
-  expect(screen.getByRole('link', { name: 'A video' })).toHaveClass('youtube-preview');
+  expect(screen.getByRole('link', { name: 'A video' }).parentElement).toHaveClass(
+    'youtube-preview'
+  );
 });
 
 test('a preview keeps its text but drops its picture where media previews are off (MSC4278)', async () => {
@@ -236,7 +238,30 @@ test('a preview keeps its text but drops its picture where media previews are of
   await Promise.resolve();
   await tick();
 
-  expect(screen.getByRole('link', { name: /Example/ })).toHaveClass('link-preview');
+  expect(screen.getByRole('link', { name: /Example/ }).parentElement).toHaveClass('link-preview');
   expect(document.querySelector('.link-preview-image')).toBeNull();
   mediaPreviewSettings.global = {};
+});
+
+test.each([
+  ['https://example.org/ordinary', 'Example', null],
+  ['https://example.org/image-only', null, null],
+  ['https://youtu.be/MTn_bhTVr2U', 'A video', 'YouTube'],
+])('the image at %s can be hidden without following its link', async (url, title, site_name) => {
+  const onDocumentClick = vi.fn();
+  document.addEventListener('click', onDocumentClick);
+  render(LinkPreviewCard, {
+    url,
+    encrypted: false,
+    bundled: preview({ url, title, site_name, image: 'mxc://example.org/preview-spoiler' }),
+  });
+  await tick();
+  const hide = screen.getByRole('button', { name: 'Hide image' });
+  expect(hide.closest('a')).toBeNull();
+  await userEvent.click(hide);
+  expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
+  expect(onDocumentClick).not.toHaveBeenCalled();
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal image' }));
+  expect(document.querySelector('.spoilerable-media')).not.toHaveClass('spoilered');
+  document.removeEventListener('click', onDocumentClick);
 });

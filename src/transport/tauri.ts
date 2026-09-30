@@ -32,10 +32,10 @@ export function createTauriTransport(): Transport {
         try {
           listener(event);
         } catch (error) {
-          console.error('[sable transport] event listener failed', { event: event.type, error });
           Sentry.captureException(error, {
             tags: { source: 'tauri-event', event: event.type },
           });
+          console.error('[sable transport] event listener failed', error, event.type);
         }
       }
     }
@@ -53,10 +53,15 @@ export function createTauriTransport(): Transport {
       }
     },
 
-    async fetchMedia(source, width, height) {
+    async fetchMedia(source, width, height, background = false) {
       try {
         // `Response` on the Rust side makes this an ArrayBuffer rather than JSON.
-        const bytes = await invoke<ArrayBuffer>('fetch_media', { source, width, height });
+        const bytes = await invoke<ArrayBuffer>('fetch_media', {
+          source,
+          width,
+          height,
+          background,
+        });
         return new Uint8Array(bytes);
       } catch (error) {
         throw new CoreError(error as CommandErr);
@@ -191,8 +196,8 @@ export function createTauriTransport(): Transport {
         await invoke('submit_command', { command: { type: 'reset_local_cache' } });
         await resetWebStorage(accountIds);
       } catch (error) {
-        console.error('[sable transport] the local caches were not fully cleared', error);
         Sentry.captureException(error, { tags: { source: 'cache-reset' } });
+        console.error('[sable transport] the local caches were not fully cleared', error);
       }
     },
 

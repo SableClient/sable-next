@@ -97,9 +97,25 @@ export async function watchMaximized(onChange: (maximized: boolean) => void): Pr
 
 export async function watchWindowFocus(onChange: (focused: boolean) => void): Promise<() => void> {
   if (!supportsDesktopWindow()) return () => {};
-  return (await currentWindow()).onFocusChanged((event) => {
+  onChange(false);
+  const window = await currentWindow();
+  const focus = { changed: false };
+  const unlisten = await window.onFocusChanged((event) => {
+    focus.changed = true;
     onChange(event.payload);
   });
+  try {
+    const [focused, minimized, visible] = await Promise.all([
+      window.isFocused(),
+      window.isMinimized(),
+      window.isVisible(),
+    ]);
+    if (!focus.changed) onChange(focused && !minimized && visible);
+  } catch (error) {
+    unlisten();
+    throw error;
+  }
+  return unlisten;
 }
 
 export async function watchHiddenToTray(onHidden: () => void): Promise<() => void> {

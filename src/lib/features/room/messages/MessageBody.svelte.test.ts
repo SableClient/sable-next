@@ -291,9 +291,40 @@ test('hides a spoilered gallery item until it is revealed', async () => {
 
   expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(1);
 
-  await userEvent.click(screen.getByRole('button', { name: /sunburn/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal two.png' }));
 
   expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(2);
+});
+
+test('gallery captions and images agree when an image leaves and returns to its slot', async () => {
+  const image = {
+    kind: 'image' as const,
+    filename: 'ending.png',
+    caption: 'Secret ending',
+    source: 'mxc://example.org/gallery-ending',
+    mime: 'image/png',
+    width: 100,
+    height: 100,
+    size: null,
+    blurhash: null,
+    thumbnail: null,
+    spoiler: 'Ending',
+  };
+  const gallery = (source: string) =>
+    item({ kind: 'gallery', body: '', html: '', items: [{ ...image, source }] });
+  const view = render(MessageBody, {
+    item: gallery(image.source),
+    canRedactOthers: false,
+  });
+
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal ending.png' }));
+  await view.rerender({ item: gallery('mxc://example.org/replacement') });
+  expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
+  expect(screen.queryByText('Secret ending')).not.toBeInTheDocument();
+
+  await view.rerender({ item: gallery(image.source) });
+  expect(document.querySelector('.spoilerable-media')).not.toHaveClass('spoilered');
+  expect(screen.getByText('Secret ending')).toBeInTheDocument();
 });
 
 test('keeps an image filename hidden without the alt-text preference', async () => {
@@ -382,18 +413,86 @@ test('opens a valid location using validated coordinates', async () => {
   expect(screen.getByRole('link')).toHaveAttribute('href', 'geo:48.8,2.3');
 });
 
-test.each(['image', 'video'] as const)(
-  'hides %s spoilers and their captions until revealed',
-  async (kind) => {
-    const content = { ...attachment(kind), spoiler: 'Ending' } as TimelineItemContentView;
-    render(MessageBody, { item: item(content), canRedactOthers: false });
-    await tick();
-    expect(core.commands.fetchMedia).not.toHaveBeenCalled();
-    expect(document.querySelector('img, video, .formatted-body')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /Ending/ }));
-    expect(document.querySelector('.formatted-body')).toBeInTheDocument();
-  }
-);
+test('hides video spoilers and their captions until revealed', async () => {
+  const content = { ...attachment('video'), spoiler: 'Ending' } as TimelineItemContentView;
+  render(MessageBody, { item: item(content), canRedactOthers: false });
+  await tick();
+  expect(core.commands.fetchMedia).not.toHaveBeenCalled();
+  expect(document.querySelector('video, .formatted-body')).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /Ending/ }));
+  expect(document.querySelector('.formatted-body')).toBeInTheDocument();
+});
+
+test('blurs a spoilered image and lets it be revealed again', async () => {
+  const onOpenMedia = vi.fn();
+  const content = { ...attachment('image'), spoiler: 'Ending' } as TimelineItemContentView;
+  render(MessageBody, { item: item(content), canRedactOthers: false, onOpenMedia });
+  await tick();
+
+  const media = document.querySelector('.spoilerable-media');
+  expect(media).toHaveClass('spoilered');
+  expect(document.querySelector('.media-image')).toBeInTheDocument();
+  expect(document.querySelector('.formatted-body')).not.toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal photo.png' }));
+  expect(media).not.toHaveClass('spoilered');
+  expect(document.querySelector('.formatted-body')).toBeInTheDocument();
+  expect(onOpenMedia).not.toHaveBeenCalled();
+
+  await userEvent.click(screen.getByRole('button', { name: 'Open caption' }));
+  expect(onOpenMedia).toHaveBeenCalledWith('$item');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Hide photo.png' }));
+  expect(media).toHaveClass('spoilered');
+});
+
+test('lets an ordinary image be hidden locally', async () => {
+  render(MessageBody, { item: item(attachment('image')), canRedactOthers: false });
+  await tick();
+
+  const media = document.querySelector('.spoilerable-media');
+  expect(media).not.toHaveClass('spoilered');
+
+  await userEvent.click(screen.getByRole('button', { name: 'Hide photo.png' }));
+  expect(media).toHaveClass('spoilered');
+  expect(screen.getByRole('button', { name: 'Reveal photo.png' })).toBeInTheDocument();
+});
+
+test('a recycled image does not inherit the previous image reveal or caption state', async () => {
+  const content = { ...attachment('image'), spoiler: 'Ending' } as TimelineItemContentView;
+  const view = render(MessageBody, { item: item(content), canRedactOthers: false });
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal photo.png' }));
+
+  const next = {
+    ...content,
+    source: 'mxc://example.org/another-spoiler',
+  } as TimelineItemContentView;
+  await view.rerender({ item: { ...item(next), id: 'next', event_id: '$next' } });
+
+  expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
+  expect(document.querySelector('.formatted-body')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Reveal photo.png' })).toBeInTheDocument();
+});
+
+test('a sticker can be hidden without opening its viewer', async () => {
+  const onOpenMedia = vi.fn();
+  render(MessageBody, {
+    item: item({
+      kind: 'sticker',
+      body: 'Cat sticker',
+      source: 'mxc://example.org/sticker',
+      mime: 'image/png',
+      width: 128,
+      height: 128,
+    }),
+    canRedactOthers: false,
+    onOpenMedia,
+  });
+
+  await userEvent.click(screen.getByRole('button', { name: 'Hide Cat sticker' }));
+  expect(document.querySelector('.spoilerable-media')).toHaveClass('spoilered');
+  expect(onOpenMedia).not.toHaveBeenCalled();
+});
 
 test('live location expires without another SDK update and keeps its last known coordinates', async () => {
   vi.useFakeTimers();

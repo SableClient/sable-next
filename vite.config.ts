@@ -9,6 +9,9 @@ import { fetchDeepFilterNet } from './scripts/fetch-deepfilternet.mjs';
 const wasmOutput = process.env.SABLE_WASM_OUTPUT ?? 'src/generated/wasm';
 
 export default defineConfig({
+  optimizeDeps: {
+    exclude: ['phosphor-svelte'],
+  },
   resolve: {
     alias: {
       '#src/generated/wasm': resolve(wasmOutput),

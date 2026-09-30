@@ -461,6 +461,7 @@
     border-radius: var(--radius);
     flex-shrink: 1;
     font-size: var(--font-size-label);
+    line-height: var(--line-height-small);
     margin-left: var(--space-100);
     margin-top: calc(-1 * var(--space-600));
     min-width: var(--space-700);

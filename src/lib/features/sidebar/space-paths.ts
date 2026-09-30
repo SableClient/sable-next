@@ -30,11 +30,9 @@ export function spaceNavigationHref(
   root: string,
   savedPath: string | undefined,
   mobile: boolean,
-  fallback: string,
-  search?: string
+  fallback: string
 ): string {
   if (mobile) return root;
-  if (savedPath && (savedPath === search || savedPath.startsWith(`${search}?`))) return savedPath;
   if (!savedPath || (savedPath !== root && !savedPath.startsWith(`${root}/`))) {
     return fallback;
   }
@@ -48,10 +46,8 @@ export function spaceIndexRedirect(
   root: string,
   savedPath: string | undefined,
   lobby: string,
-  search: string,
   isJoinedRoom: (pathId: string) => boolean
 ): string {
-  if (savedPath === search || savedPath?.startsWith(`${search}?`)) return savedPath;
   if (!savedPath?.startsWith(`${root}/`)) return lobby;
 
   const segment = savedPath.slice(root.length + 1).split(/[/?#]/, 1)[0];

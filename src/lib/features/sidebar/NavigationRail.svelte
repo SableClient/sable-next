@@ -89,6 +89,7 @@
     onToggleFolder?: (folderId: string) => void;
     onRenameFolder?: (folder: SidebarFolder) => void;
     onUngroupFolder?: (folderId: string) => void;
+    onMarkFolderRead?: (folder: SidebarFolder) => void;
     onRemoveFromFolder?: (roomId: string, folderId: string) => void;
     onReorder?: (source: LayoutRef, target: LayoutRef, instruction: DropInstruction) => void;
     onMarkSectionRead?: (section: RailSection) => void;
@@ -113,6 +114,7 @@
     onToggleFolder,
     onRenameFolder,
     onUngroupFolder,
+    onMarkFolderRead,
     onRemoveFromFolder,
     onReorder,
     onMarkSectionRead,
@@ -138,7 +140,6 @@
     return typeof own === 'string' ? `${own} ${id}` : id;
   }
   const directRoot = resolve('direct');
-  const searchRoot = resolve('/(app)/search');
   let spacePaths = $state(savedSpacePaths());
   let dragged = $state<LayoutRef | null>(null);
   let dropState = $state<DropState<LayoutRef> | null>(null);
@@ -368,7 +369,7 @@
       href,
       activePrefix: href,
       roomId: space.room_id,
-      navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby, searchRoot),
+      navigateHref: spaceNavigationHref(href, savedPath, mobile, lobby),
       initial: toInitials(name),
       avatar: space.avatar_url,
       label: name,
@@ -460,21 +461,14 @@
   afterNavigate(() => {
     if (mobile) return;
 
-    const searchSpace = page.url.searchParams.get('space');
     const kept = [...new URLSearchParams(page.url.search)].filter(([key]) => key !== 'event');
     const search = new URLSearchParams(kept).toString();
     const path = `${page.url.pathname}${search ? `?${search}` : ''}${page.url.hash}`;
-    const searchSpaceRoom =
-      page.url.pathname === searchRoot
-        ? spaces.find((candidate) => candidate.room_id === searchSpace)
-        : undefined;
     const space = spaces.find((candidate) => {
       const href = resolve('/(app)/space/[spaceId]', { spaceId: roomPathParam(candidate) });
       return path === href || path.startsWith(`${href}/`);
     });
-    const key = under(path, directRoot)
-      ? DIRECT_PATHS_KEY
-      : (searchSpaceRoom?.room_id ?? space?.room_id);
+    const key = under(path, directRoot) ? DIRECT_PATHS_KEY : space?.room_id;
     if (key === undefined || spacePaths[key] === path) return;
 
     spacePaths = { ...spacePaths, [key]: path };
@@ -874,6 +868,15 @@
     side="right"
     align="start"
   >
+    <ActionMenuItem
+      onSelect={() => {
+        onMarkFolderRead?.(folder);
+      }}
+    >
+      <ChecksIcon />
+      {$i18n.t('nav.markSectionRead')}
+    </ActionMenuItem>
+    <ActionMenuSeparator />
     <ActionMenuItem
       onSelect={() => {
         onRenameFolder?.(folder);

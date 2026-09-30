@@ -77,7 +77,9 @@ test('falls back to the homeserver preview for a video YouTube will not describe
   render(YoutubeEmbed, { url: bundled.url, encrypted: false, bundled });
   await settle();
 
-  expect(screen.getByRole('link', { name: 'Unavailable video' })).toHaveClass('youtube-preview');
+  expect(screen.getByRole('link', { name: 'Unavailable video' }).parentElement).toHaveClass(
+    'youtube-preview'
+  );
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 

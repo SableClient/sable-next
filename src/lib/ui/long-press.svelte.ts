@@ -14,7 +14,7 @@ export interface LongPressOptions {
 
 export function touchContextMenu(event: MouseEvent): boolean {
   const kind = (event as Partial<PointerEvent>).pointerType;
-  return kind === 'touch' || kind === 'pen' || (kind === undefined && touchActive());
+  return kind === 'touch' || kind === 'pen' || (!kind && touchActive());
 }
 
 export function mouseContextMenu<E extends MouseEvent>(
@@ -67,27 +67,26 @@ export class LongPress {
   }
 
   start = (event: PointerEvent): void => {
-    this.touch = event.pointerType !== 'mouse';
     if (this.options.stopPropagation) event.stopPropagation();
+    if (!event.isPrimary) return;
+    this.cancel();
+    this.touch = event.pointerType !== 'mouse';
+    this.fired = false;
     if (event.pointerType === 'mouse') return;
     if (this.options.enabled && !this.options.enabled()) return;
 
-    this.fired = false;
     this.pressing = true;
     this.#held = true;
-    this.#menuSeen = false;
     this.#origin = { x: event.clientX, y: event.clientY };
     this.#timer = setTimeout(() => {
-      this.#timer = undefined;
-      this.#origin = null;
       this.fire(event);
     }, this.options.delayMs ?? LONG_PRESS_MS);
   };
 
   fire(event: MouseEvent): void {
-    this.#held = false;
+    this.cancel();
+    if (this.options.enabled && !this.options.enabled()) return;
     this.fired = true;
-    this.pressing = false;
     hapticFeedback('medium');
     armTrailingClickSwallow();
     this.options.onPress(event);
@@ -95,6 +94,7 @@ export class LongPress {
 
   move = (event: PointerEvent): void => {
     if (this.options.stopPropagation) event.stopPropagation();
+    if (!event.isPrimary) return;
     if (!this.#origin) return;
 
     const moved =
@@ -107,6 +107,7 @@ export class LongPress {
   };
 
   lift = (event: PointerEvent): void => {
+    if (!event.isPrimary) return;
     this.#held = false;
     this.end(event);
   };
@@ -118,12 +119,14 @@ export class LongPress {
   };
 
   cancelled = (event: PointerEvent): void => {
+    if (!event.isPrimary) return;
     this.end(event);
     if (this.#held && this.#menuSeen) this.fire(event);
   };
 
   end = (event?: PointerEvent): void => {
     if (this.options.stopPropagation) event?.stopPropagation();
+    if (event && !event.isPrimary) return;
     if (this.#timer) clearTimeout(this.#timer);
     this.#timer = undefined;
     this.#origin = null;
@@ -132,8 +135,7 @@ export class LongPress {
 
   cancel(): void {
     this.#held = false;
-    if (this.#timer) clearTimeout(this.#timer);
-    this.#timer = undefined;
-    this.pressing = false;
+    this.#menuSeen = false;
+    this.end();
   }
 }

@@ -1,12 +1,34 @@
 import { render } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+
+const native = vi.hoisted(() => ({
+  onFocus: null as ((focused: boolean) => void) | null,
+}));
+
+vi.mock('#lib/platform/window-decorations.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#lib/platform/window-decorations.js')>()),
+  watchWindowFocus: (onFocus: (focused: boolean) => void) => {
+    native.onFocus = onFocus;
+    return Promise.resolve(() => {});
+  },
+}));
 
 import type { TimelineItemView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
 import TimelineReadReceipt from './TimelineReadReceipt.svelte';
+
+beforeEach(() => {
+  native.onFocus = null;
+  vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
 
 function item(): TimelineItemView {
   return {
@@ -126,6 +148,36 @@ test('a focused timeline read to the live end sends a receipt', async () => {
 function itemWithId(id: string): TimelineItemView {
   return { ...item(), id, event_id: `$${id}` };
 }
+
+test('new messages stay unread after native focus is lost while the page reports visible', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [itemWithId('a')];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const props = $state({ timeline, visibleEventId: '$a', onRead: read });
+  const instance = render(TimelineReadReceipt, { props });
+
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenCalledExactlyOnceWith('$a');
+
+  native.onFocus?.(false);
+  await tick();
+  timeline.items = [...timeline.items, itemWithId('b')];
+  props.visibleEventId = '$b';
+  await tick();
+  await vi.advanceTimersByTimeAsync(1000);
+
+  expect(document.visibilityState).toBe('visible');
+  expect(document.hasFocus()).toBe(true);
+  expect(read).toHaveBeenCalledTimes(1);
+
+  native.onFocus?.(true);
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenNthCalledWith(2, '$b');
+  instance.unmount();
+});
 
 test('a fast scroll across many rows sends one receipt for the newest', async () => {
   vi.useFakeTimers();
@@ -294,6 +346,40 @@ test('hiding the document sends the pending receipt rather than losing it', asyn
   expect(read).toHaveBeenCalledWith('$a');
 
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  instance.unmount();
+  vi.useRealTimers();
+});
+
+test('unread navigation blocks receipts even when the viewport is at latest', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const props = $state({ timeline, visibleEventId: '$latest', enabled: false, onRead: read });
+  const instance = render(TimelineReadReceipt, { props });
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
+  props.enabled = true;
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenCalledWith('$latest');
+  instance.unmount();
+  vi.useRealTimers();
+});
+
+test('blocking receipts discards a previously queued receipt', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const props = $state({ timeline, visibleEventId: '$latest', enabled: true, onRead: read });
+  const instance = render(TimelineReadReceipt, { props });
+  await tick();
+  props.enabled = false;
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
   instance.unmount();
   vi.useRealTimers();
 });

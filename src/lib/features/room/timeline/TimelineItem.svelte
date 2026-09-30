@@ -8,6 +8,7 @@
   } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import '../members/avatar-button.css';
   import { memberIdentity } from '../members/members.js';
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { cursorAnchor, type CursorAnchor } from '#lib/ui/cursor-anchor.js';
@@ -47,9 +48,8 @@
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import { useMessageMenu } from '../messages/message-menu-open.svelte.js';
   import '#lib/ui/primitives/menu.css';
-  import PersonaProfile from '../members/PersonaProfile.svelte';
   import ReadReceiptStack from './ReadReceiptStack.svelte';
-  import { trailingReceipt } from './receipt-fit';
+  import { receiptReserve } from './receipt-reserve';
   import SenderName from '../members/SenderName.svelte';
   import RoleTagIcon from '../members/RoleTagIcon.svelte';
   import { hasSenderRoles, useSenderRoles } from '../members/sender-roles.js';
@@ -80,7 +80,11 @@
     roomId?: string;
     highlighted?: boolean;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onSenderProfile?: (
+      userId: string,
+      anchor: HTMLElement,
+      pmp?: PerMessageProfileView | null
+    ) => void;
     onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -99,11 +103,10 @@
     members?: readonly MemberView[];
     onJumpToEvent?: (eventId: string) => void;
     onOpenMedia?: (eventId: string) => void;
-    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     events?: TimelineEventIndex;
-    onPersonaOpenChange?: (open: boolean) => void;
+    onMenuOpenChange?: (open: boolean) => void;
     placeholder?: boolean;
     placeholderCharacters?: number;
   }
@@ -143,11 +146,10 @@
     members = [],
     onJumpToEvent,
     onOpenMedia,
-    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     events,
-    onPersonaOpenChange,
+    onMenuOpenChange,
     placeholder = false,
     placeholderCharacters = 35,
   }: Props = $props();
@@ -369,7 +371,6 @@
   );
 
   let trailingReceiptBadge = $derived(actionable && showReceiptBadge && !receiptsInline);
-  let receiptBeside = $state(false);
 
   const rowPress = new LongPress({
     enabled: () => actionable,
@@ -419,7 +420,7 @@
   function pinActions(open: boolean): void {
     if (open) emoteAnchor = null;
     actionsPinned = open;
-    onPersonaOpenChange?.(open);
+    onMenuOpenChange?.(open);
   }
 
   function openContextMenu(event: MouseEvent): void {
@@ -448,11 +449,15 @@
   });
 
   function openSenderProfileAt(anchor: HTMLElement): void {
-    if (item.sender) onSenderProfile?.(item.sender, anchor);
+    if (item.sender) onSenderProfile?.(item.sender, anchor, persona);
   }
 
   function openSenderProfile(event: MouseEvent & { currentTarget: HTMLButtonElement }): void {
     openSenderProfileAt(event.currentTarget);
+  }
+
+  function openSenderAccountProfileAt(anchor: HTMLElement): void {
+    if (item.sender) onSenderProfile?.(item.sender, anchor);
   }
 
   let nameOpensProfile = $derived(
@@ -464,11 +469,6 @@
 
   function mentionSender(): void {
     if (item.sender) onMentionUser?.(item.sender, accountName);
-  }
-
-  function openAccountFromPersona(anchor: HTMLElement | null): void {
-    const target = anchor ?? messageRow;
-    if (item.sender && target) onSenderProfile?.(item.sender, target);
   }
 </script>
 
@@ -613,25 +613,7 @@
         {/if}
       </div>
     {:else if !collapsed}
-      {#if persona && item.sender}
-        <PersonaProfile
-          profile={persona}
-          accountId={item.sender}
-          {accountName}
-          label={$i18n.t('timeline.personaProfile', { name: senderName })}
-          onOpenAccount={openAccountFromPersona}
-          onAvatarClick={onPersonaAvatarClick}
-          onOpenChange={onPersonaOpenChange}
-        >
-          <Avatar
-            class="message-avatar"
-            src={senderAvatar}
-            size="small"
-            id={personaTint ? null : item.sender}
-            name={senderName}
-          />
-        </PersonaProfile>
-      {:else if item.sender && onSenderProfile}
+      {#if item.sender && onSenderProfile}
         <button
           class="avatar-button"
           type="button"
@@ -657,12 +639,8 @@
       {/if}
     {/if}
     <div
-      class={['message-content', { 'receipt-beside': trailingReceiptBadge && receiptBeside }]}
-      {@attach trailingReceiptBadge
-        ? trailingReceipt((fits) => {
-            receiptBeside = fits;
-          })
-        : undefined}
+      class="message-content"
+      style:--receipt-reserve={trailingReceiptBadge ? `${String(receiptWidth)}px` : undefined}
     >
       {#if item.in_reply_to && preferences.replyPreviewStyle === 'connected'}
         {@const target = item.in_reply_to.event_id}
@@ -696,7 +674,7 @@
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
-              onViaProfile={persona ? openSenderProfileAt : undefined}
+              onViaProfile={openSenderAccountProfileAt}
             />
             {#if senderRoleIcon}
               <RoleTagIcon icon={senderRoleIcon} />
@@ -758,6 +736,7 @@
           <div
             class={['emote', { 'has-receipts': inlineReceipts }]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             * <SenderName
               displayName={senderName}
@@ -783,6 +762,7 @@
               { notice, 'has-edited': item.content.edited, 'has-receipts': inlineReceipts },
             ]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             <!-- Trails the body, where the edit happened, not the header. -->
@@ -808,6 +788,7 @@
           <div
             class={{ 'content-bubble': layout === 'bubble', 'has-receipts': inlineReceipts }}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
+            {@attach inlineReceipts ? receiptReserve : undefined}
           >
             <MessageBody {item} {canRedactOthers} />
             {#if inlineReceipts}
@@ -955,8 +936,11 @@
             </span>
           </p>
         {/if}
+        {#if trailingReceiptBadge}
+          <span class="receipt-tail" aria-hidden="true"></span>
+        {/if}
       </div>
-      {#if actionable && showReceiptBadge && !receiptsInline}
+      {#if trailingReceiptBadge}
         {@render receiptSlot()}
       {/if}
     </div>
@@ -1373,12 +1357,6 @@
   }
 
   .message-content > .receipt-slot {
-    grid-column: 1;
-    margin-inline-start: var(--space-200);
-    place-self: end;
-  }
-
-  .receipt-beside > .receipt-slot {
     inset-block-end: 0;
     inset-inline-end: 0;
     position: absolute;
@@ -1403,6 +1381,14 @@
     inline-size: var(--receipt-reserve);
   }
 
+  .has-receipts:global([data-receipt-narrow]) {
+    padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
+  }
+
+  .has-receipts:global([data-receipt-narrow]) .receipt-space {
+    display: none;
+  }
+
   .message header {
     align-items: center;
     display: flex;
@@ -1418,6 +1404,7 @@
     align-items: center;
     display: flex;
     flex-grow: 1;
+    flex-shrink: 0;
     font-size: var(--font-size-small);
     justify-content: end;
     min-width: 0;
@@ -1788,6 +1775,11 @@
     flex-direction: column;
   }
 
+  .message.layout-bubble .message-main > * {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .message.layout-bubble .content-bubble,
   .message.layout-bubble :global(.formatted-body) {
     background: var(--surface-var-container);
@@ -1824,8 +1816,36 @@
     display: inline-block;
   }
 
-  .message.layout-bubble .receipt-space {
+  .message.layout-bubble .receipt-space,
+  .message.layout-bubble .receipt-tail {
     display: none;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) {
+    align-items: flex-end;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) > * {
+    flex: 0 0 100%;
+    min-width: 0;
+  }
+
+  .message:not(.layout-bubble) .message-main:has(> .receipt-tail) > :nth-last-child(2) {
+    flex: 0 1 auto;
+  }
+
+  .message:not(.layout-bubble) .message-main > .receipt-tail {
+    flex: none;
+    inline-size: calc(var(--receipt-reserve) + var(--space-200));
+    margin-inline-start: auto;
+  }
+
+  .message.layout-bubble:not(.own.align-own)
+    .message-main:has(> .receipt-tail)
+    > :nth-last-child(2) {
+    margin-inline-end: calc(var(--receipt-reserve) + var(--space-200));
   }
 
   .message.layout-bubble.own.align-own .has-edited {

@@ -7,10 +7,11 @@ import * as Sentry from '@sentry/sveltekit';
 vi.mock('@sentry/sveltekit', () => ({
   captureException: vi.fn(),
   consoleLoggingIntegration: vi.fn(),
+  captureConsoleIntegration: vi.fn(() => ({ name: 'CaptureConsole' })),
   init: vi.fn(),
 }));
 vi.mock('#lib/platform/telemetry.js', () => ({
-  syncNativeTelemetryConsent: vi.fn(),
+  syncTelemetryConsent: vi.fn(),
 }));
 vi.mock('#lib/settings/preferences.svelte.js', () => ({
   preferences: { errorReporting: false },
@@ -75,4 +76,41 @@ test('scrubs matrix identifiers from every streamed span', async () => {
 
   expect(span?.name).not.toContain('!abc:example.org');
   expect(span?.attributes).toEqual({ 'url.path': '/rooms/![ROOM_ID]' });
+});
+
+test('captures handled console errors as issues', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+  await import('./hooks.client.js');
+
+  expect(Sentry.captureConsoleIntegration).toHaveBeenCalledWith({ levels: ['error'] });
+});
+
+test('continues reporting new errors after fifty events', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+  await import('./hooks.client.js');
+  const options = vi.mocked(Sentry.init).mock.calls[0][0];
+
+  for (let index = 0; index < 60; index += 1) {
+    const event = { type: undefined, message: `failure ${index}` };
+    expect(options.beforeSend?.(event, {})).toBe(event);
+  }
+});
+
+test('scrubs custom grouping and captured console arguments', async () => {
+  preferences.errorReporting = true;
+  vi.stubEnv('VITE_SENTRY_DSN', 'https://public@example.invalid/1');
+  await import('./hooks.client.js');
+  const options = vi.mocked(Sentry.init).mock.calls[0][0];
+  const event = {
+    type: undefined,
+    fingerprint: ['worker-crash', '!private:example.org'],
+    extra: { arguments: ['token=secret', '!private:example.org'], roomId: '!private:example.org' },
+    tags: { source: 'worker' },
+  };
+
+  const sent = options.beforeSend?.(event, {});
+  expect(JSON.stringify(sent)).not.toContain('secret');
+  expect(JSON.stringify(sent)).not.toContain('!private:example.org');
 });

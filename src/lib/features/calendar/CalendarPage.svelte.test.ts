@@ -85,6 +85,15 @@ const core = Object.assign(baseCore, {
   ),
 });
 
+test('offers room settings and members from the calendar header', async () => {
+  const user = userEvent.setup();
+  render(CalendarPage, { roomId: '!cal:x' });
+
+  await user.click(screen.getByRole('button', { name: 'More options' }));
+  expect(screen.getByRole('menuitem', { name: 'Settings' })).toBeInTheDocument();
+  expect(screen.getByRole('menuitem', { name: 'Members' })).toBeInTheDocument();
+});
+
 test('lists who answered each event, by name', async () => {
   render(CalendarPage, { roomId: '!cal:x' });
 

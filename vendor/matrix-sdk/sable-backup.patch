@@ -1,0 +1,171 @@
+--- a/src/encryption/backups/mod.rs
++++ b/src/encryption/backups/mod.rs
+@@ -69,6 +69,146 @@
+     pub(super) client: Client,
+ }
+ 
++/// Counts for the local crypto store and the current server backup.
++#[derive(Clone, Debug)]
++pub struct BackupStatus {
++    /// Number of locally stored session keys.
++    pub local_keys: u64,
++    /// Local keys stored in the current server backup.
++    pub backed_up_keys: u64,
++    /// Number reported by the server, or `None` when no backup exists.
++    pub cloud_keys: Option<u64>,
++    /// Whether the locally stored private key matches the current backup.
++    pub can_restore: bool,
++}
++
++/// Progress of a bulk restore. Existing keys count as processed, not imported.
++#[derive(Clone, Copy, Debug, Default)]
++pub struct BackupDownloadProgress {
++    /// Keys in the downloaded response.
++    pub total: usize,
++    /// Keys checked so far, including invalid keys.
++    pub processed: usize,
++    /// Keys newly imported or improved in the crypto store.
++    pub imported: usize,
++    /// Keys that could not be decoded or decrypted.
++    pub failed: usize,
++}
++
++impl Backups {
++    /// Fetch current server metadata and local counts without exporting keys.
++    pub async fn status(&self) -> Result<BackupStatus, Error> {
++        let olm_machine = self.client.olm_machine().await;
++        let olm_machine = olm_machine.as_ref().ok_or(Error::NoOlmMachine)?;
++        let counts = olm_machine.backup_machine().room_key_counts().await?;
++        let keys = olm_machine.store().load_backup_keys().await?;
++        let current = self.get_current_version().await?;
++        let same_version = current
++            .as_ref()
++            .is_some_and(|info| keys.backup_version.as_ref() == Some(&info.version));
++        let backup_info = current
++            .as_ref()
++            .map(|info| info.algorithm.deserialize_as::<RoomKeyBackupInfo>())
++            .transpose()?;
++        let can_restore = same_version
++            && backup_info.as_ref().is_some_and(|info| {
++                keys.decryption_key
++                    .as_ref()
++                    .is_some_and(|key| key.backup_key_matches(info))
++            });
++        Ok(BackupStatus {
++            local_keys: counts.total as u64,
++            backed_up_keys: if same_version {
++                counts.backed_up as u64
++            } else {
++                0
++            },
++            cloud_keys: current.map(|info| info.count.into()),
++            can_restore,
++        })
++    }
++
++    /// Restore the current backup using its locally stored private key.
++    ///
++    /// The server response is not paginated. Progress begins after downloading
++    /// it, then advances as batches are checked and imported. Keys retain the
++    /// same trust semantics and notifications as automatic backup downloads.
++    pub async fn download_all_room_keys_with_progress(
++        &self,
++        progress: impl Fn(BackupDownloadProgress),
++    ) -> Result<BackupDownloadProgress, Error> {
++        let _guard = self.client.locks().backup_modify_lock.lock().await;
++        let olm_machine = self.client.olm_machine().await;
++        let olm_machine = olm_machine.as_ref().ok_or(Error::NoOlmMachine)?;
++        let keys = olm_machine.store().load_backup_keys().await?;
++        let key = keys.decryption_key.ok_or(Error::BackupNotEnabled)?;
++        let version = keys.backup_version.ok_or(Error::BackupNotEnabled)?;
++        let current = self
++            .get_current_version()
++            .await?
++            .ok_or(Error::BackupNotEnabled)?;
++        let backup_info = current.algorithm.deserialize_as::<RoomKeyBackupInfo>()?;
++        if current.version != version || !key.backup_key_matches(&backup_info) {
++            return Err(Error::BackupNotEnabled);
++        }
++        let response = self
++            .client
++            .send(get_backup_keys::v3::Request::new(version.clone()))
++            .await?;
++        let mut counts = BackupDownloadProgress {
++            total: response
++                .rooms
++                .values()
++                .map(|room| room.sessions.len())
++                .sum(),
++            ..Default::default()
++        };
++        progress(counts);
++        let mut batch: BTreeMap<OwnedRoomId, RoomKeyBackup> = BTreeMap::new();
++        let mut batch_count = 0;
++        for (room_id, room_keys) in response.rooms {
++            for (session_id, room_key) in room_keys.sessions {
++                batch
++                    .entry(room_id.clone())
++                    .or_insert_with(|| RoomKeyBackup::new(BTreeMap::new()))
++                    .sessions
++                    .insert(session_id, room_key);
++                batch_count += 1;
++                if batch_count == 100 {
++                    let result = self
++                        .handle_downloaded_room_keys(
++                            get_backup_keys::v3::Response::new(std::mem::take(&mut batch)),
++                            key.clone(),
++                            &version,
++                            olm_machine,
++                        )
++                        .await?;
++                    counts.processed += batch_count;
++                    counts.imported += result.imported_count;
++                    counts.failed += batch_count - result.total_count;
++                    batch_count = 0;
++                    progress(counts);
++                }
++            }
++        }
++        if batch_count > 0 {
++            let result = self
++                .handle_downloaded_room_keys(
++                    get_backup_keys::v3::Response::new(batch),
++                    key,
++                    &version,
++                    olm_machine,
++                )
++                .await?;
++            counts.processed += batch_count;
++            counts.imported += result.imported_count;
++            counts.failed += batch_count - result.total_count;
++            progress(counts);
++        }
++        Ok(counts)
++    }
++}
++
+ impl Backups {
+     /// Create a new backup version, encrypted with a new backup recovery key.
+     ///
+@@ -574,7 +714,7 @@
+         backup_decryption_key: BackupDecryptionKey,
+         backup_version: &str,
+         olm_machine: &OlmMachine,
+-    ) -> Result<(), Error> {
++    ) -> Result<RoomKeyImportResult, Error> {
+         let mut decrypted_room_keys: Vec<_> = Vec::new();
+ 
+         for (room_id, room_keys) in backed_up_keys.rooms {
+@@ -617,9 +757,9 @@
+ 
+         // Since we can't use the usual room keys stream from the `OlmMachine`
+         // we're going to send things out in our own custom broadcaster.
+-        let _ = self.client.inner.e2ee.backup_state.room_keys_broadcaster.send(result);
+-
+-        Ok(())
++        let _ = self.client.inner.e2ee.backup_state.room_keys_broadcaster.send(result.clone());
++
++        Ok(result)
+     }
+ 
+     /// Download all room keys from the backup on the homeserver.

@@ -26,3 +26,5 @@ minimumReleaseAgeExclude:
   - '@sentry/server-utils@11.0.0'
   - '@sentry/svelte@11.0.0'
   - '@sentry/sveltekit@11.0.0'
+patchedDependencies:
+  svelte@5.57.1: patches/svelte@5.57.1.patch

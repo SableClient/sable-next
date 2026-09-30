@@ -1,6 +1,6 @@
 import { createSubscriber } from 'svelte/reactivity';
 
-import { readJson } from '#lib/platform/local-json.js';
+import { readJson, readText, writeJson, writeText } from '#lib/platform/local-json.js';
 
 import { sanitizePayload, scrubMatrixIds } from './scrubbers.js';
 
@@ -34,9 +34,14 @@ const DISABLED_CATEGORIES_KEY = 'sable-debug-disabled-categories';
 const consoleMethods = ['error', 'warn', 'info', 'debug'] as const;
 
 type ConsoleMethod = (typeof consoleMethods)[number];
+type ConsoleInterceptor = {
+  active: boolean;
+  original: (...args: unknown[]) => void;
+  wrapped: (...args: unknown[]) => void;
+};
 
 function readEnabled(): boolean {
-  return typeof localStorage !== 'undefined' && localStorage.getItem(ENABLED_KEY) === '1';
+  return readText(ENABLED_KEY) === '1';
 }
 
 function readDisabledCategories(): DebugLogCategory[] {
@@ -53,7 +58,7 @@ function readDisabledCategories(): DebugLogCategory[] {
 const buffer: DebugLogEntry[] = [];
 /* eslint-disable svelte/prefer-svelte-reactivity */
 const disabledCategories = new Set<DebugLogCategory>(readDisabledCategories());
-const originalConsole = new Map<ConsoleMethod, (...args: unknown[]) => void>();
+const consoleInterceptors = new Map<ConsoleMethod, ConsoleInterceptor>();
 const captureListeners = new Set<(enabled: boolean) => void>();
 /* eslint-enable svelte/prefer-svelte-reactivity */
 
@@ -129,45 +134,50 @@ function formatConsoleArgs(args: unknown[]): string {
 }
 
 function interceptConsole(): void {
-  if (originalConsole.size > 0) return;
+  if (consoleInterceptors.size > 0) return;
   for (const method of consoleMethods) {
     const original = console[method].bind(console);
-    originalConsole.set(method, original);
-    console[method] = (...args: unknown[]) => {
-      if (interceptingConsole) {
+    const interceptor: ConsoleInterceptor = { active: true, original, wrapped };
+    function wrapped(...args: unknown[]): void {
+      if (!interceptor.active || interceptingConsole) {
         original(...args);
         return;
       }
 
       interceptingConsole = true;
-      append({
-        timestamp: Date.now(),
-        level: method === 'error' ? 'error' : method === 'warn' ? 'warn' : method,
-        category: method === 'error' ? 'error' : 'general',
-        namespace: 'console',
-        message: scrubMatrixIds(formatConsoleArgs(args)),
-      });
-      original(...args);
-      interceptingConsole = false;
-    };
+      try {
+        append({
+          timestamp: Date.now(),
+          level: method === 'error' ? 'error' : method === 'warn' ? 'warn' : method,
+          category: method === 'error' ? 'error' : 'general',
+          namespace: 'console',
+          message: scrubMatrixIds(formatConsoleArgs(args)),
+        });
+        original(...args);
+      } finally {
+        interceptingConsole = false;
+      }
+    }
+    consoleInterceptors.set(method, interceptor);
+    console[method] = wrapped;
   }
 }
 
 function restoreConsole(): void {
   for (const method of consoleMethods) {
-    const original = originalConsole.get(method);
-    if (original) console[method] = original;
+    const interceptor = consoleInterceptors.get(method);
+    if (!interceptor) continue;
+    interceptor.active = false;
+    if (console[method] === interceptor.wrapped) console[method] = interceptor.original;
   }
-  originalConsole.clear();
+  consoleInterceptors.clear();
 }
 
 export function setDebugLogging(next: boolean): void {
   enabled = next;
   if (next) interceptConsole();
   else restoreConsole();
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(ENABLED_KEY, next ? '1' : '0');
-  }
+  writeText(ENABLED_KEY, next ? '1' : '0');
   notify?.();
   for (const listener of captureListeners) listener(next);
 }
@@ -185,9 +195,7 @@ if (enabled) interceptConsole();
 export function setDebugCategoryEnabled(category: DebugLogCategory, next: boolean): void {
   if (next) disabledCategories.delete(category);
   else disabledCategories.add(category);
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(DISABLED_CATEGORIES_KEY, JSON.stringify([...disabledCategories]));
-  }
+  writeJson(DISABLED_CATEGORIES_KEY, [...disabledCategories]);
   notify?.();
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { readText, writeText, removeLocalValue } from '#lib/platform/local-json.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -114,7 +115,7 @@
   }
 
   function freshRecord(encryption: EncryptionStatusView): SetupRecord {
-    const marker = localStorage.getItem(profileOnboardingMarker(userId));
+    const marker = readText(profileOnboardingMarker(userId));
     let homeserver = '';
     try {
       const parsed = JSON.parse(marker ?? 'null') as { homeserver?: unknown } | null;
@@ -140,8 +141,8 @@
       }),
       permissionState().then((state) => state === 'prompt'),
     ]);
-    const base = readSetupRecord(localStorage, key) ?? freshRecord(encryption);
-    localStorage.removeItem(profileOnboardingMarker(userId));
+    const base = readSetupRecord({ getItem: readText }, key) ?? freshRecord(encryption);
+    removeLocalValue(profileOnboardingMarker(userId));
     settle(key, base);
   }
 
@@ -152,11 +153,11 @@
       : base;
     const upcoming = pendingStep(next);
     if (!upcoming) {
-      localStorage.removeItem(key);
+      removeLocalValue(key);
       leave(takeAfterLogin(resolve('/(app)/rooms')), reload);
       return;
     }
-    writeSetupRecord(localStorage, key, next);
+    writeSetupRecord({ setItem: writeText }, key, next);
     record = next;
     const target = stepRoute(upcoming);
     if (reload) location.assign(target);

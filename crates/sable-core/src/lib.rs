@@ -19,6 +19,7 @@ pub mod matrix_html;
 mod media;
 mod media_health;
 pub use media::GalleryAttachment;
+mod key_backup;
 mod messages;
 pub mod notifications;
 mod outgoing;
@@ -100,6 +101,9 @@ pub struct Core {
     >,
     cosmetics: std::sync::Mutex<cosmetics::CosmeticsCache>,
     media_health: std::sync::Mutex<media_health::MediaHealth>,
+    media_downloads: tokio::sync::Semaphore,
+    key_backup_downloads: tokio::sync::Semaphore,
+    key_backup_download: std::sync::Mutex<Option<protocol::KeyBackupDownloadView>>,
     notification_routes: Mutex<HashMap<String, watchers::NotificationRoute>>,
     session_swap_lock: Mutex<()>,
     restore_lock: Mutex<()>,
@@ -127,7 +131,9 @@ pub struct Core {
     notify_once: AtomicBool,
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
+    search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
+    app_active: AtomicBool,
     server_search_enabled: AtomicBool,
     read_room: std::sync::Mutex<Option<OwnedRoomId>>,
     search_index: Mutex<search::MessageIndex>,
@@ -227,7 +233,9 @@ impl Core {
             notify_once: AtomicBool::new(true),
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
+            search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
+            app_active: AtomicBool::new(true),
             server_search_enabled: AtomicBool::new(true),
             read_room: std::sync::Mutex::new(None),
             next_subscription: AtomicU32::new(1),
@@ -236,6 +244,8 @@ impl Core {
             next_timeline_access: AtomicU64::new(1),
             next_registration_attempt: AtomicU64::new(1),
             session_generation: AtomicU64::new(1),
+            key_backup_downloads: tokio::sync::Semaphore::new(1),
+            key_backup_download: std::sync::Mutex::new(None),
             session_attempt_generation: AtomicU64::new(1),
             session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
@@ -245,6 +255,7 @@ impl Core {
             probed_pinned_rooms: std::sync::Mutex::new(HashMap::new()),
             cosmetics: std::sync::Mutex::new(cosmetics::CosmeticsCache::default()),
             media_health: std::sync::Mutex::new(media_health::MediaHealth::default()),
+            media_downloads: tokio::sync::Semaphore::new(media::MAX_MEDIA_DOWNLOADS),
             notification_routes: Mutex::new(HashMap::new()),
             session_swap_lock: Mutex::new(()),
             restore_lock: Mutex::new(()),
@@ -348,6 +359,20 @@ impl Core {
 
     pub(crate) fn foreground_paginations(&self) -> u32 {
         self.foreground_paginations.load(Ordering::Relaxed)
+    }
+
+    pub fn set_app_active(&self, active: bool) {
+        self.app_active.store(active, Ordering::Relaxed);
+    }
+
+    pub fn set_search_network_unmetered(&self, unmetered: bool) {
+        self.search_network.set_unmetered(unmetered);
+    }
+
+    pub(crate) fn search_crawl_active(&self) -> bool {
+        self.app_active.load(Ordering::Relaxed)
+            && self.search_foreground.load(Ordering::Relaxed)
+            && self.search_network.allows_crawl()
     }
 
     pub(crate) fn begin_foreground_pagination(self: &Arc<Self>) -> ForegroundPagination {
@@ -605,6 +630,21 @@ mod tests {
         }
     }
 
+    #[test]
+    fn app_activity_gates_the_search_crawler() {
+        let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        core.set_search_network_unmetered(true);
+        assert!(core.search_crawl_active());
+
+        core.set_app_active(false);
+        assert!(!core.search_crawl_active());
+
+        core.set_app_active(true);
+        assert!(core.search_crawl_active());
+        core.search_foreground.store(false, Ordering::Relaxed);
+        assert!(!core.search_crawl_active());
+    }
+
     #[tokio::test]
     async fn commands_before_login_are_rejected() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
@@ -756,7 +796,9 @@ mod tests {
         );
 
         core.accounts().await.unwrap();
-        core.mark_account_needs_reauth(Some("a1")).await.unwrap();
+        core.mark_account_needs_reauth(Some("a1"), false)
+            .await
+            .unwrap();
 
         let stored: serde_json::Value =
             serde_json::from_slice(bytes.lock().await.as_deref().unwrap()).unwrap();

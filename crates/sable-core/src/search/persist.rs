@@ -538,6 +538,103 @@ pub(super) async fn forget_crawl(client: &matrix_sdk::Client) -> bool {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+pub(crate) async fn reset_state_cache(path: &std::path::Path) -> Result<(), String> {
+    use matrix_sdk::SqliteStateStore;
+    use matrix_sdk_base::StateStore as _;
+
+    let source = SqliteStateStore::open(path, None)
+        .await
+        .map_err(|error| error.to_string())?;
+    let temporary = tempfile::tempdir_in(path).map_err(|error| error.to_string())?;
+    let target = SqliteStateStore::open(temporary.path(), None)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let mut rooms: Vec<OwnedRoomId> = match copy_value(&source, &target, &rooms_key()).await? {
+        Some(bytes) => {
+            serde_json::from_slice(&decode(bytes)?).map_err(|error| error.to_string())?
+        }
+        None => Vec::new(),
+    };
+    let mut rooms_changed = false;
+    for room in source
+        .get_room_infos(&matrix_sdk::store::RoomLoadSettings::default())
+        .await
+        .map_err(|error| error.to_string())?
+    {
+        let room_id = room.room_id().to_owned();
+        if !rooms.contains(&room_id)
+            && source
+                .get_custom_value(&legacy_key(&room_id))
+                .await
+                .map_err(|error| error.to_string())?
+                .is_some()
+        {
+            rooms.push(room_id);
+            rooms_changed = true;
+        }
+    }
+    for room_id in &rooms {
+        let _ = copy_value(&source, &target, &legacy_key(room_id)).await?;
+        if let Some(bytes) = copy_value(&source, &target, &manifest_key(room_id)).await? {
+            let manifest: Manifest =
+                serde_json::from_slice(&decode(bytes)?).map_err(|error| error.to_string())?;
+            for chunk in manifest.chunks {
+                let _ = copy_value(&source, &target, &chunk_key(room_id, chunk.id)).await?;
+            }
+        }
+    }
+    if rooms_changed {
+        target
+            .set_custom_value_no_read(
+                &rooms_key(),
+                encode(&serde_json::to_vec(&rooms).map_err(|error| error.to_string())?),
+            )
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    let _ = copy_value(&source, &target, &crawl_key()).await?;
+    target.close().await.map_err(|error| error.to_string())?;
+    source.close().await.map_err(|error| error.to_string())?;
+
+    let database = matrix_sdk::STATE_STORE_DATABASE_NAME;
+    let replacement = temporary.path().join(database);
+    std::fs::File::open(&replacement)
+        .and_then(|file| file.sync_all())
+        .map_err(|error| error.to_string())?;
+    for suffix in ["-wal", "-shm"] {
+        let sidecar = path.join(format!("{database}{suffix}"));
+        match std::fs::remove_file(&sidecar) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("{}: {error}", sidecar.display())),
+        }
+    }
+    std::fs::rename(replacement, path.join(database)).map_err(|error| error.to_string())
+}
+
+#[cfg(not(target_family = "wasm"))]
+async fn copy_value(
+    source: &matrix_sdk::SqliteStateStore,
+    target: &matrix_sdk::SqliteStateStore,
+    key: &[u8],
+) -> Result<Option<Vec<u8>>, String> {
+    use matrix_sdk_base::StateStore as _;
+
+    let bytes = source
+        .get_custom_value(key)
+        .await
+        .map_err(|error| error.to_string())?;
+    if let Some(bytes) = &bytes {
+        target
+            .set_custom_value_no_read(key, bytes.clone())
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(bytes)
+}
+
 #[cfg(test)]
 mod codec_tests {
     use super::{decode, encode};
@@ -556,5 +653,96 @@ mod codec_tests {
         let list = br#"["!a:b"]"#.to_vec();
         assert_eq!(decode(object.clone()), Ok(object));
         assert_eq!(decode(list.clone()), Ok(list));
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn cache_reset_keeps_unlisted_legacy_documents() {
+        use matrix_sdk_base::{RoomInfo, RoomState, StateStore as _, store::StateChanges};
+
+        let directory = tempfile::tempdir().unwrap();
+        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
+            .await
+            .unwrap();
+        let room_id = matrix_sdk::ruma::room_id!("!legacy:example.org").to_owned();
+        let mut changes = StateChanges::default();
+        changes
+            .room_infos
+            .insert(room_id.clone(), RoomInfo::new(&room_id, RoomState::Joined));
+        store.save_changes(&changes).await.unwrap();
+        let legacy = br#"{"version":4,"documents":[],"classified":[]}"#.to_vec();
+        store
+            .set_custom_value_no_read(&super::legacy_key(&room_id), legacy.clone())
+            .await
+            .unwrap();
+        store.close().await.unwrap();
+
+        super::reset_state_cache(directory.path()).await.unwrap();
+
+        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            store
+                .get_custom_value(&super::legacy_key(&room_id))
+                .await
+                .unwrap(),
+            Some(legacy)
+        );
+        let rooms: Vec<matrix_sdk::ruma::OwnedRoomId> = serde_json::from_slice(
+            &decode(
+                store
+                    .get_custom_value(&super::rooms_key())
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(rooms, vec![room_id]);
+        assert!(
+            store
+                .get_room_infos(&matrix_sdk::store::RoomLoadSettings::default())
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        store.close().await.unwrap();
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[tokio::test]
+    async fn cache_reset_leaves_the_original_store_when_search_data_cannot_be_read() {
+        use matrix_sdk_base::StateStore as _;
+
+        let directory = tempfile::tempdir().unwrap();
+        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
+            .await
+            .unwrap();
+        store
+            .set_custom_value_no_read(b"marker", b"cached".to_vec())
+            .await
+            .unwrap();
+        store
+            .set_custom_value_no_read(&super::rooms_key(), b"invalid index".to_vec())
+            .await
+            .unwrap();
+        store.close().await.unwrap();
+
+        assert!(super::reset_state_cache(directory.path()).await.is_err());
+
+        let store = matrix_sdk::SqliteStateStore::open(directory.path(), None)
+            .await
+            .unwrap();
+        assert_eq!(
+            store.get_custom_value(b"marker").await.unwrap(),
+            Some(b"cached".to_vec())
+        );
+        assert_eq!(
+            store.get_custom_value(&super::rooms_key()).await.unwrap(),
+            Some(b"invalid index".to_vec())
+        );
+        store.close().await.unwrap();
     }
 }

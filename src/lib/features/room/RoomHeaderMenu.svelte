@@ -36,7 +36,7 @@
     onInvite: () => void;
     onMembers: () => void;
     onSettings: () => void;
-    onJumpToTime: () => void;
+    onJumpToTime?: () => void;
     onAttachments?: () => void;
     onThreads?: () => void;
     onPins?: () => void;
@@ -161,10 +161,12 @@
       <GearIcon />
       {$i18n.t('room.menuSettings')}
     </ActionMenuItem>
-    <ActionMenuItem onSelect={onJumpToTime}>
-      <ClockCounterClockwiseIcon />
-      {$i18n.t('room.menuJumpToTime')}
-    </ActionMenuItem>
+    {#if onJumpToTime}
+      <ActionMenuItem onSelect={onJumpToTime}>
+        <ClockCounterClockwiseIcon />
+        {$i18n.t('room.menuJumpToTime')}
+      </ActionMenuItem>
+    {/if}
 
     <ActionMenuSeparator />
 

@@ -17,12 +17,11 @@
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
   import type { SendGalleryOptions } from '#lib/core/commands.svelte.js';
-  import { maxAttachmentBytes } from '#lib/core/limits.js';
   import { useCoreClient } from '#lib/core/context.js';
   import type { ConversationSendResult } from '#lib/features/room/conversation/conversation.svelte.js';
   import type { ReplyDirection } from '#lib/features/room/timeline/timeline-format.js';
   import DeleteMessageDialog from '#lib/features/room/messages/DeleteMessageDialog.svelte';
-  import { LongPress, SCHEDULE_PRESS_MS, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, SCHEDULE_PRESS_MS, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
@@ -1009,35 +1008,39 @@
     updateTyping();
   }
 
-  function stage(files: File[]): void {
+  async function stage(files: File[]): Promise<void> {
     if (files.length === 0) return;
+    const targetRoom = roomId;
+    const accountId = core.session?.account_id;
+    const current = () => roomId === targetRoom && core.session?.account_id === accountId;
 
-    const tooLarge = files.find((file) => file.size > maxAttachmentBytes);
-    if (tooLarge) {
-      error = $i18n.t('composer.tooLarge', {
-        name: tooLarge.name,
-        limit: formatByteSize(maxAttachmentBytes),
-      });
-      return;
+    try {
+      const { upload_size } = await core.commands.mediaConfig();
+      if (!current() || readOnly) return;
+      const tooLarge = files.find((file) => file.size > upload_size);
+      if (tooLarge) {
+        error = $i18n.t('composer.tooLarge', {
+          name: tooLarge.name,
+          limit: formatByteSize(upload_size),
+        });
+        return;
+      }
+
+      error = null;
+      staged = stageFiles(staged, files, () => nextStagedId++);
+    } catch (cause) {
+      if (current()) {
+        const failure = sendFailure(cause);
+        error = $i18n.t(failure.key, failure.values);
+      }
     }
-
-    const total = [...staged.map((item) => item.file), ...files].reduce(
-      (bytes, file) => bytes + file.size,
-      0
-    );
-    if (total > maxAttachmentBytes) {
-      error = $i18n.t('composer.batchTooLarge', { limit: formatByteSize(maxAttachmentBytes) });
-      return;
-    }
-
-    staged = stageFiles(staged, files, () => nextStagedId++);
   }
 
   function pick(accept: string): void {
     void (async () => {
       const picked = await pickFiles(accept);
       if (picked !== null) {
-        stage(picked);
+        await stage(picked);
         return;
       }
 
@@ -1050,7 +1053,7 @@
   function stageFromInput(event: Event): void {
     const input = event.currentTarget;
     if (!(input instanceof HTMLInputElement)) return;
-    stage(input.files ? Array.from(input.files) : []);
+    void stage(input.files ? Array.from(input.files) : []);
     input.value = '';
   }
 
@@ -1065,7 +1068,7 @@
     const files = filesFrom(event.dataTransfer);
     if (files.length === 0) return;
     event.preventDefault();
-    stage(files);
+    void stage(files);
   }
 
   function handleDragover(event: DragEvent): void {
@@ -1084,7 +1087,7 @@
       onEnter: () => (dragging = !readOnly),
       onLeave: () => (dragging = false),
       onDrop: (files) => {
-        if (!readOnly) stage(files);
+        if (!readOnly) void stage(files);
       },
     })
   );
@@ -1439,12 +1442,17 @@
                               recording = true;
                             }
                           : undefined,
-                      onpointerdown: (event: PointerEvent) => {
-                        if (hasContent) event.preventDefault();
-                        sendPress.start(event);
-                      },
+                      onpointerdown: sendPress.start,
                       onpointermove: sendPress.move,
-                      onpointerup: sendPress.end,
+                      onpointerup: sendPress.lift,
+                      onkeydown: (event: KeyboardEvent) => {
+                        if (
+                          event.key === 'ContextMenu' ||
+                          (event.key === 'F10' && event.shiftKey)
+                        ) {
+                          sendPress.touch = false;
+                        }
+                      },
                     })}
                     type={primaryAction === 'record' ? 'button' : 'submit'}
                     variant="ghost"
@@ -1455,11 +1463,15 @@
                     disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
                     label={sendLabel}
                     onpointercancel={sendPress.end}
-                    oncontextmenu={mouseContextMenu((event: MouseEvent) => {
+                    oncontextmenu={(event: MouseEvent) => {
+                      if (sendPress.touch || touchContextMenu(event)) {
+                        event.preventDefault();
+                        return;
+                      }
                       if (!canSchedule) return;
                       event.preventDefault();
                       scheduleOpen = true;
-                    })}
+                    }}
                     onmousedown={(event: MouseEvent) => {
                       if (hasContent) event.preventDefault();
                     }}

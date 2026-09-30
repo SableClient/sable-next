@@ -3,6 +3,7 @@
   display: inline-flex;
   flex-wrap: nowrap;
   gap: var(--space-100);
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -20,6 +21,9 @@
   font-weight: var(--font-weight-medium);
   letter-spacing: normal;
   max-width: none;
+  overflow-wrap: anywhere;
+  text-align: start;
+  white-space: normal;
 }
 
 .name-button {
@@ -45,6 +49,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sender-identity-pronouns {
+  min-width: 0;
+  overflow: hidden;
 }
 
 :root[data-high-contrast='off'] .sender-identity-via {

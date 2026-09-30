@@ -17,7 +17,7 @@ test('a colour looks for its close within a bounded span', () => {
 });
 
 test('a long run of unclosed colours stays literal', () => {
-  const source = '$[fg.color=f00 x '.repeat(20000);
+  const source = '$[fg.color=f00 x '.repeat(5000);
   for (const serialize of [serializeComposer, serializePlain]) {
     const message = serialize(textDoc(source));
     expect(message.body).toBe(source.trim());

@@ -251,6 +251,7 @@ dependencies = [
  "objc2-photos",
  "percent-encoding",
  "pipewire",
+ "regex-lite",
  "sable-core",
  "sable-hdr",
  "sentry",
@@ -4495,7 +4496,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk"
 version = "0.19.1"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk?rev=bc2502ee3d3ba1dc687740df5be0f8635032399e#bc2502ee3d3ba1dc687740df5be0f8635032399e"
 dependencies = [
  "anymap2",
  "as_variant",
@@ -7399,6 +7399,7 @@ dependencies = [
  "sentry-contexts",
  "sentry-core",
  "sentry-debug-images",
+ "sentry-log",
  "sentry-panic",
  "sentry-tracing",
  "ureq",
@@ -7449,6 +7450,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "656487fd5f7b7c0105b2e82171982aac64489e0cb679436038febf070f2f76d6"
 dependencies = [
  "findshlibs",
+ "sentry-core",
+]
+
+[[package]]
+name = "sentry-log"
+version = "0.49.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba6c1bee99be05938885266fe5c95e0e4a2f46722cae205519f26e4ebdddd733"
+dependencies = [
+ "bitflags 2.13.2",
+ "log",
  "sentry-core",
 ]
 
@@ -8846,7 +8858,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-cef"
 version = "0.1.0"
-source = "git+https://github.com/SableClient/tauri-runtime-cef?rev=b83d02a135781b8d73d8d12d70a590d5063180a1#b83d02a135781b8d73d8d12d70a590d5063180a1"
+source = "git+https://github.com/SableClient/tauri-runtime-cef?rev=5dc073b6902f6c372b617ed6b7305d22b849db0e#5dc073b6902f6c372b617ed6b7305d22b849db0e"
 dependencies = [
  "base64 0.22.1",
  "cef",

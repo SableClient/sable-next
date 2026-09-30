@@ -45,7 +45,6 @@
     onClose: () => void;
     onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
     onCopyLink?: (eventId: string) => void;
-    onPersonaAvatarClick?: (source: string, displayName: string) => void;
   }
 
   let {
@@ -63,7 +62,6 @@
     onClose,
     onSenderProfile,
     onCopyLink,
-    onPersonaAvatarClick,
   }: Props = $props();
 
   let composer = $state<ConversationComposer>();
@@ -199,7 +197,6 @@
       onMentionUser={(userId, name) => composer?.insertMention(userId, name)}
       {onCopyLink}
       onOpenMedia={(eventId) => (mediaEventId = eventId)}
-      {onPersonaAvatarClick}
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}

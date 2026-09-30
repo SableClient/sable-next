@@ -5,6 +5,18 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("rust")
+    id("io.sentry.android.gradle") version "6.19.0"
+}
+
+sentry {
+    org.set(System.getenv("SENTRY_ORG"))
+    projectName.set(System.getenv("SENTRY_PROJECT"))
+    authToken.set(System.getenv("SENTRY_AUTH_TOKEN"))
+    autoUploadProguardMapping.set(!System.getenv("SENTRY_AUTH_TOKEN").isNullOrBlank())
+    tracingInstrumentation { enabled.set(false) }
+    autoInstallation { enabled.set(false) }
+    telemetry.set(false)
+    ignoredBuildTypes.set(setOf("debug"))
 }
 
 val tauriProperties = Properties().apply {
@@ -19,6 +31,7 @@ fun sentryBuildConfigValue(name: String): String =
 
 android {
     compileSdk = 36
+    System.getenv("ANDROID_NDK_VERSION")?.let { ndkVersion = it }
     namespace = "moe.sable.next"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
@@ -54,11 +67,6 @@ android {
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
-            packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
-            }
         }
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
@@ -99,6 +107,17 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.packaging.jniLibs.keepDebugSymbols.addAll(
+            "*/arm64-v8a/*.so",
+            "*/armeabi-v7a/*.so",
+            "*/x86/*.so",
+            "*/x86_64/*.so"
+        )
+    }
+}
+
 rust {
     // The repo root, not src-tauri: pnpm refuses to run in a directory with no
     // package.json of its own.
@@ -114,6 +133,7 @@ configurations.all {
 
 dependencies {
     implementation("io.sentry:sentry-android:8.58.0")
+    implementation("io.sentry:sentry-android-ndk:8.58.0")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")

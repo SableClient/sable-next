@@ -6,6 +6,7 @@ import { CoreError, type Transport } from '#src/transport';
 import { recentSearches, rememberSearch } from '#lib/features/search/recent-searches.svelte.js';
 
 import { createCoreClient } from './client.svelte.js';
+import { markVoiceRecording } from './attachment-info.js';
 
 const localNetwork = vi.hoisted(() => ({ gated: false, denied: false }));
 
@@ -36,14 +37,22 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
   const sent: { type: string }[] = [];
   const close = vi.fn();
   const resetCaches = vi.fn().mockResolvedValue(undefined);
+  const deleteAccountStore = vi.fn().mockResolvedValue(undefined);
   const send = vi.fn((command: { type: string }) => {
     sent.push(command);
-    return Promise.resolve(responses[command.type] ?? {});
+    return Promise.resolve(
+      responses[command.type] ??
+        (command.type === 'list_accounts'
+          ? { accounts: [] }
+          : command.type === 'media_config'
+            ? { upload_size: 100 * 1024 * 1024 }
+            : {})
+    );
   });
   const transport = {
     send,
     resetCaches,
-    deleteAccountStore: vi.fn().mockResolvedValue(undefined),
+    deleteAccountStore,
     subscribe: (listener: (event: CoreEvent) => void) => {
       listeners.add(listener);
 
@@ -68,6 +77,7 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     sent,
     close,
     resetCaches,
+    deleteAccountStore,
     emit: (event: CoreEvent) => {
       for (const listener of listeners) listener(event);
     },
@@ -76,6 +86,49 @@ function fakeTransport(responses: Record<string, unknown> = {}) {
     },
   };
 }
+
+test.each([false, true])(
+  'GIF and location commands serialize silentReply=%s',
+  async (silentReply) => {
+    const fake = fakeTransport();
+    const core = createCoreClient(() => fake.transport);
+    await core.commands.sendGif(
+      '!room:example.org',
+      'mxc://example.org/gif',
+      'cat.gif',
+      null,
+      null,
+      'image/gif',
+      null,
+      '$target',
+      null,
+      null,
+      silentReply
+    );
+    expect(fake.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'send_gif',
+        in_reply_to: '$target',
+        silent_reply: silentReply,
+      })
+    );
+    await core.commands.sendLocation(
+      '!room:example.org',
+      'here',
+      'geo:48,2',
+      '$target',
+      null,
+      silentReply
+    );
+    expect(fake.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: 'send_location',
+        in_reply_to: '$target',
+        silent_reply: silentReply,
+      })
+    );
+  }
+);
 
 test('a restore that returns a session leaves the client ready', async () => {
   const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
@@ -190,7 +243,7 @@ test("a restore that fails keeps every account's recent searches", async () => {
 
   await core.start();
 
-  expect(core.status).toBe('signed-out');
+  expect(core.status).toBe('error');
   expect(recentSearches(session.user_id)).toContain('rollback plan');
 });
 
@@ -204,16 +257,143 @@ test('a restore that returns no session reports signed out, not an error', async
   expect(core.session).toBeNull();
 });
 
-test('a transport that refuses to restore leaves the client signed out for relogin', async () => {
+test('a failed restore can retry without logging in or deleting stores', async () => {
   const fake = fakeTransport();
   fake.transport.send = vi.fn(() => Promise.reject(new Error('worker gone')));
-  const core = createCoreClient(() => fake.transport);
+  const recovered = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const open = vi.fn().mockReturnValueOnce(fake.transport).mockReturnValue(recovered.transport);
+  const core = createCoreClient(open);
 
   await core.start();
 
+  expect(core.status).toBe('error');
+  expect(core.session).toBeNull();
+  expect(fake.close).toHaveBeenCalledOnce();
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+  await core.start();
+  expect(core.status).toBe('ready');
+  expect(core.session?.device_id).toBe(session.device_id);
+  expect(recovered.sent.map((command) => command.type)).not.toContain('login');
+});
+
+test('a restored session survives an account-list failure and a retry', async () => {
+  const fake = fakeTransport({ restore: { session } });
+  fake.send.mockImplementation((command) =>
+    command.type === 'list_accounts'
+      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      : Promise.resolve({ session })
+  );
+  const recovered = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(
+    vi.fn().mockReturnValueOnce(fake.transport).mockReturnValue(recovered.transport)
+  );
+  await core.start();
+  expect(core.status).toBe('error');
+  expect(core.session?.device_id).toBe(session.device_id);
+  await core.start();
+  expect(core.status).toBe('ready');
+  expect(core.session?.device_id).toBe(session.device_id);
+});
+
+test.each(['list_accounts', 'switch_account'])(
+  'retry resumes fallback selection after a failed %s',
+  async (failedCommand) => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const retired = { ...session, needs_reauth: true };
+    const initial = fakeTransport({
+      restore: { session },
+      list_accounts: { accounts: [session, otherSession] },
+    });
+    const retry = fakeTransport({
+      restore: { session: null },
+      list_accounts: { accounts: [retired, otherSession] },
+      switch_account: { session: otherSession },
+    });
+    const core = createCoreClient(
+      vi.fn().mockReturnValueOnce(initial.transport).mockReturnValue(retry.transport)
+    );
+    await core.start();
+    initial.send.mockImplementation((command) =>
+      command.type === failedCommand
+        ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+        : Promise.resolve({ accounts: [retired, otherSession] })
+    );
+    initial.emit({ type: 'session_ended', reason: 'soft_logout' });
+    await vi.waitFor(() => {
+      expect(core.status).toBe('error');
+    });
+    await core.start();
+    expect(core.status).toBe('ready');
+    expect(core.session).toEqual(otherSession);
+    expect(core.restoreFailed).toBe(false);
+    expect(retry.sent).toContainEqual({
+      type: 'switch_account',
+      account_id: otherSession.account_id,
+    });
+  }
+);
+
+test('failed crypto restoration exposes saved accounts for deliberate recovery', async () => {
+  vi.stubGlobal('BroadcastChannel', undefined);
+  const fake = fakeTransport({ list_accounts: { accounts: [session, otherSession] } });
+  fake.send.mockImplementation((command) =>
+    command.type === 'restore'
+      ? Promise.reject(new CoreError({ code: 'failed', log_id: 'e1' }))
+      : Promise.resolve({ accounts: [session, otherSession] })
+  );
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  expect(core.restoreFailed).toBe(true);
+  expect(core.accounts).toEqual([session, otherSession]);
+});
+
+test('fresh sign-in recovery keeps saved account data and avoids old-device reauthentication', async () => {
+  vi.stubGlobal('BroadcastChannel', undefined);
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  core.restoreFailed = true;
+  core.reauthenticationAccountId = session.account_id;
+  core.beginSignInRecovery();
   expect(core.status).toBe('signed-out');
   expect(core.session).toBeNull();
+  expect(core.restoreFailed).toBe(false);
+  expect(core.reauthenticationAccountId).toBeNull();
+  expect(core.accounts).toEqual([session]);
+  expect(fake.sent).not.toContainEqual({ type: 'logout' });
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+  expect(fake.resetCaches).not.toHaveBeenCalled();
 });
+
+test.each(['password', 'oidc', 'sso', 'qr'])(
+  '%s recovery selects the new device when the old account belongs to the same user',
+  async (method) => {
+    vi.stubGlobal('BroadcastChannel', undefined);
+    const fresh = { ...session, account_id: 'new-device', device_id: 'NEW' };
+    const fake = fakeTransport({
+      restore: { session: fresh },
+      list_accounts: { accounts: [session, fresh] },
+      login: { user_id: session.user_id },
+      complete_oidc_login: { user_id: session.user_id },
+      complete_sso_login: { user_id: session.user_id },
+    });
+    const core = createCoreClient(() => fake.transport);
+    if (method === 'password') {
+      await core.login(session.homeserver, { kind: 'user', user: session.user_id }, 'password');
+    } else if (method === 'oidc') {
+      await core.completeOidcLogin('sable://oauth/callback?code=new');
+    } else if (method === 'sso') {
+      await core.completeSsoLogin('sable://sso/callback?loginToken=new');
+    } else {
+      await core.finishQrLogin(session.user_id);
+    }
+    expect(core.session).toEqual(fresh);
+    expect(core.status).toBe('ready');
+    expect(core.accounts).toEqual([session, fresh]);
+    expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+    core.stop();
+  }
+);
 
 test('concurrent starts share one restore', async () => {
   const fake = fakeTransport({ restore: { session: null } });
@@ -251,6 +431,74 @@ test('commands copy caller-provided arrays, so reactive proxies cannot reach the
     via: ['example.org'],
   });
   expect(() => structuredClone(sent)).not.toThrow();
+});
+
+test.each(['attachment', 'gallery', 'scheduled'] as const)(
+  '%s uploads use the server limit instead of 100 MiB',
+  async (kind) => {
+    const fake = fakeTransport({
+      media_config: { upload_size: 500 * 1024 * 1024 },
+      delayed_events_supported: { supported: true },
+      schedule_attachment: { delay_id: 'delayed' },
+    });
+    fake.transport.sendGallery = vi.fn();
+    const core = createCoreClient(() => fake.transport);
+    const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+    Object.defineProperty(file, 'size', { value: 200 * 1024 * 1024 });
+
+    if (kind === 'attachment') await core.commands.sendAttachment('!room:example.org', file);
+    if (kind === 'gallery') await core.commands.sendGallery('!room:example.org', [file, file]);
+    if (kind === 'scheduled')
+      await core.commands.scheduleAttachment('!room:example.org', file, Date.now() + 30_000);
+
+    expect(fake.sent).toContainEqual({ type: 'media_config' });
+  }
+);
+
+test.each(['attachment', 'gallery', 'scheduled'] as const)(
+  '%s uploads reject files above a smaller server limit before reading them',
+  async (kind) => {
+    const fake = fakeTransport({ media_config: { upload_size: 10_000_000 } });
+    const sendAttachment = vi.spyOn(fake.transport, 'sendAttachment');
+    const uploadMedia = vi.spyOn(fake.transport, 'uploadMedia');
+    const sendGallery = vi.fn<Transport['sendGallery']>();
+    fake.transport.sendGallery = sendGallery;
+    const core = createCoreClient(() => fake.transport);
+    const file = new File(['x'], 'large.bin', { type: 'application/octet-stream' });
+    Object.defineProperty(file, 'size', { value: 10_000_001 });
+    const read = vi.spyOn(file, 'arrayBuffer');
+
+    const sending =
+      kind === 'attachment'
+        ? core.commands.sendAttachment('!room:example.org', file)
+        : kind === 'gallery'
+          ? core.commands.sendGallery('!room:example.org', [file, file])
+          : core.commands.scheduleAttachment('!room:example.org', file, Date.now() + 30_000);
+
+    await expect(sending).rejects.toThrow('10 MB');
+    expect(read).not.toHaveBeenCalled();
+    expect(sendAttachment).not.toHaveBeenCalled();
+    expect(sendGallery).not.toHaveBeenCalled();
+    expect(uploadMedia).not.toHaveBeenCalled();
+  }
+);
+
+test('sending a voice recording forwards its MIME type, duration, waveform and voice marker', async () => {
+  const fake = fakeTransport();
+  const sendAttachment = vi.fn<Transport['sendAttachment']>();
+  fake.transport.sendAttachment = sendAttachment;
+  const core = createCoreClient(() => fake.transport);
+  const recording = new File(['recording'], 'voice.ogg', { type: 'audio/ogg' });
+  markVoiceRecording(recording, [0, 0.5, 1], 1250);
+
+  await core.commands.sendAttachment('!room:example.org', recording);
+
+  expect(sendAttachment).toHaveBeenCalledOnce();
+  expect(sendAttachment.mock.calls[0][0]).toMatchObject({
+    filename: 'voice.ogg',
+    mime: 'audio/ogg',
+    info: { voice: true, duration_ms: 1250, waveform: [0, 0.5, 1] },
+  });
 });
 
 test('sending an attachment forwards its rich caption, mentions, reply, and thread', async () => {

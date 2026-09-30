@@ -8,7 +8,8 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
 
   import { downsampleWaveform } from './voice-waveform';
-  import { extensionForMimeType, pickRecordingMimeType } from './voice-recorder-support';
+  import { extensionForMimeType, loadVoiceRecorder } from './voice-recorder-support';
+  import type { VoiceMediaRecorder } from './voice-recorder-support';
 
   interface Props {
     onSend: (file: File) => void;
@@ -18,7 +19,7 @@
 
   let { onSend, onCancel, onDenied }: Props = $props();
 
-  type Status = 'requesting' | 'recording' | 'denied' | 'unavailable';
+  type Status = 'requesting' | 'recording' | 'stopping' | 'denied' | 'unavailable';
 
   let status = $state<Status>('requesting');
   let elapsedMs = $state(0);
@@ -26,14 +27,14 @@
   let announcement = $state('');
 
   let stream: MediaStream | null = null;
-  let recorder: MediaRecorder | null = null;
+  let recorder: VoiceMediaRecorder | null = null;
   let audioContext: AudioContext | null = null;
   let analyser: AnalyserNode | null = null;
   let chunks: Blob[] = [];
   const samples: number[] = [];
   let sampleTimer: ReturnType<typeof setInterval> | undefined;
   let startedAt = 0;
-  let mimeType = '';
+  let disposeRecorder: (() => void) | undefined;
 
   function releaseStream(): void {
     stream?.getTracks().forEach((track) => {
@@ -43,6 +44,14 @@
   }
 
   function teardown(): void {
+    if (recorder) {
+      recorder.onstart = null;
+      recorder.onstop = null;
+      recorder.onerror = null;
+      recorder.ondataavailable = null;
+    }
+    disposeRecorder?.();
+    disposeRecorder = undefined;
     if (sampleTimer !== undefined) clearInterval(sampleTimer);
     sampleTimer = undefined;
     analyser = null;
@@ -67,46 +76,72 @@
     elapsedMs = Date.now() - startedAt;
   }
 
-  async function start(): Promise<void> {
-    const picked = pickRecordingMimeType();
-    if (picked === null) {
+  async function start(cancelled: () => boolean): Promise<void> {
+    let createRecorder;
+    try {
+      createRecorder = await loadVoiceRecorder();
+    } catch (cause) {
+      console.debug('[sable composer] voice encoder unavailable', cause);
+      if (cancelled()) return;
       status = 'unavailable';
       onDenied?.();
       return;
     }
-    mimeType = picked;
+    if (cancelled()) return;
 
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (cause) {
+      if (cancelled()) return;
       console.debug('[sable composer] microphone permission denied', cause);
       status = 'denied';
       onDenied?.();
       return;
     }
+    if (cancelled()) {
+      releaseStream();
+      return;
+    }
 
-    audioContext = new AudioContext();
-    const source = audioContext.createMediaStreamSource(stream);
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 1024;
-    source.connect(analyser);
+    try {
+      audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
 
-    recorder = new MediaRecorder(stream, { mimeType });
-    chunks = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.start();
-
-    startedAt = Date.now();
-    status = 'recording';
-    announcement = $i18n.t('composer.voiceStarted');
-    sampleTimer = setInterval(sampleLevel, 100);
+      const session = createRecorder(stream, audioContext);
+      recorder = session.recorder;
+      disposeRecorder = session.dispose;
+      chunks = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onstart = () => {
+        startedAt = Date.now();
+        status = 'recording';
+        announcement = $i18n.t('composer.voiceStarted');
+        sampleTimer = setInterval(sampleLevel, 100);
+      };
+      recorder.onerror = () => {
+        teardown();
+        status = 'unavailable';
+        onDenied?.();
+      };
+      recorder.start();
+    } catch (cause) {
+      console.debug('[sable composer] voice recording unavailable', cause);
+      teardown();
+      status = 'unavailable';
+      onDenied?.();
+    }
   }
 
   $effect(() => {
-    void start();
+    let cancelled = false;
+    void start(() => cancelled);
     return () => {
+      cancelled = true;
       teardown();
     };
   });
@@ -118,23 +153,28 @@
     }
 
     const activeRecorder = recorder;
-    const finalMime = mimeType;
+    status = 'stopping';
+    if (!send) {
+      announcement = $i18n.t('composer.voiceCancelled');
+      teardown();
+      onCancel();
+      return;
+    }
+    const finalMime = activeRecorder.mimeType.split(';')[0].trim();
     const waveform = downsampleWaveform(samples);
+    const durationMs = Math.max(1, Date.now() - startedAt);
 
     activeRecorder.onstop = () => {
-      if (!send) {
-        onCancel();
-        return;
-      }
+      teardown();
       const blob = new Blob(chunks, { type: finalMime });
       const extension = extensionForMimeType(finalMime);
       const file = new File([blob], `voice-message-${String(Date.now())}.${extension}`, {
         type: finalMime,
       });
-      markVoiceRecording(file, waveform);
+      markVoiceRecording(file, waveform, durationMs);
       onSend(file);
     };
-    announcement = send ? $i18n.t('composer.voiceStopped') : $i18n.t('composer.voiceCancelled');
+    announcement = $i18n.t('composer.voiceStopped');
     activeRecorder.stop();
   }
 </script>

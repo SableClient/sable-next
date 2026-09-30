@@ -36,6 +36,7 @@
   import { resetUrlPreviews } from '#lib/features/room/media/link-preview-cache.js';
   import { rememberAfterLogin } from '#lib/auth/after-login.js';
   import { hasPendingSetup } from '#lib/features/auth/setup/setup-record.js';
+  import { readText } from '#lib/platform/local-json.js';
   import { watchScheduledQueue } from '#lib/features/composer/scheduled-sender.js';
   import {
     alertsNatively,
@@ -47,7 +48,7 @@
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { followExternalLink } from '#lib/platform/external-links.js';
-  import { watchWindowFocus } from '#lib/platform/window-decorations.js';
+  import { windowActivity } from '#lib/platform/window-activity.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
   import { type FaviconState, faviconState, setFavicon } from '#lib/ui/favicon.js';
@@ -104,6 +105,7 @@
   } from '#lib/features/notifications/room-names.js';
   import {
     dropPushSubscription,
+    pusherDisplayName,
     syncPushSubscription,
   } from '#lib/features/notifications/web-push.js';
   import { answerPushEvent, sharePushSession } from '#lib/features/notifications/push-session.js';
@@ -295,7 +297,7 @@
   $effect(() => {
     const session = core.session;
     if (core.status !== 'ready' || !session) return;
-    if (hasPendingSetup(localStorage, session.user_id, session.device_id)) {
+    if (hasPendingSetup({ getItem: readText }, session.user_id, session.device_id)) {
       void goto(resolve('setup'));
     }
   });
@@ -426,6 +428,7 @@
       .setSearchOptions(
         Number(preferences.searchIndexLimit),
         preferences.searchCrawler,
+        preferences.searchUnmeteredOnly,
         preferences.serverSearch,
         {
           crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,
@@ -445,16 +448,20 @@
     if (core.status !== 'ready') return;
 
     const message = preferences.presenceStatusMessage.trim();
+    const presence = preferences.sendPresence ? preferences.presence : 'offline';
     void core.commands
       .setPresence(
-        preferences.sendPresence ? preferences.presence : 'offline',
+        presence === 'online' && !active ? 'unavailable' : presence,
         preferences.sendPresence && message ? message : null
       )
       .catch(() => {});
   });
 
+  const pushDeviceName = $derived(pusherDisplayName(core));
+
   $effect(() => {
     void core.accountRevision;
+    void pushDeviceName;
     if (core.status !== 'ready') return;
 
     if (!preferences.systemNotifications) {
@@ -558,6 +565,7 @@
 
     // Read before the first await, or a retargeted gateway never re-registers.
     const override = pushOverride();
+    void pushDeviceName;
 
     const resync = (): void => {
       void syncPushSubscription(core, override).then(clearPushFailure, (error: unknown) => {
@@ -741,40 +749,16 @@
     notifications.retireRead(roomList.rooms, roomList.notificationsFor);
   });
 
-  let documentVisible = $state(true);
-  let windowFocused = $state(true);
-  let visible = $derived(documentVisible && windowFocused);
+  let documentVisible = $derived(windowActivity.visible);
+  let active = $derived(windowActivity.active);
 
   $effect(() => {
-    const read = () => {
-      documentVisible = document.visibilityState === 'visible';
-    };
-    read();
-    return on(document, 'visibilitychange', read);
-  });
-
-  $effect(() => {
-    let stopped = false;
-    let unlisten = () => {};
-    void watchWindowFocus((focused) => {
-      windowFocused = focused;
-    }).then((stop) => {
-      if (stopped) stop();
-      else unlisten = stop;
-    });
-    return () => {
-      stopped = true;
-      unlisten();
-    };
-  });
-
-  $effect(() => {
-    roomList.setPresentationActive(visible);
+    roomList.setPresentationActive(active);
   });
 
   $effect(() => {
     if (core.status !== 'ready') return;
-    notifications.readRoom(visible ? openRoomId : null);
+    notifications.readRoom(active ? openRoomId : null);
   });
 
   $effect(() => {

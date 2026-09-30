@@ -163,6 +163,19 @@ describe('the drag protocol', () => {
     for (const cleanup of cleanups) cleanup?.();
   });
 
+  it('forgets the drag when its end only reaches the document', () => {
+    const { source } = mount(40);
+    const list = createDragList<Ref>(refsEqual);
+    const dragging: (Ref | null)[] = [];
+    const cleanup = list.draggable(ref('!a'), (next) => dragging.push(next))(source);
+
+    source.dispatchEvent(dragEvent('dragstart'));
+    document.dispatchEvent(dragEvent('dragend'));
+
+    expect(dragging).toEqual([ref('!a'), null]);
+    cleanup?.();
+  });
+
   it('scrolls the container while a drag sits at its edge', async () => {
     const { scroll, source, target } = mount(40);
     const list = createDragList<Ref>(refsEqual);

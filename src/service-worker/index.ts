@@ -40,8 +40,16 @@ import {
   roomName,
 } from '#lib/features/notifications/room-names.js';
 import type { PushFetchView } from '#src/generated/protocol';
+import { reportWorkerError, watchWorkerOperation } from './telemetry.js';
 
 const worker = globalThis.self as unknown as ServiceWorkerGlobalScope;
+
+worker.addEventListener('error', (event) => {
+  void reportWorkerError('error', event.error ?? new Error(event.message)).catch(() => undefined);
+});
+worker.addEventListener('unhandledrejection', (event) => {
+  void reportWorkerError('unhandledrejection', event.reason).catch(() => undefined);
+});
 
 worker.addEventListener('push', (event) => {
   const raw = event.data?.text();
@@ -49,29 +57,34 @@ worker.addEventListener('push', (event) => {
   const validation = webPushValidation(raw);
   if (validation) {
     event.waitUntil(
-      Promise.all([
-        record('WEBPUSH_VALIDATION'),
-        worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
-      ]).then(([, clients]) => {
-        for (const client of clients) {
-          client.postMessage({
-            type: 'sable:webpush-ack',
-            appId: validation.appId,
-            ackToken: validation.ackToken,
-          });
-        }
-      })
+      watchWorkerOperation(
+        'push-validation',
+        Promise.all([
+          record('WEBPUSH_VALIDATION'),
+          worker.clients.matchAll({ type: 'window', includeUncontrolled: true }),
+        ]).then(([, clients]) => {
+          for (const client of clients) {
+            client.postMessage({
+              type: 'sable:webpush-ack',
+              appId: validation.appId,
+              ackToken: validation.ackToken,
+            });
+          }
+        })
+      )
     );
     return;
   }
 
-  event.waitUntil(present(parsePushPayload(raw) ?? undefined));
+  event.waitUntil(watchWorkerOperation('push', present(parsePushPayload(raw) ?? undefined)));
 });
 
 worker.addEventListener('message', (event) => {
   const message = event.data as { type?: unknown } | undefined;
-  if (message?.type === 'sable:skip-waiting') event.waitUntil(worker.skipWaiting());
-  if (message?.type === 'sable:share-take') event.waitUntil(handShares());
+  if (message?.type === 'sable:skip-waiting')
+    event.waitUntil(watchWorkerOperation('skip-waiting', worker.skipWaiting()));
+  if (message?.type === 'sable:share-take')
+    event.waitUntil(watchWorkerOperation('share-take', handShares()));
   if (message?.type === 'sable:version') event.ports[0]?.postMessage(version);
 });
 
@@ -86,7 +99,7 @@ const shares = new Map<string, StashedShare>();
 worker.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'POST' || url.pathname !== shareAction) return;
-  event.respondWith(stashShare(event));
+  event.respondWith(watchWorkerOperation('share', stashShare(event)));
 });
 
 const SHARE_HOLD_MS = 15_000;
@@ -101,7 +114,7 @@ async function stashShare(event: FetchEvent): Promise<Response> {
 
   const id = crypto.randomUUID();
   shares.set(id, { text, files });
-  event.waitUntil(holdShare(id));
+  event.waitUntil(watchWorkerOperation('share-hold', holdShare(id)));
 
   return Response.redirect(resolve('/'), 303);
 }
@@ -264,10 +277,20 @@ worker.addEventListener('notificationclick', (event) => {
     | { roomId?: string; userId?: string; eventId?: string | null }
     | undefined;
   if (event.action === 'answer' || event.action === 'decline') {
-    event.waitUntil(callAction(event.action, data?.roomId, data?.userId, data?.eventId ?? null));
+    event.waitUntil(
+      watchWorkerOperation(
+        'call-action',
+        callAction(event.action, data?.roomId, data?.userId, data?.eventId ?? null)
+      )
+    );
     return;
   }
-  event.waitUntil(open(data?.roomId, data?.userId, data?.eventId ?? undefined));
+  event.waitUntil(
+    watchWorkerOperation(
+      'notificationclick',
+      open(data?.roomId, data?.userId, data?.eventId ?? undefined)
+    )
+  );
 });
 
 async function callAction(
@@ -314,8 +337,11 @@ async function open(
 /** Only the app can re-register a replaced subscription, so it is told to. */
 worker.addEventListener('pushsubscriptionchange', (event) => {
   event.waitUntil(
-    worker.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) client.postMessage({ type: 'sable:push-resubscribe' });
-    })
+    watchWorkerOperation(
+      'pushsubscriptionchange',
+      worker.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        for (const client of clients) client.postMessage({ type: 'sable:push-resubscribe' });
+      })
+    )
   );
 });

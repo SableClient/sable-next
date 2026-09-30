@@ -2,7 +2,7 @@
 
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { readJson, writeJson } from './local-json.js';
+import { readJson, readText, writeJson, writeText, removeLocalValue } from './local-json.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -14,6 +14,38 @@ const parseNumber = (value: unknown): number => {
   if (typeof value !== 'number') throw new Error('not a number');
   return value;
 };
+
+test.each([null, undefined])('optional values tolerate unavailable storage (%s)', (storage) => {
+  vi.stubGlobal('localStorage', storage);
+  expect(readText('key')).toBeNull();
+  expect(readJson('key', parseNumber, 7)).toBe(7);
+  expect(() => {
+    writeText('key', '1');
+    writeJson('key', 1);
+    removeLocalValue('key');
+  }).not.toThrow();
+});
+
+test('optional values tolerate a storage getter that throws', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('denied');
+    },
+  });
+  try {
+    expect(readText('key')).toBeNull();
+    expect(readJson('key', parseNumber, 7)).toBe(7);
+    expect(() => {
+      writeText('key', '1');
+      writeJson('key', 1);
+      removeLocalValue('key');
+    }).not.toThrow();
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, 'localStorage', descriptor);
+  }
+});
 
 test('reads and parses a stored value', () => {
   localStorage.setItem('key', '42');

@@ -13,6 +13,8 @@ import type {
   DirectoryRoomType,
   EditVersionView,
   EncryptionStatusView,
+  KeyBackupStatusView,
+  KeyBackupDownloadView,
   HomeserverSoftwareView,
   IdentityResetStep,
   ImagePackView,
@@ -78,7 +80,7 @@ import type {
   WebPusherView,
 } from '#src/generated/protocol';
 import { measureAttachment } from './attachment-info';
-import { maxAttachmentBytes } from './limits';
+import { formatByteSize } from '#lib/ui/byte-size.js';
 import { CoreError, type Transport } from '../../transport';
 
 export type CallGrant = {
@@ -168,6 +170,18 @@ const EMPTY_SEARCH_FILTER: SearchFilter = {
 };
 
 export function createCommands(transport: () => Transport) {
+  async function mediaConfig(): Promise<{ upload_size: number }> {
+    const response = await transport().send({ type: 'media_config' });
+    return { upload_size: response.upload_size };
+  }
+
+  async function validateAttachments(files: readonly File[]): Promise<void> {
+    const { upload_size } = await mediaConfig();
+    if (files.some((file) => file.size > upload_size)) {
+      throw new Error(`Attachment exceeds the ${formatByteSize(upload_size)} limit`);
+    }
+  }
+
   async function imagePackListing(
     roomId: string,
     cachedOnly = false
@@ -181,6 +195,8 @@ export function createCommands(transport: () => Transport) {
   }
 
   return {
+    mediaConfig,
+
     async requestRegistrationEmail(email: string): Promise<RegistrationResultView> {
       const response = await transport().send({
         type: 'request_registration_email',
@@ -862,7 +878,8 @@ export function createCommands(transport: () => Transport) {
       size: number | null = null,
       inReplyTo: string | null = null,
       threadRoot: string | null = null,
-      persona: PerMessageProfileView | null = null
+      persona: PerMessageProfileView | null = null,
+      silentReply = false
     ): Promise<void> {
       await transport().send({
         type: 'send_gif',
@@ -874,6 +891,7 @@ export function createCommands(transport: () => Transport) {
         mimetype,
         size,
         in_reply_to: inReplyTo,
+        silent_reply: silentReply,
         thread_root: threadRoot,
         persona: $state.snapshot(persona),
       });
@@ -884,7 +902,8 @@ export function createCommands(transport: () => Transport) {
       body: string,
       geoUri: string,
       inReplyTo: string | null = null,
-      threadRoot: string | null = null
+      threadRoot: string | null = null,
+      silentReply = false
     ): Promise<void> {
       await transport().send({
         type: 'send_location',
@@ -892,6 +911,7 @@ export function createCommands(transport: () => Transport) {
         body,
         geo_uri: geoUri,
         in_reply_to: inReplyTo,
+        silent_reply: silentReply,
         thread_root: threadRoot,
       });
     },
@@ -1245,7 +1265,7 @@ export function createCommands(transport: () => Transport) {
       dueTs: number,
       spoiler = false
     ): Promise<string> {
-      if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      await validateAttachments([file]);
       const support = await transport().send({ type: 'delayed_events_supported' });
       if (!support.supported) throw new CoreError({ code: 'delayed_events_unsupported' });
       const [info, bytes] = await Promise.all([
@@ -1393,7 +1413,7 @@ export function createCommands(transport: () => Transport) {
       file: File,
       options: SendAttachmentOptions = {}
     ): Promise<void> {
-      if (file.size > maxAttachmentBytes) throw new Error('Attachment exceeds the 100 MiB limit');
+      await validateAttachments([file]);
       const info = await measureAttachment(file);
       const bytes = new Uint8Array(await file.arrayBuffer());
       await transport().sendAttachment({
@@ -1420,18 +1440,15 @@ export function createCommands(transport: () => Transport) {
       options: SendGalleryOptions = {}
     ): Promise<void> {
       if (files.length < 2) throw new Error('A gallery needs at least two attachments');
+      await validateAttachments(files);
       const attachments = await Promise.all(
-        files.map(async (file) => {
-          if (file.size > maxAttachmentBytes)
-            throw new Error('Attachment exceeds the 100 MiB limit');
-          return {
-            roomId,
-            filename: file.name,
-            mime: file.type || 'application/octet-stream',
-            bytes: new Uint8Array(await file.arrayBuffer()),
-            info: await measureAttachment(file),
-          };
-        })
+        files.map(async (file) => ({
+          roomId,
+          filename: file.name,
+          mime: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          info: await measureAttachment(file),
+        }))
       );
       await transport().sendGallery({
         roomId,
@@ -1446,8 +1463,13 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    fetchMedia(source: string, width: number, height: number): Promise<Uint8Array<ArrayBuffer>> {
-      return transport().fetchMedia(source, width, height);
+    fetchMedia(
+      source: string,
+      width: number,
+      height: number,
+      background = false
+    ): Promise<Uint8Array<ArrayBuffer>> {
+      return transport().fetchMedia(source, width, height, background);
     },
 
     forgetMedia(source: string): Promise<void> {
@@ -1621,6 +1643,7 @@ export function createCommands(transport: () => Transport) {
     async setSearchOptions(
       diskBudgetMb: number,
       crawler: boolean,
+      unmeteredOnly: boolean,
       serverSearch: boolean,
       tuning: SearchTuning,
       foreground: boolean
@@ -1629,6 +1652,7 @@ export function createCommands(transport: () => Transport) {
         type: 'set_search_options',
         disk_budget_mb: diskBudgetMb,
         crawler,
+        unmetered_only: unmeteredOnly,
         server_search: serverSearch,
         tuning,
         foreground,
@@ -1687,6 +1711,19 @@ export function createCommands(transport: () => Transport) {
         type: 'encryption_status',
       });
       return response.status;
+    },
+
+    async keyBackupStatus(): Promise<KeyBackupStatusView> {
+      const response = await transport().send({ type: 'key_backup_status' });
+      return response.status;
+    },
+
+    async downloadKeyBackup(requestId: string): Promise<KeyBackupDownloadView> {
+      const response = await transport().send({
+        type: 'download_key_backup',
+        request_id: requestId,
+      });
+      return response.download;
     },
 
     async signOutSafety(): Promise<SignOutSafetyView> {

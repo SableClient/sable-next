@@ -255,6 +255,188 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         .await
     }
 
+    async fn backup_metadata(
+        server: &MatrixMockServer,
+        key: &matrix_sdk_base::crypto::store::types::BackupDecryptionKey,
+        count: u64,
+    ) {
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                r"^/_matrix/client/(r0|v3)/room_keys/version$",
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
+                "algorithm": "m.megolm_backup.v1.curve25519-aes-sha2",
+                "auth_data": { "public_key": key.megolm_v1_public_key().to_base64() },
+                "version": "1", "count": count, "etag": "1"
+            })))
+            .mount(server.server())
+            .await;
+    }
+
+    async fn unlock_backup(
+        client: &Client,
+        key: &matrix_sdk_base::crypto::store::types::BackupDecryptionKey,
+    ) {
+        let machine = client.olm_machine_for_testing().await;
+        let machine = machine.as_ref().unwrap();
+        let public = key.megolm_v1_public_key();
+        public.set_version("1".to_owned());
+        machine
+            .backup_machine()
+            .enable_backup_v1(public)
+            .await
+            .unwrap();
+        machine
+            .backup_machine()
+            .save_decryption_key(Some(key.clone()), Some("1".to_owned()))
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn cloud_restore_batches_keys_preserves_backup_notifications_and_can_repeat() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (core, client, _store) = core_for(&server).await;
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 103).await;
+        unlock_backup(&client, &key).await;
+        let room = room_id!("!backup:example.org");
+        let mut sessions = serde_json::Map::new();
+        for _ in 0..102 {
+            let export = exported(&outbound_session(room)).await;
+            let inbound = InboundGroupSession::from_export(&export).unwrap();
+            let encrypted = key.megolm_v1_public_key().encrypt(inbound).await.unwrap();
+            sessions.insert(export.session_id, serde_json::to_value(encrypted).unwrap());
+        }
+        sessions.insert("unreadable".to_owned(), json!({}));
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                r"^/_matrix/client/(r0|v3)/room_keys/keys$",
+            ))
+            .and(wiremock::matchers::query_param("version", "1"))
+            .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
+                "rooms": { room: { "sessions": sessions } }
+            })))
+            .mount(server.server())
+            .await;
+        let backups = client.encryption().backups();
+        let stream = backups.room_keys_for_room_stream(room);
+        futures_util::pin_mut!(stream);
+        let updates = std::sync::Mutex::new(Vec::new());
+        let result = backups
+            .download_all_room_keys_with_progress(|update| updates.lock().unwrap().push(update))
+            .await
+            .unwrap();
+        assert_eq!(
+            (
+                result.total,
+                result.processed,
+                result.imported,
+                result.failed
+            ),
+            (103, 103, 102, 1)
+        );
+        assert!(
+            updates
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|update| update.processed == 100)
+        );
+        tokio::time::timeout(Duration::from_secs(2), stream.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(session_ids(&client).await.len(), 102);
+        let status = backups.status().await.unwrap();
+        assert_eq!(
+            (status.local_keys, status.backed_up_keys, status.cloud_keys),
+            (102, 102, Some(103))
+        );
+        assert!(status.can_restore);
+        let CommandOk::DownloadKeyBackup { download } =
+            core.download_key_backup("retry".to_owned()).await.unwrap()
+        else {
+            panic!("unexpected response")
+        };
+        assert_eq!(
+            (download.processed, download.imported, download.failed),
+            (103, 0, 1)
+        );
+        assert_eq!(
+            download.state,
+            crate::protocol::KeyBackupDownloadState::Complete
+        );
+    }
+
+    #[tokio::test]
+    async fn cloud_restore_rejects_a_locked_or_mismatched_backup_before_downloading() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (core, client, _store) = core_for(&server).await;
+        let server_key = BackupDecryptionKey::new();
+        backup_metadata(&server, &server_key, 5).await;
+        let backups = client.encryption().backups();
+        assert!(!backups.status().await.unwrap().can_restore);
+        assert!(matches!(
+            backups.download_all_room_keys_with_progress(|_| {}).await,
+            Err(matrix_sdk::Error::BackupNotEnabled)
+        ));
+        unlock_backup(&client, &BackupDecryptionKey::new()).await;
+        assert!(!backups.status().await.unwrap().can_restore);
+        assert!(matches!(
+            backups.download_all_room_keys_with_progress(|_| {}).await,
+            Err(matrix_sdk::Error::BackupNotEnabled)
+        ));
+        let _permit = core.key_backup_downloads.acquire().await.unwrap();
+        assert!(matches!(
+            core.download_key_backup("duplicate".to_owned()).await,
+            Err(CommandErr::Unavailable)
+        ));
+        assert!(
+            !server
+                .server()
+                .received_requests()
+                .await
+                .unwrap()
+                .iter()
+                .any(|request| request.url.path().ends_with("/room_keys/keys"))
+        );
+    }
+
+    #[tokio::test]
+    async fn absent_cloud_backup_is_distinct_from_network_failure() {
+        let server = MatrixMockServer::new().await;
+        let (_core, client, _store) = core_for(&server).await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                r"^/_matrix/client/(r0|v3)/room_keys/version$",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(404)
+                    .set_body_json(json!({ "errcode": "M_NOT_FOUND", "error": "No backup" })),
+            )
+            .mount(server.server())
+            .await;
+        let status = client.encryption().backups().status().await.unwrap();
+        assert_eq!(status.cloud_keys, None);
+        assert!(!status.can_restore);
+        server.server().reset().await;
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                r"^/_matrix/client/(r0|v3)/room_keys/version$",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(403)
+                    .set_body_json(json!({ "errcode": "M_FORBIDDEN", "error": "Denied" })),
+            )
+            .mount(server.server())
+            .await;
+        client.encryption().backups().status().await.unwrap_err();
+    }
+
     #[tokio::test]
     async fn an_export_imports_into_another_device() {
         let server = MatrixMockServer::new().await;

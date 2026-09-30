@@ -83,12 +83,12 @@ test('an exported pack carries the bytes, not just the mxc uris', async () => {
   expect(files['images/0-blob_party.gif']).toEqual(GIF);
 });
 
-test('the export asks for the original, never a thumbnail', async () => {
+test('the export asks for the original outside the UI download limit', async () => {
   const core = fakeCore(media);
   await buildArchive(core, [packDraft(pack())]);
 
   for (const call of vi.mocked(core.commands.fetchMedia).mock.calls) {
-    expect(call.slice(1)).toEqual([0, 0]);
+    expect(call.slice(1)).toEqual([0, 0, true]);
   }
 });
 

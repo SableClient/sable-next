@@ -122,7 +122,7 @@ function isVisibleEvent(
       return preferences.showTombstoneEvents;
     case 'state_event':
       if (item.content.change) return true;
-      return preferences.showHiddenEvents;
+      return preferences.showHiddenEvents && preferences.hiddenEventOther;
     case 'hidden_event':
       return preferences.showHiddenEvents && preferences.hiddenEventOther;
     default:
@@ -225,6 +225,10 @@ const UNREAD_KINDS = new Set<TimelineItemContentView['kind']>([
   'poll',
   'unable_to_decrypt',
 ]);
+
+export function isUnreadMessage(item: TimelineItemView): boolean {
+  return item.event_id !== null && !item.is_own && UNREAD_KINDS.has(item.content.kind);
+}
 
 export function unreadCountAfter(items: readonly TimelineItemView[], index: number): number {
   let count = 0;

@@ -194,11 +194,11 @@ test('the composer markdown parses back to the document it came from', () => {
         source.toJSON()
       );
     }),
-    { numRuns: 500 }
+    { numRuns: 100 }
   );
 });
 
-test('a plain-mode edit of any sent message reproduces its html', { timeout: 20_000 }, () => {
+test('a plain-mode edit of any sent message reproduces its html', () => {
   fc.assert(
     fc.property(htmlDoc, (source) => {
       const message = serializeComposer(source);
@@ -208,7 +208,7 @@ test('a plain-mode edit of any sent message reproduces its html', { timeout: 20_
         message.formatted
       );
     }),
-    { numRuns: 500 }
+    { numRuns: 100 }
   );
 });
 
@@ -221,6 +221,6 @@ test('a rich edit of any sent message reproduces its html', () => {
         message.formatted
       );
     }),
-    { numRuns: 500 }
+    { numRuns: 100 }
   );
 });

@@ -2,12 +2,13 @@ import * as Sentry from '@sentry/sveltekit';
 import type { HandleClientError } from '@sveltejs/kit/hooks';
 
 import { tolerateUnknownListeners } from '#lib/platform/tauri-events.js';
-import { syncNativeTelemetryConsent } from '#lib/platform/telemetry.js';
+import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
 import {
   installDynamicImportRecovery,
   recoverStaleDynamicImport,
 } from '#lib/observability/dynamic-import-recovery.js';
 import { sanitizePayload, scrubMatrixIds, scrubMatrixUrl } from '#lib/observability/scrubbers.js';
+import { scrubSentryEvent } from '#lib/observability/sentry-event.js';
 import { untrackFetch } from '#lib/observability/untracked-fetch.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { CoreError } from '#src/transport';
@@ -16,9 +17,6 @@ const dsn = import.meta.env.VITE_SENTRY_DSN;
 const environment = import.meta.env.VITE_SENTRY_ENVIRONMENT ?? import.meta.env.MODE;
 const release = import.meta.env.VITE_APP_VERSION;
 const sampleEverything = environment === 'development' || environment === 'preview';
-
-const SESSION_ERROR_LIMIT = 50;
-let sessionErrorCount = 0;
 
 installDynamicImportRecovery();
 tolerateUnknownListeners();
@@ -46,6 +44,7 @@ if (dsn && preferences.errorReporting) {
 
     integrations: [
       Sentry.consoleLoggingIntegration({ levels: ['error', 'warn'] }),
+      Sentry.captureConsoleIntegration({ levels: ['error'] }),
       ...(preferences.sessionReplay
         ? [
             Sentry.replayIntegration({
@@ -88,38 +87,21 @@ if (dsn && preferences.errorReporting) {
     },
 
     beforeSend(event, hint) {
-      sessionErrorCount += 1;
-      if (sessionErrorCount > SESSION_ERROR_LIMIT) return null;
-
-      // Every CoreError is thrown from the same line of the transport, so the
-      // code is what separates "homeserver refused" from "core panicked".
       if (hint.originalException instanceof CoreError) {
         event.fingerprint = ['{{ default }}', hint.originalException.detail.code];
       }
 
-      if (event.message) event.message = scrubMatrixIds(event.message);
-      for (const exception of event.exception?.values ?? []) {
-        if (exception.value) exception.value = scrubMatrixUrl(scrubMatrixIds(exception.value));
-      }
-      if (event.transaction) event.transaction = scrubMatrixUrl(event.transaction);
-      if (event.contexts) {
-        event.contexts = sanitizePayload(event.contexts) as typeof event.contexts;
-      }
-      if (event.request?.url) event.request.url = scrubMatrixUrl(event.request.url);
-      return event;
+      return scrubSentryEvent(event);
     },
   });
   untrackFetch(window);
 }
 
-// The native process has its own DSN baked in and drops everything until told.
-syncNativeTelemetryConsent(preferences.errorReporting);
+syncTelemetryConsent(preferences.errorReporting);
 
 export const handleError: HandleClientError = (input) => {
   if (input.kind !== 'unknown') return;
   if (recoverStaleDynamicImport(input.error)) return;
-
-  console.error('[sable] unhandled error', input.error);
 
   const eventId = Sentry.captureException(input.error, {
     mechanism: {
@@ -127,6 +109,7 @@ export const handleError: HandleClientError = (input) => {
       handled: false,
     },
   });
+  console.error('[sable] unhandled error', input.error);
 
   const error = input.error instanceof Error ? input.error : undefined;
   return {

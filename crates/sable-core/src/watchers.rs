@@ -373,7 +373,7 @@ impl Core {
         );
     }
 
-    async fn emit_devices(&self, generation: u64, client: &matrix_sdk::Client) {
+    pub(crate) async fn emit_devices(&self, generation: u64, client: &matrix_sdk::Client) {
         self.emit_if_current(
             generation,
             CoreEvent::DevicesChanged {

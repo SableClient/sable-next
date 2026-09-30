@@ -213,6 +213,17 @@ describe('omitIdentifierFields', () => {
 });
 
 describe('sanitizePayload', () => {
+  it('redacts encoded request paths inside console arguments', () => {
+    const sent = JSON.stringify(
+      sanitizePayload({
+        arguments: ['GET https://hs.example/rooms/%21private%3Aexample.org/messages'],
+      })
+    );
+    expect(sent).not.toContain('private');
+    expect(sent).not.toContain('hs.example');
+    expect(sent).toContain('[ROOM_ID]');
+  });
+
   it('drops identifier keys and redacts what remains', () => {
     expect(
       sanitizePayload({ roomId: '!room:example.org', message: 'from @alice:example.org' })

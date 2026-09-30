@@ -18,6 +18,13 @@ const core = Object.assign(baseCore, {
   deleteDevice: vi.fn<(deviceId: string, password: string | null) => Promise<string | null>>(),
   renameDevice: vi.fn<(deviceId: string, displayName: string) => Promise<void>>(),
   resetRecoveryKey: vi.fn<() => Promise<string>>(),
+  keyBackupStatus: vi.fn().mockResolvedValue({
+    local_keys: 0,
+    backed_up_keys: 0,
+    cloud_keys: 0,
+    can_restore: true,
+    download: null,
+  }),
 });
 
 import DevicesSettings from './DevicesSettings.svelte';

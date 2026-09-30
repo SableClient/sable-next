@@ -1,5 +1,6 @@
 import type { ProfileView } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { removeLocalValue } from '#lib/platform/local-json.js';
 import {
   BANNER_FIELD,
   LEGACY_STATUS_FIELDS,
@@ -204,7 +205,7 @@ export class ProfileController {
 
   private async finish(): Promise<void> {
     const userId = this.options.getUserId();
-    if (userId) localStorage.removeItem(profileOnboardingMarker(userId));
+    if (userId) removeLocalValue(profileOnboardingMarker(userId));
     await this.options.onNavigateHome();
   }
 }

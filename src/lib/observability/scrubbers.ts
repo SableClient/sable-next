@@ -2,9 +2,11 @@
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '[::1]', 'tauri.localhost']);
 
-if (typeof window !== 'undefined') {
+const appLocation = Reflect.get(globalThis, 'location') as { origin: string } | undefined;
+
+if (appLocation) {
   try {
-    const appHost = new URL(window.location.origin).hostname.toLowerCase();
+    const appHost = new URL(appLocation.origin).hostname.toLowerCase();
     if (appHost) LOCAL_HOSTS.add(appHost);
   } catch {
     // An opaque origin has no hostname to preserve.
@@ -21,7 +23,7 @@ export function scrubExternalHosts(value: string): string {
 }
 
 export function scrubMatrixIds(value: string): string {
-  return scrubExternalHosts(value)
+  return scrubMatrixUrl(value)
     .replace(
       /(access_token|password|token|refresh_token|session_id|sync_token|next_batch)([=:\s]+)([^\s&]+)/gi,
       '$1$2[REDACTED]'
@@ -61,6 +63,14 @@ const IDENTIFIER_KEYS = new Set(
     'spaceId',
     'threadRootId',
     'transactionId',
+    'accessToken',
+    'refreshToken',
+    'password',
+    'token',
+    'authorization',
+    'sessionId',
+    'syncToken',
+    'nextBatch',
   ].map(identifierKey)
 );
 

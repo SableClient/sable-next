@@ -31,6 +31,7 @@
   import { homeservers } from '../shared/homeservers.svelte.js';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { takeAfterLogin } from '#lib/auth/after-login.js';
+  import { readText, writeJson, writeText } from '#lib/platform/local-json.js';
 
   const core = useCoreClient();
   const isAddingAccount = page.url.searchParams.has('addAccount');
@@ -73,15 +74,12 @@
   let loginPending = $state(false);
 
   function markLoggedIn(): void {
-    localStorage.setItem(LOGGED_IN_MARKER, 'true');
+    writeText(LOGGED_IN_MARKER, 'true');
     hasLoggedInBefore = true;
   }
 
   function markOnboardingPending(matrixId: string): void {
-    localStorage.setItem(
-      profileOnboardingMarker(matrixId),
-      JSON.stringify({ homeserver: flow.homeserver })
-    );
+    writeJson(profileOnboardingMarker(matrixId), { homeserver: flow.homeserver });
   }
 
   function openSetup(): Promise<void> {
@@ -228,7 +226,7 @@
       return;
     if (isSetupRoute || loginPending) return;
     if (redirect.pendingIntent === 'login' && redirect.isCompleting) return;
-    if (localStorage.getItem(profileOnboardingMarker(userId))) void openSetup();
+    if (readText(profileOnboardingMarker(userId))) void openSetup();
     else void goto(takeAfterLogin(resolve('/(app)/rooms')));
   });
 
@@ -244,7 +242,7 @@
   }
 
   onMount(() => {
-    hasLoggedInBefore = readReturningUser(localStorage);
+    hasLoggedInBefore = readReturningUser();
     return () => {
       redirect.cleanup();
       if (!redirect.isCallbackWindow)

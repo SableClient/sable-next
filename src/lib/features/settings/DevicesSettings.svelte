@@ -36,6 +36,7 @@
   import VerifyDeviceDialog from './VerifyDeviceDialog.svelte';
   import DeviceActionForm from './DeviceActionForm.svelte';
   import RoomKeyFile from './RoomKeyFile.svelte';
+  import KeyBackupSettings from './KeyBackupSettings.svelte';
 
   const core = useCoreClient();
   let devices = $state.raw<DeviceView[]>([]);
@@ -412,6 +413,8 @@
         </div>
       {/if}
     </SettingsSection>
+
+    <KeyBackupSettings onUnlock={() => (verificationOpen = true)} />
 
     <SettingsSection
       headingId="devices-heading"

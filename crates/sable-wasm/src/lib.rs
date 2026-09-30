@@ -253,9 +253,10 @@ impl SableCore {
         source: String,
         width: u32,
         height: u32,
+        background: bool,
     ) -> Result<Vec<u8>, String> {
         self.core
-            .media_thumbnail(source, width, height)
+            .fetch_media(source, width, height, background)
             .await
             .map_err(|error| js_err(&error))
     }

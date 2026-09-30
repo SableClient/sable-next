@@ -1,12 +1,18 @@
 <script lang="ts">
-  import { tick, untrack, type Snippet } from 'svelte';
+  import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { fade } from 'svelte/transition';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
+  import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
-  import type { MemberView, TimelineItemView } from '#src/generated/protocol';
+  import type {
+    MemberView,
+    PerMessageProfileView,
+    TimelineItemView,
+  } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
-  import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+  import type { ResumeAnchor, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
   import {
@@ -48,10 +54,12 @@
     visibleTimelineItems,
     type ReplyDirection,
   } from './timeline-format';
-  import { TimelinePagination } from './timeline-pagination.svelte.js';
-  import { TimelineFocus } from './timeline-focus';
+  import { MAX_EMPTY_REFILLS, TimelinePagination } from './timeline-pagination.svelte.js';
+  import { TimelineFocus } from './timeline-focus.svelte.js';
+  import { TimelineFuture } from './timeline-future.svelte.js';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
+  import { TimelineUnread } from './timeline-unread.svelte.js';
   import {
     estimatedColumnPx,
     estimateRowSize,
@@ -71,8 +79,17 @@
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
+    hasUnread?: boolean;
+    onLoadReadMarker?: () => Promise<string | null>;
+    onRequestUnread?: (eventId: string) => Promise<void>;
+    onResumeLive?: (anchor: ResumeAnchor) => Promise<void>;
+    onMarkRead?: () => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
-    onSenderProfile?: (userId: string, anchor: HTMLElement) => void;
+    onSenderProfile?: (
+      userId: string,
+      anchor: HTMLElement,
+      pmp?: PerMessageProfileView | null
+    ) => void;
     onMentionUser?: (userId: string, name: string) => void;
     onRetrySend?: (transactionId: string) => void;
     onCancelSend?: (transactionId: string) => void;
@@ -82,7 +99,6 @@
     onJumpToEvent?: (eventId: string) => void;
     onJumpToLive?: () => void;
     onOpenMedia?: (eventId: string) => void;
-    onPersonaAvatarClick?: (source: string, displayName: string) => void;
     onVotePoll?: (eventId: string, answers: string[]) => void;
     onEndPoll?: (eventId: string) => void;
     readOnly?: boolean;
@@ -108,6 +124,11 @@
     onRequestHistory,
     onRequestFuture,
     onRead,
+    hasUnread = false,
+    onLoadReadMarker,
+    onRequestUnread,
+    onResumeLive,
+    onMarkRead,
     onMatrixLink,
     onCopyLink,
     onMarkUnread,
@@ -126,7 +147,6 @@
     onJumpToEvent,
     onJumpToLive,
     onOpenMedia,
-    onPersonaAvatarClick,
     onVotePoll,
     onEndPoll,
     readOnly = false,
@@ -155,6 +175,18 @@
     unreadCount: number;
   }
   const identity = new TimelineIdentityTracker();
+  const unread = new TimelineUnread();
+  let unreadNavigation: AbortController | null = null;
+  let jumpingUnread = $state(false);
+  let markingRead = $state(false);
+  let unreadError = $state<'jump' | 'read' | null>(null);
+  let switchingToUnread = false;
+  let resumeTask: Promise<void> | null = null;
+  let resumeFailed = $state(false);
+  onDestroy(() => {
+    unreadNavigation?.abort();
+    unread.destroy();
+  });
   let followingRead = $state(false);
   let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let allItems = $derived(
@@ -220,18 +252,26 @@
     )
   );
   let readersByItem = $derived(cumulativeReadBy(timeline.items));
-  let personaOpen = $state(false);
+  let menuOpen = $state(false);
   const pagination = new TimelinePagination(
     () => timeline,
     () => onRequestHistory()
   );
+  const future = new TimelineFuture(
+    () => timeline,
+    () => onRequestFuture()
+  );
+  function requestFuture(manual = false): Promise<void> {
+    return future.request(manual);
+  }
   const focus = new TimelineFocus<RowValue>({
     timeline: () => timeline,
     viewport: () => viewport,
     entries: () => entries,
     target: () => focusEventId,
     history: pagination,
-    requestFuture: () => onRequestFuture(),
+    requestFuture: () => requestFuture(),
+    canRequestFuture: () => future.canRefill(),
   });
   let noHistory = $derived(
     visibleItems.length === 0 && (pagination.exhausted || timeline.backwardPagination === 'end')
@@ -241,7 +281,7 @@
   );
   let emptyFailure = $derived(visibleItems.length === 0 && timeline.error !== null);
   let readEventId = $derived.by(() => {
-    if (!revealed || !viewport) return null;
+    if (!revealed || !viewport || unread.blocking || markingRead) return null;
     if (windowState.pinned) {
       return latestEventId(timeline.items) ?? latestEventId(rows.map((row) => row.value.item));
     }
@@ -253,23 +293,38 @@
     }
     return seen;
   });
-  let readMarker = $derived.by(() => {
-    const index = entries.findIndex(({ value }) => value.item.content.kind === 'read_marker');
-    return index >= 0 ? { index, count: entries[index].value.unreadCount } : null;
-  });
-  let stuckUnreadCount = $derived(
-    readMarker !== null &&
+  let unreadCount = $derived(unread.count(eventItems));
+  let unreadInView = $derived.by(() => {
+    const index = entries.findIndex(({ value }) => holdsEvent(value, unread.firstEventId));
+    return (
+      index >= 0 &&
       windowState.firstVisible !== null &&
-      readMarker.index < windowState.firstVisible
-      ? readMarker.count
-      : 0
-  );
+      windowState.lastVisible !== null &&
+      index >= windowState.firstVisible &&
+      index <= windowState.lastVisible
+    );
+  });
+  $effect(() => {
+    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
+    if (revealed && unreadInView && document.visibilityState === 'visible') {
+      unread.observe(unread.firstEventId);
+    }
+  });
+  let hadUnread = untrack(() => hasUnread);
+  $effect(() => {
+    if (hadUnread && !hasUnread && unread.initialized) untrack(() => unread.dismiss());
+    hadUnread = hasUnread;
+  });
   let historyLoading = $derived(
     revealed &&
       visibleItems.length > 0 &&
       (pagination.pending || timeline.backwardPagination === 'loading')
   );
   let live = $derived(timeline.mode.kind === 'live');
+  let oldestUnreadLoaded = $derived(
+    (timeline.backwardPagination === 'end' || pagination.exhausted) &&
+      (live || timeline.forwardPagination === 'end')
+  );
   let futureLoading = $derived(
     revealed && !live && visibleItems.length > 0 && timeline.forwardPagination === 'loading'
   );
@@ -304,20 +359,16 @@
     isScrolling: () => windowState.scrolling,
     requestHistory,
   });
-  function measureMediaColumn(node: HTMLElement): number {
-    const main = node.querySelector<HTMLElement>('.message-main');
-    return mediaColumnPx(main?.clientWidth ?? estimatedColumnPx(node.clientWidth));
-  }
   function windowChanged(state: TimelineWindowState): void {
     const wasScrolling = windowState.scrolling;
     windowState = state;
     const node = viewport;
-    if (node !== null) mediaColumn = measureMediaColumn(node);
-    const distance = node === null ? 0 : node.scrollHeight - node.clientHeight - node.scrollTop;
+    const height = node?.clientHeight ?? 0;
+    const distance = node === null ? 0 : node.scrollHeight - height - node.scrollTop;
     jumpToLatestVisible =
       !state.pinned &&
       (state.end !== entries.length ||
-        (node !== null && distance >= node.clientHeight * TIMELINE_LAYOUT.jumpToLatestPages));
+        (node !== null && distance >= height * TIMELINE_LAYOUT.jumpToLatestPages));
     nearLatest =
       state.end === entries.length &&
       node !== null &&
@@ -335,17 +386,27 @@
       windowState.lastVisible !== null &&
       windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
     ) {
-      void onRequestFuture().catch(() => {});
+      void requestFuture(true).catch(() => {});
     }
   }
   function mountWindow(node: HTMLDivElement): () => void {
     const canvas = node.querySelector<HTMLElement>('.items');
     const content = node.querySelector<HTMLElement>('.window-rows');
     if (!canvas || !content) throw new Error('Timeline window elements are missing');
-    mediaColumn = measureMediaColumn(node);
+    let column: HTMLElement | null = null;
     const widths = new ResizeObserver(() => {
-      mediaColumn = measureMediaColumn(node);
+      measureMediaColumn();
     });
+    function measureMediaColumn(): void {
+      const main = node.querySelector<HTMLElement>('.message-main');
+      if (main !== column) {
+        if (column) widths.unobserve(column);
+        column = main;
+        if (column) widths.observe(column);
+      }
+      mediaColumn = mediaColumnPx(main?.clientWidth ?? estimatedColumnPx(node.clientWidth));
+    }
+    measureMediaColumn();
     widths.observe(node);
     const engine = new TimelineWindow<RowValue>({
       viewport: node,
@@ -354,15 +415,27 @@
       render: async (next) => {
         rows = next;
         await tick();
+        if (!disposed) measureMediaColumn();
       },
       onChange: windowChanged,
       onScroll: readerScrolled,
       onInteraction: () => {
         focus.cancel();
+        unreadNavigation?.abort();
+        if (
+          !live &&
+          timeline.forwardPagination === 'idle' &&
+          (future.failed || !future.canRefill()) &&
+          windowState.lastVisible !== null &&
+          windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
+        ) {
+          void requestFuture(true).catch(() => {});
+        }
         abandonLanding();
       },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
+      canFollowLatest: () => untrack(() => timeline.reachesLatest),
     });
     controller = engine;
     return () => {
@@ -382,6 +455,25 @@
       if (!loading && !disposed) void openTimeline(engine);
     });
   });
+  $effect(() => {
+    if (
+      live ||
+      timeline.loading ||
+      timeline.resumingLive ||
+      !timeline.hasSnapshot ||
+      timeline.error !== null ||
+      !revealed ||
+      filling ||
+      focus.filling ||
+      future.pending ||
+      timeline.forwardPagination !== 'idle' ||
+      windowState.lastVisible === null ||
+      windowState.lastVisible < entries.length - TIMELINE_LAYOUT.historyPrefetchItems
+    )
+      return;
+    if (!future.canRefill()) return;
+    void requestFuture().catch(() => {});
+  });
   async function awaitPagination(): Promise<void> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (!disposed && timeline.backwardPagination === 'loading' && performance.now() < deadline) {
@@ -400,6 +492,21 @@
       return;
     }
     await engine.update(entries);
+    const initializingUnread = unread.initialize(
+      timeline.items,
+      hasUnread,
+      onLoadReadMarker,
+      eventItems
+    );
+    if (
+      !entries.some(({ value }) => value.item.content.kind === 'read_marker') &&
+      !entryFor(landingEventId)
+    ) {
+      revealed = true;
+    }
+    await initializingUnread;
+    if (disposed) return;
+    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (focusEventId) {
       const target = focusEventId;
       const entry = entryFor(focusEventId);
@@ -409,8 +516,8 @@
       return;
     }
     const landingEntry = () => entryFor(landingEventId);
-    const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
-    if (!unread && !landingEntry()) revealed = true;
+    const unreadEntry = entries.find(({ value }) => value.item.content.kind === 'read_marker');
+    if (!unreadEntry && !landingEntry()) revealed = true;
     filling = true;
     try {
       while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
@@ -431,10 +538,12 @@
         }
       }
       const notified = landingEntry();
-      const landing = notified ?? unread;
+      const landing = notified ?? unreadEntry;
       if (landing && !disposed && engine.state.pinned) {
         if (notified) markLanded(landingEventId);
-        await engine.jumpTo(landing.key, landing === unread ? 'start' : 'center');
+        await engine.jumpTo(landing.key, landing === unreadEntry ? 'start' : 'center');
+      } else if (!notified && unread.active && unread.firstEventId !== null && !disposed) {
+        await jumpToUnread();
       }
     } catch {
       pagination.exhausted = false;
@@ -450,6 +559,7 @@
     const node = viewport;
     if (
       timeline.loading ||
+      timeline.resumingLive ||
       timeline.mode.kind === 'focused' ||
       timeline.error !== null ||
       !engine ||
@@ -491,9 +601,60 @@
   }
   let handledFocus: string | null = null;
   $effect(() => {
+    if (
+      timeline.mode.kind !== 'unread' ||
+      timeline.forwardPagination !== 'end' ||
+      timeline.loading ||
+      timeline.resumingLive ||
+      !revealed ||
+      !onResumeLive
+    )
+      return;
+    void resumeLive().catch(() => {});
+  });
+  export function resumeLive(keepAnchor = true): Promise<void> {
+    if (resumeTask) {
+      if (keepAnchor) return resumeTask;
+      return resumeTask
+        .catch(() => {})
+        .then(() => (timeline.canResumeLive ? resumeLive(false) : jumpToLiveEnd()));
+    }
+    if (!onResumeLive || !timeline.canResumeLive) return Promise.resolve();
+    if (keepAnchor) controller?.holdAnchor();
+    const anchor = () => {
+      const key = keepAnchor && !disposed ? controller?.anchorKey(restorableAnchor) : null;
+      return entries.find((entry) => entry.key === key)?.value.item.event_id ?? null;
+    };
+    resumeFailed = false;
+    const task = onResumeLive(anchor)
+      .then(async () => {
+        if (!keepAnchor) await jumpToLiveEnd();
+      })
+      .catch((error: unknown) => {
+        if (!disposed) resumeFailed = true;
+        throw error;
+      })
+      .finally(() => {
+        if (resumeTask === task) resumeTask = null;
+      });
+    resumeTask = task;
+    return task;
+  }
+  function restorableAnchor({ item }: RowValue): boolean {
+    return item.thread_root === null;
+  }
+  async function jumpToLiveEnd(): Promise<void> {
+    await tick();
+    if (!disposed) await controller?.jumpTo(null, 'start');
+  }
+  $effect(() => {
     void focusEventId;
     void timeline.mode;
-    untrack(() => focus.cancel());
+    untrack(() => {
+      focus.cancel();
+      if (!switchingToUnread) unreadNavigation?.abort();
+      future.reset();
+    });
   });
   $effect(() => {
     const target = focusEventId;
@@ -540,8 +701,8 @@
   function userScrollMarker(node: HTMLDivElement): () => void {
     return historyController.attach(node);
   }
-  function setPersonaOpen(open: boolean): void {
-    personaOpen = open;
+  function setMenuOpen(open: boolean): void {
+    menuOpen = open;
   }
   function scrollLock(locked: boolean) {
     return (node: HTMLElement) => {
@@ -557,9 +718,98 @@
       };
     };
   }
-  function markRead(eventId: string): Promise<void> {
+  async function markRead(eventId: string): Promise<void> {
     if (windowState.pinned) followingRead = true;
-    return onRead(eventId);
+    await onRead(eventId);
+    if (disposed) return;
+    if (eventId === latestEventId(timeline.items)) unread.dismiss();
+  }
+  async function jumpToUnread(): Promise<void> {
+    const engine = controller;
+    if (!engine || jumpingUnread) return;
+    focus.cancel();
+    historyController.finishHistoryFill();
+    const navigation = new AbortController();
+    unreadNavigation?.abort();
+    unreadNavigation = navigation;
+    jumpingUnread = true;
+    unreadError = null;
+    let mode = timeline.mode;
+    const current = () => !disposed && !navigation.signal.aborted && timeline.mode === mode;
+    const deadline = performance.now() + 30_000;
+    let emptyPages = 0;
+    try {
+      await unread.initialize(timeline.items, hasUnread, onLoadReadMarker, eventItems);
+      if (unread.failed) {
+        unreadError = 'jump';
+        return;
+      }
+      if (current() && !entryFor(unread.firstEventId) && unread.readEventId && onRequestUnread) {
+        switchingToUnread = true;
+        try {
+          await onRequestUnread(unread.readEventId);
+          mode = timeline.mode;
+        } finally {
+          switchingToUnread = false;
+        }
+      }
+      while (current()) {
+        unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
+        if (!unread.active) return;
+        const target = entryFor(unread.firstEventId);
+        if (target) {
+          await engine.update(entries);
+          if (current()) await engine.jumpTo(target.key, 'start', false, navigation.signal);
+          return;
+        }
+        if (
+          emptyPages >= MAX_EMPTY_REFILLS ||
+          performance.now() >= deadline ||
+          oldestUnreadLoaded
+        ) {
+          unreadError = 'jump';
+          return;
+        }
+        const before = timeline.items;
+        if (!live && timeline.forwardPagination !== 'end') {
+          await requestFuture(true);
+          await tick();
+        } else {
+          const end = await requestHistory();
+          if (!current()) return;
+          pagination.exhausted = end;
+          await awaitPagination();
+        }
+        if (!current()) return;
+        emptyPages = timeline.items === before ? emptyPages + 1 : 0;
+        await engine.update(entries);
+      }
+    } catch {
+      if (current()) unreadError = 'jump';
+    } finally {
+      if (unreadNavigation === navigation) jumpingUnread = false;
+    }
+  }
+  async function markAllRead(): Promise<void> {
+    if (!onMarkRead || markingRead) return;
+    unreadNavigation?.abort();
+    markingRead = true;
+    unreadError = null;
+    try {
+      await onMarkRead();
+      if (!disposed) {
+        unread.dismiss();
+        followingRead = windowState.pinned;
+      }
+    } catch {
+      if (!disposed) unreadError = 'read';
+    } finally {
+      if (!disposed) markingRead = false;
+    }
+  }
+  export function dismissUnread(): void {
+    unreadNavigation?.abort();
+    unread.dismiss();
   }
   export function stepReply(direction: ReplyDirection): string | null {
     const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
@@ -578,7 +828,12 @@
   }
   function jumpToLatest(): void {
     focus.cancel();
+    unreadNavigation?.abort();
     historyController.finishHistoryFill();
+    if (timeline.canResumeLive) {
+      void resumeLive(false).catch(() => {});
+      return;
+    }
     if (!live) {
       onJumpToLive?.();
       return;
@@ -590,6 +845,7 @@
 <TimelineReadReceipt
   {timeline}
   visibleEventId={readEventId}
+  enabled={!unread.blocking && !markingRead && !timeline.resumingLive}
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
@@ -617,15 +873,51 @@
     >{$i18n.t('timeline.loadFailed')}</Alert
   >
 {/if}
+{#if resumeFailed}
+  <Alert variant="critical" role="alert">
+    {$i18n.t('timeline.loadFailed')}
+    <Button type="button" onclick={() => void resumeLive().catch(() => {})}
+      >{$i18n.t('timeline.resumeLiveRetry')}</Button
+    >
+  </Alert>
+{/if}
 
 <div
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
   style={TIMELINE_LAYOUT_STYLE}
 >
-  {#if stuckUnreadCount > 0}
-    <p class="unread-pinned">
-      <span>{$i18n.t('timeline.unreadCount', { count: stuckUnreadCount })}</span>
-    </p>
+  {#if revealed && unread.active && !unread.loading && (!unreadInView || unreadError !== null)}
+    <div class="unread-bar">
+      <Button
+        class="jump-to-unread"
+        variant="ghost"
+        loading={jumpingUnread}
+        disabled={markingRead}
+        aria-label={$i18n.t('timeline.jumpToUnread')}
+        onclick={() => void jumpToUnread()}
+      >
+        <ArrowUpIcon />
+        <span
+          >{unreadCount > 0
+            ? $i18n.t('timeline.unreadCount', { count: unreadCount })
+            : $i18n.t('timeline.newMessages')}</span
+        >
+        <span class="unread-action">{$i18n.t('timeline.jumpToUnread')}</span>
+      </Button>
+      {#if onMarkRead}
+        <Button variant="ghost" loading={markingRead} onclick={() => void markAllRead()}>
+          <span>{$i18n.t('timeline.markRead')}</span>
+          <CheckIcon />
+        </Button>
+      {/if}
+    </div>
+    {#if unreadError !== null}
+      <Alert variant="critical" role="alert"
+        >{$i18n.t(
+          unreadError === 'jump' ? 'timeline.unreadJumpFailed' : 'timeline.markReadFailed'
+        )}</Alert
+      >
+    {/if}
   {/if}
 
   <div class="timeline-stage">
@@ -662,7 +954,7 @@
         tabindex="0"
         {@attach mountWindow}
         {@attach userScrollMarker}
-        {@attach scrollLock(scrollLocked || personaOpen)}
+        {@attach scrollLock(scrollLocked || menuOpen)}
         role="log"
         aria-live="off"
       >
@@ -715,11 +1007,10 @@
                     alignOwn={preferences.alignOwnMessages}
                     {onJumpToEvent}
                     {onOpenMedia}
-                    {onPersonaAvatarClick}
                     {onVotePoll}
                     {onEndPoll}
                     {events}
-                    onPersonaOpenChange={setPersonaOpen}
+                    onMenuOpenChange={setMenuOpen}
                     {roomId}
                   />
                 {/if}
@@ -940,34 +1231,41 @@
     padding-top: calc(var(--timeline-row-padding) + var(--timeline-group-gap));
   }
 
-  .unread-pinned {
+  .unread-bar {
     align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    inset-inline: 0;
-    margin: 0;
-    padding: 0 var(--space-400);
-    pointer-events: none;
-    position: absolute;
-    top: 0;
-    z-index: 1;
-  }
-
-  .unread-pinned::before {
-    border-top: calc(var(--border-width) * 2) solid var(--primary-main-line);
-    content: '';
-    flex: 1;
-  }
-
-  .unread-pinned span {
     background: var(--primary-container);
-    border: var(--border-width) solid var(--primary-container-line);
-    border-radius: var(--radius-pill);
     color: var(--primary-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.04em;
-    padding: var(--space-050) var(--space-200);
+    display: flex;
+    flex: none;
+    gap: var(--space-100);
+    justify-content: space-between;
+    padding-inline: var(--space-100);
+  }
+
+  .unread-bar :global(.btn) {
+    --button-container: transparent;
+    --button-line: transparent;
+    --button-on-container: var(--primary-on-container);
+    --button-container-hover: var(--primary-container-hover);
+    --button-container-active: var(--primary-container-active);
+
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .unread-bar :global(.jump-to-unread) {
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .unread-action {
+    margin-inline-start: auto;
+  }
+
+  @media (width < 48rem) {
+    .unread-action {
+      display: none;
+    }
   }
 
   .timeline-foot {

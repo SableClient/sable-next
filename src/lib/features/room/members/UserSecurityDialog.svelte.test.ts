@@ -57,3 +57,32 @@ test('shows identity and MSC4153 device eligibility, then starts user verificati
   await user.click(screen.getByRole('button', { name: 'Verify identity' }));
   expect(requestVerification).toHaveBeenCalledWith('@alice:example.org');
 });
+
+test('allows a long device list to scroll within the dialog', async () => {
+  userSecurity.mockResolvedValueOnce({
+    verification: 'unverified',
+    verification_violation: false,
+    devices: Array.from({ length: 30 }, (_, index) => ({
+      device_id: `DEVICE-${index}`,
+      display_name: `Device ${index}`,
+      verified: false,
+      cross_signed: true,
+      blocked: false,
+    })),
+  });
+
+  render(UserSecurityDialog, {
+    props: {
+      open: true,
+      userId: '@alice:example.org',
+      displayName: 'Alice',
+      onOpenChange: vi.fn(),
+    },
+  });
+
+  await screen.findByText('Device 29');
+  const deviceList = screen.getByRole('list');
+  const scrollRegion = deviceList.closest('.security-body');
+  if (!scrollRegion) throw new Error('Expected a scroll region around the device list');
+  expect(getComputedStyle(scrollRegion).overflowY).toBe('auto');
+});

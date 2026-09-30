@@ -2,7 +2,7 @@
 import { expect, test, vi } from 'vitest';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 import type { TimelineWindow } from '#lib/timeline/timeline-window.js';
-import { TimelineFocus } from './timeline-focus';
+import { TimelineFocus } from './timeline-focus.svelte.js';
 import { TimelinePagination } from './timeline-pagination.svelte.js';
 
 function fixture() {

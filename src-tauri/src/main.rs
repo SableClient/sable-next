@@ -267,6 +267,11 @@ fn webkit_env_defaults() -> Vec<(&'static str, std::ffi::OsString)> {
 }
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    if app_lib::verbose::enabled() {
+        app_lib::verbose::attach_terminal();
+    }
+
     #[cfg(all(feature = "cef", target_os = "linux"))]
     let proxy = app_lib::proxy::launch_proxy().clone().ok().flatten();
 
