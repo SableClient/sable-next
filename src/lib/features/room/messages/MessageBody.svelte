@@ -262,6 +262,7 @@
     border-radius: var(--radius);
     display: block;
     margin-top: var(--space-100);
+    max-width: 100%;
     width: var(--timeline-sticker-width);
   }
 

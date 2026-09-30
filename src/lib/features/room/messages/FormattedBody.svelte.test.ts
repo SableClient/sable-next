@@ -32,6 +32,20 @@ import FormattedBodyMediaHarness from './FormattedBodyMediaHarness.test.svelte';
 const user = userEvent.setup();
 const link = () => screen.getByRole('link');
 
+test('keeps table semantics inside a keyboard-accessible scroller', async () => {
+  render(FormattedBody, {
+    props: { html: '<table><tr><th>Name</th></tr><tr><td>Alice</td></tr></table>' },
+  });
+  await tick();
+  const table = screen.getByRole('table');
+  expect(screen.getByRole('columnheader')).toHaveTextContent('Name');
+  expect(screen.getByRole('cell')).toHaveTextContent('Alice');
+  const scroller = table.parentElement;
+  expect(scroller).toHaveClass('table-scroll');
+  scroller?.focus();
+  expect(scroller).toHaveFocus();
+});
+
 afterEach(() => {
   core.fetchMedia.mockReset();
   core.roomPreview.mockReset();

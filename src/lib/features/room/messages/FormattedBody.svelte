@@ -214,6 +214,14 @@
       void html;
       return untrack(() => {
         const icons: ReturnType<typeof mount>[] = [];
+        for (const table of node.querySelectorAll('table')) {
+          if (table.parentElement?.classList.contains('table-scroll')) continue;
+          const scroller = document.createElement('div');
+          scroller.className = 'table-scroll';
+          scroller.tabIndex = 0;
+          table.replaceWith(scroller);
+          scroller.append(table);
+        }
         const withIcon = (anchor: HTMLAnchorElement, icon: Component): HTMLSpanElement => {
           const holder = document.createElement('span');
           holder.className = 'link-chip-icon';
@@ -907,9 +915,28 @@
     image-rendering: pixelated;
   }
 
+  .formatted-body :global(.table-scroll) {
+    margin: var(--space-100) 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+
   .formatted-body :global(table) {
     border-collapse: collapse;
-    margin: var(--space-100) 0;
+    width: max-content;
+  }
+
+  .formatted-body :global([data-mx-maths]) {
+    display: inline-block;
+    max-width: 100%;
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
+    vertical-align: middle;
+  }
+
+  .formatted-body :global(div[data-mx-maths]) {
+    display: block;
   }
 
   .formatted-body :global(th),

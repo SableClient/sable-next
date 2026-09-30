@@ -1404,6 +1404,7 @@
     align-items: center;
     display: flex;
     flex-grow: 1;
+    flex-shrink: 0;
     font-size: var(--font-size-small);
     justify-content: end;
     min-width: 0;
@@ -1772,6 +1773,11 @@
     align-items: flex-start;
     display: flex;
     flex-direction: column;
+  }
+
+  .message.layout-bubble .message-main > * {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .message.layout-bubble .content-bubble,
