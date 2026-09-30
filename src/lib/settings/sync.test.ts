@@ -40,6 +40,7 @@ describe('prepareSettings', () => {
     expect(content.settings).not.toHaveProperty('developerTools');
     expect(content.settings).not.toHaveProperty('systemNotifications');
     expect(content.settings).not.toHaveProperty('settingsSync');
+    expect(content.settings).not.toHaveProperty('searchUnmeteredOnly');
   });
 
   it('drops a custom theme that does not fit the budget', () => {
@@ -71,11 +72,17 @@ describe('applySettings', () => {
       ...base,
       notificationSounds: true,
       notificationContent: false,
+      searchUnmeteredOnly: true,
       notifyOnce: true,
     };
     const remote = {
       v: 1,
-      settings: { notificationSounds: false, notificationContent: true, notifyOnce: false },
+      settings: {
+        notificationSounds: false,
+        notificationContent: true,
+        notifyOnce: false,
+        searchUnmeteredOnly: false,
+      },
       themes: noThemes,
     };
 
@@ -83,6 +90,7 @@ describe('applySettings', () => {
 
     expect(applied?.preferences.notificationSounds).toBe(true);
     expect(applied?.preferences.notificationContent).toBe(false);
+    expect(applied?.preferences.searchUnmeteredOnly).toBe(true);
     expect(applied?.preferences.notifyOnce).toBe(false);
   });
 

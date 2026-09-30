@@ -2416,6 +2416,8 @@
     "searchMaxEventsHint": "The most events the crawl fetches in one session.",
     "searchCrawler": "Index message history",
     "searchCrawlerHint": "Downloads older messages in the background for on-device search. When off, search uses the server where available.",
+    "searchUnmeteredOnly": "Only index on unmetered connections",
+    "searchUnmeteredOnlyHint": "Pauses background history downloads on mobile data, metered Wi-Fi, or in Low Data Mode.",
     "searchIndexLimit": "Search index size",
     "searchIndexLimitHint": "How much storage this device may use to index messages for search. Past it, the oldest indexed history is dropped.",
     "usernameClick": "Clicking a name",

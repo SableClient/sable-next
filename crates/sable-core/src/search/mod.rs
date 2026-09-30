@@ -1,4 +1,6 @@
 mod crawl;
+mod network;
+pub(crate) use network::CrawlNetwork;
 #[cfg(target_family = "wasm")]
 mod idb;
 mod persist;
@@ -2889,6 +2891,7 @@ mod tests {
     use wiremock::{Mock, ResponseTemplate};
 
     use super::MessageIndex;
+    use super::crawl::{CrawlBatch, CrawlOutcome};
 
     pub(super) fn in_room(
         index: &MessageIndex,
@@ -4820,7 +4823,13 @@ mod tests {
             .await
             .expect("crawl one batch");
         assert!(
-            !reached_start.reached_start,
+            matches!(
+                reached_start,
+                CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: false,
+                    ..
+                })
+            ),
             "a room with a next token is not exhausted"
         );
 
@@ -4856,7 +4865,14 @@ mod tests {
             .await
             .expect("crawl the resumed batch");
         assert!(
-            reached_start.reached_start && reached_start.exhausted,
+            matches!(
+                reached_start,
+                CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: true,
+                    exhausted: true,
+                    ..
+                })
+            ),
             "no next token means the room is done"
         );
 
@@ -4935,7 +4951,13 @@ mod tests {
         );
         assert_eq!(hits.len(), 1, "the crawler must index what it paginated");
         assert_eq!(hits[0].event_id, event_id!("$older"));
-        assert!(reached_start.reached_start);
+        assert!(matches!(
+            reached_start,
+            CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                ..
+            })
+        ));
 
         drop(room);
     }
@@ -5441,7 +5463,13 @@ mod tests {
             .crawl_once(&client, &room_id)
             .await
             .expect("crawl one batch");
-        assert!(reached_start.reached_start);
+        assert!(matches!(
+            reached_start,
+            CrawlOutcome::Batch(CrawlBatch {
+                reached_start: true,
+                ..
+            })
+        ));
         core.search_crawl.lock().await.settle(room_id, true);
 
         let coverage = core.search_coverage(&client).await;

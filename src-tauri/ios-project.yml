@@ -76,6 +76,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios/Network
       - path: Assets.xcassets
       - path: ../../icons/ios/AppIcons.xcassets
       - path: Externals
@@ -197,6 +198,7 @@ targets:
       - sdk: AVFoundation.framework{{#if this.ios-frameworks}}{{~#each ios-frameworks}}
       - sdk: {{this}}.framework{{/each}}{{/if}}
       - sdk: WebKit.framework
+      - sdk: Network.framework
     preBuildScripts:
       {{~#each ios-pre-build-scripts}}{{#if this.path}}
       - path {{this.path}}{{/if}}{{#if this.script}}

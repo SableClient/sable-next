@@ -69,6 +69,7 @@ import { setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
+import { isNativeMobile } from '#lib/platform/os.js';
 import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
@@ -980,6 +981,16 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.searchCrawler',
         description: 'settings.searchCrawlerHint',
         type: 'boolean',
+      },
+      {
+        key: 'searchUnmeteredOnly',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchUnmeteredOnly',
+        description: 'settings.searchUnmeteredOnlyHint',
+        type: 'boolean',
+        gatedBy: 'searchCrawler',
+        supported: isNativeMobile,
       },
       {
         key: 'serverSearch',

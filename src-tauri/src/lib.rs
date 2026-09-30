@@ -22,6 +22,8 @@ mod cold_push;
 mod hdr_share;
 #[cfg(target_os = "android")]
 mod mobile;
+#[cfg(mobile)]
+mod network;
 mod notifications;
 #[cfg(target_os = "linux")]
 pub mod permission_grants;
@@ -434,6 +436,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
         Box::new(sable_core::store::ExclusiveFileSessionStore::new(&data_dir)),
     );
     let event_sink = Arc::new(EventSink::default());
+    #[cfg(mobile)]
+    network::attach(&core);
     let pushing = core.clone();
     #[cfg(target_os = "android")]
     let _ = cold_push::CORE.set(core.clone());

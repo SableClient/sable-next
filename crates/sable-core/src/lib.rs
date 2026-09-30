@@ -127,6 +127,7 @@ pub struct Core {
     notify_once: AtomicBool,
     notifications_enabled: AtomicBool,
     search_crawler_enabled: AtomicBool,
+    search_network: search::CrawlNetwork,
     search_foreground: AtomicBool,
     app_active: AtomicBool,
     server_search_enabled: AtomicBool,
@@ -228,6 +229,7 @@ impl Core {
             notify_once: AtomicBool::new(true),
             notifications_enabled: AtomicBool::new(true),
             search_crawler_enabled: AtomicBool::new(true),
+            search_network: search::CrawlNetwork::default(),
             search_foreground: AtomicBool::new(true),
             app_active: AtomicBool::new(true),
             server_search_enabled: AtomicBool::new(true),
@@ -356,8 +358,14 @@ impl Core {
         self.app_active.store(active, Ordering::Relaxed);
     }
 
+    pub fn set_search_network_unmetered(&self, unmetered: bool) {
+        self.search_network.set_unmetered(unmetered);
+    }
+
     pub(crate) fn search_crawl_active(&self) -> bool {
-        self.app_active.load(Ordering::Relaxed) && self.search_foreground.load(Ordering::Relaxed)
+        self.app_active.load(Ordering::Relaxed)
+            && self.search_foreground.load(Ordering::Relaxed)
+            && self.search_network.allows_crawl()
     }
 
     pub(crate) fn begin_foreground_pagination(self: &Arc<Self>) -> ForegroundPagination {
@@ -618,6 +626,7 @@ mod tests {
     #[test]
     fn app_activity_gates_the_search_crawler() {
         let (core, _rx) = Core::new("test", Box::new(store::MemorySessionStore::default()));
+        core.set_search_network_unmetered(true);
         assert!(core.search_crawl_active());
 
         core.set_app_active(false);

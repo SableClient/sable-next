@@ -1043,6 +1043,7 @@ pub enum Command {
     SetSearchOptions {
         disk_budget_mb: u32,
         crawler: bool,
+        unmetered_only: bool,
         server_search: bool,
         tuning: SearchTuning,
         foreground: bool,

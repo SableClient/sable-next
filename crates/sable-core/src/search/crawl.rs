@@ -392,13 +392,14 @@ impl Core {
                 progress.enter(phase);
             }
             let pause = match self.crawl_once(client, &room_id).await {
-                Ok(outcome) if outcome.reached_start => {
+                Ok(CrawlOutcome::Paused) => continue,
+                Ok(CrawlOutcome::Batch(outcome)) if outcome.reached_start => {
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
                     progress.settle(room_id, outcome.exhausted);
                     outcome.pause(&progress.tuning)
                 }
-                Ok(outcome) => {
+                Ok(CrawlOutcome::Batch(outcome)) => {
                     let mut progress = self.search_crawl.lock().await;
                     progress.steady(&room_id);
                     if progress.blinded(&room_id, outcome.undecryptable) {
@@ -624,13 +625,20 @@ impl Core {
             return;
         };
 
+        let Some(result) = self
+            .search_network
+            .run(room.request_encryption_state())
+            .await
+        else {
+            return;
+        };
         self.search_crawl
             .lock()
             .await
             .probed
             .insert(room.room_id().to_owned());
 
-        if let Err(error) = room.request_encryption_state().await {
+        if let Err(error) = result {
             warn!(room_id = %room.room_id(), "could not settle a room's encryption state: {error}");
         }
     }
@@ -655,7 +663,10 @@ impl Core {
         let mut options = MessagesOptions::backward().from(from.as_deref());
         options.limit = UInt::from(batch);
         let requested = now_ms();
-        let messages = room.messages(options).await?;
+        let Some(messages) = self.search_network.run(room.messages(options)).await else {
+            return Ok(CrawlOutcome::Paused);
+        };
+        let messages = messages?;
 
         {
             let mut progress = self.search_crawl.lock().await;
@@ -675,12 +686,12 @@ impl Core {
                     .is_some_and(|ts| u64::from(ts.get()) < floor)
             })
         {
-            return Ok(CrawlOutcome {
+            return Ok(CrawlOutcome::Batch(CrawlBatch {
                 reached_start: true,
                 exhausted: true,
                 undecryptable: 0,
                 readable: true,
-            });
+            }));
         }
 
         let undecryptable = if messages.chunk.iter().all(|event| event.kind.is_utd()) {
@@ -688,7 +699,7 @@ impl Core {
         } else {
             0
         };
-        let outcome = CrawlOutcome {
+        let outcome = CrawlBatch {
             reached_start: messages.end.is_none() || messages.chunk.is_empty(),
             exhausted: messages.end.is_none(),
             undecryptable,
@@ -724,11 +735,16 @@ impl Core {
             progress.events = progress.events.saturating_add(fresh);
         }
 
-        Ok(outcome)
+        Ok(CrawlOutcome::Batch(outcome))
     }
 }
 
-pub(super) struct CrawlOutcome {
+pub(super) enum CrawlOutcome {
+    Paused,
+    Batch(CrawlBatch),
+}
+
+pub(super) struct CrawlBatch {
     pub(super) reached_start: bool,
     pub(super) exhausted: bool,
     pub(super) undecryptable: usize,
@@ -737,14 +753,16 @@ pub(super) struct CrawlOutcome {
 
 impl CrawlOutcome {
     const fn gone() -> Self {
-        Self {
+        Self::Batch(CrawlBatch {
             reached_start: true,
             exhausted: false,
             undecryptable: 0,
             readable: true,
-        }
+        })
     }
+}
 
+impl CrawlBatch {
     fn pause(&self, tuning: &SearchTuning) -> Duration {
         let readable = Duration::from_millis(u64::from(tuning.crawl_pause_ms));
         if self.readable {
@@ -776,16 +794,16 @@ mod tests {
     use super::super::persist::StoredCrawlRoom;
     use super::{
         BLIND_EVENTS_BEFORE_SKIP, CRAWL_BACKOFF_CAP, CRAWL_BASE_EVENTS, CRAWL_BATCH, CRAWL_PAUSE,
-        CRAWL_READABLE_PAUSE, CRAWL_TRICKLE_PAUSE, CrawlOutcome, CrawlProgress, MAX_CRAWLED_EVENTS,
-        PUSHBACKS_BEFORE_SKIP,
+        CRAWL_READABLE_PAUSE, CRAWL_TRICKLE_PAUSE, CrawlBatch, CrawlOutcome, CrawlProgress,
+        MAX_CRAWLED_EVENTS, PUSHBACKS_BEFORE_SKIP,
     };
 
     fn room() -> OwnedRoomId {
         room_id!("!crawled:localhost").to_owned()
     }
 
-    fn outcome(readable: bool) -> CrawlOutcome {
-        CrawlOutcome {
+    fn outcome(readable: bool) -> CrawlBatch {
+        CrawlBatch {
             reached_start: false,
             exhausted: false,
             undecryptable: 0,
@@ -916,6 +934,119 @@ mod tests {
             coverage.state,
             crate::protocol::SearchCoverageState::Stopped
         );
+    }
+
+    #[async_test]
+    async fn test_metered_crawl_pauses_and_resumes() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+        let room_id = room();
+        server.sync_joined_room(&client, &room_id).await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default().end_token("older"))
+            .mock_once()
+            .mount()
+            .await;
+        let (core, _events) = crate::Core::new(
+            "metered-search-crawler",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+
+        core.set_search_network_unmetered(false);
+        core.crawl_once(&client, &room_id)
+            .await
+            .expect("paused crawl");
+        assert_eq!(core.search_crawl.lock().await.metrics.batches, 0);
+        assert!(core.search_crawl.lock().await.tokens.is_empty());
+
+        core.set_search_network_unmetered(true);
+        core.crawl_once(&client, &room_id)
+            .await
+            .expect("resumed crawl");
+        assert_eq!(core.search_crawl.lock().await.metrics.batches, 1);
+
+        server
+            .mock_room_messages()
+            .match_from("older")
+            .ok(RoomMessagesResponseTemplate::default().end_token("oldest"))
+            .mock_once()
+            .mount()
+            .await;
+        core.set_search_network_unmetered(false);
+        let outcome = core
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("paused again");
+        assert!(matches!(outcome, CrawlOutcome::Paused));
+        assert_eq!(core.search_crawl.lock().await.metrics.batches, 1);
+        assert_eq!(
+            core.search_crawl.lock().await.tokens[&room_id].as_deref(),
+            Some("older")
+        );
+
+        core.search_network.set_unmetered_only(false);
+        core.crawl_once(&client, &room_id).await.expect("opted out");
+        assert_eq!(core.search_crawl.lock().await.metrics.batches, 2);
+        assert_eq!(
+            core.search_crawl.lock().await.tokens[&room_id].as_deref(),
+            Some("oldest")
+        );
+    }
+
+    #[async_test]
+    async fn test_metered_crawl_cancels_requests() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room();
+        server.sync_joined_room(&client, &room_id).await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .end_token("older")
+                .with_delay(Duration::from_secs(30)))
+            .mock_once()
+            .mount()
+            .await;
+        let (core, _events) = crate::Core::new(
+            "metered-search-request",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        core.set_search_network_unmetered(true);
+
+        let switch_network = async {
+            loop {
+                let requests = server
+                    .server()
+                    .received_requests()
+                    .await
+                    .expect("recorded requests");
+                if requests
+                    .iter()
+                    .any(|request| request.url.path().ends_with("/messages"))
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+            core.set_search_network_unmetered(false);
+        };
+        let (outcome, ()) = tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(core.crawl_once(&client, &room_id), switch_network)
+        })
+        .await
+        .expect("request cancelled before the response");
+
+        assert!(matches!(
+            outcome.expect("paused crawl"),
+            CrawlOutcome::Paused
+        ));
+        let progress = core.search_crawl.lock().await;
+        assert_eq!(progress.metrics.batches, 0);
+        assert!(progress.tokens.is_empty());
+        assert!(progress.failed.is_empty());
+        assert!(progress.stalled.is_empty());
     }
 
     #[async_test]
@@ -1264,7 +1395,13 @@ mod tests {
             .crawl_once(&client, &room_id)
             .await
             .expect("crawl one batch");
-        assert!(outcome.exhausted);
+        assert!(matches!(
+            outcome,
+            CrawlOutcome::Batch(CrawlBatch {
+                exhausted: true,
+                ..
+            })
+        ));
         assert_eq!(core.search_index.lock().await.documents(), 0);
 
         drop(joined);
@@ -1285,8 +1422,17 @@ mod tests {
             .await
             .expect("a missing room is not an error");
 
-        assert!(outcome.reached_start);
-        assert!(!outcome.exhausted, "a rejoin must walk the room again");
+        assert!(
+            matches!(
+                outcome,
+                CrawlOutcome::Batch(CrawlBatch {
+                    reached_start: true,
+                    exhausted: false,
+                    ..
+                })
+            ),
+            "a rejoin must walk the room again"
+        );
     }
 
     #[async_test]

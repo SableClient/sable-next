@@ -429,6 +429,7 @@
       .setSearchOptions(
         Number(preferences.searchIndexLimit),
         preferences.searchCrawler,
+        preferences.searchUnmeteredOnly,
         preferences.serverSearch,
         {
           crawl_pause_ms: Number(preferences.searchCrawlPause) * 1000,

@@ -22,6 +22,19 @@ static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
     unsafe_code,
     reason = "the export symbol is fixed by the JNI naming convention"
 )]
+pub extern "system" fn Java_moe_sable_next_MainActivity_nativeNetworkChanged(
+    _env: EnvUnowned,
+    _this: JObject,
+    unmetered: jni::sys::jboolean,
+) {
+    crate::network::set_unmetered(unmetered);
+}
+
+#[unsafe(no_mangle)]
+#[expect(
+    unsafe_code,
+    reason = "the export symbol is fixed by the JNI naming convention"
+)]
 pub extern "system" fn Java_moe_sable_next_MainActivity_nativeInitSystemBars(
     mut env: EnvUnowned,
     _this: JObject,

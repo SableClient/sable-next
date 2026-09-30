@@ -2009,11 +2009,13 @@ impl Core {
             Command::SetSearchOptions {
                 disk_budget_mb,
                 crawler,
+                unmetered_only,
                 server_search,
                 tuning,
                 foreground,
             } => {
                 self.search_foreground.store(foreground, Ordering::Relaxed);
+                self.search_network.set_unmetered_only(unmetered_only);
                 self.search_crawl.lock().await.tuning = tuning.clamped();
                 self.search_crawler_enabled
                     .store(crawler, Ordering::Relaxed);

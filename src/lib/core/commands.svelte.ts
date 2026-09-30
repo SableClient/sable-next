@@ -1625,6 +1625,7 @@ export function createCommands(transport: () => Transport) {
     async setSearchOptions(
       diskBudgetMb: number,
       crawler: boolean,
+      unmeteredOnly: boolean,
       serverSearch: boolean,
       tuning: SearchTuning,
       foreground: boolean
@@ -1633,6 +1634,7 @@ export function createCommands(transport: () => Transport) {
         type: 'set_search_options',
         disk_budget_mb: diskBudgetMb,
         crawler,
+        unmetered_only: unmeteredOnly,
         server_search: serverSearch,
         tuning,
         foreground,

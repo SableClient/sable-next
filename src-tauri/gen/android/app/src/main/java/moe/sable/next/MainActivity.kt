@@ -3,6 +3,9 @@ package moe.sable.next
 import android.content.Intent
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
@@ -21,6 +24,8 @@ import io.sentry.android.core.SentryAndroid
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
+  private external fun nativeNetworkChanged(unmetered: Boolean)
+  private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
     applySentryConsent(getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
@@ -28,7 +33,45 @@ class MainActivity : TauriActivity() {
     super.onCreate(savedInstanceState)
     instance = this
     runCatching { nativeInitSystemBars() }
+    startNetworkMonitor()
     stageShareIntent(intent)
+  }
+
+  private fun startNetworkMonitor() {
+    val connectivity = getSystemService(ConnectivityManager::class.java)
+    val callback = object : ConnectivityManager.NetworkCallback() {
+      private var current: Network? = null
+
+      override fun onAvailable(network: Network) {
+        if (instance !== this@MainActivity) return
+        current = network
+        nativeNetworkChanged(false)
+      }
+
+      override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+        if (instance !== this@MainActivity) return
+        if (network != current) return
+        nativeNetworkChanged(
+          capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+          capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
+          !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        )
+      }
+
+      override fun onLost(network: Network) {
+        if (instance !== this@MainActivity) return
+        if (network != current) return
+        current = null
+        nativeNetworkChanged(false)
+      }
+    }
+    runCatching {
+      nativeNetworkChanged(false)
+      connectivity.registerDefaultNetworkCallback(callback)
+      networkCallback = callback
+    }.onFailure { error ->
+      Log.w("SableNetwork", "Could not monitor network cost", error)
+    }
   }
 
   private fun applySentryConsent(enabled: Boolean) {
@@ -131,12 +174,21 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onDestroy() {
-    if (instance === this) instance = null
+    networkCallback?.let {
+      runCatching {
+        getSystemService(ConnectivityManager::class.java).unregisterNetworkCallback(it)
+      }
+    }
+    networkCallback = null
+    if (instance === this) {
+      instance = null
+      nativeNetworkChanged(false)
+    }
     super.onDestroy()
   }
 
   companion object {
-    private var instance: MainActivity? = null
+    @Volatile private var instance: MainActivity? = null
     private var hiddenBarsDepth = 0
     private var shownBarsBehavior: Int? = null
 
