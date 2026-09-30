@@ -329,3 +329,114 @@ test('a failed catalogue install says so on its own card', async () => {
   expect(catalogCard('Night').queryByRole('alert')).not.toBeInTheDocument();
   expect(customThemes.themes).toEqual([]);
 });
+
+test('closing the catalogue discards a preview that is still downloading', async () => {
+  stubCatalog();
+  render(CustomThemes);
+  await openCatalog();
+  const pending = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => pending.promise)
+  );
+
+  await user.click(catalog().getByTitle('Night'));
+  await user.click(button('Close catalogue'));
+  pending.resolve(new Response(NIGHT));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(themePreview.current).toBeNull();
+});
+
+test('the most recently clicked preview wins when downloads finish out of order', async () => {
+  stubCatalog();
+  render(CustomThemes);
+  await openCatalog();
+  const night = Promise.withResolvers<Response>();
+  const dawn = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => (url === NIGHT_URL ? night.promise : dawn.promise))
+  );
+
+  await user.click(catalog().getByTitle('Night'));
+  await user.click(catalog().getByTitle('Dawn'));
+  dawn.resolve(new Response(DAWN));
+  await vi.waitFor(() => {
+    expect(themePreview.current?.name).toBe('Dawn');
+  });
+  night.resolve(new Response(NIGHT));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(themePreview.current?.name).toBe('Dawn');
+});
+
+test('leaving settings discards a preview that is still downloading', async () => {
+  stubCatalog();
+  const { unmount } = render(CustomThemes);
+  await openCatalog();
+  const pending = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => pending.promise)
+  );
+
+  await user.click(catalog().getByTitle('Night'));
+  unmount();
+  pending.resolve(new Response(NIGHT));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(themePreview.current).toBeNull();
+});
+
+test.each(['Revert', 'Use for dark mode'])(
+  '%s discards a newer preview that is still downloading',
+  async (action) => {
+    stubCatalog();
+    render(CustomThemes);
+    await openCatalog();
+    await user.click(catalog().getByTitle('Night'));
+    await vi.waitFor(() => {
+      expect(themePreview.current?.name).toBe('Night');
+    });
+    const pending = Promise.withResolvers<Response>();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => pending.promise)
+    );
+
+    await user.click(catalog().getByTitle('Dawn'));
+    await user.click(button(action));
+    pending.resolve(new Response(DAWN));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(themePreview.current).toBeNull();
+    expect(customThemes.themes.map((theme) => theme.name)).toEqual(
+      action === 'Revert' ? [] : ['Night']
+    );
+  }
+);
+
+test('a superseded preview failure does not clear the current download or show an error', async () => {
+  stubCatalog();
+  render(CustomThemes);
+  await openCatalog();
+  const night = Promise.withResolvers<Response>();
+  const dawn = Promise.withResolvers<Response>();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => (url === NIGHT_URL ? night.promise : dawn.promise))
+  );
+
+  await user.click(catalog().getByTitle('Night'));
+  await user.click(catalog().getByTitle('Dawn'));
+  night.resolve(new Response('', { status: 500 }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(installButton('Dawn')).toBeDisabled();
+  expect(catalogCard('Night').queryByRole('alert')).not.toBeInTheDocument();
+  dawn.resolve(new Response(DAWN));
+  await vi.waitFor(() => {
+    expect(themePreview.current?.name).toBe('Dawn');
+  });
+  expect(installButton('Dawn')).toBeEnabled();
+});

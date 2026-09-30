@@ -34,7 +34,8 @@
     width: min(34rem, 100%);
   }
 
-  :global(body:has(.composer-autocomplete)) .dock {
+  :global(body:has(.composer-autocomplete)) .dock,
+  :global(body:has(.dialog-content[data-state='open'])) .dock {
     visibility: hidden;
   }
 </style>

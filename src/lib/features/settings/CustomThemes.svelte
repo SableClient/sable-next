@@ -64,6 +64,7 @@
   let showing = $derived(resolveTheme(preferences.theme, systemDark.current));
   let tweaksInert = $derived(selectedCustomThemeId(showing) === null);
   let previewing = $state<string | null>(null);
+  let previewGeneration = 0;
 
   let pendingReverts: Array<() => void> = [];
   let pendingToast: number | null = null;
@@ -140,10 +141,12 @@
 
   async function tryFromCatalog(entry: CatalogEntry): Promise<void> {
     if (entry.kind !== 'theme') return;
+    const generation = ++previewGeneration;
     previewing = entry.fullUrl;
     failed = null;
     try {
       const css = await fetchCatalogFile(entry.fullUrl);
+      if (generation !== previewGeneration) return;
       const parsed = parseThemeFile(css, entry.basename);
       if (typeof parsed === 'string' || parsed.kind !== 'theme') throw new Error(String(parsed));
       previewTheme({
@@ -153,32 +156,38 @@
         css,
       });
     } catch {
-      failed = entry.fullUrl;
+      if (generation === previewGeneration) failed = entry.fullUrl;
     } finally {
-      previewing = null;
+      if (generation === previewGeneration) previewing = null;
     }
+  }
+
+  function revertPreview(): void {
+    previewGeneration += 1;
+    previewing = null;
+    clearThemePreview();
   }
 
   function keepPreview(): void {
     const preview = themePreview.current;
     if (!preview) return;
-    clearThemePreview();
+    revertPreview();
     install(preview.css, preview.name, preview.source, true);
   }
 
   $effect(() => {
     if (catalogOpen) return;
-    untrack(clearThemePreview);
+    untrack(revertPreview);
     failed = null;
   });
 
-  onDestroy(clearThemePreview);
+  onDestroy(revertPreview);
 
   async function installFromCatalog(entry: CatalogEntry): Promise<void> {
     installing = entry.fullUrl;
     failed = null;
     try {
-      if (themePreview.current?.source === entry.fullUrl) clearThemePreview();
+      if (themePreview.current?.source === entry.fullUrl) revertPreview();
       const css = await fetchCatalogFile(entry.fullUrl);
       if (!install(css, entry.basename, entry.fullUrl, onboarding)) throw new Error('unreadable');
     } catch {
@@ -459,7 +468,7 @@
     oninstall={(entry) => void installFromCatalog(entry)}
     onpreview={(entry) => void tryFromCatalog(entry)}
     onkeep={keepPreview}
-    onrevert={clearThemePreview}
+    onrevert={revertPreview}
   />
 {/if}
 

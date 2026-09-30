@@ -380,6 +380,7 @@
     block-size: min(46rem, 80dvh);
     display: grid;
     gap: var(--space-400);
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     width: min(44rem, calc(100vw - 2rem));
   }
@@ -395,6 +396,7 @@
     border-bottom: var(--border-width) solid var(--surface-container-line);
     display: grid;
     gap: var(--space-300);
+    grid-template-columns: minmax(0, 1fr);
     inset-block-start: calc(var(--catalog-inset) * -1);
     margin-block-start: calc(var(--catalog-inset) * -1);
     margin-inline: calc(var(--catalog-inset) * -1);
@@ -440,6 +442,7 @@
     color: var(--surface-var-on-container);
     cursor: pointer;
     display: inline-flex;
+    flex-wrap: wrap;
     font: inherit;
     font-size: var(--font-size-label);
     font-weight: var(--font-weight-medium);
@@ -483,6 +486,7 @@
 
   .search {
     flex: 1 1 14rem;
+    min-width: 0;
   }
 
   .skeleton-row {
@@ -551,6 +555,7 @@
     gap: var(--space-300);
     margin-inline: calc(var(--space-100) * -1);
     min-block-size: 0;
+    overflow-anchor: none;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: var(--space-100);
@@ -652,6 +657,7 @@
 
   .preview-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
     margin-inline-start: auto;
   }
