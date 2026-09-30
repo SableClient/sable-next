@@ -10,6 +10,7 @@ export default defineConfig({
     'timeline-media.spec.ts',
     'timeline-media-hold.spec.ts',
     'timeline-receipts.spec.ts',
+    'window-activity.spec.ts',
     'timeline-notified.spec.ts',
     'timeline-unread.spec.ts',
     'timeline-row-height.spec.ts',

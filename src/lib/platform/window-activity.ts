@@ -10,12 +10,19 @@ const subscribe = createSubscriber((update) => {
   let stopped = false;
   let unlisten = (): void => {};
   void watchWindowFocus((focused) => {
+    if (stopped) return;
     nativeFocused = focused;
     update();
-  }).then((stop) => {
-    if (stopped) stop();
-    else unlisten = stop;
-  });
+  })
+    .then((stop) => {
+      if (stopped) stop();
+      else unlisten = stop;
+    })
+    .catch(() => {
+      if (stopped) return;
+      nativeFocused = null;
+      update();
+    });
   const hide = () => {
     pageShown = false;
     update();

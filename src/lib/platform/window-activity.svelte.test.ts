@@ -5,12 +5,14 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const native = vi.hoisted(() => ({
   onChange: null as ((focused: boolean) => void) | null,
+  initialFocus: null as boolean | null,
   stop: vi.fn(),
 }));
 
 vi.mock('./window-decorations.js', () => ({
   watchWindowFocus: (onChange: (focused: boolean) => void) => {
     native.onChange = onChange;
+    if (native.initialFocus !== null) onChange(native.initialFocus);
     return Promise.resolve(native.stop);
   },
 }));
@@ -24,6 +26,7 @@ beforeEach(() => {
   focused = true;
   visibility = 'visible';
   native.onChange = null;
+  native.initialFocus = null;
   native.stop.mockReset();
   vi.spyOn(document, 'hasFocus').mockImplementation(() => focused);
   vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
@@ -99,6 +102,19 @@ test('trusts the native window focus over the document', async () => {
   stop();
   await Promise.resolve();
   expect(native.stop).toHaveBeenCalled();
+});
+
+test('starts inactive when the native window is already minimized', async () => {
+  native.initialFocus = false;
+  const { seen, stop } = track();
+  await Promise.resolve();
+
+  expect(seen.length).toBeGreaterThan(0);
+  expect(seen.every((active) => !active)).toBe(true);
+  native.onChange?.(true);
+  flushSync();
+  expect(seen.at(-1)).toBe(true);
+  stop();
 });
 
 test('stops listening once nothing reads it', () => {

@@ -48,7 +48,6 @@
   import { deliversWebPush } from '#lib/platform/notifications.js';
   import { hostsServiceWorker } from '#lib/platform/service-worker.js';
   import { followExternalLink } from '#lib/platform/external-links.js';
-  import { watchWindowFocus } from '#lib/platform/window-decorations.js';
   import { windowActivity } from '#lib/platform/window-activity.js';
   import { setUnreadBadge } from '#lib/platform/badge.js';
   import { keepStorage } from '#lib/platform/persistent-storage.js';
@@ -449,9 +448,10 @@
     if (core.status !== 'ready') return;
 
     const message = preferences.presenceStatusMessage.trim();
+    const presence = preferences.sendPresence ? preferences.presence : 'offline';
     void core.commands
       .setPresence(
-        preferences.sendPresence ? preferences.presence : 'offline',
+        presence === 'online' && !active ? 'unavailable' : presence,
         preferences.sendPresence && message ? message : null
       )
       .catch(() => {});
@@ -750,31 +750,15 @@
   });
 
   let documentVisible = $derived(windowActivity.visible);
-  let windowFocused = $state(true);
-  let visible = $derived(documentVisible && windowFocused);
+  let active = $derived(windowActivity.active);
 
   $effect(() => {
-    let stopped = false;
-    let unlisten = () => {};
-    void watchWindowFocus((focused) => {
-      windowFocused = focused;
-    }).then((stop) => {
-      if (stopped) stop();
-      else unlisten = stop;
-    });
-    return () => {
-      stopped = true;
-      unlisten();
-    };
-  });
-
-  $effect(() => {
-    roomList.setPresentationActive(visible);
+    roomList.setPresentationActive(active);
   });
 
   $effect(() => {
     if (core.status !== 'ready') return;
-    notifications.readRoom(visible ? openRoomId : null);
+    notifications.readRoom(active ? openRoomId : null);
   });
 
   $effect(() => {

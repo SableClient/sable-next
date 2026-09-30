@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { on } from 'svelte/events';
 
+  import { windowActivity } from '#lib/platform/window-activity.js';
   import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
 
   import { readReceiptEventId } from './timeline-format';
@@ -19,7 +19,7 @@
 
   let { timeline, visibleEventId, atLatest = false, enabled = true, onRead }: Props = $props();
   let historical = $derived(timeline.mode.kind === 'focused' && !atLatest);
-  let documentVisible = $state(true);
+  let active = $derived(windowActivity.active);
   let lastReadEventId: string | null = null;
   let readingEventId: string | null = null;
   let pendingEventId: string | null = null;
@@ -63,15 +63,7 @@
   }
 
   $effect(() => {
-    const updateVisibility = () => {
-      documentVisible = document.visibilityState === 'visible';
-      if (!documentVisible) flush();
-    };
-    updateVisibility();
-    return on(document, 'visibilitychange', updateVisibility);
-  });
-
-  $effect(() => {
+    if (!active) flush();
     if (historical || !enabled) {
       pendingEventId = null;
       clearTimeout(coalesceTimer);
@@ -80,7 +72,7 @@
     }
     const eventId = readReceiptEventId(timeline.items, {
       visibleEventId,
-      documentVisible,
+      documentVisible: active,
       lastReadEventId: pendingEventId ?? readingEventId ?? lastReadEventId,
     });
     if (!eventId || eventId === readingEventId) return;
