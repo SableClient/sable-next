@@ -5,13 +5,12 @@ const SESSION_KEY = 'current';
 
 const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
-const CACHE_DATABASE_SUFFIXES = [
-  '',
-  '::matrix-sdk-state',
-  '::event_cache',
-  '::media',
-  '::sable-search',
-];
+const CACHE_DATABASE_SUFFIXES = ['', '::matrix-sdk-state', '::event_cache', '::media'];
+const SEARCH_DATABASE_SUFFIX = '::sable-search';
+const STATE_DATABASE_SUFFIX = '::matrix-sdk-state';
+const SEARCH_KEY_PREFIX = 'sable.search.';
+const LEGACY_SEARCH_KEY_PREFIX = `${SEARCH_KEY_PREFIX}documents.`;
+const SEARCH_ROOMS_KEY = `${SEARCH_KEY_PREFIX}rooms`;
 const CRYPTO_DATABASE_SUFFIX = '::matrix-sdk-crypto';
 const CRYPTO_META_DATABASE_SUFFIX = '::matrix-sdk-crypto-meta';
 const CRYPTO_CORE_STORE = 'core';
@@ -211,6 +210,78 @@ async function clearHttpCaches(): Promise<void> {
   await Promise.all(names.map((name) => storage.delete(name)));
 }
 
+async function clearStateCache(name: string): Promise<void> {
+  const database = await openExistingDatabase(name);
+  if (!database) return;
+
+  try {
+    const stores = Array.from(database.objectStoreNames);
+    if (stores.length === 0) return;
+    const rooms = database.objectStoreNames.contains('custom')
+      ? await listLegacySearchRooms(database)
+      : undefined;
+    await new Promise<void>((resolve, reject) => {
+      const tx = database.transaction(stores, 'readwrite');
+      for (const name of stores) {
+        const store = tx.objectStore(name);
+        if (name === 'custom') {
+          if (rooms) store.put(rooms, SEARCH_ROOMS_KEY);
+          store.delete(IDBKeyRange.upperBound(SEARCH_KEY_PREFIX, true));
+          store.delete(IDBKeyRange.lowerBound(`${SEARCH_KEY_PREFIX}\uffff`, true));
+        } else {
+          store.clear();
+        }
+      }
+      tx.oncomplete = () => {
+        resolve();
+      };
+      tx.onerror = () => {
+        reject(tx.error ?? new Error(`Could not reset ${name}`));
+      };
+      tx.onabort = () => {
+        reject(tx.error ?? new Error(`Could not reset ${name}`));
+      };
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function listLegacySearchRooms(database: IDBDatabase): Promise<number[] | undefined> {
+  const stored = await new Promise<{ keys: IDBValidKey[]; rooms: number[] | undefined }>(
+    (resolve, reject) => {
+      const tx = database.transaction('custom', 'readonly');
+      const store = tx.objectStore('custom');
+      const keys = store.getAllKeys(
+        IDBKeyRange.bound(LEGACY_SEARCH_KEY_PREFIX, `${LEGACY_SEARCH_KEY_PREFIX}\uffff`)
+      );
+      const rooms = store.get(SEARCH_ROOMS_KEY);
+      tx.oncomplete = () => {
+        resolve({ keys: keys.result, rooms: rooms.result as number[] | undefined });
+      };
+      tx.onerror = () => {
+        reject(tx.error ?? new Error('Could not read the search rooms'));
+      };
+      tx.onabort = () => {
+        reject(tx.error ?? new Error('Could not read the search rooms'));
+      };
+    }
+  );
+  if (stored.keys.length === 0) return undefined;
+  const bytes = stored.rooms ? Uint8Array.from(stored.rooms) : undefined;
+  const rooms = bytes
+    ? (JSON.parse(
+        new TextDecoder().decode(bytes[0] === 0x78 ? unzlibSync(bytes) : bytes)
+      ) as string[])
+    : [];
+  const listed = new Set(rooms);
+  for (const key of stored.keys) {
+    if (typeof key === 'string') listed.add(key.slice(LEGACY_SEARCH_KEY_PREFIX.length));
+  }
+  if (listed.size === rooms.length) return undefined;
+  return Array.from(new TextEncoder().encode(JSON.stringify([...listed])));
+}
+
 function rejections(results: PromiseSettledResult<unknown>[]): unknown[] {
   return results
     .filter((result) => result.status === 'rejected')
@@ -224,7 +295,12 @@ export async function deleteAccountWebStorage(accountId: string): Promise<void> 
     ? listed.filter((name) => name === prefix || name.startsWith(`${prefix}::`))
     : derivedNames(
         [prefix],
-        [...CACHE_DATABASE_SUFFIXES, CRYPTO_DATABASE_SUFFIX, CRYPTO_META_DATABASE_SUFFIX]
+        [
+          ...CACHE_DATABASE_SUFFIXES,
+          SEARCH_DATABASE_SUFFIX,
+          CRYPTO_DATABASE_SUFFIX,
+          CRYPTO_META_DATABASE_SUFFIX,
+        ]
       );
 
   const failures = rejections(await Promise.allSettled([...new Set(names)].map(deleteDatabase)));
@@ -241,12 +317,20 @@ export async function resetWebStorage(accountIds: readonly string[] = []): Promi
     ? listed.filter((name) => name.endsWith(CRYPTO_DATABASE_SUFFIX))
     : derivedNames(ids, [CRYPTO_DATABASE_SUFFIX]);
   const caches = listed
-    ? listed.filter((name) => !name.includes(CRYPTO_DATABASE_SUFFIX))
+    ? listed.filter(
+        (name) => !name.includes(CRYPTO_DATABASE_SUFFIX) && !name.endsWith(SEARCH_DATABASE_SUFFIX)
+      )
     : derivedNames(ids, CACHE_DATABASE_SUFFIXES);
 
   const failures = [
     ...rejections(await Promise.allSettled([...new Set(crypto)].map(clearSlidingSyncPosition))),
-    ...rejections(await Promise.allSettled([...new Set(caches)].map(deleteDatabase))),
+    ...rejections(
+      await Promise.allSettled(
+        [...new Set(caches)].map((name) =>
+          name.endsWith(STATE_DATABASE_SUFFIX) ? clearStateCache(name) : deleteDatabase(name)
+        )
+      )
+    ),
     ...rejections(await Promise.allSettled([clearHttpCaches()])),
   ];
 
@@ -254,3 +338,4 @@ export async function resetWebStorage(accountIds: readonly string[] = []): Promi
     throw new AggregateError(failures, 'Could not fully reset the local caches');
   }
 }
+import { unzlibSync } from 'fflate';

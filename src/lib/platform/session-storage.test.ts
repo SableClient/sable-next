@@ -9,6 +9,16 @@ afterEach(() => {
 function stubIndexedDB(existing: string[] | null) {
   const deleted: string[] = [];
   const cleared: IDBKeyRange[] = [];
+  const state = {
+    room_info: new Map([['!room:example.org', 'cached room']]),
+    custom: new Map<string, unknown>([
+      ['marker', 'cached'],
+      ['sable.search.rooms', '["!room:example.org"]'],
+      ['sable.search.chunk.!room:example.org.0', 'older documents'],
+      ['sable.search.crawl', 'older-page'],
+      ['sliding_sync_store::room-list', 'stale'],
+    ]),
+  };
   const factory: Record<string, unknown> = {
     deleteDatabase(name: string) {
       deleted.push(name);
@@ -26,7 +36,11 @@ function stubIndexedDB(existing: string[] | null) {
           request.onerror?.call(request, new Event('error'));
           return;
         }
-        Object.defineProperty(request, 'result', { value: fakeCryptoDatabase(cleared) });
+        Object.defineProperty(request, 'result', {
+          value: name.endsWith('::matrix-sdk-state')
+            ? fakeStateDatabase(state)
+            : fakeCryptoDatabase(cleared),
+        });
         request.onsuccess?.call(request, new Event('success'));
       });
       return request;
@@ -36,8 +50,49 @@ function stubIndexedDB(existing: string[] | null) {
     factory.databases = () => Promise.resolve(existing.map((name) => ({ name })));
   }
   vi.stubGlobal('indexedDB', factory);
-  vi.stubGlobal('IDBKeyRange', { bound: (lower: string, upper: string) => ({ lower, upper }) });
-  return { deleted, cleared };
+  vi.stubGlobal('IDBKeyRange', {
+    bound: (lower: string, upper: string) => ({ lower, upper }),
+    upperBound: (upper: string, upperOpen: boolean) => ({ upper, upperOpen }),
+    lowerBound: (lower: string, lowerOpen: boolean) => ({ lower, lowerOpen }),
+  });
+  return { deleted, cleared, state };
+}
+
+function fakeStateDatabase(state: Record<string, Map<string, unknown>>) {
+  return {
+    objectStoreNames: Object.assign(Object.keys(state), {
+      contains: (name: string) => name in state,
+    }),
+    transaction() {
+      const tx: Record<string, unknown> = {
+        objectStore: (name: string) => ({
+          clear: () => {
+            state[name]?.clear();
+          },
+          get: (key: string) => ({ result: state[name]?.get(key) }),
+          getAllKeys: (range: IDBKeyRange) => ({
+            result: [...state[name].keys()].filter(
+              (key) => key >= (range.lower as string) && key <= (range.upper as string)
+            ),
+          }),
+          put: (value: unknown, key: string) => state[name]?.set(key, value),
+          delete(range: IDBKeyRange) {
+            for (const key of state[name].keys()) {
+              if (
+                (range.lower !== undefined && key > (range.lower as string)) ||
+                (range.upper !== undefined && key < (range.upper as string))
+              ) {
+                state[name]?.delete(key);
+              }
+            }
+          },
+        }),
+      };
+      queueMicrotask(() => (tx.oncomplete as (() => void) | undefined)?.());
+      return tx;
+    },
+    close() {},
+  };
 }
 
 function fakeCryptoDatabase(cleared: IDBKeyRange[]) {
@@ -60,13 +115,14 @@ function fakeCryptoDatabase(cleared: IDBKeyRange[]) {
   };
 }
 
-test('removes the rebuildable stores but keeps the session and the crypto stores', async () => {
+test('removes the rebuildable stores but keeps the session, crypto stores and search index', async () => {
   const { deleted } = stubIndexedDB([
     'sable-next-session',
     'sable-next-account-a1',
     'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
+    'sable-next-account-a1::sable-search',
     'sable-next-account-a1::matrix-sdk-crypto',
     'sable-next-account-a1::matrix-sdk-crypto-meta',
     'unrelated-database',
@@ -76,7 +132,6 @@ test('removes the rebuildable stores but keeps the session and the crypto stores
 
   expect(deleted).toEqual([
     'sable-next-account-a1',
-    'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
   ]);
@@ -105,16 +160,45 @@ test('derives every account store when database listing is unavailable', async (
 
   expect(deleted).toEqual([
     'sable-next',
-    'sable-next::matrix-sdk-state',
     'sable-next::event_cache',
     'sable-next::media',
-    'sable-next::sable-search',
     'sable-next-account-a1',
-    'sable-next-account-a1::matrix-sdk-state',
     'sable-next-account-a1::event_cache',
     'sable-next-account-a1::media',
-    'sable-next-account-a1::sable-search',
   ]);
+});
+
+test('keeps legacy search documents and checkpoints in the SDK state database', async () => {
+  const { state, deleted } = stubIndexedDB(['sable-next-account-a1::matrix-sdk-state']);
+
+  await resetWebStorage(['a1']);
+
+  expect(deleted).toEqual([]);
+  expect(state.room_info.size).toBe(0);
+  expect([...state.custom]).toEqual([
+    ['sable.search.rooms', '["!room:example.org"]'],
+    ['sable.search.chunk.!room:example.org.0', 'older documents'],
+    ['sable.search.crawl', 'older-page'],
+  ]);
+});
+
+test('lists unconverted legacy rooms before clearing their cached membership', async () => {
+  const { state } = stubIndexedDB(['sable-next-account-a1::matrix-sdk-state']);
+  state.custom.set(
+    'sable.search.rooms',
+    Array.from(zlibSync(new TextEncoder().encode('["!room:example.org"]')))
+  );
+  state.custom.set('sable.search.documents.!legacy:example.org', 'legacy documents');
+
+  await resetWebStorage(['a1']);
+
+  expect(state.room_info.size).toBe(0);
+  expect(state.custom.get('sable.search.documents.!legacy:example.org')).toBe('legacy documents');
+  expect(
+    JSON.parse(
+      new TextDecoder().decode(Uint8Array.from(state.custom.get('sable.search.rooms') as number[]))
+    )
+  ).toEqual(['!room:example.org', '!legacy:example.org']);
 });
 
 test('drops the sliding sync position the crypto store keeps', async () => {
@@ -171,3 +255,4 @@ test('derives the account stores when database listing is unavailable', async ()
     'sable-next-account-a1::matrix-sdk-crypto-meta',
   ]);
 });
+import { zlibSync } from 'fflate';

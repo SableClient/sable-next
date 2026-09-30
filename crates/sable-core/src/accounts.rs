@@ -316,7 +316,19 @@ impl Core {
             let accounts = self.accounts().await?;
             let mut outcome = Ok(());
             for account in &accounts.accounts {
+                let client = self
+                    .account_clients
+                    .lock()
+                    .await
+                    .get(&account.account_id)
+                    .cloned();
                 self.invalidate_account_client(&account.account_id).await;
+                if let Some(client) = client
+                    && let Err(error) = client.state_store().close().await
+                {
+                    outcome = Err(self.failed("reset_local_cache", error));
+                    continue;
+                }
                 if let Err(error) = reset_account_cache(account).await {
                     outcome = Err(self.failed("reset_local_cache", error));
                 }
@@ -926,11 +938,7 @@ fn remove_store_dir(store_id: &str) {
 const fn remove_store_dir(_store_id: &str) {}
 
 #[cfg(not(target_family = "wasm"))]
-const CACHE_DATABASES: [&str; 3] = [
-    matrix_sdk::STATE_STORE_DATABASE_NAME,
-    "matrix-sdk-event-cache.sqlite3",
-    "matrix-sdk-media.sqlite3",
-];
+const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
 
 #[cfg(not(target_family = "wasm"))]
 async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
@@ -952,6 +960,8 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
         .await
         .map_err(|error| error.to_string())?;
     drop(crypto);
+
+    search::reset_state_cache(&store).await?;
 
     for database in CACHE_DATABASES {
         for suffix in ["", "-wal", "-shm"] {
@@ -1164,8 +1174,86 @@ mod regression_tests {
         session.sync_service.stop().await;
     }
 
+    async fn seed_search_index(
+        client: &matrix_sdk::Client,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, Box<dyn std::error::Error>> {
+        let room_id = room_id!("!indexed:example.org").to_owned();
+        let search_values = [
+            (
+                b"sable.search.rooms".to_vec(),
+                serde_json::to_vec(&vec![&room_id])?,
+            ),
+            (
+                format!("sable.search.room.{room_id}").into_bytes(),
+                serde_json::to_vec(&serde_json::json!({
+                    "version": 5, "next_chunk": 2, "edits": [],
+                    "chunks": [
+                        { "id": 0, "start": 0, "bytes": 100, "count": 1 },
+                        { "id": 1, "start": 200, "bytes": 100, "count": 1 }
+                    ]
+                }))?,
+            ),
+            (
+                b"sable.search.crawl".to_vec(),
+                serde_json::to_vec(&serde_json::json!({
+                    "version": 3,
+                    "rooms": { room_id.to_string(): { "token": "older-page", "reached_start": false } }
+                }))?,
+            ),
+        ];
+        for (key, value) in &search_values {
+            client
+                .state_store()
+                .set_custom_value(key, value.clone())
+                .await?;
+        }
+        let mut chunks = Vec::new();
+        for (id, timestamp) in [(0, 100), (1, 200)] {
+            let key = format!("sable.search.chunk.{room_id}.{id}").into_bytes();
+            let value = serde_json::to_vec(&serde_json::json!({
+                "version": 5,
+                "documents": [{
+                    "event_id": format!("$indexed-{id}"), "body": "retained archaeology",
+                    "sender": "@alice:example.org", "origin_server_ts": timestamp,
+                    "attachments": [], "has_link": false, "mentions": [], "in_thread": false
+                }],
+                "classified": [[format!("$indexed-{id}"), timestamp]]
+            }))?;
+            client
+                .state_store()
+                .set_custom_value(&key, value.clone())
+                .await?;
+            chunks.push((key, value));
+        }
+        Ok(search_values.into_iter().chain(chunks).collect())
+    }
+
+    async fn assert_search_index_restored(core: &Core) -> Result<(), tokio::time::error::Elapsed> {
+        tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while core.search_index.lock().await.documents() != 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await?;
+        assert_eq!(
+            core.search_index
+                .lock()
+                .await
+                .search(
+                    "archaeology",
+                    &crate::protocol::SearchFilter::default(),
+                    crate::protocol::SearchOrder::Rank,
+                    10,
+                    0
+                )
+                .len(),
+            2
+        );
+        Ok(())
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn a_cache_reset_keeps_the_login_and_keys_but_not_the_sync_position() {
+    async fn a_cache_reset_keeps_the_login_keys_and_search_index_but_not_the_sync_position() {
         use crate::session::{AccountRegistry, Credentials, PersistedAccount, PersistedSession};
         use matrix_sdk_base::crypto::store::CryptoStore as _;
 
@@ -1210,6 +1298,7 @@ mod regression_tests {
             .set_custom_value(b"marker", b"cached".to_vec())
             .await
             .unwrap();
+        let search_values = seed_search_index(&client).await.unwrap();
         let store = std::path::Path::new(&store_id).join("store");
         let pos = "sliding_sync_store::room-list::@alice:example.org::instance";
         matrix_sdk::SqliteCryptoStore::open(&store, None)
@@ -1223,6 +1312,18 @@ mod regression_tests {
         core.reset_local_cache().await.unwrap();
 
         let client = core.client().await.unwrap();
+        for (key, value) in &search_values {
+            assert_eq!(
+                client
+                    .state_store()
+                    .get_custom_value(key)
+                    .await
+                    .unwrap()
+                    .as_ref(),
+                Some(value)
+            );
+        }
+        assert_search_index_restored(&core).await.unwrap();
         assert!(
             client
                 .state_store()

@@ -244,7 +244,11 @@ test('an interrupted IndexedDB transaction requests explicit recovery', async ()
 test('resetCaches terminates the worker and drops the cached stores', async () => {
   const deleted: string[] = [];
   vi.stubGlobal('indexedDB', {
-    databases: () => Promise.resolve([{ name: 'sable-next-account-a1::matrix-sdk-state' }]),
+    databases: () =>
+      Promise.resolve([
+        { name: 'sable-next-account-a1::event_cache' },
+        { name: 'sable-next-account-a1::sable-search' },
+      ]),
     deleteDatabase(name: string) {
       deleted.push(name);
       const request = {} as IDBOpenDBRequest;
@@ -261,7 +265,7 @@ test('resetCaches terminates the worker and drops the cached stores', async () =
   await transport.resetCaches([]);
 
   expect(FakeSharedWorker.last?.port.posted).toContainEqual({ id: 2, reset: true });
-  expect(deleted).toEqual(['sable-next-account-a1::matrix-sdk-state']);
+  expect(deleted).toEqual(['sable-next-account-a1::event_cache']);
 });
 
 test('a worker crash reports the stack the worker sent, grouped on its message', async () => {
