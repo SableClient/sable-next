@@ -51,6 +51,12 @@ The web build ships with every release as `sable-next-<version>-web.tar.gz`.
 Extract it into your web root to serve the app yourself; see
 [`Caddyfile`](Caddyfile) for an example configuration.
 
+### Console output
+
+Run with `--verbose` to print webview console messages to stderr (CEF and Wry).
+In development: `pnpm tauri dev -- -- --verbose`.
+Quit any running instance before restarting with the flag.
+
 ### Proxy
 
 Start a desktop app with `--proxy` to send all of its traffic through an HTTP
