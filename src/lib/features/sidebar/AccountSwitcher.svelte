@@ -106,7 +106,14 @@
 
     switching = true;
     try {
-      if (accountId !== core.session?.account_id) await core.switchAccount(accountId);
+      if (accountId !== core.session?.account_id) {
+        const account = core.accounts.find((account) => account.account_id === accountId);
+        if (account?.needs_reauth) {
+          await core.removeAccount(accountId);
+          return;
+        }
+        await core.switchAccount(accountId);
+      }
       await signOut.request(async () => {
         await logoutWithPush(core, pushOverride());
         if (core.status === 'ready') await goto(resolve('/(app)/rooms'));
