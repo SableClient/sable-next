@@ -64,7 +64,7 @@ class FakeCore {
     this.emit({
       type: 'timeline_diff',
       subscription,
-      diffs: [{ op: 'push_front', value: item('history') }],
+      diffs: [{ op: direction === 'forward' ? 'push_back' : 'push_front', value: item('history') }],
     });
     return Promise.resolve({ direction, reached_end: true });
   }
@@ -188,6 +188,64 @@ test('paginates a focused timeline forwards independently', async () => {
 
   expect(core.paginateSubscriptions).toEqual([1]);
   expect(timeline.forwardPagination).toBe('end');
+});
+
+test('forward pagination waits for the newer messages after the command response', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$initial');
+  const paginate = vi
+    .spyOn(core, 'paginate')
+    .mockResolvedValue({ direction: 'forward', reached_end: false });
+  await timeline.paginateForward(25);
+  expect(timeline.forwardPagination).toBe('loading');
+  await timeline.paginateForward(25);
+  expect(paginate).toHaveBeenCalledTimes(1);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('newer') }],
+  });
+  expect(timeline.forwardPagination).toBe('idle');
+  await timeline.stop();
+});
+
+test('the last forward page waits for its messages before treating the snapshot as latest', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', '$initial');
+  vi.spyOn(core, 'paginate').mockResolvedValue({ direction: 'forward', reached_end: true });
+  await timeline.paginateForward(25);
+  expect(timeline.forwardPagination).toBe('loading');
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_back', value: item('latest') }],
+  });
+  expect(timeline.forwardPagination).toBe('end');
+  await timeline.stop();
+});
+
+test('an empty forward page becomes retryable without leaving a timer in the next room', async () => {
+  vi.useFakeTimers();
+  try {
+    const core = new FakeCore();
+    const timeline = new RoomTimeline(core as unknown as CoreClient);
+    await timeline.start('!room:example.org', '$initial');
+    vi.spyOn(core, 'paginate').mockResolvedValue({ direction: 'forward', reached_end: false });
+    await timeline.paginateForward(25);
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(timeline.forwardPagination).toBe('idle');
+    await timeline.paginateForward(25);
+    expect(vi.getTimerCount()).toBe(1);
+    await timeline.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await timeline.start('!other:example.org', '$initial');
+    expect(timeline.forwardPagination).toBe('idle');
+    await timeline.stop();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('a failed forward page rejects and remains manually retryable', async () => {

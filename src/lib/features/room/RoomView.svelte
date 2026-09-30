@@ -655,11 +655,21 @@
   }
 
   function markRoomRead(): void {
-    void core.commands
-      .markRead(resolvedRoomId, null, readReceiptIsPrivate())
-      .catch((error: unknown) => {
-        console.warn('[sable room] mark as read failed', error);
-      });
+    void markAllRead().catch((error: unknown) => {
+      console.warn('[sable room] mark as read failed', error);
+    });
+  }
+
+  async function markAllRead(): Promise<void> {
+    const list = timelineList;
+    await core.commands.markRead(resolvedRoomId, null, readReceiptIsPrivate());
+    list?.dismissUnread();
+  }
+
+  async function loadReadMarker(): Promise<string | null> {
+    const content = await core.commands.roomAccountData(resolvedRoomId, 'm.fully_read');
+    const eventId = (content as { event_id?: unknown } | null)?.event_id;
+    return typeof eventId === 'string' ? eventId : null;
   }
 
   function markRoomUnread(): void {
@@ -811,6 +821,12 @@
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}
+      hasUnread={resolvedRoom === undefined ||
+        (resolvedRoom?.unread ?? 0) > 0 ||
+        (resolvedRoom?.highlight ?? 0) > 0 ||
+        (resolvedRoom?.marked_unread ?? false)}
+      onLoadReadMarker={loadReadMarker}
+      onMarkRead={markAllRead}
       onMarkUnread={markUnreadFrom}
       onMatrixLink={handleMatrixLink}
       onCopyLink={copyEventLink}

@@ -20,7 +20,8 @@ function entries(count: number) {
 
 function fixture(
   heightForRow?: (value: number) => number,
-  estimateForRow?: (value: number) => number | undefined
+  estimateForRow?: (value: number) => number | undefined,
+  canFollowLatest?: () => boolean
 ) {
   let rowHeight = 50;
   let viewportHeight = 300;
@@ -91,6 +92,7 @@ function fixture(
     onChange,
     onScroll,
     estimateSize: estimateForRow,
+    canFollowLatest,
   });
   windows.push(window);
   return {
@@ -132,6 +134,22 @@ function fixture(
     },
   };
 }
+
+test('the end of a historical snapshot preserves the reader when newer pages append', async () => {
+  const { window, content } = fixture(undefined, undefined, () => false);
+  await window.update(entries(2));
+  await window.jumpTo('1', 'center');
+  expect(window.state.pinned).toBe(false);
+  const row = () => {
+    const node = content.querySelector<HTMLElement>('[data-timeline-key="1"]');
+    if (!node) throw new Error('Missing reader anchor');
+    return node;
+  };
+  const top = row().getBoundingClientRect().top;
+  await window.update(entries(20));
+  expect(row().getBoundingClientRect().top).toBe(top);
+  expect(window.state.pinned).toBe(false);
+});
 
 test.each([
   { height: 400, touching: false },

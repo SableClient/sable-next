@@ -11,6 +11,7 @@ export default defineConfig({
     'timeline-media-hold.spec.ts',
     'timeline-receipts.spec.ts',
     'timeline-notified.spec.ts',
+    'timeline-unread.spec.ts',
     'timeline-row-height.spec.ts',
     'composer-alignment.spec.ts',
     'composer-scheduling.spec.ts',

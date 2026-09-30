@@ -23,6 +23,7 @@ interface Options<T> {
   render: (rows: readonly TimelineRow<T>[]) => Promise<void>;
   onChange: (state: TimelineWindowState) => void;
   onScroll: (delta: number) => void;
+  canFollowLatest?: () => boolean;
   onInteraction?: () => void;
   isAnchor?: (value: T) => boolean;
   estimateSize?: (value: T) => number | undefined;
@@ -103,6 +104,7 @@ export class TimelineWindow<T> {
   private readonly listeners = new AbortController();
 
   constructor(private readonly options: Options<T>) {
+    this.pinned = options.canFollowLatest?.() ?? true;
     const { viewport, canvas, content } = options;
     canvas.style.position = 'relative';
     content.style.position = 'absolute';
@@ -263,7 +265,7 @@ export class TimelineWindow<T> {
       if (this.start !== previous.start || this.end !== previous.end) await this.restore(previous);
       return false;
     }
-    this.pinned = key === null;
+    this.pinned = key === null && (this.options.canFollowLatest?.() ?? true);
     this.anchors = [];
     const viewport = this.options.viewport;
     this.setTop(Math.max(this.estimatePrefix(), viewport.clientHeight - this.contentHeight));
@@ -493,6 +495,7 @@ export class TimelineWindow<T> {
   }
 
   private atEnd(tolerance = EPSILON): boolean {
+    if (this.options.canFollowLatest?.() === false) return false;
     const viewport = this.options.viewport;
     return (
       this.end === this.items.length &&
@@ -515,6 +518,8 @@ export class TimelineWindow<T> {
 
   private layout(): void {
     if (this.disposed || this.rendering) return;
+    const canFollowLatest = this.options.canFollowLatest?.() ?? true;
+    if (!canFollowLatest) this.pinned = false;
     const viewport = this.options.viewport;
     this.top =
       this.height - this.contentHeight - Number.parseFloat(this.options.content.style.bottom);
@@ -530,7 +535,8 @@ export class TimelineWindow<T> {
       this.end === this.items.length &&
       this.contentHeight <= viewport.clientHeight;
     const reachedEnd =
-      contentFits || (this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd());
+      canFollowLatest &&
+      (contentFits || (this.ready && viewport.clientHeight > this.viewportHeight && this.atEnd()));
     if (reachedEnd) this.pinned = true;
     this.viewportHeight = viewport.clientHeight;
     if (this.pinned && this.active && !this.jumping) {

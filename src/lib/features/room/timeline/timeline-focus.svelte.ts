@@ -10,10 +10,11 @@ interface FocusDependencies<T> {
   target: () => string | null;
   history: TimelinePagination;
   requestFuture: () => Promise<void>;
+  canRequestFuture?: () => boolean;
 }
 
 export class TimelineFocus<T> {
-  filling = false;
+  filling = $state(false);
   #navigation: AbortController | null = null;
 
   constructor(private readonly deps: FocusDependencies<T>) {}
@@ -44,8 +45,13 @@ export class TimelineFocus<T> {
       }
       if (emptyPages >= MAX_EMPTY_REFILLS) break;
       const before = this.deps.timeline().items;
-      if (this.deps.timeline().forwardPagination !== 'end') await this.deps.requestFuture();
-      else if (!this.deps.history.exhausted && this.deps.timeline().backwardPagination !== 'end') {
+      if (this.deps.timeline().forwardPagination !== 'end') {
+        if (this.deps.canRequestFuture?.() === false) break;
+        await this.deps.requestFuture();
+      } else if (
+        !this.deps.history.exhausted &&
+        this.deps.timeline().backwardPagination !== 'end'
+      ) {
         const end = await this.deps.history.requestHistory();
         if (!current()) break;
         this.deps.history.exhausted = end;

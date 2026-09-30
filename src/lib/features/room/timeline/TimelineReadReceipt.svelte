@@ -13,10 +13,11 @@
     /** The newest event whose row is fully scrolled past. */
     visibleEventId: string | null;
     atLatest?: boolean;
+    enabled?: boolean;
     onRead: (eventId: string) => Promise<void>;
   }
 
-  let { timeline, visibleEventId, atLatest = false, onRead }: Props = $props();
+  let { timeline, visibleEventId, atLatest = false, enabled = true, onRead }: Props = $props();
   let historical = $derived(timeline.mode.kind === 'focused' && !atLatest);
   let documentVisible = $state(true);
   let lastReadEventId: string | null = null;
@@ -40,7 +41,7 @@
   function flush(): void {
     clearTimeout(coalesceTimer);
     coalesceTimer = undefined;
-    if (historical) {
+    if (historical || !enabled) {
       pendingEventId = null;
       return;
     }
@@ -71,7 +72,12 @@
   });
 
   $effect(() => {
-    if (historical) return;
+    if (historical || !enabled) {
+      pendingEventId = null;
+      clearTimeout(coalesceTimer);
+      coalesceTimer = undefined;
+      return;
+    }
     const eventId = readReceiptEventId(timeline.items, {
       visibleEventId,
       documentVisible,

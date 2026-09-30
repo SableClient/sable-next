@@ -23,6 +23,8 @@ export type RoomCoreMode =
   | 'error'
   | 'delayed_history'
   | 'unread'
+  | 'unread_history'
+  | 'forward_history'
   | 'delayed_media'
   | 'delayed_pagination'
   | 'endless_history'
@@ -359,7 +361,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
 
     const timelineItems = (roomName: string): TimelineItemView[] =>
-      Array.from({ length: 20 }, (_, index) => ({
+      Array.from({ length: workerMode === 'forward_history' ? 80 : 20 }, (_, index) => ({
         id: `${roomName.toLowerCase()}-${String(index)}`,
         event_id: `$${roomName.toLowerCase()}-${String(index)}:example.test`,
         transaction_id: null,
@@ -567,6 +569,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           return [timelineStart, ...items];
         case 'unread':
           return [...items.slice(0, 5), readMarker, ...items.slice(5)];
+        case 'unread_history':
+          return items.slice(10);
+        case 'forward_history':
+          return items.slice(0, 5);
         default:
           return items;
       }
@@ -590,6 +596,22 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       const items = timelineItems(roomName);
       const first = items[0];
       switch (workerMode) {
+        case 'unread_history': {
+          if (page > 1) return [];
+          const marker: TimelineItemView = {
+            ...first,
+            id: `${roomName.toLowerCase()}-read-marker`,
+            event_id: null,
+            sender: null,
+            sender_name: null,
+            content: { kind: 'read_marker' },
+          };
+          return [...items.slice(0, 5), marker, ...items.slice(5, 10)].map((value, index) => ({
+            op: 'insert' as const,
+            index,
+            value,
+          }));
+        }
         case 'empty_room':
           return [];
         case 'endless_history':
@@ -751,6 +773,38 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (!state) throw new Error('unknown timeline subscription');
         const paginated = subscriptionRoom(command.subscription);
         const roomName = paginated.name ?? '';
+        if (workerMode === 'forward_history') {
+          if (command.direction === 'backward') {
+            return { type: 'paginate', direction: command.direction, reached_end: true };
+          }
+          state.page += 1;
+          const page = state.page;
+          const items = timelineItems(roomName);
+          const values =
+            page === 1
+              ? [
+                  {
+                    ...items[4],
+                    id: 'filtered-forward',
+                    event_id: '$filtered-forward:example.test',
+                    content: {
+                      kind: 'profile_change' as const,
+                      user_id: '@alice:example.test',
+                      display_name: { old: 'Alice', new: 'Alicia' },
+                      avatar: null,
+                    },
+                  },
+                ]
+              : items.slice((page - 1) * 5, page * 5);
+          window.setTimeout(() => {
+            port.emit({
+              type: 'timeline_diff',
+              subscription: command.subscription,
+              diffs: values.map((value) => ({ op: 'push_back' as const, value })),
+            });
+          }, 250);
+          return { type: 'paginate', direction: command.direction, reached_end: page >= 16 };
+        }
         state.page += 1;
         const page = state.page;
         const reachedEnd =
@@ -1006,7 +1060,15 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         keywords: notificationKeywords.map((entry) => ({ ...entry })),
       }),
       timestamp_to_event: () => ({ type: 'timestamp_to_event', event_id: null }),
-      room_account_data: () => ({ type: 'room_account_data', content: null }),
+      room_account_data: (command) => ({
+        type: 'room_account_data',
+        content:
+          command.event_type === 'm.fully_read'
+            ? {
+                event_id: `$${(joinedRooms.find((room) => room.room_id === command.room_id)?.name ?? 'General').toLowerCase()}-${workerMode === 'unread' || workerMode === 'unread_history' ? '4' : '19'}:example.test`,
+              }
+            : null,
+      }),
       account_data_types: () => ({ type: 'account_data_types', event_types: [] }),
       access_token: () => ({ type: 'access_token', token: 'e2e-access-token' }),
       push_event: () => ({ type: 'push_event', fetched: { kind: 'unavailable' } }),
@@ -1357,6 +1419,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     };
 
     const replyDelay = (type: CommandType): number => {
+      if (workerMode === 'forward_history' && type === 'paginate') return 0;
       if (type === 'paginate') return 500;
       if (
         type === 'subscribe_timeline' &&

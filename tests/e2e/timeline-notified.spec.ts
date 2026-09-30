@@ -8,6 +8,40 @@ const notifiedBy = (id: string) =>
   `/to/${encodeURIComponent('!room:example.test')}?notified=${encodeURIComponent(id)}`;
 const notified = (event: string) => notifiedBy(eventId(event));
 
+for (const height of [420, 900]) {
+  test(`the reveal from a notification allows forward scrolling (height ${height})`, async ({
+    page,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('forward_history');
+    await page.setViewportSize({ width: page.viewportSize()?.width ?? 1280, height });
+    await page.goto(
+      `/to/${encodeURIComponent('!room:example.test')}/${encodeURIComponent(eventId('4'))}`
+    );
+    await timeline.expectRevealed();
+    await expect(timeline.message('General message 4')).toBeInViewport();
+    await expect(timeline.message('General message 19')).toBeAttached();
+    expect(await core.paginateCount()).toBeGreaterThanOrEqual(4);
+    expect(await core.paginateCount()).toBeLessThan(16);
+    await expect(timeline.message('General message 4')).toBeInViewport();
+    await expect(timeline.itemById('filtered-forward')).toHaveCount(0);
+    await expect
+      .poll(
+        async () => {
+          await timeline.scrollToBottomAndNotify();
+          return timeline.message('General message 79').isVisible();
+        },
+        { intervals: [250], timeout: 15_000 }
+      )
+      .toBe(true);
+    await timeline.scrollToBottomAndNotify();
+    await expect(timeline.message('General message 79')).toBeInViewport();
+    expect(await core.paginateCount()).toBe(16);
+  });
+}
+
 test('a notification opens the room live on its event', async ({
   page,
   timeline,

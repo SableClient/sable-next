@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { tick, untrack, type Snippet } from 'svelte';
+  import { onDestroy, tick, untrack, type Snippet } from 'svelte';
   import { on } from 'svelte/events';
   import { fade } from 'svelte/transition';
   import ArrowDownIcon from 'phosphor-svelte/lib/ArrowDownIcon';
+  import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
 
   import type {
     MemberView,
@@ -52,10 +54,12 @@
     visibleTimelineItems,
     type ReplyDirection,
   } from './timeline-format';
-  import { TimelinePagination } from './timeline-pagination.svelte.js';
-  import { TimelineFocus } from './timeline-focus';
+  import { MAX_EMPTY_REFILLS, TimelinePagination } from './timeline-pagination.svelte.js';
+  import { TimelineFocus } from './timeline-focus.svelte.js';
+  import { TimelineFuture } from './timeline-future.svelte.js';
   import { TimelineHistoryController } from './timeline-history';
   import { TimelineIdentityTracker } from './timeline-identity';
+  import { TimelineUnread } from './timeline-unread.svelte.js';
   import {
     estimatedColumnPx,
     estimateRowSize,
@@ -75,6 +79,9 @@
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
     onRead: (eventId: string) => Promise<void>;
+    hasUnread?: boolean;
+    onLoadReadMarker?: () => Promise<string | null>;
+    onMarkRead?: () => Promise<void>;
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onSenderProfile?: (
       userId: string,
@@ -115,6 +122,9 @@
     onRequestHistory,
     onRequestFuture,
     onRead,
+    hasUnread = false,
+    onLoadReadMarker,
+    onMarkRead,
     onMatrixLink,
     onCopyLink,
     onMarkUnread,
@@ -161,6 +171,15 @@
     unreadCount: number;
   }
   const identity = new TimelineIdentityTracker();
+  const unread = new TimelineUnread();
+  let unreadNavigation: AbortController | null = null;
+  let jumpingUnread = $state(false);
+  let markingRead = $state(false);
+  let unreadError = $state<'jump' | 'read' | null>(null);
+  onDestroy(() => {
+    unreadNavigation?.abort();
+    unread.destroy();
+  });
   let followingRead = $state(false);
   let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
   let allItems = $derived(
@@ -231,13 +250,21 @@
     () => timeline,
     () => onRequestHistory()
   );
+  const future = new TimelineFuture(
+    () => timeline,
+    () => onRequestFuture()
+  );
+  function requestFuture(manual = false): Promise<void> {
+    return future.request(manual);
+  }
   const focus = new TimelineFocus<RowValue>({
     timeline: () => timeline,
     viewport: () => viewport,
     entries: () => entries,
     target: () => focusEventId,
     history: pagination,
-    requestFuture: () => onRequestFuture(),
+    requestFuture: () => requestFuture(),
+    canRequestFuture: () => future.canRefill(),
   });
   let noHistory = $derived(
     visibleItems.length === 0 && (pagination.exhausted || timeline.backwardPagination === 'end')
@@ -247,7 +274,7 @@
   );
   let emptyFailure = $derived(visibleItems.length === 0 && timeline.error !== null);
   let readEventId = $derived.by(() => {
-    if (!revealed || !viewport) return null;
+    if (!revealed || !viewport || unread.blocking || markingRead) return null;
     if (windowState.pinned) {
       return latestEventId(timeline.items) ?? latestEventId(rows.map((row) => row.value.item));
     }
@@ -259,23 +286,38 @@
     }
     return seen;
   });
-  let readMarker = $derived.by(() => {
-    const index = entries.findIndex(({ value }) => value.item.content.kind === 'read_marker');
-    return index >= 0 ? { index, count: entries[index].value.unreadCount } : null;
-  });
-  let stuckUnreadCount = $derived(
-    readMarker !== null &&
+  let unreadCount = $derived(unread.count(eventItems));
+  let unreadInView = $derived.by(() => {
+    const index = entries.findIndex(({ value }) => holdsEvent(value, unread.firstEventId));
+    return (
+      index >= 0 &&
       windowState.firstVisible !== null &&
-      readMarker.index < windowState.firstVisible
-      ? readMarker.count
-      : 0
-  );
+      windowState.lastVisible !== null &&
+      index >= windowState.firstVisible &&
+      index <= windowState.lastVisible
+    );
+  });
+  $effect(() => {
+    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
+    if (revealed && unreadInView && document.visibilityState === 'visible') {
+      unread.observe(unread.firstEventId);
+    }
+  });
+  let hadUnread = untrack(() => hasUnread);
+  $effect(() => {
+    if (hadUnread && !hasUnread && unread.initialized) untrack(() => unread.dismiss());
+    hadUnread = hasUnread;
+  });
   let historyLoading = $derived(
     revealed &&
       visibleItems.length > 0 &&
       (pagination.pending || timeline.backwardPagination === 'loading')
   );
   let live = $derived(timeline.mode.kind === 'live');
+  let oldestUnreadLoaded = $derived(
+    (timeline.backwardPagination === 'end' || pagination.exhausted) &&
+      (live || timeline.forwardPagination === 'end')
+  );
   let futureLoading = $derived(
     revealed && !live && visibleItems.length > 0 && timeline.forwardPagination === 'loading'
   );
@@ -341,7 +383,7 @@
       windowState.lastVisible !== null &&
       windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
     ) {
-      void onRequestFuture().catch(() => {});
+      void requestFuture(true).catch(() => {});
     }
   }
   function mountWindow(node: HTMLDivElement): () => void {
@@ -365,10 +407,21 @@
       onScroll: readerScrolled,
       onInteraction: () => {
         focus.cancel();
+        unreadNavigation?.abort();
+        if (
+          !live &&
+          timeline.forwardPagination === 'idle' &&
+          (future.failed || !future.canRefill()) &&
+          windowState.lastVisible !== null &&
+          windowState.lastVisible >= entries.length - TIMELINE_LAYOUT.historyPrefetchItems
+        ) {
+          void requestFuture(true).catch(() => {});
+        }
         abandonLanding();
       },
       isAnchor: ({ item }) => item.event_id !== null,
       estimateSize: ({ item }) => estimateRowSize(item.content, mediaColumn),
+      canFollowLatest: () => untrack(() => live || timeline.forwardPagination === 'end'),
     });
     controller = engine;
     return () => {
@@ -388,6 +441,24 @@
       if (!loading && !disposed) void openTimeline(engine);
     });
   });
+  $effect(() => {
+    if (
+      live ||
+      timeline.loading ||
+      !timeline.hasSnapshot ||
+      timeline.error !== null ||
+      !revealed ||
+      filling ||
+      focus.filling ||
+      future.pending ||
+      timeline.forwardPagination !== 'idle' ||
+      windowState.lastVisible === null ||
+      windowState.lastVisible < entries.length - TIMELINE_LAYOUT.historyPrefetchItems
+    )
+      return;
+    if (!future.canRefill()) return;
+    void requestFuture().catch(() => {});
+  });
   async function awaitPagination(): Promise<void> {
     const deadline = performance.now() + TIMELINE_LAYOUT.initialFillSettleTimeout;
     while (!disposed && timeline.backwardPagination === 'loading' && performance.now() < deadline) {
@@ -406,6 +477,9 @@
       return;
     }
     await engine.update(entries);
+    await unread.initialize(timeline.items, hasUnread, onLoadReadMarker, eventItems);
+    if (disposed) return;
+    unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
     if (focusEventId) {
       const target = focusEventId;
       const entry = entryFor(focusEventId);
@@ -415,8 +489,8 @@
       return;
     }
     const landingEntry = () => entryFor(landingEventId);
-    const unread = entries.find(({ value }) => value.item.content.kind === 'read_marker');
-    if (!unread && !landingEntry()) revealed = true;
+    const unreadEntry = entries.find(({ value }) => value.item.content.kind === 'read_marker');
+    if (!unreadEntry && !unread.active && !landingEntry()) revealed = true;
     filling = true;
     try {
       while (!disposed && engine.state.pinned && timeline.backwardPagination !== 'end') {
@@ -437,10 +511,12 @@
         }
       }
       const notified = landingEntry();
-      const landing = notified ?? unread;
+      const landing = notified ?? unreadEntry;
       if (landing && !disposed && engine.state.pinned) {
         if (notified) markLanded(landingEventId);
-        await engine.jumpTo(landing.key, landing === unread ? 'start' : 'center');
+        await engine.jumpTo(landing.key, landing === unreadEntry ? 'start' : 'center');
+      } else if (!notified && unread.active && !disposed) {
+        await jumpToUnread();
       }
     } catch {
       pagination.exhausted = false;
@@ -499,7 +575,11 @@
   $effect(() => {
     void focusEventId;
     void timeline.mode;
-    untrack(() => focus.cancel());
+    untrack(() => {
+      focus.cancel();
+      unreadNavigation?.abort();
+      future.reset();
+    });
   });
   $effect(() => {
     const target = focusEventId;
@@ -563,9 +643,89 @@
       };
     };
   }
-  function markRead(eventId: string): Promise<void> {
+  async function markRead(eventId: string): Promise<void> {
+    await onRead(eventId);
+    if (disposed) return;
     if (windowState.pinned) followingRead = true;
-    return onRead(eventId);
+    if (eventId === latestEventId(timeline.items)) unread.dismiss();
+  }
+  async function jumpToUnread(): Promise<void> {
+    const engine = controller;
+    if (!engine || jumpingUnread) return;
+    focus.cancel();
+    historyController.finishHistoryFill();
+    const navigation = new AbortController();
+    unreadNavigation?.abort();
+    unreadNavigation = navigation;
+    jumpingUnread = true;
+    unreadError = null;
+    const mode = timeline.mode;
+    const current = () => !disposed && !navigation.signal.aborted && timeline.mode === mode;
+    const deadline = performance.now() + 30_000;
+    let emptyPages = 0;
+    try {
+      await unread.initialize(timeline.items, hasUnread, onLoadReadMarker, eventItems);
+      if (unread.failed) {
+        unreadError = 'jump';
+        return;
+      }
+      while (current()) {
+        unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
+        if (!unread.active) return;
+        const target = entryFor(unread.firstEventId);
+        if (target) {
+          await engine.update(entries);
+          if (current()) await engine.jumpTo(target.key, 'start', false, navigation.signal);
+          return;
+        }
+        if (
+          emptyPages >= MAX_EMPTY_REFILLS ||
+          performance.now() >= deadline ||
+          oldestUnreadLoaded
+        ) {
+          unreadError = 'jump';
+          return;
+        }
+        const before = timeline.items;
+        if (!live && timeline.forwardPagination !== 'end') {
+          await requestFuture(true);
+          await tick();
+        } else {
+          const end = await requestHistory();
+          if (!current()) return;
+          pagination.exhausted = end;
+          await awaitPagination();
+        }
+        if (!current()) return;
+        emptyPages = timeline.items === before ? emptyPages + 1 : 0;
+        await engine.update(entries);
+      }
+    } catch {
+      if (current()) unreadError = 'jump';
+    } finally {
+      if (unreadNavigation === navigation) jumpingUnread = false;
+    }
+  }
+  async function markAllRead(): Promise<void> {
+    if (!onMarkRead || markingRead) return;
+    unreadNavigation?.abort();
+    markingRead = true;
+    unreadError = null;
+    try {
+      await onMarkRead();
+      if (!disposed) {
+        unread.dismiss();
+        followingRead = windowState.pinned;
+      }
+    } catch {
+      if (!disposed) unreadError = 'read';
+    } finally {
+      if (!disposed) markingRead = false;
+    }
+  }
+  export function dismissUnread(): void {
+    unreadNavigation?.abort();
+    unread.dismiss();
   }
   export function stepReply(direction: ReplyDirection): string | null {
     const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
@@ -584,6 +744,7 @@
   }
   function jumpToLatest(): void {
     focus.cancel();
+    unreadNavigation?.abort();
     historyController.finishHistoryFill();
     if (!live) {
       onJumpToLive?.();
@@ -596,6 +757,7 @@
 <TimelineReadReceipt
   {timeline}
   visibleEventId={readEventId}
+  enabled={!unread.blocking && !markingRead}
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
@@ -628,10 +790,38 @@
   class={['timeline-content', `spacing-${preferences.messageSpacing}`]}
   style={TIMELINE_LAYOUT_STYLE}
 >
-  {#if stuckUnreadCount > 0}
-    <p class="unread-pinned">
-      <span>{$i18n.t('timeline.unreadCount', { count: stuckUnreadCount })}</span>
-    </p>
+  {#if revealed && unread.active && (!unreadInView || unreadError !== null)}
+    <div class="unread-bar">
+      <Button
+        class="jump-to-unread"
+        variant="ghost"
+        loading={jumpingUnread}
+        disabled={markingRead}
+        aria-label={$i18n.t('timeline.jumpToUnread')}
+        onclick={() => void jumpToUnread()}
+      >
+        <ArrowUpIcon />
+        <span
+          >{unreadCount > 0
+            ? $i18n.t('timeline.unreadCount', { count: unreadCount })
+            : $i18n.t('timeline.newMessages')}</span
+        >
+        <span class="unread-action">{$i18n.t('timeline.jumpToUnread')}</span>
+      </Button>
+      {#if onMarkRead}
+        <Button variant="ghost" loading={markingRead} onclick={() => void markAllRead()}>
+          <span>{$i18n.t('timeline.markRead')}</span>
+          <CheckIcon />
+        </Button>
+      {/if}
+    </div>
+    {#if unreadError !== null}
+      <Alert variant="critical" role="alert"
+        >{$i18n.t(
+          unreadError === 'jump' ? 'timeline.unreadJumpFailed' : 'timeline.markReadFailed'
+        )}</Alert
+      >
+    {/if}
   {/if}
 
   <div class="timeline-stage">
@@ -945,34 +1135,41 @@
     padding-top: calc(var(--timeline-row-padding) + var(--timeline-group-gap));
   }
 
-  .unread-pinned {
+  .unread-bar {
     align-items: center;
-    display: flex;
-    gap: var(--space-200);
-    inset-inline: 0;
-    margin: 0;
-    padding: 0 var(--space-400);
-    pointer-events: none;
-    position: absolute;
-    top: 0;
-    z-index: 1;
-  }
-
-  .unread-pinned::before {
-    border-top: calc(var(--border-width) * 2) solid var(--primary-main-line);
-    content: '';
-    flex: 1;
-  }
-
-  .unread-pinned span {
     background: var(--primary-container);
-    border: var(--border-width) solid var(--primary-container-line);
-    border-radius: var(--radius-pill);
     color: var(--primary-on-container);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    letter-spacing: 0.04em;
-    padding: var(--space-050) var(--space-200);
+    display: flex;
+    flex: none;
+    gap: var(--space-100);
+    justify-content: space-between;
+    padding-inline: var(--space-100);
+  }
+
+  .unread-bar :global(.btn) {
+    --button-container: transparent;
+    --button-line: transparent;
+    --button-on-container: var(--primary-on-container);
+    --button-container-hover: var(--primary-container-hover);
+    --button-container-active: var(--primary-container-active);
+
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .unread-bar :global(.jump-to-unread) {
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .unread-action {
+    margin-inline-start: auto;
+  }
+
+  @media (width < 48rem) {
+    .unread-action {
+      display: none;
+    }
   }
 
   .timeline-foot {

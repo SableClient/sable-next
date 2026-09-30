@@ -297,3 +297,37 @@ test('hiding the document sends the pending receipt rather than losing it', asyn
   instance.unmount();
   vi.useRealTimers();
 });
+
+test('unread navigation blocks receipts even when the viewport is at latest', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const props = $state({ timeline, visibleEventId: '$latest', enabled: false, onRead: read });
+  const instance = render(TimelineReadReceipt, { props });
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
+  props.enabled = true;
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).toHaveBeenCalledWith('$latest');
+  instance.unmount();
+  vi.useRealTimers();
+});
+
+test('blocking receipts discards a previously queued receipt', async () => {
+  vi.useFakeTimers();
+  const timeline = new RoomTimeline({} as CoreClient);
+  timeline.items = [item()];
+  const read = vi.fn().mockResolvedValue(undefined);
+  const props = $state({ timeline, visibleEventId: '$latest', enabled: true, onRead: read });
+  const instance = render(TimelineReadReceipt, { props });
+  await tick();
+  props.enabled = false;
+  await tick();
+  await vi.advanceTimersByTimeAsync(500);
+  expect(read).not.toHaveBeenCalled();
+  instance.unmount();
+  vi.useRealTimers();
+});

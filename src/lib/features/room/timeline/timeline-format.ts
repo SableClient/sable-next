@@ -226,6 +226,10 @@ const UNREAD_KINDS = new Set<TimelineItemContentView['kind']>([
   'unable_to_decrypt',
 ]);
 
+export function isUnreadMessage(item: TimelineItemView): boolean {
+  return item.event_id !== null && !item.is_own && UNREAD_KINDS.has(item.content.kind);
+}
+
 export function unreadCountAfter(items: readonly TimelineItemView[], index: number): number {
   let count = 0;
   for (let next = index + 1; next < items.length; next += 1) {

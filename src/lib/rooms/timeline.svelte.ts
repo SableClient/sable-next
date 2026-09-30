@@ -39,6 +39,13 @@ function sameMode(left: TimelineMode, right: TimelineMode): boolean {
   return true;
 }
 
+function lastEventId(items: readonly TimelineItemView[]): string | null {
+  for (let index = items.length - 1; index >= 0; index--) {
+    if (items[index].event_id) return items[index].event_id;
+  }
+  return null;
+}
+
 export class ActiveRoomTimeline {
   readonly timeline: RoomTimeline;
   private owner: symbol | null = null;
@@ -114,6 +121,9 @@ export class RoomTimeline {
   private backwardPaginationStartFirstEventId: string | null = null;
   private backwardPaginationBoundaryChanged = false;
   private backwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
+  private forwardPaginationCompletion: ForwardPaginationState | null = null;
+  private forwardPaginationStartLastEventId: string | null = null;
+  private forwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   constructor(private readonly core: CoreClient) {}
 
   provideReplyFallback(eventId: string, fallback: ReplyFallback): void {
@@ -241,16 +251,28 @@ export class RoomTimeline {
     }
 
     const session = this.session;
+    this.clearForwardPaginationSettleTimer();
+    this.forwardPaginationCompletion = null;
+    this.forwardPaginationStartLastEventId = lastEventId(this.items);
     this.forwardPagination = 'loading';
     try {
       const response = await this.core.commands.paginate(subscription, 'forward', count);
       if (session === this.session && subscription === this.subscription) {
         this.error = null;
-        this.forwardPagination = response.reached_end ? 'end' : 'idle';
+        this.forwardPaginationCompletion = response.reached_end ? 'end' : 'idle';
+        if (!this.settleForwardPagination()) {
+          this.forwardPaginationSettleTimer = setTimeout(() => {
+            this.forwardPaginationSettleTimer = null;
+            this.settleForwardPagination(true);
+          }, PAGINATION_DIFF_SETTLE_TIMEOUT);
+        }
       }
       return response.reached_end;
     } catch (error) {
       if (session === this.session && subscription === this.subscription) {
+        this.forwardPaginationCompletion = null;
+        this.forwardPaginationStartLastEventId = null;
+        this.clearForwardPaginationSettleTimer();
         this.error = 'load_failed';
         this.forwardPagination = 'idle';
       }
@@ -279,6 +301,9 @@ export class RoomTimeline {
     this.clearBackwardPaginationSettleTimer();
     this.backwardPagination = 'idle';
     this.forwardPagination = 'idle';
+    this.forwardPaginationCompletion = null;
+    this.forwardPaginationStartLastEventId = null;
+    this.clearForwardPaginationSettleTimer();
     this.error = null;
     this.mode = { kind: 'live' };
     this.unsubscribeEvents?.();
@@ -344,6 +369,7 @@ export class RoomTimeline {
         this.backwardPaginationBoundaryChanged ||=
           firstEventId !== this.backwardPaginationStartFirstEventId;
         this.settleBackwardPagination();
+        this.settleForwardPagination();
       }
       if (event.type === 'timeline_aggregations') {
         const next = [...this.aggregations];
@@ -413,5 +439,22 @@ export class RoomTimeline {
     if (this.backwardPaginationSettleTimer === null) return;
     clearTimeout(this.backwardPaginationSettleTimer);
     this.backwardPaginationSettleTimer = null;
+  }
+
+  private settleForwardPagination(force = false): boolean {
+    const completion = this.forwardPaginationCompletion;
+    if (completion === null) return false;
+    if (!force && lastEventId(this.items) === this.forwardPaginationStartLastEventId) return false;
+    this.forwardPaginationCompletion = null;
+    this.forwardPaginationStartLastEventId = null;
+    this.clearForwardPaginationSettleTimer();
+    this.forwardPagination = completion;
+    return true;
+  }
+
+  private clearForwardPaginationSettleTimer(): void {
+    if (this.forwardPaginationSettleTimer === null) return;
+    clearTimeout(this.forwardPaginationSettleTimer);
+    this.forwardPaginationSettleTimer = null;
   }
 }
