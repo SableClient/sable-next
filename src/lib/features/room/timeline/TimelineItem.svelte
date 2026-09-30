@@ -456,6 +456,10 @@
     openSenderProfileAt(event.currentTarget);
   }
 
+  function openSenderAccountProfileAt(anchor: HTMLElement): void {
+    if (item.sender) onSenderProfile?.(item.sender, anchor);
+  }
+
   let nameOpensProfile = $derived(
     preferences.usernameClick === 'profile' && onSenderProfile !== undefined && item.sender !== null
   );
@@ -670,7 +674,7 @@
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
-              onViaProfile={persona ? openSenderProfileAt : undefined}
+              onViaProfile={openSenderAccountProfileAt}
             />
             {#if senderRoleIcon}
               <RoleTagIcon icon={senderRoleIcon} />
