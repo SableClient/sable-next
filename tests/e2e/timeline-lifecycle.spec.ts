@@ -58,3 +58,54 @@ test('backgrounding an interrupted touch settles queued history without moving t
   await expect(timeline.itemById('lifecycle-queued')).toHaveCount(1);
   await timeline.expectAnchorHeld(anchor, { tolerance: 1 });
 });
+
+test('inline image cleanup releases detached message trees', async ({
+  app,
+  core,
+  installRoomCore,
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'DOM retention counters require CDP');
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  const subscription = await core.subscription();
+  const images = Array.from({ length: 12 }, (_, index) =>
+    timelineItem(
+      `retention-${String(index)}`,
+      `<span data-mx-spoiler="Photo"><img src="mxc://example.test/spoiler-preview-${String(index)}" alt="Photo"></span>`
+    )
+  );
+  const cdp = await page.context().newCDPSession(page);
+  const retainedNodes = async (): Promise<number> => {
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    );
+    await cdp.send('HeapProfiler.collectGarbage');
+    await cdp.send('HeapProfiler.collectGarbage');
+    const { nodes } = await cdp.send('Memory.getDOMCounters');
+    return nodes;
+  };
+  const cycle = async (): Promise<void> => {
+    await core.emitTimelineDiff(subscription, [{ op: 'reset', values: images }]);
+    await expect(page.locator('.inline-image img')).toHaveCount(images.length);
+    await expect
+      .poll(() =>
+        page
+          .locator('.inline-image img')
+          .evaluateAll((elements) =>
+            elements.every((element) => (element as HTMLImageElement).naturalWidth > 0)
+          )
+      )
+      .toBe(true);
+    await core.emitTimelineDiff(subscription, [{ op: 'reset', values: [] }]);
+    await expect(page.locator('.inline-image')).toHaveCount(0);
+  };
+
+  // Warm templates and media caches before measuring repeated teardown.
+  await cycle();
+  const baseline = await retainedNodes();
+  for (let index = 0; index < 40; index += 1) await cycle();
+  expect(await retainedNodes()).toBeLessThan(baseline + 250);
+  await cdp.detach();
+});
