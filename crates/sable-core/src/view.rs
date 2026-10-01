@@ -951,7 +951,14 @@ pub fn timeline_item(
                 in_reply_to: in_reply_to(event.content()),
                 thread_root: msg_like(event.content()).and_then(|msg| msg.thread_root.clone()),
                 thread_summary: thread_summary(event.content()),
-                reactions: reactions(event.reactions()),
+                reactions: if event
+                    .original_json()
+                    .is_none_or(crate::reactions::can_annotate)
+                {
+                    reactions(event.reactions())
+                } else {
+                    Vec::new()
+                },
                 is_own: event.is_own(),
                 read_by: event.read_receipts().keys().cloned().collect(),
                 per_message_profile: message_profile,

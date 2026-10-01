@@ -1363,6 +1363,7 @@ impl Core {
                 shortcode,
                 thread_root,
             } => {
+                self.ensure_reaction_target(&room_id, &event_id).await?;
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let shortcode = match shortcode
                     .or_else(|| source_pack.as_ref().map(|source| source.shortcode.clone()))

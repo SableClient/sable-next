@@ -1,4 +1,5 @@
 import type { TimelineItemView } from '#src/generated/protocol';
+import { isRecord } from '#lib/guards.js';
 
 import { canForward, canRedact } from '../timeline/timeline-format';
 
@@ -95,6 +96,11 @@ export function messageActionPolicy({
     item.is_own && (item.content.kind === 'message' || item.content.kind === 'image');
   const hasRoomEvent = roomId !== '' && eventId !== '';
   const threadTarget = item.thread_root ?? item.event_id;
+  const rawContent = item.content.kind === 'hidden_event' ? item.content.content : null;
+  const relation = isRecord(rawContent) ? rawContent['m.relates_to'] : null;
+  const canAnnotate =
+    !isRecord(relation) ||
+    (relation.rel_type !== 'm.annotation' && relation.rel_type !== 'm.replace');
 
   return {
     eventId,
@@ -107,8 +113,8 @@ export function messageActionPolicy({
     pinned,
     bookmarked,
     stealCount,
-    react: canToggleReaction,
-    viewReactions: item.reactions.length > 0,
+    react: canToggleReaction && canAnnotate,
+    viewReactions: canAnnotate && item.reactions.length > 0,
     readReceipts: true,
     markUnread: canMarkUnread && eventId !== '',
     reply: canReply,
