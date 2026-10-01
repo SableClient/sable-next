@@ -30,8 +30,6 @@
 <style>
   :global(.method-toggle) {
     align-items: center;
-    background: transparent;
-    border-color: transparent;
     color: var(--sec-main);
     font-size: var(--font-size-small);
     gap: var(--space-200);

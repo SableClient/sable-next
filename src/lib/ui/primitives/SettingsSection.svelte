@@ -102,12 +102,6 @@
     color: var(--surface-var-on-container);
   }
 
-  @media (pointer: coarse) {
-    .settings-section-content :global(.btn-small:not(.icon-button)) {
-      --button-height: var(--control-height-400);
-    }
-  }
-
   @media (width >= 42rem) {
     .settings-section-header {
       align-items: center;

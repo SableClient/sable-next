@@ -11,7 +11,7 @@
     argTypes: {
       variant: {
         control: 'select',
-        options: ['primary', 'secondary', 'ghost', 'danger'],
+        options: ['primary', 'secondary', 'subtle', 'ghost', 'danger'],
       },
       size: { control: 'select', options: ['small', 'medium', 'large', 'icon'] },
       loading: { control: 'boolean' },
@@ -27,7 +27,7 @@
     },
   });
 
-  const variants = ['primary', 'secondary', 'ghost', 'danger'] as const;
+  const variants = ['primary', 'secondary', 'subtle', 'ghost', 'danger'] as const;
   const sizes = ['small', 'medium', 'large'] as const;
 </script>
 
@@ -83,6 +83,6 @@
   .grid {
     display: grid;
     gap: var(--space-300);
-    grid-template-columns: repeat(3, max-content);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   }
 </style>

@@ -444,7 +444,7 @@
   }
 
   .account-profile :global(.profile-card-user-id svg) {
-    margin-top: 0.25em;
+    margin-top: var(--space-100);
   }
 
   .account-list {
