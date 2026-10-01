@@ -173,6 +173,7 @@
   }
 
   .settings {
+    border-top: var(--border-width) solid var(--bg-container-line);
     display: grid;
     list-style: none;
     margin: 0;

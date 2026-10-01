@@ -64,7 +64,7 @@ import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
 import { playNotificationSound } from '#lib/features/notifications/sound.js';
-import { setLanguage } from '#lib/i18n.js';
+import { currentLocale, setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -713,7 +713,9 @@ export const settingsCategories: SettingsCategory[] = [
         gatedBy: 'developerTools',
         options: SEARCH_BATCH_SIZES.map((value) => ({
           value,
-          label: `${value} events`,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
           literal: true,
         })),
       },
@@ -727,7 +729,9 @@ export const settingsCategories: SettingsCategory[] = [
         gatedBy: 'developerTools',
         options: SEARCH_BASE_EVENTS.map((value) => ({
           value,
-          label: `${value} events`,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
           literal: true,
         })),
       },
@@ -740,7 +744,9 @@ export const settingsCategories: SettingsCategory[] = [
         gatedBy: 'developerTools',
         options: SEARCH_MAX_EVENTS.map((value) => ({
           value,
-          label: `${value} events`,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
           literal: true,
         })),
       },
