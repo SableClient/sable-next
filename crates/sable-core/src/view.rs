@@ -2271,35 +2271,27 @@ fn search_context_view(line: crate::search::ContextLine) -> SearchContextView {
     }
 }
 
-fn clamp_int(level: Int) -> i32 {
-    i32::try_from(i64::from(level)).unwrap_or(if level.is_negative() {
-        i32::MIN
-    } else {
-        i32::MAX
-    })
-}
-
 #[must_use]
 pub fn room_power_levels(power_levels: &RoomPowerLevels) -> RoomPowerLevelsView {
     RoomPowerLevelsView {
-        ban: clamp_int(power_levels.ban),
-        kick: clamp_int(power_levels.kick),
-        redact: clamp_int(power_levels.redact),
-        invite: clamp_int(power_levels.invite),
-        events_default: clamp_int(power_levels.events_default),
-        state_default: clamp_int(power_levels.state_default),
-        users_default: clamp_int(power_levels.users_default),
+        ban: i64::from(power_levels.ban),
+        kick: i64::from(power_levels.kick),
+        redact: i64::from(power_levels.redact),
+        invite: i64::from(power_levels.invite),
+        events_default: i64::from(power_levels.events_default),
+        state_default: i64::from(power_levels.state_default),
+        users_default: i64::from(power_levels.users_default),
         events: power_levels
             .events
             .iter()
-            .map(|(event_type, level)| (event_type.to_string(), clamp_int(*level)))
+            .map(|(event_type, level)| (event_type.to_string(), i64::from(*level)))
             .collect(),
         users: power_levels
             .users
             .iter()
-            .map(|(user_id, level)| (user_id.to_string(), clamp_int(*level)))
+            .map(|(user_id, level)| (user_id.to_string(), i64::from(*level)))
             .collect(),
-        notifications_room: clamp_int(power_levels.notifications.room),
+        notifications_room: i64::from(power_levels.notifications.room),
     }
 }
 
@@ -2311,6 +2303,40 @@ mod tests {
     use serde_json::json;
 
     use crate::protocol::SendBlockView;
+
+    #[test]
+    fn power_levels_keep_every_matrix_integer() {
+        use matrix_sdk::ruma::events::room::power_levels::{
+            RoomPowerLevels, RoomPowerLevelsEventContent,
+        };
+
+        let content = json!({
+            "ban": 9_007_199_254_740_991_i64,
+            "kick": -9_007_199_254_740_991_i64,
+            "redact": 3_000_000_000_i64,
+            "invite": -3_000_000_000_i64,
+            "events_default": 4_000_000_000_i64,
+            "state_default": -4_000_000_000_i64,
+            "users_default": 5_000_000_000_i64,
+            "events": {"m.room.name": 6_000_000_000_i64},
+            "users": {"@admin:example.org": -6_000_000_000_i64},
+            "notifications": {"room": 7_000_000_000_i64}
+        });
+        let levels: RoomPowerLevelsEventContent = serde_json::from_value(content.clone()).unwrap();
+        let view = super::room_power_levels(&RoomPowerLevels::new(
+            levels.into(),
+            &matrix_sdk::ruma::room_version_rules::AuthorizationRules::V1,
+            [],
+        ));
+        let mut actual = serde_json::to_value(view).unwrap();
+        let room = actual
+            .as_object_mut()
+            .unwrap()
+            .remove("notifications_room")
+            .unwrap();
+        actual["notifications"] = json!({"room": room});
+        assert_eq!(actual, content);
+    }
 
     #[test]
     fn a_send_blocked_by_a_changed_identity_names_the_users() {

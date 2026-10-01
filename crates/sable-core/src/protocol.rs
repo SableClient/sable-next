@@ -3020,16 +3020,16 @@ pub struct RoomPermissionsView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomPowerLevelsView {
-    pub ban: i32,
-    pub kick: i32,
-    pub redact: i32,
-    pub invite: i32,
-    pub events_default: i32,
-    pub state_default: i32,
-    pub users_default: i32,
-    pub events: std::collections::BTreeMap<String, i32>,
-    pub users: std::collections::BTreeMap<String, i32>,
-    pub notifications_room: i32,
+    pub ban: i64,
+    pub kick: i64,
+    pub redact: i64,
+    pub invite: i64,
+    pub events_default: i64,
+    pub state_default: i64,
+    pub users_default: i64,
+    pub events: std::collections::BTreeMap<String, i64>,
+    pub users: std::collections::BTreeMap<String, i64>,
+    pub notifications_room: i64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]

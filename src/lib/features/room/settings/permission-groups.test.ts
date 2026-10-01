@@ -170,3 +170,19 @@ test('a sync leaves everything the server would refuse to change', () => {
   expect(next.redact).toBe(50);
   expect(next.invite).toBe(50);
 });
+
+test('editing one permission preserves unrelated large levels', () => {
+  const source = {
+    ...levels,
+    ban: Number.MAX_SAFE_INTEGER,
+    kick: Number.MIN_SAFE_INTEGER,
+    events: { 'm.room.name': 3_000_000_000 },
+    users: { '@admin:example.org': -3_000_000_000 },
+    notifications_room: 4_000_000_000,
+  };
+  const next = toEventContent(withLevel(source, { kind: 'action', action: 'invite' }, 25));
+  expect(next).toEqual({
+    ...toEventContent(source),
+    invite: 25,
+  });
+});
