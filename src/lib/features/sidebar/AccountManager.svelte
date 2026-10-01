@@ -9,6 +9,7 @@
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -141,7 +142,9 @@
 </svelte:head>
 
 {#snippet profileActions()}
-  <Pill onclick={() => void goto(resolve('settings'))}>{$i18n.t('nav.settings')}</Pill>
+  <Button class="profile-settings" variant="primary" onclick={() => void goto(resolve('settings'))}
+    ><GearIcon aria-hidden="true" />{$i18n.t('nav.settings')}</Button
+  >
   <Pill onclick={() => void goto(resolve('settings/account'))}>{$i18n.t('nav.editProfile')}</Pill>
 {/snippet}
 
@@ -337,6 +340,10 @@
     overscroll-behavior: contain;
     padding: var(--page-gutter);
     width: 100%;
+  }
+
+  .account-manager :global(.profile-settings) {
+    min-height: max(var(--control-height-400), var(--target-hit));
   }
 
   .status-bubble {

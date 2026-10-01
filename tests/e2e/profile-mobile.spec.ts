@@ -23,6 +23,10 @@ test('mobile: the profile card keeps its actions inside the card', async ({
   expect(statusBox.y + statusBox.height).toBeGreaterThan(coverBox.y + coverBox.height);
   expect(statusBox.y + statusBox.height).toBeLessThanOrEqual(nameBox.y);
 
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page.getByRole('button', { name: 'Settings', exact: true });
+  await expect(settings.locator('svg[aria-hidden="true"]')).toBeVisible();
+  const settingsBox = await settings.boundingBox();
+  expect(settingsBox?.height).toBeGreaterThanOrEqual(48);
+  await settings.click();
   await expect(page.getByRole('navigation', { name: 'Settings sections' })).toBeVisible();
 });
