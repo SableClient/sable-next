@@ -1194,7 +1194,7 @@ async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unrea
 }
 
 #[tokio::test]
-async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
+async fn unread_reply_counts_persist_until_read() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
@@ -1207,6 +1207,7 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
     let mention = |event_id| {
         factory
             .text_msg("hey")
+            .reply_to(event_id!("$original"))
             .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
                 me.clone()
             ]))
@@ -1230,8 +1231,8 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
                 .into_event(),
         )
         .set_unread_notifications_count(json!({
-            "notification_count": 0,
-            "highlight_count": 0,
+            "notification_count": 2,
+            "highlight_count": 2,
         }));
     server
         .mock_sync()
@@ -1243,10 +1244,52 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
 
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (2, 2)
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).set_unread_notifications_count(json!({
+                "notification_count": 0,
+                "highlight_count": 0,
+            })),
+        )
+        .await;
+
     assert_eq!(item.num_unread_mentions(), 2);
     assert_eq!(
         super::view::unread_counts(&item, Some(event_id!("$two")), false),
-        (2, 0)
+        (2, 2)
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$two"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 2,
+                    "highlight_count": 2,
+                })),
+        )
+        .await;
+
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (0, 0)
     );
 }
 

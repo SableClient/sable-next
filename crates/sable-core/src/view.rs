@@ -179,7 +179,7 @@ pub(crate) fn unread_counts(
         };
         (unread, local.1)
     } else {
-        (local.0.max(server.0), server.1)
+        (local.0.max(server.0), local.1.max(server.1))
     }
 }
 
