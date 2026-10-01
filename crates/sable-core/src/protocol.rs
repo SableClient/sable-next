@@ -3799,8 +3799,6 @@ pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
     pub room: Option<NotificationModeView>,
     pub default: NotificationModeView,
-    /// A direct chat with a bridge bot or another MSC4171 service member in it.
-    pub bridged: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -587,8 +587,6 @@ export type NotificationSettingsView = {
 	/**  The room's own rule. `null` means it follows `default`. */
 	room: NotificationModeView | null,
 	default: NotificationModeView,
-	/**  A direct chat with a bridge bot or another MSC4171 service member in it. */
-	bridged: boolean,
 };
 
 export type NotificationView = {

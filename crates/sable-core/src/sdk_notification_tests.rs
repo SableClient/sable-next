@@ -448,9 +448,9 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
         .await
         .snapshot()
         .await;
-    let shape = notifications::room_shape(&room).await;
-    let result = crate::push_rules::room_settings(&rules, room_id, shape);
-    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), shape)]);
+    let direct = notifications::uses_direct_push_rules(&room);
+    let result = crate::push_rules::room_settings(&rules, room_id, direct);
+    let modes = crate::push_rules::room_modes(&rules, [(room_id.to_owned(), direct)]);
 
     assert!(result.room.is_none());
     assert_eq!(
@@ -548,7 +548,7 @@ async fn a_missing_rule_on_delete_is_not_a_failure() {
 }
 
 #[tokio::test]
-async fn a_direct_chat_with_a_bridge_bot_is_still_a_direct_chat() {
+async fn a_bridge_bot_still_counts_for_one_to_one_push_rules() {
     use std::collections::BTreeSet;
 
     let server = MatrixMockServer::new().await;
@@ -584,11 +584,114 @@ async fn a_direct_chat_with_a_bridge_bot_is_still_a_direct_chat() {
         .await;
     let room = client.get_room(room_id).unwrap();
 
-    assert_eq!(
-        notifications::room_shape(&room).await,
-        notifications::RoomShape {
-            direct: true,
-            bridged: true,
-        }
+    assert!(!notifications::uses_direct_push_rules(&room));
+}
+
+#[tokio::test]
+async fn resetting_a_bridged_dm_to_default_does_not_create_a_room_push_rule() {
+    use std::collections::BTreeSet;
+
+    use crate::protocol::{Command, CommandOk, NotificationModeView};
+    use matrix_sdk::ruma::push::{PredefinedUnderrideRuleId, RuleKind, Ruleset};
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    let room_id = room_id!("!bridged:example.org");
+    let own = client.user_id().unwrap();
+    let ghost = user_id!("@whatsapp_123:example.org");
+    let bot = user_id!("@whatsappbot:example.org");
+    let members = [own, ghost, bot];
+    let factory = EventFactory::new().room(room_id).sender(ghost);
+    let mut rules = Ruleset::server_default(own);
+    rules
+        .set_actions(
+            RuleKind::Underride,
+            PredefinedUnderrideRuleId::Message.as_str(),
+            vec![],
+        )
+        .unwrap();
+    server
+        .mock_sync()
+        .ok_and_run(&client, |builder| {
+            builder.add_global_account_data(factory.push_rules(rules.clone()));
+            builder.add_joined_room(
+                JoinedRoomBuilder::new(room_id)
+                    .add_state_bulk(members.iter().map(|member| factory.member(member).into()))
+                    .add_state_event(factory.member_hints(BTreeSet::from([bot.to_owned()])))
+                    .set_joined_members_count(3),
+            );
+        })
+        .await;
+    for verb in ["PUT", "DELETE"] {
+        Mock::given(method(verb))
+            .and(path_regex(r"/_matrix/client/v3/pushrules/global/.*"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+            .mount(server.server())
+            .await;
+    }
+    let (core, _events) = watching(&server, &client).await;
+    core.dispatch(Command::SetRoomNotificationMode {
+        room_id: room_id.to_owned(),
+        mode: None,
+    })
+    .await
+    .unwrap();
+
+    let requests = server.server().received_requests().await.unwrap();
+    assert!(
+        !requests.iter().any(|request| {
+            request.method.as_str() == "PUT"
+                && request.url.path().contains("/pushrules/global/room/")
+        }),
+        "resetting to default must not install a room override"
     );
+    let CommandOk::NotificationSettings(settings) = core
+        .dispatch(Command::NotificationSettings {
+            room_id: room_id.to_owned(),
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("notification settings");
+    };
+    assert!(settings.room.is_none());
+    assert_eq!(settings.default, NotificationModeView::Mentions);
+
+    let CommandOk::RoomNotificationModes { modes } = core
+        .dispatch(Command::RoomNotificationModes {
+            room_ids: vec![room_id.to_owned()],
+        })
+        .await
+        .unwrap()
+    else {
+        panic!("room notification modes");
+    };
+    assert!(modes[0].room.is_none());
+    assert_eq!(modes[0].default, NotificationModeView::Mentions);
+
+    core.dispatch(Command::SetRoomNotificationMode {
+        room_id: room_id.to_owned(),
+        mode: Some(NotificationModeView::All),
+    })
+    .await
+    .unwrap();
+    for direct in [true, false] {
+        core.dispatch(Command::SetDefaultNotificationMode {
+            direct,
+            mode: NotificationModeView::Mentions,
+        })
+        .await
+        .unwrap();
+        let CommandOk::NotificationSettings(settings) = core
+            .dispatch(Command::NotificationSettings {
+                room_id: room_id.to_owned(),
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("notification settings");
+        };
+        assert_eq!(settings.room, Some(NotificationModeView::All));
+    }
+    core.session_tasks.lock().unwrap().clear();
 }

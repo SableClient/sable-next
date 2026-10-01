@@ -729,7 +729,6 @@ impl Core {
         self.watch_bot_commands(&client, generation);
         self.watch_image_packs(&client, generation);
         self.watch_joined_invites(&client);
-        self.watch_bridged_dms(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         let store_id = self
@@ -774,7 +773,6 @@ impl Core {
                         core.reconcile_memberships().await;
                         core.fill_own_members().await;
                         core.align_encrypted_defaults().await;
-                        core.align_bridged_dms(None).await;
                     }
 
                     if stalled {

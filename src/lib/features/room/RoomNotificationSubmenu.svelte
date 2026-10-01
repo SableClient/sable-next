@@ -33,7 +33,6 @@
 
   let mode = $state<NotificationModeView | null | undefined>();
   let fallback = $state<NotificationModeView>('mentions');
-  let bridged = $state(false);
   let defaultLabel = $derived($i18n.t(modeLabels[fallback]));
 
   $effect(() => {
@@ -46,7 +45,6 @@
       const settings = await core.commands.notificationSettings(roomId);
       mode = settings.room;
       fallback = settings.default ?? 'mentions';
-      bridged = settings.bridged;
     } catch (error) {
       console.warn('[sable room] notification settings unavailable', error);
     }
@@ -81,7 +79,7 @@
         }}
       >
         <span class="menu-check" aria-hidden="true">{selected ? '✓' : ''}</span>
-        {$i18n.t(option.mode === null && bridged ? 'room.notifyDefaultDirect' : option.label, {
+        {$i18n.t(option.label, {
           mode: defaultLabel,
         })}
       </ActionMenuItem>

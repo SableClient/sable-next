@@ -1899,7 +1899,7 @@ impl Core {
                 Ok(CommandOk::NotificationSettings(push_rules::room_settings(
                     &rules,
                     &room_id,
-                    notifications::room_shape(&room).await,
+                    notifications::uses_direct_push_rules(&room),
                 )))
             }
 
@@ -1908,7 +1908,7 @@ impl Core {
                 let mut rooms = Vec::with_capacity(room_ids.len());
                 for room_id in room_ids {
                     if let Ok(room) = self.room(&room_id).await {
-                        rooms.push((room_id, notifications::room_shape(&room).await));
+                        rooms.push((room_id, notifications::uses_direct_push_rules(&room)));
                     }
                 }
 
@@ -2066,20 +2066,13 @@ impl Core {
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
                 let rules = self.push_rules().await?;
-                let shape = notifications::room_shape(&room).await;
-                let writes = push_rules::plan_room_mode(
-                    &rules.snapshot().await,
-                    &room_id,
-                    shape.direct,
-                    mode,
-                );
+                let direct = notifications::uses_direct_push_rules(&room);
+                let writes =
+                    push_rules::plan_room_mode(&rules.snapshot().await, &room_id, direct, mode);
                 rules
                     .apply(writes)
                     .await
                     .or_failed(self, "set_room_notification_mode")?;
-                if shape.bridged {
-                    self.align_bridged_dms(None).await;
-                }
 
                 Ok(CommandOk::SetRoomNotificationMode)
             }
@@ -2093,7 +2086,6 @@ impl Core {
                     .apply(writes)
                     .await
                     .or_failed(self, "set_default_notification_mode")?;
-                self.align_bridged_dms(Some(&before)).await;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
             }

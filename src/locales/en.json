@@ -276,7 +276,6 @@
     "menuUnreadHiddenBySpace": "Unread dot hidden by space",
     "menuNotifications": "Notifications",
     "notifyDefault": "Default ({{mode}})",
-    "notifyDefaultDirect": "Default for direct chats ({{mode}})",
     "notifyAll": "All messages",
     "notifyMentions": "Mentions and keywords",
     "notifyMute": "Mute",

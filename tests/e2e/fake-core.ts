@@ -1008,7 +1008,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'notification_settings',
         room: null,
         default: 'all',
-        bridged: false,
       }),
       room_notification_modes: (command) => ({
         type: 'room_notification_modes',

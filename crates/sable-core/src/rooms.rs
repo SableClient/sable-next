@@ -91,47 +91,6 @@ pub(crate) async fn fill_own_members(client: &Client) -> Result<(), matrix_sdk::
     Ok(())
 }
 
-pub(crate) async fn bridged_dms(client: &Client) -> Vec<OwnedRoomId> {
-    let mut bridged = Vec::new();
-    for room in client.joined_rooms() {
-        if room
-            .service_members()
-            .is_none_or(|service| service.is_empty())
-        {
-            continue;
-        }
-        if crate::notifications::room_shape(&room).await.bridged {
-            bridged.push(room.room_id().to_owned());
-        }
-    }
-    bridged
-}
-
-pub(crate) async fn align_bridged_dms_on_change(core: std::sync::Arc<Core>, client: Client) {
-    use tokio::sync::broadcast::error::{RecvError, TryRecvError};
-
-    let watched = RoomInfoNotableUpdateReasons::MEMBERSHIP
-        | RoomInfoNotableUpdateReasons::ACTIVE_SERVICE_MEMBERS;
-    let mut updates = client.room_info_notable_update_receiver();
-    loop {
-        match updates.recv().await {
-            Ok(update) => {
-                let hinted = client.get_room(&update.room_id).is_some_and(|room| {
-                    room.service_members()
-                        .is_some_and(|service| !service.is_empty())
-                });
-                if !update.reasons.intersects(watched) || !hinted {
-                    continue;
-                }
-                while let Ok(_) | Err(TryRecvError::Lagged(_)) = updates.try_recv() {}
-                core.align_bridged_dms(None).await;
-            }
-            Err(RecvError::Lagged(_)) => {}
-            Err(RecvError::Closed) => break,
-        }
-    }
-}
-
 impl Core {
     pub(crate) async fn set_direct(
         &self,
@@ -218,25 +177,6 @@ impl Core {
             .await
             .map_err(|error| self.room_error("set_room_join_rule", error))?;
         Ok(())
-    }
-
-    pub(crate) async fn align_bridged_dms(&self, before: Option<&matrix_sdk::ruma::push::Ruleset>) {
-        let (Ok(client), Ok(rules)) = (self.client().await, self.push_rules().await) else {
-            return;
-        };
-        let bridged = bridged_dms(&client).await;
-        if bridged.is_empty() {
-            return;
-        }
-        let after = rules.snapshot().await;
-        let writes =
-            crate::push_rules::plan_bridged_dms(before.unwrap_or(&after), &after, &bridged);
-        if writes.is_empty() {
-            return;
-        }
-        if let Err(error) = rules.apply(writes).await {
-            tracing::warn!("could not align bridged direct chats with the DM default: {error}");
-        }
     }
 
     pub(crate) async fn fill_own_members(&self) {
