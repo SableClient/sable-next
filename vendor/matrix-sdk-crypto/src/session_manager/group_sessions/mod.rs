@@ -852,7 +852,10 @@ impl GroupSessionManager {
             )
             .await?;
 
-        let devices = devices.into_values().flatten().collect();
+        let owner = self.store.get_user_identity(user_id).await?;
+        let devices = devices.into_values().flatten()
+            .filter(|device| owner.as_ref().is_some_and(|owner| device.is_cross_signed_by_owner(owner)))
+            .collect();
         let event_type = bundle_data.event_type().to_owned();
         let (requests, _) = self
             .encrypt_content_for_devices(devices, &event_type, bundle_data, &mut changes)
@@ -1836,6 +1839,19 @@ mod tests {
         // Alice trusts Bob's device
         let device = alice.get_device(bob.user_id(), bob.device_id(), None).await.unwrap().unwrap();
         device.set_local_trust(LocalTrust::Verified).await.unwrap();
+
+        let bootstrap = bob.bootstrap_cross_signing(false).await.unwrap();
+        let signed = bootstrap.upload_signatures_req.signed_keys.get(bob.user_id()).unwrap()
+            .get(bob.device_id().as_str()).unwrap();
+        let response: get_keys::v3::Response = serde_json::from_value(json!({
+            "device_keys": {bob.user_id(): {bob.device_id(): serde_json::from_str::<Value>(signed.get()).unwrap()}},
+            "master_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.master_key},
+            "self_signing_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.self_signing_key},
+            "user_signing_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.user_signing_key},
+            "failures": {}
+        })).unwrap();
+        let (request_id, _) = alice.query_keys_for_users([bob.user_id()]);
+        alice.mark_request_as_sent(&request_id, &response).await.unwrap();
 
         let content = RoomKeyBundleContent {
             room_id: owned_room_id!("!room:id"),
