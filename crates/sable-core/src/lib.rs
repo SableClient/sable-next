@@ -43,6 +43,7 @@ pub mod search;
 pub mod session;
 pub mod spaces;
 pub mod store;
+mod store_disposal;
 mod subscriptions;
 mod timelines;
 pub mod tls;
@@ -413,7 +414,27 @@ impl Core {
         let (mut registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
             .or_failed(self, "restore_parse_session_file")?;
         let reanchored = registry.reanchor_stores(&self.store_id);
-        if migrated || reanchored {
+        for account in registry
+            .accounts
+            .iter_mut()
+            .filter(|account| account.device_invalidated)
+        {
+            account.session.credentials.discard_tokens();
+            if let Err(error) = self.discard_account_store(&account.store_id).await {
+                tracing::error!(
+                    ?error,
+                    account_id = account.account_id,
+                    "could not discard retired account store"
+                );
+            }
+        }
+        if migrated
+            || reanchored
+            || registry
+                .accounts
+                .iter()
+                .any(|account| account.device_invalidated)
+        {
             let bytes =
                 serde_json::to_vec(&registry).or_failed(self, "migrate_session_registry")?;
             self.sessions

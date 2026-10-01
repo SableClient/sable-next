@@ -360,6 +360,11 @@ impl Core {
         {
             return Err(CommandErr::NotLoggedIn);
         }
+        if let Some(expected) = reauth
+            && expected.device_invalidated
+        {
+            self.discard_account_store(&expected.store_id).await?;
+        }
         let mut updated = registry.clone();
         if let Some(expected) = reauth {
             updated
@@ -565,15 +570,30 @@ impl Core {
         };
         account.needs_reauth = true;
         account.device_invalidated = device_invalidated;
+        let store_id = account.store_id.clone();
+        if device_invalidated {
+            account.session.credentials.discard_tokens();
+        }
+
         if registry.active_account_id.as_deref() == Some(account_id) {
             registry.active_account_id = None;
         }
         let bytes = serde_json::to_vec(registry).or_failed(self, "retire_session_serialize")?;
+        let client = self.account_clients.lock().await.get(account_id).cloned();
         self.invalidate_account_client(account_id).await;
         self.sessions
             .save(bytes)
             .await
             .or_failed(self, "retire_session_save")?;
+        if device_invalidated {
+            if let Some(client) = client {
+                client
+                    .pause()
+                    .await
+                    .or_failed(self, "retire_session_close")?;
+            }
+            self.discard_account_store(&store_id).await?;
+        }
         Ok(())
     }
 
@@ -605,17 +625,15 @@ impl Core {
             .await
             .or_failed(self, "logout_save_accounts")?;
         if let Some(store_id) = store_id {
-            self.discard_account_store(&store_id);
+            self.discard_account_store(&store_id).await?;
         }
         Ok(())
     }
 
-    fn discard_account_store(&self, store_id: &str) {
-        if session::removable_account_store(&self.store_id, store_id) {
-            remove_store_dir(store_id);
-        } else {
-            tracing::warn!(store_id, "refusing to delete a shared account store");
-        }
+    pub(crate) async fn discard_account_store(&self, store_id: &str) -> Result<(), CommandErr> {
+        crate::store_disposal::discard(&self.store_id, store_id)
+            .await
+            .or_failed(self, "discard_account_store")
     }
 
     pub(crate) async fn take_session(&self) -> Option<Session> {
@@ -935,6 +953,9 @@ impl Core {
             let account_id = session.as_ref().map(|session| session.account_id.clone());
             if let Some(session) = session {
                 session.sync_service.stop().await;
+                if !soft_logout && let Err(error) = session.client.pause().await {
+                    tracing::error!("could not close rejected session stores: {error}");
+                }
             }
 
             let outcome = match account_id.as_deref() {
@@ -985,18 +1006,6 @@ fn oauth_device_delete_url(
         .map(|url| url.to_string())
         .ok_or(CommandErr::Unsupported)
 }
-
-#[cfg(not(target_family = "wasm"))]
-fn remove_store_dir(store_id: &str) {
-    if let Err(error) = std::fs::remove_dir_all(store_id)
-        && error.kind() != std::io::ErrorKind::NotFound
-    {
-        tracing::error!(store_id, "could not delete the account store: {error}");
-    }
-}
-
-#[cfg(target_family = "wasm")]
-const fn remove_store_dir(_store_id: &str) {}
 
 #[cfg(not(target_family = "wasm"))]
 const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
@@ -1214,6 +1223,77 @@ mod regression_tests {
         .await
         .unwrap();
         assert!(core.session.read().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn rejected_devices_discard_credentials_and_sqlite_stores_only_on_hard_logout() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        for hard in [false, true] {
+            let server = MatrixMockServer::new().await;
+            let directory = tempfile::tempdir().unwrap();
+            let base = directory.path().join("sable");
+            let base = base.to_str().unwrap();
+            let store_id = session::account_store_id(base, "a1");
+            let client = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder.sqlite_store_with_cache_path(
+                        std::path::Path::new(&store_id).join("store"),
+                        std::path::Path::new(&store_id).join("cache"),
+                        None,
+                    )
+                })
+                .build()
+                .await;
+            client
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            let saved = current_session(&client, server.server().uri()).unwrap();
+            let (core, _events) = Core::new(base, Box::new(MemorySessionStore::default()));
+            let mut registry = AccountRegistry::empty();
+            registry.active_account_id = Some("a1".to_owned());
+            registry.upsert(PersistedAccount {
+                account_id: "a1".to_owned(),
+                store_id: store_id.clone(),
+                session: saved.clone(),
+                needs_reauth: false,
+                device_invalidated: false,
+            });
+            *core.accounts.lock().await = Some(registry);
+            core.account_clients
+                .lock()
+                .await
+                .insert("a1".to_owned(), client.clone());
+            let database = std::path::Path::new(&store_id).join("store/matrix-sdk-crypto.sqlite3");
+            assert!(database.exists());
+            core.mark_account_needs_reauth(Some("a1"), hard)
+                .await
+                .unwrap();
+            assert_eq!(database.exists(), !hard);
+            let bytes = core.sessions.load().await.unwrap().unwrap();
+            let (registry, _) = AccountRegistry::from_bytes(&bytes, base).unwrap();
+            let account = &registry.accounts[0];
+            assert!(account.needs_reauth);
+            assert_eq!(account.device_invalidated, hard);
+            assert_eq!(
+                account.session.credentials.user_id(),
+                saved.credentials.user_id()
+            );
+            assert_eq!(
+                account.session.credentials.device_id(),
+                saved.credentials.device_id()
+            );
+            if hard {
+                assert!(account.session.credentials.tokens().access_token.is_empty());
+                assert!(account.session.credentials.tokens().refresh_token.is_none());
+            } else {
+                assert_eq!(
+                    account.session.credentials.tokens(),
+                    saved.credentials.tokens()
+                );
+            }
+        }
     }
 
     #[tokio::test]

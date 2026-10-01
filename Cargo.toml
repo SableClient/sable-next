@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/*", "src-tauri"]
-exclude = ["vendor/tauri-plugin-edge-to-edge", "vendor/matrix-sdk", "vendor/matrix-sdk-crypto"]
+exclude = ["vendor/tauri-plugin-edge-to-edge", "vendor/matrix-sdk", "vendor/matrix-sdk-crypto", "vendor/matrix-sdk-indexeddb"]
 # sable-wasm only compiles for wasm32 - its session store holds JS functions,
 # which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
 default-members = ["crates/sable-core", "src-tauri"]
@@ -12,6 +12,7 @@ tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
 [patch."https://github.com/matrix-org/matrix-rust-sdk"]
 matrix-sdk = { path = "vendor/matrix-sdk" }
 matrix-sdk-crypto = { path = "vendor/matrix-sdk-crypto" }
+matrix-sdk-indexeddb = { path = "vendor/matrix-sdk-indexeddb" }
 
 [workspace.dependencies]
 matrix-sdk-common = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e" }

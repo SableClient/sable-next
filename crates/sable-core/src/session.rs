@@ -211,7 +211,12 @@ pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
 pub fn removable_account_store(base_store_id: &str, store_id: &str) -> bool {
     store_id
         .strip_prefix(&format!("{base_store_id}-account-"))
-        .is_some_and(|account_id| !account_id.is_empty())
+        .is_some_and(|account_id| {
+            !account_id.is_empty()
+                && account_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        })
 }
 
 impl Credentials {
@@ -222,6 +227,15 @@ impl Credentials {
             Self::OAuth { user, .. } => user.tokens.clone(),
         }
     }
+    pub(crate) fn discard_tokens(&mut self) {
+        let tokens = match self {
+            Self::Password(session) => &mut session.tokens,
+            Self::OAuth { user, .. } => &mut user.tokens,
+        };
+        tokens.access_token.clear();
+        tokens.refresh_token = None;
+    }
+
     #[must_use]
     pub fn oauth(session: OAuthSession) -> Self {
         Self::OAuth {
@@ -487,6 +501,7 @@ async fn build_account_client(
         // The SharedWorker is the sole IndexedDB owner in the web runtime.
         let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::SingleProcess;
         let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
+        let close_stores = Box::new(stores.connection_closer());
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)
             .media_store(stores.media)
@@ -506,6 +521,9 @@ async fn build_account_client(
             .base_client((*base).clone())
             .build()
             .await?;
+        INDEXEDDB_STORES.with_borrow_mut(|owners| {
+            owners.insert(store_id.to_owned(), close_stores);
+        });
         BASE_CLIENTS.with_borrow_mut(|bases| {
             bases.insert(store_id.to_owned(), std::rc::Rc::downgrade(&base));
         });
@@ -529,6 +547,9 @@ const fn session_timeout(proxied: bool) -> Duration {
 
 #[cfg(target_family = "wasm")]
 thread_local! {
+    static INDEXEDDB_STORES: std::cell::RefCell<
+        std::collections::HashMap<String, Box<dyn FnOnce()>>,
+    > = std::cell::RefCell::default();
     static BASE_CLIENTS: std::cell::RefCell<
         std::collections::HashMap<String, std::rc::Weak<matrix_sdk_base::BaseClient>>,
     > = std::cell::RefCell::default();
@@ -537,6 +558,16 @@ thread_local! {
 #[cfg(target_family = "wasm")]
 pub(crate) fn base_client(store_id: &str) -> Option<std::rc::Rc<matrix_sdk_base::BaseClient>> {
     BASE_CLIENTS.with_borrow(|bases| bases.get(store_id)?.upgrade())
+}
+
+#[cfg(target_family = "wasm")]
+pub(crate) fn close_account_stores(store_id: &str) {
+    BASE_CLIENTS.with_borrow_mut(|bases| bases.remove(store_id));
+    INDEXEDDB_STORES.with_borrow_mut(|owners| {
+        if let Some(stores) = owners.remove(store_id) {
+            stores();
+        }
+    });
 }
 
 /// For dynamic client registration. The redirect URI must match the one handed

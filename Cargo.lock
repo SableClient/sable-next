@@ -4645,7 +4645,6 @@ dependencies = [
 [[package]]
 name = "matrix-sdk-indexeddb"
 version = "0.19.1"
-source = "git+https://github.com/matrix-org/matrix-rust-sdk?rev=bc2502ee3d3ba1dc687740df5be0f8635032399e#bc2502ee3d3ba1dc687740df5be0f8635032399e"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
