@@ -2,7 +2,7 @@
 
 use std::{
     fs::{self, File},
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
     sync::Mutex,
     time::Duration,
@@ -55,7 +55,8 @@ pub fn stream_to<R: Runtime>(
 ) -> Result<(), CommandErr> {
     let dir = cache_dir(app)?;
     let key = hex(&Sha256::digest(source.as_bytes()));
-    let cached = dir.join(format!("{key}.webm"));
+    // Invalidate cached conversions without duration or seek metadata.
+    let cached = dir.join(format!("{key}.v2.webm"));
 
     if is_fresh(&cached) {
         replay(&cached, chunks)?;
@@ -135,7 +136,8 @@ fn encode(
             .map("1:a:0")
             .arg("-shortest");
     }
-    command.args(ENCODE_ARGS).pipe_stdout();
+    // Write to a seekable file so ffmpeg can finalize duration and seek metadata.
+    command.args(ENCODE_ARGS).output(partial.to_string_lossy());
     if tracing::enabled!(tracing::Level::DEBUG) {
         command.print_command();
     }
@@ -153,47 +155,25 @@ fn encode(
         CommandErr::Unavailable
     })?;
     tracing::info!(audio, "ffmpeg started");
-    let mut sink = File::create(partial).ok();
     let mut problems: Vec<String> = Vec::new();
-    let mut sent = 0_usize;
-    let mut cancelled = false;
 
     for event in events {
         match event {
-            FfmpegEvent::OutputChunk(chunk) => {
-                if let Some(file) = sink.as_mut()
-                    && file.write_all(&chunk).is_err()
-                {
-                    sink = None;
-                }
-                sent += chunk.len();
-                if chunks.send(Response::new(chunk)).is_err() {
-                    cancelled = true;
-                    break;
-                }
-            }
             FfmpegEvent::Error(message) | FfmpegEvent::Log(LogLevel::Error, message) => {
                 problems.push(message);
             }
-            FfmpegEvent::Done => break,
             _ => {}
         }
     }
 
-    if cancelled {
-        tracing::info!(bytes = sent, id, "renderer dropped the video stream");
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(CommandErr::Unavailable);
-    }
-
     let finished = child.wait().is_ok_and(|status| status.success());
-    if !finished || sink.is_none() || sent == 0 {
-        tracing::warn!(bytes = sent, ?problems, "video re-encode failed");
+    let bytes = fs::metadata(partial).map_or(0, |meta| meta.len());
+    if !finished || bytes == 0 {
+        tracing::warn!(bytes, ?problems, "video re-encode failed");
         return Err(CommandErr::InvalidMedia);
     }
-    tracing::info!(bytes = sent, "video re-encode complete");
-    Ok(())
+    tracing::info!(bytes, id, "video re-encode complete");
+    replay(partial, chunks)
 }
 
 pub fn cleanup_cache<R: Runtime>(app: &AppHandle<R>) {
@@ -252,7 +232,15 @@ fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{ENCODE_ARGS, STREAM_MIME, hex};
+    use super::{ENCODE_ARGS, STREAM_MIME, encode, has_audio, hex};
+
+    use std::{
+        fs,
+        process::Command,
+        sync::{Arc, Mutex},
+        time::SystemTime,
+    };
+    use tauri::ipc::{Channel, InvokeResponseBody};
 
     #[test]
     fn hex_pads_each_byte() {
@@ -267,5 +255,87 @@ mod tests {
         assert!(ENCODE_ARGS.contains(&"libvpx-vp9"));
         assert!(ENCODE_ARGS.contains(&"libopus"));
         assert!(ENCODE_ARGS.contains(&"webm"));
+    }
+
+    #[test]
+    #[ignore = "requires system ffmpeg with libvpx-vp9/libopus and ffprobe"]
+    fn transcodes_have_a_duration_and_seek_index() -> Result<(), Box<dyn std::error::Error>> {
+        let nonce = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("sable-video-test-{nonce}"));
+        fs::create_dir(&dir)?;
+        let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+            for audio in [false, true] {
+                let source = dir.join("source.mp4");
+                let partial = dir.join("output.part");
+                let mut fixture = Command::new("ffmpeg");
+                fixture.args([
+                    "-v",
+                    "error",
+                    "-y",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc2=size=160x90:rate=24:duration=1",
+                ]);
+                if audio {
+                    fixture.args([
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "sine=frequency=440:duration=1",
+                        "-c:a",
+                        "aac",
+                    ]);
+                }
+                let output = fixture.args(["-c:v", "mpeg4"]).arg(&source).output()?;
+                assert!(
+                    output.status.success(),
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                assert_eq!(has_audio(&source), audio);
+                let received = Arc::new(Mutex::new(Vec::new()));
+                let collected = Arc::clone(&received);
+                let chunks = Channel::new(move |body| {
+                    if let InvokeResponseBody::Raw(bytes) = body {
+                        collected
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .extend(bytes);
+                    }
+                    Ok(())
+                });
+                encode(&source, &partial, &chunks, 0, audio)
+                    .map_err(|error| format!("encode failed: {error:?}"))?;
+                let probe = Command::new("ffprobe")
+                    .args([
+                        "-v",
+                        "error",
+                        "-show_entries",
+                        "format=duration",
+                        "-of",
+                        "csv=p=0",
+                    ])
+                    .arg(&partial)
+                    .output()?;
+                assert!(probe.status.success());
+                let duration = String::from_utf8(probe.stdout)?.trim().parse::<f64>()?;
+                assert!(duration.is_finite() && (1.0..1.2).contains(&duration));
+                // Matroska Cues element ID.
+                let bytes = fs::read(&partial)?;
+                assert!(bytes.windows(4).any(|id| id == [0x1c, 0x53, 0xbb, 0x6b]));
+                assert_eq!(
+                    *received
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner),
+                    bytes
+                );
+            }
+            Ok(())
+        })();
+        fs::remove_dir_all(&dir)?;
+        result
     }
 }
