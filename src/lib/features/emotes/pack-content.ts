@@ -96,6 +96,13 @@ export function infoContent(info: PackImageInfoView | null): PackImageInfoConten
 }
 
 export function packEventContent(draft: PackDraft): Record<string, unknown> {
+  const shortcodes = new Set<string>();
+  for (const image of draft.images) {
+    if (!/^[a-zA-Z0-9_-]{1,100}$/u.test(image.shortcode) || shortcodes.has(image.shortcode)) {
+      throw new Error(`Invalid or duplicate shortcode: ${image.shortcode}`);
+    }
+    shortcodes.add(image.shortcode);
+  }
   return {
     pack: {
       display_name: draft.name === '' ? undefined : draft.name,
@@ -127,16 +134,22 @@ export function normalizeShortcode(raw: string): string {
 
 export function suffixRename(shortcode: string, taken: (candidate: string) => boolean): string {
   let suffix = 1;
-  let candidate = `${shortcode}-${String(suffix)}`;
+  const base = normalizeShortcode(shortcode) || 'image';
+  const candidateFor = (index: number): string => {
+    const tail = `-${String(index)}`;
+    return `${base.slice(0, MAX_SHORTCODE_LENGTH - tail.length)}${tail}`;
+  };
+  let candidate = candidateFor(suffix);
   while (taken(candidate)) {
     suffix += 1;
-    candidate = `${shortcode}-${String(suffix)}`;
+    candidate = candidateFor(suffix);
   }
   return candidate;
 }
 
 export function uniqueShortcode(shortcode: string, taken: (candidate: string) => boolean): string {
-  return taken(shortcode) ? suffixRename(shortcode, taken) : shortcode;
+  const normalized = normalizeShortcode(shortcode) || 'image';
+  return taken(normalized) ? suffixRename(normalized, taken) : normalized;
 }
 
 export function shortcodeWithoutExtension(fileName: string): string {
