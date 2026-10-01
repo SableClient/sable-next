@@ -1421,22 +1421,6 @@
                   : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
-              <div class="composer-separator"></div>
-              <ComposerBoard
-                {roomId}
-                {desktop}
-                bind:open={boardOpen}
-                bind:tab={boardTab}
-                bind:query={boardQuery}
-                onPick={pickFromBoard}
-                onPickUnicode={pickUnicodeFromBoard}
-                onPickGif={onSendGif ? pickGifFromBoard : undefined}
-                onBeforeOpen={!desktop ? blurEditor : undefined}
-                extras={{
-                  ...(showPersonaPicker && { persona: personaButton }),
-                  ...(preferences.composerFormatButton && { format: formatButton }),
-                }}
-              />
             </div>
             <input
               bind:this={fileInput}
@@ -1477,6 +1461,22 @@
               </Tooltip>
             {/snippet}
             <div class="composer-after" bind:this={afterEl}>
+              <ComposerBoard
+                {roomId}
+                {desktop}
+                bind:open={boardOpen}
+                bind:tab={boardTab}
+                bind:query={boardQuery}
+                onPick={pickFromBoard}
+                onPickUnicode={pickUnicodeFromBoard}
+                onPickGif={onSendGif ? pickGifFromBoard : undefined}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+                extras={{
+                  ...(showPersonaPicker && { persona: personaButton }),
+                  ...(preferences.composerFormatButton && { format: formatButton }),
+                }}
+              />
+              <div class="composer-separator"></div>
               <Tooltip label={sendLabel}>
                 {#snippet trigger({ props })}
                   <IconButton

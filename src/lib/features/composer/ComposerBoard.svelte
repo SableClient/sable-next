@@ -164,7 +164,7 @@
         class="composer-board"
         {...overlayLayer()}
         side="top"
-        align="start"
+        align="end"
         sideOffset={10}
         customAnchor={anchor}
       >
