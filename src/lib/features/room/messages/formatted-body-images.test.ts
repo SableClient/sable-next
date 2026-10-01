@@ -50,3 +50,24 @@ test.each(['https://tracker.example/pixel', 'http://tracker.example/pixel', 'mxc
     expect(node.textContent).toBe('wave');
   }
 );
+
+test.each(['alt=":photo:"', 'title=":photo:"', 'title="photo" height="32"'])(
+  'keeps unmarked images ordinary with %s',
+  (attributes) => {
+    const window = new Window();
+    const node = window.document.createElement('div');
+    node.innerHTML = images.defer(`<img src="mxc://example.org/photo" ${attributes}>`);
+    images.attach(node as unknown as HTMLElement, false);
+    expect(node.querySelector('img')?.hasAttribute('data-mx-emoticon')).toBe(false);
+  }
+);
+
+test.each(['', 'legacy-value'])('recognizes an emote marker with value %s', (value) => {
+  const window = new Window();
+  const node = window.document.createElement('div');
+  const paint = vi.fn();
+  const resolver = new FormattedBodyImages({} as CoreClient, () => '', paint);
+  node.innerHTML = resolver.defer(`<img data-mx-emoticon="${value}" src="mxc://example.org/wave">`);
+  resolver.attach(node as unknown as HTMLElement, false);
+  expect(paint).toHaveBeenCalledWith(node.querySelector('img'), 'blob:fixture');
+});
