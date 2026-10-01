@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 
+import { hasNativeCalls } from '#lib/platform/calls.js';
 import { usesPushGateway } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
@@ -56,7 +57,13 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: PushGateway, when: usesPushGateway },
     { component: NotificationTroubleshooter },
   ],
-  calls: [{ component: CallDeviceSettings, section: 'call-devices' }],
+  calls: [
+    {
+      component: CallDeviceSettings,
+      section: 'call-devices',
+      when: () => !hasNativeCalls(),
+    },
+  ],
   privacy: [{ component: MediaPreviewPrivacy, section: 'blurring', start: true }],
   personas: [{ component: PersonaSettings }],
   [SETTINGS_ACCOUNT_SECTION]: [
