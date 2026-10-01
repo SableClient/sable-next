@@ -9,7 +9,7 @@
   import { panelsFor } from './category-panels.js';
   import Switch from '#lib/ui/primitives/Switch.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
-  import { settingFocusId } from '#lib/settings/registry.js';
+  import { settingFocusId, settingsCategories } from '#lib/settings/registry.js';
   import type { SettingDefinition, SettingsCategory } from '#lib/settings/registry.js';
   import {
     PREFERENCE_RANGES,
@@ -26,7 +26,12 @@
 
   const items = $derived(category.items.filter((setting) => setting.supported?.() !== false));
 
-  const shown = $derived(new Set(items.map((setting) => setting.key)));
+  const supportedSettings = $derived(
+    settingsCategories.flatMap((entry) =>
+      entry.items.filter((setting) => setting.supported?.() !== false)
+    )
+  );
+  const shown = $derived(new Set(supportedSettings.map((setting) => setting.key)));
 
   const panels = $derived(panelsFor(category.id).filter((panel) => panel.when?.() !== false));
   const sections = $derived(
@@ -48,7 +53,7 @@
   }
 
   function gateName(setting: SettingDefinition): string {
-    return items.find((item) => item.key === setting.gatedBy)?.name ?? '';
+    return supportedSettings.find((item) => item.key === setting.gatedBy)?.name ?? '';
   }
 
   /** Sentry reads its consent once, at boot. */

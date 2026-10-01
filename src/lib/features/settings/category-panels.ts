@@ -47,7 +47,14 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
-  timeline: [{ component: DoubleTapReaction, section: 'messages' }],
+  timeline: [
+    { component: DoubleTapReaction, section: 'messages' },
+    {
+      component: DeveloperSearchMetrics,
+      section: 'developer-search-metrics',
+      when: () => preferences.developerTools,
+    },
+  ],
   notifications: [
     { component: NotificationPermission, section: 'alerts', start: true },
     { component: NotificationDefaults },
@@ -84,11 +91,6 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     {
       component: DeveloperSyncDiagnostics,
       section: 'developer-sync-diagnostics',
-      when: () => preferences.developerTools,
-    },
-    {
-      component: DeveloperSearchMetrics,
-      section: 'developer-search-metrics',
       when: () => preferences.developerTools,
     },
     {

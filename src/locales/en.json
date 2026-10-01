@@ -1781,7 +1781,7 @@
     "developerSearchPhaseTrickling": "Crawling slowly",
     "developerSearchPhaseYielding": "Paused for the timeline",
     "developerSearchPhaseBackingOff": "Backing off",
-    "developerSearchPhasePaused": "Paused while the app is in the background",
+    "developerSearchPhasePaused": "Paused (app in background or metered connection)",
     "developerSearchPhaseIdle": "Nothing left to crawl",
     "developerSearchPhaseBudgetSpent": "Event budget spent",
     "developerSearchPhaseIndexFull": "Disk budget reached",
