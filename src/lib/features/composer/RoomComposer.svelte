@@ -1676,7 +1676,6 @@
     flex: 0 0 auto;
     flex-direction: column;
     min-width: 0;
-    overflow: clip;
     position: relative;
     width: 100%;
   }

@@ -155,6 +155,11 @@
     scrollbar-width: none;
   }
 
+  .formatting:first-child {
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+  }
+
   @media (pointer: coarse) {
     .formatting {
       border-bottom: 0;
