@@ -1,6 +1,6 @@
 import type { MemberView, PackImageView, RoomSummary } from '#src/generated/protocol';
 
-import { searchReactionEmoji } from '#lib/emoji/emoji.js';
+import { REACTION_EMOJI, searchReactionEmoji } from '#lib/emoji/emoji.js';
 import { t } from '#lib/i18n.js';
 
 import { adminSuggestions, type AdminCommand, type AdminScope } from './admin-commands';
@@ -91,7 +91,10 @@ function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Sug
       imageUrl: image.url,
     }));
 
-  const native = searchReactionEmoji(needle, limit - packs.length).map((emoji) => ({
+  const emojiMatches = needle
+    ? searchReactionEmoji(needle, limit - packs.length)
+    : REACTION_EMOJI.slice(0, limit - packs.length);
+  const native = emojiMatches.map((emoji) => ({
     id: `emoji:${emoji.emoji}`,
     insert: emoji.emoji,
     label: emoji.emoji,

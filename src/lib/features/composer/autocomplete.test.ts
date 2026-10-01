@@ -2,6 +2,18 @@ import { expect, test } from 'vitest';
 
 import { activeQuery, replaceQuery } from './autocomplete';
 
+test('quick reaction queries open immediately and allow a leading space', () => {
+  expect(activeQuery('+:', 2)).toEqual({ sigil: '+:', query: '', start: 0, end: 2 });
+  expect(activeQuery('  +:w', 5)).toEqual({ sigil: '+:', query: 'w', start: 2, end: 5 });
+});
+
+test('quick reactions cannot consume surrounding prose or a finished shortcode', () => {
+  for (const draft of ['hello +:wave', '+:wave more', '+:wave:', '+:wave\nhello']) {
+    expect(activeQuery(draft, draft.length)).toBeNull();
+  }
+  expect(activeQuery('+:wave more', 6)).toBeNull();
+});
+
 test('a sigil opens a query at the start of the draft or after whitespace', () => {
   expect(activeQuery('@no', 3)).toEqual({ sigil: '@', query: 'no', start: 0, end: 3 });
   expect(activeQuery('hey @no', 7)).toEqual({ sigil: '@', query: 'no', start: 4, end: 7 });

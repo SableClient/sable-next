@@ -147,6 +147,12 @@
       dueTs: number
     ) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
+    onQuickReact?: (
+      roomId: string,
+      key: string,
+      sourcePack: ImageSourcePackView | null
+    ) => Promise<void>;
+    canReact?: boolean;
     roomName?: string | null;
     readOnly?: boolean;
     encrypted?: boolean | null;
@@ -173,6 +179,8 @@
     onSendLocation,
     onSchedule,
     onTyping,
+    onQuickReact,
+    canReact = true,
     roomName = null,
     readOnly = false,
     encrypted = null,
@@ -308,7 +316,17 @@
   $effect(() => {
     if (preferences.personaPicker || preferences.personaProxying) void personas.load();
   });
-  let panelOpen = $derived(query !== null && dismissedAt !== query.start);
+  let quickReactEnabled = $derived(
+    onQuickReact !== undefined &&
+      canReact &&
+      !readOnly &&
+      staged.length === 0 &&
+      context?.kind !== 'edit' &&
+      !editingScheduled
+  );
+  let panelOpen = $derived(
+    query !== null && dismissedAt !== query.start && (query.sigil !== '+:' || quickReactEnabled)
+  );
   let admin = $derived(adminScope(roomId, roomList.rooms, core.session?.user_id));
   let adminCommands = $state.raw<readonly AdminCommand[] | null>(null);
   let botCommandsEnabled = $derived(
@@ -366,7 +384,7 @@
     core.subscribeEvents((event) => {
       if (!isPackChange(event)) return;
       loadedEmotesFor = null;
-      if (query?.sigil === ':') void loadEmotes();
+      if (query?.sigil === ':' || query?.sigil === '+:') void loadEmotes();
     })
   );
 
@@ -426,7 +444,7 @@
       if (!next) dismissedAt = null;
       query = next;
       if (next?.sigil === '@') void loadMembers();
-      if (next?.sigil === ':') void loadEmotes();
+      if (next?.sigil === ':' || next?.sigil === '+:') void loadEmotes();
       if (next?.sigil === '/' || (next?.sigil === '!' && admin === 'adminRoom')) {
         void loadBotCommands();
       }
@@ -1127,6 +1145,10 @@
   function commit(suggestion: Suggestion): void {
     const current = query;
     if (!current) return;
+    if (current.sigil === '+:') {
+      if (quickReactEnabled) void quickReact(suggestion);
+      return;
+    }
 
     const slashBot =
       current.sigil === '/'
@@ -1151,6 +1173,27 @@
     editor.replaceQuery(current, nodeFor(current.sigil, suggestion));
     if (current.sigil === '#') void attachVia(suggestion.id);
     updateTyping();
+  }
+
+  async function quickReact(suggestion: Suggestion): Promise<void> {
+    if (!onQuickReact) return;
+    const target = roomId;
+    const doc = editor.doc();
+    const image = suggestion.id.startsWith('pack:')
+      ? emotes.find((candidate) => `pack:${candidate.shortcode}` === suggestion.id)
+      : undefined;
+    editor.clear();
+    if (typingTimeout) clearTimeout(typingTimeout);
+    stopTyping();
+    error = null;
+    try {
+      await onQuickReact(target, image?.url ?? suggestion.insert, image?.source_pack ?? null);
+      if (roomId === target && editor.isEmpty()) editor.clearHistory();
+    } catch (cause) {
+      if (roomId !== target) return;
+      if (doc && editor.isEmpty()) editor.setDoc(doc);
+      error = failureText(cause);
+    }
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -1497,9 +1540,11 @@
               ? $i18n.t('composer.membersHeading', { query: query.query })
               : query.sigil === '#'
                 ? $i18n.t('composer.roomsHeading', { query: query.query })
-                : query.sigil === ':'
-                  ? $i18n.t('composer.emotesHeading', { query: query.query })
-                  : $i18n.t('composer.commandsHeading', { query: query.query })}
+                : query.sigil === '+:'
+                  ? $i18n.t('timeline.addReaction')
+                  : query.sigil === ':'
+                    ? $i18n.t('composer.emotesHeading', { query: query.query })
+                    : $i18n.t('composer.commandsHeading', { query: query.query })}
             {suggestions}
             {active}
             onSelect={commit}

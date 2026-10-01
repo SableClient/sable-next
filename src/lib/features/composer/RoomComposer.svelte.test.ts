@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 
-import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
+import type {
+  BotCommandDescriptionView,
+  ImagePackView,
+  ImageSourcePackView,
+  MemberView,
+} from '#src/generated/protocol';
 import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -141,6 +146,12 @@ interface ComposerProps {
     dueTs: number
   ) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
+  onQuickReact?: (
+    roomId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null
+  ) => Promise<void>;
+  canReact?: boolean;
   context?: ComposerContext;
   onCancelContext?: () => void;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
@@ -156,15 +167,13 @@ interface ComposerProps {
   registerRoom?: (set: (roomId: string) => void) => void;
 }
 
-function setup({
-  registerReply,
-  registerContext,
-  registerRoom,
-  ...composer
-}: ComposerProps): RenderResult<typeof Harness> {
+function setup(
+  { registerReply, registerContext, registerRoom, ...composer }: ComposerProps,
+  client: CoreClient = core()
+): RenderResult<typeof Harness> {
   return render(Harness, {
     props: {
-      core: core(),
+      core: client,
       registerReply,
       registerContext,
       registerRoom,
@@ -1600,6 +1609,94 @@ function draftText(text: string): void {
   ]);
   writeDraft('!room:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 });
 }
+
+test.each(['rich text', 'plain text'])(
+  'selecting a quick reaction clears the %s composer',
+  async (mode) => {
+    setPreference('richTextComposer', mode === 'rich text');
+    const onQuickReact = vi.fn(async () => {});
+    const onSend = vi.fn(async () => {});
+    const onTyping = vi.fn(async () => {});
+    draftText('+:joy');
+    setup({ roomId: '!room:example.org', onQuickReact, onSend, onTyping });
+
+    await screen.findByRole('option', { name: ':joy:' });
+    pressInEditor({ key: 'Enter' });
+    await vi.waitFor(() => {
+      expect(onQuickReact).toHaveBeenCalledWith('!room:example.org', '😂', null);
+    });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(editorText()).toBe('');
+    expect(onTyping).toHaveBeenLastCalledWith('!room:example.org', false);
+  }
+);
+
+test('clicking a custom quick reaction sends its media URL and source pack', async () => {
+  const onQuickReact = vi.fn(async () => {});
+  const sourcePack = {
+    room_id: '!room:example.org',
+    state_key: '',
+    shortcode: 'wave',
+    via: ['example.org'],
+  };
+  const client = core();
+  Object.assign(client.commands, {
+    imagePackListing: () =>
+      Promise.resolve({
+        packs: [{ ...packs[0], images: [{ ...packs[0].images[0], source_pack: sourcePack }] }],
+        complete: true,
+      }),
+  });
+  draftText('+:wa');
+  setup({ roomId: '!room:example.org', onQuickReact }, client);
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="option"] .emote')).not.toBeNull();
+  });
+  await press(document.querySelector('[role="option"]:has(.emote)'));
+  expect(onQuickReact).toHaveBeenCalledWith(
+    '!room:example.org',
+    'mxc://example.org/wave',
+    sourcePack
+  );
+  expect(editorText()).toBe('');
+});
+
+test('Tab selects an emoji from a bare quick reaction prefix', async () => {
+  const onQuickReact = vi.fn(async () => {});
+  draftText('+:');
+  setup({ roomId: '!room:example.org', onQuickReact });
+  await screen.findAllByRole('option');
+  pressInEditor({ key: 'Tab' });
+  await vi.waitFor(() => {
+    expect(onQuickReact).toHaveBeenCalledTimes(1);
+  });
+  expect(editorText()).toBe('');
+});
+
+test.each([
+  { name: 'reaction permissions', canReact: false, readOnly: false },
+  { name: 'a read-only room', canReact: true, readOnly: true },
+])('quick reactions are disabled by $name', async ({ canReact, readOnly }) => {
+  const onQuickReact = vi.fn(async () => {});
+  draftText('+:joy');
+  setup({ roomId: '!room:example.org', onQuickReact, canReact, readOnly });
+  await tick();
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(onQuickReact).not.toHaveBeenCalled();
+  if (!readOnly) expect(editorText()).toBe('+:joy');
+  else expect(readDraft('!room:example.org')).toBeDefined();
+});
+
+test('a failed quick reaction restores the draft', async () => {
+  const onQuickReact = vi.fn(() => Promise.reject(new Error('offline')));
+  draftText('+:joy');
+  setup({ roomId: '!room:example.org', onQuickReact });
+  await press(await screen.findByRole('option', { name: ':joy:' }));
+  await vi.waitFor(() => {
+    expect(editorText()).toBe('+:joy');
+  });
+});
 
 test('a complete bot command typed in the composer is sent as a structured command', async () => {
   const onSend = vi.fn(async () => {});

@@ -219,6 +219,7 @@
         threadRoot={rootEventId}
         {roomName}
         {readOnly}
+        {canReact}
         onDeleteEdited={conversation.redact}
         onEditLast={conversation.editLast}
         onEditNext={conversation.editNext}

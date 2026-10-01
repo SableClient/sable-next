@@ -10,6 +10,40 @@ import { composerSchema } from './schema';
 
 const { doc, paragraph, mention } = composerSchema.nodes;
 
+test('quick reactions use document offsets and cannot consume trailing text', () => {
+  expect(queryAfter([composerSchema.text('+:wa')])).toEqual({
+    sigil: '+:',
+    query: 'wa',
+    start: 1,
+    end: 5,
+  });
+  expect(queryAfter([composerSchema.text('+:wa more')], 5)).toBeNull();
+  expect(
+    queryAfter([
+      mention.create({ userId: '@one:example.org', name: 'One' }),
+      composerSchema.text('+:wa'),
+    ])
+  ).toBeNull();
+});
+
+test('quick reactions cannot replace a draft with multiple paragraphs', () => {
+  for (const paragraphs of [
+    ['hello', '+:wa'],
+    ['+:wa', 'hello'],
+  ]) {
+    const state = EditorState.create({
+      doc: doc.create(
+        null,
+        paragraphs.map((text) => paragraph.create(null, composerSchema.text(text)))
+      ),
+      plugins: [queryPlugin()],
+    });
+    const at = paragraphs[0] === '+:wa' ? 5 : state.doc.content.size - 1;
+    const moved = state.apply(state.tr.setSelection(TextSelection.create(state.doc, at)));
+    expect(queryKey.getState(moved)).toBeNull();
+  }
+});
+
 function queryAfter(content: ProseMirrorNode[], caret?: number): AutocompleteQuery | null {
   const state = EditorState.create({
     doc: doc.create(null, [paragraph.create(null, content)]),

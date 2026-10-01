@@ -21,6 +21,7 @@ function item(eventId: string, sender: string): TimelineItemView {
     event_id: eventId,
     sender,
     sender_name: 'Ana',
+    reactions: [],
     content: { kind: 'message', body: 'Hello', html: '<p>Hello</p>' },
   } as unknown as TimelineItemView;
 }
@@ -29,7 +30,8 @@ function setup(
   items: TimelineItemView[],
   userId: string,
   store: Partial<PersonaStore> = {},
-  beforeSend?: () => Promise<void>
+  beforeSend?: () => Promise<void>,
+  threadRoot: string | null = null
 ) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
@@ -37,9 +39,18 @@ function setup(
   const sendGallery = vi.fn(() => Promise.resolve());
   const sendGif = vi.fn(() => Promise.resolve());
   const sendLocation = vi.fn(() => Promise.resolve());
+  const toggleReaction = vi.fn(() => Promise.resolve());
   const core = {
     session: { user_id: userId },
-    commands: { sendMessage, editMessage, sendAttachment, sendGallery, sendGif, sendLocation },
+    commands: {
+      sendMessage,
+      editMessage,
+      sendAttachment,
+      sendGallery,
+      sendGif,
+      sendLocation,
+      toggleReaction,
+    },
   } as unknown as CoreClient;
   const personas = {
     personas: [],
@@ -57,10 +68,96 @@ function setup(
     sendGallery,
     sendGif,
     sendLocation,
+    toggleReaction,
     timeline,
-    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM, beforeSend }),
+    conversation: new Conversation({
+      core,
+      personas,
+      timeline,
+      roomId: () => ROOM,
+      beforeSend,
+      threadRoot,
+    }),
   };
 }
+
+test('quick reactions resume live before choosing the latest message', async () => {
+  const live = Promise.withResolvers<undefined>();
+  const fixture = setup(
+    [item('$old', '@ana:example.org')],
+    '@kris:example.org',
+    {},
+    () => live.promise
+  );
+  const reacting = fixture.conversation.quickReact(ROOM, '😂');
+  expect(fixture.toggleReaction).not.toHaveBeenCalled();
+  fixture.timeline.items = [
+    item('$latest', '@ana:example.org'),
+    { ...item('$state', '@ana:example.org'), content: { kind: 'state_event' } } as TimelineItemView,
+    { ...item('$pending', '@kris:example.org'), event_id: null },
+    { ...item('$redacted', '@ana:example.org'), content: { kind: 'redacted', reason: null } },
+  ];
+  live.resolve(undefined);
+  await reacting;
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+  expect(fixture.sendMessage).not.toHaveBeenCalled();
+});
+
+test('quick reactions do nothing in an empty room', async () => {
+  const fixture = setup([], '@kris:example.org');
+  await fixture.conversation.quickReact(ROOM, '😂');
+  expect(fixture.toggleReaction).not.toHaveBeenCalled();
+});
+
+test.each(['message', 'image', 'sticker', 'unable_to_decrypt'] as const)(
+  'quick reactions target the latest %s',
+  async (kind) => {
+    const latest = {
+      ...item('$latest', '@ana:example.org'),
+      content: { kind },
+    } as TimelineItemView;
+    const fixture = setup([item('$old', '@ana:example.org'), latest], '@kris:example.org');
+    await fixture.conversation.quickReact(ROOM, '😂');
+    expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+  }
+);
+
+test('quick reactions in a thread target its latest message and preserve the source pack', async () => {
+  const sourcePack = { room_id: ROOM, state_key: '', shortcode: 'wave', via: ['example.org'] };
+  const fixture = setup(
+    [item('$root', '@ana:example.org'), item('$reply', '@kris:example.org')],
+    '@kris:example.org',
+    {},
+    undefined,
+    '$root'
+  );
+  await fixture.conversation.quickReact(ROOM, 'mxc://example.org/wave', sourcePack);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(
+    ROOM,
+    '$reply',
+    'mxc://example.org/wave',
+    '$root',
+    sourcePack
+  );
+});
+
+test('toggling an existing custom quick reaction omits its source pack', async () => {
+  const key = 'mxc://example.org/wave';
+  const sourcePack = { room_id: ROOM, state_key: '', shortcode: 'wave', via: ['example.org'] };
+  const latest = {
+    ...item('$latest', '@ana:example.org'),
+    reactions: [{ key, senders: ['@kris:example.org'] }],
+  };
+  const fixture = setup([latest], '@kris:example.org');
+  await fixture.conversation.quickReact(ROOM, key, sourcePack);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', key, null, null);
+});
+
+test('reaction failures reach the composer', async () => {
+  const fixture = setup([item('$latest', '@ana:example.org')], '@kris:example.org');
+  fixture.toggleReaction.mockRejectedValueOnce(new Error('offline'));
+  await expect(fixture.conversation.quickReact(ROOM, '😂')).rejects.toThrow('offline');
+});
 
 test.each(['message', 'attachment'] as const)(
   'switches to live before sending a %s',

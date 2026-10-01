@@ -932,6 +932,7 @@
           {conversation}
           roomId={resolvedRoomId}
           onSchedule={conversation.schedule}
+          canReact={roomSession.permissions?.can_react ?? true}
           {roomName}
           readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
           encrypted={resolvedRoom?.encrypted ?? null}

@@ -14,6 +14,14 @@ function readQuery(state: EditorState): AutocompleteQuery | null {
   const text = state.doc.textBetween(start, $from.pos, '\n', '\n');
   const query = activeQuery(text, text.length);
   if (!query) return null;
+  if (
+    query.sigil === '+:' &&
+    ($from.depth !== 1 ||
+      $from.index(0) !== 0 ||
+      state.doc.textBetween(0, start + query.start, '\n', '\uFFFC').trim() !== '' ||
+      state.doc.textBetween($from.pos, state.doc.content.size, '\n', '\uFFFC').trim() !== '')
+  )
+    return null;
 
   return { ...query, start: start + query.start, end: $from.pos };
 }

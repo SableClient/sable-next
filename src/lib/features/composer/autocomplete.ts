@@ -1,4 +1,4 @@
-export type AutocompleteSigil = '@' | '#' | ':' | '/' | '!';
+export type AutocompleteSigil = '@' | '#' | ':' | '+:' | '/' | '!';
 
 export interface Suggestion {
   id: string;
@@ -34,6 +34,11 @@ const maxQueryLength = 32;
 export function activeQuery(draft: string, caret: number): AutocompleteQuery | null {
   const upToCaret = draft.slice(0, caret);
   let active: AutocompleteQuery | null = null;
+
+  const reaction = /^\s*\+:([^:\s]*)$/.exec(upToCaret);
+  if (reaction && reaction[1].length <= maxQueryLength && draft.slice(caret).trim() === '') {
+    return { sigil: '+:', query: reaction[1], start: upToCaret.indexOf('+:'), end: caret };
+  }
 
   const admin = /^\\?!([a-z]*)((?: [a-z0-9-]*)*)$/.exec(upToCaret);
   if (admin && (admin[2] === '' ? 'admin'.startsWith(admin[1]) : admin[1] === 'admin')) {
