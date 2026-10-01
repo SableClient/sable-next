@@ -7099,6 +7099,7 @@ dependencies = [
  "regex-lite",
  "reqwest",
  "ruma",
+ "rusqlite",
  "rust-stemmers",
  "rustls",
  "serde",

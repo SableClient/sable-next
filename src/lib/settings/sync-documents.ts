@@ -37,6 +37,7 @@ import type { SyncedDocument } from './account-sync.svelte.js';
 import { customThemes, replaceCustomThemes } from './custom-themes.svelte.js';
 import { applyPreferences, isExplicitPreference, preferences } from './preferences.svelte.js';
 import { applySettings, prepareSettings, SETTINGS_ACCOUNT_DATA_TYPE } from './sync.js';
+import { v1SettingsFallback, v1WorkspaceFallback } from '#lib/migrations/v1/documents.js';
 
 export const WORKSPACE_ACCOUNT_DATA_TYPE = 'moe.sable.next.workspace';
 export const DRAFTS_ACCOUNT_DATA_TYPE = 'moe.sable.next.drafts';
@@ -50,6 +51,7 @@ let excludedThemeIds: readonly string[] = [];
 
 export const settingsDocument: SyncedDocument = {
   eventType: SETTINGS_ACCOUNT_DATA_TYPE,
+  legacy: v1SettingsFallback,
 
   snapshot() {
     const prepared = prepareSettings(preferences, customThemes, isExplicitPreference);
@@ -70,6 +72,7 @@ export const settingsDocument: SyncedDocument = {
 export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
   return {
     eventType: WORKSPACE_ACCOUNT_DATA_TYPE,
+    legacy: v1WorkspaceFallback,
 
     snapshot: () => ({
       content: {

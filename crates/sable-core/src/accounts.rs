@@ -10,7 +10,7 @@ use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::session::AccountRegistry;
-use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
+use crate::session::{PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
 use crate::cosmetics;
@@ -483,20 +483,9 @@ impl Core {
         )
         .await
         .or_failed(self, "restore_build_client")?;
-        match account.session.credentials.clone() {
-            Credentials::Password(matrix) => client
-                .restore_session(matrix)
-                .await
-                .or_failed(self, "restore_session")?,
-            Credentials::OAuth { client_id, user } => client
-                .oauth()
-                .restore_session(
-                    session::oauth_session(client_id, user),
-                    matrix_sdk::store::RoomLoadSettings::default(),
-                )
-                .await
-                .or_failed(self, "restore_session_oauth")?,
-        }
+        session::restore_credentials(&client, &account.session)
+            .await
+            .or_failed(self, "restore_session")?;
         Ok(client)
     }
 
@@ -1338,6 +1327,7 @@ mod regression_tests {
             account_id,
             store_id: store_id.clone(),
             session: PersistedSession {
+                oauth_issuer: None,
                 resolved_homeserver: None,
                 homeserver: server.server().uri(),
                 credentials: Credentials::Password(

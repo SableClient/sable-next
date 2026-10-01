@@ -18,6 +18,7 @@ export interface SyncedDocument {
   enabled?: () => boolean;
   snapshot: () => SyncedSnapshot;
   adopt: (content: unknown) => boolean;
+  legacy?: { eventType: string; convert: (content: unknown) => unknown };
 }
 
 interface DocumentState {
@@ -134,6 +135,7 @@ export class AccountSync {
     const state = this.#stateFor(document.eventType);
     let content: unknown;
     let unsealed = false;
+    let migrated = false;
     try {
       if (document.sealed) {
         const sealed = await core.commands.sealedAccountData(document.eventType);
@@ -149,6 +151,12 @@ export class AccountSync {
         unsealed = sealed.state === 'plain' && sealed.can_seal && sealed.content !== null;
       } else {
         content = await core.commands.accountData(document.eventType);
+        if (content === null && document.legacy) {
+          const legacy = await core.commands.accountData(document.legacy.eventType);
+          if (generation !== this.#generation) return;
+          content = document.legacy.convert(legacy);
+          migrated = content !== null;
+        }
       }
     } catch (error) {
       if (generation !== this.#generation) return;
@@ -168,11 +176,11 @@ export class AccountSync {
 
     const next = detach(document.snapshot());
     state.pending = next;
-    state.remote = unsealed ? null : fingerprint(next.content);
+    state.remote = unsealed || migrated ? null : fingerprint(next.content);
     state.status = next.partial === true ? 'partial' : 'idle';
     this.lastSyncedAt = Date.now();
     this.#refresh();
-    if (unsealed) this.#schedule(document, state);
+    if (unsealed || migrated) this.#schedule(document, state);
   }
 
   async #upload(document: SyncedDocument, generation: number): Promise<void> {

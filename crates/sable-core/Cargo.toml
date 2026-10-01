@@ -59,6 +59,7 @@ reqwest = { version = "0.13", default-features = false, features = ["socks"] }
 matrix-sdk-common.workspace = true
 matrix-sdk = { workspace = true, features = ["bundled-sqlite", "automatic-room-key-forwarding"] }
 tempfile = "3"
+rusqlite = { version = "0.40.2", default-features = false, features = ["backup"] }
 tokio = { workspace = true }
 
 [target.'cfg(target_os = "android")'.dependencies]

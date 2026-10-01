@@ -278,6 +278,7 @@ impl Core {
             &account_id,
             &store_id,
             &PersistedSession {
+                oauth_issuer: None,
                 resolved_homeserver: Some(client.homeserver()),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::oauth(full),

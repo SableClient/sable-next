@@ -137,6 +137,7 @@ targets:
           - CFBundleURLName: sable
             CFBundleURLSchemes:
               - sable
+              - moe.sable.app
               - moe.sable.next
         {{~#each apple.plist-pairs}}
         {{this.key}}: {{this.value}}{{/each}}

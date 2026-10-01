@@ -159,6 +159,9 @@ jobs:
         if: ${{ matrix.rust-targets != '' }}
         shell: bash
         run: rustup target add ${{ matrix.rust-targets }}
+      - name: Prepare in-place v1 upgrade identity
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: node scripts/ci/prepare-v1-release.mjs
       - name: Stamp release version into tauri.conf.json
         shell: bash
         run: |
@@ -256,6 +259,9 @@ jobs:
           rust: 'true'
           rust-cache-key: tauri-ios
           install-mise-tools: 'false'
+      - name: Prepare in-place v1 upgrade identity
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: node scripts/ci/prepare-v1-release.mjs
       - name: Set up iOS project
         run: |
           brew install cocoapods
@@ -366,31 +372,37 @@ jobs:
           rust: 'true'
           rust-cache-key: tauri-linux
           install-mise-tools: 'false'
+      - name: Prepare in-place v1 upgrade identity
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: node scripts/ci/prepare-v1-release.mjs
       - name: Stamp release version into tauri.conf.json
         run: |
           args=''
           [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
           node scripts/ci/set-tauri-version.mjs "$VERSION" $args
-      # `tauri:cef build` stops at the binary; the bundler cannot carry the
-      # Chromium runtime, so cef:package assembles the packages around it.
-      - name: Build and package the CEF bundles
+      - name: Build Linux bundles
         run: |
           config_args=(--config src-tauri/tauri.ci.conf.json)
-          display_name='Sable Next'
           if [ "$IS_NIGHTLY" = 'true' ]; then
             config_args+=(--config src-tauri/tauri.nightly.conf.json)
-            display_name='Sable Next Nightly'
+            pnpm tauri:cef build "${config_args[@]}"
+            mise run cef:package "$VERSION" 'Sable Next Nightly'
+          else
+            pnpm tauri build "${config_args[@]}"
+            node scripts/ci/normalize-linux-bundles.mjs "$VERSION" "$ARCH"
           fi
-          pnpm tauri:cef build "${config_args[@]}"
           node scripts/ci/upload-sentry-symbols.mjs target/release
-          mise run cef:package "$VERSION" "$display_name"
-      - name: Check the packages carry what they should
+      - name: Check the CEF packages carry what they should
+        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
         run: |
           deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
           dpkg-deb --contents "$deb" | grep -q 'etc/apparmor.d/sable-next$'
           dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './postinst'
           dpkg-deb --ctrl-tarfile "$deb" | tar -t | grep -qx './prerm'
           dpkg-deb --contents "$deb" | grep -q 'opt/sable-next/CEF-LICENSE.txt$'
+      - name: Check stable packages replace v1
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" Package)" = sable
       - name: Sign the AppImage for the updater
         if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"

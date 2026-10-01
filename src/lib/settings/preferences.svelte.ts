@@ -7,6 +7,7 @@ import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
+import { readV1Preferences } from '#lib/migrations/v1/preferences.js';
 
 export type { BadgeNotificationMode };
 
@@ -537,7 +538,9 @@ const explicit = new SvelteSet<keyof Preferences>();
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
-  const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
+  const current = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
+  const migrated = current === null ? readV1Preferences() : null;
+  const stored = current ?? migrated;
   if (!stored) return { ...DEFAULTS };
 
   const loaded = mergeFontScale(
@@ -546,6 +549,9 @@ function load(): Preferences {
   );
   for (const key of PREFERENCE_KEYS) {
     if (key in stored || loaded[key] !== DEFAULTS[key]) explicit.add(key);
+  }
+  if (migrated !== null) {
+    writeJson(STORAGE_KEY, stored, '[sable settings] migrated preferences not persisted');
   }
   return loaded;
 }

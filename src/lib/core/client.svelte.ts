@@ -21,6 +21,7 @@ import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.j
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
+import { V1MigrationError } from '#lib/migrations/v1/migration.js';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
@@ -130,6 +131,7 @@ export class CoreClient {
   crashed = $state<string | null>(null);
   storageInterrupted = $state(false);
   restoreFailed = $state(false);
+  migrationFailed = $state(false);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -810,6 +812,7 @@ export class CoreClient {
   private async startTransport(): Promise<void> {
     const generation = ++this.generation;
     this.status = 'starting';
+    this.migrationFailed = false;
 
     try {
       const transport = this.ensureTransport();
@@ -852,6 +855,7 @@ export class CoreClient {
         if (generation !== this.generation) return;
       }
       this.restoreFailed = true;
+      this.migrationFailed = error instanceof V1MigrationError;
       this.status = 'error';
       this.cleanupTransport();
     }

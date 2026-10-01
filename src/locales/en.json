@@ -752,6 +752,7 @@
     "pettingAnimal": "Petting {{animal}}",
     "unableToStart": "Unable to restore your session.",
     "startFailed": "Check your connection and device storage, then try again.",
+    "migrationFailed": "Your v1 data could not be migrated. Your original data is still saved. Close other Sable windows before retrying.",
     "tryAgain": "Try again",
     "signInRecoveryHint": "Signing in creates a new device and keeps your saved account data."
   },

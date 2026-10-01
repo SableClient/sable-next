@@ -18,7 +18,7 @@ use std::{
 
 use crate::deep_link_delivery::Delivery;
 
-const SCHEMES: &[&str] = &["moe.sable.next:", "sable:"];
+const SCHEMES: &[&str] = &["moe.sable.app:", "moe.sable.next:", "sable:"];
 const SOCKET_NAME: &str = "moe.sable.next-deeplink.sock";
 const NEW_URL_EVENT: &str = "deep-link://new-url";
 const ACTIVATE: &str = "activate";

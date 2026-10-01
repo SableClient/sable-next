@@ -43,6 +43,7 @@ pub struct Session {
 pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedSession> {
     if let Some(full) = client.oauth().full_session() {
         return Some(PersistedSession {
+            oauth_issuer: None,
             resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::oauth(full),
@@ -53,6 +54,7 @@ pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedS
         .matrix_auth()
         .session()
         .map(|matrix| PersistedSession {
+            oauth_issuer: None,
             resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::Password(matrix),
@@ -73,6 +75,8 @@ pub enum Credentials {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PersistedSession {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_issuer: Option<Url>,
     #[serde(default)]
     pub resolved_homeserver: Option<Url>,
     pub homeserver: String,
@@ -82,6 +86,7 @@ pub struct PersistedSession {
 impl PersistedSession {
     #[must_use]
     pub fn keeping_endpoint_of(mut self, previous: &Self) -> Self {
+        self.oauth_issuer.clone_from(&previous.oauth_issuer);
         if previous.resolved_homeserver.is_some() {
             self.resolved_homeserver
                 .clone_from(&previous.resolved_homeserver);
@@ -332,6 +337,16 @@ pub(crate) async fn restore_credentials(
     client: &Client,
     persisted: &PersistedSession,
 ) -> Result<(), String> {
+    if let Some(expected) = &persisted.oauth_issuer {
+        let metadata = client
+            .oauth()
+            .server_metadata()
+            .await
+            .map_err(|error| error.to_string())?;
+        if metadata.issuer.as_str() != expected.as_str() {
+            return Err("saved OAuth issuer does not match the homeserver".to_owned());
+        }
+    }
     match persisted.credentials.clone() {
         Credentials::Password(matrix) => client
             .restore_session(matrix)

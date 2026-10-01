@@ -2,6 +2,7 @@ const DATABASE_NAME = 'sable-next-session';
 const DATABASE_VERSION = 1;
 const STORE_NAME = 'session';
 const SESSION_KEY = 'current';
+const V1_MIGRATION_KEY = 'v1-migrated';
 
 const APP_DATABASE_PREFIX = 'sable-next';
 const ACCOUNT_STORE_INFIX = '-account-';
@@ -115,6 +116,41 @@ export function saveSession(bytes: Uint8Array): Promise<void> {
 
 export function clearSession(): Promise<void> {
   return transaction('readwrite', (store) => store.delete(SESSION_KEY));
+}
+
+export async function v1MigrationComplete(): Promise<boolean> {
+  const database = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).get(V1_MIGRATION_KEY);
+    tx.oncomplete = () => {
+      resolve(request.result === true);
+    };
+    tx.onabort = tx.onerror = () => {
+      reject(tx.error ?? new Error('Could not read migration status'));
+    };
+  });
+}
+
+export function markV1MigrationComplete(): Promise<void> {
+  return transaction('readwrite', (store) => store.put(true, V1_MIGRATION_KEY));
+}
+
+export async function saveV1Session(bytes: Uint8Array): Promise<void> {
+  const database = await openDatabase();
+  const value = Uint8Array.from(bytes).buffer;
+  return new Promise((resolve, reject) => {
+    const tx = database.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(value, SESSION_KEY);
+    store.put(true, V1_MIGRATION_KEY);
+    tx.oncomplete = () => {
+      resolve();
+    };
+    tx.onabort = tx.onerror = () => {
+      reject(tx.error ?? new Error('Could not save the migrated accounts'));
+    };
+  });
 }
 
 function deleteDatabase(name: string): Promise<void> {

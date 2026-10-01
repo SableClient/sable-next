@@ -159,6 +159,7 @@ impl Core {
             &account_id,
             &account_store_id,
             &PersistedSession {
+                oauth_issuer: None,
                 resolved_homeserver: Some(endpoint),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
@@ -411,6 +412,7 @@ impl Core {
             &account_id,
             &account_store_id,
             &PersistedSession {
+                oauth_issuer: None,
                 resolved_homeserver: Some(client.homeserver()),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::oauth(full),
@@ -556,6 +558,7 @@ impl Core {
                 resolved_homeserver: Some(endpoint),
                 homeserver: homeserver.clone(),
                 credentials: Credentials::Password(matrix),
+                oauth_issuer: None,
             },
             reauth.as_ref(),
         )

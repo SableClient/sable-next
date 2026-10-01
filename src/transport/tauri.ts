@@ -5,6 +5,7 @@ import type { Command, CommandErr, CoreEvent } from '#src/generated/protocol';
 import { CoreError, type ResponseFor, type Transport } from './index';
 import { rawInvoke } from '#lib/platform/raw-invoke.js';
 import { resetWebStorage } from '#lib/platform/session-storage.js';
+import { migrateV1 } from '#lib/migrations/v1/migration.js';
 
 async function carry<T>(
   command: string,
@@ -46,6 +47,7 @@ export function createTauriTransport(): Transport {
   return {
     async send<C extends Command>(command: C) {
       await ready;
+      await migrateV1();
       try {
         return await invoke<ResponseFor<C['type']>>('submit_command', { command });
       } catch (error) {

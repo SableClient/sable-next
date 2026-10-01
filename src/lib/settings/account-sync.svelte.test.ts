@@ -74,6 +74,25 @@ afterEach(() => {
 });
 
 describe('AccountSync', () => {
+  it('converts v1 account data only when the v2 document is absent', async () => {
+    const local = { value: 'local' };
+    const document = stubDocument(local, {
+      legacy: { eventType: 'old.settings', convert: (content) => content },
+    });
+    const { core, commands } = stubCore({ 'old.settings': { v: 1, value: 'v1' } });
+    new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+    expect(local.value).toBe('v1');
+    expect(commands.setAccountData).toHaveBeenCalledWith(document.eventType, { v: 1, value: 'v1' });
+    const current = stubCore({
+      'old.settings': { v: 1, value: 'stale' },
+      [document.eventType]: { v: 1, value: 'v2' },
+    });
+    new AccountSync().start(current.core, [document]);
+    await vi.runAllTimersAsync();
+    expect(local.value).toBe('v2');
+    expect(current.commands.accountData).not.toHaveBeenCalledWith('old.settings');
+  });
   it('adopts what the account already holds', async () => {
     const local = { value: 'local' };
     const document = stubDocument(local);

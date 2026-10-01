@@ -30,6 +30,15 @@ if (!app) {
   process.exit(1);
 }
 
+const bundleIdentifier = process.env.ALTSTORE_BUNDLE_IDENTIFIER;
+if (bundleIdentifier && app.bundleIdentifier !== bundleIdentifier) {
+  source.featuredApps = source.featuredApps?.map((identifier) =>
+    identifier === app.bundleIdentifier ? bundleIdentifier : identifier
+  );
+  app.bundleIdentifier = bundleIdentifier;
+  app.versions = [];
+}
+
 // https://faq.altstore.io/developers/make-a-source#app-versions
 const normalize = (value) =>
   value
