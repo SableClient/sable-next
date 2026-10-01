@@ -7,6 +7,7 @@ use matrix_sdk::ruma::api::client::membership::joined_rooms;
 use matrix_sdk::ruma::api::client::space::get_hierarchy;
 use matrix_sdk::ruma::directory::{Filter, RoomTypeFilter};
 use matrix_sdk::ruma::events::room::join_rules::{AllowRule, JoinRule, RoomJoinRulesEventContent};
+use matrix_sdk::ruma::events::room::tombstone::RoomTombstoneEventContent;
 use matrix_sdk::ruma::events::space::child::SpaceChildEventContent;
 use matrix_sdk::ruma::{OwnedEventId, OwnedRoomId, RoomId, RoomOrAliasId, ServerName, UInt};
 use matrix_sdk::send_queue::SendHandle;
@@ -299,7 +300,25 @@ impl Core {
             })
             .collect();
 
-        Ok(view::via_servers(&ranked))
+        let mut via = view::via_servers(&ranked);
+        if let Some(event) = room
+            .get_state_event_static::<RoomTombstoneEventContent>()
+            .await
+            .or_failed(self, "room_via_servers")?
+            .and_then(|event| event.deserialize().ok())
+        {
+            let sender = match &event {
+                SyncOrStrippedState::Sync(event) => event.as_original().map(|event| &event.sender),
+                SyncOrStrippedState::Stripped(event) => Some(&event.sender),
+            };
+            if let Some(sender) = sender {
+                let server = sender.server_name().to_string();
+                if !via.contains(&server) {
+                    via.insert(0, server);
+                }
+            }
+        }
+        Ok(via)
     }
 
     async fn space_child_content(
@@ -556,5 +575,54 @@ mod tests {
     #[test]
     fn an_unknown_encryption_state_is_treated_as_encrypted() {
         assert!(maybe_encrypted(&EncryptionState::Unknown));
+    }
+
+    #[tokio::test]
+    async fn upgrade_routes_include_the_tombstone_sender() {
+        use matrix_sdk::ruma::{room_id, serde::Raw};
+        use matrix_sdk::test_utils::mocks::MatrixMockServer;
+        use matrix_sdk_test::JoinedRoomBuilder;
+        use serde_json::json;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path_regex},
+        };
+
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!old:example.org");
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_event(
+                    Raw::new(&json!({
+                        "type": "m.room.tombstone", "state_key": "", "event_id": "$upgrade",
+                        "sender": "@upgrader:[2001:db8::1]:8448", "origin_server_ts": 1,
+                        "content": {"body": "upgraded", "replacement_room": "!new:example.org"}
+                    }))
+                    .unwrap()
+                    .cast_unchecked(),
+                ),
+            )
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex("/_matrix/client/v3/rooms/.*/members"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"chunk": []})))
+            .mount(server.server())
+            .await;
+        let (core, _events) = crate::Core::new(
+            "routes",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        let via = core
+            .room_via_servers(&client.get_room(room_id).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            via.iter()
+                .filter(|server| *server == "[2001:db8::1]:8448")
+                .count(),
+            1
+        );
     }
 }
