@@ -68,6 +68,7 @@
     align-items: center;
     background: var(--bg-container);
     border-bottom: var(--border-width) solid var(--bg-container-line);
+    color: var(--bg-on-container);
     display: flex;
     justify-content: space-between;
     min-height: var(--header-height);

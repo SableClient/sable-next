@@ -297,13 +297,14 @@
 
   :global(.filter:hover:not(:disabled)) {
     background: var(--surface-var-container-hover);
-    color: var(--bg-on-container);
+    color: var(--surface-var-on-container);
   }
 
   .feed {
     background: var(--bg-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     list-style: none;
     margin: 0;
     overflow: hidden;

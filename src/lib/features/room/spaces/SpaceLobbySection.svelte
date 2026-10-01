@@ -571,6 +571,7 @@
     background: var(--bg-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     overflow: hidden;
   }
 

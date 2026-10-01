@@ -112,7 +112,7 @@
       <div class="max-selection-textual">
         <span>{$i18n.t('composer.pollMaxSelection')}</span>
         <input
-          class="max-selection-input"
+          class="form-control max-selection-input"
           min="1"
           max={answers.length}
           type="number"

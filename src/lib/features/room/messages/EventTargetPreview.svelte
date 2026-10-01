@@ -234,6 +234,7 @@
 
     align-items: start;
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     padding: var(--space-200) var(--space-300) var(--space-200)
       calc(var(--space-300) + var(--target-accent-width));
     position: relative;

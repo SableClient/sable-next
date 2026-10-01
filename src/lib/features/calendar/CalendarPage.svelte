@@ -503,6 +503,7 @@
   .calendar-event {
     background: var(--surface-container);
     border-radius: var(--radii-400);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-300);
     grid-template-columns: 8rem 1fr;

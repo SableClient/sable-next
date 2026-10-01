@@ -266,6 +266,7 @@
 
   .room:hover {
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
   }
 
   .room-text {

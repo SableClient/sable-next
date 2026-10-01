@@ -56,6 +56,7 @@
     background: var(--surface-var-container);
     border-radius: var(--radii-400);
     box-sizing: border-box;
+    color: var(--surface-var-on-container);
     container-type: size;
     overflow: hidden;
     position: relative;

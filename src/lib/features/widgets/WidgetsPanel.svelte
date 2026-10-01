@@ -198,6 +198,7 @@
   .widgets-panel {
     background: var(--surface-container);
     box-sizing: border-box;
+    color: var(--surface-on-container);
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
     height: 100%;
@@ -235,6 +236,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-pill);
+    color: var(--surface-var-on-container);
     display: flex;
     flex-shrink: 0;
     gap: var(--space-100);

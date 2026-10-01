@@ -2,6 +2,7 @@
   background: var(--bg-container);
   border-right: var(--border-width) solid var(--bg-container-line);
   box-sizing: border-box;
+  color: var(--bg-on-container);
   display: flex;
   flex: 0 0 16rem;
   flex-direction: column;

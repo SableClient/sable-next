@@ -180,7 +180,7 @@
     background: var(--surface-container);
     border: 0;
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     cursor: pointer;
     display: flex;
     height: var(--star-size);

@@ -291,6 +291,7 @@
   .similar {
     background: var(--primary-container);
     border-radius: var(--radius);
+    color: var(--primary-on-container);
     display: grid;
     gap: var(--space-200);
     padding: var(--space-300) var(--space-400);

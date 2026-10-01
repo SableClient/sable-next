@@ -46,6 +46,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-300) var(--space-200);
     grid-template-areas:
@@ -73,7 +74,7 @@
   .icon {
     align-items: center;
     align-self: start;
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     grid-area: icon;
     height: var(--control-height-medium);
@@ -82,7 +83,7 @@
   }
 
   .banner-warning .icon {
-    color: var(--warn-on-container);
+    color: var(--warn-main);
   }
 
   .icon :global(svg) {
@@ -101,7 +102,7 @@
   }
 
   .body {
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     font-size: var(--font-size-small);
     margin: var(--space-100) 0 0;
   }

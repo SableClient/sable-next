@@ -907,7 +907,7 @@
 <style>
   :global(.viewer) {
     background: var(--surface-var-container);
-    color: var(--surface-on-container);
+    color: var(--surface-var-on-container);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100dvh;
@@ -923,6 +923,9 @@
 
   .toolbar,
   .bottom-bar {
+    --ghost-hover: var(--surface-var-container-hover);
+    --ghost-active: var(--surface-var-container-active);
+
     align-items: center;
     background: var(--surface-var-container);
     display: flex;
@@ -1068,6 +1071,7 @@
 
   :global(.nav) {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -1164,7 +1168,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-100);
@@ -1173,7 +1177,7 @@
   }
 
   .error {
-    color: var(--crit-on-container);
+    color: var(--crit-main);
     display: grid;
     gap: var(--space-200);
     text-align: center;

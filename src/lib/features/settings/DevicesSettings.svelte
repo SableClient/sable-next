@@ -706,7 +706,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-small);
@@ -785,6 +785,7 @@
   .bulk-remove-form {
     background: var(--surface-container);
     border-bottom: var(--border-width) solid var(--bg-container-line);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-300);
     padding: var(--space-300) var(--space-400);
@@ -922,6 +923,7 @@
     background: var(--bg-container);
     border: var(--border-width) solid var(--warn-container-line);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     display: block;
     overflow-wrap: anywhere;
     padding: var(--space-300);

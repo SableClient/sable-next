@@ -721,7 +721,7 @@
   }
 
   .formatted-body :global(a) {
-    color: var(--primary-main);
+    color: var(--tc-link, var(--primary-main));
     text-decoration: var(--link-decoration);
   }
 
@@ -781,6 +781,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-300);
+    color: var(--surface-var-on-container);
     font-family: var(--font-family-mono);
     font-size: var(--inline-code-scale);
     padding: 0 var(--space-100);
@@ -790,6 +791,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     margin: var(--space-100) 0;
     overflow: hidden;
     position: relative;
@@ -799,6 +801,7 @@
     align-items: center;
     background: var(--surface-container);
     border-bottom: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-on-container);
     display: flex;
     gap: var(--space-200);
     min-height: var(--control-height-small);

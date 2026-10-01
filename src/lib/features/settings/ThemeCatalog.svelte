@@ -394,6 +394,7 @@
   .catalog-head {
     background: var(--surface-container);
     border-bottom: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-300);
     grid-template-columns: minmax(0, 1fr);
@@ -531,10 +532,12 @@
 
   .chip:hover {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   .chip:active {
     background: var(--surface-container-active);
+    color: var(--surface-on-container);
   }
 
   .chip:focus-visible {
@@ -646,6 +649,7 @@
     background: var(--surface-container);
     border-top: var(--border-width) solid var(--surface-container-line);
     bottom: calc(var(--catalog-inset) * -1);
+    color: var(--surface-on-container);
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-200);

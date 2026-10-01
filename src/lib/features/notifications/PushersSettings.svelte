@@ -346,6 +346,7 @@
   .pusher {
     background: var(--surface-container);
     border-radius: var(--radius);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-200);
     padding: var(--space-200) var(--space-300);

@@ -116,7 +116,10 @@
 {:else}
   <BitsSelect.Root type="single" {items} bind:value {name} {required} {disabled} {onValueChange}>
     <BitsSelect.Trigger {id} aria-label={ariaLabel} class={['form-control', 'select', className]}>
-      <BitsSelect.Value class="select-text" {placeholder} />
+      <BitsSelect.Value
+        class={['select-text', { 'select-placeholder': selectedLabel === undefined }]}
+        {placeholder}
+      />
       <CaretDownIcon class="select-caret" aria-hidden="true" />
     </BitsSelect.Trigger>
     <BitsSelect.Portal>
@@ -177,8 +180,9 @@
     width: 48px;
   }
 
-  .select-placeholder {
-    color: var(--surface-var-on-container);
+  :global(.select-placeholder) {
+    color: inherit;
+    opacity: var(--opacity-placeholder);
   }
 
   .select-sheet {

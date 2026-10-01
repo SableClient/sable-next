@@ -1681,6 +1681,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;

@@ -53,7 +53,7 @@
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius-inner);
-    color: inherit;
+    color: var(--surface-on-container);
     cursor: pointer;
     display: flex;
     gap: var(--space-300);
@@ -99,7 +99,7 @@
   }
 
   :global(.option-card-hint) {
-    color: var(--surface-var-on-container);
+    color: inherit;
     font-size: var(--font-size-small);
     line-height: var(--line-height-small);
   }

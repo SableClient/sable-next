@@ -367,6 +367,7 @@
   .pin-item {
     background: var(--bg-container);
     border-radius: var(--radius-inner);
+    color: var(--bg-on-container);
     padding: var(--space-100) var(--space-200) var(--space-100) var(--space-600);
   }
 

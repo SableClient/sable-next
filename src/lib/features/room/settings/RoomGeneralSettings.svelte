@@ -492,6 +492,7 @@
     border-color: var(--bg-container-line);
     bottom: var(--space-300);
     box-shadow: var(--shadow-e200);
+    color: var(--bg-on-container);
     position: sticky;
     z-index: 1;
   }

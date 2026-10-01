@@ -1032,6 +1032,7 @@
     align-items: center;
     background: var(--surface-container);
     box-sizing: border-box;
+    color: var(--surface-on-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;
@@ -1045,6 +1046,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
+    color: var(--bg-on-container);
     display: flex;
     flex-direction: column;
     gap: var(--space-400);

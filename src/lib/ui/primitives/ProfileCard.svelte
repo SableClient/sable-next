@@ -284,7 +284,8 @@
   .profile-card {
     /* --sec-main alone fails 4.5:1 on the light background at this text
        size, so small words get a stronger mix and it is left to icons. */
-    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
+    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--surface-on-container));
+    --profile-ink: var(--surface-on-container);
     --profile-icon: var(--sec-main);
     --profile-line: var(--surface-container-line);
     --profile-avatar-size: var(--avatar-size-large);
@@ -304,6 +305,7 @@
     background: var(--profile-card-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
+    color: var(--profile-ink);
     overflow: hidden;
     position: relative;
   }
@@ -445,6 +447,7 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     font-size: var(--font-size-label);
     line-height: var(--line-height-small);
     margin: 0;
@@ -595,7 +598,13 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius-inner);
+    color: var(--surface-var-on-container);
     overflow: clip;
+  }
+
+  .profile-card.tinted .profile-card-status,
+  .profile-card.tinted .profile-card-panel.framed {
+    color: var(--profile-ink);
   }
 
   .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel.framed {
@@ -655,10 +664,11 @@
   .profile-card.tinted :global(.formatted-body code:not(pre code)) {
     background: var(--profile-card-ground);
     border-color: var(--profile-line);
+    color: var(--profile-ink);
   }
 
   .profile-card.tinted :global(.formatted-body .code-block) {
-    color: var(--bg-on-container);
+    color: var(--surface-var-on-container);
   }
 
   /* No hairline: the framed panel above already draws one edge, and two reads as

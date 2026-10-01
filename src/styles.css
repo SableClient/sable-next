@@ -106,6 +106,15 @@ html {
   --media-on-scrim: #fff;
   --qr-dark: #000;
   --qr-light: #fff;
+  --tc-link: initial;
+  --mx-uc-1: initial;
+  --mx-uc-2: initial;
+  --mx-uc-3: initial;
+  --mx-uc-4: initial;
+  --mx-uc-5: initial;
+  --mx-uc-6: initial;
+  --mx-uc-7: initial;
+  --mx-uc-8: initial;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -323,13 +332,6 @@ html {
   --opacity-p300: 0.75;
   --opacity-placeholder: 0.5;
   --opacity-disabled: 0.38;
-  --shadow-e100: 0 1px 6px -2px var(--shadow-color);
-  --shadow-e200: 0 1px 12px -3px var(--shadow-color);
-  --shadow-e300: 0 2px 16px -4px var(--shadow-color);
-  --shadow-e400: 0 4px 26px -6px var(--shadow-color);
-  --shadow-inset: inset 0 1px 3px var(--shadow-color);
-  --shadow-float: var(--shadow-e300);
-  --shadow-dialog: var(--shadow-e400);
   --control-height-touch: 2.75rem;
   --control-height-300: 2rem;
   --control-height-400: 2.5rem;
@@ -449,6 +451,17 @@ html {
   --edge-inset-top: 0px;
   --edge-inset-bottom: 0px;
   --sheet-inset-bottom: 0px;
+}
+
+:root,
+body {
+  --shadow-e100: 0 1px 6px -2px var(--shadow-color);
+  --shadow-e200: 0 1px 12px -3px var(--shadow-color);
+  --shadow-e300: 0 2px 16px -4px var(--shadow-color);
+  --shadow-e400: 0 4px 26px -6px var(--shadow-color);
+  --shadow-inset: inset 0 1px 3px var(--shadow-color);
+  --shadow-float: var(--shadow-e300);
+  --shadow-dialog: var(--shadow-e400);
 }
 
 :root[data-tauri-os='android'] {
@@ -577,6 +590,16 @@ textarea {
   caret-color: var(--primary-main);
 }
 
+body.remote-theme {
+  --focus-ring: color-mix(in srgb, var(--primary-main) 50%, transparent);
+}
+
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] {
+  accent-color: var(--primary-main);
+}
+
 ::placeholder {
   color: inherit;
   opacity: var(--opacity-placeholder);
@@ -663,12 +686,12 @@ label[for],
 }
 
 a:not([class]) {
-  color: var(--primary-main);
+  color: var(--tc-link, var(--primary-main));
   text-underline-offset: 0.15em;
 }
 
 a:not([class]):hover {
-  color: var(--primary-main-hover);
+  color: var(--tc-link, var(--primary-main-hover));
 }
 
 @media (prefers-reduced-motion: no-preference) {

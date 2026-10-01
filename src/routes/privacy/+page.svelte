@@ -131,6 +131,7 @@
 <style>
   .privacy-page {
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;

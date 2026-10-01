@@ -296,10 +296,12 @@
 
   .navigation-panel {
     background: var(--bg-container);
+    color: var(--bg-on-container);
   }
 
   .content-panel {
     background: var(--surface-container);
+    color: var(--surface-on-container);
     flex-direction: column;
   }
 

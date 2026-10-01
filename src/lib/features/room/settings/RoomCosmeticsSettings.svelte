@@ -408,6 +408,7 @@
   .preview {
     background: var(--surface-container);
     border-radius: var(--radius);
+    color: var(--surface-on-container);
     margin-bottom: var(--space-300);
     padding: var(--space-300) var(--space-400);
   }

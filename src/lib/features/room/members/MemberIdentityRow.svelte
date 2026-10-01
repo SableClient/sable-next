@@ -152,6 +152,7 @@
 
   .member-identity-button:hover {
     background: var(--surface-container);
+    color: var(--surface-on-container);
   }
 
   .member-identity-button:focus-visible {

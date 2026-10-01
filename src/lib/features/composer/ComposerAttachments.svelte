@@ -144,6 +144,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-outer);
+    color: var(--surface-var-on-container);
     flex: none;
     height: 5.5rem;
     position: relative;

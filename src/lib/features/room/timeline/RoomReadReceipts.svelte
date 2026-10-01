@@ -77,6 +77,7 @@
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
+    color: var(--surface-on-container);
     display: flex;
     max-height: min(28rem, calc(100dvh - 2rem));
     overflow: hidden;

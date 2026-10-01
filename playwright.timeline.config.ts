@@ -26,6 +26,7 @@ export default defineConfig({
     'account-mobile.spec.ts',
     'settings-size.spec.ts',
     'theme-catalog.spec.ts',
+    'theme-variables.spec.ts',
     'avatar-frame.spec.ts',
     'settings-range.spec.ts',
     'reaction-sheet.spec.ts',

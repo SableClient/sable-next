@@ -264,6 +264,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: var(--radius);
+    color: var(--surface-on-container);
     display: flex;
     gap: var(--space-300);
     padding: var(--space-200) var(--space-300);

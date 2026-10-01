@@ -1029,7 +1029,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
-    color: inherit;
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -1044,6 +1044,7 @@
 
   .free-text:hover {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
@@ -1080,7 +1081,7 @@
   }
 
   .preview code {
-    color: var(--bg-on-container);
+    color: inherit;
     font-size: var(--font-size-subheading);
   }
 

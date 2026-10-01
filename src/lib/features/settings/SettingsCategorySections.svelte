@@ -230,6 +230,7 @@
   .settings-card {
     background: var(--bg-container);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     overflow: hidden;
   }
 

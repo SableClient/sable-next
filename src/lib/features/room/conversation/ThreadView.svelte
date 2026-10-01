@@ -296,6 +296,7 @@
     --ghost-active: var(--surface-container-active);
 
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     flex: 1;
     flex-direction: column;

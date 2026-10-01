@@ -1,6 +1,7 @@
 .form-control {
   --form-control-container: var(--bg-container);
-  --form-control-line: var(--bg-container-line);
+  --form-control-container-line: var(--bg-container-line);
+  --form-control-line: var(--form-control-container-line);
   --form-control-color: var(--bg-on-container);
   --form-control-ring: var(--border-width-400);
   --form-control-padding-block: 0;

@@ -105,6 +105,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     display: flex;
     gap: var(--space-300);
     margin-top: var(--space-200);

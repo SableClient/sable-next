@@ -55,7 +55,7 @@
   --button-container-hover: var(--surface-container-hover);
   --button-container-active: var(--surface-container-active);
   --button-line: var(--surface-container-line);
-  --button-on-container: var(--bg-on-container);
+  --button-on-container: var(--surface-on-container);
 }
 
 .btn-subtle {

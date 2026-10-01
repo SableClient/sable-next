@@ -178,6 +178,7 @@
 
     background: var(--bg-container);
     border-left: var(--border-width) solid var(--bg-container-line);
+    color: var(--bg-on-container);
     display: grid;
     flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr);
@@ -214,6 +215,7 @@
   li {
     background: var(--surface-container);
     border-radius: var(--radius-inner);
+    color: var(--surface-on-container);
     display: grid;
     min-width: 0;
     padding: var(--space-100) var(--space-300) var(--space-300);

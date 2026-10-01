@@ -375,6 +375,7 @@
     background: var(--bg-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     display: grid;
     gap: var(--space-400);
     padding: var(--space-400);
@@ -459,6 +460,7 @@
   .reason {
     background: var(--surface-container);
     border-radius: var(--radius-inner);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-100);
     margin: 0;

@@ -103,6 +103,6 @@
   }
 
   :global(.date-time-field-segment[data-segment='literal']) {
-    color: var(--surface-var-on-container);
+    color: inherit;
   }
 </style>

@@ -430,6 +430,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-pill);
+    color: var(--surface-var-on-container);
     display: inline-flex;
     font-size: var(--font-size-small);
     gap: var(--space-050);

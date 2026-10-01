@@ -1196,6 +1196,7 @@
   .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {
     background: var(--bg-container-hover);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
   }
 
   .message.collapsed {
@@ -1219,6 +1220,7 @@
   .message.pressed {
     background: var(--bg-container-active);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
   }
 
   /* Glyph sizes for emoji-only messages, deliberately off the type scale. */
@@ -1257,15 +1259,18 @@
   @keyframes jump {
     0% {
       background-color: var(--primary-container);
+      color: var(--primary-on-container);
     }
 
     16% {
       background-color: var(--primary-container-active);
+      color: var(--primary-on-container);
     }
 
     33%,
     100% {
       background-color: transparent;
+      color: inherit;
     }
   }
 
@@ -1278,11 +1283,13 @@
   @media (prefers-reduced-motion: reduce) {
     .message.highlighted {
       background-color: var(--primary-container);
+      color: var(--primary-on-container);
     }
   }
 
   :global(html[data-reduced-motion='on']) .message.highlighted {
     background-color: var(--primary-container);
+    color: var(--primary-on-container);
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
@@ -1669,6 +1676,7 @@
 
     align-items: start;
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     grid-template-columns: auto minmax(0, 1fr);
     padding: var(--space-200) var(--space-300) var(--space-200)
       calc(var(--space-300) + var(--reply-accent-width));

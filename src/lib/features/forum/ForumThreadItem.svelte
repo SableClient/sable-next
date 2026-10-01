@@ -162,6 +162,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-400);
+    color: var(--surface-var-on-container);
     display: flex;
     position: relative;
   }
@@ -173,6 +174,7 @@
   .forum-thread-card:has(.forum-thread-button:hover),
   .forum-thread-card:has(.forum-thread-meta:focus-visible) {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -185,6 +187,7 @@
 
   .forum-thread-card.pressed {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   .forum-thread-time {
@@ -193,7 +196,7 @@
   }
 
   .forum-thread-preview {
-    color: var(--bg-on-container);
+    color: inherit;
     font-weight: var(--font-weight-500);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -224,6 +227,7 @@
   .forum-thread-replies {
     background: var(--surface-container);
     border-radius: var(--radius-pill);
+    color: var(--surface-on-container);
     flex: 0 0 auto;
     padding: var(--space-050) var(--space-200);
   }

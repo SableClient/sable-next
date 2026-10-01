@@ -175,6 +175,7 @@
     background: var(--bg-container);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
+    color: var(--bg-on-container);
     padding: var(--space-200);
     width: min(18rem, calc(100vw - 2rem));
   }
