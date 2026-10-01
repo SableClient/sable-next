@@ -10,10 +10,43 @@ vi.mock('#lib/ui/media-query.svelte.js', () => ({
 }));
 
 import CallDeviceSettings from './CallDeviceSettings.svelte';
+import * as inputMeter from './input-meter';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+test.each(['closing settings', 'stopping the test'])(
+  'releases a pending microphone test after %s',
+  async (ending) => {
+    const mediaDevices = Object.assign(new EventTarget(), {
+      enumerateDevices: vi.fn(() => Promise.resolve([])),
+    });
+    vi.stubGlobal('navigator', { mediaDevices });
+    const meter = Promise.withResolvers<(() => void) | null>();
+    const start = vi.spyOn(inputMeter, 'startInputMeter').mockReturnValueOnce(meter.promise);
+    const stop = vi.fn();
+    const user = userEvent.setup();
+    const instance = render(CallDeviceSettings);
+
+    await user.click(screen.getByRole('button', { name: 'settings.callMicTest' }));
+    await waitFor(() => {
+      expect(start).toHaveBeenCalledOnce();
+    });
+    if (ending === 'closing settings') instance.unmount();
+    else await user.click(screen.getByRole('button', { name: 'settings.callMicTestStop' }));
+    meter.resolve(stop);
+    await waitFor(() => {
+      expect(stop).toHaveBeenCalledOnce();
+    });
+    if (ending !== 'closing settings') {
+      expect(screen.getByRole('button', { name: 'settings.callMicTest' })).toBeInTheDocument();
+      instance.unmount();
+    }
+    expect(start).toHaveBeenCalledOnce();
+  }
+);
 
 test.each([
   { name: 'empty', initial: [] },

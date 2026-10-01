@@ -445,6 +445,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   };
 
   let screenAudio: LocalAudioTrack | null = null;
+  let screenAudioGeneration = 0;
+  let screenAudioTask: Promise<boolean> = Promise.resolve(true);
   let hdrScreen: LocalVideoTrack | null = null;
 
   const stopHdrScreen = async (): Promise<void> => {
@@ -457,31 +459,50 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     });
   };
 
-  const stopSharingAudio = async (): Promise<void> => {
+  const stopSharingAudio = (): Promise<void> => {
+    screenAudioGeneration += 1;
     const track = screenAudio;
     screenAudio = null;
-    if (!track) return;
-    await room.localParticipant.unpublishTrack(track, true).catch(ignoreError);
-    await stopScreenAudio().catch((error: unknown) => {
-      fail('call.screen_share.audio_stop', error);
-    });
+    if (!track) return Promise.resolve();
+    track.stop();
+    const cleanup = (async () => {
+      await room.localParticipant.unpublishTrack(track, false).catch(ignoreError);
+      await stopScreenAudio().catch((error: unknown) => {
+        fail('call.screen_share.audio_stop', error);
+      });
+    })();
+    screenAudioTask = Promise.all([screenAudioTask, cleanup]).then(() => true);
+    return cleanup;
   };
 
-  const shareAudio = async (choice: ScreenAudioChoice | undefined): Promise<boolean> => {
-    if (!choice || choice.kind === 'none' || !screenAudioSupported() || screenAudio) return true;
-    try {
-      const track = new LocalAudioTrack(await captureScreenAudio(choice), undefined, false);
-      screenAudio = track;
-      await room.localParticipant.publishTrack(track, {
-        ...SCREEN_AUDIO_PUBLISH,
-        source: Track.Source.ScreenShareAudio,
-      });
-      return true;
-    } catch (error) {
-      fail('call.screen_share.audio', error);
-      await stopSharingAudio();
-      return false;
-    }
+  const shareAudio = (choice: ScreenAudioChoice | undefined): Promise<boolean> => {
+    if (!choice || choice.kind === 'none' || !screenAudioSupported() || screenAudio)
+      return Promise.resolve(true);
+    const generation = screenAudioGeneration;
+    screenAudioTask = screenAudioTask.then(async () => {
+      if (isDisposed() || generation !== screenAudioGeneration || screenAudio) return true;
+      try {
+        const captured = await captureScreenAudio(choice);
+        if (isDisposed() || generation !== screenAudioGeneration) {
+          captured.stop();
+          await stopScreenAudio();
+          return true;
+        }
+        const track = new LocalAudioTrack(captured, undefined, true);
+        screenAudio = track;
+        await room.localParticipant.publishTrack(track, {
+          ...SCREEN_AUDIO_PUBLISH,
+          source: Track.Source.ScreenShareAudio,
+        });
+        return true;
+      } catch (error) {
+        if (isDisposed() || generation !== screenAudioGeneration) return true;
+        fail('call.screen_share.audio', error);
+        await stopSharingAudio();
+        return false;
+      }
+    });
+    return screenAudioTask;
   };
 
   const publishTrack = async (stage: string, enable: () => Promise<unknown>): Promise<void> => {

@@ -267,10 +267,13 @@ fn watch_stream(
     let listener = node
         .add_listener_local()
         .info({
-            let graph = graph.clone();
+            let graph = Rc::downgrade(graph);
             let core = core.clone();
             move |info| {
                 let Some(app) = info.props().and_then(app_name) else {
+                    return;
+                };
+                let Some(graph) = graph.upgrade() else {
                     return;
                 };
                 let mut graph = graph.borrow_mut();
@@ -325,10 +328,13 @@ fn link(core: &pw::core::CoreRc, graph: &mut Graph) {
 }
 
 pub(crate) fn start(selection: Selection) -> Result<String, String> {
-    stop();
     let mut session = SESSION
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(previous) = session.take() {
+        let _ = previous.stop.send(());
+        let _ = previous.thread.join();
+    }
 
     let (stop, receiver) = pw::channel::channel();
     let (ready, answer) = mpsc::channel();
@@ -422,11 +428,10 @@ pub(crate) fn list_apps() -> Result<Vec<String>, String> {
 }
 
 pub(crate) fn stop() {
-    let session = SESSION
+    let mut session = SESSION
         .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .take();
-    if let Some(session) = session {
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(session) = session.take() {
         let _ = session.stop.send(());
         let _ = session.thread.join();
     }
@@ -434,7 +439,80 @@ pub(crate) fn stop() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Graph, Selection, Side, app_name, pw, sides};
+    use super::{
+        Graph, Selection, Side, app_name, connect, node_name, pw, roundtrip, sides, start, stop,
+    };
+    use std::cell::RefCell;
+    use std::collections::BTreeSet;
+    use std::rc::Rc;
+    use std::sync::{Arc, Barrier};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    #[ignore = "requires a running PipeWire server"]
+    fn stopping_capture_removes_its_pipewire_source() {
+        let (mainloop, _context, core, registry) = connect().unwrap();
+        let _stream = core
+            .create_object::<pw::node::Node>(
+                "adapter",
+                &pw::properties::properties! {
+                    "factory.name" => "support.null-audio-sink",
+                    "node.name" => "sable-screen-audio-test-stream",
+                    "media.class" => "Stream/Output/Audio",
+                    "audio.position" => "FL,FR",
+                },
+            )
+            .unwrap();
+        let captures = Rc::new(RefCell::new(BTreeSet::new()));
+        let _listener = registry
+            .add_listener_local()
+            .global({
+                let captures = captures.clone();
+                let name = node_name();
+                move |global| {
+                    if global.props.and_then(|props| props.get("node.name")) == Some(name.as_str())
+                    {
+                        captures.borrow_mut().insert(global.id);
+                    }
+                }
+            })
+            .global_remove({
+                let captures = captures.clone();
+                move |id| {
+                    captures.borrow_mut().remove(&id);
+                }
+            })
+            .register();
+
+        for concurrent in [1, 4, 4, 4] {
+            let barrier = Arc::new(Barrier::new(concurrent));
+            let starts: Vec<_> = (0..concurrent)
+                .map(|_| {
+                    let barrier = barrier.clone();
+                    std::thread::spawn(move || {
+                        barrier.wait();
+                        start(Selection::default()).unwrap();
+                    })
+                })
+                .collect();
+            for start in starts {
+                start.join().unwrap();
+            }
+            roundtrip(&mainloop, &core).unwrap();
+            assert!(!captures.borrow().is_empty());
+
+            stop();
+            let stopped = Instant::now();
+            while !captures.borrow().is_empty() && stopped.elapsed() < Duration::from_secs(1) {
+                roundtrip(&mainloop, &core).unwrap();
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(
+                captures.borrow().is_empty(),
+                "screen audio source survived stop"
+            );
+        }
+    }
 
     fn graph(selection: Selection) -> Graph {
         let mut graph = Graph {
