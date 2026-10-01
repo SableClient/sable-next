@@ -124,6 +124,29 @@ test('committing a mention keeps the text that came before it', () => {
   expect(serializeComposer(doc).body).toBe('hi Me');
 });
 
+test('committing a room mention replaces the whole query with spaces', () => {
+  const onQuery = vi.fn<ComposerEditorOptions['onQuery']>();
+  const editor = openWith({ onQuery });
+  editor.setText('join #Sable Dev tomorrow');
+  const target = view(editor);
+  target.dispatch(target.state.tr.setSelection(TextSelection.create(target.state.doc, 16)));
+
+  const found = onQuery.mock.lastCall?.[0];
+  expect(found).toEqual({ sigil: '#', query: 'Sable Dev', start: 6, end: 16 });
+  if (!found) throw new Error('no room query');
+  editor.replaceQuery(
+    found,
+    composerSchema.nodes.mention.create({ userId: '#dev:example.org', name: '#Sable Dev' })
+  );
+
+  const doc = editor.doc();
+  if (!doc) throw new Error('no doc');
+  const message = serializeComposer(doc);
+  expect(message.body).toBe('join #Sable Dev  tomorrow');
+  expect(message.formatted).toContain('https://matrix.to/#/#dev:example.org');
+  expect(doc.nodeAt(6)?.type.name).toBe('mention');
+});
+
 test('unlinking a mention makes its Matrix ID literal for a bot command', () => {
   const editor = open();
   editor.setDoc(

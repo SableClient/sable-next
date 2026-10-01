@@ -102,17 +102,28 @@ function emoteSuggestions(needle: string, emotes: readonly PackImageView[]): Sug
 }
 
 function roomSuggestions(needle: string, rooms: readonly RoomSummary[]): Suggestion[] {
+  const normalized = (text: string) => text.toLowerCase().replace(/\s/g, '');
+  const normalizedNeedle = normalized(needle);
+  if (!normalizedNeedle) return [];
   const seen = new Set<string>();
   return rooms
-    .map((room) => ({ room, name: room.name ?? room.canonical_alias ?? room.room_id }))
-    .filter(({ room, name }) => {
-      const alias = room.canonical_alias ?? '';
-      return name.toLowerCase().includes(needle) || alias.toLowerCase().includes(needle);
+    .map((room) => {
+      const name = room.name ?? room.canonical_alias ?? room.room_id;
+      return {
+        room,
+        name,
+        searchName: normalized(name),
+        searchAlias: normalized(room.canonical_alias ?? ''),
+      };
     })
+    .filter(
+      ({ searchName, searchAlias }) =>
+        searchName.includes(normalizedNeedle) || searchAlias.includes(normalizedNeedle)
+    )
     .sort((left, right) => {
       const byPrefix = rank(
-        left.name.toLowerCase().startsWith(needle),
-        right.name.toLowerCase().startsWith(needle)
+        left.searchName.startsWith(normalizedNeedle),
+        right.searchName.startsWith(normalizedNeedle)
       );
       return byPrefix === 0 ? left.name.localeCompare(right.name) : byPrefix;
     })

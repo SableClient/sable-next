@@ -32,9 +32,51 @@ test('a sigil glued to other text opens nothing', () => {
   expect(activeQuery('http://host', 11)).toBeNull();
 });
 
-test('the query ends at the first space, and a bare sigil opens nothing', () => {
+test('member and emoji queries end at whitespace, and bare sigils open nothing', () => {
   expect(activeQuery('@', 1)).toBeNull();
+  expect(activeQuery('#', 1)).toBeNull();
+  expect(activeQuery('# ', 2)).toBeNull();
   expect(activeQuery('@no one', 7)).toBeNull();
+  expect(activeQuery(':wave more', 10)).toBeNull();
+});
+
+test('room queries end at a line break', () => {
+  for (const draft of ['#Sable\nDev', '#Sable\rDev']) {
+    expect(activeQuery(draft, draft.length)).toBeNull();
+  }
+});
+
+test('a later sigil takes over from a room query with spaces', () => {
+  for (const [draft, sigil, query] of [
+    ['#Sable Dev :wa', ':', 'wa'],
+    ['#Sable Dev @no', '@', 'no'],
+    ['@no #Sable Dev', '#', 'Sable Dev'],
+  ] as const) {
+    expect(activeQuery(draft, draft.length)).toEqual({
+      sigil,
+      query,
+      start: draft.lastIndexOf(sigil),
+      end: draft.length,
+    });
+  }
+});
+
+test('replacing a room query consumes its spaces and preserves surrounding text', () => {
+  const draft = 'join #Sable Dev tomorrow';
+  const query = activeQuery(draft, 'join #Sable Dev'.length);
+  if (!query) throw new Error('expected a query');
+  expect(replaceQuery(draft, query, '#Development')).toBe('join #Development tomorrow');
+});
+
+test('room queries stay open through spaces', () => {
+  for (const draft of ['#Sable ', '#Sable Dev', '#Sable  Dev']) {
+    expect(activeQuery(draft, draft.length)).toEqual({
+      sigil: '#',
+      query: draft.slice(1),
+      start: 0,
+      end: draft.length,
+    });
+  }
 });
 
 test('a one-letter needle opens a member but not an emoji', () => {

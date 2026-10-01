@@ -33,6 +33,7 @@ const maxQueryLength = 32;
  */
 export function activeQuery(draft: string, caret: number): AutocompleteQuery | null {
   const upToCaret = draft.slice(0, caret);
+  let active: AutocompleteQuery | null = null;
 
   const admin = /^\\?!([a-z]*)((?: [a-z0-9-]*)*)$/.exec(upToCaret);
   if (admin && (admin[2] === '' ? 'admin'.startsWith(admin[1]) : admin[1] === 'admin')) {
@@ -51,13 +52,14 @@ export function activeQuery(draft: string, caret: number): AutocompleteQuery | n
     if (before !== '' && !/\s/.test(before)) continue;
 
     const query = upToCaret.slice(start + 1);
-    if (query.length < minQueryLength || query.length > maxQueryLength) continue;
-    if (/\s/.test(query) || (sigil !== '#' && query.includes(':'))) continue;
+    if (query.trim().length < minQueryLength || query.length > maxQueryLength) continue;
+    const whitespace = sigil === '#' ? /[\r\n]/ : /\s/;
+    if (whitespace.test(query) || (sigil !== '#' && query.includes(':'))) continue;
 
-    return { sigil, query, start, end: caret };
+    if (!active || start > active.start) active = { sigil, query, start, end: caret };
   }
 
-  return null;
+  return active;
 }
 
 export function replaceQuery(draft: string, query: AutocompleteQuery, insert: string): string {

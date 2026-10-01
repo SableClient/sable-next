@@ -11,7 +11,7 @@ function readQuery(state: EditorState): AutocompleteQuery | null {
   if (composerSchema.marks.code.isInSet(state.storedMarks ?? $from.marks())) return null;
 
   const start = $from.start();
-  const text = state.doc.textBetween(start, $from.pos, ' ', ' ');
+  const text = state.doc.textBetween(start, $from.pos, '\n', '\n');
   const query = activeQuery(text, text.length);
   if (!query) return null;
 
