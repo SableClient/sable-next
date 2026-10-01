@@ -1067,6 +1067,7 @@
           members={memberLoader.members}
           canPin={roomSession.permissions?.can_pin ?? false}
           onJump={jumpToEvent}
+          onOpenMedia={openPanelMedia}
         />
       {/snippet}
       {#snippet menu()}

@@ -19,6 +19,7 @@
     timeAction?: { label: string; run: () => void };
     onMatrixLink?: (link: MatrixLink, anchor: HTMLAnchorElement) => void;
     onJumpToEvent?: (eventId: string) => void;
+    onOpenMedia?: (eventId: string) => void;
   }
 
   let {
@@ -32,6 +33,7 @@
     timeAction,
     onMatrixLink,
     onJumpToEvent,
+    onOpenMedia,
   }: Props = $props();
 
   const eventItems = useEventItems();
@@ -55,6 +57,7 @@
           alignOwn={false}
           {onMatrixLink}
           {onJumpToEvent}
+          {onOpenMedia}
         />
       </MessageScope>
     {/key}
