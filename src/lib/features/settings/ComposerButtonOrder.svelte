@@ -14,6 +14,7 @@
     gif: 'settings.composerGifButton',
     sticker: 'settings.composerStickerButton',
     emoticon: 'settings.composerEmoteButton',
+    separator: 'settings.composerSeparator',
     persona: 'personas.picker',
     format: 'settings.composerFormatButton',
   };
@@ -22,6 +23,7 @@
     gif: 'composerGifButton',
     sticker: 'composerStickerButton',
     emoticon: 'composerEmoteButton',
+    separator: 'composerFormatButton',
     persona: 'personaPicker',
     format: 'composerFormatButton',
   } as const satisfies Record<ComposerButton, keyof typeof preferences>;

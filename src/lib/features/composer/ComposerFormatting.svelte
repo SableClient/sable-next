@@ -144,6 +144,7 @@
 
 <style>
   .formatting {
+    background: oklch(from var(--surface-var-container) calc(l - 0.025) c h);
     border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-050);

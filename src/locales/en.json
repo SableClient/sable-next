@@ -2013,6 +2013,7 @@
     "mentionInRepliesHint": "Turn off to reply silently by default. Every reply keeps its own toggle.",
     "richTextComposer": "Rich text editor",
     "richTextComposerHint": "Formats text while you type. When off, Markdown syntax remains visible until the message is sent.",
+    "composerSeparator": "Separator",
     "composerGifButton": "GIF button",
     "composerGifButtonHint": "Shows a GIF button beside the composer. It opens the picker on the GIF tab.",
     "composerStickerButton": "Sticker button",

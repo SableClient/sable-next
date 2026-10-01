@@ -39,6 +39,7 @@
     min-width: 0;
     overflow-y: auto;
     padding: var(--space-200);
+    padding-bottom: var(--space-100);
     position: relative;
   }
 

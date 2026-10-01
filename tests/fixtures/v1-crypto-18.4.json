@@ -136,11 +136,7 @@
           },
           {
             "name": "inbound_group_session_sender_key_sender_data_type_idx",
-            "keyPath": [
-              "sender_key",
-              "sender_data_type",
-              "session_id"
-            ],
+            "keyPath": ["sender_key", "sender_data_type", "session_id"],
             "unique": false,
             "multiEntry": false
           }

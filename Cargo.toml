@@ -1,6 +1,11 @@
 [workspace]
 members = ["crates/*", "src-tauri"]
-exclude = ["vendor/tauri-plugin-edge-to-edge", "vendor/matrix-sdk", "vendor/matrix-sdk-crypto", "vendor/matrix-sdk-indexeddb"]
+exclude = [
+  "vendor/tauri-plugin-edge-to-edge",
+  "vendor/matrix-sdk",
+  "vendor/matrix-sdk-crypto",
+  "vendor/matrix-sdk-indexeddb",
+]
 # sable-wasm only compiles for wasm32 - its session store holds JS functions,
 # which are not Send. Build it with `-p sable-wasm --target wasm32-unknown-unknown`.
 default-members = ["crates/sable-core", "src-tauri"]

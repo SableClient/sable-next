@@ -55,11 +55,12 @@ export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type UsernameClick = 'mention' | 'profile';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
-export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'persona' | 'format';
+export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
   'sticker',
   'emoticon',
+  'separator',
   'persona',
   'format',
 ] as const satisfies readonly ComposerButton[];

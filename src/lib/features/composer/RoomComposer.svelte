@@ -68,7 +68,6 @@
     unstageFile,
     type StagedFile,
   } from './composer-files';
-  import { isMultiline } from './composer-multiline';
   import { shouldFocusComposer } from './type-to-focus';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
@@ -254,7 +253,6 @@
   let beforeEl = $state<HTMLElement>();
   let afterEl = $state<HTMLElement>();
   let measurerEl = $state<HTMLElement>();
-  let multiline = $state(false);
   let layoutFrame: number | undefined;
   let empty = $state(true);
   let showPlaceholder = $state(true);
@@ -477,14 +475,6 @@
   function updateLayout(): void {
     const editable = editor.editable();
     if (!rowEl || !measurerEl || !editable) return;
-    multiline = isMultiline({
-      text: editor.text(),
-      row: rowEl,
-      before: beforeEl,
-      after: afterEl,
-      editable,
-      measurer: measurerEl,
-    });
   }
 
   function scheduleLayout(): void {
@@ -1388,7 +1378,6 @@
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
-          class:multiline={multiline && !recording}
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
@@ -1432,6 +1421,22 @@
                   : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
+              <div class="composer-separator"></div>
+              <ComposerBoard
+                {roomId}
+                {desktop}
+                bind:open={boardOpen}
+                bind:tab={boardTab}
+                bind:query={boardQuery}
+                onPick={pickFromBoard}
+                onPickUnicode={pickUnicodeFromBoard}
+                onPickGif={onSendGif ? pickGifFromBoard : undefined}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+                extras={{
+                  ...(showPersonaPicker && { persona: personaButton }),
+                  ...(preferences.composerFormatButton && { format: formatButton }),
+                }}
+              />
             </div>
             <input
               bind:this={fileInput}
@@ -1472,21 +1477,6 @@
               </Tooltip>
             {/snippet}
             <div class="composer-after" bind:this={afterEl}>
-              <ComposerBoard
-                {roomId}
-                {desktop}
-                bind:open={boardOpen}
-                bind:tab={boardTab}
-                bind:query={boardQuery}
-                onPick={pickFromBoard}
-                onPickUnicode={pickUnicodeFromBoard}
-                onPickGif={onSendGif ? pickGifFromBoard : undefined}
-                onBeforeOpen={!desktop ? blurEditor : undefined}
-                extras={{
-                  ...(showPersonaPicker && { persona: personaButton }),
-                  ...(preferences.composerFormatButton && { format: formatButton }),
-                }}
-              />
               <Tooltip label={sendLabel}>
                 {#snippet trigger({ props })}
                   <IconButton
@@ -1652,7 +1642,7 @@
 
   @media (width < 48rem), (pointer: coarse) {
     .composer-stack {
-      --target: var(--control-height-touch);
+      --target: var(--control-height-400);
     }
 
     .composer-stack :global(.icon-button-small) {
@@ -1686,6 +1676,7 @@
     flex: 0 0 auto;
     flex-direction: column;
     min-width: 0;
+    overflow: clip;
     position: relative;
     width: 100%;
   }
@@ -1735,20 +1726,16 @@
     align-items: center;
     display: grid;
     gap: var(--space-100);
-    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'field field'
+      'before after';
+    grid-template-columns: auto 1fr;
     padding: var(--space-100);
     width: 100%;
   }
 
   .composer-row[hidden] {
     display: none;
-  }
-
-  .composer-row.multiline {
-    grid-template-areas:
-      'before field'
-      'before after';
-    grid-template-columns: auto 1fr;
   }
 
   .composer-before,
@@ -1788,20 +1775,24 @@
   .composer-field {
     align-items: center;
     display: flex;
+    grid-area: field;
     min-width: 0;
     position: relative;
   }
 
-  .multiline .composer-before {
+  :global(.composer-separator) {
+    align-self: center;
+    border-left: var(--border-width-400) solid var(--primary-container-line, rebeccapurple);
+    height: var(--size-x200);
+    width: 1px;
+  }
+
+  .composer-before {
     align-self: end;
     grid-area: before;
   }
 
-  .multiline .composer-field {
-    grid-area: field;
-  }
-
-  .multiline .composer-after {
+  .composer-after {
     grid-area: after;
     justify-self: end;
   }
