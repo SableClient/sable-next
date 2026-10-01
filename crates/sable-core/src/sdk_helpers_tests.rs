@@ -787,6 +787,45 @@ fn remote_media_error(status: u16) -> ResponseTemplate {
 }
 
 #[tokio::test]
+async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
+    use std::io::Read;
+    let server = MatrixMockServer::new().await;
+    let client = server
+        .client_builder()
+        .server_versions(vec![MatrixVersion::V1_11])
+        .build()
+        .await;
+    let mut plaintext = std::io::Cursor::new(b"room key bundle".to_vec());
+    let mut encryptor = matrix_sdk_base::crypto::AttachmentEncryptor::new(&mut plaintext);
+    let mut ciphertext = Vec::new();
+    encryptor.read_to_end(&mut ciphertext).unwrap();
+    let keys = encryptor.finish();
+    ciphertext[0] ^= 1;
+    let file = matrix_sdk::ruma::events::room::EncryptedFile::new(
+        "mxc://example.org/corrupt".into(),
+        keys.encryption_info,
+        keys.hashes,
+    );
+    Mock::given(method("GET"))
+        .and(path(
+            "/_matrix/client/v1/media/download/example.org/corrupt",
+        ))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(ciphertext))
+        .expect(1)
+        .mount(server.server())
+        .await;
+    let core = core(&server, client).await;
+    let source = serde_json::to_string(&matrix_sdk::ruma::events::room::MediaSource::Encrypted(
+        Box::new(file),
+    ))
+    .unwrap();
+    assert!(matches!(
+        core.media_thumbnail(source, 0, 0).await,
+        Err(CommandErr::Unavailable)
+    ));
+}
+
+#[tokio::test]
 #[allow(clippy::unwrap_used)]
 async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() {
     let server = MatrixMockServer::new().await;
