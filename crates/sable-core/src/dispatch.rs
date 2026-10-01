@@ -417,13 +417,32 @@ impl Core {
                 mut content,
             } => {
                 ensure_empty_mentions(&mut content);
-                self.room(&room_id)
+                let response = self
+                    .room(&room_id)
                     .await?
                     .send_raw(&event_type, content)
                     .await
                     .or_failed(self, "send_raw_event")?;
 
-                Ok(CommandOk::SendRawEvent)
+                Ok(CommandOk::SendRawEvent {
+                    event_id: response.response.event_id,
+                })
+            }
+
+            Command::SendRedaction {
+                room_id,
+                event_id,
+                reason,
+            } => {
+                let response = self
+                    .room(&room_id)
+                    .await?
+                    .redact(&event_id, reason.as_deref(), None)
+                    .await
+                    .map_err(|error| self.homeserver_http_error("send_redaction", error))?;
+                Ok(CommandOk::SendRedaction {
+                    event_id: response.event_id,
+                })
             }
 
             Command::CalendarEntries { room_id } => Ok(CommandOk::CalendarEntries(
@@ -2178,7 +2197,8 @@ impl Core {
                 state_key,
                 content,
             } => {
-                self.room(&room_id)
+                let response = self
+                    .room(&room_id)
                     .await?
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
@@ -2191,7 +2211,9 @@ impl Core {
                     self.emit(CoreEvent::RoomCosmeticsChanged { room_id });
                 }
 
-                Ok(CommandOk::SendStateEvent)
+                Ok(CommandOk::SendStateEvent {
+                    event_id: response.event_id,
+                })
             }
 
             Command::SetRoomName { room_id, name } => {

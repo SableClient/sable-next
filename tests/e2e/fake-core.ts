@@ -1590,8 +1590,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           roomWidgets.set(command.room_id, null);
         if (command.event_type === 'moe.sable.room.abbreviations')
           abbreviations.set(command.room_id, command.content as { entries: unknown[] });
-        return { type: 'send_state_event' };
+        return { type: 'send_state_event', event_id: `$state-${crypto.randomUUID()}` };
       },
+      send_raw_event: () => ({
+        type: 'send_raw_event',
+        event_id: `$message-${crypto.randomUUID()}`,
+      }),
+      send_redaction: () => ({
+        type: 'send_redaction',
+        event_id: `$redaction-${crypto.randomUUID()}`,
+      }),
       set_space_child_order: (command) => {
         recordChildOrder(command);
         return { type: 'set_space_child_order' };

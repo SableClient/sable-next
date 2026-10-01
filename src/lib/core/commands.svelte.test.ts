@@ -2,6 +2,26 @@ import { expect, test, vi } from 'vitest';
 import type { Transport } from '#src/transport';
 import { createCommands } from './commands.svelte.js';
 
+test('returns server event IDs to send callers', async () => {
+  const send = vi.fn(() => Promise.resolve({ event_id: '$created' }));
+  const commands = createCommands(() => ({ send }) as unknown as Transport);
+  await expect(commands.sendRawEvent('!room:example.org', 'com.example.event', {})).resolves.toBe(
+    '$created'
+  );
+  await expect(
+    commands.sendStateEvent('!room:example.org', 'com.example.state', '', {})
+  ).resolves.toBe('$created');
+  await expect(commands.sendRedaction('!room:example.org', '$target', null)).resolves.toBe(
+    '$created'
+  );
+  expect(send).toHaveBeenLastCalledWith({
+    type: 'send_redaction',
+    room_id: '!room:example.org',
+    event_id: '$target',
+    reason: null,
+  });
+});
+
 test.each([false, true])('loads room packs (cachedOnly=%s)', async (cachedOnly) => {
   const send = vi.fn(() =>
     Promise.resolve({ type: 'image_packs', packs: [], complete: !cachedOnly })

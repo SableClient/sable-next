@@ -248,6 +248,13 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
     },
+    SendRedaction {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+        reason: Option<String>,
+    },
     CalendarEntries {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1425,7 +1432,14 @@ pub enum CommandOk {
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
-    SendRawEvent,
+    SendRawEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
+    SendRedaction {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     CalendarEntries(CalendarView),
     SaveCalendarEvent,
     SendSticker,
@@ -1751,7 +1765,10 @@ pub enum CommandOk {
     SetRoomTopic,
     SetRoomAvatar,
     SetRoomJoinRule,
-    SendStateEvent,
+    SendStateEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     SetUserPowerLevel,
 
     KickUser,
@@ -1808,6 +1825,7 @@ pub enum CommandErr {
     InvalidKeyExport,
     EncryptedScheduleUnsupported,
     DelayedEventsUnsupported,
+    SlidingSyncUnsupported,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -3020,15 +3038,25 @@ pub struct RoomPermissionsView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomPowerLevelsView {
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub ban: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub kick: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub redact: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub invite: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub events_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub state_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub users_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
     pub events: std::collections::BTreeMap<String, i64>,
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
     pub users: std::collections::BTreeMap<String, i64>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub notifications_room: i64,
 }
 

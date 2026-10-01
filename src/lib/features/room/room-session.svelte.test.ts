@@ -53,7 +53,7 @@ function fixture() {
     ),
     roomStateEvent: vi.fn((): Promise<unknown> => Promise.resolve(null)),
     roomStateEvents: vi.fn((): Promise<RoomStateEventView[]> => Promise.resolve([])),
-    sendStateEvent: vi.fn(async () => {}),
+    sendStateEvent: vi.fn(() => Promise.resolve('$created')),
   };
   const pins = { set: vi.fn() };
   return { commands, pins, session: new RoomSession(commands, pins) };

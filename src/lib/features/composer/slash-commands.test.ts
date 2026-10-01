@@ -34,12 +34,12 @@ function fakeCommands() {
     setDirect: vi.fn(() => Promise.resolve()),
     discardRoomKey: vi.fn(() => Promise.resolve()),
     sendLocation: vi.fn(() => Promise.resolve()),
-    sendRawEvent: vi.fn(() => Promise.resolve()),
+    sendRawEvent: vi.fn(() => Promise.resolve('$created')),
     roomStateEvent: vi.fn(() => Promise.resolve<unknown>({ membership: 'join' })),
     roomStateEvents: vi.fn(() =>
       Promise.resolve([{ state_key: '!space:example.org', content: {} }])
     ),
-    sendStateEvent: vi.fn(() => Promise.resolve()),
+    sendStateEvent: vi.fn(() => Promise.resolve('$created')),
     personas: vi.fn(() =>
       Promise.resolve({
         personas: [],
