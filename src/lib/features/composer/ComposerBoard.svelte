@@ -187,12 +187,12 @@
         {disabled}
         data-state={open && tab === id ? 'open' : 'closed'}
         aria-label={triggerLabel(id)}
-        onpointerdown={onBeforeOpen}
         onclick={() => {
           if (open && tab === id) {
             open = false;
             return;
           }
+          onBeforeOpen?.();
           tab = id;
           open = true;
         }}
