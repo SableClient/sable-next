@@ -17,6 +17,7 @@ export function shortcodeNode(
   if (image)
     return composerSchema.nodes.emoticon.create({
       url: image.url,
+      body: image.body,
       shortcode,
       sourcePack: image.source_pack,
     });

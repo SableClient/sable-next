@@ -234,15 +234,20 @@ export const composerSchema = new Schema({
       atom: true,
       group: 'inline',
       selectable: true,
-      attrs: { url: {}, shortcode: {}, sourcePack: { default: null } },
+      attrs: { url: {}, shortcode: {}, body: { default: null }, sourcePack: { default: null } },
       parseDOM: [
         {
           tag: 'img[data-mx-emoticon]',
           priority: 60,
-          getAttrs: (dom) => ({
-            url: dom.getAttribute('src') ?? '',
-            shortcode: (dom.getAttribute('alt') ?? '').replace(/^:|:$/g, ''),
-          }),
+          getAttrs: (dom) => {
+            const alt = dom.getAttribute('alt') ?? '';
+            const shortcode = (dom.getAttribute('title') ?? alt).replace(/^:|:$/g, '');
+            return {
+              url: dom.getAttribute('src') ?? '',
+              shortcode,
+              body: alt && alt !== `:${shortcode}:` ? alt : null,
+            };
+          },
         },
       ],
       toDOM: (node) => {
@@ -252,7 +257,7 @@ export const composerSchema = new Schema({
           {
             'data-mx-emoticon': '',
             src: node.attrs.url as string,
-            alt: label,
+            alt: (node.attrs.body as string | null) ?? label,
             title: label,
             height: '32',
           },

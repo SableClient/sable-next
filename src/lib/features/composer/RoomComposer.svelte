@@ -1019,6 +1019,7 @@
     editor.insert(
       composerSchema.nodes.emoticon.create({
         url: image.url,
+        body: image.body,
         shortcode: image.shortcode,
         sourcePack: image.source_pack,
       })
