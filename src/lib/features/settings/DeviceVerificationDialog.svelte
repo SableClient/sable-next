@@ -1,10 +1,12 @@
 <script lang="ts">
   import { Dialog } from 'bits-ui';
+  import { onMount } from 'svelte';
   import { uint8ArrayToBase64 } from 'uint8array-extras';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { verificationErrorMessage } from '#lib/core/verification-errors.js';
   import { i18n } from '#lib/i18n.js';
+  import { isNativeMobile } from '#lib/platform/os.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
@@ -13,7 +15,15 @@
 
   const core = useCoreClient();
   let error = $state<string | null>(null);
-  let scanning = $state(false);
+  let scanning = $state<boolean | null>(null);
+  let prefersScan = $state(isNativeMobile());
+  let processingScan = $state(false);
+  let activeFlow = $state<string | null>(null);
+  let scanMode = $derived(
+    core.verification?.state.phase === 'choose' &&
+      core.verification.state.can_scan &&
+      (scanning ?? prefersScan)
+  );
   let selfVerification = $derived(core.verification?.userId === core.session?.user_id);
 
   // This app-level component keeps verification events flowing even when no
@@ -21,7 +31,27 @@
   $effect(() => core.subscribeEvents(() => {}));
 
   $effect(() => {
-    if (core.verification?.state.phase !== 'choose') scanning = false;
+    const flow = core.verification;
+    const key = flow ? JSON.stringify([flow.userId, flow.flowId]) : null;
+    if (key === activeFlow) return;
+    activeFlow = key;
+    scanning = null;
+    processingScan = false;
+    error = null;
+  });
+
+  $effect(() => {
+    if (core.verification?.state.phase !== 'choose') processingScan = false;
+  });
+
+  onMount(() => {
+    if (prefersScan || !window.matchMedia('(pointer: coarse)').matches) return;
+    void navigator.mediaDevices?.enumerateDevices().then(
+      (devices) => {
+        prefersScan = devices.some((device) => device.kind === 'videoinput');
+      },
+      () => {}
+    );
   });
 
   async function accept(): Promise<void> {
@@ -34,16 +64,17 @@
   }
 
   async function scanned(data: Uint8Array): Promise<void> {
-    if (!core.verification) return;
-    scanning = false;
+    const flow = core.verification;
+    if (!flow || processingScan) return;
+    processingScan = true;
+    error = null;
     try {
-      await core.commands.scanVerificationQr(
-        core.verification.userId,
-        core.verification.flowId,
-        uint8ArrayToBase64(data)
-      );
+      await core.commands.scanVerificationQr(flow.userId, flow.flowId, uint8ArrayToBase64(data));
     } catch (cause) {
-      error = verificationErrorMessage(cause);
+      if (core.verification?.userId === flow.userId && core.verification.flowId === flow.flowId) {
+        processingScan = false;
+        error = verificationErrorMessage(cause);
+      }
     }
   }
 
@@ -113,17 +144,22 @@
           >{$i18n.t('settings.acceptVerification')}</Button
         >
       {/if}
+    {:else if core.verification.state.phase === 'choose' && processingScan}
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.finishing')}
+      </Dialog.Description>
+      <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'choose'}
       {@const choice = core.verification.state}
       <Dialog.Description class="verification-description">
         {$i18n.t(
-          scanning || !choice.qr
+          scanMode || !choice.qr
             ? 'settings.verificationScanTheirs'
             : 'settings.verificationShowOurs'
         )}
       </Dialog.Description>
       <div class="verification-code">
-        {#if scanning || !choice.qr}
+        {#if scanMode || !choice.qr}
           <VerificationQrScanner onScan={(data: Uint8Array) => void scanned(data)} />
         {:else}
           <VerificationQrCode code={choice.qr} label={$i18n.t('settings.verificationQrLabel')} />
@@ -131,8 +167,8 @@
       </div>
       <div class="verification-actions">
         {#if choice.can_scan && choice.qr}
-          <Button class="verification-action" onclick={() => (scanning = !scanning)}>
-            {$i18n.t(scanning ? 'settings.showOurCode' : 'settings.scanTheirCode')}
+          <Button class="verification-action" onclick={() => (scanning = !scanMode)}>
+            {$i18n.t(scanMode ? 'settings.showOurCode' : 'settings.scanTheirCode')}
           </Button>
         {/if}
         {#if choice.can_compare}
@@ -156,6 +192,11 @@
           onclick={() => void cancel(true)}>{$i18n.t('settings.verificationScannedNo')}</Button
         >
       </div>
+    {:else if core.verification.state.phase === 'reciprocated'}
+      <Dialog.Description class="verification-description">
+        {$i18n.t('settings.verificationScanSucceeded')}
+      </Dialog.Description>
+      <p class="verification-wait" role="status">{$i18n.t('settings.waiting')}</p>
     {:else if core.verification.state.phase === 'waiting'}
       <Dialog.Description class="verification-description">
         {$i18n.t('settings.startingEmojiComparison')}

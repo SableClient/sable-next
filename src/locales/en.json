@@ -1672,6 +1672,7 @@
     "verificationScannedPrompt": "Your other device scanned the code. Does it say the scan worked?",
     "verificationScannedYes": "Yes, it worked",
     "verificationScannedNo": "No",
+    "verificationScanSucceeded": "Code scanned. Confirm on your other device.",
     "invalidVerificationCode": "That isn't a verification code.",
     "verificationComplete": "Your device is verified.",
     "userVerificationComplete": "This identity is verified.",

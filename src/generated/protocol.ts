@@ -1443,6 +1443,8 @@ initiated_by_us: boolean } |
 { phase: "choose"; qr: QrCodeView | null; can_scan: boolean; can_compare: boolean } |
 /**  The other device read our code and waits for us to say it shows success. */
 { phase: "scanned" } |
+/**  QR scan succeeded; awaiting the other device's confirmation. */
+{ phase: "reciprocated" } |
 /**  `decimals` is the fallback when the other side refused emoji. */
 { phase: "compare"; emojis: EmojiView[]; decimals: [number, number, number] } |
 /**  We said they match, but the other side has not. */

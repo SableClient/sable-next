@@ -2603,6 +2603,8 @@ pub enum VerificationView {
     },
     /// The other device read our code and waits for us to say it shows success.
     Scanned,
+    /// QR scan succeeded; awaiting the other device's confirmation.
+    Reciprocated,
     /// `decimals` is the fallback when the other side refused emoji.
     Compare {
         emojis: Vec<EmojiView>,

@@ -258,7 +258,9 @@ async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
 
 #[allow(clippy::unwrap_used)]
 #[tokio::test]
-async fn a_self_verification_offers_a_qr_code_both_ways() {
+async fn a_self_verification_completes_with_a_qr_code() {
+    use base64::Engine;
+
     let server = MatrixMockServer::new().await;
     let (mut old, mut new, queue) = two_devices(&server, true).await;
     let user_id = old.client.user_id().unwrap().to_owned();
@@ -279,7 +281,7 @@ async fn a_self_verification_offers_a_qr_code_both_ways() {
     old.core
         .dispatch(Command::AcceptVerification {
             user_id: user_id.clone(),
-            flow_id,
+            flow_id: flow_id.clone(),
         })
         .await
         .unwrap();
@@ -298,5 +300,38 @@ async fn a_self_verification_offers_a_qr_code_both_ways() {
             ),
             "{state:?}"
         );
+    }
+
+    let code = old.core.qr(&user_id, &flow_id).await.unwrap();
+    new.core
+        .dispatch(Command::ScanVerificationQr {
+            user_id: user_id.clone(),
+            flow_id: flow_id.clone(),
+            data: base64::engine::general_purpose::STANDARD.encode(code.to_bytes().unwrap()),
+        })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    assert!(matches!(
+        old.last_live().unwrap().1,
+        VerificationView::Scanned
+    ));
+    assert!(matches!(
+        new.last_live().unwrap().1,
+        VerificationView::Reciprocated
+    ));
+
+    old.core
+        .dispatch(Command::ConfirmVerification { user_id, flow_id })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    for device in [&old, &new] {
+        assert!(matches!(
+            device.last_live().unwrap().1,
+            VerificationView::Done
+        ));
     }
 }
