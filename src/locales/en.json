@@ -2579,6 +2579,7 @@
     "gifUnfavorite": "Remove this GIF",
     "gifAttribution": "Results from {{provider}}",
     "previewHint": "Point at an image for its shortcode.",
+    "packMediaVisibility": "Custom emote and sticker images are not encrypted. Homeservers can see them.",
     "recent": "Recent",
     "closeBoard": "Close emotes and stickers",
     "formatting": "Formatting",

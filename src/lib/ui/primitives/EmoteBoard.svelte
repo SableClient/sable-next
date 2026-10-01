@@ -564,6 +564,9 @@
       aria-label={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
       onkeydown={submitQuery}
     />
+    {#if !gifTab && sections.length > 0}
+      <p class="pack-visibility">{$i18n.t('composer.packMediaVisibility')}</p>
+    {/if}
   </div>
 
   {#if gifs && gifTab}
@@ -827,6 +830,12 @@
     flex-direction: column;
     gap: var(--space-200);
     padding: var(--space-300) var(--space-300) 0;
+  }
+
+  .pack-visibility {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .tabs {
