@@ -49,6 +49,8 @@ declare global {
   interface Window {
     __e2eCommands: string[];
     __e2eAccounts?: SessionInfo[];
+    __e2eSwitchAccountError?: boolean;
+    __e2eSwitchAccountDelayMs?: number;
     __e2eCommandPayloads: Command[];
     __e2eProfileSaveError?: boolean;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
@@ -799,7 +801,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'list_accounts',
         accounts: signedOut ? [] : (window.__e2eAccounts ?? [session]),
       }),
-      switch_account: () => ({ type: 'switch_account', session }),
+      switch_account: () => {
+        if (window.__e2eSwitchAccountError) throw new FakeCoreError('unavailable');
+        return { type: 'switch_account', session };
+      },
       homeserver_info: () => ({
         type: 'homeserver_info',
         homeserver: 'https://example.test',
@@ -1641,6 +1646,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
     const replyDelay = (command: Command): number => {
       const type = command.type;
+      if (type === 'switch_account') return window.__e2eSwitchAccountDelayMs ?? 0;
       if (workerMode === 'forward_history' && type === 'paginate') return 0;
       if (
         type === 'subscribe_timeline' &&

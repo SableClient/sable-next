@@ -28,6 +28,7 @@
   import type { OptionCard } from '#lib/ui/primitives/option-card.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
+  import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
   import { LEGACY_STATUS_FIELDS, STATUS_FIELD, legacyDeletes } from '#lib/profile/fields.js';
   import { SignOutGuard } from './sign-out-guard.svelte.js';
@@ -41,7 +42,7 @@
   const core = useCoreClient();
   const accountProfiles = new AccountDirectory(core);
   const signOut = new SignOutGuard(core);
-  let switching = $state(false);
+  let switchingAccountId = $state<string | null>(null);
   let accountSwitching = $state(true);
   let removing = $state(false);
   let removeAccountId = $state<string | null>(null);
@@ -127,17 +128,17 @@
   }
 
   async function switchAccount(accountId: string): Promise<void> {
-    if (accountId === activeAccountId || switching) return;
+    if (accountId === activeAccountId || switchingAccountId !== null) return;
 
-    switching = true;
+    switchingAccountId = accountId;
     error = null;
     try {
       await core.switchAccount(accountId);
       await goto(resolve('/(app)/rooms'));
     } catch {
-      error = $i18n.t('nav.switchAccount');
+      error = $i18n.t('nav.switchAccountFailed');
     } finally {
-      switching = false;
+      switchingAccountId = null;
     }
   }
 
@@ -234,8 +235,9 @@
             variant="ghost"
             class="account-select"
             aria-pressed={active}
+            aria-busy={switchingAccountId === account.account_id}
             aria-label={`${$i18n.t(active ? 'nav.activeAccount' : account.needs_reauth ? 'nav.accountSignInAgain' : 'nav.switchAccount')}: ${identity.displayName}, ${account.user_id}`}
-            disabled={active || switching}
+            disabled={active || switchingAccountId !== null}
             onclick={() =>
               void (account.needs_reauth
                 ? reauthenticate(account.homeserver, account.account_id)
@@ -257,8 +259,15 @@
                   {#if account.needs_reauth}
                     <StatusBadge variant="neutral" label={$i18n.t('nav.accountSignedOut')} />
                   {/if}
+                  {#if switchingAccountId === account.account_id}<Spinner small />{/if}
                   <span
-                    >{$i18n.t(account.needs_reauth ? 'nav.accountSignInAgain' : 'nav.switch')}</span
+                    >{$i18n.t(
+                      switchingAccountId === account.account_id
+                        ? 'nav.switchingAccount'
+                        : account.needs_reauth
+                          ? 'nav.accountSignInAgain'
+                          : 'nav.switch'
+                    )}</span
                   >
                 </span>
               {/if}
@@ -566,6 +575,10 @@
     opacity: 1;
   }
 
+  .account-row :global(.account-select[aria-busy='true']) {
+    opacity: 1;
+  }
+
   .account-copy {
     display: grid;
     gap: var(--space-100);
@@ -578,8 +591,7 @@
     font-weight: var(--font-weight-medium);
   }
 
-  .account-id,
-  .account-status {
+  .account-id {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     line-height: var(--line-height-body);
@@ -587,9 +599,13 @@
 
   .account-status {
     align-items: center;
+    color: var(--primary-on-container);
     display: flex;
     flex-wrap: wrap;
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-medium);
     gap: var(--space-200);
+    line-height: var(--line-height-body);
   }
 
   @container (width < 20rem) {

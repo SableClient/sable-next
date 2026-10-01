@@ -229,6 +229,51 @@ test('mobile: account options do not select the account', async ({ page, install
   await expect(confirmation).not.toBeVisible();
 });
 
+test('mobile: switching shows progress and a failed switch can be retried', async ({
+  page,
+  installRoomCore,
+}) => {
+  await page.addInitScript(() => {
+    window.__e2eSwitchAccountDelayMs = 1500;
+    window.__e2eSwitchAccountError = true;
+  });
+  await installRoomCore('ready');
+  await page.goto('/profile');
+  const account = page.getByRole('button', {
+    name: 'Switch account: Second, @second:example.test',
+    exact: true,
+  });
+  await expect(account).toBeVisible();
+  const dismiss = page.getByRole('button', { name: 'Close', exact: true });
+  if (await dismiss.isVisible()) await dismiss.click();
+  await account.click();
+  await expect(account).toHaveAttribute('aria-busy', 'true');
+  await expect(account.getByText('Switching…', { exact: true })).toBeVisible();
+  await expect(account).toBeDisabled();
+  await expect(page.locator('.account-list').getByRole('alert')).toHaveText(
+    'Could not switch accounts. Try again.'
+  );
+  await expect(account).toBeEnabled();
+  await expect(account).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('button', { pressed: true })).toHaveAccessibleName(
+    'Active account: E2E User, @e2e:example.test'
+  );
+  await page.evaluate(() => {
+    window.__e2eSwitchAccountError = false;
+    window.__e2eSwitchAccountDelayMs = 0;
+  });
+  await account.click();
+  await expect(page).toHaveURL(/\/rooms$/);
+  expect(
+    await page.evaluate(() =>
+      window.__e2eCommandPayloads.filter((c) => c.type === 'switch_account')
+    )
+  ).toEqual([
+    { type: 'switch_account', account_id: 'second-account' },
+    { type: 'switch_account', account_id: 'second-account' },
+  ]);
+});
+
 test('mobile: custom profile colors keep a distinct avatar and touch controls are at least 48px', async ({
   page,
   installRoomCore,

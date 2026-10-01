@@ -22,6 +22,8 @@
     "account": "Account",
     "accounts": "Accounts",
     "switchAccount": "Switch account",
+    "switchingAccount": "Switching…",
+    "switchAccountFailed": "Could not switch accounts. Try again.",
     "switch": "Switch",
     "addAccount": "Add account",
     "manageAccounts": "Manage accounts",
