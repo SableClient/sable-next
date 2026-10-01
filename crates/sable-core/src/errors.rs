@@ -127,6 +127,8 @@ impl Core {
         error: matrix_sdk::HttpError,
     ) -> CommandErr {
         match error.client_api_error_kind() {
+            Some(ErrorKind::UserLocked) => CommandErr::AccountLocked,
+            Some(ErrorKind::UserSuspended) => CommandErr::AccountSuspended,
             Some(ErrorKind::LimitExceeded(limit)) => {
                 tracing::warn!(
                     context,

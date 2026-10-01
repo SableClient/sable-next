@@ -125,6 +125,10 @@ function discardAccountStore(transport: Transport, accountId: string): void {
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
+  private lockedAccountId = $state<string | null>(null);
+  accountLocked = $derived(
+    this.lockedAccountId !== null && this.lockedAccountId === this.session?.account_id
+  );
   reauthenticationAccountId = $state<string | null>(null);
   accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
@@ -946,6 +950,10 @@ export class CoreClient {
   private readonly handleEvent = (event: CoreEvent): void => {
     recordDebugLog('debug', event.type === 'sync_status' ? 'sync' : 'general', 'core', event.type);
     switch (event.type) {
+      case 'account_lock_changed':
+        if (event.locked) this.lockedAccountId = event.account_id;
+        else if (this.lockedAccountId === event.account_id) this.lockedAccountId = null;
+        return;
       case 'sync_status':
         this.applySyncStatus(event);
         return;

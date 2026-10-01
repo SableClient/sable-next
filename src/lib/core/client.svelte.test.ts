@@ -31,6 +31,41 @@ const otherSession: SessionInfo = {
   device_id: 'PHONE',
 };
 
+test('a locked account keeps its session and clears the lock after switching accounts', async () => {
+  const fake = fakeTransport({
+    restore: { session },
+    list_accounts: { accounts: [session, otherSession] },
+    switch_account: { session: otherSession },
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: true });
+  expect(core.accountLocked).toBe(true);
+  expect(core.session).toEqual(session);
+  fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: false });
+  expect(core.accountLocked).toBe(false);
+  fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: true });
+  await core.switchAccount(otherSession.account_id);
+  expect(core.accountLocked).toBe(false);
+  expect(core.session).toEqual(otherSession);
+  expect(fake.deleteAccountStore).not.toHaveBeenCalled();
+});
+
+test('keeps a lock event that arrives before the restored session response', async () => {
+  const fake = fakeTransport({ restore: { session }, list_accounts: { accounts: [session] } });
+  const send = fake.send.getMockImplementation();
+  if (!send) throw new Error('missing transport handler');
+  fake.send.mockImplementation((command) => {
+    if (command.type === 'restore')
+      fake.emit({ type: 'account_lock_changed', account_id: session.account_id, locked: true });
+    return send(command);
+  });
+  const core = createCoreClient(() => fake.transport);
+  await core.start();
+  expect(core.accountLocked).toBe(true);
+  expect(core.session).toEqual(session);
+});
+
 function fakeTransport(responses: Record<string, unknown> = {}) {
   const listeners = new Set<(event: CoreEvent) => void>();
   const storageFailureListeners = new Set<() => void>();

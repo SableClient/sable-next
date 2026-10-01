@@ -1826,6 +1826,8 @@ pub enum CommandErr {
     EncryptedScheduleUnsupported,
     DelayedEventsUnsupported,
     SlidingSyncUnsupported,
+    AccountLocked,
+    AccountSuspended,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -1946,6 +1948,10 @@ pub enum RegistrationResultView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
+    AccountLockChanged {
+        account_id: String,
+        locked: bool,
+    },
     SyncStatus(SyncStatus),
     SessionEnded {
         reason: String,

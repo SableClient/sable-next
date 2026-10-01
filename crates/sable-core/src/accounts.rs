@@ -722,6 +722,14 @@ impl Core {
         self.watch_incoming_verifications(&client);
 
         self.session_generation.store(generation, Ordering::SeqCst);
+        self.account_locked.store(false, Ordering::SeqCst);
+        self.emit_if_current(
+            generation,
+            CoreEvent::AccountLockChanged {
+                account_id: account_id.clone(),
+                locked: false,
+            },
+        );
         let verification_client = client.clone();
         let verification_user_id = client.user_id().map(ToOwned::to_owned);
         let mut session = self.session.write().await;
@@ -780,6 +788,9 @@ impl Core {
             spawn(async move {
                 let mut failures = 0u32;
                 while let Some(state) = states.next().await {
+                    if core.account_locked.load(Ordering::SeqCst) {
+                        continue;
+                    }
                     let stalled = matches!(
                         state,
                         SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
@@ -809,7 +820,9 @@ impl Core {
                         }
                         failures = failures.saturating_add(1);
                         crate::watchers::retry_backoff(failures).await;
-                        restarted.start().await;
+                        if !core.account_locked.load(Ordering::SeqCst) {
+                            restarted.start().await;
+                        }
                     } else {
                         failures = 0;
                     }
@@ -940,6 +953,10 @@ impl Core {
         change: &matrix_sdk::SessionChange,
         generation: u64,
     ) -> bool {
+        if matches!(change, matrix_sdk::SessionChange::AccountLocked) {
+            self.lock_account(generation);
+            return false;
+        }
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
             if self.session_generation.load(Ordering::SeqCst) == generation {
                 self.emit(CoreEvent::SessionTokensRefreshed);

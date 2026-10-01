@@ -748,6 +748,8 @@
     "close": "Close"
   },
   "app": {
+    "accountLocked": "Account locked",
+    "accountLockedDetail": "Your homeserver has locked this account. Sable will keep this session and check for access to return.",
     "starting": "Starting Sable…",
     "pettingAnimal": "Petting {{animal}}",
     "unableToStart": "Unable to restore your session.",
@@ -2479,6 +2481,8 @@
     "passwordUnsupported": "This homeserver does not support password sign-in.",
     "temporarilyUnavailable": "The homeserver is temporarily unavailable. Try again.",
     "slidingSyncUnsupported": "This homeserver does not support Sliding Sync.",
+    "accountLocked": "Your homeserver has locked this account.",
+    "accountSuspended": "Your homeserver has suspended this account.",
     "invalidCredentials": "Invalid username or password.",
     "registrationUnavailable": "This provider is not accepting new accounts right now.",
     "usernameTaken": "That username is already in use.",

@@ -65,6 +65,10 @@ export function authenticationError(value: unknown): string {
   switch (value.detail.code) {
     case 'denied':
       return t('errors.invalidCredentials');
+    case 'account_locked':
+      return t('errors.accountLocked');
+    case 'account_suspended':
+      return t('errors.accountSuspended');
     case 'rate_limited':
       return value.detail.retry_after_ms
         ? t('errors.tooManyAttemptsSeconds', {

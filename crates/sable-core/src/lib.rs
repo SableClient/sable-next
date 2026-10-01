@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod account_data;
+mod account_lock;
 mod accounts;
 mod attachments;
 mod auth;
@@ -95,6 +96,7 @@ pub struct Core {
     next_timeline_access: AtomicU64,
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
+    account_locked: AtomicBool,
     session_attempt_generation: AtomicU64,
     session_activation_lock: Mutex<()>,
     session_store_lock: Mutex<()>,
@@ -235,6 +237,7 @@ impl Core {
             sessions,
             events,
             notification_content: AtomicBool::new(false),
+            account_locked: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
             notification_sounds: AtomicBool::new(true),
             notify_once: AtomicBool::new(true),

@@ -15,6 +15,7 @@
   import TitleBar from '#lib/ui/TitleBar.svelte';
   import CoreHealthBanner from '#lib/ui/CoreHealthBanner.svelte';
   import SessionRestoreError from '#lib/ui/SessionRestoreError.svelte';
+  import AccountLocked from '#lib/ui/AccountLocked.svelte';
   import DesktopUpdateBanner from '#lib/ui/DesktopUpdateBanner.svelte';
   import WebUpdateBanner from '#lib/ui/WebUpdateBanner.svelte';
   import RecoveryIncompleteBanner from '#lib/ui/RecoveryIncompleteBanner.svelte';
@@ -161,15 +162,19 @@
     <TitleBar kind={titlebar} />
   {/if}
   <CoreHealthBanner />
-  <BannerDock>
-    <UnverifiedDeviceBanner />
-    <RecoveryIncompleteBanner />
-    <DesktopUpdateBanner />
-    <WebUpdateBanner />
-  </BannerDock>
+  {#if !core.accountLocked}
+    <BannerDock>
+      <UnverifiedDeviceBanner />
+      <RecoveryIncompleteBanner />
+      <DesktopUpdateBanner />
+      <WebUpdateBanner />
+    </BannerDock>
+  {/if}
 
   <TooltipProvider>
-    {#if core.restoreFailed}
+    {#if core.accountLocked}
+      <AccountLocked />
+    {:else if core.restoreFailed}
       <SessionRestoreError />
     {:else}
       {@render children()}
