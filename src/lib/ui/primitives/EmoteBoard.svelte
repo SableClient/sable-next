@@ -738,7 +738,7 @@
             <ClockCounterClockwiseIcon />
           </button>
         {/if}
-        {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
+        {#each ['account', 'global', 'room', 'space'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
             <hr class="rail-divider" />

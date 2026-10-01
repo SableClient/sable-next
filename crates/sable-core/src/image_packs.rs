@@ -390,7 +390,6 @@ impl Core {
                 None,
             ));
         }
-        packs.extend(own_room.packs);
 
         let subscribed_rooms: Vec<(matrix_sdk::Room, Vec<String>)> = subscribed
             .and_then(|raw| raw.deserialize_as_unchecked::<EmoteRooms>().ok())
@@ -400,9 +399,6 @@ impl Core {
                     .into_iter()
                     .filter_map(|(subscribed_id, state_keys)| {
                         let parsed = RoomId::parse(&subscribed_id).ok()?;
-                        if parsed == room_id {
-                            return None;
-                        }
                         let subscribed_room = client.get_room(&parsed)?;
                         Some((subscribed_room, state_keys.into_keys().collect()))
                     })
@@ -443,6 +439,7 @@ impl Core {
                 }
             }
         }
+        packs.extend(own_room.packs);
         complete &= space_complete;
         packs.extend(space);
 
@@ -915,6 +912,75 @@ mod server_tests {
             .images
             .into_keys()
             .collect()
+    }
+
+    #[tokio::test]
+    async fn globally_selected_packs_precede_room_packs_including_the_current_room() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!room:example.org");
+        let global_id = room_id!("!global:example.org");
+        let pack = |key: &str| {
+            Raw::new(&json!({
+                "type": "m.room.image_pack", "state_key": key, "event_id": format!("${key}"),
+                "sender": "@alice:example.org", "origin_server_ts": 1,
+                "content": {"images": {"wave": {"url": format!("mxc://example.org/{key}")}}}
+            }))
+            .unwrap()
+            .cast_unchecked()
+        };
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id).add_state_bulk([pack("local"), pack("selected")]),
+            )
+            .await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(global_id).add_state_event(pack("global")),
+            )
+            .await;
+        server
+            .mock_sync()
+            .ok_and_run(&client, |sync| {
+                sync.add_custom_global_account_data(json!({
+                    "type": "m.image_pack.rooms", "content": {"rooms": {
+                        room_id: {"selected": {}}, global_id: {"global": {}}
+                    }}
+                }));
+            })
+            .await;
+        let core = core();
+        let service = Arc::new(
+            matrix_sdk_ui::sync_service::SyncService::builder(client.clone())
+                .build()
+                .await
+                .unwrap(),
+        );
+        *core.session.write().await = Some(crate::session::Session {
+            account_id: "a1".to_owned(),
+            client,
+            sync_service: service,
+            homeserver: server.server().uri(),
+            oauth: false,
+        });
+        let crate::protocol::CommandOk::ImagePacks { packs, .. } =
+            core.image_packs(room_id.to_owned(), true).await.unwrap()
+        else {
+            panic!("unexpected response")
+        };
+        assert_eq!(
+            packs
+                .iter()
+                .map(|pack| (pack.id.as_str(), pack.origin))
+                .collect::<Vec<_>>(),
+            [
+                ("global", ImagePackOriginView::Global),
+                ("selected", ImagePackOriginView::Global),
+                ("local", ImagePackOriginView::Room)
+            ]
+        );
     }
 
     #[tokio::test]
