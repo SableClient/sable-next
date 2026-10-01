@@ -184,6 +184,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     const ELEMENT_SESSION: &str = "gM8i47Xhu0q52xLfgUXzanCMpLinoyVyH7R58cBuVBU";
 
     #[tokio::test]
+    #[allow(clippy::too_many_lines)]
     async fn restored_backups_respect_the_account_preference() {
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         use wiremock::{
@@ -426,14 +427,18 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
                     .as_object_mut()
                     .unwrap()
                     .extend(fields.as_object().unwrap().clone());
-                assert!(matches!(
-                    serde_json::from_value::<ExportedRoomKey>(invalid.clone()),
-                    Err(_)
-                ));
-                assert!(matches!(
-                    serde_json::from_value::<BackedUpRoomKey>(invalid.clone()),
-                    Err(_)
-                ));
+                assert!(
+                    serde_json::from_value::<ExportedRoomKey>(invalid.clone())
+                        .err()
+                        .unwrap()
+                        .is_data()
+                );
+                assert!(
+                    serde_json::from_value::<BackedUpRoomKey>(invalid.clone())
+                        .err()
+                        .unwrap()
+                        .is_data()
+                );
                 serde_json::from_value::<RoomKeyContent>(invalid).unwrap_err();
             }
         }
@@ -563,6 +568,84 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             download.state,
             crate::protocol::KeyBackupDownloadState::Complete
         );
+    }
+
+    #[tokio::test]
+    async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owner() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (core, client, _store) = core_for(&server).await;
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 1).await;
+        unlock_backup(&client, &key).await;
+        let room = room_id!("!restore:example.org");
+        let exported = exported(&outbound_session(room)).await;
+        let encrypted = key
+            .megolm_v1_public_key()
+            .encrypt(InboundGroupSession::from_export(&exported).unwrap())
+            .await
+            .unwrap();
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                "/_matrix/client/(r0|v3)/room_keys/keys$",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_delay(Duration::from_millis(100))
+                    .set_body_json(json!({
+                        "rooms": {room: {"sessions": {exported.session_id: encrypted}}}
+                    })),
+            )
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let restore_core = core.clone();
+        let restore = tokio::spawn(async move {
+            restore_core
+                .download_key_backup("old-account".to_owned())
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if server
+                    .server()
+                    .received_requests()
+                    .await
+                    .unwrap()
+                    .iter()
+                    .any(|request| request.url.path().ends_with("/room_keys/keys"))
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let other = server.client_builder().build().await;
+        core.session_generation
+            .store(2, std::sync::atomic::Ordering::SeqCst);
+        *core.session.write().await = Some(Session {
+            account_id: "other".to_owned(),
+            homeserver: server.server().uri(),
+            oauth: false,
+            sync_service: Arc::new(SyncService::builder(other.clone()).build().await.unwrap()),
+            client: other.clone(),
+        });
+        let CommandOk::DownloadKeyBackup { download } = restore.await.unwrap().unwrap() else {
+            panic!("unexpected response")
+        };
+        assert_eq!(download.account_id, "a1");
+        assert_eq!(
+            download.state,
+            crate::protocol::KeyBackupDownloadState::Complete
+        );
+        assert_eq!(session_ids(&client).await.len(), 1);
+        assert!(session_ids(&other).await.is_empty());
+        let CommandOk::KeyBackupStatus { status } = core.key_backup_status().await.unwrap() else {
+            panic!("unexpected response")
+        };
+        assert!(status.download.is_none());
     }
 
     #[tokio::test]
