@@ -39,6 +39,17 @@ test('plain text sends no formatted body', () => {
   });
 });
 
+test('a code block containing backticks keeps a valid body fence', () => {
+  const source = docOf(
+    para(composerSchema.text('code')),
+    composerSchema.nodes.code_block.create({ language: 'yaml' }, composerSchema.text('a\n```\nb'))
+  );
+  const message = serializeComposer(source);
+
+  expect(message.body).toBe('code\n\n````yaml\na\n```\nb\n````');
+  expect(serializePlain(textDoc(message.body)).formatted).toBe(message.formatted);
+});
+
 test('unformatted text keeps its markdown characters unescaped', () => {
   for (const typed of ['test \\', 'C:\\path', '5 * 3', '# hi', 'a_b_c']) {
     const message = serializeComposer(docOf(para(composerSchema.text(typed))));

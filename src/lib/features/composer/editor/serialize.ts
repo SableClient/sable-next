@@ -76,10 +76,7 @@ const markdown = new MarkdownSerializer(
       }
     },
     code_block: (state, node) => {
-      state.write(`\`\`\`${node.attrs.language as string}\n`);
-      state.text(node.textContent, false);
-      state.ensureNewLine();
-      state.write('```');
+      state.text(docToMarkdown(composerSchema.topNodeType.create(null, node)), false);
       state.closeBlock(node);
     },
     horizontal_rule: (state, node) => {
@@ -581,6 +578,19 @@ export function plainTextOf(doc: ProseMirrorNode): string {
   return doc.textBetween(0, doc.content.size, '\n\n', (node) =>
     node.type === hardBreak ? '\n' : atomText(node)
   );
+}
+
+export function commandTextOf(doc: ProseMirrorNode): string {
+  const fenceCodeBlocks = (node: ProseMirrorNode): ProseMirrorNode => {
+    if (node.type === composerSchema.nodes.code_block) {
+      const fenced = docToMarkdown(composerSchema.topNodeType.create(null, node));
+      return node.copy(Fragment.from(composerSchema.text(fenced)));
+    }
+    if (node.isLeaf) return node;
+    return node.copy(Fragment.fromArray(node.children.map(fenceCodeBlocks)));
+  };
+
+  return plainTextOf(fenceCodeBlocks(doc));
 }
 
 function markdownSourceOf(doc: ProseMirrorNode): { source: string; atoms: ProseMirrorNode[] } {

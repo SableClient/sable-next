@@ -76,7 +76,12 @@
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
-  import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
+  import {
+    commandTextOf,
+    plainEditSource,
+    serializeComposer,
+    serializePlain,
+  } from './editor/serialize';
   import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import {
@@ -692,10 +697,11 @@
     invocation: BotCommandInvocation
   ): Promise<boolean> {
     if (!onSendBotCommand) return false;
+    const targetRoomId = roomId;
     inFlight += 1;
     error = null;
     try {
-      await queue.enqueue(() => onSendBotCommand(roomId, command.sender, body, invocation));
+      await queue.enqueue(() => onSendBotCommand(targetRoomId, command.sender, body, invocation));
       if (activeBotCommand?.command === command) closeBotCommand();
       return true;
     } catch (cause) {
@@ -709,13 +715,18 @@
 
   function commandLine(): string | null {
     if (!onSendBotCommand || staged.length > 0 || context?.kind === 'edit') return null;
-    const text = editor.text().trim();
+    const doc = editor.doc();
+    if (!doc) return null;
+    const text = commandTextOf(doc).trim();
     if (admin && text.startsWith(adminPrefix)) return text;
     return parseSlash(text).kind === 'unknown' ? text : null;
   }
 
   async function typedBotCommand(text: string): Promise<boolean> {
+    const doc = editor.doc();
+    const targetRoomId = roomId;
     await Promise.all([loadBotCommands(), admin ? loadAdminCatalog() : undefined]);
+    if (roomId !== targetRoomId || (doc && !editor.doc()?.eq(doc))) return true;
     const typed = text.startsWith('/')
       ? { line: text.slice(1), prefix: '/', commands: slashBotCommands }
       : { line: text.slice(adminPrefix.length), prefix: adminPrefix, commands: serverCommands };
@@ -731,7 +742,7 @@
           arguments: {},
         }))
       ) {
-        editor.setText(text);
+        if (doc && roomId === targetRoomId && editor.isEmpty()) editor.setDoc(doc);
       }
       return true;
     }
@@ -739,7 +750,7 @@
     const result = buildInvocation(matched.command, drafts, typed.prefix);
     if (result.ok) {
       if (!(await sendBotCommand(matched.command, result.body, result.invocation))) {
-        editor.setText(text);
+        if (doc && roomId === targetRoomId && editor.isEmpty()) editor.setDoc(doc);
       }
     } else {
       openBotCommand(matched.command, matched.args, typed.prefix);
