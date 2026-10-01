@@ -189,7 +189,7 @@ impl Core {
         }
     }
 
-    pub(crate) async fn align_encrypted_defaults(&self) {
+    pub(crate) async fn align_notification_rules(&self) {
         let Ok(rules) = self.push_rules().await else {
             return;
         };
@@ -198,7 +198,7 @@ impl Core {
             return;
         }
         if let Err(error) = rules.apply(writes).await {
-            tracing::warn!("could not align the encrypted notification defaults: {error}");
+            tracing::warn!("could not align notification rules: {error}");
         }
     }
 

@@ -9,9 +9,10 @@ use matrix_sdk::ruma::api::client::push::{
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::events::push_rules::PushRulesEvent;
 use matrix_sdk::ruma::push::{
-    Action, AnyPushRuleRef, HighlightTweakValue, NewConditionalPushRule, NewPatternedPushRule,
-    NewPushRule, NewSimplePushRule, PredefinedContentRuleId, PredefinedOverrideRuleId,
-    PredefinedUnderrideRuleId, PushCondition, RuleKind, Ruleset, SoundTweakValue, Tweak,
+    Action, AnyPushRuleRef, EventMatchConditionData, HighlightTweakValue, NewConditionalPushRule,
+    NewPatternedPushRule, NewPushRule, NewSimplePushRule, PredefinedContentRuleId,
+    PredefinedOverrideRuleId, PredefinedUnderrideRuleId, PushCondition, RuleKind, Ruleset,
+    SoundTweakValue, Tweak,
 };
 use matrix_sdk::ruma::{OwnedRoomId, RoomId};
 use tokio::sync::{RwLock, broadcast};
@@ -491,7 +492,7 @@ pub fn plan_default_mode(
 
 #[must_use]
 pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
-    [true, false]
+    let mut writes: Vec<_> = [true, false]
         .into_iter()
         .filter_map(|direct| {
             let plain = rules.get(RuleKind::Underride, message_rule(direct).as_str())?;
@@ -514,7 +515,30 @@ pub fn plan_alignment(rules: &Ruleset) -> Vec<RuleWrite> {
             })
         })
         .flatten()
-        .collect()
+        .collect();
+
+    let rule_id = "moe.sable.suppress_bridge_status";
+    let existing = rules.override_.iter().find(|rule| rule.rule_id == rule_id);
+    if existing.is_none() {
+        writes.push(RuleWrite::Put(NewPushRule::Override(
+            NewConditionalPushRule::new(
+                rule_id.to_owned(),
+                vec![PushCondition::EventMatch(EventMatchConditionData::new(
+                    "type".to_owned(),
+                    "com.beeper.message_send_status".to_owned(),
+                ))],
+                vec![],
+            ),
+        )));
+    }
+    if existing.is_some_and(|rule| !rule.enabled) {
+        writes.push(RuleWrite::Enabled {
+            kind: RuleKind::Override,
+            rule_id: rule_id.to_owned(),
+            enabled: true,
+        });
+    }
+    writes
 }
 
 const ENCRYPTED_EVENT_RULES: [&str; 2] = [
@@ -960,7 +984,8 @@ mod tests {
 
     #[test]
     fn a_default_left_notifying_for_encrypted_rooms_is_aligned() {
-        let mut rules = Ruleset::server_default(me());
+        let defaults = Ruleset::server_default(me());
+        let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
         assert!(plan_alignment(&rules).is_empty());
 
         rules
@@ -988,6 +1013,29 @@ mod tests {
             ]
         );
         let aligned = applied(rules.clone(), plan_alignment(&rules));
+        assert!(plan_alignment(&aligned).is_empty());
+    }
+
+    #[test]
+    fn bridge_status_rule_is_enabled_without_rewriting() {
+        let defaults = Ruleset::server_default(me());
+        let mut rules = applied(defaults.clone(), plan_alignment(&defaults));
+        assert!(plan_alignment(&rules).is_empty());
+
+        rules
+            .set_enabled(
+                RuleKind::Override,
+                "moe.sable.suppress_bridge_status",
+                false,
+            )
+            .unwrap();
+        let aligned = applied(rules.clone(), plan_alignment(&rules));
+        assert!(
+            aligned
+                .get(RuleKind::Override, "moe.sable.suppress_bridge_status")
+                .unwrap()
+                .enabled()
+        );
         assert!(plan_alignment(&aligned).is_empty());
     }
 

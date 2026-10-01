@@ -800,7 +800,7 @@ impl Core {
                     if running {
                         core.reconcile_memberships().await;
                         core.fill_own_members().await;
-                        core.align_encrypted_defaults().await;
+                        core.align_notification_rules().await;
                     }
 
                     if stalled {
