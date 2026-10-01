@@ -928,8 +928,8 @@
     display: flex;
     justify-content: space-between;
     min-width: 0;
-    padding: calc(var(--space-200) + var(--safe-top)) max(var(--space-300), var(--safe-left))
-      var(--space-200);
+    padding: calc(var(--space-200) + var(--safe-area-inset-top))
+      max(var(--space-300), var(--safe-left)) var(--space-200);
     position: relative;
     z-index: 1;
   }
@@ -1194,8 +1194,8 @@
     }
 
     .toolbar {
-      padding: calc(var(--space-300) + var(--safe-top)) max(var(--space-400), var(--safe-left))
-        var(--space-300);
+      padding: calc(var(--space-300) + var(--safe-area-inset-top))
+        max(var(--space-400), var(--safe-left)) var(--space-300);
     }
 
     .bottom-bar {

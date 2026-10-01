@@ -44,6 +44,59 @@ function undecodablePicture() {
 }
 
 for (const mobile of [false, true]) {
+  test(`viewer toolbar respects titlebar and safe-area offsets${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', picture(800, 600));
+    await timeline.container.getByRole('button', { name: 'Open shot.png' }).click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    await expect(viewer.locator('.stage img')).toBeVisible(MEDIA_LOADED);
+
+    for (const decorations of [null, 'desktop', 'mac']) {
+      for (const safeTop of [0, 24]) {
+        await page.evaluate(
+          ({ decorations, safeTop }) => {
+            const root = document.documentElement;
+            if (decorations === null) delete root.dataset.clientDecorations;
+            else root.dataset.clientDecorations = decorations;
+            root.style.setProperty('--safe-area-inset-top', `${safeTop}px`);
+          },
+          { decorations, safeTop }
+        );
+
+        const layout = await viewer.evaluate((element) => {
+          const toolbar = element.querySelector('header');
+          if (!toolbar) throw new Error('viewer toolbar missing');
+          const rect = element.getBoundingClientRect();
+          const toolbarStyle = getComputedStyle(toolbar);
+          const rootStyle = getComputedStyle(document.documentElement);
+          return {
+            top: rect.top,
+            bottom: rect.bottom,
+            paddingTop: Number.parseFloat(toolbarStyle.paddingTop),
+            paddingBottom: Number.parseFloat(toolbarStyle.paddingBottom),
+            fontSize: Number.parseFloat(rootStyle.fontSize),
+            viewportHeight: window.innerHeight,
+          };
+        });
+
+        expect(layout.top).toBe(decorations === null ? 0 : 2 * layout.fontSize);
+        expect(layout.bottom).toBe(layout.viewportHeight);
+        expect(layout.paddingTop).toBe(layout.paddingBottom + safeTop);
+      }
+    }
+  });
+
   test(`viewer backdrop clicks${mobile ? ' on mobile' : ''}`, async ({
     page,
     app,
