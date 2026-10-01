@@ -186,6 +186,11 @@ export function createCommands(transport: () => Transport) {
     roomId: string,
     cachedOnly = false
   ): Promise<{ packs: ImagePackView[]; complete: boolean }> {
+    if (roomId === '') {
+      if (cachedOnly) return { packs: [], complete: false };
+      const response = await transport().send({ type: 'all_image_packs' });
+      return { packs: response.packs, complete: false };
+    }
     const response = await transport().send({
       type: 'image_packs',
       room_id: roomId,
