@@ -466,22 +466,11 @@
   let voiceView = $derived(isVoiceRoom && (!voiceChat.open || desktop));
   let voiceChatBeside = $derived(isVoiceRoom && voiceChat.open && desktop);
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
-  let typingLabel = $derived.by(() => {
-    if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
-    const names = typingUserIds.slice(0, 3).map(memberDisplayName);
-    if (names.some((name) => name === null)) return $i18n.t('timeline.unknownTyping');
-    if (names.length === 1) return $i18n.t('timeline.oneTyping', { name: names[0] });
-    if (names.length === 2)
-      return $i18n.t('timeline.twoTyping', { name1: names[0], name2: names[1] });
-    if (names.length === 3 && typingUserIds.length === 3) {
-      return $i18n.t('timeline.threeTyping', { name1: names[0], name2: names[1], name3: names[2] });
-    }
-    return $i18n.t('timeline.manyTyping', {
-      name1: names[0],
-      name2: names[1],
-      count: typingUserIds.length - 2,
-    });
-  });
+  let typingUsers = $derived(
+    preferences.hideTypingIndicators
+      ? []
+      : typingUserIds.map((userId) => ({ userId, name: memberDisplayName(userId) }))
+  );
 
   $effect(() => {
     void resolvedRoomId;
@@ -932,7 +921,7 @@
       encrypted={resolvedRoom?.encrypted ?? null}
       currentUserId={core.session?.user_id ?? null}
       scrollLocked={memberProfile.open || receiptsOpen}
-      {typingLabel}
+      {typingUsers}
       footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
       bind:nearLatest={timelineAtBottom}
       bind:followingLive={timelineFollowingLive}

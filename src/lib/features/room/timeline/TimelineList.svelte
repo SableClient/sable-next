@@ -38,7 +38,7 @@
   import TimelineReadReceipt from './TimelineReadReceipt.svelte';
   import TimelineAnnouncements from './TimelineAnnouncements.svelte';
   import TimelineSkeleton from './TimelineSkeleton.svelte';
-  import TypingIndicator from './TypingIndicator.svelte';
+  import TypingIndicator, { type TypingUser } from './TypingIndicator.svelte';
   import type { MatrixLink } from '#lib/rooms/matrix-link.js';
   import { groupMemberEvents } from '../members/member-groups';
   import { TimelineEventIndex } from './timeline-event-index';
@@ -112,7 +112,7 @@
     scrollLocked?: boolean;
     nearLatest?: boolean;
     followingLive?: boolean;
-    typingLabel?: string | null;
+    typingUsers?: readonly TypingUser[];
     footTrailing?: Snippet;
     footTrailingVisible?: boolean;
     timelineStart?: Snippet;
@@ -164,7 +164,7 @@
     nearLatest = $bindable(true),
     /* eslint-disable-next-line no-useless-assignment */
     followingLive = $bindable(false),
-    typingLabel = null,
+    typingUsers = [],
     footTrailing,
     footTrailingVisible = false,
     timelineStart,
@@ -1088,9 +1088,9 @@
     </IconButton>
   {/if}
 
-  {#if typingLabel || footTrailingVisible}
+  {#if typingUsers.length > 0 || footTrailingVisible}
     <div class="timeline-foot">
-      <TypingIndicator label={typingLabel} />
+      <TypingIndicator users={typingUsers} onProfile={onSenderProfile} />
       {#if footTrailing && footTrailingVisible}
         <div class="foot-trailing">{@render footTrailing()}</div>
       {/if}
