@@ -176,11 +176,11 @@ export class AccountSync {
 
     const next = detach(document.snapshot());
     state.pending = next;
-    state.remote = unsealed || migrated ? null : fingerprint(next.content);
+    state.remote = unsealed || migrated ? null : fingerprint(content ?? next.content);
     state.status = next.partial === true ? 'partial' : 'idle';
     this.lastSyncedAt = Date.now();
     this.#refresh();
-    if (unsealed || migrated) this.#schedule(document, state);
+    this.#schedule(document, state);
   }
 
   async #upload(document: SyncedDocument, generation: number): Promise<void> {
