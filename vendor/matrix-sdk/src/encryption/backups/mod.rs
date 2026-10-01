@@ -949,6 +949,10 @@ impl Backups {
         &self,
         maybe_recovery_key: &str,
     ) -> Result<bool, EnableBackupError> {
+        if self.client.encryption().recovery().are_backups_marked_as_disabled().await? {
+            return Ok(false);
+        }
+
         let _guard = self.client.locks().backup_modify_lock.lock().await;
 
         // Create a future here which allows us to catch any failure that might
@@ -1096,6 +1100,10 @@ impl Backups {
     /// `io.element.msc4385.secret.push` to-device messages the [`OlmMachine`]
     /// has received and stored in the secret inbox.
     async fn maybe_resume_from_secret_inbox(&self, olm_machine: &OlmMachine) -> Result<(), Error> {
+        if self.client.encryption().recovery().are_backups_marked_as_disabled().await? {
+            return Ok(());
+        }
+
         let secrets = olm_machine.store().get_secrets_from_inbox(&SecretName::RecoveryKey).await?;
 
         for secret in secrets {
@@ -1120,6 +1128,10 @@ impl Backups {
 
     /// Check and re-enable a backup if we have a backup recovery key locally.
     pub(super) async fn maybe_resume_backups(&self) -> Result<(), Error> {
+        if self.client.encryption().recovery().are_backups_marked_as_disabled().await? {
+            return Ok(());
+        }
+
         let olm_machine = self.client.olm_machine().await;
         let olm_machine = olm_machine.as_ref().ok_or(Error::NoOlmMachine)?;
 

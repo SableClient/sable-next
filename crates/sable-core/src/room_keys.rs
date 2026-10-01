@@ -183,6 +183,114 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
 
     const ELEMENT_SESSION: &str = "gM8i47Xhu0q52xLfgUXzanCMpLinoyVyH7R58cBuVBU";
 
+    #[tokio::test]
+    async fn restored_backups_respect_the_account_preference() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path_regex},
+        };
+
+        for (status, preference, enabled) in [
+            (200, json!({"enabled": false}), false),
+            (200, json!({"enabled": true}), true),
+            (200, json!({}), true),
+            (
+                404,
+                json!({"errcode": "M_NOT_FOUND", "error": "No preference"}),
+                true,
+            ),
+            (
+                500,
+                json!({"errcode": "M_UNKNOWN", "error": "Unavailable"}),
+                false,
+            ),
+        ] {
+            let server = MatrixMockServer::new().await;
+            Mock::given(method("GET"))
+                .and(path_regex("/account_data/m.key_backup$"))
+                .respond_with(ResponseTemplate::new(status).set_body_json(preference))
+                .mount(server.server())
+                .await;
+            Mock::given(method("GET"))
+                .and(path_regex(
+                    "/account_data/m.org.matrix.custom.backup_disabled$",
+                ))
+                .respond_with(
+                    ResponseTemplate::new(404)
+                        .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "No preference"})),
+                )
+                .mount(server.server())
+                .await;
+            let key = BackupDecryptionKey::new();
+            backup_metadata(&server, &key, 0).await;
+            let store = tempfile::tempdir().unwrap();
+            let client = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder
+                        .sqlite_store(store.path(), None)
+                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
+                })
+                .build()
+                .await;
+            client
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            client
+                .olm_machine_for_testing()
+                .await
+                .as_ref()
+                .unwrap()
+                .backup_machine()
+                .save_decryption_key(Some(key.clone()), Some("1".to_owned()))
+                .await
+                .unwrap();
+            client.pause().await.unwrap();
+            drop(client);
+            let restored = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder
+                        .sqlite_store(store.path(), None)
+                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
+                })
+                .build()
+                .await;
+            restored
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            assert_eq!(
+                restored.encryption().backups().are_enabled().await,
+                enabled,
+                "preference status {status}"
+            );
+            let keys = restored
+                .olm_machine_for_testing()
+                .await
+                .as_ref()
+                .unwrap()
+                .store()
+                .load_backup_keys()
+                .await
+                .unwrap();
+            assert_eq!(keys.decryption_key.unwrap().to_base64(), key.to_base64());
+            assert_eq!(keys.backup_version.as_deref(), Some("1"));
+            let requests = server.server().received_requests().await.unwrap();
+            assert!(
+                requests
+                    .iter()
+                    .any(|request| request.url.path().ends_with("/account_data/m.key_backup"))
+            );
+            if !enabled {
+                assert!(!requests.iter().any(|request| request.method == "PUT"
+                    && request.url.path().contains("/room_keys/keys")));
+            }
+        }
+    }
+
     async fn core_for(server: &MatrixMockServer) -> (Arc<Core>, Client, TempDir) {
         let client = server.client_builder().build().await;
         client.event_cache().subscribe().unwrap();
