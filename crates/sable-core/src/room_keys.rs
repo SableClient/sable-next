@@ -363,6 +363,92 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         .await
     }
 
+    #[tokio::test]
+    async fn history_keys_use_the_stable_wire_field_and_accept_legacy_aliases() {
+        use matrix_sdk_base::crypto::{
+            olm::BackedUpRoomKey, types::events::room_key::RoomKeyContent,
+        };
+        let session = outbound_session(room_id!("!history:example.org"));
+        let exported = serde_json::to_value(exported(&session).await).unwrap();
+        let room_key = json!({
+            "algorithm": "m.megolm.v1.aes-sha2", "room_id": session.0.room_id(),
+            "session_id": session.0.session_id(), "session_key": session.0.session_key().await.to_base64()
+        });
+        for field in [
+            "shared_history",
+            "m.shared_history",
+            "org.matrix.msc3061.shared_history",
+        ] {
+            let mut key = exported.clone();
+            key.as_object_mut().unwrap().remove("shared_history");
+            key[field] = json!(true);
+            assert!(
+                serde_json::from_value::<BackedUpRoomKey>(key.clone())
+                    .unwrap()
+                    .shared_history
+            );
+            let key: ExportedRoomKey = serde_json::from_value(key).unwrap();
+            assert!(key.shared_history);
+            assert!(
+                InboundGroupSession::from_export(&key)
+                    .unwrap()
+                    .export()
+                    .await
+                    .shared_history
+            );
+            let wire = serde_json::to_value(&key).unwrap();
+            assert_eq!(wire["shared_history"], true);
+            assert!(wire.get("m.shared_history").is_none());
+            let backup: BackedUpRoomKey = key.into();
+            let backup = serde_json::to_value(backup).unwrap();
+            assert_eq!(backup["shared_history"], true);
+            assert!(backup.get("m.shared_history").is_none());
+            assert!(
+                serde_json::from_value::<BackedUpRoomKey>(backup)
+                    .unwrap()
+                    .shared_history
+            );
+            let mut content = room_key.clone();
+            content[field] = json!(true);
+            let content: RoomKeyContent = serde_json::from_value(content).unwrap();
+            let wire = serde_json::to_value(content).unwrap();
+            assert_eq!(wire["shared_history"], true);
+            assert!(wire.get("m.shared_history").is_none());
+        }
+        for mut wire in [exported.clone(), room_key.clone()] {
+            wire.as_object_mut().unwrap().remove("shared_history");
+            for fields in [
+                json!({"shared_history": "true"}),
+                json!({"shared_history": true, "m.shared_history": false}),
+            ] {
+                let mut invalid = wire.clone();
+                invalid
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(fields.as_object().unwrap().clone());
+                assert!(matches!(
+                    serde_json::from_value::<ExportedRoomKey>(invalid.clone()),
+                    Err(_)
+                ));
+                assert!(matches!(
+                    serde_json::from_value::<BackedUpRoomKey>(invalid.clone()),
+                    Err(_)
+                ));
+                serde_json::from_value::<RoomKeyContent>(invalid).unwrap_err();
+            }
+        }
+        assert!(
+            !serde_json::from_value::<ExportedRoomKey>(exported)
+                .unwrap()
+                .shared_history
+        );
+        let RoomKeyContent::MegolmV1AesSha2(content) = serde_json::from_value(room_key).unwrap()
+        else {
+            panic!("wrong algorithm")
+        };
+        assert!(!content.shared_history);
+    }
+
     async fn backup_metadata(
         server: &MatrixMockServer,
         key: &matrix_sdk_base::crypto::store::types::BackupDecryptionKey,

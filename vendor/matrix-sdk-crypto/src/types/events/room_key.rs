@@ -127,7 +127,7 @@ pub struct MegolmV1AesSha2Content {
     /// [MSC3061].
     ///
     /// [MSC3061]: https://github.com/matrix-org/matrix-spec-proposals/pull/3061
-    #[serde(default, rename = "m.shared_history", alias = "org.matrix.msc3061.shared_history")]
+    #[serde(default, rename = "shared_history", alias = "m.shared_history", alias = "org.matrix.msc3061.shared_history")]
     pub shared_history: bool,
     /// Any other, custom and non-specced fields of the content.
     #[serde(flatten)]
@@ -247,7 +247,7 @@ pub(super) mod tests {
                 "m.custom": "something custom",
                 "algorithm": "m.megolm.v1.aes-sha2",
                 "room_id": "!Cuyf34gef24t:localhost",
-                if stable { "m.shared_history" } else { "org.matrix.msc3061.shared_history" }: false,
+                if stable { "shared_history" } else { "org.matrix.msc3061.shared_history" }: false,
                 "session_id": "ZFD6+OmV7fVCsJ7Gap8UnORH8EnmiAkes8FAvQuCw/I",
                 "session_key": "AgAAAADNp1EbxXYOGmJtyX4AkD1bvJvAUyPkbIaKxtnGKjv\
                                 SQ3E/4mnuqdM4vsmNzpO1EeWzz1rDkUpYhYE9kP7sJhgLXi\

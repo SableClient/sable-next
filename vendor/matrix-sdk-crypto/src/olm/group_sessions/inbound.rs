@@ -1230,7 +1230,7 @@ mod tests {
 
     fn key_json(stable: bool) -> serde_json::Value {
         let shared_history =
-            if stable { "m.shared_history" } else { "org.matrix.msc3061.shared_history" };
+            if stable { "shared_history" } else { "org.matrix.msc3061.shared_history" };
 
         json!({
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -1311,7 +1311,7 @@ mod tests {
 
     fn exported_key_json(stable: bool) -> serde_json::Value {
         let shared_history =
-            if stable { "m.shared_history" } else { "org.matrix.msc3061.shared_history" };
+            if stable { "shared_history" } else { "org.matrix.msc3061.shared_history" };
 
         json!({
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -1381,7 +1381,7 @@ mod tests {
 
     fn backed_up_room_key(stable: bool) -> serde_json::Value {
         let shared_history =
-            if stable { "m.shared_history" } else { "org.matrix.msc3061.shared_history" };
+            if stable { "shared_history" } else { "org.matrix.msc3061.shared_history" };
 
         json!({
                 "algorithm": "m.megolm.v1.aes-sha2",
