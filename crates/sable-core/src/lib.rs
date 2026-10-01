@@ -41,6 +41,7 @@ mod scheduled;
 mod sealed_account_data;
 pub mod search;
 pub mod session;
+mod space_parents;
 pub mod spaces;
 pub mod store;
 mod store_disposal;

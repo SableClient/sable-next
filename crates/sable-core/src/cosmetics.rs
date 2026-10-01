@@ -208,50 +208,25 @@ impl CosmeticsCache {
     }
 }
 
-#[derive(Deserialize)]
-struct SpaceParent {
-    state_key: String,
-    #[serde(default)]
-    content: SpaceParentContent,
-}
-
-#[derive(Deserialize, Default)]
-struct SpaceParentContent {
-    #[serde(default)]
-    canonical: bool,
-    #[serde(default)]
-    via: Vec<String>,
-}
-
 pub(crate) async fn space_parents(room: &matrix_sdk::Room) -> Vec<(OwnedRoomId, Vec<String>)> {
-    let Ok(events) = room.get_state_events(StateEventType::SpaceParent).await else {
-        return Vec::new();
-    };
-    let mut parents: Vec<SpaceParent> = events
+    let events = room
+        .get_state_events(StateEventType::SpaceParent)
+        .await
+        .unwrap_or_default();
+    let claims = events
         .iter()
         .filter_map(|event| {
-            let json = match event {
+            let raw = match event {
                 RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
                 RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
             };
-            serde_json::from_str::<SpaceParent>(json.get()).ok()
+            serde_json::from_str::<crate::space_parents::ParentClaim>(raw.get()).ok()
         })
-        .filter(|parent| !parent.content.via.is_empty())
-        .collect();
-    parents.sort_by(|left, right| {
-        right
-            .content
-            .canonical
-            .cmp(&left.content.canonical)
-            .then_with(|| left.state_key.cmp(&right.state_key))
-    });
-    parents
+        .collect::<Vec<_>>();
+    crate::space_parents::validate(&room.client(), room.room_id(), &claims, true)
+        .await
         .into_iter()
-        .filter_map(|parent| {
-            RoomId::parse(&parent.state_key)
-                .ok()
-                .map(|room_id| (room_id, parent.content.via))
-        })
+        .filter_map(|parent| parent.room_id().map(|id| (id, parent.content.via)))
         .collect()
 }
 
@@ -567,6 +542,35 @@ mod tests {
         client
     }
 
+    async fn reciprocal(
+        server: &MatrixMockServer,
+        client: &matrix_sdk::Client,
+        parent: &RoomId,
+        child: &RoomId,
+    ) {
+        server
+            .sync_room(
+                client,
+                JoinedRoomBuilder::new(parent).add_state_bulk([
+                    Raw::new(&state(
+                        "m.room.create",
+                        "",
+                        &json!({"type": "m.space", "creator": ALICE, "room_version": "10"}),
+                    ))
+                    .unwrap()
+                    .cast_unchecked(),
+                    Raw::new(&state(
+                        "m.space.child",
+                        child.as_str(),
+                        &json!({"via": ["example.org"]}),
+                    ))
+                    .unwrap()
+                    .cast_unchecked(),
+                ]),
+            )
+            .await;
+    }
+
     async fn serve_state(server: &MatrixMockServer, room_id: &RoomId, events: Value, times: u64) {
         Mock::given(method("GET"))
             .and(path(format!("/_matrix/client/v3/rooms/{room_id}/state")))
@@ -623,6 +627,27 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let joined_space = room_id!("!joined:example.org");
         let client = joined(&server, &[joined_space]).await;
+        reciprocal(&server, &client, joined_space, room_id).await;
+        for id in ["!other:example.org", "!canonical:example.org"] {
+            serve_state(
+                &server,
+                &RoomId::parse(id).unwrap(),
+                json!([
+                    state(
+                        "m.room.create",
+                        "",
+                        &json!({"type": "m.space", "creator": ALICE, "room_version": "10"})
+                    ),
+                    state(
+                        "m.space.child",
+                        room_id.as_str(),
+                        &json!({"via": ["example.org"]})
+                    )
+                ]),
+                1,
+            )
+            .await;
+        }
         let parent = |space: &str, content: Value| {
             Raw::new(&state("m.space.parent", space, &content))
                 .unwrap()
@@ -670,6 +695,7 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let space_id = room_id!("!space:example.org");
         let client = joined(&server, &[space_id]).await;
+        reciprocal(&server, &client, space_id, room_id).await;
         server
             .sync_room(
                 &client,

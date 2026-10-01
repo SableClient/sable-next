@@ -82,20 +82,7 @@ pub struct RoomPackEvent {
     pub content: PackContent,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct SpaceParentEvent {
-    #[serde(rename = "type", default)]
-    pub event_type: String,
-    #[serde(default)]
-    pub state_key: String,
-    pub content: SpaceParentContent,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SpaceParentContent {
-    #[serde(default)]
-    pub canonical: bool,
-}
+type SpaceParentEvent = crate::space_parents::ParentClaim;
 
 /// `im.ponies.emote_rooms`: room id → state key → selection object.
 #[derive(Debug, Deserialize)]
@@ -236,7 +223,7 @@ impl PackCache {
 #[derive(Clone, Default)]
 struct RoomPackState {
     packs: BTreeMap<String, RoomPackEvent>,
-    canonical_parents: Vec<OwnedRoomId>,
+    canonical_parents: Vec<SpaceParentEvent>,
 }
 
 impl RoomPackState {
@@ -270,12 +257,14 @@ struct RoomPacks {
     complete: bool,
 }
 
-fn push_canonical(parents: &mut Vec<OwnedRoomId>, event: &SpaceParentEvent) {
+fn push_canonical(parents: &mut Vec<SpaceParentEvent>, event: &SpaceParentEvent) {
     if event.content.canonical
-        && let Ok(parent) = RoomId::parse(&event.state_key)
-        && !parents.contains(&parent)
+        && event.room_id().is_some()
+        && !parents
+            .iter()
+            .any(|parent| parent.state_key == event.state_key)
     {
-        parents.push(parent);
+        parents.push(event.clone());
     }
 }
 
@@ -651,7 +640,16 @@ impl Core {
         }
         Ok(RoomPacks {
             packs,
-            canonical_parents: state.canonical_parents,
+            canonical_parents: crate::space_parents::validate(
+                client,
+                room.room_id(),
+                &state.canonical_parents,
+                network_fallback,
+            )
+            .await
+            .into_iter()
+            .filter_map(|parent| parent.room_id())
+            .collect(),
             complete,
         })
     }
@@ -804,7 +802,7 @@ mod tests {
     #[test]
     fn only_a_canonical_parent_is_walked() {
         let canonical: SpaceParentEvent = serde_json::from_str(
-            r#"{"type":"m.space.parent","state_key":"!space:example.org","content":{"canonical":true,"via":["example.org"]}}"#,
+            r#"{"type":"m.space.parent","state_key":"!space:example.org","sender":"@alice:example.org","content":{"canonical":true,"via":["example.org"]}}"#,
         )
         .expect("space parent");
         let secondary: SpaceParentEvent = serde_json::from_str(
@@ -818,7 +816,7 @@ mod tests {
         push_canonical(&mut parents, &canonical);
 
         assert_eq!(parents.len(), 1);
-        assert_eq!(parents[0].as_str(), "!space:example.org");
+        assert_eq!(parents[0].state_key.as_str(), "!space:example.org");
     }
 
     #[test]
