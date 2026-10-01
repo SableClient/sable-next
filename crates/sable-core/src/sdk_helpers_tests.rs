@@ -36,6 +36,109 @@ async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core
 }
 
 #[tokio::test]
+async fn room_members_use_cached_or_fetched_power_levels() {
+    use matrix_sdk::ruma::user_id;
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    for (version, cached, status, valid) in [
+        ("10", false, 200, true),
+        ("10", true, 200, true),
+        ("10", false, 404, true),
+        ("10", false, 403, true),
+        ("10", false, 200, false),
+        ("12", false, 200, true),
+    ] {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!members:example.org");
+        let admin = user_id!("@admin:example.org");
+        let moderator = user_id!("@moderator:example.org");
+        let factory = EventFactory::new().room(room_id).sender(admin);
+        let levels = json!({"users": {admin: 100, moderator: 50}});
+        let members = vec![
+            factory.member(admin).into_raw(),
+            factory.member(moderator).into_raw(),
+        ];
+        let mut builder = JoinedRoomBuilder::new(room_id)
+            .add_state_bulk(members)
+            .add_state_event(factory.create(admin, version.try_into().unwrap()));
+        if cached {
+            builder = builder.add_state_event(
+                Raw::new(&json!({
+                    "type": "m.room.power_levels", "state_key": "", "sender": admin,
+                    "event_id": "$levels", "origin_server_ts": 1, "content": levels
+                }))
+                .unwrap()
+                .cast_unchecked(),
+            );
+        }
+        server.sync_room(&client, builder).await;
+        server
+            .mock_get_members()
+            .ok(vec![
+                factory.member(admin).into_raw(),
+                factory.member(moderator).into_raw(),
+            ])
+            .mount()
+            .await;
+        let response = match status {
+            403 => json!({"errcode": "M_FORBIDDEN", "error": "Forbidden"}),
+            404 => json!({"errcode": "M_NOT_FOUND", "error": "No power levels"}),
+            _ if !valid => json!({"users": {moderator: "invalid"}}),
+            _ => levels,
+        };
+        Mock::given(method("GET"))
+            .and(path(format!(
+                "/_matrix/client/v3/rooms/{room_id}/state/m.room.power_levels/"
+            )))
+            .respond_with(ResponseTemplate::new(status).set_body_json(response))
+            .expect(u64::from(!cached))
+            .mount(server.server())
+            .await;
+
+        let room = client.get_room(room_id).unwrap();
+        let core = core(&server, client).await;
+        let CommandOk::RoomMembers { members } = core
+            .dispatch(Command::RoomMembers {
+                room_id: room_id.to_owned(),
+                memberships: vec![],
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("wrong response")
+        };
+        let admin_level = if version == "12" {
+            9_007_199_254_740_992
+        } else {
+            100
+        };
+        let moderator_level = if status == 200 && valid { 50 } else { 0 };
+        for (user_id, level) in [(admin, admin_level), (moderator, moderator_level)] {
+            let member = members
+                .iter()
+                .find(|member| member.user_id == user_id)
+                .unwrap();
+            assert_eq!(
+                member.power_level, level,
+                "{version}, cached={cached}, status={status}, valid={valid}, {user_id}"
+            );
+        }
+        if cached || status != 200 || !valid {
+            let expected = room
+                .members_no_sync(matrix_sdk::RoomMemberships::JOIN)
+                .await
+                .unwrap();
+            let expected: Vec<_> = expected.iter().map(crate::view::member_view).collect();
+            assert_eq!(
+                serde_json::to_value(members).unwrap(),
+                serde_json::to_value(expected).unwrap()
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn device_rename_updates_pusher_state() {
     use wiremock::matchers::body_json;
 

@@ -61,6 +61,27 @@ describe('groupMembers', () => {
     ]);
   });
 
+  it('keeps elevated members on the first page in a large offline room', () => {
+    const members = Array.from({ length: 4000 }, (_, index) =>
+      member({
+        user_id: `@user${String(index).padStart(4, '0')}:e.org`,
+        power_level: index === 3999 ? 100 : index === 2999 ? 50 : 0,
+      })
+    );
+    const groups = groupMembers(members, 'name-asc', () => false);
+
+    expect(groups.map((group) => [group.level, group.members.length])).toEqual([
+      [100, 1],
+      [50, 1],
+      [null, 3998],
+    ]);
+    expect(limitGroups(groups, 30).map((group) => [group.level, group.members.length])).toEqual([
+      [100, 1],
+      [50, 1],
+      [null, 28],
+    ]);
+  });
+
   it('lists from the level the room sets, whatever their presence', () => {
     const offline = (): boolean => false;
 

@@ -26,6 +26,7 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::message::Relation;
+use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLevelsEventContent};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -700,20 +701,47 @@ impl Core {
                 memberships,
             } => {
                 let room = self.room(&room_id).await?;
-                if let Err(error) = room.power_levels().await {
-                    tracing::error!(
-                        room_id = %room_id,
-                        %error,
-                        "room power levels are unavailable, every member reads as the spec default"
-                    );
-                }
                 let members = room
                     .members(membership_filter(&memberships))
                     .await
                     .or_failed(self, "room_members")?;
+                let power_levels = if room.power_levels().await.is_err() {
+                    let content = self
+                        .room_state_event_content(
+                            room_id,
+                            "m.room.power_levels".to_owned(),
+                            String::new(),
+                        )
+                        .await
+                        .ok()
+                        .flatten()
+                        .and_then(|content| {
+                            serde_json::from_value::<RoomPowerLevelsEventContent>(content).ok()
+                        });
+                    let rules = room.clone_info().room_version_rules_or_default();
+                    content.map(|content| {
+                        RoomPowerLevels::new(
+                            content.into(),
+                            &rules.authorization,
+                            room.creators().unwrap_or_default(),
+                        )
+                    })
+                } else {
+                    None
+                };
 
                 Ok(CommandOk::RoomMembers {
-                    members: members.iter().map(view::member_view).collect(),
+                    members: members
+                        .iter()
+                        .map(|member| {
+                            let mut member = view::member_view(member);
+                            if let Some(levels) = &power_levels {
+                                member.power_level =
+                                    view::clamp_power_level(levels.for_user(&member.user_id));
+                            }
+                            member
+                        })
+                        .collect(),
                 })
             }
 
