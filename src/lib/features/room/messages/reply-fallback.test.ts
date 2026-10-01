@@ -33,6 +33,46 @@ test('any other event falls back to its body, then its type', () => {
   ).toBe('timeline.replyToEvent:{"type":"m.room.topic"}');
 });
 
+test.each(['m.room.message', 'm.room.encrypted', 'm.reaction', 'm.room.topic'])(
+  'redacted %s reply',
+  (type) => {
+    const source = JSON.stringify({
+      type,
+      sender: '@ana:example.org',
+      content: {},
+      unsigned: { redacted_because: { type: 'm.room.redaction', content: {} } },
+    });
+
+    expect(replyFallbackFromSource(source, t)).toEqual({
+      sender: '@ana:example.org',
+      body: 'timeline.redacted',
+    });
+  }
+);
+
+test('redaction overrides body', () => {
+  expect(
+    replyFallbackFromSource(
+      JSON.stringify({
+        type: 'm.room.message',
+        sender: '@ana:example.org',
+        content: { body: 'Old body' },
+        unsigned: { redacted_because: { type: 'm.room.redaction', content: {} } },
+      }),
+      t
+    )?.body
+  ).toBe('timeline.redacted');
+});
+
+test('reply to a redaction event', () => {
+  expect(
+    replyFallbackFromSource(
+      JSON.stringify({ type: 'm.room.redaction', sender: '@ana:example.org', content: {} }),
+      t
+    )?.body
+  ).toBe('timeline.replyToRedaction');
+});
+
 test('unreadable source gives nothing', () => {
   expect(replyFallbackFromSource('not json', t)).toBeNull();
   expect(replyFallbackFromSource('[]', t)).toBeNull();

@@ -560,41 +560,48 @@ test('a reply the SDK cannot embed takes its preview from the event source', asy
 });
 
 test.each([
-  ['m.room.name', 'Sent a m.room.name event'],
-  ['m.room.member', 'Sent a m.room.member event'],
-])(
-  '%s replies with missing details after a successful fetch take their preview from the event source',
-  async (type, body) => {
-    const reply = {
-      ...item('$reply:example.org', '@kris:example.org'),
-      in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
-    } as unknown as TimelineItemView;
-    const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
-    const eventSource = vi.fn(() =>
-      Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {} }))
-    );
-    const core = {
-      session: { user_id: '@kris:example.org' },
-      commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
-    } as unknown as CoreClient;
-    const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
-    const conversation = new Conversation({
-      core,
-      personas: {} as PersonaStore,
-      timeline,
-      roomId: () => ROOM,
-    });
+  ['m.room.name', 'Sent a m.room.name event', undefined],
+  ['m.room.member', 'Sent a m.room.member event', undefined],
+  [
+    'm.room.message',
+    'Message deleted',
+    { redacted_because: { type: 'm.room.redaction', content: {} } },
+  ],
+  [
+    'm.room.encrypted',
+    'Message deleted',
+    { redacted_because: { type: 'm.room.redaction', content: {} } },
+  ],
+])('uses event source for missing %s reply details', async (type, body, unsigned) => {
+  const reply = {
+    ...item('$reply:example.org', '@kris:example.org'),
+    in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
+  } as unknown as TimelineItemView;
+  const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
+  const eventSource = vi.fn(() =>
+    Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {}, unsigned }))
+  );
+  const core = {
+    session: { user_id: '@kris:example.org' },
+    commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
+  } as unknown as CoreClient;
+  const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
+  const conversation = new Conversation({
+    core,
+    personas: {} as PersonaStore,
+    timeline,
+    roomId: () => ROOM,
+  });
 
-    conversation.fetchMissingReplyDetails();
-    await vi.waitFor(() => {
-      expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
-        sender: '@ana:example.org',
-        body,
-      });
+  conversation.fetchMissingReplyDetails();
+  await vi.waitFor(() => {
+    expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
+      sender: '@ana:example.org',
+      body,
     });
-    expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
-  }
-);
+  });
+  expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
+});
 
 test('editing steps back to the own message before the one being edited', () => {
   const me = '@kris:example.org';

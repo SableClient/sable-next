@@ -13,6 +13,9 @@ export function replyFallbackFromSource(source: string, t: Translate): ReplyFall
   if (!isRecord(event) || typeof event.type !== 'string') return null;
 
   const sender = typeof event.sender === 'string' ? event.sender : null;
+  if (isRecord(event.unsigned) && isRecord(event.unsigned.redacted_because)) {
+    return { sender, body: t('timeline.redacted') };
+  }
   const key = event.type === 'm.reaction' ? reactionKey(event.content) : null;
   if (key) return { sender, body: t('timeline.replyToReaction', { key }) };
   if (event.type === 'm.room.redaction') return { sender, body: t('timeline.replyToRedaction') };
