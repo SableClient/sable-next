@@ -220,7 +220,10 @@
 
   const bookmarks = useBookmarks();
 
-  function openThread(rootEventId: string): void {
+  let threadEventId = $state<string | null>(null);
+
+  function openThread(rootEventId: string, targetEventId: string | null = null): void {
+    threadEventId = targetEventId;
     panels.openThread(rootEventId);
   }
 
@@ -250,7 +253,40 @@
 
   function closeThread(): void {
     panels.threadRootId = null;
+    threadEventId = null;
   }
+
+  let permalinkTarget = $state<{
+    roomId: string;
+    eventId: string;
+    rootEventId: string | null;
+  } | null>(null);
+
+  $effect(() => {
+    const targetEventId = eventId;
+    const targetRoomId = resolvedRoomId;
+    if (targetEventId === null) return;
+    let active = true;
+    void core.commands
+      .eventSource(targetRoomId, targetEventId)
+      .then((source) => {
+        if (!active) return;
+        const relation = notifiedRelation(source);
+        const rootEventId = relation?.thread ? relation.eventId : null;
+        permalinkTarget = { roomId: targetRoomId, eventId: targetEventId, rootEventId };
+        if (rootEventId !== null) untrack(() => openThread(rootEventId, targetEventId));
+        else untrack(closeThread);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        permalinkTarget = { roomId: targetRoomId, eventId: targetEventId, rootEventId: null };
+        untrack(closeThread);
+        console.debug('[sable room] linked event unavailable', error);
+      });
+    return () => {
+      active = false;
+    };
+  });
 
   let notifiedTarget = $state<{ eventId: string; target: string } | null>(null);
   let landingEventId = $derived(
@@ -269,7 +305,7 @@
         const relation = notifiedRelation(source);
         if (!active || relation === null) return;
         notifiedTarget = { eventId, target: relation.eventId };
-        if (relation.thread) openThread(relation.eventId);
+        if (relation.thread) openThread(relation.eventId, eventId);
       })
       .catch((error: unknown) => {
         console.debug('[sable room] notified event unavailable', error);
@@ -327,6 +363,12 @@
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  let resolvedPermalink = $derived(
+    permalinkTarget?.roomId === resolvedRoomId && permalinkTarget.eventId === eventId
+      ? permalinkTarget
+      : null
+  );
+  let timelineEventId = $derived(resolvedPermalink?.rootEventId ?? eventId);
   const VOICE_CHAT_WIDTH_KEY = 'sable-voice-chat-width';
   const VOICE_CHAT_DEFAULT_WIDTH = 400;
   const VOICE_CHAT_MIN_WIDTH = 300;
@@ -500,6 +542,7 @@
     // jump the mode is still `live` and this would strip the anchor straight
     // back off the URL, undoing the navigation before it takes effect.
     if (eventId === null || eventId !== appliedEventId) return;
+    if (resolvedPermalink === null || resolvedPermalink.rootEventId !== null) return;
     if (!timelineFollowingLive || timeline.mode.kind !== 'live') return;
     void goto(roomUrl(null), { replace: true, reset: false });
   });
@@ -507,13 +550,15 @@
   $effect(() => {
     const activeRoomId = timelineRoomId;
     if (!activeRoomId) return;
+    if (eventId !== null && resolvedPermalink === null) return;
+    const targetEventId = timelineEventId;
     const anchor = untrack(() => {
       // An event already in the loaded range is reached by scrolling, so only a
       // target we do not hold restarts the timeline in permalink mode. That
       // only holds while live: dropping the anchor from a focused timeline
       // restarts it at the present instead of moving within the loaded window.
-      const loaded = timeline.items.some((item) => item.event_id === eventId);
-      return loaded && timeline.mode.kind === 'live' ? null : eventId;
+      const loaded = timeline.items.some((item) => item.event_id === targetEventId);
+      return loaded && timeline.mode.kind === 'live' ? null : targetEventId;
     });
     appliedEventId = eventId;
     const openAtUnread = untrack(() => {
@@ -844,7 +889,7 @@
       bind:this={timelineList}
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
-      focusEventId={eventId}
+      focusEventId={timelineEventId}
       {landingEventId}
       onLanded={landed}
       onRequestHistory={requestHistory}
@@ -1153,6 +1198,7 @@
         <ThreadPanel
           roomId={resolvedRoomId}
           rootEventId={panels.threadRootId}
+          focusEventId={threadEventId}
           {roomName}
           members={memberLoader.members}
           readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
@@ -1211,6 +1257,7 @@
         <ThreadPanel
           roomId={resolvedRoomId}
           rootEventId={panels.threadRootId}
+          focusEventId={threadEventId}
           {roomName}
           members={memberLoader.members}
           readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}

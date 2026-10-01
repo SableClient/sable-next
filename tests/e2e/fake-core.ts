@@ -19,6 +19,7 @@ import type {
 
 export type RoomCoreMode =
   | 'ready'
+  | 'thread_links'
   | 'loading'
   | 'error'
   | 'delayed_history'
@@ -49,6 +50,7 @@ declare global {
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
+    __e2eTimelineFocus: Extract<Command, { type: 'subscribe_timeline' }>['focus'][];
     __e2ePaginationDirections: string[];
     __e2eRefreshRoom: () => void;
     __e2eReceiveMessage: (body: string) => void;
@@ -60,6 +62,7 @@ declare global {
 export async function installFakeCore(page: Page, mode: WorkerMode): Promise<void> {
   await page.addInitScript((workerMode: WorkerMode) => {
     window.__e2ePaginationDirections = [];
+    window.__e2eTimelineFocus = [];
     type CommandType = Command['type'];
     type CommandFor<T extends CommandType> = Extract<Command, { type: T }>;
     type OkFor<T extends CommandType> = Extract<CommandOk, { type: T }>;
@@ -490,7 +493,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     });
     const subscriptions = new Map<
       number,
-      { roomId: string; page: number; live: boolean; oldest: number }
+      { roomId: string; page: number; live: boolean; thread: boolean; oldest: number }
     >();
     const arrivals: TimelineItemView[] = [];
     let unreadContextOpened = false;
@@ -787,6 +790,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         rooms: joinedRooms,
       }),
       subscribe_timeline: (command) => {
+        window.__e2eTimelineFocus.push(command.focus);
         if (workerMode === 'unread_context_error' && command.focus.kind === 'event') {
           throw new FakeCoreError('load_failed');
         }
@@ -795,6 +799,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           roomId: command.room_id,
           page: 0,
           live: command.focus.kind === 'live',
+          thread: command.focus.kind === 'thread',
           oldest: workerMode === 'unread_catchup' ? 60 : 0,
         });
         timelineRooms.push(command.room_id);
@@ -818,7 +823,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           subscription,
           items: unreadContext
             ? [...items.slice(0, 5), marker, ...items.slice(5, 20)]
-            : timelineSnapshot(roomName),
+            : workerMode === 'thread_links' && command.focus.kind === 'thread'
+              ? [
+                  { ...items[0], id: 'thread-root', event_id: '$thread-root:example.test' },
+                  ...Array.from({ length: 40 }, (_, index) => ({
+                    ...items[0],
+                    id: `thread-reply-${index}`,
+                    event_id: `$thread-reply-${index}:example.test`,
+                    content: messageContent(`Thread reply ${index}`),
+                    thread_root: '$thread-root:example.test',
+                  })),
+                ]
+              : timelineSnapshot(roomName),
           aggregations: [],
         };
       },
@@ -828,6 +844,28 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (!state) throw new Error('unknown timeline subscription');
         const paginated = subscriptionRoom(command.subscription);
         const roomName = paginated.name ?? '';
+        if (workerMode === 'thread_links' && state.thread) {
+          window.setTimeout(() => {
+            port.emit({
+              type: 'timeline_diff',
+              subscription: command.subscription,
+              diffs: [
+                {
+                  op: 'insert',
+                  index: 1,
+                  value: {
+                    ...timelineItems(roomName)[0],
+                    id: 'thread-reply-older',
+                    event_id: '$thread-reply-older:example.test',
+                    content: messageContent('Older thread reply'),
+                    thread_root: '$thread-root:example.test',
+                  },
+                },
+              ],
+            });
+          }, 750);
+          return { type: 'paginate', direction: command.direction, reached_end: true };
+        }
         if (workerMode === 'unread_catchup') {
           const items = timelineItems(roomName);
           if (command.direction === 'backward') {
@@ -1211,14 +1249,21 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       event_source: (command) => ({
         type: 'event_source',
         source:
-          command.event_id === '$edit:example.test'
+          workerMode === 'thread_links' && command.event_id.startsWith('$thread-reply-')
             ? JSON.stringify({
                 type: 'm.room.message',
                 content: {
-                  'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                  'm.relates_to': { rel_type: 'm.thread', event_id: '$thread-root:example.test' },
                 },
               })
-            : '{}',
+            : command.event_id === '$edit:example.test'
+              ? JSON.stringify({
+                  type: 'm.room.message',
+                  content: {
+                    'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                  },
+                })
+              : '{}',
       }),
       edit_history: () => ({ type: 'edit_history', versions: [] }),
       event_items: (command) => {

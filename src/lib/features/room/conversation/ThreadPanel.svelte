@@ -33,6 +33,7 @@
   interface Props {
     roomId: string;
     rootEventId: string;
+    focusEventId?: string | null;
     roomName?: string | null;
     members?: readonly MemberView[];
     readOnly?: boolean;
@@ -50,6 +51,7 @@
   let {
     roomId,
     rootEventId,
+    focusEventId = null,
     roomName = null,
     members = [],
     readOnly = false,
@@ -88,6 +90,21 @@
 
   $effect(() => {
     void timeline.startThread(roomId, rootEventId);
+  });
+
+  $effect(() => {
+    const target = focusEventId;
+    if (target === null) return;
+    const navigation = new AbortController();
+    void (async () => {
+      await timeline.startThread(roomId, rootEventId);
+      await timeline.loadThreadEvent(target, navigation.signal);
+    })().catch((error: unknown) => {
+      console.debug('[sable thread] linked reply unavailable', error);
+    });
+    return () => {
+      navigation.abort();
+    };
   });
 
   $effect(() => {
@@ -186,6 +203,7 @@
       bind:this={timelineList}
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
+      {focusEventId}
       {roomId}
       {members}
       {readOnly}
