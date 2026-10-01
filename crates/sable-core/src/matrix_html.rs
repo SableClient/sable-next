@@ -913,12 +913,15 @@ const SPOILER_PLACEHOLDER: &str = "[Spoiler]";
 
 #[must_use]
 pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
-    let Some(formatted) = formatted.filter(|formatted| formatted.contains(SPOILER_ATTRIBUTE))
-    else {
+    let Some(formatted) = formatted else {
         return body.to_owned();
     };
     if nests_too_deeply(formatted) {
-        return SPOILER_PLACEHOLDER.to_owned();
+        return if formatted.contains(SPOILER_ATTRIBUTE) {
+            SPOILER_PLACEHOLDER.to_owned()
+        } else {
+            body.to_owned()
+        };
     }
     let html = Html::parse(formatted);
     html.sanitize_with(&MATRIX_POLICY);
@@ -926,7 +929,12 @@ pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
     for node in html.children() {
         push_preview_text(&node, &mut text);
     }
-    text
+    let text = text.trim_end_matches('\n');
+    if text.is_empty() {
+        body.to_owned()
+    } else {
+        text.to_owned()
+    }
 }
 
 fn push_preview_text(node: &NodeRef, out: &mut String) {
@@ -944,9 +952,41 @@ fn push_preview_text(node: &NodeRef, out: &mut String) {
             }
             if &*element.name.local == "br" {
                 out.push('\n');
+                return;
+            }
+            if &*element.name.local == "img" {
+                if let Some(alt) = element
+                    .attrs
+                    .borrow()
+                    .iter()
+                    .find(|attr| &*attr.name.local == "alt")
+                {
+                    out.push_str(&alt.value);
+                }
+                return;
+            }
+            let block = matches!(
+                &*element.name.local,
+                "p" | "div"
+                    | "pre"
+                    | "blockquote"
+                    | "h1"
+                    | "h2"
+                    | "h3"
+                    | "h4"
+                    | "h5"
+                    | "h6"
+                    | "li"
+                    | "tr"
+            );
+            if block && !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
             }
             for child in node.children() {
                 push_preview_text(&child, out);
+            }
+            if block && !out.is_empty() && !out.ends_with('\n') {
+                out.push('\n');
             }
         }
         _ => {}
@@ -1172,6 +1212,44 @@ mod tests {
     }
 
     #[test]
+    fn preview_body_uses_formatted_text() {
+        for (body, formatted, expected) in [
+            ("***both***", "<strong><em>both</em></strong>", "both"),
+            ("``code ` tick``", "<code>code ` tick</code>", "code ` tick"),
+            (
+                "[label](https://example.org)",
+                "<a href=\"https://example.org\">label</a>",
+                "label",
+            ),
+            (
+                "```rust\nlet x = 1;\n```",
+                "<pre><code class=\"language-rust\">let x = 1;</code></pre>",
+                "let x = 1;",
+            ),
+            (
+                "before\n```\n    a\n    b\n```\nafter",
+                "<p>before</p><pre><code>    a\n    b</code></pre><p>after</p>",
+                "before\n    a\n    b\nafter",
+            ),
+            (
+                ":rotate:",
+                "<img data-mx-emoticon src=\"mxc://example.org/rotate\" alt=\":rotate:\">",
+                ":rotate:",
+            ),
+            ("\\*literal\\*", "*literal*", "*literal*"),
+            (
+                "`<tag> & text`",
+                "<code>&lt;tag&gt; &amp; text</code>",
+                "<tag> & text",
+            ),
+        ] {
+            assert_eq!(preview_body(body, Some(formatted)), expected);
+        }
+        assert_eq!(preview_body("plain **literal**", None), "plain **literal**");
+        assert_eq!(preview_body("fallback", Some("")), "fallback");
+    }
+
+    #[test]
     fn preview_body_hides_spoilers() {
         assert_eq!(
             preview_body(
@@ -1192,7 +1270,7 @@ mod tests {
         );
         assert_eq!(
             preview_body("plain **bold**", Some("plain <b>bold</b>")),
-            "plain **bold**"
+            "plain bold"
         );
         assert_eq!(preview_body("plain", None), "plain");
     }

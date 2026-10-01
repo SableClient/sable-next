@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -382,6 +384,24 @@ test('a reply keeps the target formatting for its composer preview', () => {
   expect(conversation.context).toMatchObject({
     body: ':rotate:',
     html: '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">',
+  });
+});
+
+test('a reply context uses rendered preview text', () => {
+  const target = item('$one:example.org', '@ana:example.org');
+  target.content = {
+    kind: 'message',
+    body: '**bold** and ``code ` tick``',
+    html: '<strong>bold</strong> and <code>code ` tick</code>',
+    emote: false,
+    notice: false,
+    edited: false,
+  };
+  const { conversation } = setup([target], '@kris:example.org');
+  conversation.reply('$one:example.org');
+  expect(conversation.context).toMatchObject({
+    body: 'bold and code ` tick',
+    html: '<strong>bold</strong> and <code>code ` tick</code>',
   });
 });
 

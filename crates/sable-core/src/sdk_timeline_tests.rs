@@ -1860,6 +1860,45 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
 }
 
 #[tokio::test]
+async fn a_reply_quotes_formatted_text() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!formatted-reply:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .text_html(
+                            "**bold** and `code`",
+                            "<strong>bold</strong> and <code>code</code>",
+                        )
+                        .event_id(event_id!("$formatted")),
+                )
+                .add_timeline_event(
+                    factory
+                        .text_msg("nice")
+                        .reply_to(event_id!("$formatted"))
+                        .event_id(event_id!("$reply")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false).await.unwrap();
+    let reply = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$reply")))
+        .and_then(|view| view.in_reply_to.as_ref())
+        .unwrap();
+    assert_eq!(reply.body.as_deref(), Some("bold and code"));
+}
+
+#[tokio::test]
 async fn a_reply_to_an_uncaptioned_gallery_quotes_its_file_names() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
