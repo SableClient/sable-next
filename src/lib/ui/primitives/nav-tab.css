@@ -151,5 +151,14 @@
     html:not([data-reduced-motion='on']) .nav-tab-bottom:hover {
       transform: translateY(-0.1875rem);
     }
+
+    html:not([data-reduced-motion='on']) .nav-tab-bottom:hover::before {
+      transform: translateY(0.1875rem) scaleY(0.5);
+    }
+
+    html:not([data-reduced-motion='on']) .nav-tab-bottom[aria-current='page']:hover::before,
+    html:not([data-reduced-motion='on']) .nav-tab-bottom[data-current='true']:hover::before {
+      transform: translateY(0.1875rem) scaleY(1);
+    }
   }
 }
