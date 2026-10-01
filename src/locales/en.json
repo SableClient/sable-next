@@ -2478,6 +2478,7 @@
     "unsupportedSignIn": "This homeserver does not offer a sign-in method supported by Sable.",
     "passwordUnsupported": "This homeserver does not support password sign-in.",
     "temporarilyUnavailable": "The homeserver is temporarily unavailable. Try again.",
+    "slidingSyncUnsupported": "This homeserver does not support Sliding Sync.",
     "invalidCredentials": "Invalid username or password.",
     "registrationUnavailable": "This provider is not accepting new accounts right now.",
     "usernameTaken": "That username is already in use.",

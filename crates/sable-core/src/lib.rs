@@ -46,6 +46,7 @@ pub mod spaces;
 pub mod store;
 mod store_disposal;
 mod subscriptions;
+mod sync_support;
 mod timelines;
 pub mod tls;
 #[cfg(not(target_family = "wasm"))]

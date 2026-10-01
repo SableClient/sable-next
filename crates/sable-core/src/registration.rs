@@ -371,6 +371,7 @@ impl Core {
             .build_account_client(&store_id, &homeserver)
             .await
             .or_failed(self, "register_build_client")?;
+        self.require_sliding_sync(&client).await?;
 
         let registration_email = registration_email
             .map(|email| email.trim().to_owned())
@@ -849,6 +850,7 @@ impl Core {
             .await
             .map_err(|error| self.discovery_error(error))?;
         self.remember_homeserver(&homeserver, &client).await;
+        self.require_sliding_sync(&client).await?;
 
         let error = client
             .matrix_auth()

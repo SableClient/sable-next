@@ -773,6 +773,7 @@ impl Core {
         let core = self.clone();
         let mut states = sync_service.state();
         let restarted = sync_service.clone();
+        let support_client = client.clone();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
         core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
         self.track_session_task(
@@ -792,6 +793,20 @@ impl Core {
                     }
 
                     if stalled {
+                        if matches!(
+                            core.require_sliding_sync(&support_client).await,
+                            Err(CommandErr::SlidingSyncUnsupported)
+                        ) {
+                            restarted.stop().await;
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::SyncStatus(crate::protocol::SyncStatus::Error {
+                                    message: "This homeserver does not support Sliding Sync."
+                                        .to_owned(),
+                                }),
+                            );
+                            return;
+                        }
                         failures = failures.saturating_add(1);
                         crate::watchers::retry_backoff(failures).await;
                         restarted.start().await;

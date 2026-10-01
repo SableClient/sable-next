@@ -56,14 +56,17 @@ impl Core {
         store_id: &str,
         homeserver: &str,
         account: Option<&session::PersistedAccount>,
-    ) -> Result<matrix_sdk::Client, matrix_sdk::ClientBuildError> {
-        match account {
+    ) -> Result<matrix_sdk::Client, CommandErr> {
+        let client = match account {
             Some(account) if !account.device_invalidated => {
                 session::restore_client(store_id, &account.session, self.persistent_event_cache)
                     .await
             }
             _ => self.build_account_client(store_id, homeserver).await,
         }
+        .map_err(|error| self.discovery_error(error))?;
+        self.require_sliding_sync(&client).await?;
+        Ok(client)
     }
 
     async fn validate_reauthentication(
@@ -121,8 +124,7 @@ impl Core {
         );
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
-            .await
-            .or_failed(self, "build_client")?;
+            .await?;
         let endpoint = client.homeserver();
 
         tracing::info!(
@@ -194,6 +196,7 @@ impl Core {
             .await
             .map_err(|error| self.discovery_error(error))?;
         self.remember_homeserver(&homeserver, &client).await;
+        self.require_sliding_sync(&client).await?;
         let mut flows = protocol::LoginFlowsView {
             password: false,
             oidc: false,
@@ -293,8 +296,7 @@ impl Core {
 
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
-            .await
-            .or_failed(self, "start_oidc_login_build_client")?;
+            .await?;
 
         let registration = session::client_metadata(&redirect_uri).into();
         if let Some(account) = &reauth {
@@ -454,8 +456,7 @@ impl Core {
 
         let client = self
             .login_client(&account_store_id, &homeserver, reauth.as_ref())
-            .await
-            .or_failed(self, "start_sso_login_build_client")?;
+            .await?;
 
         let authorization_url = client
             .matrix_auth()
@@ -654,7 +655,12 @@ mod tests {
             matchers::{method, path},
         };
         let server = MatrixMockServer::new().await;
-        server.mock_versions().ok().mount().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
         Mock::given(method("POST"))
             .and(path("/_matrix/client/v3/login"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
@@ -732,7 +738,12 @@ mod tests {
             matchers::{body_partial_json, method, path},
         };
         let server = MatrixMockServer::new().await;
-        server.mock_versions().ok().mount().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
         Mock::given(method("POST"))
             .and(path("/_matrix/client/v3/login"))
             .and(body_partial_json(serde_json::json!({
@@ -812,7 +823,12 @@ mod tests {
             matchers::{body_partial_json, method, path},
         };
         let server = MatrixMockServer::new().await;
-        server.mock_versions().ok().mount().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
         for identifier in [
             serde_json::json!({"type": "m.id.user", "user": "@alice:example.org"}),
             serde_json::json!({"type": "m.id.thirdparty", "medium": "email", "address": "alice@example.org"}),
@@ -868,7 +884,12 @@ mod tests {
             matchers::{method, path},
         };
         let server = MatrixMockServer::new().await;
-        server.mock_versions().ok().mount().await;
+        server
+            .mock_versions()
+            .with_simplified_sliding_sync()
+            .ok()
+            .mount()
+            .await;
         Mock::given(method("POST"))
             .and(path("/_matrix/client/v3/login"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({

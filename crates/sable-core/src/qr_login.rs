@@ -216,6 +216,7 @@ impl Core {
             .build_account_client(&store_id, &homeserver)
             .await
             .or_failed(self, "start_qr_login_build_client")?;
+        self.require_sliding_sync(&client).await?;
 
         let slots = Arc::new(QrSlots::default());
         let core = self.clone();
