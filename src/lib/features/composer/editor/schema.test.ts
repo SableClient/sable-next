@@ -117,6 +117,7 @@ test('both atoms survive a clipboard round trip', () => {
   expect(doc.firstChild?.child(3).attrs).toEqual({
     url: 'mxc://example.org/wave',
     shortcode: 'wave',
+    body: null,
     sourcePack: null,
   });
 });
@@ -188,4 +189,19 @@ test('a Google Docs paste keeps the bold its spans set by weight', () => {
   expect(doc.firstChild?.child(0).text).toBe('bold');
   expect(doc.firstChild?.child(0).marks.map((mark) => mark.type.name)).toEqual(['strong']);
   expect(doc.firstChild?.child(1).marks).toEqual([]);
+});
+
+test('an emote description survives HTML and draft round trips', () => {
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, [
+      emoticon.create({ url: 'mxc://example.org/wave', shortcode: 'wave', body: 'A cat waving' }),
+    ]),
+  ]);
+  const output = html(doc);
+  expect(output).toContain('alt="A cat waving" title=":wave:"');
+  expect(parse(output).firstChild?.firstChild?.attrs).toMatchObject({
+    shortcode: 'wave',
+    body: 'A cat waving',
+  });
+  expect(composerSchema.nodeFromJSON(doc.toJSON()).eq(doc)).toBe(true);
 });

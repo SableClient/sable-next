@@ -196,6 +196,7 @@
     --ghost-active: var(--surface-container-active);
 
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -240,6 +241,7 @@
   .section-bar {
     background: var(--surface-container);
     border-bottom: var(--border-width) solid var(--surface-container-line);
+    color: var(--surface-on-container);
     flex: 0 0 auto;
     gap: var(--space-300);
     justify-content: flex-start;

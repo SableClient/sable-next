@@ -2,6 +2,7 @@
   background: var(--surface-container);
   border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radius);
+  color: var(--surface-on-container);
   display: grid;
   gap: var(--space-400);
   padding: var(--space-500);
@@ -51,6 +52,7 @@
 .auth-page .auth-card-surface .user-id {
   background: var(--surface-var-container);
   border-radius: var(--radius);
+  color: var(--surface-var-on-container);
   overflow-wrap: anywhere;
   padding: var(--space-250) var(--space-300);
 }

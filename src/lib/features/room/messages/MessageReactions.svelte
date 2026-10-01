@@ -11,7 +11,7 @@
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
 
-  import { LongPress, mouseContextMenu } from '#lib/ui/long-press.svelte.js';
+  import { LongPress, touchContextMenu } from '#lib/ui/long-press.svelte.js';
   import ReactionSheet from './ReactionSheet.svelte';
   import { reactionSummary } from './reaction-summary.js';
   import {
@@ -79,7 +79,7 @@
   function openDetails(event: MouseEvent, index: number): void {
     event.preventDefault();
     event.stopPropagation();
-    onViewReactions?.(index);
+    if (!touchContextMenu(event)) onViewReactions?.(index);
   }
 
   onDestroy(() => {
@@ -146,9 +146,7 @@
           }
           if (eventId) onToggleReaction?.(eventId, reaction.key);
         }}
-        oncontextmenu={mouseContextMenu((event) => {
-          openDetails(event, index);
-        })}
+        oncontextmenu={(event) => openDetails(event, index)}
         onpointerdown={(event) => {
           pressIndex = index;
           press.start(event);

@@ -544,6 +544,11 @@
     "flag": "Steaguri"
   },
   "timeline": {
+    "backToConversation": "Înapoi la conversație",
+    "jumpToOriginal": "Mergi la mesajul original",
+    "originalMessage": "Mesaj original",
+    "retryLoad": "Încearcă din nou",
+    "resizeThread": "Redimensionează firul",
     "label": "Cronologie",
     "back": "Înapoi la camere",
     "loading": "Mesajele se încarcă…",
@@ -967,6 +972,10 @@
     "showOptions": "Arată opțiunile"
   },
   "settings": {
+    "threadPresentation": "Fire și discuții",
+    "threadPresentationHint": "Alege cum se deschid firele și discuțiile de forum pe desktop. Ecranele mici afișează conversația completă.",
+    "threadPresentationTimeline": "Conversație completă",
+    "threadPresentationPanel": "Panou lateral",
     "title": "Setări",
     "dialogDescription": "Selectează o secțiune de setări.",
     "sections": "Secțiuni de setări",
@@ -1823,14 +1832,6 @@
         "description": "Setează-ți culoarea numelui în camera asta",
         "usage": "/color <#rrggbb|reset>"
       },
-      "font": {
-        "description": "Setează un font în camera asta",
-        "usage": "/font <nume|reset>"
-      },
-      "sfont": {
-        "description": "Setează-ți font-ul în tot spațiul ăsta",
-        "usage": "/sfont <nume|reset>"
-      },
       "pronoun": {
         "description": "Setează-ți pronumele în camera asta",
         "usage": "/pronoun <pronume|reset>"
@@ -2199,6 +2200,7 @@
     "pageDescription": "Toate scurtăturile, și combinațiile lor pe acest dispozitiv."
   },
   "forum": {
+    "backToForum": "Înapoi la forum",
     "label": "Forum",
     "threads": "Fire",
     "empty": "Încă nu sunt fire.",

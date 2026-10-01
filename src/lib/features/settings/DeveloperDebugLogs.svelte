@@ -167,6 +167,7 @@
   .entry {
     background: var(--bg-container);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     padding: var(--space-200) var(--space-300);
   }
 

@@ -92,6 +92,7 @@
   .error-page {
     align-items: center;
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;

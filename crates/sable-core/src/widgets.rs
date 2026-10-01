@@ -147,3 +147,63 @@ impl Core {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{Core, protocol::Command, session::Session, store::MemorySessionStore};
+    use matrix_sdk::{ruma::room_id, test_utils::mocks::MatrixMockServer};
+    use matrix_sdk_ui::sync_service::SyncService;
+    use serde_json::json;
+    use std::sync::Arc;
+    use wiremock::{
+        Mock, ResponseTemplate,
+        matchers::{method, path_regex},
+    };
+
+    #[tokio::test]
+    async fn widget_sends_return_the_created_event_id() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let room_id = room_id!("!widgets:example.org");
+        server.sync_joined_room(&client, room_id).await;
+        server.mock_room_state_encryption().plain().mount().await;
+        Mock::given(method("PUT"))
+            .and(path_regex(
+                "/_matrix/client/v3/rooms/.*/(send|state|redact)/.*",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"event_id": "$created"})))
+            .expect(3)
+            .mount(server.server())
+            .await;
+        let (core, _events) = Core::new("widgets", Box::new(MemorySessionStore::default()));
+        *core.session.write().await = Some(Session {
+            account_id: "widgets".to_owned(),
+            homeserver: server.server().uri(),
+            oauth: false,
+            sync_service: Arc::new(SyncService::builder(client.clone()).build().await.unwrap()),
+            client,
+        });
+        for command in [
+            Command::SendRawEvent {
+                room_id: room_id.to_owned(),
+                event_type: "com.example.message".to_owned(),
+                content: json!({}),
+            },
+            Command::SendStateEvent {
+                room_id: room_id.to_owned(),
+                event_type: "com.example.state".to_owned(),
+                state_key: String::new(),
+                content: json!({}),
+            },
+            Command::SendRedaction {
+                room_id: room_id.to_owned(),
+                event_id: "$target".try_into().unwrap(),
+                reason: None,
+            },
+        ] {
+            let response =
+                serde_json::to_value(Box::pin(core.dispatch(command)).await.unwrap()).unwrap();
+            assert_eq!(response["event_id"], "$created");
+        }
+    }
+}

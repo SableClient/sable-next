@@ -175,6 +175,8 @@ pub enum SessionChange {
     UnknownToken(UnknownTokenErrorData),
     /// The session's tokens have been refreshed.
     TokensRefreshed,
+    #[allow(missing_docs)]
+    AccountLocked,
 }
 
 /// Information about the server vendor obtained from the federation API.
@@ -2233,6 +2235,10 @@ impl Client {
                 send_progress,
             )
             .await;
+
+        if result.as_ref().is_err_and(|error| error.client_api_error_kind() == Some(&ErrorKind::UserLocked)) {
+            _ = self.inner.auth_ctx.session_change_sender.send(SessionChange::AccountLocked);
+        }
 
         if let Err(Some(ErrorKind::UnknownToken { .. })) =
             result.as_ref().map_err(HttpError::client_api_error_kind)

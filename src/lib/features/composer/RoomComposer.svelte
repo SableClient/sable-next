@@ -68,7 +68,6 @@
     unstageFile,
     type StagedFile,
   } from './composer-files';
-  import { isMultiline } from './composer-multiline';
   import { shouldFocusComposer } from './type-to-focus';
   import ComposerEditorView from './editor/ComposerEditor.svelte';
   import { ComposerEditor } from './editor/composer-editor';
@@ -76,7 +75,12 @@
   import type { EmoteMedia } from './editor/node-views';
   import { composerSchema } from './editor/schema';
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
-  import { plainEditSource, serializeComposer, serializePlain } from './editor/serialize';
+  import {
+    commandTextOf,
+    plainEditSource,
+    serializeComposer,
+    serializePlain,
+  } from './editor/serialize';
   import { isServerScheduleUnsupported, ScheduledOriginalKept, sendFailure } from './send-failure';
   import { SendQueue } from './send-queue';
   import {
@@ -147,6 +151,12 @@
       dueTs: number
     ) => Promise<void>;
     onTyping: (roomId: string, typing: boolean) => Promise<void>;
+    onQuickReact?: (
+      roomId: string,
+      key: string,
+      sourcePack: ImageSourcePackView | null
+    ) => Promise<void>;
+    canReact?: boolean;
     roomName?: string | null;
     readOnly?: boolean;
     encrypted?: boolean | null;
@@ -173,6 +183,8 @@
     onSendLocation,
     onSchedule,
     onTyping,
+    onQuickReact,
+    canReact = true,
     roomName = null,
     readOnly = false,
     encrypted = null,
@@ -241,7 +253,6 @@
   let beforeEl = $state<HTMLElement>();
   let afterEl = $state<HTMLElement>();
   let measurerEl = $state<HTMLElement>();
-  let multiline = $state(false);
   let layoutFrame: number | undefined;
   let empty = $state(true);
   let showPlaceholder = $state(true);
@@ -308,7 +319,17 @@
   $effect(() => {
     if (preferences.personaPicker || preferences.personaProxying) void personas.load();
   });
-  let panelOpen = $derived(query !== null && dismissedAt !== query.start);
+  let quickReactEnabled = $derived(
+    onQuickReact !== undefined &&
+      canReact &&
+      !readOnly &&
+      staged.length === 0 &&
+      context?.kind !== 'edit' &&
+      !editingScheduled
+  );
+  let panelOpen = $derived(
+    query !== null && dismissedAt !== query.start && (query.sigil !== '+:' || quickReactEnabled)
+  );
   let admin = $derived(adminScope(roomId, roomList.rooms, core.session?.user_id));
   let adminCommands = $state.raw<readonly AdminCommand[] | null>(null);
   let botCommandsEnabled = $derived(
@@ -366,7 +387,7 @@
     core.subscribeEvents((event) => {
       if (!isPackChange(event)) return;
       loadedEmotesFor = null;
-      if (query?.sigil === ':') void loadEmotes();
+      if (query?.sigil === ':' || query?.sigil === '+:') void loadEmotes();
     })
   );
 
@@ -426,7 +447,7 @@
       if (!next) dismissedAt = null;
       query = next;
       if (next?.sigil === '@') void loadMembers();
-      if (next?.sigil === ':') void loadEmotes();
+      if (next?.sigil === ':' || next?.sigil === '+:') void loadEmotes();
       if (next?.sigil === '/' || (next?.sigil === '!' && admin === 'adminRoom')) {
         void loadBotCommands();
       }
@@ -454,14 +475,6 @@
   function updateLayout(): void {
     const editable = editor.editable();
     if (!rowEl || !measurerEl || !editable) return;
-    multiline = isMultiline({
-      text: editor.text(),
-      row: rowEl,
-      before: beforeEl,
-      after: afterEl,
-      editable,
-      measurer: measurerEl,
-    });
   }
 
   function scheduleLayout(): void {
@@ -674,10 +687,11 @@
     invocation: BotCommandInvocation
   ): Promise<boolean> {
     if (!onSendBotCommand) return false;
+    const targetRoomId = roomId;
     inFlight += 1;
     error = null;
     try {
-      await queue.enqueue(() => onSendBotCommand(roomId, command.sender, body, invocation));
+      await queue.enqueue(() => onSendBotCommand(targetRoomId, command.sender, body, invocation));
       if (activeBotCommand?.command === command) closeBotCommand();
       return true;
     } catch (cause) {
@@ -691,13 +705,18 @@
 
   function commandLine(): string | null {
     if (!onSendBotCommand || staged.length > 0 || context?.kind === 'edit') return null;
-    const text = editor.text().trim();
+    const doc = editor.doc();
+    if (!doc) return null;
+    const text = commandTextOf(doc).trim();
     if (admin && text.startsWith(adminPrefix)) return text;
     return parseSlash(text).kind === 'unknown' ? text : null;
   }
 
   async function typedBotCommand(text: string): Promise<boolean> {
+    const doc = editor.doc();
+    const targetRoomId = roomId;
     await Promise.all([loadBotCommands(), admin ? loadAdminCatalog() : undefined]);
+    if (roomId !== targetRoomId || (doc && !editor.doc()?.eq(doc))) return true;
     const typed = text.startsWith('/')
       ? { line: text.slice(1), prefix: '/', commands: slashBotCommands }
       : { line: text.slice(adminPrefix.length), prefix: adminPrefix, commands: serverCommands };
@@ -713,7 +732,7 @@
           arguments: {},
         }))
       ) {
-        editor.setText(text);
+        if (doc && roomId === targetRoomId && editor.isEmpty()) editor.setDoc(doc);
       }
       return true;
     }
@@ -721,7 +740,7 @@
     const result = buildInvocation(matched.command, drafts, typed.prefix);
     if (result.ok) {
       if (!(await sendBotCommand(matched.command, result.body, result.invocation))) {
-        editor.setText(text);
+        if (doc && roomId === targetRoomId && editor.isEmpty()) editor.setDoc(doc);
       }
     } else {
       openBotCommand(matched.command, matched.args, typed.prefix);
@@ -1001,6 +1020,7 @@
     editor.insert(
       composerSchema.nodes.emoticon.create({
         url: image.url,
+        body: image.body,
         shortcode: image.shortcode,
         sourcePack: image.source_pack,
       })
@@ -1127,6 +1147,10 @@
   function commit(suggestion: Suggestion): void {
     const current = query;
     if (!current) return;
+    if (current.sigil === '+:') {
+      if (quickReactEnabled) void quickReact(suggestion);
+      return;
+    }
 
     const slashBot =
       current.sigil === '/'
@@ -1151,6 +1175,27 @@
     editor.replaceQuery(current, nodeFor(current.sigil, suggestion));
     if (current.sigil === '#') void attachVia(suggestion.id);
     updateTyping();
+  }
+
+  async function quickReact(suggestion: Suggestion): Promise<void> {
+    if (!onQuickReact) return;
+    const target = roomId;
+    const doc = editor.doc();
+    const image = suggestion.id.startsWith('pack:')
+      ? emotes.find((candidate) => `pack:${candidate.shortcode}` === suggestion.id)
+      : undefined;
+    editor.clear();
+    if (typingTimeout) clearTimeout(typingTimeout);
+    stopTyping();
+    error = null;
+    try {
+      await onQuickReact(target, image?.url ?? suggestion.insert, image?.source_pack ?? null);
+      if (roomId === target && editor.isEmpty()) editor.clearHistory();
+    } catch (cause) {
+      if (roomId !== target) return;
+      if (doc && editor.isEmpty()) editor.setDoc(doc);
+      error = failureText(cause);
+    }
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -1333,7 +1378,6 @@
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
-          class:multiline={multiline && !recording}
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
@@ -1432,6 +1476,7 @@
                   ...(preferences.composerFormatButton && { format: formatButton }),
                 }}
               />
+              <div class="composer-separator"></div>
               <Tooltip label={sendLabel}>
                 {#snippet trigger({ props })}
                   <IconButton
@@ -1497,9 +1542,11 @@
               ? $i18n.t('composer.membersHeading', { query: query.query })
               : query.sigil === '#'
                 ? $i18n.t('composer.roomsHeading', { query: query.query })
-                : query.sigil === ':'
-                  ? $i18n.t('composer.emotesHeading', { query: query.query })
-                  : $i18n.t('composer.commandsHeading', { query: query.query })}
+                : query.sigil === '+:'
+                  ? $i18n.t('timeline.addReaction')
+                  : query.sigil === ':'
+                    ? $i18n.t('composer.emotesHeading', { query: query.query })
+                    : $i18n.t('composer.commandsHeading', { query: query.query })}
             {suggestions}
             {active}
             onSelect={commit}
@@ -1593,6 +1640,16 @@
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
 
+  @media (width < 48rem), (pointer: coarse) {
+    .composer-stack {
+      --target: var(--control-height-400);
+    }
+
+    .composer-stack :global(.icon-button-small) {
+      --button-height: var(--target);
+    }
+  }
+
   @media (width >= 32rem) {
     .composer-stack {
       --composer-gutter: var(--page-gutter);
@@ -1614,6 +1671,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
@@ -1667,20 +1725,16 @@
     align-items: center;
     display: grid;
     gap: var(--space-100);
-    grid-template-columns: auto 1fr auto;
+    grid-template-areas:
+      'field field'
+      'before after';
+    grid-template-columns: auto 1fr;
     padding: var(--space-100);
     width: 100%;
   }
 
   .composer-row[hidden] {
     display: none;
-  }
-
-  .composer-row.multiline {
-    grid-template-areas:
-      'before field'
-      'before after';
-    grid-template-columns: auto 1fr;
   }
 
   .composer-before,
@@ -1720,20 +1774,24 @@
   .composer-field {
     align-items: center;
     display: flex;
+    grid-area: field;
     min-width: 0;
     position: relative;
   }
 
-  .multiline .composer-before {
+  :global(.composer-separator) {
+    align-self: center;
+    border-left: var(--border-width-400) solid var(--primary-container-line, rebeccapurple);
+    height: var(--size-x200);
+    width: 1px;
+  }
+
+  .composer-before {
     align-self: end;
     grid-area: before;
   }
 
-  .multiline .composer-field {
-    grid-area: field;
-  }
-
-  .multiline .composer-after {
+  .composer-after {
     grid-area: after;
     justify-self: end;
   }

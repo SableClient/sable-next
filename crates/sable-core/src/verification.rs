@@ -341,15 +341,15 @@ impl Core {
     ) {
         let core = self.clone();
         let task = spawn(async move {
-            let mut changes = qr.changes();
+            let changes = qr.changes();
+            let mut changes = futures_util::stream::iter([qr.state()]).chain(changes);
 
             while let Some(state) = changes.next().await {
                 let view = match state {
                     QrVerificationState::Started => continue,
                     QrVerificationState::Scanned => VerificationView::Scanned,
-                    QrVerificationState::Confirmed | QrVerificationState::Reciprocated => {
-                        VerificationView::Confirmed
-                    }
+                    QrVerificationState::Reciprocated => VerificationView::Reciprocated,
+                    QrVerificationState::Confirmed => VerificationView::Confirmed,
                     QrVerificationState::Done { .. } => VerificationView::Done,
                     QrVerificationState::Cancelled(info) => VerificationView::Cancelled {
                         reason: info.reason().to_owned(),
@@ -522,6 +522,7 @@ const fn verification_phase(state: &VerificationView) -> &'static str {
         VerificationView::Waiting => "waiting",
         VerificationView::Choose { .. } => "choose",
         VerificationView::Scanned => "scanned",
+        VerificationView::Reciprocated => "reciprocated",
         VerificationView::Compare { .. } => "compare",
         VerificationView::Confirmed => "confirmed",
         VerificationView::Done => "done",

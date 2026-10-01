@@ -40,19 +40,29 @@ export class SableWidgetDriver extends WidgetDriver {
     const target = roomId ?? this.#roomId;
 
     if (stateKey !== null) {
-      await this.#core.commands.sendStateEvent(target, eventType, stateKey, content);
-      return { roomId: target, eventId: '' };
+      const eventId = await this.#core.commands.sendStateEvent(
+        target,
+        eventType,
+        stateKey,
+        content
+      );
+      return { roomId: target, eventId };
     }
 
     if (eventType === REDACTION_EVENT_TYPE) {
       const redacts = (content as { redacts?: unknown }).redacts;
       if (typeof redacts !== 'string') throw new Error('redaction without a target');
-      await this.#core.commands.redact(target, redacts, null);
-      return { roomId: target, eventId: redacts };
+      const reason = (content as { reason?: unknown }).reason;
+      const eventId = await this.#core.commands.sendRedaction(
+        target,
+        redacts,
+        typeof reason === 'string' ? reason : null
+      );
+      return { roomId: target, eventId };
     }
 
-    await this.#core.commands.sendRawEvent(target, eventType, content);
-    return { roomId: target, eventId: '' };
+    const eventId = await this.#core.commands.sendRawEvent(target, eventType, content);
+    return { roomId: target, eventId };
   }
 
   override async readRoomTimeline(

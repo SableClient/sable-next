@@ -19,10 +19,12 @@
 
   .text-input:autofill,
   .text-input:-webkit-autofill {
-    -webkit-text-fill-color: var(--bg-on-container);
+    -webkit-text-fill-color: var(--form-control-color);
   }
 
   .text-input:-webkit-autofill {
-    box-shadow: 0 0 0 1000px var(--bg-container) inset;
+    box-shadow:
+      inset 0 0 0 var(--form-control-ring) var(--form-control-line),
+      inset 0 0 0 1000px var(--form-control-container);
   }
 </style>

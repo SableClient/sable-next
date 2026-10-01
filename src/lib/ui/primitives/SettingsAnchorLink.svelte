@@ -70,7 +70,7 @@
 
   .anchor-link:hover {
     background: var(--surface-container-hover);
-    color: inherit;
+    color: var(--surface-on-container);
   }
 
   .anchor-link:focus-visible {

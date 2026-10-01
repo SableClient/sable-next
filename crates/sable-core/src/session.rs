@@ -43,6 +43,7 @@ pub struct Session {
 pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedSession> {
     if let Some(full) = client.oauth().full_session() {
         return Some(PersistedSession {
+            oauth_issuer: None,
             resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::oauth(full),
@@ -53,6 +54,7 @@ pub fn current_session(client: &Client, homeserver: String) -> Option<PersistedS
         .matrix_auth()
         .session()
         .map(|matrix| PersistedSession {
+            oauth_issuer: None,
             resolved_homeserver: Some(client.homeserver()),
             homeserver,
             credentials: Credentials::Password(matrix),
@@ -73,6 +75,8 @@ pub enum Credentials {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PersistedSession {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_issuer: Option<Url>,
     #[serde(default)]
     pub resolved_homeserver: Option<Url>,
     pub homeserver: String,
@@ -82,6 +86,7 @@ pub struct PersistedSession {
 impl PersistedSession {
     #[must_use]
     pub fn keeping_endpoint_of(mut self, previous: &Self) -> Self {
+        self.oauth_issuer.clone_from(&previous.oauth_issuer);
         if previous.resolved_homeserver.is_some() {
             self.resolved_homeserver
                 .clone_from(&previous.resolved_homeserver);
@@ -206,7 +211,12 @@ pub fn account_store_id(base_store_id: &str, account_id: &str) -> String {
 pub fn removable_account_store(base_store_id: &str, store_id: &str) -> bool {
     store_id
         .strip_prefix(&format!("{base_store_id}-account-"))
-        .is_some_and(|account_id| !account_id.is_empty())
+        .is_some_and(|account_id| {
+            !account_id.is_empty()
+                && account_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        })
 }
 
 impl Credentials {
@@ -217,6 +227,15 @@ impl Credentials {
             Self::OAuth { user, .. } => user.tokens.clone(),
         }
     }
+    pub(crate) fn discard_tokens(&mut self) {
+        let tokens = match self {
+            Self::Password(session) => &mut session.tokens,
+            Self::OAuth { user, .. } => &mut user.tokens,
+        };
+        tokens.access_token.clear();
+        tokens.refresh_token = None;
+    }
+
     #[must_use]
     pub fn oauth(session: OAuthSession) -> Self {
         Self::OAuth {
@@ -332,6 +351,16 @@ pub(crate) async fn restore_credentials(
     client: &Client,
     persisted: &PersistedSession,
 ) -> Result<(), String> {
+    if let Some(expected) = &persisted.oauth_issuer {
+        let metadata = client
+            .oauth()
+            .server_metadata()
+            .await
+            .map_err(|error| error.to_string())?;
+        if metadata.issuer.as_str() != expected.as_str() {
+            return Err("saved OAuth issuer does not match the homeserver".to_owned());
+        }
+    }
     match persisted.credentials.clone() {
         Credentials::Password(matrix) => client
             .restore_session(matrix)
@@ -439,29 +468,32 @@ async fn build_account_client(
 
     #[cfg(not(target_family = "wasm"))]
     let builder = {
-        static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
         let _ = persistent_event_cache;
-        let holder = format!(
-            "sable-{}-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos(),
-            NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        );
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let lock = {
+            static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+            let holder = format!(
+                "sable-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos(),
+                NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            );
+            matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(holder)
+        };
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess;
+
         builder
             .sqlite_store_with_cache_path(
                 std::path::Path::new(store_id).join("store"),
                 std::path::Path::new(store_id).join("cache"),
                 None,
             )
-            .cross_process_store_config(
-                matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
-                    holder,
-                ),
-            )
+            .cross_process_store_config(lock)
     };
 
     #[cfg(not(target_family = "wasm"))]
@@ -472,6 +504,7 @@ async fn build_account_client(
         // The SharedWorker is the sole IndexedDB owner in the web runtime.
         let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::SingleProcess;
         let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
+        let close_stores = Box::new(stores.connection_closer());
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)
             .media_store(stores.media)
@@ -491,6 +524,9 @@ async fn build_account_client(
             .base_client((*base).clone())
             .build()
             .await?;
+        INDEXEDDB_STORES.with_borrow_mut(|owners| {
+            owners.insert(store_id.to_owned(), close_stores);
+        });
         BASE_CLIENTS.with_borrow_mut(|bases| {
             bases.insert(store_id.to_owned(), std::rc::Rc::downgrade(&base));
         });
@@ -514,6 +550,9 @@ const fn session_timeout(proxied: bool) -> Duration {
 
 #[cfg(target_family = "wasm")]
 thread_local! {
+    static INDEXEDDB_STORES: std::cell::RefCell<
+        std::collections::HashMap<String, Box<dyn FnOnce()>>,
+    > = std::cell::RefCell::default();
     static BASE_CLIENTS: std::cell::RefCell<
         std::collections::HashMap<String, std::rc::Weak<matrix_sdk_base::BaseClient>>,
     > = std::cell::RefCell::default();
@@ -522,6 +561,16 @@ thread_local! {
 #[cfg(target_family = "wasm")]
 pub(crate) fn base_client(store_id: &str) -> Option<std::rc::Rc<matrix_sdk_base::BaseClient>> {
     BASE_CLIENTS.with_borrow(|bases| bases.get(store_id)?.upgrade())
+}
+
+#[cfg(target_family = "wasm")]
+pub(crate) fn close_account_stores(store_id: &str) {
+    BASE_CLIENTS.with_borrow_mut(|bases| bases.remove(store_id));
+    INDEXEDDB_STORES.with_borrow_mut(|owners| {
+        if let Some(stores) = owners.remove(store_id) {
+            stores();
+        }
+    });
 }
 
 /// For dynamic client registration. The redirect URI must match the one handed
@@ -908,6 +957,30 @@ mod tests {
             .await
             .unwrap();
         client
+    }
+
+    #[cfg(not(any(target_family = "wasm", target_os = "android", target_os = "ios")))]
+    #[tokio::test]
+    async fn idle_desktop_crypto_store_does_not_write() {
+        let root = tempfile::tempdir().unwrap();
+        let client = seed_crypto(root.path().to_str().unwrap(), &offline_session()).await;
+        let _sync = super::build_sync(client.clone()).await.unwrap();
+        let _guard = client.encryption().spin_lock_store(None).await.unwrap();
+        let observer = rusqlite::Connection::open_with_flags(
+            root.path().join("store/matrix-sdk-crypto.sqlite3"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let before: i64 = observer
+            .pragma_query_value(None, "data_version", |row| row.get(0))
+            .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+        let after: i64 = observer
+            .pragma_query_value(None, "data_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(before, after, "idle crypto store committed database writes");
     }
 
     #[cfg(not(target_family = "wasm"))]

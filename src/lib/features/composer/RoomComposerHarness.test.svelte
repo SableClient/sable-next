@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CoreClient } from '#lib/core/client.svelte.js';
+  import type { RoomSummary } from '#src/generated/protocol';
   import { provideCoreClient } from '#lib/core/context.js';
   import { PersonaStore, providePersonaStore } from '#lib/personas/personas.svelte.js';
   import { provideRoomList, RoomList } from '#lib/rooms/room-list.svelte.js';
@@ -11,19 +12,22 @@
 
   interface Props {
     core: CoreClient;
+    rooms?: RoomSummary[];
     composer: ComponentProps<typeof RoomComposer>;
     registerReply?: (reply: () => void) => void;
     registerContext?: (set: (next: ComposerContext | null) => void) => void;
     registerRoom?: (set: (roomId: string) => void) => void;
   }
 
-  let { core, composer, registerReply, registerContext, registerRoom }: Props = $props();
+  let { core, rooms, composer, registerReply, registerContext, registerRoom }: Props = $props();
   let context = $state<ComposerContext | null>(
     untrack(() => composer.context as ComposerContext | null)
   );
 
   provideCoreClient(untrack(() => core));
-  provideRoomList(untrack(() => new RoomList(core)));
+  const roomList = untrack(() => new RoomList(core));
+  roomList.rooms = untrack(() => rooms ?? []);
+  provideRoomList(roomList);
   providePersonaStore(untrack(() => new PersonaStore(core)));
 
   function reply(): void {

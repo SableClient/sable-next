@@ -186,6 +186,11 @@ export function createCommands(transport: () => Transport) {
     roomId: string,
     cachedOnly = false
   ): Promise<{ packs: ImagePackView[]; complete: boolean }> {
+    if (roomId === '') {
+      if (cachedOnly) return { packs: [], complete: false };
+      const response = await transport().send({ type: 'all_image_packs' });
+      return { packs: response.packs, complete: false };
+    }
     const response = await transport().send({
       type: 'image_packs',
       room_id: roomId,
@@ -815,13 +820,24 @@ export function createCommands(transport: () => Transport) {
       });
     },
 
-    async sendRawEvent(roomId: string, eventType: string, content: unknown): Promise<void> {
-      await transport().send({
+    async sendRawEvent(roomId: string, eventType: string, content: unknown): Promise<string> {
+      const { event_id } = await transport().send({
         type: 'send_raw_event',
         room_id: roomId,
         event_type: eventType,
         content: $state.snapshot(content),
       });
+      return event_id;
+    },
+
+    async sendRedaction(roomId: string, eventId: string, reason: string | null): Promise<string> {
+      const { event_id } = await transport().send({
+        type: 'send_redaction',
+        room_id: roomId,
+        event_id: eventId,
+        reason,
+      });
+      return event_id;
     },
 
     async calendarEntries(roomId: string): Promise<CalendarView> {
@@ -1984,14 +2000,15 @@ export function createCommands(transport: () => Transport) {
       eventType: string,
       stateKey: string,
       content: unknown
-    ): Promise<void> {
-      await transport().send({
+    ): Promise<string> {
+      const { event_id } = await transport().send({
         type: 'send_state_event',
         room_id: roomId,
         event_type: eventType,
         state_key: stateKey,
         content: $state.snapshot(content),
       });
+      return event_id;
     },
 
     async setUserPowerLevel(roomId: string, userId: string, powerLevel: number): Promise<void> {

@@ -40,3 +40,11 @@ test('an older button order gains the persona and format buttons at the end', ()
       .composerButtonOrder
   ).toEqual(['emoticon', 'gif', 'sticker', 'persona', 'format']);
 });
+
+test('threads default to full conversations and keep a saved panel choice', () => {
+  expect(sanitize({}, preferences).threadPresentation).toBe('timeline');
+  expect(sanitize({ threadPresentation: 'panel' }, preferences).threadPresentation).toBe('panel');
+  expect(sanitize({ threadPresentation: 'unknown' }, preferences).threadPresentation).toBe(
+    'timeline'
+  );
+});

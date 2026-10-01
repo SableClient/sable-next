@@ -3,8 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CoreEvent } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import {
+  clearDraft,
+  clearDrafts,
+  readDraft,
+} from '#lib/features/composer/composer-drafts.svelte.js';
 
 import { ACCOUNT_DATA_KEY_TYPE, AccountSync, type SyncedDocument } from './account-sync.svelte';
+import { draftsDocumentFor } from './sync-documents';
 
 type SealState = 'plain' | 'sealed' | 'locked';
 
@@ -70,10 +76,62 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearDrafts();
   vi.useRealTimers();
 });
 
 describe('AccountSync', () => {
+  it('keeps a sent draft cleared after restarting', async () => {
+    const roomId = '!room:example.org';
+    const document = draftsDocumentFor('');
+    const remote = { [document.eventType]: { v: 1, drafts: { [roomId]: { type: 'doc' } } } };
+    const { core, commands, announce } = stubCore(remote, {
+      canSeal: true,
+      states: { [document.eventType]: 'sealed' },
+    });
+    const sync = new AccountSync();
+    const stop = sync.start(core, [document]);
+    await vi.runAllTimersAsync();
+    expect(readDraft(roomId)?.doc).toEqual({ type: 'doc' });
+
+    clearDraft(roomId);
+    sync.push(document);
+    announce(document.eventType);
+    await vi.advanceTimersByTimeAsync(0);
+    sync.push(document);
+    await vi.runAllTimersAsync();
+
+    stop();
+    clearDrafts();
+    const stopRestarted = new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+    expect(readDraft(roomId)).toBeUndefined();
+    stopRestarted();
+    expect(commands.setSealedAccountData).toHaveBeenCalledWith(document.eventType, {
+      v: 1,
+      drafts: {},
+    });
+  });
+
+  it('converts v1 account data only when the v2 document is absent', async () => {
+    const local = { value: 'local' };
+    const document = stubDocument(local, {
+      legacy: { eventType: 'old.settings', convert: (content) => content },
+    });
+    const { core, commands } = stubCore({ 'old.settings': { v: 1, value: 'v1' } });
+    new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+    expect(local.value).toBe('v1');
+    expect(commands.setAccountData).toHaveBeenCalledWith(document.eventType, { v: 1, value: 'v1' });
+    const current = stubCore({
+      'old.settings': { v: 1, value: 'stale' },
+      [document.eventType]: { v: 1, value: 'v2' },
+    });
+    new AccountSync().start(current.core, [document]);
+    await vi.runAllTimersAsync();
+    expect(local.value).toBe('v2');
+    expect(current.commands.accountData).not.toHaveBeenCalledWith('old.settings');
+  });
   it('adopts what the account already holds', async () => {
     const local = { value: 'local' };
     const document = stubDocument(local);
@@ -111,6 +169,17 @@ describe('AccountSync', () => {
     await vi.runAllTimersAsync();
 
     expect(commands.setAccountData).not.toHaveBeenCalled();
+  });
+
+  it('does not upload an accepted missing document', async () => {
+    const document = stubDocument({ value: '' }, { adopt: (content) => content === null });
+    const { core, commands } = stubCore({});
+
+    const stop = new AccountSync().start(core, [document]);
+    await vi.runAllTimersAsync();
+
+    expect(commands.setAccountData).not.toHaveBeenCalled();
+    stop();
   });
 
   it('uploads a local change once the debounce elapses', async () => {

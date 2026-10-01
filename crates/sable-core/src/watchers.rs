@@ -382,16 +382,6 @@ impl Core {
         );
     }
 
-    pub(crate) fn watch_bridged_dms(self: &Arc<Self>, client: &matrix_sdk::Client) {
-        self.track_session_task(
-            spawn(crate::rooms::align_bridged_dms_on_change(
-                self.clone(),
-                client.clone(),
-            ))
-            .abort_on_drop(),
-        );
-    }
-
     pub(crate) fn watch_joined_invites(&self, client: &matrix_sdk::Client) {
         self.track_session_task(
             spawn(crate::rooms::reconcile_joined_invites(client.clone())).abort_on_drop(),

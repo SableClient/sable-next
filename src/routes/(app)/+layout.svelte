@@ -172,7 +172,14 @@
   );
   const callVolumeOf = (identity: string, screen: boolean): number => {
     const userId = callUserIds.get(identity) ?? identity;
-    return effectiveVolume(screen ? screenVolumeKey(userId) : userId);
+    if (!screen) return effectiveVolume(userId);
+    const watched = callSession.transport.participants.some(
+      (participant) =>
+        participant.identity === identity &&
+        participant.screenShare !== undefined &&
+        callSession.watchedScreenShareIds.includes(participant.screenShare.id)
+    );
+    return watched ? effectiveVolume(screenVolumeKey(userId)) : 0;
   };
   const shareInbox = new ShareInbox();
 
@@ -1025,6 +1032,7 @@
     align-items: center;
     background: var(--surface-container);
     box-sizing: border-box;
+    color: var(--surface-on-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;
@@ -1038,6 +1046,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
+    color: var(--bg-on-container);
     display: flex;
     flex-direction: column;
     gap: var(--space-400);

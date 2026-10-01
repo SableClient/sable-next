@@ -15,8 +15,8 @@
     <div
       class={['toast', `toast-${toast.tone}`]}
       role={toast.tone === 'error' ? 'alert' : 'status'}
-      in:fly={{ y: 8, duration: motionMs(MOTION_MS.slow) }}
-      out:fly={{ y: 8, duration: motionMs(MOTION_MS.medium) }}
+      in:fly={{ y: -8, duration: motionMs(MOTION_MS.slow) }}
+      out:fly={{ y: -8, duration: motionMs(MOTION_MS.medium) }}
       onpointerenter={() => {
         toasts.hold(toast.id);
       }}
@@ -51,13 +51,15 @@
 
 <style>
   .toast-region {
-    bottom: calc(var(--space-400) + var(--safe-bottom));
     display: grid;
     gap: var(--space-200);
-    max-width: min(28rem, calc(100vw - var(--space-800)));
+    inset-inline: calc(var(--space-300) + var(--safe-left))
+      calc(var(--space-300) + var(--safe-right));
+    margin-inline: auto;
+    max-width: 28rem;
     pointer-events: none;
     position: fixed;
-    right: calc(var(--space-400) + var(--safe-right));
+    top: calc(var(--safe-top) + var(--header-height) + var(--space-300));
     z-index: var(--layer-notify);
   }
 
@@ -68,6 +70,7 @@
     box-shadow: var(--shadow-e300);
     display: flex;
     gap: var(--space-300);
+    min-width: 0;
     padding: var(--space-200) var(--space-200) var(--space-200) var(--space-300);
     pointer-events: auto;
   }
@@ -86,5 +89,15 @@
 
   .toast span {
     flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  @media (width >= 768px) {
+    .toast-region {
+      inset-inline: auto calc(var(--space-400) + var(--safe-right));
+      margin-inline: 0;
+      width: min(28rem, calc(100vw - var(--space-400) * 2 - var(--safe-left) - var(--safe-right)));
+    }
   }
 </style>

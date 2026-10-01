@@ -4,12 +4,35 @@ const SPOILER = 'data-mx-spoiler';
 
 export type ReplyVersion = { of: string; body: string; html: string | null };
 
-function spoilerSafe(body: string, html: string | null): string {
-  if (html === null || !html.includes(SPOILER)) return body;
+function previewText(body: string, html: string | null): string {
+  if (html === null) return body;
   const parsed = new DOMParser().parseFromString(html, 'text/html').body;
   for (const spoiler of parsed.querySelectorAll(`[${SPOILER}]`)) spoiler.replaceWith('[Spoiler]');
-  for (const lineBreak of parsed.querySelectorAll('br')) lineBreak.replaceWith('\n');
-  return parsed.textContent;
+  let text = '';
+  const lineBreak = () => {
+    if (text !== '' && !text.endsWith('\n')) text += '\n';
+  };
+  const visit = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.textContent;
+      return;
+    }
+    if (!(node instanceof Element)) return;
+    if (node.tagName === 'BR') {
+      text += '\n';
+      return;
+    }
+    if (node.tagName === 'IMG') {
+      text += node.getAttribute('alt') ?? '';
+      return;
+    }
+    const block = /^(?:P|DIV|PRE|BLOCKQUOTE|H[1-6]|LI|TR)$/.test(node.tagName);
+    if (block) lineBreak();
+    node.childNodes.forEach(visit);
+    if (block) lineBreak();
+  };
+  parsed.childNodes.forEach(visit);
+  return text.replace(/\n+$/, '') || body;
 }
 
 export function replyPreviewBody(content: TimelineItemContentView): string {
@@ -20,13 +43,13 @@ export function replyPreviewBody(content: TimelineItemContentView): string {
     case 'file':
       return content.caption === null
         ? content.filename
-        : spoilerSafe(content.caption, content.html);
+        : previewText(content.caption, content.html);
     case 'message':
-      return spoilerSafe(content.body, content.html);
+      return previewText(content.body, content.html);
     case 'gallery':
       return content.body === ''
         ? content.items.map((item) => item.filename).join(', ')
-        : spoilerSafe(content.body, content.html);
+        : previewText(content.body, content.html);
     case 'sticker':
     case 'location':
       return content.body;

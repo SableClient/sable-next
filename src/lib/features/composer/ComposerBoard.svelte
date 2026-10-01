@@ -78,14 +78,19 @@
       (id): id is BoardTab =>
         (id === 'gif' && preferences.composerGifButton && gifs !== null) ||
         (id === 'sticker' && preferences.composerStickerButton) ||
-        (id === 'emoticon' && preferences.composerEmoteButton)
+        (id === 'emoticon' && preferences.composerEmoteButton) ||
+        id === 'separator'
     );
     return wanted.length > 0 ? wanted : ['emoticon'];
   });
 
   let triggers = $derived(
     preferences.composerButtonOrder.filter((id) =>
-      id === 'persona' || id === 'format' ? extras[id] !== undefined : boardTriggers.includes(id)
+      id === 'separator'
+        ? extras['persona'] !== undefined || extras['format'] !== undefined
+        : id === 'persona' || id === 'format'
+          ? extras[id] !== undefined
+          : boardTriggers.includes(id)
     )
   );
 
@@ -127,7 +132,9 @@
 {#if desktop}
   <Popover.Root bind:open>
     {#each triggers as id (id)}
-      {#if id === 'persona' || id === 'format'}
+      {#if id === 'separator'}
+        <div class="composer-separator"></div>
+      {:else if id === 'persona' || id === 'format'}
         {@render extras[id]?.()}
       {:else}
         {@const Icon = triggerIcons[id]}
@@ -177,7 +184,9 @@
   </Popover.Root>
 {:else}
   {#each triggers as id (id)}
-    {#if id === 'persona' || id === 'format'}
+    {#if id === 'separator'}
+      <div class="composer-separator"></div>
+    {:else if id === 'persona' || id === 'format'}
       {@render extras[id]?.()}
     {:else}
       {@const Icon = triggerIcons[id]}
@@ -187,12 +196,12 @@
         {disabled}
         data-state={open && tab === id ? 'open' : 'closed'}
         aria-label={triggerLabel(id)}
-        onpointerdown={onBeforeOpen}
         onclick={() => {
           if (open && tab === id) {
             open = false;
             return;
           }
+          onBeforeOpen?.();
           tab = id;
           open = true;
         }}

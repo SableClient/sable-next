@@ -26,6 +26,7 @@ use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
 use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::message::Relation;
+use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLevelsEventContent};
 use matrix_sdk::ruma::events::sticker::StickerEventContent;
 use matrix_sdk::ruma::events::tag::{TagInfo, TagName};
 use matrix_sdk::ruma::profile::{ProfileFieldName, ProfileFieldValue};
@@ -417,13 +418,32 @@ impl Core {
                 mut content,
             } => {
                 ensure_empty_mentions(&mut content);
-                self.room(&room_id)
+                let response = self
+                    .room(&room_id)
                     .await?
                     .send_raw(&event_type, content)
                     .await
                     .or_failed(self, "send_raw_event")?;
 
-                Ok(CommandOk::SendRawEvent)
+                Ok(CommandOk::SendRawEvent {
+                    event_id: response.response.event_id,
+                })
+            }
+
+            Command::SendRedaction {
+                room_id,
+                event_id,
+                reason,
+            } => {
+                let response = self
+                    .room(&room_id)
+                    .await?
+                    .redact(&event_id, reason.as_deref(), None)
+                    .await
+                    .map_err(|error| self.homeserver_http_error("send_redaction", error))?;
+                Ok(CommandOk::SendRedaction {
+                    event_id: response.event_id,
+                })
             }
 
             Command::CalendarEntries { room_id } => Ok(CommandOk::CalendarEntries(
@@ -681,20 +701,47 @@ impl Core {
                 memberships,
             } => {
                 let room = self.room(&room_id).await?;
-                if let Err(error) = room.power_levels().await {
-                    tracing::error!(
-                        room_id = %room_id,
-                        %error,
-                        "room power levels are unavailable, every member reads as the spec default"
-                    );
-                }
                 let members = room
                     .members(membership_filter(&memberships))
                     .await
                     .or_failed(self, "room_members")?;
+                let power_levels = if room.power_levels().await.is_err() {
+                    let content = self
+                        .room_state_event_content(
+                            room_id,
+                            "m.room.power_levels".to_owned(),
+                            String::new(),
+                        )
+                        .await
+                        .ok()
+                        .flatten()
+                        .and_then(|content| {
+                            serde_json::from_value::<RoomPowerLevelsEventContent>(content).ok()
+                        });
+                    let rules = room.clone_info().room_version_rules_or_default();
+                    content.map(|content| {
+                        RoomPowerLevels::new(
+                            content.into(),
+                            &rules.authorization,
+                            room.creators().unwrap_or_default(),
+                        )
+                    })
+                } else {
+                    None
+                };
 
                 Ok(CommandOk::RoomMembers {
-                    members: members.iter().map(view::member_view).collect(),
+                    members: members
+                        .iter()
+                        .map(|member| {
+                            let mut member = view::member_view(member);
+                            if let Some(levels) = &power_levels {
+                                member.power_level =
+                                    view::clamp_power_level(levels.for_user(&member.user_id));
+                            }
+                            member
+                        })
+                        .collect(),
                 })
             }
 
@@ -1363,6 +1410,7 @@ impl Core {
                 shortcode,
                 thread_root,
             } => {
+                self.ensure_reaction_target(&room_id, &event_id).await?;
                 let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
                 let shortcode = match shortcode
                     .or_else(|| source_pack.as_ref().map(|source| source.shortcode.clone()))
@@ -1898,7 +1946,7 @@ impl Core {
                 Ok(CommandOk::NotificationSettings(push_rules::room_settings(
                     &rules,
                     &room_id,
-                    notifications::room_shape(&room).await,
+                    notifications::uses_direct_push_rules(&room),
                 )))
             }
 
@@ -1907,7 +1955,7 @@ impl Core {
                 let mut rooms = Vec::with_capacity(room_ids.len());
                 for room_id in room_ids {
                     if let Ok(room) = self.room(&room_id).await {
-                        rooms.push((room_id, notifications::room_shape(&room).await));
+                        rooms.push((room_id, notifications::uses_direct_push_rules(&room)));
                     }
                 }
 
@@ -2065,20 +2113,13 @@ impl Core {
             Command::SetRoomNotificationMode { room_id, mode } => {
                 let room = self.room(&room_id).await?;
                 let rules = self.push_rules().await?;
-                let shape = notifications::room_shape(&room).await;
-                let writes = push_rules::plan_room_mode(
-                    &rules.snapshot().await,
-                    &room_id,
-                    shape.direct,
-                    mode,
-                );
+                let direct = notifications::uses_direct_push_rules(&room);
+                let writes =
+                    push_rules::plan_room_mode(&rules.snapshot().await, &room_id, direct, mode);
                 rules
                     .apply(writes)
                     .await
                     .or_failed(self, "set_room_notification_mode")?;
-                if shape.bridged {
-                    self.align_bridged_dms(None).await;
-                }
 
                 Ok(CommandOk::SetRoomNotificationMode)
             }
@@ -2092,7 +2133,6 @@ impl Core {
                     .apply(writes)
                     .await
                     .or_failed(self, "set_default_notification_mode")?;
-                self.align_bridged_dms(Some(&before)).await;
 
                 Ok(CommandOk::SetDefaultNotificationMode)
             }
@@ -2185,7 +2225,8 @@ impl Core {
                 state_key,
                 content,
             } => {
-                self.room(&room_id)
+                let response = self
+                    .room(&room_id)
                     .await?
                     .send_state_event_raw(&event_type, &state_key, &content)
                     .await
@@ -2198,7 +2239,9 @@ impl Core {
                     self.emit(CoreEvent::RoomCosmeticsChanged { room_id });
                 }
 
-                Ok(CommandOk::SendStateEvent)
+                Ok(CommandOk::SendStateEvent {
+                    event_id: response.event_id,
+                })
             }
 
             Command::SetRoomName { room_id, name } => {

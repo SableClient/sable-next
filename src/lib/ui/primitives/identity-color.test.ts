@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { expect, test } from 'vitest';
 
-import { identityColor } from './identity-color.js';
+import { identityColor, senderColor } from './identity-color.js';
 
 function channel(value: number): number {
   return value <= 0.039_28 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -39,6 +39,15 @@ function contrast(first: number[], second: number[]): number {
 
 const styles = readFileSync(new URL('../../../styles.css', import.meta.url), 'utf8');
 const onPlate = /--avatar-identity-on-plate: (#[0-9a-f]{6});/.exec(styles)?.[1];
+
+test.each([
+  [null, 'var(--mx-uc-1, var(--primary-main))'],
+  ['', 'var(--mx-uc-1, var(--primary-main))'],
+  ['@alice:example.test', 'var(--mx-uc-1, var(--primary-main))'],
+  ['@bob:example.test', 'var(--mx-uc-6, var(--warn-main))'],
+])('sender %s uses the v1 theme slot with its existing fallback', (id, expected) => {
+  expect(senderColor(id)).toBe(expected);
+});
 
 test('the initials colour is declared once, for every theme', () => {
   expect(onPlate).toBeDefined();

@@ -40,7 +40,6 @@
     presenceLabel?: string;
     nameColorLight?: string | null;
     nameColorDark?: string | null;
-    nameFont?: string | null;
     variant?: 'popover' | 'sheet';
     insetBody?: boolean;
     class?: ClassValue;
@@ -72,7 +71,6 @@
     presenceLabel = '',
     nameColorLight = null,
     nameColorDark = null,
-    nameFont = null,
     variant = 'popover',
     insetBody = false,
     class: className = '',
@@ -188,7 +186,8 @@
             size="large"
             src={avatarUrl}
             name={displayName}
-            {color}
+            id={userId}
+            color={heroColor ? undefined : color}
             original
             decorative
           />
@@ -199,7 +198,8 @@
           size="large"
           src={avatarUrl}
           name={displayName}
-          {color}
+          id={userId}
+          color={heroColor ? undefined : color}
           original
           alt={displayName}
         />
@@ -237,12 +237,7 @@
   <div class="profile-card-body">
     <div class="profile-card-identity">
       <div class="profile-card-heading">
-        <h2
-          id={nameId}
-          class="profile-card-name"
-          class:tinted={nameColor}
-          style:font-family={nameFont ?? undefined}
-        >
+        <h2 id={nameId} class="profile-card-name" class:tinted={nameColor}>
           {displayName}
         </h2>
         {#if pronouns}{@render pronouns()}{/if}
@@ -299,7 +294,8 @@
   .profile-card {
     /* --sec-main alone fails 4.5:1 on the light background at this text
        size, so small words get a stronger mix and it is left to icons. */
-    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--bg-on-container));
+    --profile-text-muted: color-mix(in oklab, var(--sec-main) 55%, var(--surface-on-container));
+    --profile-ink: var(--surface-on-container);
     --profile-icon: var(--sec-main);
     --profile-line: var(--surface-container-line);
     --profile-avatar-size: var(--avatar-size-large);
@@ -319,6 +315,7 @@
     background: var(--profile-card-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
+    color: var(--profile-ink);
     overflow: hidden;
     position: relative;
   }
@@ -410,6 +407,7 @@
   .profile-card-avatar-wrap :global(.avatar-root.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
+    background: var(--profile-card-ground);
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
   }
 
@@ -459,6 +457,7 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     flex-shrink: 1;
     font-size: var(--font-size-label);
     line-height: var(--line-height-small);
@@ -613,7 +612,7 @@
 
   @media (pointer: coarse) {
     .profile-card-user-id {
-      min-height: var(--control-height-300);
+      min-height: var(--control-height-large);
     }
   }
 
@@ -657,7 +656,13 @@
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius-inner);
+    color: var(--surface-var-on-container);
     overflow: clip;
+  }
+
+  .profile-card.tinted .profile-card-status,
+  .profile-card.tinted .profile-card-panel.framed {
+    color: var(--profile-ink);
   }
 
   .profile-card-popover.tinted.profile-card-inset-body .profile-card-panel.framed {
@@ -717,10 +722,11 @@
   .profile-card.tinted :global(.formatted-body code:not(pre code)) {
     background: var(--profile-card-ground);
     border-color: var(--profile-line);
+    color: var(--profile-ink);
   }
 
   .profile-card.tinted :global(.formatted-body .code-block) {
-    color: var(--bg-on-container);
+    color: var(--surface-var-on-container);
   }
 
   /* No hairline: the framed panel above already draws one edge, and two reads as

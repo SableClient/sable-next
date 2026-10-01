@@ -28,10 +28,10 @@ const additionalSettings = {
 const config = {
   apps: [
     {
-      id: isNightly ? 'moe.sable.next.nightly' : 'moe.sable.next',
+      id: isNightly ? 'moe.sable.next.nightly' : 'moe.sable.client',
       url: `${server}/${repository}`,
       author: 'SableClient',
-      name: isNightly ? 'Sable Next Nightly' : 'Sable Next',
+      name: isNightly ? 'Sable Next Nightly' : 'Sable',
       installedVersion: null,
       latestVersion: version,
       apkUrls: JSON.stringify([[apkName, apkUrl]]),

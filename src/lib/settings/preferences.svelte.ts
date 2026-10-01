@@ -7,9 +7,11 @@ import { languageValues, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 import { customTitleBarDefault } from '#lib/platform/window-decorations.js';
 import type { BadgeNotificationMode } from '#lib/rooms/unread.js';
+import { readV1Preferences } from '#lib/migrations/v1/preferences.js';
 
 export type { BadgeNotificationMode };
 
+export type ThreadPresentation = 'timeline' | 'panel';
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
@@ -53,11 +55,12 @@ export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type UsernameClick = 'mention' | 'profile';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
-export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'persona' | 'format';
+export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
   'sticker',
   'emoticon',
+  'separator',
   'persona',
   'format',
 ] as const satisfies readonly ComposerButton[];
@@ -65,6 +68,7 @@ export const COMPOSER_BUTTONS = [
 export interface Preferences {
   language: string;
   layout: TimelineLayout;
+  threadPresentation: ThreadPresentation;
   alignOwnMessages: boolean;
   messageSpacing: MessageSpacing;
   timelineEmoteSize: TimelineEmoteSize;
@@ -72,7 +76,6 @@ export interface Preferences {
   quickCss: string;
   underlineLinks: boolean;
   renderRoomColors: boolean;
-  renderRoomFonts: boolean;
   reducedMotion: boolean;
   pageZoom: number;
   textScale: number;
@@ -122,6 +125,7 @@ export interface Preferences {
   groupMembersByPresence: boolean;
   filterPronounsByLanguage: boolean;
   showPronouns: boolean;
+  showPronounPills: boolean;
   pronounPillLimit: PronounPillLimit;
   pronounPillLength: PronounPillLength;
 
@@ -248,6 +252,7 @@ type EnumPreference = Exclude<
 const ENUMS = {
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
+  threadPresentation: ['timeline', 'panel'],
   messageSpacing: ['compact', 'cozy', 'roomy'],
   timelineEmoteSize: ['default', '20', '24', '32', '48', '64'],
   theme: ['system', 'dark', 'light'],
@@ -308,6 +313,7 @@ export type RangePreference = keyof typeof PREFERENCE_RANGES;
 const DEFAULTS: Preferences = {
   language: SYSTEM_LANGUAGE,
   layout: 'modern',
+  threadPresentation: 'timeline',
   alignOwnMessages: true,
   messageSpacing: 'cozy',
   timelineEmoteSize: 'default',
@@ -315,7 +321,6 @@ const DEFAULTS: Preferences = {
   quickCss: '',
   underlineLinks: true,
   renderRoomColors: true,
-  renderRoomFonts: true,
   reducedMotion: prefersReducedMotion(),
   pageZoom: 1,
   textScale: 1,
@@ -365,6 +370,7 @@ const DEFAULTS: Preferences = {
   groupMembersByPresence: true,
   filterPronounsByLanguage: true,
   showPronouns: true,
+  showPronounPills: true,
   pronounPillLimit: '3',
   pronounPillLength: 'all',
 
@@ -537,7 +543,9 @@ const explicit = new SvelteSet<keyof Preferences>();
 function load(): Preferences {
   if (typeof localStorage === 'undefined') return { ...DEFAULTS };
 
-  const stored = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
+  const current = read(STORAGE_KEY) ?? read(LEGACY_STORAGE_KEY);
+  const migrated = current === null ? readV1Preferences() : null;
+  const stored = current ?? migrated;
   if (!stored) return { ...DEFAULTS };
 
   const loaded = mergeFontScale(
@@ -546,6 +554,9 @@ function load(): Preferences {
   );
   for (const key of PREFERENCE_KEYS) {
     if (key in stored || loaded[key] !== DEFAULTS[key]) explicit.add(key);
+  }
+  if (migrated !== null) {
+    writeJson(STORAGE_KEY, stored, '[sable settings] migrated preferences not persisted');
   }
   return loaded;
 }

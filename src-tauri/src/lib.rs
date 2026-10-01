@@ -41,6 +41,7 @@ mod share_inbox;
 mod snap_layouts;
 #[cfg(desktop)]
 mod tray;
+mod v1_migration;
 #[cfg(desktop)]
 pub mod verbose;
 #[cfg(all(feature = "cef", target_os = "linux"))]
@@ -823,6 +824,10 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol(map_tiles::TILE_URI_SCHEME, map_tiles::respond)
         .setup(setup)
         .invoke_handler(tauri::generate_handler![
+            v1_migration::v1_migration_complete,
+            v1_migration::begin_v1_migration,
+            v1_migration::import_v1_crypto_batch,
+            v1_migration::finish_v1_migration,
             submit_command,
             subscribe_events,
             fetch_media,

@@ -248,6 +248,13 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
         content: serde_json::Value,
     },
+    SendRedaction {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+        reason: Option<String>,
+    },
     CalendarEntries {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1425,7 +1432,14 @@ pub enum CommandOk {
     },
     /// The local echo arrives on the timeline diff stream.
     SendMessage,
-    SendRawEvent,
+    SendRawEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
+    SendRedaction {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     CalendarEntries(CalendarView),
     SaveCalendarEvent,
     SendSticker,
@@ -1751,7 +1765,10 @@ pub enum CommandOk {
     SetRoomTopic,
     SetRoomAvatar,
     SetRoomJoinRule,
-    SendStateEvent,
+    SendStateEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     SetUserPowerLevel,
 
     KickUser,
@@ -1808,6 +1825,9 @@ pub enum CommandErr {
     InvalidKeyExport,
     EncryptedScheduleUnsupported,
     DelayedEventsUnsupported,
+    SlidingSyncUnsupported,
+    AccountLocked,
+    AccountSuspended,
     /// Static: safe to hide UI.
     Unsupported,
     /// Retryable: keep UI.
@@ -1928,6 +1948,10 @@ pub enum RegistrationResultView {
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
+    AccountLockChanged {
+        account_id: String,
+        locked: bool,
+    },
     SyncStatus(SyncStatus),
     SessionEnded {
         reason: String,
@@ -2579,6 +2603,8 @@ pub enum VerificationView {
     },
     /// The other device read our code and waits for us to say it shows success.
     Scanned,
+    /// QR scan succeeded; awaiting the other device's confirmation.
+    Reciprocated,
     /// `decimals` is the fallback when the other side refused emoji.
     Compare {
         emojis: Vec<EmojiView>,
@@ -2978,7 +3004,6 @@ pub struct SenderCosmeticsView {
     pub user_id: OwnedUserId,
     pub color_on_light: Option<String>,
     pub color_on_dark: Option<String>,
-    pub font: Option<String>,
     pub pronouns: Vec<PronounView>,
 }
 
@@ -3020,16 +3045,26 @@ pub struct RoomPermissionsView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 pub struct RoomPowerLevelsView {
-    pub ban: i32,
-    pub kick: i32,
-    pub redact: i32,
-    pub invite: i32,
-    pub events_default: i32,
-    pub state_default: i32,
-    pub users_default: i32,
-    pub events: std::collections::BTreeMap<String, i32>,
-    pub users: std::collections::BTreeMap<String, i32>,
-    pub notifications_room: i32,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub ban: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub kick: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub redact: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub invite: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub events_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub state_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub users_default: i64,
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
+    pub events: std::collections::BTreeMap<String, i64>,
+    #[cfg_attr(feature = "typegen", specta(type = std::collections::BTreeMap<String, specta_typescript::Number<i64>>))]
+    pub users: std::collections::BTreeMap<String, i64>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub notifications_room: i64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -3799,8 +3834,6 @@ pub struct NotificationSettingsView {
     /// The room's own rule. `null` means it follows `default`.
     pub room: Option<NotificationModeView>,
     pub default: NotificationModeView,
-    /// A direct chat with a bridge bot or another MSC4171 service member in it.
-    pub bridged: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

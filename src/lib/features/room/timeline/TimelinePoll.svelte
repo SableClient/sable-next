@@ -151,6 +151,7 @@
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     gap: var(--space-150);

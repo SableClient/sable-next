@@ -65,27 +65,51 @@ test.each([
   }
 );
 
-test('signs out at once when nothing is at risk', async () => {
-  const guard = guardFor(() => Promise.resolve(safe));
+test.each([
+  ['backed-up keys', safe],
+  ['no encrypted rooms', { ...safe, has_encrypted_rooms: false }],
+] as const)('requires confirmation with %s', async (_label, safety) => {
+  const guard = guardFor(() => Promise.resolve(safety));
   const proceed = vi.fn(() => Promise.resolve());
 
   await guard.request(proceed);
 
-  expect(proceed).toHaveBeenCalledOnce();
-  expect(guard.risk).toBeNull();
-});
-
-test('holds the sign-out until it is confirmed', async () => {
-  const guard = guardFor(() => Promise.resolve({ ...safe, backup_enabled: false }));
-  const proceed = vi.fn(() => Promise.resolve());
-
-  await guard.request(proceed);
-  expect(guard.risk).toBe('no_backup');
   expect(proceed).not.toHaveBeenCalled();
+  expect(guard.open).toBe(true);
+  expect(guard.risk).toBeNull();
 
   await guard.confirm();
   expect(proceed).toHaveBeenCalledOnce();
+  expect(guard.open).toBe(false);
   expect(guard.risk).toBeNull();
+});
+
+test.each([false, true])(
+  'holds a risky sign-out even if already confirmed: %s',
+  async (confirmed) => {
+    const guard = guardFor(() => Promise.resolve({ ...safe, backup_enabled: false }));
+    const proceed = vi.fn(() => Promise.resolve());
+
+    await guard.request(proceed, confirmed);
+    expect(guard.open).toBe(true);
+    expect(guard.risk).toBe('no_backup');
+    expect(proceed).not.toHaveBeenCalled();
+
+    await guard.confirm();
+    expect(proceed).toHaveBeenCalledOnce();
+    expect(guard.open).toBe(false);
+    expect(guard.risk).toBeNull();
+  }
+);
+
+test('does not ask again when a safe sign-out was already confirmed', async () => {
+  const guard = guardFor(() => Promise.resolve(safe));
+  const proceed = vi.fn(() => Promise.resolve());
+
+  await guard.request(proceed, true);
+
+  expect(proceed).toHaveBeenCalledOnce();
+  expect(guard.open).toBe(false);
 });
 
 test('warns when the core cannot answer', async () => {
@@ -98,8 +122,11 @@ test('warns when the core cannot answer', async () => {
   expect(proceed).not.toHaveBeenCalled();
 });
 
-test('a dismissed warning never signs out', async () => {
-  const guard = guardFor(() => Promise.resolve({ ...safe, backup_uploaded: false }));
+test.each([
+  ['confirmation', safe],
+  ['encryption warning', { ...safe, backup_uploaded: false }],
+] as const)('dismissing the %s never signs out', async (_label, safety) => {
+  const guard = guardFor(() => Promise.resolve(safety));
   const proceed = vi.fn(() => Promise.resolve());
 
   await guard.request(proceed);
@@ -107,5 +134,6 @@ test('a dismissed warning never signs out', async () => {
   await guard.confirm();
 
   expect(proceed).not.toHaveBeenCalled();
+  expect(guard.open).toBe(false);
   expect(guard.risk).toBeNull();
 });

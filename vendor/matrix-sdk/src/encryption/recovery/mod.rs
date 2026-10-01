@@ -595,7 +595,7 @@ impl Recovery {
         if self.client.encryption().backups().are_enabled().await {
             Ok(true)
         } else {
-            self.are_backups_marked_as_disabled().await
+            Ok(self.are_backups_marked_as_disabled().await?)
         }
     }
 
@@ -653,7 +653,7 @@ impl Recovery {
 
     /// Run a network request to figure whether backups have been disabled at
     /// the account level.
-    async fn are_backups_marked_as_disabled(&self) -> Result<bool> {
+    pub(super) async fn are_backups_marked_as_disabled(&self) -> crate::Result<bool> {
         if let Some(key_backup_content) =
             self.client.account().fetch_account_data_static::<KeyBackupContent>().await?
         {

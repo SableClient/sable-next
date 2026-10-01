@@ -234,6 +234,46 @@ const openFence: Command = (state, dispatch) => {
   return true;
 };
 
+const closeFence: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  const block = $from.parent;
+  if (!empty || block.type !== composerSchema.nodes.code_block) return false;
+  if ($from.parentOffset !== block.content.size) return false;
+  const start = block.textContent.lastIndexOf('\n') + 1;
+  if (!/^```[ \t]*$/.test(block.textContent.slice(start))) return false;
+  if (dispatch) {
+    const from = $from.start() + start;
+    const tr = state.tr.delete(start === 0 ? from : from - 1, $from.pos);
+    const after = tr.mapping.map($from.after());
+    const next = tr.doc.nodeAt(after);
+    if (next?.type !== composerSchema.nodes.paragraph || next.content.size > 0) {
+      tr.insert(after, composerSchema.nodes.paragraph.create());
+    }
+    dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView());
+  }
+  return true;
+};
+
+const openHorizontalRule: Command = (state, dispatch) => {
+  const { $from, empty } = state.selection;
+  if (!empty || $from.parent.type !== composerSchema.nodes.paragraph) return false;
+  if ($from.parentOffset !== $from.parent.content.size) return false;
+  const start = softLineStart($from);
+  const line = state.doc.textBetween(start, $from.pos);
+  if (!/^(?:-{3,}|\*{3,}|_{3,})[ \t]*$/.test(line)) return false;
+  if (dispatch) {
+    const tr = state.tr.replaceRangeWith(
+      start,
+      $from.pos,
+      composerSchema.nodes.horizontal_rule.create()
+    );
+    const after = tr.mapping.map($from.pos);
+    tr.insert(after, composerSchema.nodes.paragraph.create());
+    dispatch(tr.setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView());
+  }
+  return true;
+};
+
 function escapeCodeBlock(direction: -1 | 1): Command {
   return (state, dispatch) => {
     const { $from } = state.selection;
@@ -521,7 +561,7 @@ export class ComposerEditor {
   private source = false;
   private pillSpace: number | null = null;
   private androidDelete: { pos: number; at: number } | null = null;
-  private iosShiftEnter = false;
+  private iosEnter: { shift: boolean; handled: boolean } | null = null;
   private keyboardReset: HTMLTextAreaElement | undefined;
   private keyboardResetFrame: number | undefined;
 
@@ -542,17 +582,24 @@ export class ComposerEditor {
     return true;
   }
 
+  private blockBreak: Command = (state, dispatch, view) =>
+    preferences.richTextComposer &&
+    !this.source &&
+    chainCommands(openFence, openHorizontalRule, closeFence)(state, dispatch, view);
+
   private shiftEnter: Command = (state, dispatch, view) =>
-    preferences.enterForNewline ? this.submit() : softBreak(state, dispatch, view);
+    preferences.enterForNewline
+      ? this.submit()
+      : this.blockBreak(state, dispatch, view) || softBreak(state, dispatch, view);
 
   private enter: Command = (state, dispatch, view) => {
-    if (this.iosShiftEnter) {
-      this.iosShiftEnter = false;
-      return this.shiftEnter(state, dispatch, view);
-    }
+    const iosEnter = this.iosEnter;
+    this.iosEnter = null;
+    if (iosEnter?.handled) return true;
+    if (iosEnter?.shift) return this.shiftEnter(state, dispatch, view);
     if (this.options.onNavigate('Enter')) return true;
     const rich = preferences.richTextComposer && !this.source;
-    if (rich && openFence(state, dispatch, view)) return true;
+    if (this.blockBreak(state, dispatch, view)) return true;
     if (exitEmptyCodeLine(state, dispatch, view)) return true;
     if (newlineInCode(state, dispatch, view)) return true;
     if (splitListEntry(state, dispatch, view)) return true;
@@ -720,11 +767,29 @@ export class ComposerEditor {
           handleDOMEvents: {
             keydown: (_view, event) => {
               if (event.key === 'Enter' && hasIosKeyboardContextQuirk()) {
-                this.iosShiftEnter = event.shiftKey;
+                this.iosEnter = { shift: event.shiftKey, handled: false };
               }
               return false;
             },
             beforeinput: (view, event) => {
+              if (
+                event.cancelable &&
+                hasIosKeyboardContextQuirk() &&
+                (event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak') &&
+                !(this.iosEnter?.shift && preferences.enterForNewline) &&
+                (this.blockBreak(view.state, view.dispatch, view) ||
+                  (this.iosEnter?.shift
+                    ? newlineInCode
+                    : chainCommands(exitEmptyCodeLine, newlineInCode))(
+                    view.state,
+                    view.dispatch,
+                    view
+                  ))
+              ) {
+                event.preventDefault();
+                if (this.iosEnter) this.iosEnter.handled = true;
+                return true;
+              }
               if (event.inputType === 'deleteContentBackward') {
                 if (hasAndroidCompositionQuirk()) {
                   this.androidDelete = { pos: view.state.selection.head, at: Date.now() };

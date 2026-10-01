@@ -117,7 +117,7 @@
       await signOut.request(async () => {
         await logoutWithPush(core, pushOverride());
         if (core.status === 'ready') await goto(resolve('/(app)/rooms'));
-      });
+      }, true);
     } finally {
       switching = false;
     }

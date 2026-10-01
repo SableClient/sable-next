@@ -11,6 +11,7 @@
   border: var(--border-width) solid var(--surface-container-line);
   border-radius: var(--radius-outer);
   box-shadow: var(--shadow-e200);
+  color: var(--surface-on-container);
   display: grid;
   max-height: var(--menu-max-height);
   min-width: var(--menu-min-width);

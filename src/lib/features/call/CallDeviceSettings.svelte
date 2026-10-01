@@ -26,6 +26,7 @@
   let level = $state(0);
   let testing = $state(false);
   let stopTest: (() => void) | undefined;
+  let testGeneration = 0;
 
   const supported = supportsDeviceSelection();
   const SYSTEM_DEFAULT = 'system';
@@ -53,27 +54,37 @@
     return off;
   });
 
-  $effect(() => () => stopTest?.());
+  $effect(() => stopTesting);
+
+  function stopTesting(): void {
+    testGeneration += 1;
+    stopTest?.();
+    stopTest = undefined;
+    testing = false;
+    level = 0;
+  }
 
   async function toggleTest(): Promise<void> {
     if (testing) {
-      stopTest?.();
-      return;
-    }
-    const { startInputMeter } = await import('./input-meter');
-    const meter = await startInputMeter(preferences.audioInputDevice, (next) => (level = next));
-    if (!meter) {
-      denied = true;
+      stopTesting();
       return;
     }
     testing = true;
-    void refresh();
-    stopTest = () => {
-      meter();
-      stopTest = undefined;
+    const generation = ++testGeneration;
+    const { startInputMeter } = await import('./input-meter');
+    if (generation !== testGeneration) return;
+    const meter = await startInputMeter(preferences.audioInputDevice, (next) => (level = next));
+    if (generation !== testGeneration) {
+      meter?.();
+      return;
+    }
+    if (!meter) {
       testing = false;
-      level = 0;
-    };
+      denied = true;
+      return;
+    }
+    void refresh();
+    stopTest = meter;
   }
 </script>
 

@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 mod account_data;
+mod account_lock;
 mod accounts;
 mod attachments;
 mod auth;
@@ -41,11 +42,16 @@ mod scheduled;
 mod sealed_account_data;
 pub mod search;
 pub mod session;
+mod space_parents;
 pub mod spaces;
 pub mod store;
+mod store_disposal;
 mod subscriptions;
+mod sync_support;
 mod timelines;
 pub mod tls;
+#[cfg(not(target_family = "wasm"))]
+pub mod v1_migration;
 mod verification;
 pub mod view;
 mod watchers;
@@ -90,9 +96,12 @@ pub struct Core {
     next_timeline_access: AtomicU64,
     next_registration_attempt: AtomicU64,
     session_generation: AtomicU64,
+    account_locked: AtomicBool,
     session_attempt_generation: AtomicU64,
     session_activation_lock: Mutex<()>,
     session_store_lock: Mutex<()>,
+    #[cfg(not(target_family = "wasm"))]
+    v1_migration: Mutex<Option<v1_migration::Import>>,
     credential_writers: Mutex<HashMap<String, u64>>,
     account_clients: Mutex<HashMap<String, matrix_sdk::Client>>,
     session_handlers: std::sync::Mutex<Vec<matrix_sdk::event_handler::EventHandlerDropGuard>>,
@@ -228,6 +237,7 @@ impl Core {
             sessions,
             events,
             notification_content: AtomicBool::new(false),
+            account_locked: AtomicBool::new(false),
             notification_encrypted_content: AtomicBool::new(false),
             notification_sounds: AtomicBool::new(true),
             notify_once: AtomicBool::new(true),
@@ -249,6 +259,8 @@ impl Core {
             session_attempt_generation: AtomicU64::new(1),
             session_activation_lock: Mutex::new(()),
             session_store_lock: Mutex::new(()),
+            #[cfg(not(target_family = "wasm"))]
+            v1_migration: Mutex::new(None),
             credential_writers: Mutex::new(HashMap::new()),
             account_clients: Mutex::new(HashMap::new()),
             session_handlers: std::sync::Mutex::new(Vec::new()),
@@ -407,7 +419,27 @@ impl Core {
         let (mut registry, migrated) = AccountRegistry::from_bytes(&bytes, &self.store_id)
             .or_failed(self, "restore_parse_session_file")?;
         let reanchored = registry.reanchor_stores(&self.store_id);
-        if migrated || reanchored {
+        for account in registry
+            .accounts
+            .iter_mut()
+            .filter(|account| account.device_invalidated)
+        {
+            account.session.credentials.discard_tokens();
+            if let Err(error) = self.discard_account_store(&account.store_id).await {
+                tracing::error!(
+                    ?error,
+                    account_id = account.account_id,
+                    "could not discard retired account store"
+                );
+            }
+        }
+        if migrated
+            || reanchored
+            || registry
+                .accounts
+                .iter()
+                .any(|account| account.device_invalidated)
+        {
             let bytes =
                 serde_json::to_vec(&registry).or_failed(self, "migrate_session_registry")?;
             self.sessions

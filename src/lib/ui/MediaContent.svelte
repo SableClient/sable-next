@@ -462,7 +462,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     gap: var(--space-100);
     padding: var(--space-100) var(--space-200);
@@ -490,7 +490,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: 50%;
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     height: var(--control-height-medium);
     justify-content: center;
@@ -561,7 +561,7 @@
   }
 
   .media-error {
-    color: var(--crit-on-container);
+    color: var(--crit-main);
     display: inline-block;
     margin-top: var(--space-100);
   }

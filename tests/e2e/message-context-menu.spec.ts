@@ -58,3 +58,53 @@ test('right-clicking the same message again reopens the menu at the pointer', as
   const second = await menu(page).boundingBox();
   expect(second?.x).toBeGreaterThan((first?.x ?? 0) + 100);
 });
+
+test.describe('mobile reactions', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+
+  test('dismissing reaction details leaves no message menu open', async ({
+    page,
+    timeline,
+    core,
+  }) => {
+    const item = {
+      ...timelineItem('reaction-menu', 'Message with reactions'),
+      reactions: [{ key: '👍', senders: ['@alice:example.test'] }],
+    };
+    await core.emitTimelineDiff(await core.subscription(), [{ op: 'reset', values: [item] }]);
+    const row = timeline.itemById(item.id);
+    const reaction = row.locator('button.reaction');
+    const details = page.getByRole('dialog', { name: 'View reactions', exact: true });
+    const actions = page.getByRole('dialog', { name: 'More actions', exact: true });
+
+    await reaction.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true });
+    await expect(details).toBeVisible();
+    await reaction.dispatchEvent('contextmenu', { pointerType: 'touch' });
+    await reaction.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
+    await expect(actions).toHaveCount(0);
+
+    const backdrop = page.locator('.dialog-backdrop-verification');
+    await backdrop.dispatchEvent('pointerdown', {
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 195,
+      clientY: 200,
+    });
+    await page.waitForTimeout(50);
+    await backdrop.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
+    await backdrop.dispatchEvent('click', { clientX: 195, clientY: 200 });
+    await expect(details).toHaveCount(0);
+    await expect(actions).toHaveCount(0);
+    await expect(menu(page)).toHaveCount(0);
+    expect(await core.commands()).not.toContain('react');
+
+    await reaction.tap();
+    await expect.poll(() => core.commands()).toContain('react');
+
+    const body = row.locator('article.message');
+    await body.dispatchEvent('pointerdown', { pointerType: 'touch', isPrimary: true });
+    await expect(actions).toBeVisible();
+    await body.dispatchEvent('pointerup', { pointerType: 'touch', isPrimary: true });
+    await expect(details).toHaveCount(0);
+  });
+});

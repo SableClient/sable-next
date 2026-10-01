@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
+  import { hasPageMeta, usePageMeta } from '#lib/core/page-meta.js';
 
   type Props = {
     title: string;
@@ -24,6 +25,12 @@
     children,
     density = 'default',
   }: Props = $props();
+
+  const pageMeta = hasPageMeta() ? usePageMeta() : null;
+
+  $effect(() => {
+    if (pageMeta) pageMeta.title = title;
+  });
 </script>
 
 <svelte:head>

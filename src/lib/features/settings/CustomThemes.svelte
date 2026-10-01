@@ -535,10 +535,6 @@
     gap: var(--space-200);
   }
 
-  .actions :global(.btn) {
-    min-height: max(var(--control-height-400), var(--target-hit));
-  }
-
   .tweaks-block {
     border-top: var(--border-width) solid var(--surface-container-line);
     display: grid;

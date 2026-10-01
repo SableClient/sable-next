@@ -13,13 +13,19 @@
 
   let {
     joinRule,
+    onMessageContextMenu,
     ...props
-  }: ComponentProps<typeof MessageReactions> & { joinRule?: RoomJoinRuleView } = $props();
+  }: ComponentProps<typeof MessageReactions> & {
+    joinRule?: RoomJoinRuleView;
+    onMessageContextMenu?: (event: MouseEvent) => void;
+  } = $props();
 
   if (untrack(() => joinRule))
     provideRoomMediaPreviews(new RoomMediaPreviews(() => joinRule ?? null));
 </script>
 
 <TooltipProvider>
-  <MessageReactions {...props} />
+  <div role="presentation" oncontextmenu={onMessageContextMenu}>
+    <MessageReactions {...props} />
+  </div>
 </TooltipProvider>

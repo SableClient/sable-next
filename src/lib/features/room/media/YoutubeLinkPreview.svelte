@@ -58,7 +58,7 @@
     background: var(--surface-container);
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    color: inherit;
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     margin-top: var(--space-100);

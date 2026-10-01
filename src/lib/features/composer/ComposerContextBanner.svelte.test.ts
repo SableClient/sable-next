@@ -10,6 +10,27 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 
 import ComposerContextBanner from './ComposerContextBanner.svelte';
 
+test.each([
+  ['***both***', '<strong><em>both</em></strong>', 'both', 'strong em'],
+  ['`code`', '<code>code</code>', 'code', 'code'],
+  ['``code ` tick``', '<code>code ` tick</code>', 'code ` tick', 'code'],
+  [
+    '```rust\nlet x = 1;\n```',
+    '<pre><code class="language-rust">let x = 1;</code></pre>',
+    'let x = 1;',
+    'pre code',
+  ],
+])('the reply preview renders %s', (body, html, text, selector) => {
+  const { container } = render(ComposerContextBanner, {
+    props: {
+      context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body, html },
+    },
+  });
+  const preview = container.querySelector('.context-body');
+  expect(preview?.querySelector(selector)).toHaveTextContent(text);
+  expect(preview).not.toHaveTextContent(body);
+});
+
 test('a reply context shows its sender and announces who is being replied to', () => {
   const { container } = render(ComposerContextBanner, {
     props: {

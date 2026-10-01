@@ -1,3 +1,4 @@
+import { hasNativeCalls } from '#lib/platform/calls.js';
 import { SCREEN_AUDIO_LABEL } from '#lib/platform/screen-audio.js';
 
 export type CallDevice = {
@@ -14,6 +15,7 @@ export const DEVICE_PREFERENCE = {
 
 export function supportsDeviceSelection(): boolean {
   return (
+    !hasNativeCalls() &&
     typeof navigator !== 'undefined' &&
     typeof (navigator.mediaDevices as MediaDevices | undefined)?.enumerateDevices === 'function'
   );

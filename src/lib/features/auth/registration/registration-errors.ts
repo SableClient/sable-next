@@ -39,12 +39,17 @@ export function registrationError(value: unknown): string {
       return t('errors.homeserverNotFound');
     case 'auth_provider_unreachable':
       return t('errors.authProviderUnreachable');
+    case 'sliding_sync_unsupported':
+      return t('errors.slidingSyncUnsupported');
     default:
       return t('errors.registrationFailed');
   }
 }
 
 export function registrationHomeserverError(value: unknown): string {
+  if (value instanceof CoreError && value.detail.code === 'sliding_sync_unsupported') {
+    return authenticationError(value);
+  }
   if (value instanceof CoreError && value.detail.code === 'unsupported') {
     return t('errors.registrationUnavailable');
   }
@@ -60,6 +65,10 @@ export function authenticationError(value: unknown): string {
   switch (value.detail.code) {
     case 'denied':
       return t('errors.invalidCredentials');
+    case 'account_locked':
+      return t('errors.accountLocked');
+    case 'account_suspended':
+      return t('errors.accountSuspended');
     case 'rate_limited':
       return value.detail.retry_after_ms
         ? t('errors.tooManyAttemptsSeconds', {
@@ -72,6 +81,8 @@ export function authenticationError(value: unknown): string {
       return t('errors.homeserverNotFound');
     case 'unsupported':
       return t('errors.passwordUnsupported');
+    case 'sliding_sync_unsupported':
+      return t('errors.slidingSyncUnsupported');
     case 'auth_provider_unreachable':
       return t('errors.authProviderUnreachable');
     default:

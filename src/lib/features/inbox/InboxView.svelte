@@ -79,6 +79,7 @@
   .inbox-sheet header {
     align-items: center;
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     inset-block-start: 0;
     justify-content: space-between;

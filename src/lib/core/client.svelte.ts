@@ -21,6 +21,7 @@ import { invalidatePacks, isPackAccountDataEvent } from '#lib/emoji/load-packs.j
 import { createTransport } from '../../transport/create';
 import type { Transport } from '../../transport';
 import { CoreError } from '../../transport';
+import { V1MigrationError } from '#lib/migrations/v1/migration.js';
 import QuickLRU from 'quick-lru';
 import { on } from 'svelte/events';
 import { onDebugLogCapture, recordDebugLog } from '#lib/observability/debug-log.svelte.js';
@@ -124,12 +125,17 @@ function discardAccountStore(transport: Transport, accountId: string): void {
 export class CoreClient {
   status = $state<CoreStatus>('idle');
   session = $state<CoreSession | null>(null);
+  private lockedAccountId = $state<string | null>(null);
+  accountLocked = $derived(
+    this.lockedAccountId !== null && this.lockedAccountId === this.session?.account_id
+  );
   reauthenticationAccountId = $state<string | null>(null);
   accounts = $state.raw<CoreSession[]>([]);
   verification = $state<ActiveVerification | null>(null);
   crashed = $state<string | null>(null);
   storageInterrupted = $state(false);
   restoreFailed = $state(false);
+  migrationFailed = $state(false);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -810,6 +816,7 @@ export class CoreClient {
   private async startTransport(): Promise<void> {
     const generation = ++this.generation;
     this.status = 'starting';
+    this.migrationFailed = false;
 
     try {
       const transport = this.ensureTransport();
@@ -852,6 +859,7 @@ export class CoreClient {
         if (generation !== this.generation) return;
       }
       this.restoreFailed = true;
+      this.migrationFailed = error instanceof V1MigrationError;
       this.status = 'error';
       this.cleanupTransport();
     }
@@ -942,6 +950,10 @@ export class CoreClient {
   private readonly handleEvent = (event: CoreEvent): void => {
     recordDebugLog('debug', event.type === 'sync_status' ? 'sync' : 'general', 'core', event.type);
     switch (event.type) {
+      case 'account_lock_changed':
+        if (event.locked) this.lockedAccountId = event.account_id;
+        else if (this.lockedAccountId === event.account_id) this.lockedAccountId = null;
+        return;
       case 'sync_status':
         this.applySyncStatus(event);
         return;

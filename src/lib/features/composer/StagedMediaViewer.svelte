@@ -265,7 +265,7 @@
 <style>
   :global(.staged-viewer) {
     background: var(--surface-var-container);
-    color: var(--surface-on-container);
+    color: var(--surface-var-on-container);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100dvh;

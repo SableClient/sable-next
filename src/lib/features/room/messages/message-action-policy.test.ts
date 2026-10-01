@@ -109,3 +109,47 @@ test('only the sender can remove embeds, and only while there are some', () => {
   expect(policy({ link_previews_removed: true }, true).removeLinkPreviews).toBe(false);
   expect(policy({ event_id: null, transaction_id: 'local' }, true).removeLinkPreviews).toBe(false);
 });
+
+test.each(['m.annotation', 'm.replace'])('cannot react to a %s event', (relType) => {
+  const actions = policy({
+    content: {
+      kind: 'hidden_event',
+      event_type: 'com.example.custom',
+      content: { 'm.relates_to': { rel_type: relType, event_id: '$original' } },
+      redacts: null,
+    },
+    reactions: [{ key: '👍', senders: ['@alice:example.org'] }],
+  });
+
+  expect(actions.react).toBe(false);
+  expect(actions.viewReactions).toBe(false);
+});
+
+test.each(['m.thread', 'm.reference', null])('can react to a %s relation', (relType) => {
+  const actions = policy({
+    content: {
+      kind: 'hidden_event',
+      event_type: 'com.example.custom',
+      content: { 'm.relates_to': { rel_type: relType, event_id: '$original' } },
+      redacts: null,
+    },
+  });
+
+  expect(actions.react).toBe(true);
+});
+
+test('edited messages can still be annotated through their original event', () => {
+  const actions = policy({
+    content: {
+      kind: 'message',
+      body: 'edited',
+      html: 'edited',
+      emote: false,
+      notice: false,
+      edited: true,
+    },
+  });
+
+  expect(actions.react).toBe(true);
+  expect(actions.eventId).toBe('$item');
+});

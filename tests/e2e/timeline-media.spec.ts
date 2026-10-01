@@ -44,6 +44,137 @@ function undecodablePicture() {
 }
 
 for (const mobile of [false, true]) {
+  test(`viewer toolbar respects titlebar and safe-area offsets${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', picture(800, 600));
+    await timeline.container.getByRole('button', { name: 'Open shot.png' }).click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    await expect(viewer.locator('.stage img')).toBeVisible(MEDIA_LOADED);
+
+    for (const decorations of [null, 'desktop', 'mac']) {
+      for (const safeTop of [0, 24]) {
+        await page.evaluate(
+          ({ decorations, safeTop }) => {
+            const root = document.documentElement;
+            if (decorations === null) delete root.dataset.clientDecorations;
+            else root.dataset.clientDecorations = decorations;
+            root.style.setProperty('--safe-area-inset-top', `${safeTop}px`);
+          },
+          { decorations, safeTop }
+        );
+
+        const layout = await viewer.evaluate((element) => {
+          const toolbar = element.querySelector('header');
+          if (!toolbar) throw new Error('viewer toolbar missing');
+          const rect = element.getBoundingClientRect();
+          const toolbarStyle = getComputedStyle(toolbar);
+          const rootStyle = getComputedStyle(document.documentElement);
+          return {
+            top: rect.top,
+            bottom: rect.bottom,
+            paddingTop: Number.parseFloat(toolbarStyle.paddingTop),
+            paddingBottom: Number.parseFloat(toolbarStyle.paddingBottom),
+            fontSize: Number.parseFloat(rootStyle.fontSize),
+            viewportHeight: window.innerHeight,
+          };
+        });
+
+        expect(layout.top).toBe(decorations === null ? 0 : 2 * layout.fontSize);
+        expect(layout.bottom).toBe(layout.viewportHeight);
+        expect(layout.paddingTop).toBe(layout.paddingBottom + safeTop);
+      }
+    }
+  });
+
+  test(`viewer backdrop clicks${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }, testInfo) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    const item = picture(800, 600);
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...item,
+      content: {
+        ...item.content,
+        source: JSON.stringify({ Plain: 'mxc://example.test/spoiler-preview-backdrop' }),
+      },
+    });
+    const open = timeline.container.getByRole('button', { name: 'Open shot.png' });
+    await open.click();
+
+    const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });
+    const image = viewer.locator('.stage img');
+    const stage = viewer.locator('.stage');
+    await expect(image).toBeVisible(MEDIA_LOADED);
+    await expect(image).toHaveCSS('opacity', '1');
+    await expect(viewer.locator('footer')).toHaveCount(0);
+    await expect(viewer.locator('.heading')).toContainText('shot.png');
+    const alpha = await viewer.evaluate((element) =>
+      Number(getComputedStyle(element).backgroundColor.match(/\/\s*([\d.]+)/)?.[1] ?? 1)
+    );
+    expect(alpha).toBe(mobile ? 1 : 0.9);
+    await page.screenshot({ path: testInfo.outputPath('viewer-backdrop.png') });
+
+    if (mobile) {
+      const bounds = await stage.boundingBox();
+      if (!bounds) throw new Error('viewer stage missing');
+      await page.touchscreen.tap(bounds.x + 20, bounds.y + bounds.height / 2);
+      await expect(viewer.locator('header')).toHaveClass(/chrome-hidden/);
+      await expect(viewer).toBeVisible();
+    } else {
+      await image.click();
+      await viewer.getByRole('button', { name: 'Zoom in', exact: true }).click();
+      await expect(image).toHaveAttribute('style', /scale\(1\.2\)/);
+
+      await image.hover();
+      await page.mouse.down();
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.up();
+      await expect(viewer).toBeVisible();
+
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.down();
+      await stage.hover({ position: { x: 100, y: 30 } });
+      await stage.hover({ position: { x: 30, y: 30 } });
+      await page.mouse.up();
+      await expect(viewer).toBeVisible();
+      await stage.click({ position: { x: 30, y: 30 }, button: 'right' });
+      await expect(viewer).toBeVisible();
+
+      await stage.dispatchEvent('pointerdown', {
+        pointerId: 5,
+        pointerType: 'touch',
+        button: 0,
+        clientX: 30,
+        clientY: 100,
+      });
+      await stage.dispatchEvent('pointerup', { pointerId: 5, pointerType: 'touch' });
+      await expect(viewer).toBeVisible();
+
+      await stage.click({ position: { x: 30, y: 30 } });
+      await expect(viewer).toHaveCount(0);
+      await expect(open).toBeFocused();
+    }
+  });
+
   test(`viewer header and menu actions${mobile ? ' on mobile' : ''}`, async ({
     page,
     app,
@@ -415,6 +546,53 @@ test('a gallery keeps two columns on desktop', async ({
   expect(cells).toHaveLength(2);
   expect(cells[1]).toBeCloseTo(cells[0] ?? 0, 0);
 });
+
+for (const mobile of [false, true]) {
+  test(`a forwarded gallery keeps its label above the media${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...timelineItem('general-19', ''),
+      forwarded: { room_id: '!random:example.test', event_id: '$original', timestamp: null },
+      read_by: ['@bob:example.test'],
+      content: {
+        kind: 'gallery',
+        body: '',
+        html: '',
+        items: ['one', 'two'].map((filename) => ({
+          kind: 'image',
+          filename,
+          caption: null,
+          source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+          mime: 'image/png',
+          width: 800,
+          height: 600,
+          size: null,
+          blurhash: null,
+          thumbnail: null,
+          spoiler: null,
+        })),
+      },
+    });
+    const row = page.locator('[data-item-id="general-19"] .message');
+    await expect(row.locator('.receipt-slot')).toHaveCount(1);
+    await expect(row.locator('.gallery img').first()).toBeVisible(MEDIA_LOADED);
+
+    const label = await row.locator('.forwarded').boundingBox();
+    const gallery = await row.locator('.gallery').boundingBox();
+    if (!label || !gallery) throw new Error('forwarded gallery missing');
+    expect(gallery.y).toBeGreaterThanOrEqual(label.y + label.height);
+  });
+}
 
 test('a pdf in a gallery opens in the viewer', async ({
   page,

@@ -121,7 +121,7 @@ class EmoticonNodeView extends AtomNodeView {
   ) {
     super('span', 'composer-emoticon');
     const url = node.attrs.url as string;
-    const label = `:${node.attrs.shortcode as string}:`;
+    const label = (node.attrs.body as string | null) ?? `:${node.attrs.shortcode as string}:`;
 
     this.release = this.media.hold(url);
     const cached = this.media.cached(url);

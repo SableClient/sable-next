@@ -183,3 +183,30 @@ test('a filename becomes a shortcode without its extension', () => {
   expect(shortcodeWithoutExtension('blob-wave.png')).toBe('blob-wave');
   expect(shortcodeWithoutExtension('noextension')).toBe('noextension');
 });
+
+test('duplicate names reserve room for the suffix', () => {
+  const name = 'a'.repeat(100);
+  const renamed = suffixRename(name, (candidate) => candidate.endsWith('-1'));
+  expect(renamed).toBe(`${'a'.repeat(98)}-2`);
+  expect(renamed).toHaveLength(100);
+});
+
+test('uploads whose names contain no shortcode characters get a valid name', () => {
+  expect(uniqueShortcode('☃️', () => false)).toBe('image');
+  expect(uniqueShortcode('', (candidate) => candidate === 'image')).toBe('image-1');
+});
+
+test.each(['', 'a'.repeat(101), 'a/b', 'snow☃'])(
+  'refuses an invalid shortcode %s before writing',
+  (shortcode) => {
+    const draft = packDraft(pack());
+    draft.images[0].shortcode = shortcode;
+    expect(() => packEventContent(draft)).toThrow('Invalid or duplicate shortcode');
+  }
+);
+
+test('refuses duplicate shortcodes before one image can overwrite another', () => {
+  const draft = packDraft(pack());
+  draft.images.push({ ...draft.images[0], url: 'mxc://a/c' });
+  expect(() => packEventContent(draft)).toThrow('Invalid or duplicate shortcode');
+});

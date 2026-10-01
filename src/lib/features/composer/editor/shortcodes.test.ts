@@ -8,7 +8,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { PackImageView } from '#src/generated/protocol';
 
 import { composerSchema } from './schema';
-import { shortcodeInputRule } from './shortcodes';
+import { shortcodeInputRule, shortcodeNode } from './shortcodes';
 
 let view: EditorView | undefined;
 
@@ -129,4 +129,46 @@ test('backspace undoes the replacement back to the text', () => {
 
   expect(undoInputRule(editor().state, editor().dispatch.bind(editor()))).toBe(true);
   expect(editor().state.doc.textContent).toBe(':joy:');
+});
+
+test('matching emotes from different packs leave the shortcode for explicit selection', () => {
+  const image = {
+    shortcode: 'joy',
+    body: null,
+    url: 'mxc://example.org/a',
+    usage: ['emoticon'],
+    info: null,
+    source_pack: null,
+  } satisfies PackImageView;
+  expect(shortcodeNode('joy', [image, { ...image, url: 'mxc://example.org/b' }])).toBeNull();
+});
+
+test('a unique emote at the maximum shortcode length can be completed', () => {
+  const shortcode = 'a'.repeat(100);
+  const host = document.createElement('div');
+  document.body.append(host);
+  view = new EditorView(host, {
+    state: EditorState.create({
+      schema: composerSchema,
+      plugins: [
+        inputRules({
+          rules: [
+            shortcodeInputRule(() => [
+              {
+                shortcode,
+                body: null,
+                url: 'mxc://example.org/a',
+                usage: ['emoticon'],
+                info: null,
+                source_pack: null,
+              },
+            ]),
+          ],
+        }),
+      ],
+    }),
+  });
+  type(`:${shortcode}:`);
+  expect(editor().state.doc.firstChild?.firstChild?.type.name).toBe('emoticon');
+  expect(editor().state.doc.firstChild?.firstChild?.attrs.shortcode).toBe(shortcode);
 });

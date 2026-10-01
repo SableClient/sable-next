@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 
+import { hasNativeCalls } from '#lib/platform/calls.js';
 import { usesPushGateway } from '#lib/platform/notifications.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
@@ -46,7 +47,14 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
-  timeline: [{ component: DoubleTapReaction, section: 'messages' }],
+  timeline: [
+    { component: DoubleTapReaction, section: 'messages' },
+    {
+      component: DeveloperSearchMetrics,
+      section: 'developer-search-metrics',
+      when: () => preferences.developerTools,
+    },
+  ],
   notifications: [
     { component: NotificationPermission, section: 'alerts', start: true },
     { component: NotificationDefaults },
@@ -56,7 +64,13 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: PushGateway, when: usesPushGateway },
     { component: NotificationTroubleshooter },
   ],
-  calls: [{ component: CallDeviceSettings, section: 'call-devices' }],
+  calls: [
+    {
+      component: CallDeviceSettings,
+      section: 'call-devices',
+      when: () => !hasNativeCalls(),
+    },
+  ],
   privacy: [{ component: MediaPreviewPrivacy, section: 'blurring', start: true }],
   personas: [{ component: PersonaSettings }],
   [SETTINGS_ACCOUNT_SECTION]: [
@@ -77,11 +91,6 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     {
       component: DeveloperSyncDiagnostics,
       section: 'developer-sync-diagnostics',
-      when: () => preferences.developerTools,
-    },
-    {
-      component: DeveloperSearchMetrics,
-      section: 'developer-search-metrics',
       when: () => preferences.developerTools,
     },
     {

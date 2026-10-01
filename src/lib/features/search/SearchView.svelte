@@ -546,9 +546,10 @@
                           {@const sender = senders.identity(hit.sender)}
                           {@const profile = senders.profile(hit.sender)}
                           {@const name = profileOverrides.name(hit.sender, sender.displayName)}
-                          {@const parsedName = preferences.showPronouns
-                            ? splitDisplayNamePronouns(name)
-                            : { name, pronouns: [] }}
+                          {@const parsedName =
+                            preferences.showPronouns && preferences.showPronounPills
+                              ? splitDisplayNamePronouns(name)
+                              : { name, pronouns: [] }}
                           <span class="hit-fallback">
                             <Avatar
                               id={hit.sender}
@@ -566,7 +567,7 @@
                                     null,
                                     hit.sender === userId
                                   )}
-                                  pronouns={preferences.showPronouns
+                                  pronouns={preferences.showPronouns && preferences.showPronounPills
                                     ? withDisplayNamePronouns(
                                         profile?.pronouns ?? [],
                                         parsedName.pronouns

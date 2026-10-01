@@ -40,7 +40,7 @@
   :global(.status-badge-neutral) {
     background: var(--surface-container);
     border-color: var(--surface-container-line);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
   }
 
   :global(.status-badge-primary) {

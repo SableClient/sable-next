@@ -10,7 +10,7 @@ use crate::protocol::{CommandErr, CommandOk, CoreEvent, SessionInfo};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::session::AccountRegistry;
-use crate::session::{Credentials, PersistedAccount, PersistedSession, Session};
+use crate::session::{PersistedAccount, PersistedSession, Session};
 
 use crate::Core;
 use crate::cosmetics;
@@ -39,15 +39,13 @@ impl Core {
         let client = self.client().await?;
         let devices = [device_id];
 
-        if client.oauth().full_session().is_some()
-            && let Ok(metadata) = client.oauth().server_metadata().await
-            && let Some(url) = metadata.account_management_url_with_action(
-                matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
-                    matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
-                ),
-            )
-        {
-            return Ok(Some(url.to_string()));
+        if client.oauth().full_session().is_some() {
+            let metadata = client
+                .oauth()
+                .server_metadata()
+                .await
+                .or_failed(self, "delete_device_metadata")?;
+            return oauth_device_delete_url(&metadata, &devices[0]).map(Some);
         }
 
         let Err(error) = client.delete_devices(&devices, None).await else {
@@ -362,6 +360,11 @@ impl Core {
         {
             return Err(CommandErr::NotLoggedIn);
         }
+        if let Some(expected) = reauth
+            && expected.device_invalidated
+        {
+            self.discard_account_store(&expected.store_id).await?;
+        }
         let mut updated = registry.clone();
         if let Some(expected) = reauth {
             updated
@@ -483,20 +486,9 @@ impl Core {
         )
         .await
         .or_failed(self, "restore_build_client")?;
-        match account.session.credentials.clone() {
-            Credentials::Password(matrix) => client
-                .restore_session(matrix)
-                .await
-                .or_failed(self, "restore_session")?,
-            Credentials::OAuth { client_id, user } => client
-                .oauth()
-                .restore_session(
-                    session::oauth_session(client_id, user),
-                    matrix_sdk::store::RoomLoadSettings::default(),
-                )
-                .await
-                .or_failed(self, "restore_session_oauth")?,
-        }
+        session::restore_credentials(&client, &account.session)
+            .await
+            .or_failed(self, "restore_session")?;
         Ok(client)
     }
 
@@ -578,15 +570,30 @@ impl Core {
         };
         account.needs_reauth = true;
         account.device_invalidated = device_invalidated;
+        let store_id = account.store_id.clone();
+        if device_invalidated {
+            account.session.credentials.discard_tokens();
+        }
+
         if registry.active_account_id.as_deref() == Some(account_id) {
             registry.active_account_id = None;
         }
         let bytes = serde_json::to_vec(registry).or_failed(self, "retire_session_serialize")?;
+        let client = self.account_clients.lock().await.get(account_id).cloned();
         self.invalidate_account_client(account_id).await;
         self.sessions
             .save(bytes)
             .await
             .or_failed(self, "retire_session_save")?;
+        if device_invalidated {
+            if let Some(client) = client {
+                client
+                    .pause()
+                    .await
+                    .or_failed(self, "retire_session_close")?;
+            }
+            self.discard_account_store(&store_id).await?;
+        }
         Ok(())
     }
 
@@ -618,17 +625,15 @@ impl Core {
             .await
             .or_failed(self, "logout_save_accounts")?;
         if let Some(store_id) = store_id {
-            self.discard_account_store(&store_id);
+            self.discard_account_store(&store_id).await?;
         }
         Ok(())
     }
 
-    fn discard_account_store(&self, store_id: &str) {
-        if session::removable_account_store(&self.store_id, store_id) {
-            remove_store_dir(store_id);
-        } else {
-            tracing::warn!(store_id, "refusing to delete a shared account store");
-        }
+    pub(crate) async fn discard_account_store(&self, store_id: &str) -> Result<(), CommandErr> {
+        crate::store_disposal::discard(&self.store_id, store_id)
+            .await
+            .or_failed(self, "discard_account_store")
     }
 
     pub(crate) async fn take_session(&self) -> Option<Session> {
@@ -717,6 +722,14 @@ impl Core {
         self.watch_incoming_verifications(&client);
 
         self.session_generation.store(generation, Ordering::SeqCst);
+        self.account_locked.store(false, Ordering::SeqCst);
+        self.emit_if_current(
+            generation,
+            CoreEvent::AccountLockChanged {
+                account_id: account_id.clone(),
+                locked: false,
+            },
+        );
         let verification_client = client.clone();
         let verification_user_id = client.user_id().map(ToOwned::to_owned);
         let mut session = self.session.write().await;
@@ -740,7 +753,6 @@ impl Core {
         self.watch_bot_commands(&client, generation);
         self.watch_image_packs(&client, generation);
         self.watch_joined_invites(&client);
-        self.watch_bridged_dms(&client);
         self.watch_send_queue(&client);
         self.watch_presence(&client, generation);
         let store_id = self
@@ -769,12 +781,16 @@ impl Core {
         let core = self.clone();
         let mut states = sync_service.state();
         let restarted = sync_service.clone();
+        let support_client = client.clone();
         // `Subscriber::next` yields only on *change*, so emit the first by hand.
         core.emit_if_current(generation, CoreEvent::SyncStatus(sync_status(states.get())));
         self.track_session_task(
             spawn(async move {
                 let mut failures = 0u32;
                 while let Some(state) = states.next().await {
+                    if core.account_locked.load(Ordering::SeqCst) {
+                        continue;
+                    }
                     let stalled = matches!(
                         state,
                         SyncState::Error(_) | SyncState::Terminated | SyncState::Idle
@@ -784,14 +800,29 @@ impl Core {
                     if running {
                         core.reconcile_memberships().await;
                         core.fill_own_members().await;
-                        core.align_encrypted_defaults().await;
-                        core.align_bridged_dms(None).await;
+                        core.align_notification_rules().await;
                     }
 
                     if stalled {
+                        if matches!(
+                            core.require_sliding_sync(&support_client).await,
+                            Err(CommandErr::SlidingSyncUnsupported)
+                        ) {
+                            restarted.stop().await;
+                            core.emit_if_current(
+                                generation,
+                                CoreEvent::SyncStatus(crate::protocol::SyncStatus::Error {
+                                    message: "This homeserver does not support Sliding Sync."
+                                        .to_owned(),
+                                }),
+                            );
+                            return;
+                        }
                         failures = failures.saturating_add(1);
                         crate::watchers::retry_backoff(failures).await;
-                        restarted.start().await;
+                        if !core.account_locked.load(Ordering::SeqCst) {
+                            restarted.start().await;
+                        }
                     } else {
                         failures = 0;
                     }
@@ -922,6 +953,10 @@ impl Core {
         change: &matrix_sdk::SessionChange,
         generation: u64,
     ) -> bool {
+        if matches!(change, matrix_sdk::SessionChange::AccountLocked) {
+            self.lock_account(generation);
+            return false;
+        }
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
             if self.session_generation.load(Ordering::SeqCst) == generation {
                 self.emit(CoreEvent::SessionTokensRefreshed);
@@ -950,6 +985,9 @@ impl Core {
             let account_id = session.as_ref().map(|session| session.account_id.clone());
             if let Some(session) = session {
                 session.sync_service.stop().await;
+                if !soft_logout && let Err(error) = session.client.pause().await {
+                    tracing::error!("could not close rejected session stores: {error}");
+                }
             }
 
             let outcome = match account_id.as_deref() {
@@ -983,17 +1021,23 @@ impl Core {
     }
 }
 
-#[cfg(not(target_family = "wasm"))]
-fn remove_store_dir(store_id: &str) {
-    if let Err(error) = std::fs::remove_dir_all(store_id)
-        && error.kind() != std::io::ErrorKind::NotFound
-    {
-        tracing::error!(store_id, "could not delete the account store: {error}");
+fn oauth_device_delete_url(
+    metadata: &matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata,
+    device_id: &matrix_sdk::ruma::DeviceId,
+) -> Result<String, CommandErr> {
+    use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
+        AccountManagementAction, AccountManagementActionData, DeviceDeleteData,
+    };
+    if !metadata.is_account_management_action_supported(&AccountManagementAction::DeviceDelete) {
+        return Err(CommandErr::Unsupported);
     }
+    metadata
+        .account_management_url_with_action(AccountManagementActionData::DeviceDelete(
+            DeviceDeleteData::new(device_id),
+        ))
+        .map(|url| url.to_string())
+        .ok_or(CommandErr::Unsupported)
 }
-
-#[cfg(target_family = "wasm")]
-const fn remove_store_dir(_store_id: &str) {}
 
 #[cfg(not(target_family = "wasm"))]
 const CACHE_DATABASES: [&str; 2] = ["matrix-sdk-event-cache.sqlite3", "matrix-sdk-media.sqlite3"];
@@ -1120,6 +1164,48 @@ mod regression_tests {
         (server, core, room)
     }
 
+    #[test]
+    fn oauth_device_deletion_requires_an_advertised_management_action() {
+        use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata;
+        let mut value = serde_json::json!({
+            "issuer": "https://id.example.org/", "authorization_endpoint": "https://id.example.org/authorize",
+            "token_endpoint": "https://id.example.org/token", "revocation_endpoint": "https://id.example.org/revoke",
+            "response_types_supported": ["code"], "response_modes_supported": ["query", "fragment"],
+            "grant_types_supported": ["authorization_code", "refresh_token"], "code_challenge_methods_supported": ["S256"],
+            "account_management_uri": "https://id.example.org/account"
+        });
+        let device = matrix_sdk::ruma::device_id!("DEVICE");
+        let metadata: AuthorizationServerMetadata = serde_json::from_value(value.clone()).unwrap();
+        assert!(matches!(
+            super::oauth_device_delete_url(&metadata, device),
+            Err(CommandErr::Unsupported)
+        ));
+        for action in ["org.matrix.device_delete", "org.matrix.session_end"] {
+            value["account_management_actions_supported"] = serde_json::json!([action]);
+            let metadata: AuthorizationServerMetadata =
+                serde_json::from_value(value.clone()).unwrap();
+            let url = url::Url::parse(&super::oauth_device_delete_url(&metadata, device).unwrap())
+                .unwrap();
+            assert!(
+                url.query_pairs()
+                    .any(|(key, value)| key == "action" && value == action)
+            );
+            assert!(
+                url.query_pairs()
+                    .any(|(key, value)| key == "device_id" && value == "DEVICE")
+            );
+        }
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("account_management_uri");
+        let metadata: AuthorizationServerMetadata = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            super::oauth_device_delete_url(&metadata, device),
+            Err(CommandErr::Unsupported)
+        ));
+    }
+
     #[tokio::test]
     async fn overlapping_failed_attempts_leave_committed_generation_unchanged() {
         use std::sync::atomic::Ordering;
@@ -1169,6 +1255,77 @@ mod regression_tests {
         .await
         .unwrap();
         assert!(core.session.read().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn rejected_devices_discard_credentials_and_sqlite_stores_only_on_hard_logout() {
+        use crate::session::{AccountRegistry, PersistedAccount, current_session};
+        for hard in [false, true] {
+            let server = MatrixMockServer::new().await;
+            let directory = tempfile::tempdir().unwrap();
+            let base = directory.path().join("sable");
+            let base = base.to_str().unwrap();
+            let store_id = session::account_store_id(base, "a1");
+            let client = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder.sqlite_store_with_cache_path(
+                        std::path::Path::new(&store_id).join("store"),
+                        std::path::Path::new(&store_id).join("cache"),
+                        None,
+                    )
+                })
+                .build()
+                .await;
+            client
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            let saved = current_session(&client, server.server().uri()).unwrap();
+            let (core, _events) = Core::new(base, Box::new(MemorySessionStore::default()));
+            let mut registry = AccountRegistry::empty();
+            registry.active_account_id = Some("a1".to_owned());
+            registry.upsert(PersistedAccount {
+                account_id: "a1".to_owned(),
+                store_id: store_id.clone(),
+                session: saved.clone(),
+                needs_reauth: false,
+                device_invalidated: false,
+            });
+            *core.accounts.lock().await = Some(registry);
+            core.account_clients
+                .lock()
+                .await
+                .insert("a1".to_owned(), client.clone());
+            let database = std::path::Path::new(&store_id).join("store/matrix-sdk-crypto.sqlite3");
+            assert!(database.exists());
+            core.mark_account_needs_reauth(Some("a1"), hard)
+                .await
+                .unwrap();
+            assert_eq!(database.exists(), !hard);
+            let bytes = core.sessions.load().await.unwrap().unwrap();
+            let (registry, _) = AccountRegistry::from_bytes(&bytes, base).unwrap();
+            let account = &registry.accounts[0];
+            assert!(account.needs_reauth);
+            assert_eq!(account.device_invalidated, hard);
+            assert_eq!(
+                account.session.credentials.user_id(),
+                saved.credentials.user_id()
+            );
+            assert_eq!(
+                account.session.credentials.device_id(),
+                saved.credentials.device_id()
+            );
+            if hard {
+                assert!(account.session.credentials.tokens().access_token.is_empty());
+                assert!(account.session.credentials.tokens().refresh_token.is_none());
+            } else {
+                assert_eq!(
+                    account.session.credentials.tokens(),
+                    saved.credentials.tokens()
+                );
+            }
+        }
     }
 
     #[tokio::test]
@@ -1338,6 +1495,7 @@ mod regression_tests {
             account_id,
             store_id: store_id.clone(),
             session: PersistedSession {
+                oauth_issuer: None,
                 resolved_homeserver: None,
                 homeserver: server.server().uri(),
                 credentials: Credentials::Password(

@@ -302,7 +302,11 @@ fn main() {
                 "asset".into(),
                 app_lib::TILE_URI_SCHEME.into(),
             ],
-            deep_link_schemes: vec!["moe.sable.next".into(), "sable".into()],
+            deep_link_schemes: vec![
+                "moe.sable.app".into(),
+                "moe.sable.next".into(),
+                "sable".into(),
+            ],
             command_line_args: cef_command_line_args(proxy.as_deref()),
             linux_windowing: if is_cef_views() {
                 tauri_runtime_cef::LinuxWindowing::Wayland

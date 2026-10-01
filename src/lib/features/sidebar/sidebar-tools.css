@@ -44,7 +44,7 @@
 }
 
 .mobile-tool[aria-current='page'] {
-  color: var(--surface-on-container);
+  color: var(--primary-on-container);
 }
 
 .mobile-tool {

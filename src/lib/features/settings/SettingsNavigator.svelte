@@ -194,8 +194,8 @@
 
   .search-field {
     align-items: center;
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     display: flex;
     gap: var(--space-300);
@@ -204,7 +204,7 @@
   }
 
   .search-field :global(svg) {
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     flex: 0 0 auto;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
@@ -216,6 +216,10 @@
   }
 
   .search-field :global(.text-input) {
+    --form-control-container: var(--surface-container);
+    --form-control-container-line: var(--surface-container-line);
+    --form-control-color: var(--surface-on-container);
+
     background: transparent;
     box-shadow: none;
     min-height: var(--control-height-medium);

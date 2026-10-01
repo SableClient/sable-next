@@ -22,7 +22,7 @@
   {...rest}
   {type}
   disabled={disabled || loading}
-  aria-busy={loading ? 'true' : undefined}
+  aria-busy={loading ? 'true' : rest['aria-busy']}
   class={[
     'btn',
     `btn-${variant}`,

@@ -34,7 +34,7 @@
   import { Conversation } from './conversation/conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
+  import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
@@ -79,7 +79,7 @@
   import ThreadList from './conversation/ThreadList.svelte';
   import RoomAttachments from './media/RoomAttachments.svelte';
   import RoomSearchPanel from './RoomSearchPanel.svelte';
-  import ThreadPanel from './conversation/ThreadPanel.svelte';
+  import ThreadView from './conversation/ThreadView.svelte';
   import MentionProfile from './members/MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';
@@ -220,7 +220,10 @@
 
   const bookmarks = useBookmarks();
 
-  function openThread(rootEventId: string): void {
+  let threadEventId = $state<string | null>(null);
+
+  function openThread(rootEventId: string, targetEventId: string | null = null): void {
+    threadEventId = targetEventId;
     panels.openThread(rootEventId);
   }
 
@@ -248,9 +251,44 @@
     };
   }
 
+  holdOverlayBack(() => panels.threadRootId !== null, closeThread);
+
   function closeThread(): void {
     panels.threadRootId = null;
+    threadEventId = null;
   }
+
+  let permalinkTarget = $state<{
+    roomId: string;
+    eventId: string;
+    rootEventId: string | null;
+  } | null>(null);
+
+  $effect(() => {
+    const targetEventId = eventId;
+    const targetRoomId = resolvedRoomId;
+    if (targetEventId === null) return;
+    let active = true;
+    void core.commands
+      .eventSource(targetRoomId, targetEventId)
+      .then((source) => {
+        if (!active) return;
+        const relation = notifiedRelation(source);
+        const rootEventId = relation?.thread ? relation.eventId : null;
+        permalinkTarget = { roomId: targetRoomId, eventId: targetEventId, rootEventId };
+        if (rootEventId !== null) untrack(() => openThread(rootEventId, targetEventId));
+        else untrack(closeThread);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        permalinkTarget = { roomId: targetRoomId, eventId: targetEventId, rootEventId: null };
+        untrack(closeThread);
+        console.debug('[sable room] linked event unavailable', error);
+      });
+    return () => {
+      active = false;
+    };
+  });
 
   let notifiedTarget = $state<{ eventId: string; target: string } | null>(null);
   let landingEventId = $derived(
@@ -269,7 +307,7 @@
         const relation = notifiedRelation(source);
         if (!active || relation === null) return;
         notifiedTarget = { eventId, target: relation.eventId };
-        if (relation.thread) openThread(relation.eventId);
+        if (relation.thread) openThread(relation.eventId, eventId);
       })
       .catch((error: unknown) => {
         console.debug('[sable room] notified event unavailable', error);
@@ -327,6 +365,12 @@
   );
 
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
+  let resolvedPermalink = $derived(
+    permalinkTarget?.roomId === resolvedRoomId && permalinkTarget.eventId === eventId
+      ? permalinkTarget
+      : null
+  );
+  let timelineEventId = $derived(resolvedPermalink?.rootEventId ?? eventId);
   const VOICE_CHAT_WIDTH_KEY = 'sable-voice-chat-width';
   const VOICE_CHAT_DEFAULT_WIDTH = 400;
   const VOICE_CHAT_MIN_WIDTH = 300;
@@ -418,25 +462,15 @@
   let pinsOpen = $state(false);
   let pinsUnread = $state(0);
   let desktop = $derived(sidePanels.matches);
+  let threadInPanel = $derived(desktop && preferences.threadPresentation === 'panel');
   let voiceView = $derived(isVoiceRoom && (!voiceChat.open || desktop));
   let voiceChatBeside = $derived(isVoiceRoom && voiceChat.open && desktop);
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
-  let typingLabel = $derived.by(() => {
-    if (preferences.hideTypingIndicators || typingUserIds.length === 0) return null;
-    const names = typingUserIds.slice(0, 3).map(memberDisplayName);
-    if (names.some((name) => name === null)) return $i18n.t('timeline.unknownTyping');
-    if (names.length === 1) return $i18n.t('timeline.oneTyping', { name: names[0] });
-    if (names.length === 2)
-      return $i18n.t('timeline.twoTyping', { name1: names[0], name2: names[1] });
-    if (names.length === 3 && typingUserIds.length === 3) {
-      return $i18n.t('timeline.threeTyping', { name1: names[0], name2: names[1], name3: names[2] });
-    }
-    return $i18n.t('timeline.manyTyping', {
-      name1: names[0],
-      name2: names[1],
-      count: typingUserIds.length - 2,
-    });
-  });
+  let typingUsers = $derived(
+    preferences.hideTypingIndicators
+      ? []
+      : typingUserIds.map((userId) => ({ userId, name: memberDisplayName(userId) }))
+  );
 
   $effect(() => {
     void resolvedRoomId;
@@ -500,6 +534,7 @@
     // jump the mode is still `live` and this would strip the anchor straight
     // back off the URL, undoing the navigation before it takes effect.
     if (eventId === null || eventId !== appliedEventId) return;
+    if (resolvedPermalink === null || resolvedPermalink.rootEventId !== null) return;
     if (!timelineFollowingLive || timeline.mode.kind !== 'live') return;
     void goto(roomUrl(null), { replace: true, reset: false });
   });
@@ -507,13 +542,15 @@
   $effect(() => {
     const activeRoomId = timelineRoomId;
     if (!activeRoomId) return;
+    if (eventId !== null && resolvedPermalink === null) return;
+    const targetEventId = timelineEventId;
     const anchor = untrack(() => {
       // An event already in the loaded range is reached by scrolling, so only a
       // target we do not hold restarts the timeline in permalink mode. That
       // only holds while live: dropping the anchor from a focused timeline
       // restarts it at the present instead of moving within the loaded window.
-      const loaded = timeline.items.some((item) => item.event_id === eventId);
-      return loaded && timeline.mode.kind === 'live' ? null : eventId;
+      const loaded = timeline.items.some((item) => item.event_id === targetEventId);
+      return loaded && timeline.mode.kind === 'live' ? null : targetEventId;
     });
     appliedEventId = eventId;
     const openAtUnread = untrack(() => {
@@ -844,7 +881,8 @@
       bind:this={timelineList}
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
-      focusEventId={eventId}
+      active={panels.threadRootId === null || threadInPanel}
+      focusEventId={timelineEventId}
       {landingEventId}
       onLanded={landed}
       onRequestHistory={requestHistory}
@@ -883,7 +921,7 @@
       encrypted={resolvedRoom?.encrypted ?? null}
       currentUserId={core.session?.user_id ?? null}
       scrollLocked={memberProfile.open || receiptsOpen}
-      {typingLabel}
+      {typingUsers}
       footTrailingVisible={showReceiptFooter && timelineAtBottom && latestReadBy.length > 0}
       bind:nearLatest={timelineAtBottom}
       bind:followingLive={timelineFollowingLive}
@@ -932,6 +970,7 @@
           {conversation}
           roomId={resolvedRoomId}
           onSchedule={conversation.schedule}
+          canReact={roomSession.permissions?.can_react ?? true}
           {roomName}
           readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
           encrypted={resolvedRoom?.encrypted ?? null}
@@ -951,7 +990,12 @@
   aria-label={$i18n.t('timeline.label')}
   data-inset-owner={voiceView ? 'top' : 'top bottom'}
 >
-  <div class="timeline" {@attach trackTimelineHeight}>
+  <div
+    class="timeline"
+    class:thread-covered={panels.threadRootId !== null && !threadInPanel}
+    inert={panels.threadRootId !== null && !threadInPanel}
+    {@attach trackTimelineHeight}
+  >
     {#snippet headerActions()}
       {#if !voiceView}
         <PanelHeaderButton
@@ -1012,6 +1056,7 @@
           members={memberLoader.members}
           canPin={roomSession.permissions?.can_pin ?? false}
           onJump={jumpToEvent}
+          onOpenMedia={openPanelMedia}
         />
       {/snippet}
       {#snippet menu()}
@@ -1088,8 +1133,37 @@
     {/if}
   </div>
 
+  {#if panels.threadRootId !== null}
+    {#key panels.threadRootId}
+      <ThreadView
+        roomId={resolvedRoomId}
+        rootEventId={panels.threadRootId}
+        focusEventId={threadEventId}
+        sidePanel={threadInPanel}
+        rootMessage={timeline.items.find((item) => item.event_id === panels.threadRootId)}
+        {roomName}
+        members={memberLoader.members}
+        readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+        canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+        canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+        canReact={roomSession.permissions?.can_react ?? true}
+        canPin={roomSession.permissions?.can_pin ?? false}
+        encrypted={resolvedRoom?.encrypted ?? null}
+        onClose={closeThread}
+        onSenderProfile={openProfile}
+        onCopyLink={copyEventLink}
+      />
+    {/key}
+  {/if}
+
   {#if voiceChatBeside}
-    <aside class="voice-chat" style:width="{voiceChatWidth}px" aria-label={$i18n.t('call.chat')}>
+    <aside
+      class:thread-covered={panels.threadRootId !== null && !threadInPanel}
+      inert={panels.threadRootId !== null && !threadInPanel}
+      class="voice-chat"
+      style:width="{voiceChatWidth}px"
+      aria-label={$i18n.t('call.chat')}
+    >
       <ResizeHandle
         value={voiceChatWidth}
         min={VOICE_CHAT_MIN_WIDTH}
@@ -1147,25 +1221,6 @@
   {/if}
 
   {#if desktop}
-    {#if panels.threadRootId !== null}
-      {#key panels.threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={panels.threadRootId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
-          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-          canReact={roomSession.permissions?.can_react ?? true}
-          canPin={roomSession.permissions?.can_pin ?? false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          onClose={closeThread}
-          onSenderProfile={openProfile}
-          onCopyLink={copyEventLink}
-        />
-      {/key}
-    {/if}
     {#if panels.desktopMembersOpen}
       <MembersDrawer
         members={memberLoader.members}
@@ -1202,29 +1257,6 @@
         onMemberProfile={openProfile}
       />
     </DialogFrame>
-  {/if}
-
-  {#if !desktop}
-    {#if panels.threadRootId !== null}
-      {#key panels.threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={panels.threadRootId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
-          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-          canReact={roomSession.permissions?.can_react ?? true}
-          canPin={roomSession.permissions?.can_pin ?? false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          modal
-          onClose={closeThread}
-          onSenderProfile={openProfile}
-          onCopyLink={copyEventLink}
-        />
-      {/key}
-    {/if}
   {/if}
 
   {#if !desktop}
@@ -1351,6 +1383,7 @@
     --ghost-active: var(--surface-container-active);
 
     background: var(--surface-container);
+    color: var(--surface-on-container);
     display: flex;
     flex: 1;
     height: 100%;
@@ -1368,6 +1401,14 @@
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+
+  .timeline.thread-covered,
+  .voice-chat.thread-covered {
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
   }
 
   .call-stage {

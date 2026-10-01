@@ -130,6 +130,92 @@ async fn two_devices(
     (old, new, queue)
 }
 
+#[tokio::test]
+async fn history_bundles_require_owner_signed_recipient_devices() {
+    use matrix_sdk::ruma::{
+        events::{ToDeviceEventType, room::EncryptedFile},
+        serde::Raw,
+        to_device::DeviceIdOrAllDevices,
+    };
+    use matrix_sdk_base::crypto::{
+        AttachmentEncryptor, CollectStrategy, LocalTrust,
+        types::events::room_key_bundle::RoomKeyBundleContent,
+    };
+    use std::io::Cursor;
+
+    for signed in [false, true] {
+        let server = MatrixMockServer::new().await;
+        let (old, new, _queue) = two_devices(&server, true).await;
+        let user_id = old.client.user_id().unwrap();
+        let device = old
+            .client
+            .encryption()
+            .get_device(user_id, new.client.device_id().unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        device.set_local_trust(LocalTrust::Verified).await.unwrap();
+        if signed {
+            device.verify().await.unwrap();
+            old.client
+                .encryption()
+                .request_user_identity(user_id)
+                .await
+                .unwrap();
+        }
+        let device = old
+            .client
+            .encryption()
+            .get_device(user_id, new.client.device_id().unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(device.is_cross_signed_by_owner(), signed);
+        server.mock_send_to_device().ok().mount().await;
+        old.client
+            .send_encrypted_to_device(
+                &ToDeviceEventType::Dummy,
+                [(
+                    user_id.to_owned(),
+                    vec![DeviceIdOrAllDevices::from(
+                        new.client.device_id().unwrap().to_owned(),
+                    )],
+                )]
+                .into(),
+                Raw::new(&serde_json::json!({})).unwrap().cast_unchecked(),
+            )
+            .await
+            .unwrap();
+        let mut data = Cursor::new(Vec::<u8>::new());
+        let info = AttachmentEncryptor::new(&mut data).finish();
+        let bundle = RoomKeyBundleContent {
+            room_id: matrix_sdk::ruma::owned_room_id!("!history:example.org"),
+            file: EncryptedFile::new(
+                "mxc://example.org/bundle".into(),
+                info.encryption_info,
+                info.hashes,
+            ),
+        };
+        let machine = old.client.olm_machine_for_testing().await;
+        let machine = machine.as_ref().unwrap();
+        for strategy in [
+            CollectStrategy::OnlyTrustedDevices,
+            CollectStrategy::IdentityBasedStrategy,
+            CollectStrategy::AllDevices,
+        ] {
+            let requests = machine
+                .share_room_key_bundle_data(user_id, &strategy, bundle.clone())
+                .await
+                .unwrap();
+            let recipients: usize = requests
+                .iter()
+                .map(matrix_sdk_base::crypto::types::requests::ToDeviceRequest::message_count)
+                .sum();
+            assert_eq!(recipients, usize::from(signed), "{strategy:?}");
+        }
+    }
+}
+
 #[allow(clippy::unwrap_used)]
 #[tokio::test]
 async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
@@ -172,7 +258,9 @@ async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
 
 #[allow(clippy::unwrap_used)]
 #[tokio::test]
-async fn a_self_verification_offers_a_qr_code_both_ways() {
+async fn a_self_verification_completes_with_a_qr_code() {
+    use base64::Engine;
+
     let server = MatrixMockServer::new().await;
     let (mut old, mut new, queue) = two_devices(&server, true).await;
     let user_id = old.client.user_id().unwrap().to_owned();
@@ -193,7 +281,7 @@ async fn a_self_verification_offers_a_qr_code_both_ways() {
     old.core
         .dispatch(Command::AcceptVerification {
             user_id: user_id.clone(),
-            flow_id,
+            flow_id: flow_id.clone(),
         })
         .await
         .unwrap();
@@ -212,5 +300,38 @@ async fn a_self_verification_offers_a_qr_code_both_ways() {
             ),
             "{state:?}"
         );
+    }
+
+    let code = old.core.qr(&user_id, &flow_id).await.unwrap();
+    new.core
+        .dispatch(Command::ScanVerificationQr {
+            user_id: user_id.clone(),
+            flow_id: flow_id.clone(),
+            data: base64::engine::general_purpose::STANDARD.encode(code.to_bytes().unwrap()),
+        })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    assert!(matches!(
+        old.last_live().unwrap().1,
+        VerificationView::Scanned
+    ));
+    assert!(matches!(
+        new.last_live().unwrap().1,
+        VerificationView::Reciprocated
+    ));
+
+    old.core
+        .dispatch(Command::ConfirmVerification { user_id, flow_id })
+        .await
+        .unwrap();
+    deliver(&server, &queue, &mut [&mut old, &mut new]).await;
+
+    for device in [&old, &new] {
+        assert!(matches!(
+            device.last_live().unwrap().1,
+            VerificationView::Done
+        ));
     }
 }

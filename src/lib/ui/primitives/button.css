@@ -17,11 +17,19 @@
   font-weight: var(--font-weight-600);
   gap: var(--button-gap);
   justify-content: center;
+  line-height: var(--line-height-small);
   max-width: 100%;
   min-height: var(--button-height);
   min-width: 0;
-  padding: 0 var(--button-padding-inline);
+  overflow-wrap: anywhere;
+  padding: var(--space-100) var(--button-padding-inline);
+  text-align: center;
   text-decoration: none;
+}
+
+.btn:not(.icon-button) {
+  border-radius: var(--radius);
+  border-width: 0;
 }
 
 .btn > svg {
@@ -51,11 +59,18 @@
 }
 
 .btn-ghost {
-  --button-container: var(--surface-container);
+  --button-container: transparent;
   --button-container-hover: var(--surface-container-hover);
   --button-container-active: var(--surface-container-active);
-  --button-line: var(--surface-container-line);
-  --button-on-container: var(--bg-on-container);
+  --button-line: transparent;
+  --button-on-container: inherit;
+}
+
+.btn-ghost:not(.icon-button):is(:hover, :focus-visible, :active):not(
+    :disabled,
+    [aria-disabled='true']
+  ) {
+  --button-on-container: var(--surface-on-container);
 }
 
 .btn-subtle {
@@ -78,6 +93,7 @@
   --button-height: var(--control-height-300);
   --button-gap: var(--space-100);
   --button-padding-inline: var(--control-padding-300);
+  --button-icon-size: var(--size-x50);
 
   font-size: var(--font-size-small);
 }
@@ -87,6 +103,8 @@
   --button-gap: var(--space-300);
   --button-padding-inline: var(--control-padding-500);
   --button-icon-size: var(--size-x400);
+
+  font-size: var(--font-size-subheading);
 }
 
 .btn-icon {
@@ -149,21 +167,17 @@
 }
 
 .icon-button.btn-ghost {
-  --button-container: transparent;
   --button-container-hover: var(--ghost-hover, var(--bg-container-hover));
   --button-container-active: var(--ghost-active, var(--bg-container-active));
-  --button-line: transparent;
   --button-on-container: inherit;
 }
 
 @media (pointer: coarse) {
-  .btn-small:not(.icon-button) {
-    position: relative;
+  .btn:not(.icon-button) {
+    --button-height: max(var(--control-height-400), var(--target-hit));
   }
 
-  .btn-small:not(.icon-button)::after {
-    content: '';
-    inset: calc((var(--button-height) - var(--target-hit)) / 2) 0;
-    position: absolute;
+  .btn-small:not(.icon-button) {
+    font-size: var(--font-size-label);
   }
 }

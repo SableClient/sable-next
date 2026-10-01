@@ -467,31 +467,11 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
 
 pub use crate::push_rules::notifies;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RoomShape {
-    pub direct: bool,
-    pub bridged: bool,
-}
-
-pub async fn room_shape(room: &matrix_sdk::Room) -> RoomShape {
-    let by_count = RoomShape {
-        direct: room.active_members_count() == 2,
-        bridged: false,
-    };
-    let Some(service) = room.service_members().filter(|service| !service.is_empty()) else {
-        return by_count;
-    };
-    let Ok(members) = room.members(matrix_sdk::RoomMemberships::ACTIVE).await else {
-        return by_count;
-    };
-    let people = members
-        .iter()
-        .filter(|member| !service.contains(member.user_id()))
-        .count();
-    RoomShape {
-        direct: people == 2,
-        bridged: people == 2 && people < members.len(),
-    }
+/// Match the member count used by the SDK push-condition context. MSC4171
+/// service-member hints do not change `room_member_count` push conditions.
+#[must_use]
+pub fn uses_direct_push_rules(room: &matrix_sdk::Room) -> bool {
+    room.active_members_count() == 2
 }
 
 pub async fn every_encrypted_event_pushed(client: &Client) -> bool {

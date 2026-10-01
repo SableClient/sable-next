@@ -52,11 +52,37 @@ async function openWarning(safety: SignOutSafetyView) {
 
 const button = (name: string) => screen.queryByRole('button', { name });
 
-test('stays closed when the sign-out is safe', async () => {
-  const { proceed } = await openWarning(safe);
+test('confirms a safe sign-out without encryption recovery actions', async () => {
+  const { user, proceed } = await openWarning(safe);
 
-  expect(proceed).toHaveBeenCalledOnce();
-  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(await screen.findByRole('dialog')).toHaveTextContent('Are you sure you want to log out?');
+  expect(proceed).not.toHaveBeenCalled();
+  expect(button('Export keys')).not.toBeInTheDocument();
+  expect(button('Set up recovery')).not.toBeInTheDocument();
+  expect(button('Verify this session')).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole('button', { name: 'Log out' }));
+  await vi.waitFor(() => {
+    expect(proceed).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+test.each(['Cancel', 'Escape'])('dismisses a safe sign-out with %s', async (action) => {
+  const { user, guard, proceed } = await openWarning(safe);
+  await screen.findByRole('dialog');
+
+  if (action === 'Cancel') {
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+  } else {
+    await user.keyboard('{Escape}');
+  }
+
+  await vi.waitFor(() => {
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  await guard.confirm();
+  expect(proceed).not.toHaveBeenCalled();
 });
 
 test('explains the risk and signs out only when asked to', async () => {

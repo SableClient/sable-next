@@ -135,6 +135,11 @@
 
   .setting-row.highlighted {
     background: var(--primary-container);
+    color: var(--primary-on-container);
+  }
+
+  .setting-row.highlighted .row-copy p {
+    color: inherit;
   }
 
   @media (prefers-reduced-motion: no-preference) {

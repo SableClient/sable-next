@@ -47,7 +47,7 @@
     senderDisplayColors(userId, profile, null, false, cosmetics, powerTag?.color ?? null)
   );
   let pronouns = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? cosmetics?.pronouns.length
         ? cosmetics.pronouns
         : (profile?.pronouns ?? [])
@@ -94,7 +94,6 @@
         {displayName}
         {colors}
         {pronouns}
-        font={cosmetics?.font}
         nameClass="member-name"
         compact={pronouns.length === 0}
       />
@@ -152,6 +151,7 @@
 
   .member-identity-button:hover {
     background: var(--surface-container);
+    color: var(--surface-on-container);
   }
 
   .member-identity-button:focus-visible {

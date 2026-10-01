@@ -80,6 +80,7 @@
     border-right: var(--border-width) solid var(--surface-container-line);
     border-top: var(--border-width) solid var(--surface-container-line);
     box-sizing: border-box;
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-050);
     padding: var(--space-100);
@@ -114,6 +115,7 @@
     background: var(--bg-container);
     border-right-color: var(--bg-container-line);
     border-top-color: var(--bg-container-line);
+    color: var(--bg-on-container);
   }
 
   .call-room:hover,

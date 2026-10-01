@@ -224,6 +224,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
+    color: var(--surface-var-on-container);
     cursor: grab;
     display: grid;
     grid-template-rows: auto auto;

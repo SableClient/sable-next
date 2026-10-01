@@ -7,16 +7,19 @@ import { emojiForShortcode } from '#lib/emoji/emoji.js';
 
 import { composerSchema } from './schema';
 
-const pattern = /(?<![^\s\uFFFC]):([^\s:\uFFFC]{1,32}):$/u;
+const pattern = /(?<![^\s\uFFFC]):([^\s:\uFFFC]{1,100}):$/u;
 
 export function shortcodeNode(
   shortcode: string,
   emotes: readonly PackImageView[]
 ): ProseMirrorNode | null {
-  const image = emotes.find((candidate) => candidate.shortcode === shortcode);
+  const matches = emotes.filter((candidate) => candidate.shortcode === shortcode);
+  if (matches.length > 1) return null;
+  const image = matches.at(0);
   if (image)
     return composerSchema.nodes.emoticon.create({
       url: image.url,
+      body: image.body,
       shortcode,
       sourcePack: image.source_pack,
     });

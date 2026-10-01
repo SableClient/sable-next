@@ -107,6 +107,7 @@
     background: var(--bg-container);
     border: 0;
     border-radius: 0;
+    color: var(--bg-on-container);
     inset: 0;
     overflow: hidden;
     padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
@@ -117,6 +118,7 @@
     border: 0;
     border-radius: 0;
     box-shadow: var(--shadow-dialog);
+    color: var(--bg-on-container);
     height: 100dvh;
     left: 50%;
     max-width: 68rem;
@@ -137,6 +139,7 @@
     border-radius: var(--radius) var(--radius) 0 0;
     bottom: 0;
     box-shadow: var(--shadow-dialog);
+    color: var(--surface-on-container);
     max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - var(--space-300) * 2);
     overflow: auto;
     padding: var(--space-400);

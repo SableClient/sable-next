@@ -564,6 +564,9 @@
       aria-label={gifTab ? $i18n.t('composer.searchGifs') : $i18n.t('composer.searchPacks')}
       onkeydown={submitQuery}
     />
+    {#if !gifTab && sections.length > 0}
+      <p class="pack-visibility">{$i18n.t('composer.packMediaVisibility')}</p>
+    {/if}
   </div>
 
   {#if gifs && gifTab}
@@ -738,7 +741,7 @@
             <ClockCounterClockwiseIcon />
           </button>
         {/if}
-        {#each ['account', 'room', 'global', 'space'] as const as origin (origin)}
+        {#each ['account', 'global', 'room', 'space'] as const as origin (origin)}
           {@const group = sections.filter((section) => section.pack.origin === origin)}
           {#if group.length > 0}
             <hr class="rail-divider" />
@@ -827,6 +830,12 @@
     flex-direction: column;
     gap: var(--space-200);
     padding: var(--space-300) var(--space-300) 0;
+  }
+
+  .pack-visibility {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
   }
 
   .tabs {
@@ -1020,7 +1029,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
-    color: inherit;
+    color: var(--surface-var-on-container);
     cursor: pointer;
     font: inherit;
     font-size: var(--font-size-small);
@@ -1035,6 +1044,7 @@
 
   .free-text:hover {
     background: var(--surface-container-hover);
+    color: var(--surface-on-container);
   }
 
   /* Rows are real elements for the grid pattern, so the wrap is laid out here. */
@@ -1071,7 +1081,7 @@
   }
 
   .preview code {
-    color: var(--bg-on-container);
+    color: inherit;
     font-size: var(--font-size-subheading);
   }
 

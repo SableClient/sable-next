@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { TimelineItemView } from '#src/generated/protocol';
@@ -21,6 +23,7 @@ function item(eventId: string, sender: string): TimelineItemView {
     event_id: eventId,
     sender,
     sender_name: 'Ana',
+    reactions: [],
     content: { kind: 'message', body: 'Hello', html: '<p>Hello</p>' },
   } as unknown as TimelineItemView;
 }
@@ -29,7 +32,8 @@ function setup(
   items: TimelineItemView[],
   userId: string,
   store: Partial<PersonaStore> = {},
-  beforeSend?: () => Promise<void>
+  beforeSend?: () => Promise<void>,
+  threadRoot: string | null = null
 ) {
   const sendMessage = vi.fn(() => Promise.resolve());
   const editMessage = vi.fn(() => Promise.resolve());
@@ -37,9 +41,18 @@ function setup(
   const sendGallery = vi.fn(() => Promise.resolve());
   const sendGif = vi.fn(() => Promise.resolve());
   const sendLocation = vi.fn(() => Promise.resolve());
+  const toggleReaction = vi.fn(() => Promise.resolve());
   const core = {
     session: { user_id: userId },
-    commands: { sendMessage, editMessage, sendAttachment, sendGallery, sendGif, sendLocation },
+    commands: {
+      sendMessage,
+      editMessage,
+      sendAttachment,
+      sendGallery,
+      sendGif,
+      sendLocation,
+      toggleReaction,
+    },
   } as unknown as CoreClient;
   const personas = {
     personas: [],
@@ -57,10 +70,96 @@ function setup(
     sendGallery,
     sendGif,
     sendLocation,
+    toggleReaction,
     timeline,
-    conversation: new Conversation({ core, personas, timeline, roomId: () => ROOM, beforeSend }),
+    conversation: new Conversation({
+      core,
+      personas,
+      timeline,
+      roomId: () => ROOM,
+      beforeSend,
+      threadRoot,
+    }),
   };
 }
+
+test('quick reactions resume live before choosing the latest message', async () => {
+  const live = Promise.withResolvers<undefined>();
+  const fixture = setup(
+    [item('$old', '@ana:example.org')],
+    '@kris:example.org',
+    {},
+    () => live.promise
+  );
+  const reacting = fixture.conversation.quickReact(ROOM, '😂');
+  expect(fixture.toggleReaction).not.toHaveBeenCalled();
+  fixture.timeline.items = [
+    item('$latest', '@ana:example.org'),
+    { ...item('$state', '@ana:example.org'), content: { kind: 'state_event' } } as TimelineItemView,
+    { ...item('$pending', '@kris:example.org'), event_id: null },
+    { ...item('$redacted', '@ana:example.org'), content: { kind: 'redacted', reason: null } },
+  ];
+  live.resolve(undefined);
+  await reacting;
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+  expect(fixture.sendMessage).not.toHaveBeenCalled();
+});
+
+test('quick reactions do nothing in an empty room', async () => {
+  const fixture = setup([], '@kris:example.org');
+  await fixture.conversation.quickReact(ROOM, '😂');
+  expect(fixture.toggleReaction).not.toHaveBeenCalled();
+});
+
+test.each(['message', 'image', 'sticker', 'unable_to_decrypt'] as const)(
+  'quick reactions target the latest %s',
+  async (kind) => {
+    const latest = {
+      ...item('$latest', '@ana:example.org'),
+      content: { kind },
+    } as TimelineItemView;
+    const fixture = setup([item('$old', '@ana:example.org'), latest], '@kris:example.org');
+    await fixture.conversation.quickReact(ROOM, '😂');
+    expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+  }
+);
+
+test('quick reactions in a thread target its latest message and preserve the source pack', async () => {
+  const sourcePack = { room_id: ROOM, state_key: '', shortcode: 'wave', via: ['example.org'] };
+  const fixture = setup(
+    [item('$root', '@ana:example.org'), item('$reply', '@kris:example.org')],
+    '@kris:example.org',
+    {},
+    undefined,
+    '$root'
+  );
+  await fixture.conversation.quickReact(ROOM, 'mxc://example.org/wave', sourcePack);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(
+    ROOM,
+    '$reply',
+    'mxc://example.org/wave',
+    '$root',
+    sourcePack
+  );
+});
+
+test('toggling an existing custom quick reaction omits its source pack', async () => {
+  const key = 'mxc://example.org/wave';
+  const sourcePack = { room_id: ROOM, state_key: '', shortcode: 'wave', via: ['example.org'] };
+  const latest = {
+    ...item('$latest', '@ana:example.org'),
+    reactions: [{ key, senders: ['@kris:example.org'] }],
+  };
+  const fixture = setup([latest], '@kris:example.org');
+  await fixture.conversation.quickReact(ROOM, key, sourcePack);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', key, null, null);
+});
+
+test('reaction failures reach the composer', async () => {
+  const fixture = setup([item('$latest', '@ana:example.org')], '@kris:example.org');
+  fixture.toggleReaction.mockRejectedValueOnce(new Error('offline'));
+  await expect(fixture.conversation.quickReact(ROOM, '😂')).rejects.toThrow('offline');
+});
 
 test.each(['message', 'attachment'] as const)(
   'switches to live before sending a %s',
@@ -145,70 +244,94 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
-test.each([false, true])('media replies preserve silentReply=%s', async (silentReply) => {
-  vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
-    runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
-  );
-  const fixture = setup([item('$one:example.org', '@ana:example.org')], '@kris:example.org');
-  const { conversation } = fixture;
-  const file = new File(['picture'], 'picture.png', { type: 'image/png' });
-  const mentions = { userIds: ['@bea:example.org'], room: false };
+test.each([
+  [false, null],
+  [true, null],
+  [false, '$root'],
+  [true, '$root'],
+] as const)(
+  'media replies preserve silentReply=%s and threadRoot=%s',
+  async (silentReply, threadRoot) => {
+    vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
+      runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
+    );
+    const fixture = setup(
+      [item('$one:example.org', '@ana:example.org')],
+      '@kris:example.org',
+      {},
+      undefined,
+      threadRoot
+    );
+    const { conversation } = fixture;
+    const file = new File(['picture'], 'picture.png', { type: 'image/png' });
+    const mentions = { userIds: ['@bea:example.org'], room: false };
 
-  for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
-    conversation.reply('$one:example.org');
-    if (silentReply) conversation.toggleSilentReply();
-    if (kind === 'attachment') {
-      await conversation.sendAttachment(ROOM, file, { mentions });
-      expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
-        ROOM,
-        file,
-        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
-      );
-    } else if (kind === 'gallery') {
-      await conversation.sendGallery(ROOM, [file, file], { mentions });
-      expect(fixture.sendGallery).toHaveBeenLastCalledWith(
-        ROOM,
-        [file, file],
-        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
-      );
-    } else if (kind === 'gif') {
-      await conversation.sendGif(ROOM, {
-        id: 'cat',
-        title: 'cat',
-        mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
-        previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
-        width: 320,
-        height: 240,
-        size: 1000,
-        mimetype: 'image/gif',
-      });
-      expect(fixture.sendGif.mock.lastCall).toEqual([
-        ROOM,
-        expect.any(String),
-        'cat.gif',
-        320,
-        240,
-        'image/gif',
-        1000,
-        '$one:example.org',
-        null,
-        null,
-        silentReply,
-      ]);
-    } else {
-      await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
-      expect(fixture.sendLocation).toHaveBeenLastCalledWith(
-        ROOM,
-        'here',
-        'geo:48,2',
-        '$one:example.org',
-        null,
-        silentReply
-      );
+    for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
+      conversation.reply('$one:example.org');
+      if (silentReply) conversation.toggleSilentReply();
+      if (kind === 'attachment') {
+        await conversation.sendAttachment(ROOM, file, { mentions });
+        expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
+          ROOM,
+          file,
+          expect.objectContaining({
+            inReplyTo: '$one:example.org',
+            silentReply,
+            mentions,
+            threadRoot,
+          })
+        );
+      } else if (kind === 'gallery') {
+        await conversation.sendGallery(ROOM, [file, file], { mentions });
+        expect(fixture.sendGallery).toHaveBeenLastCalledWith(
+          ROOM,
+          [file, file],
+          expect.objectContaining({
+            inReplyTo: '$one:example.org',
+            silentReply,
+            mentions,
+            threadRoot,
+          })
+        );
+      } else if (kind === 'gif') {
+        await conversation.sendGif(ROOM, {
+          id: 'cat',
+          title: 'cat',
+          mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
+          previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
+          width: 320,
+          height: 240,
+          size: 1000,
+          mimetype: 'image/gif',
+        });
+        expect(fixture.sendGif.mock.lastCall).toEqual([
+          ROOM,
+          expect.any(String),
+          'cat.gif',
+          320,
+          240,
+          'image/gif',
+          1000,
+          '$one:example.org',
+          threadRoot,
+          null,
+          silentReply,
+        ]);
+      } else {
+        await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
+        expect(fixture.sendLocation).toHaveBeenLastCalledWith(
+          ROOM,
+          'here',
+          'geo:48,2',
+          '$one:example.org',
+          threadRoot,
+          silentReply
+        );
+      }
+      expect(conversation.context).toBeNull();
     }
-    expect(conversation.context).toBeNull();
   }
-});
+);
 
 test('a reply to a persona message names the persona', () => {
   const target = {
@@ -261,6 +384,24 @@ test('a reply keeps the target formatting for its composer preview', () => {
   expect(conversation.context).toMatchObject({
     body: ':rotate:',
     html: '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">',
+  });
+});
+
+test('a reply context uses rendered preview text', () => {
+  const target = item('$one:example.org', '@ana:example.org');
+  target.content = {
+    kind: 'message',
+    body: '**bold** and ``code ` tick``',
+    html: '<strong>bold</strong> and <code>code ` tick</code>',
+    emote: false,
+    notice: false,
+    edited: false,
+  };
+  const { conversation } = setup([target], '@kris:example.org');
+  conversation.reply('$one:example.org');
+  expect(conversation.context).toMatchObject({
+    body: 'bold and code ` tick',
+    html: '<strong>bold</strong> and <code>code ` tick</code>',
   });
 });
 
@@ -560,41 +701,48 @@ test('a reply the SDK cannot embed takes its preview from the event source', asy
 });
 
 test.each([
-  ['m.room.name', 'Sent a m.room.name event'],
-  ['m.room.member', 'Sent a m.room.member event'],
-])(
-  '%s replies with missing details after a successful fetch take their preview from the event source',
-  async (type, body) => {
-    const reply = {
-      ...item('$reply:example.org', '@kris:example.org'),
-      in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
-    } as unknown as TimelineItemView;
-    const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
-    const eventSource = vi.fn(() =>
-      Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {} }))
-    );
-    const core = {
-      session: { user_id: '@kris:example.org' },
-      commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
-    } as unknown as CoreClient;
-    const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
-    const conversation = new Conversation({
-      core,
-      personas: {} as PersonaStore,
-      timeline,
-      roomId: () => ROOM,
-    });
+  ['m.room.name', 'Sent a m.room.name event', undefined],
+  ['m.room.member', 'Sent a m.room.member event', undefined],
+  [
+    'm.room.message',
+    'Message deleted',
+    { redacted_because: { type: 'm.room.redaction', content: {} } },
+  ],
+  [
+    'm.room.encrypted',
+    'Message deleted',
+    { redacted_because: { type: 'm.room.redaction', content: {} } },
+  ],
+])('uses event source for missing %s reply details', async (type, body, unsigned) => {
+  const reply = {
+    ...item('$reply:example.org', '@kris:example.org'),
+    in_reply_to: { event_id: '$state:example.org', sender: null, body: null },
+  } as unknown as TimelineItemView;
+  const provideReplyFallback = vi.fn<(eventId: string, fallback: ReplyFallback) => void>();
+  const eventSource = vi.fn(() =>
+    Promise.resolve(JSON.stringify({ type, sender: '@ana:example.org', content: {}, unsigned }))
+  );
+  const core = {
+    session: { user_id: '@kris:example.org' },
+    commands: { fetchEventDetails: vi.fn(() => Promise.resolve()), eventSource },
+  } as unknown as CoreClient;
+  const timeline = { items: [reply], provideReplyFallback } as unknown as RoomTimeline;
+  const conversation = new Conversation({
+    core,
+    personas: {} as PersonaStore,
+    timeline,
+    roomId: () => ROOM,
+  });
 
-    conversation.fetchMissingReplyDetails();
-    await vi.waitFor(() => {
-      expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
-        sender: '@ana:example.org',
-        body,
-      });
+  conversation.fetchMissingReplyDetails();
+  await vi.waitFor(() => {
+    expect(provideReplyFallback).toHaveBeenCalledWith('$state:example.org', {
+      sender: '@ana:example.org',
+      body,
     });
-    expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
-  }
-);
+  });
+  expect(eventSource).toHaveBeenCalledWith(ROOM, '$state:example.org');
+});
 
 test('editing steps back to the own message before the one being edited', () => {
   const me = '@kris:example.org';

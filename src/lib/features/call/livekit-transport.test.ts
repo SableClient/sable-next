@@ -272,7 +272,7 @@ test('runs without telemetry and performs media toggles once', async () => {
   expect(fixture.localParticipant.setScreenShareEnabled).toHaveBeenCalledOnce();
 });
 
-function audioTrackStub(): MediaStreamTrack {
+function audioTrackStub(): MediaStreamTrack & { stop: ReturnType<typeof vi.fn> } {
   return {
     kind: 'audio',
     id: 'screen-audio',
@@ -284,7 +284,7 @@ function audioTrackStub(): MediaStreamTrack {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     stop: vi.fn(),
-  } as unknown as MediaStreamTrack;
+  } as unknown as MediaStreamTrack & { stop: ReturnType<typeof vi.fn> };
 }
 
 function withPublishing(fixture: ReturnType<typeof roomFixture>) {
@@ -423,6 +423,144 @@ test('keeps sharing the screen when its audio cannot be captured', async () => {
   expect(fixture.localParticipant.isScreenShareEnabled).toBe(true);
   expect(participant.publishTrack).not.toHaveBeenCalled();
   screenAudio.screenAudioSupported.mockReturnValue(false);
+});
+
+test.each(['stop', 'disconnect', 'desktop'])(
+  'releases screen audio acquired after %s',
+  async (ending) => {
+    const fixture = roomFixture();
+    const participant = withPublishing(fixture);
+    const capture = Promise.withResolvers<MediaStreamTrack>();
+    const track = audioTrackStub();
+    screenAudio.screenAudioSupported.mockReturnValue(true);
+    screenAudio.captureScreenAudio.mockReturnValueOnce(capture.promise);
+    const transport = createLivekitTransport({
+      encryptMedia: false,
+      createRoom: () => fixture.room,
+    });
+
+    try {
+      await transport.connect(connectOptions);
+      const sharing = transport.capabilities.screenShare?.setEnabled(true, {
+        kind: 'system',
+        exclude: [],
+      });
+      await vi.waitFor(() => {
+        expect(screenAudio.captureScreenAudio).toHaveBeenCalled();
+      });
+
+      if (ending === 'disconnect') await transport.disconnect();
+      else if (ending === 'stop') await transport.capabilities.screenShare?.setEnabled(false);
+      else {
+        await fixture.localParticipant.setScreenShareEnabled(false);
+        fixture.room.emit(RoomEvent.LocalTrackUnpublished, { source: 'screen_share' });
+      }
+      capture.resolve(track);
+      await sharing;
+
+      expect(participant.publishTrack).not.toHaveBeenCalled();
+      expect(track.stop).toHaveBeenCalled();
+      expect(screenAudio.stopScreenAudio).toHaveBeenCalled();
+    } finally {
+      screenAudio.screenAudioSupported.mockReturnValue(false);
+    }
+  }
+);
+
+test('releases screen audio when publishing fails', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  const track = audioTrackStub();
+  participant.publishTrack.mockRejectedValueOnce(new Error('publication failed'));
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockResolvedValueOnce(track);
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+
+  try {
+    await transport.connect(connectOptions);
+    await expect(
+      transport.capabilities.screenShare?.setEnabled(true, { kind: 'system', exclude: [] })
+    ).rejects.toBeInstanceOf(ScreenAudioError);
+
+    expect(track.stop).toHaveBeenCalled();
+    expect(screenAudio.stopScreenAudio).toHaveBeenCalled();
+  } finally {
+    screenAudio.screenAudioSupported.mockReturnValue(false);
+  }
+});
+
+test('finishes capture cleanup before restarting screen audio', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  const firstCapture = Promise.withResolvers<MediaStreamTrack>();
+  const stopped = Promise.withResolvers<undefined>();
+  const firstTrack = audioTrackStub();
+  const nextTrack = audioTrackStub();
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockClear();
+  screenAudio.captureScreenAudio
+    .mockReturnValueOnce(firstCapture.promise)
+    .mockResolvedValueOnce(nextTrack);
+  screenAudio.stopScreenAudio.mockReturnValueOnce(stopped.promise);
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+  const choice = { kind: 'system' as const, exclude: [] };
+
+  try {
+    await transport.connect(connectOptions);
+    const first = transport.capabilities.screenShare?.setEnabled(true, choice);
+    await vi.waitFor(() => {
+      expect(screenAudio.captureScreenAudio).toHaveBeenCalledOnce();
+    });
+    await transport.capabilities.screenShare?.setEnabled(false);
+    const next = transport.capabilities.screenShare?.setEnabled(true, choice);
+    firstCapture.resolve(firstTrack);
+    await vi.waitFor(() => {
+      expect(firstTrack.stop).toHaveBeenCalled();
+    });
+    expect(screenAudio.captureScreenAudio).toHaveBeenCalledOnce();
+    stopped.resolve(undefined);
+    await Promise.all([first, next]);
+
+    expect(screenAudio.captureScreenAudio).toHaveBeenCalledTimes(2);
+    expect(participant.publishTrack).toHaveBeenCalledOnce();
+    expect(nextTrack.stop).not.toHaveBeenCalled();
+    await transport.disconnect();
+    expect(nextTrack.stop).toHaveBeenCalled();
+  } finally {
+    stopped.resolve(undefined);
+    screenAudio.screenAudioSupported.mockReturnValue(false);
+  }
+});
+
+test('restarts screen audio after a cancelled capture fails', async () => {
+  const fixture = roomFixture();
+  const participant = withPublishing(fixture);
+  const firstCapture = Promise.withResolvers<MediaStreamTrack>();
+  screenAudio.screenAudioSupported.mockReturnValue(true);
+  screenAudio.captureScreenAudio.mockClear();
+  screenAudio.captureScreenAudio
+    .mockReturnValueOnce(firstCapture.promise)
+    .mockResolvedValueOnce(audioTrackStub());
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+  const choice = { kind: 'system' as const, exclude: [] };
+
+  try {
+    await transport.connect(connectOptions);
+    const first = transport.capabilities.screenShare?.setEnabled(true, choice);
+    await vi.waitFor(() => {
+      expect(screenAudio.captureScreenAudio).toHaveBeenCalledOnce();
+    });
+    await transport.capabilities.screenShare?.setEnabled(false);
+    const next = transport.capabilities.screenShare?.setEnabled(true, choice);
+    firstCapture.reject(new Error('capture ended'));
+    await Promise.all([first, next]);
+
+    expect(screenAudio.captureScreenAudio).toHaveBeenCalledTimes(2);
+    expect(participant.publishTrack).toHaveBeenCalledOnce();
+    await transport.disconnect();
+  } finally {
+    screenAudio.screenAudioSupported.mockReturnValue(false);
+  }
 });
 
 test('shares no audio when the reader chose none', async () => {

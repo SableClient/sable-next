@@ -5,18 +5,21 @@ import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { VerificationView } from '#src/generated/protocol';
+import { CoreError } from '#src/transport';
 
 vi.mock('#lib/core/context.js');
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
+vi.mock('#lib/platform/os.js', () => ({ isNativeMobile: vi.fn(() => false) }));
 vi.mock('./VerificationQrScanner.svelte', async () => ({
   default: (await import('./ScannerStub.test.svelte')).default,
 }));
 
 import { core } from '#lib/core/__mocks__/context.js';
+import { isNativeMobile } from '#lib/platform/os.js';
 
 const commands = {
-  scanVerificationQr: vi.fn(() => Promise.resolve()),
+  scanVerificationQr: vi.fn<() => Promise<void>>(() => Promise.resolve()),
   startSasVerification: vi.fn(() => Promise.resolve()),
   confirmVerification: vi.fn(() => Promise.resolve()),
   cancelVerification: vi.fn(() => Promise.resolve()),
@@ -40,6 +43,8 @@ const qr = () => screen.queryByRole('img', { name: 'Verification code' });
 
 afterEach(() => {
   vi.clearAllMocks();
+  commands.scanVerificationQr.mockReset().mockResolvedValue();
+  vi.mocked(isNativeMobile).mockReturnValue(false);
 });
 
 test('shows this device’s code with the logo, and offers the other ways', async () => {
@@ -61,7 +66,44 @@ test('a scanned code goes to the core as base64', async () => {
   await vi.waitFor(() => {
     expect(commands.scanVerificationQr).toHaveBeenCalledWith('@alice:example.org', 'flow', 'TUH/');
   });
+  expect(qr()).not.toBeInTheDocument();
+  expect(button(/scan stub/)).not.toBeInTheDocument();
   expect(button(/Compare emoji instead/)).not.toBeInTheDocument();
+});
+
+test('hides QR actions while a scan is pending', async () => {
+  let finish!: () => void;
+  commands.scanVerificationQr.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
+  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: 'scan stub' }));
+
+  expect(qr()).not.toBeInTheDocument();
+  expect(button(/scan stub/)).not.toBeInTheDocument();
+  expect(button(/Compare emoji instead/)).not.toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Waiting for the other device');
+  finish();
+});
+
+test('shows scan errors and allows retry', async () => {
+  commands.scanVerificationQr.mockRejectedValueOnce(
+    new CoreError({ code: 'invalid_verification_code' })
+  );
+  const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
+  await user.click(screen.getByRole('button', { name: /Scan their code instead/ }));
+  await user.click(screen.getByRole('button', { name: 'scan stub' }));
+
+  expect(await screen.findByRole('alert')).toHaveTextContent("That isn't a verification code.");
+  expect(button(/scan stub/)).toBeInTheDocument();
+  expect(qr()).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: 'scan stub' }));
+  expect(commands.scanVerificationQr).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
 
 test('without a code of our own, the scanner opens straight away', () => {
@@ -69,6 +111,32 @@ test('without a code of our own, the scanner opens straight away', () => {
 
   expect(button(/scan stub/)).toBeInTheDocument();
   expect(button(/Scan their code instead/)).not.toBeInTheDocument();
+});
+
+test('defaults to scanning on mobile and allows switching to display', async () => {
+  vi.mocked(isNativeMobile).mockReturnValue(true);
+  const user = setup({ phase: 'choose', qr: code, can_scan: true, can_compare: true });
+
+  expect(button(/scan stub/)).toBeInTheDocument();
+  expect(qr()).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: "Show this device's code" }));
+  expect(qr()).toBeInTheDocument();
+});
+
+test('defaults to display when scanning is unsupported', () => {
+  vi.mocked(isNativeMobile).mockReturnValue(true);
+  setup({ phase: 'choose', qr: code, can_scan: false, can_compare: true });
+
+  expect(qr()).toBeInTheDocument();
+  expect(button(/scan stub/)).not.toBeInTheDocument();
+});
+
+test('shows scan success while awaiting confirmation', () => {
+  setup({ phase: 'reciprocated' });
+
+  expect(screen.getByText('Code scanned. Confirm on your other device.')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveTextContent('Waiting for the other device');
+  expect(qr()).not.toBeInTheDocument();
 });
 
 test('the other device scanning our code needs our confirmation', async () => {

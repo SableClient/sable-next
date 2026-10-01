@@ -39,6 +39,7 @@
     min-width: 0;
     overflow-y: auto;
     padding: var(--space-200);
+    padding-bottom: var(--space-100);
     position: relative;
   }
 
@@ -110,6 +111,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radii-300);
+    color: var(--surface-var-on-container);
     font-family: var(--font-family-mono);
     padding: 0 var(--space-050);
   }
@@ -118,6 +120,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     font-family: var(--font-family-mono);
     margin: 0;
     overflow-x: auto;
@@ -141,11 +144,12 @@
   .editor :global([data-mx-spoiler]) {
     background: var(--surface-container-active);
     border-radius: var(--radii-300);
+    color: var(--surface-on-container);
     padding: 0 var(--space-050);
   }
 
   .editor :global(a) {
-    color: var(--primary-main);
+    color: var(--tc-link, var(--primary-main));
     text-decoration: underline;
   }
 
@@ -170,6 +174,7 @@
 
   .editor :global(th) {
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     font-weight: var(--font-weight-bold);
   }
 

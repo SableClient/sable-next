@@ -19,6 +19,7 @@ type SubscriptionState = 'pending' | 'active' | 'stopped';
 const PAGINATION_DIFF_SETTLE_TIMEOUT = 2_000;
 const RESUME_PAGE_SIZE = 25;
 const MAX_EMPTY_RESUME_PAGES = 5;
+const MAX_EMPTY_THREAD_PAGES = 5;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -211,6 +212,25 @@ export class RoomTimeline {
 
   startThread(roomId: string, rootEventId: string): Promise<void> {
     return this.open(roomId, { kind: 'thread', rootEventId }, false);
+  }
+
+  async loadThreadEvent(eventId: string, signal: AbortSignal): Promise<void> {
+    const session = this.session;
+    let emptyPages = 0;
+    while (
+      !signal.aborted &&
+      session === this.session &&
+      this.mode.kind === 'thread' &&
+      this.error === null &&
+      !this.items.some((item) => item.event_id === eventId) &&
+      this.backwardPagination !== 'end' &&
+      emptyPages < MAX_EMPTY_THREAD_PAGES
+    ) {
+      const before = this.items;
+      await this.paginateBackward(RESUME_PAGE_SIZE);
+      await this.backwardPaginationSettled();
+      emptyPages = this.items === before ? emptyPages + 1 : 0;
+    }
   }
 
   startUnread(roomId: string, eventId: string, hiddenEvents = false): Promise<void> {

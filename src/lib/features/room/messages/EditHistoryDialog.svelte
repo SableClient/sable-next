@@ -166,6 +166,7 @@
   .edit-history-original {
     background: var(--surface-var-container);
     border-radius: var(--radii-300);
+    color: var(--surface-var-on-container);
     padding: 0 var(--space-200);
   }
 

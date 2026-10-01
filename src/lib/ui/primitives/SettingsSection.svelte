@@ -66,7 +66,7 @@
     align-items: center;
     background: var(--surface-container);
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     display: flex;
     flex: 0 0 auto;
     height: var(--control-height-medium);
@@ -99,12 +99,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
-  }
-
-  @media (pointer: coarse) {
-    .settings-section-content :global(.btn-small:not(.icon-button)) {
-      --button-height: var(--control-height-400);
-    }
+    color: var(--surface-var-on-container);
   }
 
   @media (width >= 42rem) {

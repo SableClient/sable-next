@@ -294,11 +294,11 @@ test('pixelates a small emote by its decoded size, following the setting', async
   preferences.pixelatedImages = 'smart';
 });
 
-test('recognises a sanitised custom emote from its Matrix image attributes', async () => {
+test('preserves a custom emote marker', async () => {
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer(1)));
   render(FormattedBody, {
     props: {
-      html: '<img src="mxc://example.org/emoji" alt=":party:" title=":party:" height="32">',
+      html: '<img data-mx-emoticon src="mxc://example.org/emoji" alt=":party:" title=":party:" height="32">',
     },
   });
   await tick();

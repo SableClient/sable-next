@@ -116,7 +116,7 @@
 
   .location-map :global(.leaflet-control-attribution) {
     background: var(--surface-container);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     font-size: var(--font-size-small);
   }
 

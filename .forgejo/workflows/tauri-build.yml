@@ -11,8 +11,8 @@ on:
         type: string
 permissions: {}
 concurrency:
-  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && (inputs.tag || github.run_id) || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
@@ -240,25 +240,28 @@ jobs:
           rust: 'true'
           rust-cache-key: tauri-linux
           install-mise-tools: 'false'
+      - name: Prepare in-place v1 upgrade identity
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: node scripts/ci/prepare-v1-release.mjs
       - name: Stamp release version into tauri.conf.json
         run: |
           args=''
           [ -n "$UPDATER_ENDPOINT" ] && args="--updater-endpoint=$UPDATER_ENDPOINT"
           node scripts/ci/set-tauri-version.mjs "$VERSION" $args
-      # `tauri:cef build` stops at the binary; the bundler cannot carry the
-      # Chromium runtime, so cef:package assembles the packages around it.
-      - name: Build and package the CEF bundles
+      - name: Build Linux bundles
         run: |
           config_args=(--config src-tauri/tauri.ci.conf.json)
-          display_name='Sable Next'
           if [ "$IS_NIGHTLY" = 'true' ]; then
             config_args+=(--config src-tauri/tauri.nightly.conf.json)
-            display_name='Sable Next Nightly'
+            pnpm tauri:cef build "${config_args[@]}"
+            mise run cef:package "$VERSION" 'Sable Next Nightly'
+          else
+            pnpm tauri build "${config_args[@]}"
+            node scripts/ci/normalize-linux-bundles.mjs "$VERSION" "$ARCH"
           fi
-          pnpm tauri:cef build "${config_args[@]}"
           node scripts/ci/upload-sentry-symbols.mjs target/release
-          mise run cef:package "$VERSION" "$display_name"
-      - name: Check the packages carry what they should
+      - name: Check the CEF packages carry what they should
+        if: ${{ needs.setup-release.outputs.nightly == 'true' }}
         run: |
           deb="target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb"
           contents=$(dpkg-deb --contents "$deb")
@@ -267,6 +270,9 @@ jobs:
           grep -qx './postinst' <<<"$ctrl"
           grep -qx './prerm' <<<"$ctrl"
           grep -q 'opt/sable-next/CEF-LICENSE.txt$' <<<"$contents"
+      - name: Check stable packages replace v1
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: test "$(dpkg-deb --field "target/release/bundle/deb/sable-next-${VERSION}-linux-${ARCH}.deb" Package)" = sable
       - name: Sign the AppImage for the updater
         if: ${{ env.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: pnpm tauri signer sign "target/release/bundle/appimage/sable-next-${VERSION}-linux-${ARCH}.AppImage"
@@ -295,8 +301,8 @@ jobs:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
       MISE_ENV: tauri
-      # rustc is OOM-killed on the app crate's LTO with one job per core and a single codegen unit.
-      CARGO_BUILD_JOBS: '2'
+      # Limit peak memory while compiling the SDK and linking the app on the Android runner.
+      CARGO_BUILD_JOBS: '1'
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '4'
       # Matches the ABIs passed to `tauri android build` below.
       RUST_TARGETS: aarch64-linux-android armv7-linux-androideabi
@@ -337,6 +343,16 @@ jobs:
           rustup target add $RUST_TARGETS
       - name: Set up Gradle cache
         uses: https://github.com/gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+      - name: Limit Gradle memory
+        run: |
+          printf '\n%s\n' \
+            'org.gradle.workers.max=1' \
+            'org.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8' \
+            'kotlin.daemon.jvmargs=-Xmx512m' \
+            >> src-tauri/gen/android/gradle.properties
+      - name: Prepare in-place v1 upgrade identity
+        if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+        run: node scripts/ci/prepare-v1-release.mjs
       - name: Stamp release version into tauri.conf.json
         run: |
           args=''
@@ -405,7 +421,7 @@ jobs:
   github-bundles:
     name: Wait for GitHub bundles
     needs: setup-release
-    runs-on: light
+    runs-on: ubuntu-latest
     # github-bundles.json is published by the GitHub-side handoff job, which
     # waits on the whole desktop/linux/ios matrix.
     timeout-minutes: 120
@@ -487,6 +503,11 @@ jobs:
             fi
           fi
 
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            export ALTSTORE_BUNDLE_IDENTIFIER=moe.sable.next.nightly
+          else
+            export ALTSTORE_BUNDLE_IDENTIFIER=moe.sable.client
+          fi
           node scripts/ci/update-altstore-source.mjs \
             altstore-source.json \
             "$ipa_version" \

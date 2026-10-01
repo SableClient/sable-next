@@ -6,6 +6,7 @@
 
   import { i18n } from '#lib/i18n.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
 
   import '#lib/features/room/members/sender-identity.css';
@@ -57,7 +58,7 @@
     {/each}
   </div>
 
-  <input
+  <TextInput
     class="persona-search"
     bind:value={query}
     type="search"
@@ -167,11 +168,13 @@
     padding: 0;
   }
 
-  .persona-search {
-    background: var(--surface-container);
+  :global(.persona-search) {
+    --form-control-container: var(--surface-container);
+    --form-control-container-line: var(--surface-container-line);
+    --form-control-color: var(--surface-on-container);
+
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    color: inherit;
     font: inherit;
     margin-inline: var(--space-200);
     padding: var(--space-200) var(--space-300);
@@ -195,6 +198,7 @@
   .persona-option:hover,
   .persona-option:focus-visible {
     background: var(--surface-container);
+    color: var(--surface-on-container);
   }
 
   .persona-option-name {

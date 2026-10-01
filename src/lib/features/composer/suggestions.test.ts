@@ -182,6 +182,51 @@ test('a room name that already starts with # keeps a single #', () => {
   expect(suggestion.label).toBe('#General');
 });
 
+test('room matching ignores whitespace in the query and name', () => {
+  const rooms = [
+    room('!dev:example.org', 'Sable Dev'),
+    room('!support:example.org', 'Sable Support'),
+  ];
+  for (const query of ['sabledev', 'Sable  Dev', 'sable de', 'sable\u00a0dev', 'dev']) {
+    expect(suggestionsFor(roomQuery(query), [], [], rooms).map((item) => item.id)).toEqual([
+      '!dev:example.org',
+    ]);
+  }
+});
+
+test('room aliases still match when the query contains spaces', () => {
+  expect(
+    suggestionsFor(
+      roomQuery('dev team'),
+      [],
+      [],
+      [room('!one:example.org', 'Engineering', '#devteam:example.org')]
+    )
+  ).toEqual([expect.objectContaining({ id: '#devteam:example.org', label: '#Engineering' })]);
+});
+
+test('room prefixes are ranked after ignoring whitespace, before contained matches', () => {
+  expect(
+    suggestionsFor(
+      roomQuery('sable de'),
+      [],
+      [],
+      [
+        room('!other:example.org', 'A Sable Dev'),
+        room('!dev:example.org', 'Sable Dev'),
+        room('!design:example.org', 'Sable Design'),
+        room('!support:example.org', 'Sable Support'),
+      ]
+    ).map((item) => item.label)
+  ).toEqual(['#Sable Design', '#Sable Dev', '#A Sable Dev']);
+});
+
+test('a whitespace-only room query offers no suggestions', () => {
+  expect(suggestionsFor(roomQuery('  '), [], [], [room('!one:example.org', 'General')])).toEqual(
+    []
+  );
+});
+
 test('@room is offered while the needle still prefixes it', () => {
   const members = [member('@rob:example.org', 'Rob')];
 

@@ -53,7 +53,10 @@ export class FormattedBodyImages {
       image.dataset.mediaHandled = '';
       const source = this.#source(image);
       const emoticon = this.#isEmoticon(image);
-      if (emoticon) image.dataset.mxEmoticon = '';
+      if (emoticon && !/^mxc:\/\/[^/?#\s]+\/[A-Za-z0-9_-]+$/u.test(source)) {
+        image.replaceWith(this.fallbackLabel(image, true));
+        continue;
+      }
       const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
       if (scheme === 'http:' || scheme === 'https:') {
         image.onerror = () => {
@@ -114,12 +117,6 @@ export class FormattedBodyImages {
   }
 
   #isEmoticon(image: HTMLImageElement): boolean {
-    return (
-      image.dataset.mxEmoticon !== undefined ||
-      (this.#source(image).startsWith('mxc:') &&
-        (image.getAttribute('alt')?.startsWith(':') === true ||
-          image.getAttribute('title')?.startsWith(':') === true ||
-          (image.hasAttribute('height') && image.hasAttribute('title'))))
-    );
+    return image.hasAttribute('data-mx-emoticon');
   }
 }

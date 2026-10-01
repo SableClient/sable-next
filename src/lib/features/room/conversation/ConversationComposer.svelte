@@ -18,6 +18,7 @@
     | 'onCreatePoll'
     | 'onSendLocation'
     | 'onTyping'
+    | 'onQuickReact'
     | 'context'
     | 'onCancelContext'
     | 'onToggleSilentReply'
@@ -47,6 +48,7 @@
   onCreatePoll={conversation.createPoll}
   onSendLocation={conversation.sendLocation}
   onTyping={conversation.setTyping}
+  onQuickReact={conversation.quickReact}
   context={conversation.context}
   onCancelContext={conversation.clearContext}
   onToggleSilentReply={conversation.toggleSilentReply}

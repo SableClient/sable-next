@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = process.env.SABLE_PREVIEW_PORT ?? '4173';
 const origin = `http://127.0.0.1:${port}`;
 const SCRIPTED_TIMELINE_SPECS =
-  /(?:^|\/)timeline-(?:anchoring|stability|gap|keyboard|lifecycle|media)\.spec\.ts$/;
+  /(?:^|\/)(?:timeline-(?:anchoring|stability|gap|keyboard|lifecycle|media)|thread-links)\.spec\.ts$/;
 
 const build = process.env.SABLE_E2E_PREBUILT
   ? ''
@@ -45,7 +45,7 @@ export default defineConfig({
       // deliberately small so it catches compatibility regressions cheaply.
       name: 'webkit',
       dependencies: ['setup'],
-      testMatch: /(?:^|\/)(?:app-shell|login|navigation|window-activity)\.spec\.ts$/,
+      testMatch: /(?:^|\/)(?:app-shell|login|navigation|window-activity|thread-links)\.spec\.ts$/,
       use: devices['Desktop Safari'],
     },
     {

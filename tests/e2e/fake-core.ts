@@ -19,6 +19,8 @@ import type {
 
 export type RoomCoreMode =
   | 'ready'
+  | 'thread_links'
+  | 'thread_error'
   | 'loading'
   | 'error'
   | 'delayed_history'
@@ -37,6 +39,7 @@ export type RoomCoreMode =
   | 'tombstoned'
   | 'voice'
   | 'calendar'
+  | 'forum'
   | 'unverified'
   | 'onboarding';
 
@@ -45,10 +48,16 @@ type WorkerMode = RoomCoreMode;
 declare global {
   interface Window {
     __e2eCommands: string[];
+    __e2eAccounts?: SessionInfo[];
+    __e2eSwitchAccountError?: boolean;
+    __e2eSwitchAccountDelayMs?: number;
+    __e2eCommandPayloads: Command[];
+    __e2eProfileSaveError?: boolean;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
+    __e2eTimelineFocus: Extract<Command, { type: 'subscribe_timeline' }>['focus'][];
     __e2ePaginationDirections: string[];
     __e2eRefreshRoom: () => void;
     __e2eReceiveMessage: (body: string) => void;
@@ -60,6 +69,7 @@ declare global {
 export async function installFakeCore(page: Page, mode: WorkerMode): Promise<void> {
   await page.addInitScript((workerMode: WorkerMode) => {
     window.__e2ePaginationDirections = [];
+    window.__e2eTimelineFocus = [];
     type CommandType = Command['type'];
     type CommandFor<T extends CommandType> = Extract<Command, { type: T }>;
     type OkFor<T extends CommandType> = Extract<CommandOk, { type: T }>;
@@ -84,11 +94,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     }
 
     const commandLog: string[] = [];
+    const commandPayloads: Command[] = [];
     const timelineRooms: string[] = [];
     const timelineSubscriptions: number[] = [];
     Object.defineProperty(window, '__e2eCommands', {
       configurable: true,
       value: commandLog,
+    });
+    Object.defineProperty(window, '__e2eCommandPayloads', {
+      configurable: true,
+      value: commandPayloads,
     });
     Object.defineProperty(window, '__e2eTimelineRooms', {
       configurable: true,
@@ -138,7 +153,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
-      room_type: workerMode === 'calendar' ? 'chat.commet.calendar' : null,
+      room_type:
+        workerMode === 'calendar'
+          ? 'chat.commet.calendar'
+          : workerMode === 'forum'
+            ? 'pl.chrome.forum'
+            : null,
       supports_knock: false,
       supports_restricted: false,
       supports_knock_restricted: false,
@@ -457,6 +477,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [tombstonedRoom.room_id, tombstonedRoom],
       [successorRoom.room_id, successorRoom],
       [voiceRoom.room_id, voiceRoom],
+      [alphaSpace.room_id, alphaSpace],
+      [betaSpace.room_id, betaSpace],
+      [gammaSpace.room_id, gammaSpace],
     ]);
     let nextSubscription = 2;
     const ONBOARDING_KEY = 'sable-e2e-onboarding';
@@ -490,7 +513,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     });
     const subscriptions = new Map<
       number,
-      { roomId: string; page: number; live: boolean; oldest: number }
+      { roomId: string; page: number; live: boolean; thread: boolean; oldest: number }
     >();
     const arrivals: TimelineItemView[] = [];
     let unreadContextOpened = false;
@@ -774,8 +797,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         signedOut = true;
         return { type: 'logout' };
       },
-      list_accounts: () => ({ type: 'list_accounts', accounts: signedOut ? [] : [session] }),
-      switch_account: () => ({ type: 'switch_account', session }),
+      list_accounts: () => ({
+        type: 'list_accounts',
+        accounts: signedOut ? [] : (window.__e2eAccounts ?? [session]),
+      }),
+      switch_account: () => {
+        if (window.__e2eSwitchAccountError) throw new FakeCoreError('unavailable');
+        return { type: 'switch_account', session };
+      },
       homeserver_info: () => ({
         type: 'homeserver_info',
         homeserver: 'https://example.test',
@@ -787,6 +816,14 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         rooms: joinedRooms,
       }),
       subscribe_timeline: (command) => {
+        window.__e2eTimelineFocus.push(command.focus);
+        if (
+          workerMode === 'thread_error' &&
+          command.focus.kind === 'thread' &&
+          window.__e2eTimelineFocus.filter((focus) => focus.kind === 'thread').length === 1
+        ) {
+          throw new FakeCoreError('load_failed');
+        }
         if (workerMode === 'unread_context_error' && command.focus.kind === 'event') {
           throw new FakeCoreError('load_failed');
         }
@@ -795,6 +832,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           roomId: command.room_id,
           page: 0,
           live: command.focus.kind === 'live',
+          thread: command.focus.kind === 'thread',
           oldest: workerMode === 'unread_catchup' ? 60 : 0,
         });
         timelineRooms.push(command.room_id);
@@ -818,7 +856,18 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           subscription,
           items: unreadContext
             ? [...items.slice(0, 5), marker, ...items.slice(5, 20)]
-            : timelineSnapshot(roomName),
+            : workerMode === 'thread_links' && command.focus.kind === 'thread'
+              ? [
+                  { ...items[0], id: 'thread-root', event_id: '$thread-root:example.test' },
+                  ...Array.from({ length: 40 }, (_, index) => ({
+                    ...items[0],
+                    id: `thread-reply-${index}`,
+                    event_id: `$thread-reply-${index}:example.test`,
+                    content: messageContent(`Thread reply ${index}`),
+                    thread_root: '$thread-root:example.test',
+                  })),
+                ]
+              : timelineSnapshot(roomName),
           aggregations: [],
         };
       },
@@ -828,6 +877,28 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         if (!state) throw new Error('unknown timeline subscription');
         const paginated = subscriptionRoom(command.subscription);
         const roomName = paginated.name ?? '';
+        if (workerMode === 'thread_links' && state.thread) {
+          window.setTimeout(() => {
+            port.emit({
+              type: 'timeline_diff',
+              subscription: command.subscription,
+              diffs: [
+                {
+                  op: 'insert',
+                  index: 1,
+                  value: {
+                    ...timelineItems(roomName)[0],
+                    id: 'thread-reply-older',
+                    event_id: '$thread-reply-older:example.test',
+                    content: messageContent('Older thread reply'),
+                    thread_root: '$thread-root:example.test',
+                  },
+                },
+              ],
+            });
+          }, 750);
+          return { type: 'paginate', direction: command.direction, reached_end: true };
+        }
         if (workerMode === 'unread_catchup') {
           const items = timelineItems(roomName);
           if (command.direction === 'backward') {
@@ -1008,7 +1079,6 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'notification_settings',
         room: null,
         default: 'all',
-        bridged: false,
       }),
       room_notification_modes: (command) => ({
         type: 'room_notification_modes',
@@ -1060,6 +1130,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             ...(window as { __e2eProfilePatch?: Partial<ProfileView> }).__e2eProfilePatch,
           },
         };
+      },
+      set_profile_field: () => {
+        if (window.__e2eProfileSaveError) throw new FakeCoreError('unavailable');
+        return bareReply('set_profile_field');
       },
       user_relations: () => ({ type: 'user_relations', mutual_rooms: [], ignored: false }),
       account_contacts: () => ({ type: 'account_contacts', emails: [] }),
@@ -1212,14 +1286,21 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       event_source: (command) => ({
         type: 'event_source',
         source:
-          command.event_id === '$edit:example.test'
+          workerMode === 'thread_links' && command.event_id.startsWith('$thread-reply-')
             ? JSON.stringify({
                 type: 'm.room.message',
                 content: {
-                  'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                  'm.relates_to': { rel_type: 'm.thread', event_id: '$thread-root:example.test' },
                 },
               })
-            : '{}',
+            : command.event_id === '$edit:example.test'
+              ? JSON.stringify({
+                  type: 'm.room.message',
+                  content: {
+                    'm.relates_to': { rel_type: 'm.replace', event_id: '$general-8:example.test' },
+                  },
+                })
+              : '{}',
       }),
       edit_history: () => ({ type: 'edit_history', versions: [] }),
       event_items: (command) => {
@@ -1532,8 +1613,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           roomWidgets.set(command.room_id, null);
         if (command.event_type === 'moe.sable.room.abbreviations')
           abbreviations.set(command.room_id, command.content as { entries: unknown[] });
-        return { type: 'send_state_event' };
+        return { type: 'send_state_event', event_id: `$state-${crypto.randomUUID()}` };
       },
+      send_raw_event: () => ({
+        type: 'send_raw_event',
+        event_id: `$message-${crypto.randomUUID()}`,
+      }),
+      send_redaction: () => ({
+        type: 'send_redaction',
+        event_id: `$redaction-${crypto.randomUUID()}`,
+      }),
       set_space_child_order: (command) => {
         recordChildOrder(command);
         return { type: 'set_space_child_order' };
@@ -1557,6 +1646,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
 
     const replyDelay = (command: Command): number => {
       const type = command.type;
+      if (type === 'switch_account') return window.__e2eSwitchAccountDelayMs ?? 0;
       if (workerMode === 'forward_history' && type === 'paginate') return 0;
       if (
         type === 'subscribe_timeline' &&
@@ -1624,6 +1714,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         const command = request.command;
         if (!command) return;
         commandLog.push(command.type);
+        commandPayloads.push(command);
 
         let response: { id: number; ok: CommandOk } | { id: number; err: { code: string } };
         try {

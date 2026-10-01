@@ -5,7 +5,7 @@
   import { useCoreClient } from '#lib/core/context.js';
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
-  import ThreadPanel from '#lib/features/room/conversation/ThreadPanel.svelte';
+  import ThreadView from '#lib/features/room/conversation/ThreadView.svelte';
   import { Conversation } from '#lib/features/room/conversation/conversation.svelte.js';
   import {
     PinnedEvents,
@@ -28,6 +28,7 @@
   import { copyRoomLink } from '#lib/rooms/permalink.js';
   import { RoomMemberLoader } from '#lib/rooms/room-members.svelte.js';
   import { preferences, readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
+  import { holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { toasts } from '#lib/ui/toasts.svelte.js';
@@ -49,7 +50,6 @@
   const personas = usePersonaStore();
   const roomList = useRoomList();
   const messageMenu = provideMessageMenu(new OpenMessageMenu());
-  const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
   const forumThreads = new ForumThreads(core);
   const memberLoader = new RoomMemberLoader();
   const pinnedEvents = new PinnedEvents(core.commands);
@@ -59,8 +59,9 @@
   let resolvedRoomId = $derived(resolvedRoom?.room_id ?? roomId);
   let roomName = $derived(resolvedRoom?.name ?? roomId);
   let roomAvatar = $derived(resolvedRoom?.avatar_url ?? null);
-  let desktop = $derived(sidePanels.matches);
   let threadRootId = $state<string | null>(null);
+  const sidePanels = createMediaQuery(BREAKPOINTS.sidePanels);
+  let threadInPanel = $derived(sidePanels.matches && preferences.threadPresentation === 'panel');
   let permissions = $state<RoomPermissionsView | null>(null);
   let latestEventId = $derived.by(() => {
     const items = forumThreads.roomTimeline.items;
@@ -98,6 +99,7 @@
 
   $effect(() => {
     void resolvedRoomId;
+    threadRootId = null;
     memberLoader.reset();
   });
 
@@ -168,6 +170,8 @@
     );
   }
 
+  holdOverlayBack(() => threadRootId !== null, closeThread);
+
   function closeThread(): void {
     threadRootId = null;
   }
@@ -218,11 +222,16 @@
   timeline={forumThreads.roomTimeline}
   visibleEventId={latestEventId}
   onRead={markRead}
+  enabled={threadRootId === null || threadInPanel}
 />
 <MessageContextMenu menu={messageMenu} />
 
 <main class="forum-page" aria-label={$i18n.t('forum.label')}>
-  <div class="forum-main">
+  <div
+    class="forum-main"
+    class:thread-covered={threadRootId !== null && !threadInPanel}
+    inert={threadRootId !== null && !threadInPanel}
+  >
     <ForumHeader
       roomId={resolvedRoomId}
       {roomName}
@@ -264,10 +273,13 @@
   </div>
 
   {#if threadRootId !== null}
-    {#key `${threadRootId}:${String(desktop)}`}
-      <ThreadPanel
+    {#key `${resolvedRoomId}:${threadRootId}`}
+      <ThreadView
         roomId={resolvedRoomId}
         rootEventId={threadRootId}
+        sidePanel={threadInPanel}
+        backLabel={$i18n.t('forum.backToForum')}
+        rootMessage={forumThreads.roomTimeline.items.find((item) => item.event_id === threadRootId)}
         {roomName}
         members={memberLoader.members}
         readOnly={permissions ? !permissions.can_post : false}
@@ -275,7 +287,8 @@
         canRedactOthers={permissions?.can_redact_others ?? false}
         canReact={permissions?.can_react ?? true}
         canPin={permissions?.can_pin ?? false}
-        modal={!desktop}
+        encrypted={resolvedRoom?.encrypted ?? null}
+        onCopyLink={copyEventLink}
         onClose={closeThread}
       />
     {/key}
@@ -300,6 +313,13 @@
     height: 100%;
     min-height: 0;
     min-width: 0;
+  }
+
+  .thread-covered {
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
   }
 
   .forum-content {

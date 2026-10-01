@@ -10,6 +10,7 @@ import SessionRestoreError from './SessionRestoreError.svelte';
 beforeEach(() => {
   Object.assign(core, {
     status: 'error',
+    migrationFailed: false,
     accounts: [],
     start: vi.fn(),
     beginSignInRecovery: vi.fn(),
@@ -90,4 +91,12 @@ test('a failed account switch leaves retry and sign-in available', async () => {
   expect(goto).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeEnabled();
   expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled();
+});
+
+test('migration failures preserve data and show retry without a misleading fresh-device sign-in', () => {
+  Object.assign(core, { migrationFailed: true });
+  render(SessionRestoreError);
+  expect(screen.getByText(/Your original data is still saved/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
 });

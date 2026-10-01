@@ -12,6 +12,6 @@
   let { label, launching, disabled = false, onclick }: Props = $props();
 </script>
 
-<Button {disabled} {onclick} variant="primary">
+<Button {disabled} {onclick} variant="primary" size="large">
   {launching ? $i18n.t('auth.opening') : label}
 </Button>

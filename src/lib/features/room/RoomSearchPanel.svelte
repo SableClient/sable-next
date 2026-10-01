@@ -60,6 +60,7 @@
 
     background: var(--bg-container);
     border-left: var(--border-width) solid var(--bg-container-line);
+    color: var(--bg-on-container);
     display: grid;
     flex: 0 0 auto;
     grid-template-rows: auto minmax(0, 1fr);

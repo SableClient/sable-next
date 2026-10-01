@@ -3,7 +3,7 @@
 import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, expect, test, vi } from 'vitest';
-import type { SessionInfo } from '#src/generated/protocol';
+import type { SessionInfo, SignOutSafetyView } from '#src/generated/protocol';
 
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
@@ -53,7 +53,9 @@ const removeAccount = vi.fn((accountId: string) => {
   return Promise.resolve();
 });
 const logout = vi.fn(() => Promise.resolve());
-const signOutSafety = vi.fn(() => Promise.reject(new Error('not_logged_in')));
+const signOutSafety = vi.fn<() => Promise<SignOutSafetyView>>(() =>
+  Promise.reject(new Error('not_logged_in'))
+);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -128,6 +130,33 @@ test('checks encryption safety before logging out a healthy secondary account', 
   await vi.waitFor(() => {
     expect(logout).toHaveBeenCalledOnce();
   });
+});
+
+test('logs out a safe account after one confirmation', async () => {
+  signOutSafety.mockResolvedValueOnce({
+    encryption: {
+      verification: 'verified',
+      recovery: 'enabled',
+      cross_signing_ready: true,
+      backup_unlocked: true,
+      signing_keys: { master: true, self_signing: true, user_signing: true },
+      recovery_passphrase: false,
+      account_data_key: false,
+    },
+    backup_enabled: true,
+    backup_uploaded: true,
+    has_encrypted_rooms: false,
+  });
+  const { user, dialog } = await requestLogout(current.user_id);
+
+  expect(logout).not.toHaveBeenCalled();
+  await user.click(within(dialog).getByRole('button', { name: 'settings.logout' }));
+
+  await vi.waitFor(() => {
+    expect(logout).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+  expect(signOutSafety).toHaveBeenCalledOnce();
 });
 
 test('uses session logout for the active account even if it requires reauthentication', async () => {

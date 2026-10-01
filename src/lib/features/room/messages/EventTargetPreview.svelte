@@ -130,13 +130,7 @@
 >
   {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
-    <SenderName
-      displayName={name}
-      {colors}
-      font={cosmetics?.font ?? null}
-      nameClass="target-name"
-      compact
-    />
+    <SenderName displayName={name} {colors} nameClass="target-name" compact />
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
   </span>
 </button>
@@ -203,8 +197,10 @@
     --target-connector-width: var(--border-width-500);
 
     grid-template-columns: minmax(0, 1fr);
+    margin-bottom: var(--space-100);
     min-height: var(--space-500);
     overflow: visible;
+    padding-block: 0;
     padding-inline: 0;
     position: relative;
   }
@@ -232,6 +228,7 @@
 
     align-items: start;
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     padding: var(--space-200) var(--space-300) var(--space-200)
       calc(var(--space-300) + var(--target-accent-width));
     position: relative;

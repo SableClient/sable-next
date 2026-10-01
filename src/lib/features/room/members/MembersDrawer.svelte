@@ -301,6 +301,7 @@
 
     background: var(--bg-container);
     box-shadow: var(--shadow-dialog);
+    color: var(--bg-on-container);
     display: flex;
     flex-direction: column;
     inset: 0 0 0 auto;
@@ -388,10 +389,12 @@
   }
 
   :global(.member-search-input) {
-    background: var(--surface-container);
+    --form-control-container: var(--surface-container);
+    --form-control-container-line: var(--surface-container-line);
+    --form-control-color: var(--surface-on-container);
+
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    color: inherit;
     min-height: 2.25rem;
     padding: 0 var(--space-300);
     width: 100%;

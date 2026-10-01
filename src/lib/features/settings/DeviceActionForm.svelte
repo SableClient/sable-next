@@ -73,6 +73,7 @@
   .device-form {
     background: var(--surface-container);
     border-top: var(--border-width) solid var(--bg-container-line);
+    color: var(--surface-on-container);
     display: grid;
     gap: var(--space-300);
     grid-template-columns: 1fr;

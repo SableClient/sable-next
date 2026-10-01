@@ -18,6 +18,7 @@
   // Keep participant updates from restarting playback.
   let playbackRoom = $derived(room);
   let node = $state<HTMLDivElement>();
+  let audioElements = $state.raw<HTMLMediaElement[]>([]);
 
   type Filtered = { source: AudioNode; gain: GainNode; filter?: AudioWorkletNode };
 
@@ -112,6 +113,7 @@
         );
         currentNode.append(element);
         attached.set(track.sid, { track, element });
+        audioElements = [...untrack(() => audioElements), element];
         currentTelemetry?.event('call.audio.track_attached', {
           'audio.attached_count': attached.size,
         });
@@ -136,6 +138,7 @@
         unroute(entry.element);
         entry.element.remove();
         attached.delete(sid);
+        audioElements = untrack(() => audioElements).filter((element) => element !== entry.element);
         currentTelemetry?.event('call.audio.track_detached', {
           'audio.attached_count': attached.size,
         });
@@ -167,32 +170,14 @@
   });
 
   $effect(() => {
-    const currentNode = node;
     const muted = deafened;
-    if (!currentNode) return;
-
-    for (const element of currentNode.children) {
-      if (element instanceof HTMLMediaElement)
-        levelOf(
-          element,
-          muted,
-          untrack(() => volumeOf(element.dataset.identity ?? '', element.dataset.screen === 'true'))
-        );
-    }
-  });
-
-  $effect(() => {
-    const currentNode = node;
     const volume = volumeOf;
-    if (!currentNode) return;
-
-    for (const element of currentNode.children) {
-      if (element instanceof HTMLMediaElement)
-        levelOf(
-          element,
-          untrack(() => deafened),
-          volume(element.dataset.identity ?? '', element.dataset.screen === 'true')
-        );
+    for (const element of audioElements) {
+      levelOf(
+        element,
+        muted,
+        volume(element.dataset.identity ?? '', element.dataset.screen === 'true')
+      );
     }
   });
 </script>

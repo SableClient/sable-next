@@ -101,7 +101,7 @@
 
     background: var(--bg-container-hover);
     border-color: var(--bg-container-line);
-    color: var(--surface-var-on-container);
+    color: var(--bg-on-container);
   }
 
   button:active {

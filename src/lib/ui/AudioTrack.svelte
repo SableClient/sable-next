@@ -35,6 +35,7 @@
     align-items: center;
     background: var(--surface-var-container);
     border-radius: var(--radius);
+    color: var(--surface-var-on-container);
     display: flex;
     gap: var(--space-300);
     isolation: isolate;
@@ -67,7 +68,7 @@
 
   .audio-track-cover.empty {
     background: var(--surface-container);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
   }
 
   .audio-track-text {

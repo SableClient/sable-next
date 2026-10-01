@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 
-import { inputRules } from 'prosemirror-inputrules';
+import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { activeMarks, formatCommands, formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
+import { serializeComposer } from './serialize';
 
 let view: EditorView | undefined;
 
@@ -307,27 +308,25 @@ test('an address inside a code span is left alone', () => {
   expect(marksOn('https://example.org')).toEqual(['code']);
 });
 
-test('a fence opens a block when a space follows its language', () => {
+test('a fence language followed by a space stays literal', () => {
   open();
   type('```rust ');
 
   const block = view?.state.doc.firstChild;
-  expect(block?.type.name).toBe('code_block');
-  expect(block?.attrs.language).toBe('rust');
-  expect(block?.textContent).toBe('');
+  expect(block?.type.name).toBe('paragraph');
+  expect(block?.textContent).toBe('```rust ');
 });
 
-test('a bare fence opens a block when followed by a space', () => {
+test('a space after a bare fence stays literal', () => {
   open();
   type('``` ');
 
   const block = view?.state.doc.firstChild;
-  expect(block?.type.name).toBe('code_block');
-  expect(block?.attrs.language).toBe('');
-  expect(block?.textContent).toBe('');
+  expect(block?.type.name).toBe('paragraph');
+  expect(block?.textContent).toBe('``` ');
 });
 
-test('a fence stays text until enter or a following space opens it', () => {
+test('an unfinished fence stays literal', () => {
   open();
   type('```go');
 
@@ -335,11 +334,162 @@ test('a fence stays text until enter or a following space opens it', () => {
   expect(view?.state.doc.textContent).toBe('```go');
 });
 
-test('three dashes become a rule rather than a paragraph of dashes', () => {
+test('three dashes stay literal while typing', () => {
   open();
   type('---');
 
-  expect(view?.state.doc.firstChild?.type.name).toBe('horizontal_rule');
+  expect(view?.state.doc.textContent).toBe('---');
+});
+
+describe('typed Markdown', () => {
+  test.each([
+    ['**', '<strong>test</strong>'],
+    ['*', '<em>test</em>'],
+    ['__', '<strong>test</strong>'],
+    ['_', '<em>test</em>'],
+    ['~~', '<del>test</del>'],
+    ['||', '<span data-mx-spoiler="">test</span>'],
+    ['`', '<code>test</code>'],
+    ['``', '<code>test</code>'],
+    ['***', '<strong><em>test</em></strong>'],
+  ])('typing between %s markers applies formatting', (delimiter, html) => {
+    const editor = open();
+    type(delimiter + delimiter);
+    editor.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1 + delimiter.length))
+    );
+    type('test');
+
+    expect(editor.state.doc.textContent).toBe('test');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(html);
+  });
+
+  test('typing between markers preserves the following text and caret', () => {
+    const editor = open();
+    type('**** tail');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('test');
+
+    expect(editor.state.selection.from).toBe(5);
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>test</strong> tail');
+
+    editor.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)));
+    type(' done');
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>test</strong> tail done');
+  });
+
+  test('replacing text between markers keeps formatting', () => {
+    const editor = open();
+    editor.dispatch(editor.state.tr.insertText('**old**'));
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3, 6)));
+    type('new');
+
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>new</strong>');
+  });
+
+  test('undo restores both markers', () => {
+    const editor = open();
+    type('****');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('t');
+
+    expect(undoInputRule(editor.state, editor.dispatch)).toBe(true);
+    expect(editor.state.doc.textContent).toBe('**t**');
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test.each([
+    ['**__', 3, '**test__'],
+    ['\\****', 4, '\\**test**'],
+    ['__word', 2, '_test_word'],
+  ])('typing into %s keeps unmatched or escaped markers literal', (source, position, expected) => {
+    const editor = open();
+    type(source);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, position)));
+    type('test');
+
+    expect(editor.state.doc.textContent).toBe(expected);
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test('markers inside code stay literal', () => {
+    const editor = open();
+    type('`****`');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('test');
+
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<code>**test**</code>');
+  });
+
+  test.each([
+    ['***both***', '<strong><em>both</em></strong>'],
+    ['say ***both*** now', 'say <strong><em>both</em></strong> now'],
+    ['__bold__', '<strong>bold</strong>'],
+    ['**a*b**', '<strong>a*b</strong>'],
+    ['**a *b* c**', '<strong>a <em>b</em> c</strong>'],
+    ['**a `b` c**', '<strong>a </strong><code>b</code><strong> c</strong>'],
+    ['`a` **b**', '<code>a</code> <strong>b</strong>'],
+    ['**💜a*b**', '<strong>💜a*b</strong>'],
+    ['[label](https://example.org)', '<a href="https://example.org">label</a>'],
+    [
+      '[**label**](https://example.org)',
+      '<strong><a href="https://example.org">label</a></strong>',
+    ],
+    ['`code` next', '<code>code</code> next'],
+    ['``code ` tick`` next', '<code>code ` tick</code> next'],
+    ['```code `` tick``` next', '<code>code `` tick</code> next'],
+    ['` **literal** `', '<code>**literal**</code>'],
+    ['`` ` ``', '<code>`</code>'],
+    ['`a\\`', '<code>a\\</code>'],
+  ])('%s renders as Markdown', (source, html) => {
+    const editor = open();
+    type(source);
+    expect(serializeComposer(editor.state.doc).formatted).toBe(html);
+  });
+
+  test.each([
+    '\\*literal\\*',
+    '\\_literal\\_',
+    '\\||literal\\||',
+    '\\`literal\\`',
+    '---literal',
+    '***',
+    '``code`',
+    '`code``',
+    '[label](javascript:alert(1))',
+  ])('%s stays literal', (source) => {
+    const editor = open();
+    type(source);
+    expect(editor.state.doc.textContent).toBe(source);
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test('inline code preserves stored formatting', () => {
+    const editor = open();
+    editor.dispatch(editor.state.tr.addStoredMark(composerSchema.marks.strong.create()));
+    type('`code` next');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(
+      '<code>code</code><strong> next</strong>'
+    );
+  });
+
+  test('Markdown formatting preserves mentions', () => {
+    const editor = open();
+    const mention = composerSchema.nodes.mention.create({
+      userId: '@one:example.org',
+      name: 'One',
+    });
+    const tr = editor.state.tr.replaceWith(
+      0,
+      editor.state.doc.content.size,
+      composerSchema.nodes.paragraph.create(null, [composerSchema.text('**hello '), mention])
+    );
+    editor.dispatch(tr.setSelection(Selection.atEnd(tr.doc)));
+    type('**');
+    expect(editor.state.doc.firstChild?.lastChild?.type.name).toBe('mention');
+    expect(editor.state.doc.firstChild?.lastChild?.attrs.userId).toBe('@one:example.org');
+    expect(serializeComposer(editor.state.doc).mentions.userIds).toEqual(['@one:example.org']);
+  });
 });
 
 test.each(['2 * 3 * 4', 'a ** b ** c', 'x ~~ y ~~ z', 'p _ q _ r'])(

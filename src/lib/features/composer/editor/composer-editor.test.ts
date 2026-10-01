@@ -124,6 +124,29 @@ test('committing a mention keeps the text that came before it', () => {
   expect(serializeComposer(doc).body).toBe('hi Me');
 });
 
+test('committing a room mention replaces the whole query with spaces', () => {
+  const onQuery = vi.fn<ComposerEditorOptions['onQuery']>();
+  const editor = openWith({ onQuery });
+  editor.setText('join #Sable Dev tomorrow');
+  const target = view(editor);
+  target.dispatch(target.state.tr.setSelection(TextSelection.create(target.state.doc, 16)));
+
+  const found = onQuery.mock.lastCall?.[0];
+  expect(found).toEqual({ sigil: '#', query: 'Sable Dev', start: 6, end: 16 });
+  if (!found) throw new Error('no room query');
+  editor.replaceQuery(
+    found,
+    composerSchema.nodes.mention.create({ userId: '#dev:example.org', name: '#Sable Dev' })
+  );
+
+  const doc = editor.doc();
+  if (!doc) throw new Error('no doc');
+  const message = serializeComposer(doc);
+  expect(message.body).toBe('join #Sable Dev  tomorrow');
+  expect(message.formatted).toContain('https://matrix.to/#/#dev:example.org');
+  expect(doc.nodeAt(6)?.type.name).toBe('mention');
+});
+
 test('unlinking a mention makes its Matrix ID literal for a bot command', () => {
   const editor = open();
   editor.setDoc(
@@ -838,6 +861,83 @@ describe('block editing', () => {
 
     expect(editor.doc()?.firstChild?.type.name).toBe('code_block');
     expect(editor.doc()?.firstChild?.attrs.language).toBe('');
+  });
+
+  test.each([false, true])('a closing fence exits the code block (shift: %s)', (shift) => {
+    const editor = open();
+    type(editor, '```rust');
+    press(editor, 'Enter', shift);
+    type(editor, 'let x = 1;');
+    press(editor, 'Enter', shift);
+    type(editor, '```');
+    press(editor, 'Enter', shift);
+    type(editor, 'after');
+
+    expect(editor.doc()?.firstChild?.type.name).toBe('code_block');
+    expect(editor.doc()?.firstChild?.textContent).toBe('let x = 1;');
+    expect(editor.doc()?.lastChild?.type.name).toBe('paragraph');
+    expect(editor.doc()?.lastChild?.textContent).toBe('after');
+  });
+
+  test('a fence inside a code line remains code', () => {
+    const editor = open();
+    type(editor, '```');
+    press(editor, 'Enter');
+    type(editor, 'const value = "```";');
+    press(editor, 'Enter');
+    expect(editor.doc()?.firstChild?.textContent).toBe('const value = "```";\n');
+  });
+
+  test('iOS handles code line breaks once', () => {
+    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    const lineBreak = () => {
+      view(editor).props.handleDOMEvents?.keydown?.(
+        view(editor),
+        new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true })
+      );
+      expect(beforeInput(surface(), 'insertLineBreak').defaultPrevented).toBe(true);
+      press(editor, 'Enter');
+    };
+    type(editor, '```rust');
+    lineBreak();
+    expect(editor.doc()?.firstChild?.type.name).toBe('code_block');
+    expect(editor.doc()?.firstChild?.textContent).toBe('');
+    expect(submit).not.toHaveBeenCalled();
+
+    type(editor, 'let x = 1;');
+    lineBreak();
+    expect(editor.doc()?.firstChild?.textContent).toBe('let x = 1;\n');
+    type(editor, '```');
+    lineBreak();
+    type(editor, 'after');
+    expect(editor.doc()?.firstChild?.textContent).toBe('let x = 1;');
+    expect(editor.doc()?.lastChild?.textContent).toBe('after');
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  test('an iOS fence entered without keydown does not consume the next Enter', () => {
+    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)');
+    const submit = vi.fn();
+    const editor = openWith({ onSubmit: submit });
+    type(editor, '```');
+    beforeInput(surface(), 'insertParagraph');
+    type(editor, '```');
+    beforeInput(surface(), 'insertParagraph');
+    type(editor, 'after');
+    press(editor, 'Enter');
+    expect(submit).toHaveBeenCalledOnce();
+  });
+
+  test('Enter converts a horizontal rule', () => {
+    const editor = open();
+    type(editor, '---');
+    expect(editor.doc()?.firstChild?.type.name).toBe('paragraph');
+    press(editor, 'Enter');
+    expect(editor.doc()?.firstChild?.type.name).toBe('horizontal_rule');
+    type(editor, 'after');
+    expect(editor.doc()?.lastChild?.textContent).toBe('after');
   });
 
   test('shift+arrowdown exits a code block from its final line', () => {

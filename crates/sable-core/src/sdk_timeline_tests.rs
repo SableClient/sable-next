@@ -1194,7 +1194,7 @@ async fn a_server_that_pushes_every_encrypted_event_does_not_count_them_as_unrea
 }
 
 #[tokio::test]
-async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
+async fn unread_reply_counts_persist_until_read() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
     client.event_cache().subscribe().unwrap();
@@ -1207,6 +1207,7 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
     let mention = |event_id| {
         factory
             .text_msg("hey")
+            .reply_to(event_id!("$original"))
             .mentions(matrix_sdk::ruma::events::Mentions::with_user_ids([
                 me.clone()
             ]))
@@ -1230,8 +1231,8 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
                 .into_event(),
         )
         .set_unread_notifications_count(json!({
-            "notification_count": 0,
-            "highlight_count": 0,
+            "notification_count": 2,
+            "highlight_count": 2,
         }));
     server
         .mock_sync()
@@ -1243,10 +1244,52 @@ async fn an_unencrypted_room_takes_its_highlights_from_the_server() {
     let item =
         matrix_sdk_ui::room_list_service::RoomListItem::from(client.get_room(room_id).unwrap());
 
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (2, 2)
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).set_unread_notifications_count(json!({
+                "notification_count": 0,
+                "highlight_count": 0,
+            })),
+        )
+        .await;
+
     assert_eq!(item.num_unread_mentions(), 2);
     assert_eq!(
         super::view::unread_counts(&item, Some(event_id!("$two")), false),
-        (2, 0)
+        (2, 2)
+    );
+
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_receipt(
+                    factory
+                        .read_receipts()
+                        .add(
+                            event_id!("$two"),
+                            &me,
+                            ReceiptType::Read,
+                            ReceiptThread::Unthreaded,
+                        )
+                        .into_event(),
+                )
+                .set_unread_notifications_count(json!({
+                    "notification_count": 2,
+                    "highlight_count": 2,
+                })),
+        )
+        .await;
+
+    assert_eq!(
+        super::view::unread_counts(&item, Some(event_id!("$two")), false),
+        (0, 0)
     );
 }
 
@@ -1814,6 +1857,45 @@ async fn a_gallery_item_carries_what_a_single_attachment_does() {
     assert_eq!(json[1]["waveform"], json!([0.0, 1.0]));
     assert_eq!(json[2]["filename"], "report.pdf");
     assert_eq!(json[2]["size"], 4096);
+}
+
+#[tokio::test]
+async fn a_reply_quotes_formatted_text() {
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!formatted-reply:example.org");
+    let factory = EventFactory::new().room(room_id).sender(*ALICE);
+
+    server.mock_room_state_encryption().plain().mount().await;
+    let room = server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id)
+                .add_timeline_event(
+                    factory
+                        .text_html(
+                            "**bold** and `code`",
+                            "<strong>bold</strong> and <code>code</code>",
+                        )
+                        .event_id(event_id!("$formatted")),
+                )
+                .add_timeline_event(
+                    factory
+                        .text_msg("nice")
+                        .reply_to(event_id!("$formatted"))
+                        .event_id(event_id!("$reply")),
+                ),
+        )
+        .await;
+
+    let views = timeline_views(&client, &room, false).await.unwrap();
+    let reply = views
+        .iter()
+        .find(|view| view.event_id.as_deref() == Some(event_id!("$reply")))
+        .and_then(|view| view.in_reply_to.as_ref())
+        .unwrap();
+    assert_eq!(reply.body.as_deref(), Some("bold and code"));
 }
 
 #[tokio::test]

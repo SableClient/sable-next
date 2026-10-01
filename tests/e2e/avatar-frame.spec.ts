@@ -66,3 +66,71 @@ test('the hover animation stacks over the still picture inside the frame', async
     [0, 0, 0, 0],
   ]);
 });
+
+for (const mobile of [false, true]) {
+  test.describe(mobile ? 'mobile profile avatar' : 'desktop profile avatar', () => {
+    test.use({
+      hasTouch: mobile,
+      viewport: mobile ? { width: 412, height: 915 } : { width: 1280, height: 800 },
+    });
+
+    for (const hero of [null, '#430039']) {
+      for (const scheme of ['light', 'dark'] as const) {
+        test(`transparent avatars cover the banner (${scheme}, ${hero ? 'tinted' : 'default'})`, async ({
+          app,
+          page,
+          installRoomCore,
+        }) => {
+          await page.emulateMedia({ colorScheme: scheme });
+          await page.addInitScript((heroColor) => {
+            (window as unknown as { __e2eProfilePatch: object }).__e2eProfilePatch = {
+              avatar_url: 'mxc://example.test/transparent-avatar',
+              banner_url: 'mxc://example.test/banner',
+              hero_color: heroColor,
+            };
+            window.__e2eFetchMedia = async (source) => {
+              const canvas = new OffscreenCanvas(96, 96);
+              const context = canvas.getContext('2d');
+              if (!context) throw new Error('No canvas context');
+              const transparent = source.endsWith('/transparent-avatar');
+              context.fillStyle = transparent ? '#ffffff' : '#ff0000';
+              if (transparent) context.fillRect(32, 32, 32, 32);
+              else context.fillRect(0, 0, 96, 96);
+              const blob = await canvas.convertToBlob({ type: 'image/png' });
+              return new Uint8Array(await blob.arrayBuffer());
+            };
+          }, hero);
+          await installRoomCore('ready');
+          await app.openRoom('!room:example.test');
+          await page.getByRole('button', { name: "Open Alice's profile" }).last().click();
+
+          const card = page.locator('.profile-card');
+          const avatar = card.locator('.profile-card-avatar');
+          const cover = card.locator('.profile-card-cover');
+          await expect(avatar.locator('img')).toBeVisible();
+          await expect(cover.locator('img')).toBeVisible();
+          await expect
+            .poll(() =>
+              cover
+                .locator('img')
+                .evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)
+            )
+            .toBe(true);
+          await expect(avatar.locator('.media-image')).not.toHaveAttribute('style', /background/);
+
+          const box = await avatar.boundingBox();
+          if (!box) throw new Error('Avatar is not laid out');
+          const clip = {
+            x: box.x + box.width / 4,
+            y: box.y + box.height / 8,
+            width: box.width / 2,
+            height: (box.height * 3) / 4,
+          };
+          const withBanner = await page.screenshot({ clip });
+          await cover.evaluate((element) => (element.style.visibility = 'hidden'));
+          expect((await page.screenshot({ clip })).equals(withBanner)).toBe(true);
+        });
+      }
+    }
+  });
+}

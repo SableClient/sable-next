@@ -86,6 +86,8 @@ runs:
       if: ${{ inputs.build == 'true' && steps.wasm.outputs.cache-hit != 'true' }}
       shell: bash
       working-directory: ${{ github.workspace }}
+      env:
+        CARGO_BUILD_JOBS: '1'
       run: pnpm wasm:build
 
     - name: Verify Sentry source map configuration

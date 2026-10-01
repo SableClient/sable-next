@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 
-import type { BotCommandDescriptionView, ImagePackView, MemberView } from '#src/generated/protocol';
+import type {
+  BotCommandDescriptionView,
+  ImagePackView,
+  ImageSourcePackView,
+  MemberView,
+  RoomSummary,
+} from '#src/generated/protocol';
 import { SCHEDULE_PRESS_MS } from '#lib/ui/long-press.svelte.js';
 import { guardTouchClicks } from '#lib/ui/trailing-click.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -24,6 +30,7 @@ import {
 } from './composer-drafts.svelte';
 import { ComposerEditor } from './editor/composer-editor';
 import { composerSchema } from './editor/schema';
+import { textDoc } from './editor/serialize';
 import Harness from './RoomComposerHarness.test.svelte';
 
 afterEach(() => {
@@ -141,6 +148,12 @@ interface ComposerProps {
     dueTs: number
   ) => Promise<void>;
   onTyping?: (roomId: string, typing: boolean) => Promise<void>;
+  onQuickReact?: (
+    roomId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null
+  ) => Promise<void>;
+  canReact?: boolean;
   context?: ComposerContext;
   onCancelContext?: () => void;
   onDeleteEdited?: (eventId: string, reason: string | null) => void;
@@ -156,15 +169,15 @@ interface ComposerProps {
   registerRoom?: (set: (roomId: string) => void) => void;
 }
 
-function setup({
-  registerReply,
-  registerContext,
-  registerRoom,
-  ...composer
-}: ComposerProps): RenderResult<typeof Harness> {
+function setup(
+  { registerReply, registerContext, registerRoom, ...composer }: ComposerProps,
+  client: CoreClient = core(),
+  rooms: RoomSummary[] = []
+): RenderResult<typeof Harness> {
   return render(Harness, {
     props: {
-      core: core(),
+      core: client,
+      rooms,
       registerReply,
       registerContext,
       registerRoom,
@@ -217,6 +230,32 @@ test('the editor mounts as a labelled combobox surface', async () => {
   const editable = document.querySelector('[role="combobox"]');
   expect(editable?.getAttribute('aria-label')).toBe('Send a message…');
   expect(editable?.getAttribute('contenteditable')).toBe('true');
+});
+
+test.each([
+  ['\\*like so*', '*like so*'],
+  ['\\`code\\`', '`code`'],
+  ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
+])('Markdown mode renders escapes in %j', async (source, formatted) => {
+  setPreference('richTextComposer', false);
+  writeDraft('!room:example.org', {
+    doc: textDoc(source).toJSON(),
+    staged: [],
+    nextStagedId: 0,
+  });
+  const send = vi.fn(async () => {});
+  setup({ roomId: '!room:example.org', onSend: send });
+  await tick();
+  expect(editorText()).toBe(source);
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(send).toHaveBeenCalledWith('!room:example.org', source, formatted, {
+      userIds: [],
+      room: false,
+    });
+  });
 });
 
 test('an unmount stops the typing notice for the room it was mounted with', async () => {
@@ -1601,6 +1640,94 @@ function draftText(text: string): void {
   writeDraft('!room:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 });
 }
 
+test.each(['rich text', 'plain text'])(
+  'selecting a quick reaction clears the %s composer',
+  async (mode) => {
+    setPreference('richTextComposer', mode === 'rich text');
+    const onQuickReact = vi.fn(async () => {});
+    const onSend = vi.fn(async () => {});
+    const onTyping = vi.fn(async () => {});
+    draftText('+:joy');
+    setup({ roomId: '!room:example.org', onQuickReact, onSend, onTyping });
+
+    await screen.findByRole('option', { name: ':joy:' });
+    pressInEditor({ key: 'Enter' });
+    await vi.waitFor(() => {
+      expect(onQuickReact).toHaveBeenCalledWith('!room:example.org', '😂', null);
+    });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(editorText()).toBe('');
+    expect(onTyping).toHaveBeenLastCalledWith('!room:example.org', false);
+  }
+);
+
+test('clicking a custom quick reaction sends its media URL and source pack', async () => {
+  const onQuickReact = vi.fn(async () => {});
+  const sourcePack = {
+    room_id: '!room:example.org',
+    state_key: '',
+    shortcode: 'wave',
+    via: ['example.org'],
+  };
+  const client = core();
+  Object.assign(client.commands, {
+    imagePackListing: () =>
+      Promise.resolve({
+        packs: [{ ...packs[0], images: [{ ...packs[0].images[0], source_pack: sourcePack }] }],
+        complete: true,
+      }),
+  });
+  draftText('+:wa');
+  setup({ roomId: '!room:example.org', onQuickReact }, client);
+
+  await vi.waitFor(() => {
+    expect(document.querySelector('[role="option"] .emote')).not.toBeNull();
+  });
+  await press(document.querySelector('[role="option"]:has(.emote)'));
+  expect(onQuickReact).toHaveBeenCalledWith(
+    '!room:example.org',
+    'mxc://example.org/wave',
+    sourcePack
+  );
+  expect(editorText()).toBe('');
+});
+
+test('Tab selects an emoji from a bare quick reaction prefix', async () => {
+  const onQuickReact = vi.fn(async () => {});
+  draftText('+:');
+  setup({ roomId: '!room:example.org', onQuickReact });
+  await screen.findAllByRole('option');
+  pressInEditor({ key: 'Tab' });
+  await vi.waitFor(() => {
+    expect(onQuickReact).toHaveBeenCalledTimes(1);
+  });
+  expect(editorText()).toBe('');
+});
+
+test.each([
+  { name: 'reaction permissions', canReact: false, readOnly: false },
+  { name: 'a read-only room', canReact: true, readOnly: true },
+])('quick reactions are disabled by $name', async ({ canReact, readOnly }) => {
+  const onQuickReact = vi.fn(async () => {});
+  draftText('+:joy');
+  setup({ roomId: '!room:example.org', onQuickReact, canReact, readOnly });
+  await tick();
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(onQuickReact).not.toHaveBeenCalled();
+  if (!readOnly) expect(editorText()).toBe('+:joy');
+  else expect(readDraft('!room:example.org')).toBeDefined();
+});
+
+test('a failed quick reaction restores the draft', async () => {
+  const onQuickReact = vi.fn(() => Promise.reject(new Error('offline')));
+  draftText('+:joy');
+  setup({ roomId: '!room:example.org', onQuickReact });
+  await press(await screen.findByRole('option', { name: ':joy:' }));
+  await vi.waitFor(() => {
+    expect(editorText()).toBe('+:joy');
+  });
+});
+
 test('a complete bot command typed in the composer is sent as a structured command', async () => {
   const onSend = vi.fn(async () => {});
   const onSendBotCommand = vi.fn(async () => {});
@@ -1631,6 +1758,216 @@ test('choosing a bot command suggestion opens its argument form', async () => {
   expect(await screen.findByRole('form', { name: 'Arguments for /warn' })).toBeTruthy();
   expect(screen.getByLabelText('user')).toBeTruthy();
   expect(screen.getByLabelText('days')).toBeTruthy();
+});
+
+test.each(['command', 'argument'])('formatting a bot %s keeps its invocation', async (part) => {
+  const onSendBotCommand = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, [
+      composerSchema.text(
+        '/warn',
+        part === 'command' ? [composerSchema.marks.strong.create()] : []
+      ),
+      composerSchema.text(' @spam:example.org '),
+      composerSchema.text('7', part === 'argument' ? [composerSchema.marks.code.create()] : []),
+    ]),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  setup({ roomId: '!room:example.org', onSendBotCommand });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/warn @spam:example.org 7',
+      { command: 'warn', arguments: { user: '@spam:example.org', days: 7 } }
+    );
+  });
+});
+
+test('a failed bot command restores its code block', async () => {
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, composerSchema.text('/register')),
+    composerSchema.node('code_block', { language: 'yaml' }, composerSchema.text('id: bridge')),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  setup({
+    roomId: '!room:example.org',
+    onSendBotCommand: () => Promise.reject(new Error('offline')),
+  });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+  expect(document.querySelector('[role="combobox"] pre code')?.textContent).toBe('id: bridge');
+  expect(editorText()).toBe('/registerid: bridge');
+});
+
+test.each(['/register payload', '/warn @spam:example.org 7'])(
+  'a failed %s keeps text entered while sending',
+  async (command) => {
+    let rejectSend: ((error: Error) => void) | undefined;
+    const onSendBotCommand = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectSend = reject;
+        })
+    );
+    draftText(command);
+    setup({ roomId: '!room:example.org', onSendBotCommand });
+    await tick();
+
+    submit();
+    await vi.waitFor(() => {
+      expect(onSendBotCommand).toHaveBeenCalledOnce();
+    });
+    const editable = screen.getByRole('combobox');
+    editable.focus();
+    await user.paste('next message');
+    expect(editorText()).toBe('next message');
+    rejectSend?.(new Error('offline'));
+
+    await vi.waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+    expect(editorText()).toBe('next message');
+  }
+);
+
+test('a failed bot command does not restore into another room', async () => {
+  let rejectSend: ((error: Error) => void) | undefined;
+  let setRoom: ((roomId: string) => void) | undefined;
+  const onSendBotCommand = vi.fn(
+    () =>
+      new Promise<void>((_resolve, reject) => {
+        rejectSend = reject;
+      })
+  );
+  draftText('/register payload');
+  setup({
+    roomId: '!room:example.org',
+    onSendBotCommand,
+    registerRoom: (set) => {
+      setRoom = set;
+    },
+  });
+  await tick();
+
+  submit();
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledOnce();
+  });
+  setRoom?.('!other:example.org');
+  await tick();
+  rejectSend?.(new Error('offline'));
+
+  await vi.waitFor(() => {
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+  });
+  expect(editorText()).toBe('');
+});
+
+test('a bot command lookup does not clear a newer draft', async () => {
+  let resolveCommands: ((commands: BotCommandDescriptionView[]) => void) | undefined;
+  const client = core();
+  const lookup = vi.fn(
+    () =>
+      new Promise<BotCommandDescriptionView[]>((resolve) => {
+        resolveCommands = resolve;
+      })
+  );
+  Object.assign(client.commands, { botCommands: lookup });
+  const onSendBotCommand = vi.fn(async () => {});
+  draftText('/register payload');
+  setup({ roomId: '!room:example.org', onSendBotCommand }, client);
+  await tick();
+
+  submit();
+  await vi.waitFor(() => {
+    expect(lookup).toHaveBeenCalledOnce();
+  });
+  screen.getByRole('combobox').focus();
+  await user.paste(' updated');
+  const updated = editorText();
+  expect(updated).toContain('updated');
+  resolveCommands?.(botCommands);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(editorText()).toBe(updated);
+  expect(onSendBotCommand).not.toHaveBeenCalled();
+});
+
+test('a queued bot command keeps its room', async () => {
+  let resolveSend: (() => void) | undefined;
+  let setRoom: ((roomId: string) => void) | undefined;
+  const onSendBotCommand = vi.fn(async () => {});
+  onSendBotCommand.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        resolveSend = resolve;
+      })
+  );
+  draftText('/register first');
+  setup({
+    roomId: '!room:example.org',
+    onSendBotCommand,
+    registerRoom: (set) => {
+      setRoom = set;
+    },
+  });
+  await tick();
+
+  submit();
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledOnce();
+  });
+  screen.getByRole('combobox').focus();
+  await user.paste('/register second');
+  submit();
+  await vi.waitFor(() => {
+    expect(editorText()).toBe('');
+  });
+  setRoom?.('!other:example.org');
+  await tick();
+  resolveSend?.();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenNthCalledWith(
+      2,
+      '!room:example.org',
+      '@bot:example.org',
+      '/register second',
+      { command: 'register', arguments: {} }
+    );
+  });
+});
+
+test('a bot command fences code containing backticks', async () => {
+  const onSendBotCommand = vi.fn(async () => {});
+  const draft = composerSchema.node('doc', null, [
+    composerSchema.node('paragraph', null, composerSchema.text('/register')),
+    composerSchema.node('code_block', { language: '' }, composerSchema.text('a\n```\nb')),
+  ]);
+  writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+  setup({ roomId: '!room:example.org', onSendBotCommand });
+  await tick();
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(onSendBotCommand).toHaveBeenCalledWith(
+      '!room:example.org',
+      '@bot:example.org',
+      '/register\n\n````\na\n```\nb\n````',
+      { command: 'register', arguments: {} }
+    );
+  });
 });
 
 test('a bot command change clears stale suggestions', async () => {
@@ -1703,6 +2040,51 @@ test('a pack change refreshes open emote suggestions', async () => {
 
   expect(await screen.findByRole('option', { name: /:wave2:/ })).toBeTruthy();
 });
+
+test.each([
+  { command: '/register', richText: true, language: 'yaml' },
+  { command: '/register', richText: false, language: 'yaml' },
+  { command: '!admin appservices register', richText: true, language: '' },
+  { command: '!admin appservices register', richText: false, language: '' },
+])(
+  '$command preserves code fences with rich text $richText',
+  async ({ command, richText, language }) => {
+    setPreference('richTextComposer', richText);
+    const onSendBotCommand = vi.fn(async () => {});
+    const body = `${command}\n\n\`\`\`${language}\nid: bridge\n\`\`\``;
+    const draft = richText
+      ? composerSchema.node('doc', null, [
+          composerSchema.node('paragraph', null, composerSchema.text(command)),
+          composerSchema.node('code_block', { language }, composerSchema.text('id: bridge')),
+        ])
+      : textDoc(body);
+    writeDraft('!room:example.org', { doc: draft.toJSON(), staged: [], nextStagedId: 0 });
+    const client = core();
+    const admin = command.startsWith('!admin');
+    if (admin) {
+      Object.defineProperty(client, 'session', { value: { user_id: '@me:example.org' } });
+    }
+    setup(
+      { roomId: '!room:example.org', onSendBotCommand },
+      client,
+      admin
+        ? [{ room_id: '!room:example.org', canonical_alias: '#admins:example.org' } as RoomSummary]
+        : []
+    );
+    await tick();
+
+    submit();
+
+    await vi.waitFor(() => {
+      expect(onSendBotCommand).toHaveBeenCalledWith(
+        '!room:example.org',
+        admin ? '@conduit:example.org' : '@bot:example.org',
+        body,
+        { command: admin ? 'appservices register' : 'register', arguments: {} }
+      );
+    });
+  }
+);
 
 test('a zero-parameter bot command preserves raw trailing input', async () => {
   const onSendBotCommand = vi.fn(async () => {});

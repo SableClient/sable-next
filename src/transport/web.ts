@@ -13,6 +13,7 @@ import {
   wasmLogLevel,
 } from '../lib/observability/wasm-log.js';
 import { deleteAccountWebStorage, resetWebStorage } from '../lib/platform/session-storage.js';
+import { migrateV1 } from '#lib/migrations/v1/migration.js';
 
 type RequestLabel = Command['type'] | 'media' | 'attachment' | 'upload';
 
@@ -277,6 +278,8 @@ export function createWebTransport(): Transport {
     transfers: Transferable[] = []
   ): Promise<T> {
     return (async () => {
+      const migration = migrateV1();
+      if (migration) await migration;
       if (closed) throw new CoreError({ code: 'failed', log_id: 'transport closed' });
       const id = nextId++;
       const activeWorker = connect();

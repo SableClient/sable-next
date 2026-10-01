@@ -54,7 +54,6 @@ import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TextAlignLeftIcon from 'phosphor-svelte/lib/TextAlignLeftIcon';
-import TextTIcon from 'phosphor-svelte/lib/TextTIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -65,7 +64,7 @@ import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
 import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
 import { playNotificationSound } from '#lib/features/notifications/sound.js';
-import { setLanguage } from '#lib/i18n.js';
+import { currentLocale, setLanguage } from '#lib/i18n.js';
 import { availableLocales, localeLabel, SYSTEM_LANGUAGE } from '#lib/locales.js';
 import { hasNativeCalls } from '#lib/platform/calls.js';
 import { presentsInApp } from '#lib/platform/notifications.js';
@@ -422,6 +421,18 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'threadPresentation',
+        section: 'message-layout',
+        icon: LayoutIcon,
+        name: 'settings.threadPresentation',
+        description: 'settings.threadPresentationHint',
+        type: 'select',
+        options: [
+          { value: 'timeline', label: 'settings.threadPresentationTimeline' },
+          { value: 'panel', label: 'settings.threadPresentationPanel' },
+        ],
+      },
+      {
         key: 'alignOwnMessages',
         section: 'message-layout',
         icon: LayoutIcon,
@@ -483,13 +494,6 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'sidebar',
         icon: HouseIcon,
         name: 'settings.showHome',
-        type: 'boolean',
-      },
-      {
-        key: 'showSearch',
-        section: 'sidebar',
-        icon: MagnifyingGlassIcon,
-        name: 'settings.showSearch',
         type: 'boolean',
       },
       {
@@ -581,14 +585,6 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
-        key: 'renderRoomFonts',
-        section: 'accessibility',
-        icon: TextTIcon,
-        name: 'settings.renderRoomFonts',
-        description: 'settings.renderRoomFontsHint',
-        type: 'boolean',
-      },
-      {
         key: 'reducedMotion',
         section: 'accessibility',
         icon: WheelchairMotionIcon,
@@ -616,8 +612,144 @@ export const settingsCategories: SettingsCategory[] = [
       { id: 'room-events', name: 'settings.groups.roomEvents' },
       { id: 'receipts-typing', name: 'settings.groups.receiptsTyping' },
       { id: 'members-pronouns', name: 'settings.groups.membersPronouns' },
+      { id: 'message-search', name: 'settings.groups.messageSearch' },
+      { id: 'developer-search-metrics', name: 'settings.developerSearchTitle' },
     ],
     items: [
+      {
+        key: 'showSearch',
+        section: 'message-search',
+        icon: MagnifyingGlassIcon,
+        name: 'settings.showSearch',
+        type: 'boolean',
+      },
+      {
+        key: 'searchCrawler',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchCrawler',
+        description: 'settings.searchCrawlerHint',
+        type: 'boolean',
+      },
+      {
+        key: 'searchUnmeteredOnly',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchUnmeteredOnly',
+        description: 'settings.searchUnmeteredOnlyHint',
+        type: 'boolean',
+        gatedBy: 'searchCrawler',
+        supported: isNativeMobile,
+      },
+      {
+        key: 'serverSearch',
+        section: 'message-search',
+        icon: MagnifyingGlassIcon,
+        name: 'settings.serverSearch',
+        description: 'settings.serverSearchHint',
+        type: 'boolean',
+      },
+      {
+        key: 'searchIndexLimit',
+        section: 'message-search',
+        icon: DatabaseIcon,
+        name: 'settings.searchIndexLimit',
+        description: 'settings.searchIndexLimitHint',
+        type: 'select',
+        options: SEARCH_INDEX_LIMITS.map((limit) => ({
+          value: limit,
+          label: Number(limit) >= 1024 ? `${String(Number(limit) / 1024)} GB` : `${limit} MB`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchCrawlPause',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchCrawlPause',
+        description: 'settings.searchCrawlPauseHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_CRAWL_PAUSES.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchTricklePause',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchTricklePause',
+        description: 'settings.searchTricklePauseHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_TRICKLE_PAUSES.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchFlushInterval',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchFlushInterval',
+        description: 'settings.searchFlushIntervalHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_FLUSH_INTERVALS.map((value) => ({
+          value,
+          label: `${value} s`,
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchBatchSize',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchBatchSize',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_BATCH_SIZES.map((value) => ({
+          value,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchBaseEvents',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchBaseEvents',
+        description: 'settings.searchBaseEventsHint',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_BASE_EVENTS.map((value) => ({
+          value,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
+          literal: true,
+        })),
+      },
+      {
+        key: 'searchMaxEvents',
+        section: 'developer-search-metrics',
+        icon: DatabaseIcon,
+        name: 'settings.searchMaxEvents',
+        type: 'select',
+        gatedBy: 'developerTools',
+        options: SEARCH_MAX_EVENTS.map((value) => ({
+          value,
+          get label() {
+            return `${Number(value).toLocaleString(currentLocale())} events`;
+          },
+          literal: true,
+        })),
+      },
       {
         key: 'timelineEmoteSize',
         section: 'messages',
@@ -767,6 +899,15 @@ export const settingsCategories: SettingsCategory[] = [
         icon: UserCircleIcon,
         name: 'settings.showPronouns',
         type: 'boolean',
+      },
+      {
+        key: 'showPronounPills',
+        section: 'members-pronouns',
+        icon: UserCircleIcon,
+        name: 'settings.showPronounPills',
+        description: 'settings.showPronounPillsHint',
+        type: 'boolean',
+        gatedBy: 'showPronouns',
       },
       {
         key: 'filterPronounsByLanguage',
@@ -923,7 +1064,6 @@ export const settingsCategories: SettingsCategory[] = [
     sections: [
       { id: 'activity', name: 'settings.groups.activity' },
       { id: 'blurring', name: 'settings.groups.blurring' },
-      { id: 'message-search', name: 'settings.groups.messageSearch' },
       { id: 'diagnostics', name: 'settings.groups.diagnostics' },
     ],
     items: [
@@ -973,45 +1113,6 @@ export const settingsCategories: SettingsCategory[] = [
         name: 'settings.blurEmotes',
         description: 'settings.blurEmotesHint',
         type: 'boolean',
-      },
-      {
-        key: 'searchCrawler',
-        section: 'message-search',
-        icon: DatabaseIcon,
-        name: 'settings.searchCrawler',
-        description: 'settings.searchCrawlerHint',
-        type: 'boolean',
-      },
-      {
-        key: 'searchUnmeteredOnly',
-        section: 'message-search',
-        icon: DatabaseIcon,
-        name: 'settings.searchUnmeteredOnly',
-        description: 'settings.searchUnmeteredOnlyHint',
-        type: 'boolean',
-        gatedBy: 'searchCrawler',
-        supported: isNativeMobile,
-      },
-      {
-        key: 'serverSearch',
-        section: 'message-search',
-        icon: MagnifyingGlassIcon,
-        name: 'settings.serverSearch',
-        description: 'settings.serverSearchHint',
-        type: 'boolean',
-      },
-      {
-        key: 'searchIndexLimit',
-        section: 'message-search',
-        icon: DatabaseIcon,
-        name: 'settings.searchIndexLimit',
-        description: 'settings.searchIndexLimitHint',
-        type: 'select',
-        options: SEARCH_INDEX_LIMITS.map((limit) => ({
-          value: limit,
-          label: Number(limit) >= 1024 ? `${String(Number(limit) / 1024)} GB` : `${limit} MB`,
-          literal: true,
-        })),
       },
       ...telemetrySettings,
     ],
@@ -1374,7 +1475,6 @@ export const settingsCategories: SettingsCategory[] = [
     sections: [
       { id: 'developer-options', name: 'settings.groups.developerTools' },
       { id: 'developer-sync-diagnostics', name: 'settings.developerSyncTitle' },
-      { id: 'developer-search-metrics', name: 'settings.developerSearchTitle' },
       { id: 'developer-account-data', name: 'settings.developerAccountDataTitle' },
       { id: 'developer-notifications', name: 'settings.developerNotificationsTitle' },
       { id: 'developer-debug-logs', name: 'settings.developerLogsTitle' },
@@ -1388,88 +1488,6 @@ export const settingsCategories: SettingsCategory[] = [
         icon: CodeIcon,
         name: 'settings.developerTools',
         type: 'boolean',
-      },
-      {
-        key: 'searchCrawlPause',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchCrawlPause',
-        description: 'settings.searchCrawlPauseHint',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_CRAWL_PAUSES.map((value) => ({
-          value,
-          label: `${value} s`,
-          literal: true,
-        })),
-      },
-      {
-        key: 'searchTricklePause',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchTricklePause',
-        description: 'settings.searchTricklePauseHint',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_TRICKLE_PAUSES.map((value) => ({
-          value,
-          label: `${value} s`,
-          literal: true,
-        })),
-      },
-      {
-        key: 'searchFlushInterval',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchFlushInterval',
-        description: 'settings.searchFlushIntervalHint',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_FLUSH_INTERVALS.map((value) => ({
-          value,
-          label: `${value} s`,
-          literal: true,
-        })),
-      },
-      {
-        key: 'searchBatchSize',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchBatchSize',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_BATCH_SIZES.map((value) => ({
-          value,
-          label: `${value} events`,
-          literal: true,
-        })),
-      },
-      {
-        key: 'searchBaseEvents',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchBaseEvents',
-        description: 'settings.searchBaseEventsHint',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_BASE_EVENTS.map((value) => ({
-          value,
-          label: `${value} events`,
-          literal: true,
-        })),
-      },
-      {
-        key: 'searchMaxEvents',
-        section: 'developer-search-metrics',
-        icon: DatabaseIcon,
-        name: 'settings.searchMaxEvents',
-        type: 'select',
-        gatedBy: 'developerTools',
-        options: SEARCH_MAX_EVENTS.map((value) => ({
-          value,
-          label: `${value} events`,
-          literal: true,
-        })),
       },
       {
         key: 'showHiddenEvents',

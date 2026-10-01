@@ -34,6 +34,7 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import {
@@ -60,7 +61,7 @@
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
   import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
-  import { eventTimelinePath } from '../event-timeline.js';
+  import { spaceTimelinePath } from '../event-timeline.js';
 
   import AddExistingDialog from './AddExistingDialog.svelte';
   import FormattedBody from '../messages/FormattedBody.svelte';
@@ -521,16 +522,21 @@
     {#if space}
       <div class="hero-menu">
         {#if preferences.developerTools}
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={$i18n.t('timeline.eventTimeline')}
-            onclick={() => {
-              void goto(eventTimelinePath(space.room_id));
-            }}
-          >
-            <ListBulletsIcon />
-          </IconButton>
+          <Tooltip label={$i18n.t('room.menuShowSpaceTimeline')} side="bottom">
+            {#snippet trigger({ props })}
+              <IconButton
+                {...props}
+                variant="ghost"
+                size="small"
+                label={$i18n.t('room.menuShowSpaceTimeline')}
+                onclick={() => {
+                  void goto(spaceTimelinePath(space));
+                }}
+              >
+                <ListBulletsIcon />
+              </IconButton>
+            {/snippet}
+          </Tooltip>
         {/if}
         <IconButton
           variant="ghost"
@@ -887,6 +893,7 @@
     background: var(--bg-container);
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
     overflow: hidden;
   }
 

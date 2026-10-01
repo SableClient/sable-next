@@ -1165,6 +1165,66 @@ test('reopening the same thread does not resubscribe', async () => {
   expect(core.subscribeCalls).toHaveLength(1);
 });
 
+test('loading a linked thread reply waits for pagination diffs', async () => {
+  const core = new FakeCore();
+  const paginate = vi.spyOn(core, 'paginate').mockResolvedValue({
+    direction: 'backward',
+    reached_end: false,
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.startThread('!room:example.org', '$root');
+
+  let loaded = false;
+  const loading = timeline.loadThreadEvent('$older', new AbortController().signal).then(() => {
+    loaded = true;
+  });
+  await Promise.resolve();
+  expect(paginate).toHaveBeenCalledTimes(1);
+  expect(loaded).toBe(false);
+  core.emit({
+    type: 'timeline_diff',
+    subscription: 1,
+    diffs: [{ op: 'push_front', value: item('older') }],
+  });
+  await loading;
+
+  expect(loaded).toBe(true);
+  expect(paginate).toHaveBeenCalledTimes(1);
+  expect(timeline.items[0].event_id).toBe('$older');
+});
+
+test('loading a missing thread reply stops at the start of the thread', async () => {
+  const core = new FakeCore();
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.startThread('!room:example.org', '$root');
+
+  await timeline.loadThreadEvent('$missing', new AbortController().signal);
+
+  expect(core.paginateCalls).toBe(1);
+  expect(timeline.backwardPagination).toBe('end');
+});
+
+test('leaving the thread cancels loading a linked reply', async () => {
+  const core = new FakeCore();
+  const navigation = new AbortController();
+  core.paginate = (subscription, direction) => {
+    core.paginateCalls += 1;
+    navigation.abort();
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item('history') }],
+    });
+    return Promise.resolve({ direction, reached_end: false });
+  };
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.startThread('!room:example.org', '$root');
+
+  await timeline.loadThreadEvent('$older', navigation.signal);
+
+  expect(core.paginateCalls).toBe(1);
+});
+
 test('a different thread in the same room resubscribes', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);

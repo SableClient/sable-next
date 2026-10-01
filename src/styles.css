@@ -106,6 +106,15 @@ html {
   --media-on-scrim: #fff;
   --qr-dark: #000;
   --qr-light: #fff;
+  --tc-link: initial;
+  --mx-uc-1: initial;
+  --mx-uc-2: initial;
+  --mx-uc-3: initial;
+  --mx-uc-4: initial;
+  --mx-uc-5: initial;
+  --mx-uc-6: initial;
+  --mx-uc-7: initial;
+  --mx-uc-8: initial;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -325,13 +334,7 @@ html {
   --opacity-p300: 0.75;
   --opacity-placeholder: 0.5;
   --opacity-disabled: 0.38;
-  --shadow-e100: 0 1px 6px -2px var(--shadow-color);
-  --shadow-e200: 0 1px 12px -3px var(--shadow-color);
-  --shadow-e300: 0 2px 16px -4px var(--shadow-color);
-  --shadow-e400: 0 4px 26px -6px var(--shadow-color);
-  --shadow-inset: inset 0 1px 3px var(--shadow-color);
-  --shadow-float: var(--shadow-e300);
-  --shadow-dialog: var(--shadow-e400);
+  --control-height-touch: 2.75rem;
   --control-height-300: 2rem;
   --control-height-400: 2.5rem;
   --control-height-500: 3rem;
@@ -365,7 +368,6 @@ html {
   --duration-slow: 400ms;
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-slide: cubic-bezier(0.25, 0.8, 0.25, 1);
-  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
   --scale-enter: 0.96;
   --scale-subtle: 0.98;
   --blur-small: 2px;
@@ -401,14 +403,6 @@ html {
   /* Font families */
   --font-family-emoji: 'Twemoji_DISABLED';
   --font-family-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', menlo, consolas, monospace;
-  --font-family-cosmetic-arial: arial, helvetica, sans-serif;
-  --font-family-cosmetic-verdana: verdana, geneva, sans-serif;
-  --font-family-cosmetic-trebuchet: 'Trebuchet MS', 'Lucida Grande', sans-serif;
-  --font-family-cosmetic-georgia: georgia, 'Times New Roman', serif;
-  --font-family-cosmetic-times: 'Times New Roman', times, serif;
-  --font-family-cosmetic-courier: 'Courier New', courier, monospace;
-  --font-family-cosmetic-comic: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
-  --font-family-cosmetic-impact: impact, haettenschweiler, 'Arial Narrow Bold', sans-serif;
 
   /* Typography scale */
   --font-size-x-small: calc(0.75rem * var(--text-scale));
@@ -451,6 +445,17 @@ html {
   --edge-inset-top: 0px;
   --edge-inset-bottom: 0px;
   --sheet-inset-bottom: 0px;
+}
+
+:root,
+body {
+  --shadow-e100: 0 1px 6px -2px var(--shadow-color);
+  --shadow-e200: 0 1px 12px -3px var(--shadow-color);
+  --shadow-e300: 0 2px 16px -4px var(--shadow-color);
+  --shadow-e400: 0 4px 26px -6px var(--shadow-color);
+  --shadow-inset: inset 0 1px 3px var(--shadow-color);
+  --shadow-float: var(--shadow-e300);
+  --shadow-dialog: var(--shadow-e400);
 }
 
 :root[data-tauri-os='android'] {
@@ -579,6 +584,16 @@ textarea {
   caret-color: var(--primary-main);
 }
 
+body.remote-theme {
+  --focus-ring: color-mix(in srgb, var(--primary-main) 50%, transparent);
+}
+
+input[type='checkbox'],
+input[type='radio'],
+input[type='range'] {
+  accent-color: var(--primary-main);
+}
+
 ::placeholder {
   color: inherit;
   opacity: var(--opacity-placeholder);
@@ -665,12 +680,12 @@ label[for],
 }
 
 a:not([class]) {
-  color: var(--primary-main);
+  color: var(--tc-link, var(--primary-main));
   text-underline-offset: 0.15em;
 }
 
 a:not([class]):hover {
-  color: var(--primary-main-hover);
+  color: var(--tc-link, var(--primary-main-hover));
 }
 
 @media (prefers-reduced-motion: no-preference) {

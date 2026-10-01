@@ -76,10 +76,7 @@ const markdown = new MarkdownSerializer(
       }
     },
     code_block: (state, node) => {
-      state.write(`\`\`\`${node.attrs.language as string}\n`);
-      state.text(node.textContent, false);
-      state.ensureNewLine();
-      state.write('```');
+      state.text(docToMarkdown(composerSchema.topNodeType.create(null, node)), false);
       state.closeBlock(node);
     },
     horizontal_rule: (state, node) => {
@@ -286,6 +283,27 @@ function html(doc: ProseMirrorNode): string {
   holder.append(DOMSerializer.fromSchema(composerSchema).serializeFragment(doc.content));
   for (const paragraph of holder.querySelectorAll('li > p:only-child')) {
     paragraph.replaceWith(...paragraph.childNodes);
+  }
+
+  const texts = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+  const literalMfm: { node: Text; offset: number }[] = [];
+  for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+    if (!(node instanceof Text) || node.parentElement?.closest('code, pre, a, time')) continue;
+    for (
+      let offset = node.data.indexOf('$[');
+      offset >= 0;
+      offset = node.data.indexOf('$[', offset + 2)
+    ) {
+      const source = node.data.slice(offset);
+      if (parseMfmUnixtime(source) || parseMfmColor(source)) literalMfm.push({ node, offset });
+    }
+  }
+  for (const { node, offset } of literalMfm.reverse()) {
+    const suffix = node.splitText(offset);
+    suffix.deleteData(0, 1);
+    const dollar = document.createElement('span');
+    dollar.textContent = '$';
+    suffix.before(dollar);
   }
 
   const blocks = Array.from(holder.children);
@@ -583,6 +601,19 @@ export function plainTextOf(doc: ProseMirrorNode): string {
   );
 }
 
+export function commandTextOf(doc: ProseMirrorNode): string {
+  const fenceCodeBlocks = (node: ProseMirrorNode): ProseMirrorNode => {
+    if (node.type === composerSchema.nodes.code_block) {
+      const fenced = docToMarkdown(composerSchema.topNodeType.create(null, node));
+      return node.copy(Fragment.from(composerSchema.text(fenced)));
+    }
+    if (node.isLeaf) return node;
+    return node.copy(Fragment.fromArray(node.children.map(fenceCodeBlocks)));
+  };
+
+  return plainTextOf(fenceCodeBlocks(doc));
+}
+
 function markdownSourceOf(doc: ProseMirrorNode): { source: string; atoms: ProseMirrorNode[] } {
   const { hard_break: hardBreak } = composerSchema.nodes;
   const atoms: ProseMirrorNode[] = [];
@@ -640,7 +671,7 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   );
   return {
     body,
-    formatted: isPlain(parsed) ? null : html(parsed),
+    formatted: isPlain(parsed) && plainTextOf(parsed) === body ? null : html(parsed),
     mentions,
     ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
   };

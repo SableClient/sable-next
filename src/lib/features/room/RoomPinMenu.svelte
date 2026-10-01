@@ -7,6 +7,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import ActionMenu from '#lib/ui/primitives/ActionMenu.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
@@ -24,6 +25,8 @@
   import { pinErrorMessage } from './timeline/pinned-events.svelte.js';
   import MessagePreview from './messages/MessagePreview.svelte';
   import { opensFrom } from './messages/message-preview';
+  import { timelineMediaItems } from './media/media-items.js';
+  import type { MediaItem } from './media/media-viewer-types.js';
 
   interface Props {
     roomId: string;
@@ -34,6 +37,7 @@
     onUnread?: (count: number) => void;
     triggerHidden?: boolean;
     onJump: (eventId: string) => void;
+    onOpenMedia: (items: MediaItem[], eventId: string) => void;
   }
 
   let {
@@ -45,6 +49,7 @@
     onUnread,
     triggerHidden = false,
     onJump,
+    onOpenMedia,
   }: Props = $props();
   const core = useCoreClient();
   const eventItems = useEventItems();
@@ -158,6 +163,12 @@
     open = false;
     onJump(eventId);
   }
+
+  function openMedia(eventId: string): void {
+    const items = timelineMediaItems(ordered.flatMap((id) => entries.get(id) ?? []));
+    open = false;
+    void afterOverlayPops().then(() => onOpenMedia(items, eventId));
+  }
 </script>
 
 {#snippet pinTrigger({ props }: { props: Record<string, unknown> })}
@@ -226,6 +237,7 @@
                 loadPreviewProfile
                 timeAction={{ label: $i18n.t('room.pinsJump'), run: () => jump(eventId) }}
                 onJumpToEvent={jump}
+                onOpenMedia={openMedia}
               >
                 {#snippet fallback()}
                   <div class="pin-unreadable">
@@ -355,6 +367,7 @@
   .pin-item {
     background: var(--bg-container);
     border-radius: var(--radius-inner);
+    color: var(--bg-on-container);
     padding: var(--space-100) var(--space-200) var(--space-100) var(--space-600);
   }
 

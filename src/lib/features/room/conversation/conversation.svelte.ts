@@ -36,6 +36,7 @@ import {
 } from '#lib/personas/persona.js';
 import type { PersonaStore } from '#lib/personas/personas.svelte.js';
 import type { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
+import { isMessageRow } from '#lib/features/room/timeline/timeline-format.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const NO_MENTIONS: OutgoingMentions = { userIds: [], room: false };
@@ -402,16 +403,49 @@ export class Conversation {
     key: string,
     sourcePack: ImageSourcePackView | null = null
   ): void => {
+    void this.#toggleReaction(eventId, key, sourcePack).catch(failed('reaction'));
+  };
+
+  readonly quickReact = async (
+    targetRoomId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null = null
+  ): Promise<void> => {
+    await this.#beforeSend();
+    if (targetRoomId !== this.#roomId()) throw new Error('Room changed while reacting');
+    const items = this.#timeline.items;
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index];
+      if (
+        !item.event_id ||
+        (!isMessageRow(item.content) && item.content.kind !== 'unable_to_decrypt') ||
+        item.content.kind === 'redacted'
+      )
+        continue;
+      await this.#toggleReaction(item.event_id, key, sourcePack);
+      return;
+    }
+  };
+
+  async #toggleReaction(
+    eventId: string,
+    key: string,
+    sourcePack: ImageSourcePackView | null
+  ): Promise<void> {
     const mine = this.#timeline.items
       .find((item) => item.event_id === eventId)
       ?.reactions.some(
         (reaction) =>
           reaction.key === key && reaction.senders.includes(this.#core.session?.user_id ?? '')
       );
-    void this.#core.commands
-      .toggleReaction(this.#roomId(), eventId, key, this.#threadRoot, mine ? null : sourcePack)
-      .catch(failed('reaction'));
-  };
+    await this.#core.commands.toggleReaction(
+      this.#roomId(),
+      eventId,
+      key,
+      this.#threadRoot,
+      mine ? null : sourcePack
+    );
+  }
 
   readonly votePoll = (eventId: string, answers: string[]): void => {
     void this.#core.commands

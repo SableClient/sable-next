@@ -81,6 +81,7 @@
     border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
     box-shadow: var(--shadow-float);
+    color: var(--surface-on-container);
     max-height: min(42rem, calc(100dvh - 2rem));
     overflow: auto;
     width: min(24rem, calc(100vw - 2rem));

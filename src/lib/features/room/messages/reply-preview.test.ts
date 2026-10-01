@@ -17,6 +17,35 @@ const video: TimelineItemContentView = {
   spoiler: null,
 };
 
+test.each([
+  ['***both***', '<strong><em>both</em></strong>', 'both'],
+  ['``code ` tick``', '<code>code ` tick</code>', 'code ` tick'],
+  ['[label](https://example.org)', '<a href="https://example.org">label</a>', 'label'],
+  [
+    '```rust\nlet x = 1;\n```',
+    '<pre><code class="language-rust">let x = 1;</code></pre>',
+    'let x = 1;',
+  ],
+  [
+    'before\n```\n    a\n    b\n```\nafter',
+    '<p>before</p><pre><code>    a\n    b</code></pre><p>after</p>',
+    'before\n    a\n    b\nafter',
+  ],
+  [':rotate:', '<img data-mx-emoticon src="mxc://example.org/rotate" alt=":rotate:">', ':rotate:'],
+  ['\\*literal\\*', '*literal*', '*literal*'],
+  ['`<tag> & text`', '<code>&lt;tag&gt; &amp; text</code>', '<tag> & text'],
+  ['plain **literal**', 'plain **literal**', 'plain **literal**'],
+  ['fallback', '', 'fallback'],
+])('a preview renders %s', (body, html, expected) => {
+  expect(
+    replyPreviewBody({ kind: 'message', body, html, emote: false, notice: false, edited: false })
+  ).toBe(expected);
+});
+
+test('a caption without HTML keeps literal Markdown', () => {
+  expect(replyPreviewBody({ ...video, caption: 'plain **literal**' })).toBe('plain **literal**');
+});
+
 test('every renderable message kind yields a preview', () => {
   expect(replyPreviewBody(video)).toBe('clip.mp4');
   expect(

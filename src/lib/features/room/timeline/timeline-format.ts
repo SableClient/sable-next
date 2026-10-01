@@ -6,6 +6,8 @@ import type {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { ReplyPreviewStyle, TimelinePreferences } from '#lib/settings/preferences.svelte.js';
 
+export { senderColor } from '#lib/ui/primitives/identity-color.js';
+
 const MESSAGE_ROW_KINDS = [
   'message',
   'image',
@@ -259,21 +261,6 @@ export function personaLookup(
     const loaded = personas.get(eventId);
     return loaded === undefined ? (unloaded?.(eventId) ?? null) : loaded;
   };
-}
-
-const senderColors = [
-  'var(--primary-main)',
-  'var(--sec-main)',
-  'var(--success-main)',
-  'var(--warn-main)',
-  'var(--crit-main)',
-];
-
-export function senderColor(sender: string | null): string {
-  if (!sender) return senderColors[0];
-  let hash = 0;
-  for (const character of sender) hash = (hash * 31 + character.charCodeAt(0)) | 0;
-  return senderColors[Math.abs(hash) % senderColors.length];
 }
 
 function personaKey(item: TimelineItemView): string {

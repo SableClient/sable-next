@@ -4,12 +4,19 @@ import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 import { RoomEvent, Track, type RemoteTrack, type Room } from 'livekit-client';
+import { tick } from 'svelte';
 
 import CallAudio from './CallAudio.svelte';
 import CallAudioHarness from './CallAudioHarness.test.svelte';
 import CallAudioUpdatesHarness from './CallAudioUpdatesHarness.test.svelte';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import * as voiceFilter from './voice-filter';
+import {
+  effectiveVolume,
+  screenVolumeKey,
+  setOutputVolume,
+  setParticipantVolume,
+} from './participant-volumes.svelte.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -125,6 +132,71 @@ test('applies a per-participant volume to attached audio', () => {
 
   room.emit(RoomEvent.TrackSubscribed, fakeTrack('next'), undefined, { identity: 'next' });
   expect(elements()[1].volume).toBe(0);
+});
+
+test('updates voice and screen volume for late subscriptions', async () => {
+  const room = fakeRoom();
+  const identity = 'late-participant';
+  const screenKey = screenVolumeKey(identity);
+  setOutputVolume(1);
+  setParticipantVolume(identity, 1);
+  setParticipantVolume(screenKey, 0.6);
+  const volumeOf = (identity: string, screen: boolean) =>
+    effectiveVolume(screen ? screenVolumeKey(identity) : identity);
+  const playback = $state({ deafened: false });
+  const instance = render(CallAudio, {
+    room: room.room,
+    volumeOf,
+    get deafened() {
+      return playback.deafened;
+    },
+  });
+
+  try {
+    const voice = fakeTrack('late');
+    const sharedAudio = Object.assign(fakeTrack('late-screen'), {
+      source: Track.Source.ScreenShareAudio,
+    });
+    room.emit(RoomEvent.TrackSubscribed, voice, undefined, { identity });
+    room.emit(RoomEvent.TrackSubscribed, sharedAudio, undefined, { identity });
+    await tick();
+    const [element, screenElement] = document.querySelectorAll('audio');
+    expect(element.volume).toBe(1);
+    expect(screenElement.volume).toBe(0.6);
+
+    setParticipantVolume(identity, 0.4);
+    await tick();
+    expect(element.volume).toBe(0.4);
+    expect(screenElement.volume).toBe(0.6);
+
+    setOutputVolume(0.5);
+    await tick();
+    expect(element.volume).toBe(0.2);
+    expect(screenElement.volume).toBe(0.3);
+
+    setParticipantVolume(screenKey, 0);
+    await tick();
+    expect(element.volume).toBe(0.2);
+    expect(screenElement.volume).toBe(0);
+
+    playback.deafened = true;
+    await tick();
+    expect(element.muted).toBe(true);
+    expect(screenElement.muted).toBe(true);
+    playback.deafened = false;
+    await tick();
+    expect(element.muted).toBe(false);
+    expect(element.volume).toBe(0.2);
+    expect(screenElement.volume).toBe(0);
+    expect(voice.attach).toHaveBeenCalledOnce();
+    expect(voice.detach).not.toHaveBeenCalled();
+    expect(sharedAudio.attach).toHaveBeenCalledOnce();
+  } finally {
+    instance.unmount();
+    setOutputVolume(1);
+    setParticipantVolume(identity, 1);
+    setParticipantVolume(screenKey, 1);
+  }
 });
 
 test('plays a shared screen at its own volume, apart from the voice', () => {

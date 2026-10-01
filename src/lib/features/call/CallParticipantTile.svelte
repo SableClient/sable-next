@@ -278,6 +278,7 @@
     background: var(--surface-var-container);
     border-radius: var(--radii-400);
     box-sizing: border-box;
+    color: var(--surface-var-on-container);
     container-type: size;
     overflow: hidden;
     position: relative;
@@ -434,6 +435,7 @@
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-300);
     box-shadow: var(--shadow-float);
+    color: var(--bg-on-container);
     display: flex;
     gap: var(--space-150);
     inline-size: min(14rem, calc(100% - var(--space-400)));

@@ -282,7 +282,7 @@
   /* Above sticky headers (z-index 1) in sheet content. */
   :global(.bottom-sheet-grip) {
     display: grid;
-    height: var(--control-height-medium);
+    height: var(--control-height-large);
     left: 50%;
     place-items: center;
     position: absolute;
@@ -324,6 +324,6 @@
   }
 
   .content-inset {
-    padding: var(--control-height-medium) 0 var(--space-400);
+    padding: var(--control-height-large) 0 var(--space-400);
   }
 </style>

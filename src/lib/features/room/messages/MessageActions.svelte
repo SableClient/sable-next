@@ -102,6 +102,7 @@
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius-outer);
+    color: var(--surface-var-on-container);
     inset-inline-end: var(--space-300);
     bottom: calc(100% - var(--space-200));
     box-shadow: var(--shadow-float);

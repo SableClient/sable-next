@@ -329,12 +329,6 @@ function colorUpdate(text: string): ColorUpdate | null {
     : { kind: 'set', colors: { on_dark: value } };
 }
 
-export function fontContent(text: string): Record<string, unknown> | null {
-  if (isReset(text)) return {};
-  const font = text.replaceAll(/[;{}<>]/g, '').slice(0, 32);
-  return font === '' ? null : { font };
-}
-
 export function pronounContent(text: string): Record<string, unknown> | null {
   if (isReset(text)) return {};
   const pronouns = text.split(',').map((entry) => {
@@ -347,7 +341,6 @@ export function pronounContent(text: string): Record<string, unknown> | null {
 
 export const COSMETIC_EVENT_TYPES = {
   color: 'moe.sable.room.cosmetics.color',
-  font: 'moe.sable.room.cosmetics.font',
   pronoun: 'moe.sable.room.cosmetics.pronouns',
 } as const;
 
@@ -630,8 +623,6 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
   ),
   ownColor('color', 'room'),
   ownColor('scolor', 'space'),
-  ownCosmetic('font', COSMETIC_EVENT_TYPES.font, 'room', fontContent),
-  ownCosmetic('sfont', COSMETIC_EVENT_TYPES.font, 'space', fontContent),
   ownCosmetic('pronoun', COSMETIC_EVENT_TYPES.pronoun, 'room', pronounContent),
   ownCosmetic('spronoun', COSMETIC_EVENT_TYPES.pronoun, 'space', pronounContent),
   setter('roomname', (text, { roomId, commands }) => commands.setRoomName(roomId, text)),

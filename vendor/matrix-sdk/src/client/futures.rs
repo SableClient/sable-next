@@ -157,7 +157,8 @@ where
                         // the session.
                         let rejected = http_error
                             .as_client_api_error()
-                            .is_some_and(|error| !error.status_code.is_server_error());
+                            .is_some_and(|error| !error.status_code.is_server_error())
+                            && http_error.client_api_error_kind() != Some(&ErrorKind::UserLocked);
 
                         if rejected {
                             error!("Token refresh: the homeserver rejected the refresh token");

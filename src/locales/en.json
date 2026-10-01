@@ -22,6 +22,8 @@
     "account": "Account",
     "accounts": "Accounts",
     "switchAccount": "Switch account",
+    "switchingAccount": "Switching…",
+    "switchAccountFailed": "Could not switch accounts. Try again.",
     "switch": "Switch",
     "addAccount": "Add account",
     "manageAccounts": "Manage accounts",
@@ -276,7 +278,6 @@
     "menuUnreadHiddenBySpace": "Unread dot hidden by space",
     "menuNotifications": "Notifications",
     "notifyDefault": "Default ({{mode}})",
-    "notifyDefaultDirect": "Default for direct chats ({{mode}})",
     "notifyAll": "All messages",
     "notifyMentions": "Mentions and keywords",
     "notifyMute": "Mute",
@@ -288,6 +289,7 @@
     "menuJoinParentSpace": "Join {{space}}",
     "menuLeave": "Leave room",
     "menuLeaveSpace": "Leave space",
+    "menuShowSpaceTimeline": "Show space timeline",
     "menuCopyLink": "Copy room link",
     "leaveTitle": "Leave {{name}}?",
     "leaveBody": "You will stop receiving messages. Rejoining needs an invite unless the room is public.",
@@ -580,7 +582,7 @@
     "settingsCosmetics": "Your look",
     "cosmeticsTitleRoom": "Your look in this room",
     "cosmeticsTitleSpace": "Your look in this space",
-    "cosmeticsHintRoom": "Overrides your profile here only. People who turned off room colours or fonts still see your profile.",
+    "cosmeticsHintRoom": "Overrides your profile here only.",
     "cosmeticsHintSpace": "Applies in every room of this space that has no look of its own.",
     "cosmeticsColorLight": "Name colour on light themes",
     "cosmeticsColorDark": "Name colour on dark themes",
@@ -600,9 +602,6 @@
     "cosmeticsMembersPronouns": "Pronouns",
     "cosmeticsMembersPronounsRoom": "Let everyone set pronouns for this room.",
     "cosmeticsMembersPronounsSpace": "Let everyone set pronouns for every room of this space.",
-    "cosmeticsMembersFonts": "Fonts",
-    "cosmeticsMembersFontsRoom": "Let everyone set a name font for this room.",
-    "cosmeticsMembersFontsSpace": "Let everyone set a name font for every room of this space.",
     "historyTitle": "Message history visibility",
     "historyHint": "Only future messages are affected. Existing history keeps its old visibility.",
     "encryptionTitle": "End-to-end encryption",
@@ -748,10 +747,13 @@
     "close": "Close"
   },
   "app": {
+    "accountLocked": "Account locked",
+    "accountLockedDetail": "Your homeserver has locked this account. Sable will keep this session and check for access to return.",
     "starting": "Starting Sable…",
     "pettingAnimal": "Petting {{animal}}",
     "unableToStart": "Unable to restore your session.",
     "startFailed": "Check your connection and device storage, then try again.",
+    "migrationFailed": "Your v1 data could not be migrated. Your original data is still saved. Close other Sable windows before retrying.",
     "tryAgain": "Try again",
     "signInRecoveryHint": "Signing in creates a new device and keeps your saved account data."
   },
@@ -780,6 +782,11 @@
     "flag": "Flags"
   },
   "timeline": {
+    "backToConversation": "Back to conversation",
+    "jumpToOriginal": "Jump to original message",
+    "originalMessage": "Original message",
+    "retryLoad": "Try again",
+    "resizeThread": "Resize thread",
     "label": "Timeline",
     "eventTimeline": "Event timeline",
     "back": "Back to rooms",
@@ -1438,6 +1445,10 @@
     "showOptions": "Show options"
   },
   "settings": {
+    "threadPresentation": "Threads and discussions",
+    "threadPresentationHint": "Choose how threads and forum discussions open on desktop. Small screens use the full conversation view.",
+    "threadPresentationTimeline": "Full conversation",
+    "threadPresentationPanel": "Side panel",
     "title": "Settings",
     "dialogDescription": "Choose a settings section.",
     "sections": "Settings sections",
@@ -1527,6 +1538,7 @@
     "security": "Security",
     "close": "Close",
     "logout": "Log out",
+    "logoutConfirmDescription": "Are you sure you want to log out?",
     "logoutWarning": {
       "title": "You could lose your encrypted messages",
       "unverified": "This session is not verified. Logging out deletes its message keys, so you may lose access to your encrypted messages.",
@@ -1659,6 +1671,7 @@
     "verificationScannedPrompt": "Your other device scanned the code. Does it say the scan worked?",
     "verificationScannedYes": "Yes, it worked",
     "verificationScannedNo": "No",
+    "verificationScanSucceeded": "Code scanned. Confirm on your other device.",
     "invalidVerificationCode": "That isn't a verification code.",
     "verificationComplete": "Your device is verified.",
     "userVerificationComplete": "This identity is verified.",
@@ -1780,7 +1793,7 @@
     "developerSearchPhaseTrickling": "Crawling slowly",
     "developerSearchPhaseYielding": "Paused for the timeline",
     "developerSearchPhaseBackingOff": "Backing off",
-    "developerSearchPhasePaused": "Paused while the app is in the background",
+    "developerSearchPhasePaused": "Paused (app in background or metered connection)",
     "developerSearchPhaseIdle": "Nothing left to crawl",
     "developerSearchPhaseBudgetSpent": "Event budget spent",
     "developerSearchPhaseIndexFull": "Disk budget reached",
@@ -1906,9 +1919,7 @@
     "nameColorCorrectionWeak": "Weak",
     "nameColorCorrectionOff": "Off",
     "renderRoomColors": "Room and space name colours",
-    "renderRoomFontsHint": "Shows the name font people pick for a room or space, from a short list of safe fonts.",
     "renderRoomColorsHint": "Shows the name colour people set for a room or space, instead of their account colour.",
-    "renderRoomFonts": "Room and space name fonts",
     "accessibilityTitle": "Accessibility",
     "fontScale": "Text size",
     "fontScaleHint": "Scales text only. Spacing, icons and pictures keep their size.",
@@ -1980,6 +1991,8 @@
     "groupMembersByPresenceHint": "Keeps online members in their role groups and places other members under Offline.",
     "showPronouns": "Show pronouns",
     "showPronounsHint": "Shows a pronoun pill beside a sender name and on profile cards.",
+    "showPronounPills": "Show pronoun pills",
+    "showPronounPillsHint": "Shows pronoun pills beside names. Profile pronouns stay visible when off.",
     "pronounPillLength": "Pronoun pill length",
     "pronounPillLengthHint": "Shortens a long pronoun to this many characters.",
     "pronounPillLengthAll": "No limit",
@@ -1999,6 +2012,7 @@
     "mentionInRepliesHint": "Turn off to reply silently by default. Every reply keeps its own toggle.",
     "richTextComposer": "Rich text editor",
     "richTextComposerHint": "Formats text while you type. When off, Markdown syntax remains visible until the message is sent.",
+    "composerSeparator": "Separator",
     "composerGifButton": "GIF button",
     "composerGifButtonHint": "Shows a GIF button beside the composer. It opens the picker on the GIF tab.",
     "composerStickerButton": "Sticker button",
@@ -2467,6 +2481,9 @@
     "unsupportedSignIn": "This homeserver does not offer a sign-in method supported by Sable.",
     "passwordUnsupported": "This homeserver does not support password sign-in.",
     "temporarilyUnavailable": "The homeserver is temporarily unavailable. Try again.",
+    "slidingSyncUnsupported": "This homeserver does not support Sliding Sync.",
+    "accountLocked": "Your homeserver has locked this account.",
+    "accountSuspended": "Your homeserver has suspended this account.",
     "invalidCredentials": "Invalid username or password.",
     "registrationUnavailable": "This provider is not accepting new accounts right now.",
     "usernameTaken": "That username is already in use.",
@@ -2568,6 +2585,7 @@
     "gifUnfavorite": "Remove this GIF",
     "gifAttribution": "Results from {{provider}}",
     "previewHint": "Point at an image for its shortcode.",
+    "packMediaVisibility": "Custom emote and sticker images are not encrypted. Homeservers can see them.",
     "recent": "Recent",
     "closeBoard": "Close emotes and stickers",
     "formatting": "Formatting",
@@ -2758,17 +2776,9 @@
         "description": "Set your name colour in this room",
         "usage": "/color [light|dark] <#rrggbb|reset>"
       },
-      "font": {
-        "description": "Set your font in this room",
-        "usage": "/font <name|reset>"
-      },
       "scolor": {
         "description": "Set your name colour across this space",
         "usage": "/scolor [light|dark] <#rrggbb|reset>"
-      },
-      "sfont": {
-        "description": "Set your font across this space",
-        "usage": "/sfont <name|reset>"
       },
       "pronoun": {
         "description": "Set your pronouns in this room",
@@ -3308,6 +3318,7 @@
     }
   },
   "forum": {
+    "backToForum": "Back to forum",
     "deleteThread": "Delete thread",
     "deleteThreadExplain": "This deletes all messages in this thread.",
     "deleteThreadTitle": "Delete thread?",

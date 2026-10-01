@@ -79,6 +79,7 @@
     border-radius: var(--radius);
     bottom: calc(100% + 0.5rem);
     box-shadow: var(--shadow-float);
+    color: var(--surface-on-container);
     display: flex;
     flex-direction: column;
     left: 0;

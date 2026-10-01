@@ -186,7 +186,7 @@
   );
   let persona = $derived(item.per_message_profile);
   let senderIdentity = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? splitDisplayNamePronouns(persona?.display_name ?? accountName)
       : { name: persona?.display_name ?? accountName, pronouns: [] }
   );
@@ -202,7 +202,7 @@
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? withDisplayNamePronouns(
           persona?.pronouns?.length
             ? persona.pronouns
@@ -311,7 +311,6 @@
       senderRole?.color ?? null
     )
   );
-  let senderFont = $derived(persona ? null : (senderCosmetics?.font ?? null));
   let senderRoleIcon = $derived(senderRole?.icon ?? null);
 
   $effect(() => {
@@ -603,7 +602,6 @@
           <SenderName
             displayName={senderName}
             colors={senderColors}
-            font={senderFont}
             {pronouns}
             nameClass="compact-name"
             onMention={nameMentions ? mentionSender : undefined}
@@ -655,7 +653,6 @@
             ><SenderName
               displayName={replyName}
               colors={replyColors}
-              font={replyCosmetics?.font ?? null}
               nameClass="reply-name"
               compact
             />
@@ -670,7 +667,6 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
-              font={senderFont}
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
@@ -720,7 +716,6 @@
               ><SenderName
                 displayName={replyName}
                 colors={replyColors}
-                font={replyCosmetics?.font ?? null}
                 nameClass="reply-name"
                 compact
               />
@@ -729,7 +724,9 @@
           </button>
         {/if}
         {#if item.forwarded}
-          <ForwardedLine forwarded={item.forwarded} {roomId} {onJumpToEvent} />
+          <div>
+            <ForwardedLine forwarded={item.forwarded} {roomId} {onJumpToEvent} />
+          </div>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
           {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
@@ -742,7 +739,6 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
-              font={senderFont}
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
@@ -1196,6 +1192,7 @@
   .message:has(:focus-visible):not([data-selected='true'], :has(.reply-preview:focus-visible)) {
     background: var(--bg-container-hover);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
   }
 
   .message.collapsed {
@@ -1219,6 +1216,7 @@
   .message.pressed {
     background: var(--bg-container-active);
     border-radius: var(--radius);
+    color: var(--bg-on-container);
   }
 
   /* Glyph sizes for emoji-only messages, deliberately off the type scale. */
@@ -1257,15 +1255,18 @@
   @keyframes jump {
     0% {
       background-color: var(--primary-container);
+      color: var(--primary-on-container);
     }
 
     16% {
       background-color: var(--primary-container-active);
+      color: var(--primary-on-container);
     }
 
     33%,
     100% {
       background-color: transparent;
+      color: inherit;
     }
   }
 
@@ -1278,11 +1279,13 @@
   @media (prefers-reduced-motion: reduce) {
     .message.highlighted {
       background-color: var(--primary-container);
+      color: var(--primary-on-container);
     }
   }
 
   :global(html[data-reduced-motion='on']) .message.highlighted {
     background-color: var(--primary-container);
+    color: var(--primary-on-container);
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
@@ -1669,6 +1672,7 @@
 
     align-items: start;
     background: var(--surface-var-container);
+    color: var(--surface-var-on-container);
     grid-template-columns: auto minmax(0, 1fr);
     padding: var(--space-200) var(--space-300) var(--space-200)
       calc(var(--space-300) + var(--reply-accent-width));
@@ -1834,6 +1838,12 @@
 
   .message:not(.layout-bubble) .message-main:has(> .receipt-tail) > :nth-last-child(2) {
     flex: 0 1 auto;
+  }
+
+  .message:not(.layout-bubble.own.align-own)
+    .message-main:has(> .receipt-tail)
+    > :global(.reactions):nth-last-child(2) {
+    max-width: calc(100% - var(--receipt-reserve) - var(--space-200));
   }
 
   .message:not(.layout-bubble) .message-main > .receipt-tail {

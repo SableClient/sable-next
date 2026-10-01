@@ -16,17 +16,12 @@ use crate::protocol::{CommandErr, CoreEvent, PronounView, RoomCosmeticsView, Sen
 pub(crate) const MEMBER_EVENT: &str = "m.room.member";
 pub(crate) const MEMBER_COLOR_FIELD: &str = "eu.she-a.color";
 pub(crate) const COLOR_EVENT: &str = "moe.sable.room.cosmetics.color";
-pub(crate) const FONT_EVENT: &str = "moe.sable.room.cosmetics.font";
 pub(crate) const PRONOUNS_EVENT: &str = "moe.sable.room.cosmetics.pronouns";
 const SPACE_PARENT_EVENT: &str = "m.space.parent";
-const MAX_FONT_CHARS: usize = 32;
 const MAX_CACHED_ROOMS: usize = 16;
 
 fn is_cosmetic(event_type: &str) -> bool {
-    matches!(
-        event_type,
-        MEMBER_EVENT | COLOR_EVENT | FONT_EVENT | PRONOUNS_EVENT
-    )
+    matches!(event_type, MEMBER_EVENT | COLOR_EVENT | PRONOUNS_EVENT)
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -34,7 +29,6 @@ struct Entry {
     on_light: Option<String>,
     on_dark: Option<String>,
     color: Option<String>,
-    font: Option<String>,
     pronouns: Vec<PronounView>,
 }
 
@@ -42,17 +36,6 @@ impl Entry {
     fn is_empty(&self) -> bool {
         self == &Self::default()
     }
-}
-
-fn font_name(value: Option<&Value>) -> Option<String> {
-    let font: String = value
-        .and_then(Value::as_str)?
-        .chars()
-        .filter(|char| !matches!(char, ';' | '{' | '}' | '<' | '>'))
-        .take(MAX_FONT_CHARS)
-        .collect();
-    let font = font.trim();
-    (!font.is_empty()).then(|| font.to_owned())
 }
 
 #[derive(Debug, Clone, Default)]
@@ -75,7 +58,6 @@ impl Layer {
                 entry.on_dark = profile_hex_color(colors.and_then(|colors| colors.get("on_dark")));
             }
             COLOR_EVENT => entry.color = profile_hex_color(content.get("color")),
-            FONT_EVENT => entry.font = font_name(content.get("font")),
             PRONOUNS_EVENT => entry.pronouns = pronoun_sets(content.get("pronouns")),
             _ => return false,
         }
@@ -148,7 +130,6 @@ pub(crate) fn resolve(room: &Layer, space: Option<&Layer>) -> Vec<SenderCosmetic
                 user_id: user_id.clone(),
                 color_on_light: pick(|entry| &entry.on_light),
                 color_on_dark: pick(|entry| &entry.on_dark),
-                font: own.font.clone().or_else(|| inherited.font.clone()),
                 pronouns: if own.pronouns.is_empty() {
                     inherited.pronouns.clone()
                 } else {
@@ -208,50 +189,25 @@ impl CosmeticsCache {
     }
 }
 
-#[derive(Deserialize)]
-struct SpaceParent {
-    state_key: String,
-    #[serde(default)]
-    content: SpaceParentContent,
-}
-
-#[derive(Deserialize, Default)]
-struct SpaceParentContent {
-    #[serde(default)]
-    canonical: bool,
-    #[serde(default)]
-    via: Vec<String>,
-}
-
 pub(crate) async fn space_parents(room: &matrix_sdk::Room) -> Vec<(OwnedRoomId, Vec<String>)> {
-    let Ok(events) = room.get_state_events(StateEventType::SpaceParent).await else {
-        return Vec::new();
-    };
-    let mut parents: Vec<SpaceParent> = events
+    let events = room
+        .get_state_events(StateEventType::SpaceParent)
+        .await
+        .unwrap_or_default();
+    let claims = events
         .iter()
         .filter_map(|event| {
-            let json = match event {
+            let raw = match event {
                 RawAnySyncOrStrippedState::Sync(raw) => raw.json(),
                 RawAnySyncOrStrippedState::Stripped(raw) => raw.json(),
             };
-            serde_json::from_str::<SpaceParent>(json.get()).ok()
+            serde_json::from_str::<crate::space_parents::ParentClaim>(raw.get()).ok()
         })
-        .filter(|parent| !parent.content.via.is_empty())
-        .collect();
-    parents.sort_by(|left, right| {
-        right
-            .content
-            .canonical
-            .cmp(&left.content.canonical)
-            .then_with(|| left.state_key.cmp(&right.state_key))
-    });
-    parents
+        .collect::<Vec<_>>();
+    crate::space_parents::validate(&room.client(), room.room_id(), &claims, true)
+        .await
         .into_iter()
-        .filter_map(|parent| {
-            RoomId::parse(&parent.state_key)
-                .ok()
-                .map(|room_id| (room_id, parent.content.via))
-        })
+        .filter_map(|parent| parent.room_id().map(|id| (id, parent.content.via)))
         .collect()
 }
 
@@ -281,7 +237,7 @@ async fn first_space_parent(room: &matrix_sdk::Room) -> Option<OwnedRoomId> {
 
 async fn stored_layer(room: &matrix_sdk::Room) -> Result<Layer, matrix_sdk::Error> {
     let mut raws = Vec::new();
-    for event_type in [MEMBER_EVENT, COLOR_EVENT, FONT_EVENT, PRONOUNS_EVENT] {
+    for event_type in [MEMBER_EVENT, COLOR_EVENT, PRONOUNS_EVENT] {
         for event in room
             .get_state_events(StateEventType::from(event_type))
             .await?
@@ -431,7 +387,7 @@ mod tests {
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, ResponseTemplate};
 
-    use super::{COLOR_EVENT, FONT_EVENT, Layer, MEMBER_EVENT, PRONOUNS_EVENT, resolve};
+    use super::{COLOR_EVENT, Layer, MEMBER_EVENT, PRONOUNS_EVENT, resolve};
     use crate::Core;
     use crate::protocol::{CoreEvent, PronounView, SenderCosmeticsView};
     use crate::store::MemorySessionStore;
@@ -474,7 +430,6 @@ mod tests {
                 json!({ "membership": "join", "eu.she-a.color": { "on_dark": "#111111" } }),
             ),
             (COLOR_EVENT, ALICE, json!({ "color": "#222222" })),
-            (FONT_EVENT, BOB, json!({ "font": "Georgia" })),
         ]);
         let space = layer(&[
             (
@@ -485,13 +440,11 @@ mod tests {
                     "eu.she-a.color": { "on_light": "#333333", "on_dark": "#444444" }
                 }),
             ),
-            (FONT_EVENT, ALICE, json!({ "font": "Courier New" })),
             (
                 PRONOUNS_EVENT,
                 ALICE,
                 json!({ "pronouns": [{ "summary": "she/her" }] }),
             ),
-            (FONT_EVENT, BOB, json!({ "font": "Impact" })),
             (COLOR_EVENT, BOB, json!({ "color": "#555555" })),
         ]);
 
@@ -502,14 +455,12 @@ mod tests {
                     user_id: ALICE.try_into().unwrap(),
                     color_on_light: Some("#222222".to_owned()),
                     color_on_dark: Some("#111111".to_owned()),
-                    font: Some("Courier New".to_owned()),
                     pronouns: vec![pronoun("she/her", None)],
                 },
                 SenderCosmeticsView {
                     user_id: BOB.try_into().unwrap(),
                     color_on_light: Some("#555555".to_owned()),
                     color_on_dark: Some("#555555".to_owned()),
-                    font: Some("Georgia".to_owned()),
                     pronouns: Vec::new(),
                 },
             ]
@@ -521,7 +472,6 @@ mod tests {
         let room = layer(&[
             (MEMBER_EVENT, ALICE, json!({ "membership": "join" })),
             (COLOR_EVENT, BOB, json!({})),
-            (FONT_EVENT, BOB, json!({ "font": "   " })),
             (COLOR_EVENT, ALICE, json!({ "color": "red" })),
         ]);
 
@@ -546,17 +496,14 @@ mod tests {
     }
 
     #[test]
-    fn a_font_is_sanitised_like_v1() {
-        let room = layer(&[(
-            FONT_EVENT,
+    fn legacy_font_events_are_ignored() {
+        let mut room = Layer::default();
+        assert!(!room.apply(
+            "moe.sable.room.cosmetics.font",
             ALICE,
-            json!({ "font": "Comic<b>{x}; Sans, and far too long a name" }),
-        )]);
-
-        assert_eq!(
-            resolve(&room, None)[0].font.as_deref(),
-            Some("Comicbx Sans, and far too long a")
-        );
+            &json!({ "font": "Georgia" })
+        ));
+        assert!(resolve(&room, None).is_empty());
     }
 
     async fn joined(server: &MatrixMockServer, rooms: &[&RoomId]) -> matrix_sdk::Client {
@@ -565,6 +512,35 @@ mod tests {
             server.sync_joined_room(&client, room_id).await;
         }
         client
+    }
+
+    async fn reciprocal(
+        server: &MatrixMockServer,
+        client: &matrix_sdk::Client,
+        parent: &RoomId,
+        child: &RoomId,
+    ) {
+        server
+            .sync_room(
+                client,
+                JoinedRoomBuilder::new(parent).add_state_bulk([
+                    Raw::new(&state(
+                        "m.room.create",
+                        "",
+                        &json!({"type": "m.space", "creator": ALICE, "room_version": "10"}),
+                    ))
+                    .unwrap()
+                    .cast_unchecked(),
+                    Raw::new(&state(
+                        "m.space.child",
+                        child.as_str(),
+                        &json!({"via": ["example.org"]}),
+                    ))
+                    .unwrap()
+                    .cast_unchecked(),
+                ]),
+            )
+            .await;
     }
 
     async fn serve_state(server: &MatrixMockServer, room_id: &RoomId, events: Value, times: u64) {
@@ -587,7 +563,7 @@ mod tests {
             &server,
             room_id,
             json!([
-                state(FONT_EVENT, ALICE, &json!({ "font": "Georgia" })),
+                state(COLOR_EVENT, ALICE, &json!({ "color": "#123456" })),
                 state("m.room.name", "", &json!({ "name": "Room" })),
             ]),
             1,
@@ -612,7 +588,7 @@ mod tests {
                 .await;
             assert_eq!(found.space_id.as_deref(), Some(space_id));
             assert_eq!(found.users.len(), 1);
-            assert_eq!(found.users[0].font.as_deref(), Some("Georgia"));
+            assert_eq!(found.users[0].color_on_light.as_deref(), Some("#123456"));
             assert_eq!(found.users[0].pronouns, [pronoun("they/them", Some("en"))]);
         }
     }
@@ -623,6 +599,27 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let joined_space = room_id!("!joined:example.org");
         let client = joined(&server, &[joined_space]).await;
+        reciprocal(&server, &client, joined_space, room_id).await;
+        for id in ["!other:example.org", "!canonical:example.org"] {
+            serve_state(
+                &server,
+                &RoomId::parse(id).unwrap(),
+                json!([
+                    state(
+                        "m.room.create",
+                        "",
+                        &json!({"type": "m.space", "creator": ALICE, "room_version": "10"})
+                    ),
+                    state(
+                        "m.space.child",
+                        room_id.as_str(),
+                        &json!({"via": ["example.org"]})
+                    )
+                ]),
+                1,
+            )
+            .await;
+        }
         let parent = |space: &str, content: Value| {
             Raw::new(&state("m.space.parent", space, &content))
                 .unwrap()
@@ -670,6 +667,7 @@ mod tests {
         let room_id = room_id!("!room:example.org");
         let space_id = room_id!("!space:example.org");
         let client = joined(&server, &[space_id]).await;
+        reciprocal(&server, &client, space_id, room_id).await;
         server
             .sync_room(
                 &client,
@@ -722,7 +720,7 @@ mod tests {
             .sync_room(
                 &client,
                 JoinedRoomBuilder::new(room_id).add_timeline_event(
-                    Raw::new(&state(FONT_EVENT, ALICE, &json!({ "font": "Impact" })))
+                    Raw::new(&state(COLOR_EVENT, ALICE, &json!({ "color": "#123456" })))
                         .unwrap()
                         .cast_unchecked(),
                 ),
@@ -737,6 +735,6 @@ mod tests {
             .collect();
         assert_eq!(announced, [room_id.to_owned()]);
         let found = core.cosmetics_for(&client, &room, None).await;
-        assert_eq!(found.users[0].font.as_deref(), Some("Impact"));
+        assert_eq!(found.users[0].color_on_light.as_deref(), Some("#123456"));
     }
 }

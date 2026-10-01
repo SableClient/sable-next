@@ -183,6 +183,115 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
 
     const ELEMENT_SESSION: &str = "gM8i47Xhu0q52xLfgUXzanCMpLinoyVyH7R58cBuVBU";
 
+    #[tokio::test]
+    #[allow(clippy::too_many_lines)]
+    async fn restored_backups_respect_the_account_preference() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path_regex},
+        };
+
+        for (status, preference, enabled) in [
+            (200, json!({"enabled": false}), false),
+            (200, json!({"enabled": true}), true),
+            (200, json!({}), true),
+            (
+                404,
+                json!({"errcode": "M_NOT_FOUND", "error": "No preference"}),
+                true,
+            ),
+            (
+                500,
+                json!({"errcode": "M_UNKNOWN", "error": "Unavailable"}),
+                false,
+            ),
+        ] {
+            let server = MatrixMockServer::new().await;
+            Mock::given(method("GET"))
+                .and(path_regex("/account_data/m.key_backup$"))
+                .respond_with(ResponseTemplate::new(status).set_body_json(preference))
+                .mount(server.server())
+                .await;
+            Mock::given(method("GET"))
+                .and(path_regex(
+                    "/account_data/m.org.matrix.custom.backup_disabled$",
+                ))
+                .respond_with(
+                    ResponseTemplate::new(404)
+                        .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "No preference"})),
+                )
+                .mount(server.server())
+                .await;
+            let key = BackupDecryptionKey::new();
+            backup_metadata(&server, &key, 0).await;
+            let store = tempfile::tempdir().unwrap();
+            let client = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder
+                        .sqlite_store(store.path(), None)
+                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
+                })
+                .build()
+                .await;
+            client
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            client
+                .olm_machine_for_testing()
+                .await
+                .as_ref()
+                .unwrap()
+                .backup_machine()
+                .save_decryption_key(Some(key.clone()), Some("1".to_owned()))
+                .await
+                .unwrap();
+            client.pause().await.unwrap();
+            drop(client);
+            let restored = server
+                .client_builder()
+                .on_builder(|builder| {
+                    builder
+                        .sqlite_store(store.path(), None)
+                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
+                })
+                .build()
+                .await;
+            restored
+                .encryption()
+                .wait_for_e2ee_initialization_tasks()
+                .await;
+            assert_eq!(
+                restored.encryption().backups().are_enabled().await,
+                enabled,
+                "preference status {status}"
+            );
+            let keys = restored
+                .olm_machine_for_testing()
+                .await
+                .as_ref()
+                .unwrap()
+                .store()
+                .load_backup_keys()
+                .await
+                .unwrap();
+            assert_eq!(keys.decryption_key.unwrap().to_base64(), key.to_base64());
+            assert_eq!(keys.backup_version.as_deref(), Some("1"));
+            let requests = server.server().received_requests().await.unwrap();
+            assert!(
+                requests
+                    .iter()
+                    .any(|request| request.url.path().ends_with("/account_data/m.key_backup"))
+            );
+            if !enabled {
+                assert!(!requests.iter().any(|request| request.method == "PUT"
+                    && request.url.path().contains("/room_keys/keys")));
+            }
+        }
+    }
+
     async fn core_for(server: &MatrixMockServer) -> (Arc<Core>, Client, TempDir) {
         let client = server.client_builder().build().await;
         client.event_cache().subscribe().unwrap();
@@ -253,6 +362,96 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         .unwrap()
         .export()
         .await
+    }
+
+    #[tokio::test]
+    async fn history_keys_use_the_stable_wire_field_and_accept_legacy_aliases() {
+        use matrix_sdk_base::crypto::{
+            olm::BackedUpRoomKey, types::events::room_key::RoomKeyContent,
+        };
+        let session = outbound_session(room_id!("!history:example.org"));
+        let exported = serde_json::to_value(exported(&session).await).unwrap();
+        let room_key = json!({
+            "algorithm": "m.megolm.v1.aes-sha2", "room_id": session.0.room_id(),
+            "session_id": session.0.session_id(), "session_key": session.0.session_key().await.to_base64()
+        });
+        for field in [
+            "shared_history",
+            "m.shared_history",
+            "org.matrix.msc3061.shared_history",
+        ] {
+            let mut key = exported.clone();
+            key.as_object_mut().unwrap().remove("shared_history");
+            key[field] = json!(true);
+            assert!(
+                serde_json::from_value::<BackedUpRoomKey>(key.clone())
+                    .unwrap()
+                    .shared_history
+            );
+            let key: ExportedRoomKey = serde_json::from_value(key).unwrap();
+            assert!(key.shared_history);
+            assert!(
+                InboundGroupSession::from_export(&key)
+                    .unwrap()
+                    .export()
+                    .await
+                    .shared_history
+            );
+            let wire = serde_json::to_value(&key).unwrap();
+            assert_eq!(wire["shared_history"], true);
+            assert!(wire.get("m.shared_history").is_none());
+            let backup: BackedUpRoomKey = key.into();
+            let backup = serde_json::to_value(backup).unwrap();
+            assert_eq!(backup["shared_history"], true);
+            assert!(backup.get("m.shared_history").is_none());
+            assert!(
+                serde_json::from_value::<BackedUpRoomKey>(backup)
+                    .unwrap()
+                    .shared_history
+            );
+            let mut content = room_key.clone();
+            content[field] = json!(true);
+            let content: RoomKeyContent = serde_json::from_value(content).unwrap();
+            let wire = serde_json::to_value(content).unwrap();
+            assert_eq!(wire["shared_history"], true);
+            assert!(wire.get("m.shared_history").is_none());
+        }
+        for mut wire in [exported.clone(), room_key.clone()] {
+            wire.as_object_mut().unwrap().remove("shared_history");
+            for fields in [
+                json!({"shared_history": "true"}),
+                json!({"shared_history": true, "m.shared_history": false}),
+            ] {
+                let mut invalid = wire.clone();
+                invalid
+                    .as_object_mut()
+                    .unwrap()
+                    .extend(fields.as_object().unwrap().clone());
+                assert!(
+                    serde_json::from_value::<ExportedRoomKey>(invalid.clone())
+                        .err()
+                        .unwrap()
+                        .is_data()
+                );
+                assert!(
+                    serde_json::from_value::<BackedUpRoomKey>(invalid.clone())
+                        .err()
+                        .unwrap()
+                        .is_data()
+                );
+                serde_json::from_value::<RoomKeyContent>(invalid).unwrap_err();
+            }
+        }
+        assert!(
+            !serde_json::from_value::<ExportedRoomKey>(exported)
+                .unwrap()
+                .shared_history
+        );
+        let RoomKeyContent::MegolmV1AesSha2(content) = serde_json::from_value(room_key).unwrap()
+        else {
+            panic!("wrong algorithm")
+        };
+        assert!(!content.shared_history);
     }
 
     async fn backup_metadata(
@@ -369,6 +568,84 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             download.state,
             crate::protocol::KeyBackupDownloadState::Complete
         );
+    }
+
+    #[tokio::test]
+    async fn switching_accounts_during_restore_keeps_keys_and_progress_with_the_owner() {
+        use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
+        let server = MatrixMockServer::new().await;
+        let (core, client, _store) = core_for(&server).await;
+        let key = BackupDecryptionKey::new();
+        backup_metadata(&server, &key, 1).await;
+        unlock_backup(&client, &key).await;
+        let room = room_id!("!restore:example.org");
+        let exported = exported(&outbound_session(room)).await;
+        let encrypted = key
+            .megolm_v1_public_key()
+            .encrypt(InboundGroupSession::from_export(&exported).unwrap())
+            .await
+            .unwrap();
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path_regex(
+                "/_matrix/client/(r0|v3)/room_keys/keys$",
+            ))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_delay(Duration::from_millis(100))
+                    .set_body_json(json!({
+                        "rooms": {room: {"sessions": {exported.session_id: encrypted}}}
+                    })),
+            )
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let restore_core = core.clone();
+        let restore = tokio::spawn(async move {
+            restore_core
+                .download_key_backup("old-account".to_owned())
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                if server
+                    .server()
+                    .received_requests()
+                    .await
+                    .unwrap()
+                    .iter()
+                    .any(|request| request.url.path().ends_with("/room_keys/keys"))
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let other = server.client_builder().build().await;
+        core.session_generation
+            .store(2, std::sync::atomic::Ordering::SeqCst);
+        *core.session.write().await = Some(Session {
+            account_id: "other".to_owned(),
+            homeserver: server.server().uri(),
+            oauth: false,
+            sync_service: Arc::new(SyncService::builder(other.clone()).build().await.unwrap()),
+            client: other.clone(),
+        });
+        let CommandOk::DownloadKeyBackup { download } = restore.await.unwrap().unwrap() else {
+            panic!("unexpected response")
+        };
+        assert_eq!(download.account_id, "a1");
+        assert_eq!(
+            download.state,
+            crate::protocol::KeyBackupDownloadState::Complete
+        );
+        assert_eq!(session_ids(&client).await.len(), 1);
+        assert!(session_ids(&other).await.is_empty());
+        let CommandOk::KeyBackupStatus { status } = core.key_backup_status().await.unwrap() else {
+            panic!("unexpected response")
+        };
+        assert!(status.download.is_none());
     }
 
     #[tokio::test]

@@ -48,6 +48,7 @@
   .source {
     background: var(--surface-var-container);
     border-radius: var(--radii-400);
+    color: var(--surface-var-on-container);
     font-family: var(--font-family-mono);
     font-size: var(--font-size-small);
     line-height: var(--line-height-small);

@@ -144,6 +144,7 @@
 
 <style>
   .formatting {
+    background: oklch(from var(--surface-var-container) calc(l - 0.025) c h);
     border-bottom: var(--border-width) solid var(--surface-container-line);
     display: flex;
     gap: var(--space-050);
@@ -152,6 +153,11 @@
     overscroll-behavior-x: contain;
     padding: var(--space-150) var(--space-200);
     scrollbar-width: none;
+  }
+
+  .formatting:first-child {
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
   }
 
   @media (pointer: coarse) {

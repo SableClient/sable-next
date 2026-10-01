@@ -53,6 +53,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import MentionProfileCard from './MentionProfileCard.svelte';
+import MemberIdentityRow from './MemberIdentityRow.svelte';
 
 const emptyProfile: ProfileView = {
   user_id: '@alice:example.org',
@@ -75,6 +76,36 @@ const emptyProfile: ProfileView = {
 core.userRelations.mockResolvedValue({ mutualRooms: [], ignored: false });
 
 const user = userEvent.setup();
+
+test('hides sidebar pills without hiding profile pronouns', async () => {
+  const profile = {
+    ...emptyProfile,
+    display_name: 'Alice',
+    pronouns: [{ summary: 'they/them', language: null }],
+  };
+  core.userProfile.mockResolvedValueOnce(profile);
+  render(MemberIdentityRow, { userId: profile.user_id, members: [] });
+  render(MentionProfileCard, {
+    userId: profile.user_id,
+    roomId: '!room:example.org',
+    member: null,
+    profile,
+  });
+  await vi.waitFor(() => {
+    expect(
+      document.querySelector('.member-identity-row .sender-identity-pronoun')
+    ).toHaveTextContent('they/them');
+  });
+
+  try {
+    preferences.showPronounPills = false;
+    await tick();
+    expect(document.querySelector('.member-identity-row .sender-identity-pronoun')).toBeNull();
+    expect(document.querySelector('.profile-pronoun-pill')).toHaveTextContent('they/them');
+  } finally {
+    preferences.showPronounPills = true;
+  }
+});
 
 async function press(element: Element | null | undefined): Promise<void> {
   if (!element) throw new Error('nothing to press');

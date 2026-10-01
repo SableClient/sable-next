@@ -40,7 +40,7 @@
 <main class="restore-error" aria-labelledby="restore-error-title">
   <div class="restore-card" role="alert">
     <h1 id="restore-error-title">{$i18n.t('app.unableToStart')}</h1>
-    <p>{$i18n.t('app.startFailed')}</p>
+    <p>{$i18n.t(core.migrationFailed ? 'app.migrationFailed' : 'app.startFailed')}</p>
     <Button disabled={busy} onclick={() => void core.start()}>
       {$i18n.t('app.tryAgain')}
     </Button>
@@ -50,8 +50,10 @@
       </Button>
     {/each}
     {#if switchFailed}<p role="alert">{$i18n.t('app.unableToStart')}</p>{/if}
-    <p>{$i18n.t('app.signInRecoveryHint')}</p>
-    <Button disabled={busy} onclick={() => void signIn()}>{$i18n.t('auth.signInTitle')}</Button>
+    {#if !core.migrationFailed}
+      <p>{$i18n.t('app.signInRecoveryHint')}</p>
+      <Button disabled={busy} onclick={() => void signIn()}>{$i18n.t('auth.signInTitle')}</Button>
+    {/if}
   </div>
 </main>
 
@@ -60,6 +62,7 @@
     align-items: center;
     background: var(--surface-container);
     box-sizing: border-box;
+    color: var(--surface-on-container);
     display: flex;
     justify-content: center;
     min-height: 100dvh;
@@ -73,6 +76,7 @@
     border-radius: var(--radius);
     box-shadow: var(--shadow-dialog);
     box-sizing: border-box;
+    color: var(--bg-on-container);
     display: flex;
     flex-direction: column;
     gap: var(--space-400);

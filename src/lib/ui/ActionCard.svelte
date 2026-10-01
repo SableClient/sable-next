@@ -65,7 +65,7 @@
     border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
     box-sizing: border-box;
-    color: inherit;
+    color: var(--bg-on-container);
     cursor: pointer;
     display: flex;
     flex-direction: column;

@@ -121,7 +121,7 @@
   .preview {
     background: var(--surface-container);
     border-radius: var(--radii-300);
-    color: var(--surface-var-on-container);
+    color: var(--surface-on-container);
     font-size: var(--font-size-small);
     margin: 0;
     max-height: 6rem;
