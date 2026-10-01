@@ -30,6 +30,72 @@ async function heightSettled(row: Locator): Promise<void> {
     .toBe(true);
 }
 
+for (const layout of ['modern', 'compact', 'bubble'] as const) {
+  test(`mobile: ${layout} receipts do not overlap wrapped reactions`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await page.addInitScript((layout) => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ layout }));
+    }, layout);
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    await timeline.expectRevealed();
+    const subscription = await core.subscription();
+    const row = page.locator('[data-item-id="general-18"] .message');
+    const readers = Array.from(
+      { length: 38 },
+      (_, index) => `@reader${String(index)}:example.test`
+    );
+    const reactions = [
+      "I'm updating my server",
+      "/query nex I'm updating",
+      '😂',
+      'what.',
+      '🐟',
+      '🤨',
+      '😭',
+      '👍',
+      'PDU in invite state (index 1) violates the room event format',
+    ].map((key) => ({ key, senders: readers.slice(0, 14) }));
+
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const own of [false, true]) {
+        for (const count of [1, 38]) {
+          const label = `${String(width)}px, own=${String(own)}, readers=${String(count)}`;
+          await core.setTimelineItemById(subscription, 'general-18', {
+            ...timelineItem('general-18', 'Hello everyone'),
+            is_own: own,
+            reactions,
+            read_by: readers.slice(0, count),
+          });
+          await expect(row.locator('.read-receipt-stack')).toBeVisible();
+          await heightSettled(row);
+          const overlap = await row.evaluate((node) => {
+            const receipt = node.querySelector('.read-receipt-stack');
+            if (!receipt) throw new Error('missing receipt');
+            const badge = receipt.getBoundingClientRect();
+            return [...node.querySelectorAll('.reaction, .add-reaction')].some((reaction) => {
+              const box = reaction.getBoundingClientRect();
+              return (
+                box.left < badge.right - 0.5 &&
+                box.right > badge.left + 0.5 &&
+                box.top < badge.bottom - 0.5 &&
+                box.bottom > badge.top + 0.5
+              );
+            });
+          });
+          expect(overlap, label).toBe(false);
+        }
+      }
+    }
+  });
+}
+
 test('own bubble receipts reach the same edge as everyone else’s on mobile', async ({
   page,
   app,

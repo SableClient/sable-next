@@ -1840,6 +1840,12 @@
     flex: 0 1 auto;
   }
 
+  .message:not(.layout-bubble.own.align-own)
+    .message-main:has(> .receipt-tail)
+    > :global(.reactions):nth-last-child(2) {
+    max-width: calc(100% - var(--receipt-reserve) - var(--space-200));
+  }
+
   .message:not(.layout-bubble) .message-main > .receipt-tail {
     flex: none;
     inline-size: calc(var(--receipt-reserve) + var(--space-200));
