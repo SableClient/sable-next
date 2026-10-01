@@ -292,9 +292,8 @@
   }
 
   .mobile-tools::before {
-    background: var(--surface-container-active);
+    background: var(--primary-container);
     border-radius: var(--radius-pill);
-    box-shadow: inset 0 0 0 var(--border-width) var(--primary-main);
     content: '';
     height: var(--control-height-large);
     left: 0;
@@ -305,7 +304,10 @@
     translate: calc(
         (var(--mobile-selected-index) + 0.5) * 100cqi / var(--mobile-slot-count) - 50%
       ) -50%;
-    width: var(--control-height-large);
+    width: min(
+      calc(var(--control-height-large) + var(--space-400)),
+      calc(100cqi / var(--mobile-slot-count) - var(--space-200))
+    );
     z-index: 0;
   }
 
