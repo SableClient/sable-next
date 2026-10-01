@@ -61,7 +61,7 @@
   import { dropIndex, reorderChildren, sortEdges, type Reorder } from './space-order';
 
   import RoomOptionsMenu from '#lib/features/sidebar/RoomOptionsMenu.svelte';
-  import { eventTimelinePath } from '../event-timeline.js';
+  import { spaceTimelinePath } from '../event-timeline.js';
 
   import AddExistingDialog from './AddExistingDialog.svelte';
   import FormattedBody from '../messages/FormattedBody.svelte';
@@ -530,7 +530,7 @@
                 size="small"
                 label={$i18n.t('room.menuShowSpaceTimeline')}
                 onclick={() => {
-                  void goto(eventTimelinePath(space.room_id));
+                  void goto(spaceTimelinePath(space));
                 }}
               >
                 <ListBulletsIcon />

@@ -23,7 +23,7 @@
 
   import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
   import RoomNotificationSubmenu from '#lib/features/room/RoomNotificationSubmenu.svelte';
-  import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
+  import { spaceTimelinePath } from '#lib/features/room/event-timeline.js';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -328,7 +328,7 @@
     {#if room.is_space}
       <ActionMenuItem
         onSelect={() => {
-          void goto(eventTimelinePath(room.room_id));
+          void goto(spaceTimelinePath(room));
         }}
       >
         <ListBulletsIcon />

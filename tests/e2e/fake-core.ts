@@ -473,6 +473,9 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       [tombstonedRoom.room_id, tombstonedRoom],
       [successorRoom.room_id, successorRoom],
       [voiceRoom.room_id, voiceRoom],
+      [alphaSpace.room_id, alphaSpace],
+      [betaSpace.room_id, betaSpace],
+      [gammaSpace.room_id, gammaSpace],
     ]);
     let nextSubscription = 2;
     const ONBOARDING_KEY = 'sable-e2e-onboarding';
