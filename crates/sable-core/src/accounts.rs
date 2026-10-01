@@ -39,15 +39,13 @@ impl Core {
         let client = self.client().await?;
         let devices = [device_id];
 
-        if client.oauth().full_session().is_some()
-            && let Ok(metadata) = client.oauth().server_metadata().await
-            && let Some(url) = metadata.account_management_url_with_action(
-                matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AccountManagementActionData::DeviceDelete(
-                    matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::DeviceDeleteData::new(devices[0].as_ref()),
-                ),
-            )
-        {
-            return Ok(Some(url.to_string()));
+        if client.oauth().full_session().is_some() {
+            let metadata = client
+                .oauth()
+                .server_metadata()
+                .await
+                .or_failed(self, "delete_device_metadata")?;
+            return oauth_device_delete_url(&metadata, &devices[0]).map(Some);
         }
 
         let Err(error) = client.delete_devices(&devices, None).await else {
@@ -970,6 +968,24 @@ impl Core {
     }
 }
 
+fn oauth_device_delete_url(
+    metadata: &matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata,
+    device_id: &matrix_sdk::ruma::DeviceId,
+) -> Result<String, CommandErr> {
+    use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::{
+        AccountManagementAction, AccountManagementActionData, DeviceDeleteData,
+    };
+    if !metadata.is_account_management_action_supported(&AccountManagementAction::DeviceDelete) {
+        return Err(CommandErr::Unsupported);
+    }
+    metadata
+        .account_management_url_with_action(AccountManagementActionData::DeviceDelete(
+            DeviceDeleteData::new(device_id),
+        ))
+        .map(|url| url.to_string())
+        .ok_or(CommandErr::Unsupported)
+}
+
 #[cfg(not(target_family = "wasm"))]
 fn remove_store_dir(store_id: &str) {
     if let Err(error) = std::fs::remove_dir_all(store_id)
@@ -1105,6 +1121,48 @@ mod regression_tests {
             oauth: false,
         });
         (server, core, room)
+    }
+
+    #[test]
+    fn oauth_device_deletion_requires_an_advertised_management_action() {
+        use matrix_sdk::ruma::api::client::discovery::get_authorization_server_metadata::v1::AuthorizationServerMetadata;
+        let mut value = serde_json::json!({
+            "issuer": "https://id.example.org/", "authorization_endpoint": "https://id.example.org/authorize",
+            "token_endpoint": "https://id.example.org/token", "revocation_endpoint": "https://id.example.org/revoke",
+            "response_types_supported": ["code"], "response_modes_supported": ["query", "fragment"],
+            "grant_types_supported": ["authorization_code", "refresh_token"], "code_challenge_methods_supported": ["S256"],
+            "account_management_uri": "https://id.example.org/account"
+        });
+        let device = matrix_sdk::ruma::device_id!("DEVICE");
+        let metadata: AuthorizationServerMetadata = serde_json::from_value(value.clone()).unwrap();
+        assert!(matches!(
+            super::oauth_device_delete_url(&metadata, device),
+            Err(CommandErr::Unsupported)
+        ));
+        for action in ["org.matrix.device_delete", "org.matrix.session_end"] {
+            value["account_management_actions_supported"] = serde_json::json!([action]);
+            let metadata: AuthorizationServerMetadata =
+                serde_json::from_value(value.clone()).unwrap();
+            let url = url::Url::parse(&super::oauth_device_delete_url(&metadata, device).unwrap())
+                .unwrap();
+            assert!(
+                url.query_pairs()
+                    .any(|(key, value)| key == "action" && value == action)
+            );
+            assert!(
+                url.query_pairs()
+                    .any(|(key, value)| key == "device_id" && value == "DEVICE")
+            );
+        }
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("account_management_uri");
+        let metadata: AuthorizationServerMetadata = serde_json::from_value(value).unwrap();
+        assert!(matches!(
+            super::oauth_device_delete_url(&metadata, device),
+            Err(CommandErr::Unsupported)
+        ));
     }
 
     #[tokio::test]
