@@ -242,70 +242,94 @@ test('replying to yourself never mentions', () => {
   expect(conversation.context?.silentReply).toBe(true);
 });
 
-test.each([false, true])('media replies preserve silentReply=%s', async (silentReply) => {
-  vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
-    runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
-  );
-  const fixture = setup([item('$one:example.org', '@ana:example.org')], '@kris:example.org');
-  const { conversation } = fixture;
-  const file = new File(['picture'], 'picture.png', { type: 'image/png' });
-  const mentions = { userIds: ['@bea:example.org'], room: false };
+test.each([
+  [false, null],
+  [true, null],
+  [false, '$root'],
+  [true, '$root'],
+] as const)(
+  'media replies preserve silentReply=%s and threadRoot=%s',
+  async (silentReply, threadRoot) => {
+    vi.spyOn(runtime, 'runtimeConfig').mockResolvedValue(
+      runtime.parseRuntimeConfig({ gifs: { proxyUrl: 'gifs.example' } })
+    );
+    const fixture = setup(
+      [item('$one:example.org', '@ana:example.org')],
+      '@kris:example.org',
+      {},
+      undefined,
+      threadRoot
+    );
+    const { conversation } = fixture;
+    const file = new File(['picture'], 'picture.png', { type: 'image/png' });
+    const mentions = { userIds: ['@bea:example.org'], room: false };
 
-  for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
-    conversation.reply('$one:example.org');
-    if (silentReply) conversation.toggleSilentReply();
-    if (kind === 'attachment') {
-      await conversation.sendAttachment(ROOM, file, { mentions });
-      expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
-        ROOM,
-        file,
-        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
-      );
-    } else if (kind === 'gallery') {
-      await conversation.sendGallery(ROOM, [file, file], { mentions });
-      expect(fixture.sendGallery).toHaveBeenLastCalledWith(
-        ROOM,
-        [file, file],
-        expect.objectContaining({ inReplyTo: '$one:example.org', silentReply, mentions })
-      );
-    } else if (kind === 'gif') {
-      await conversation.sendGif(ROOM, {
-        id: 'cat',
-        title: 'cat',
-        mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
-        previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
-        width: 320,
-        height: 240,
-        size: 1000,
-        mimetype: 'image/gif',
-      });
-      expect(fixture.sendGif.mock.lastCall).toEqual([
-        ROOM,
-        expect.any(String),
-        'cat.gif',
-        320,
-        240,
-        'image/gif',
-        1000,
-        '$one:example.org',
-        null,
-        null,
-        silentReply,
-      ]);
-    } else {
-      await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
-      expect(fixture.sendLocation).toHaveBeenLastCalledWith(
-        ROOM,
-        'here',
-        'geo:48,2',
-        '$one:example.org',
-        null,
-        silentReply
-      );
+    for (const kind of ['attachment', 'gallery', 'gif', 'location'] as const) {
+      conversation.reply('$one:example.org');
+      if (silentReply) conversation.toggleSilentReply();
+      if (kind === 'attachment') {
+        await conversation.sendAttachment(ROOM, file, { mentions });
+        expect(fixture.sendAttachment).toHaveBeenLastCalledWith(
+          ROOM,
+          file,
+          expect.objectContaining({
+            inReplyTo: '$one:example.org',
+            silentReply,
+            mentions,
+            threadRoot,
+          })
+        );
+      } else if (kind === 'gallery') {
+        await conversation.sendGallery(ROOM, [file, file], { mentions });
+        expect(fixture.sendGallery).toHaveBeenLastCalledWith(
+          ROOM,
+          [file, file],
+          expect.objectContaining({
+            inReplyTo: '$one:example.org',
+            silentReply,
+            mentions,
+            threadRoot,
+          })
+        );
+      } else if (kind === 'gif') {
+        await conversation.sendGif(ROOM, {
+          id: 'cat',
+          title: 'cat',
+          mediaUrl: 'https://media.tenor.com/abc123/cat.gif',
+          previewUrl: 'https://media.tenor.com/abc123/cat-tiny.gif',
+          width: 320,
+          height: 240,
+          size: 1000,
+          mimetype: 'image/gif',
+        });
+        expect(fixture.sendGif.mock.lastCall).toEqual([
+          ROOM,
+          expect.any(String),
+          'cat.gif',
+          320,
+          240,
+          'image/gif',
+          1000,
+          '$one:example.org',
+          threadRoot,
+          null,
+          silentReply,
+        ]);
+      } else {
+        await conversation.sendLocation(ROOM, 'here', 'geo:48,2');
+        expect(fixture.sendLocation).toHaveBeenLastCalledWith(
+          ROOM,
+          'here',
+          'geo:48,2',
+          '$one:example.org',
+          threadRoot,
+          silentReply
+        );
+      }
+      expect(conversation.context).toBeNull();
     }
-    expect(conversation.context).toBeNull();
   }
-});
+);
 
 test('a reply to a persona message names the persona', () => {
   const target = {

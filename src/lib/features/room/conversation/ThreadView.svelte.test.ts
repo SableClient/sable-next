@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -131,3 +131,47 @@ test('a failed subscription can be retried without replacing the composer', asyn
   expect(await screen.findByRole('heading', { name: 'first.png' })).toBeVisible();
   expect(container.querySelector('.thread-composer')).toBe(composer);
 });
+
+test.each([false, true])(
+  'read-only threads hide restricted actions (sidePanel=%s)',
+  async (sidePanel) => {
+    const root = image('$root', 'first.png');
+    root.is_own = true;
+    root.content = {
+      kind: 'message',
+      body: 'Read-only discussion',
+      html: 'Read-only discussion',
+      emote: false,
+      notice: false,
+      edited: false,
+    };
+    vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+      this: RoomTimeline
+    ) {
+      this.items = [root];
+      this.hasSnapshot = true;
+      return Promise.resolve();
+    });
+    vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+    const { container } = render(ThreadViewHarness, {
+      panel: {
+        roomId: '!room:example.org',
+        rootEventId: '$root',
+        sidePanel,
+        readOnly: true,
+        canReact: false,
+        canPin: false,
+        canRedactOwn: false,
+        onClose: () => {},
+      },
+    });
+    await screen.findByRole('heading', { name: 'Read-only discussion' });
+    expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+    await fireEvent.contextMenu(screen.getByRole('article'));
+    await screen.findByRole('menu');
+    for (const name of ['Reply', 'Edit message', 'Add reaction', 'Pin message', 'Delete message']) {
+      expect(screen.queryByRole('menuitem', { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('menuitem', { name: 'Copy message' })).toBeVisible();
+  }
+);

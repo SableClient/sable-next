@@ -48,6 +48,7 @@ type WorkerMode = RoomCoreMode;
 declare global {
   interface Window {
     __e2eCommands: string[];
+    __e2eCommandPayloads: Command[];
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
@@ -89,11 +90,16 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     }
 
     const commandLog: string[] = [];
+    const commandPayloads: Command[] = [];
     const timelineRooms: string[] = [];
     const timelineSubscriptions: number[] = [];
     Object.defineProperty(window, '__e2eCommands', {
       configurable: true,
       value: commandLog,
+    });
+    Object.defineProperty(window, '__e2eCommandPayloads', {
+      configurable: true,
+      value: commandPayloads,
     });
     Object.defineProperty(window, '__e2eTimelineRooms', {
       configurable: true,
@@ -1690,6 +1696,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         const command = request.command;
         if (!command) return;
         commandLog.push(command.type);
+        commandPayloads.push(command);
 
         let response: { id: number; ok: CommandOk } | { id: number; err: { code: string } };
         try {

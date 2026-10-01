@@ -36,6 +36,7 @@ export default defineConfig({
     'profile-card-tint.spec.ts',
     'reply-name-color.spec.ts',
     'thread-panel.spec.ts',
+    'thread-actions.spec.ts',
     'settings-backdrop.spec.ts',
     'sheet-swipe.spec.ts',
     'voice-room-chat.spec.ts',
