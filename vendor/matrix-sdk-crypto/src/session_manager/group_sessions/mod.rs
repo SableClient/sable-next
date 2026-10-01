@@ -1842,14 +1842,20 @@ mod tests {
 
         let bootstrap = bob.bootstrap_cross_signing(false).await.unwrap();
         let signed = bootstrap.upload_signatures_req.signed_keys.get(bob.user_id()).unwrap()
-            .get(bob.device_id().as_str()).unwrap();
-        let response: get_keys::v3::Response = serde_json::from_value(json!({
-            "device_keys": {bob.user_id(): {bob.device_id(): serde_json::from_str::<Value>(signed.get()).unwrap()}},
+            .iter().find(|(id, _)| *id == bob.device_id().as_str()).unwrap().1;
+        let mut signed: DeviceKeys = serde_json::from_str(signed.get()).unwrap();
+        for (key_id, signature) in device.signatures().get(bob.user_id()).unwrap() {
+            signed.signatures.add_signature(
+                bob.user_id().to_owned(), key_id.clone(), signature.clone().unwrap(),
+            );
+        }
+        let response: get_keys::v3::Response = ruma_response_from_json(&json!({
+            "device_keys": {bob.user_id(): {bob.device_id(): signed}},
             "master_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.master_key},
             "self_signing_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.self_signing_key},
             "user_signing_keys": {bob.user_id(): bootstrap.upload_signing_keys_req.user_signing_key},
             "failures": {}
-        })).unwrap();
+        }));
         let (request_id, _) = alice.query_keys_for_users([bob.user_id()]);
         alice.mark_request_as_sent(&request_id, &response).await.unwrap();
 
