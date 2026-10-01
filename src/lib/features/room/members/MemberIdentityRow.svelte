@@ -47,7 +47,7 @@
     senderDisplayColors(userId, profile, null, false, cosmetics, powerTag?.color ?? null)
   );
   let pronouns = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? cosmetics?.pronouns.length
         ? cosmetics.pronouns
         : (profile?.pronouns ?? [])

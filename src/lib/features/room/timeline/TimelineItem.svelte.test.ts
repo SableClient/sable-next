@@ -83,6 +83,8 @@ const menuLabels = () => screen.getAllByRole('menuitem').map((row) => row.textCo
 afterEach(() => {
   document.body.replaceChildren();
   setPreference('replyPreviewStyle', 'connected');
+  setPreference('showPronouns', true);
+  setPreference('showPronounPills', true);
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
 });
@@ -1105,23 +1107,31 @@ test('adds the display name pronouns after the structured sets', async () => {
   });
 });
 
-test('keeps the display name suffix when pronoun pills are hidden', async () => {
-  setPreference('showPronouns', false);
-  core.userProfile.mockResolvedValue({ pronouns: [] });
-  const instance = render(TimelineItemHarness, {
-    props: {
-      core,
-      item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
-    },
-  });
-  await tick();
-  expect(document.querySelector('header .sender-identity-name')?.textContent).toBe(
-    'sugary (she/it)'
-  );
-  expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(0);
-  instance.unmount();
-  setPreference('showPronouns', true);
-});
+test.each(['showPronouns', 'showPronounPills'] as const)(
+  'keeps the display name suffix when %s is disabled',
+  async (preference) => {
+    setPreference(preference, false);
+    core.userProfile.mockResolvedValue({
+      pronouns: [{ summary: 'they/them', language: null }],
+    });
+    render(TimelineItemHarness, {
+      props: {
+        core,
+        item: { item: { ...item(false), sender_name: 'sugary (she/it)' }, collapsed: false },
+      },
+    });
+    await tick();
+    expect(document.querySelector('header .sender-identity-name')?.textContent).toBe(
+      'sugary (she/it)'
+    );
+    expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(0);
+    setPreference(preference, true);
+    await vi.waitFor(() => {
+      expect(document.querySelector('header .sender-identity-name')?.textContent).toBe('sugary');
+      expect(document.querySelectorAll('header .sender-identity-pronoun')).toHaveLength(2);
+    });
+  }
+);
 
 test('shows only the sets tagged with the reader language', async () => {
   core.userProfile.mockResolvedValue({

@@ -1991,6 +1991,8 @@
     "groupMembersByPresenceHint": "Keeps online members in their role groups and places other members under Offline.",
     "showPronouns": "Show pronouns",
     "showPronounsHint": "Shows a pronoun pill beside a sender name and on profile cards.",
+    "showPronounPills": "Show pronoun pills",
+    "showPronounPillsHint": "Shows pronoun pills beside names. Profile pronouns stay visible when off.",
     "pronounPillLength": "Pronoun pill length",
     "pronounPillLengthHint": "Shortens a long pronoun to this many characters.",
     "pronounPillLengthAll": "No limit",

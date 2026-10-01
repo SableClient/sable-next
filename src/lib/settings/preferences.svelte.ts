@@ -125,6 +125,7 @@ export interface Preferences {
   groupMembersByPresence: boolean;
   filterPronounsByLanguage: boolean;
   showPronouns: boolean;
+  showPronounPills: boolean;
   pronounPillLimit: PronounPillLimit;
   pronounPillLength: PronounPillLength;
 
@@ -369,6 +370,7 @@ const DEFAULTS: Preferences = {
   groupMembersByPresence: true,
   filterPronounsByLanguage: true,
   showPronouns: true,
+  showPronounPills: true,
   pronounPillLimit: '3',
   pronounPillLength: 'all',
 

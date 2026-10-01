@@ -895,6 +895,15 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'showPronounPills',
+        section: 'members-pronouns',
+        icon: UserCircleIcon,
+        name: 'settings.showPronounPills',
+        description: 'settings.showPronounPillsHint',
+        type: 'boolean',
+        gatedBy: 'showPronouns',
+      },
+      {
         key: 'filterPronounsByLanguage',
         section: 'members-pronouns',
         icon: TranslateIcon,

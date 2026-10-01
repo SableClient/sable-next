@@ -186,7 +186,7 @@
   );
   let persona = $derived(item.per_message_profile);
   let senderIdentity = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? splitDisplayNamePronouns(persona?.display_name ?? accountName)
       : { name: persona?.display_name ?? accountName, pronouns: [] }
   );
@@ -202,7 +202,7 @@
   );
   let personaTint = $derived(personaWithColor(persona));
   let pronouns = $derived(
-    preferences.showPronouns
+    preferences.showPronouns && preferences.showPronounPills
       ? withDisplayNamePronouns(
           persona?.pronouns?.length
             ? persona.pronouns
