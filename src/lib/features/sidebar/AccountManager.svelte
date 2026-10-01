@@ -9,7 +9,9 @@
   import { logoutWithPush } from '#lib/features/notifications/web-push.js';
   import { i18n } from '#lib/i18n.js';
   import DotsThreeVerticalIcon from 'phosphor-svelte/lib/DotsThreeVerticalIcon';
+  import CheckCircleIcon from 'phosphor-svelte/lib/CheckCircleIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
+  import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
   import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -22,16 +24,12 @@
   import DialogActions from '#lib/ui/primitives/DialogActions.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import Pill from '#lib/ui/primitives/Pill.svelte';
   import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import type { OptionCard } from '#lib/ui/primitives/option-card.js';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
-  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
-  import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
   import StatusBadge from '#lib/ui/primitives/StatusBadge.svelte';
-  import '#lib/ui/primitives/settings-row.css';
-  import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
+  import { LEGACY_STATUS_FIELDS, STATUS_FIELD, legacyDeletes } from '#lib/profile/fields.js';
   import { SignOutGuard } from './sign-out-guard.svelte.js';
   import SignOutWarningDialog from './SignOutWarningDialog.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
@@ -41,7 +39,6 @@
   import { AccountDirectory } from './account-directory.svelte.js';
 
   const core = useCoreClient();
-  const presenceStore = usePresenceStore();
   const accountProfiles = new AccountDirectory(core);
   const signOut = new SignOutGuard(core);
   let switching = $state(false);
@@ -53,7 +50,9 @@
   let activeAccountId = $derived(core.session?.account_id);
   let activeUserId = $derived(core.session?.user_id ?? '');
   let displayName = $derived(profile?.display_name ?? activeUserId);
-  let userStatus = $derived(resolveUserStatus(profile, presenceStore.get(activeUserId)));
+  let userStatus = $derived(
+    resolveUserStatus(profile, { statusMessage: preferences.presenceStatusMessage })
+  );
   let profileColor = $derived(profile?.hero_color ?? 'var(--primary-container)');
   let presenceOptions = $derived<OptionCard<PresenceView>[]>([
     { value: 'online', label: $i18n.t('presence.online') },
@@ -61,8 +60,11 @@
     { value: 'offline', label: $i18n.t('presence.offline') },
   ]);
   let statusDraft = $state(preferences.presenceStatusMessage);
+  let presenceDraft = $state<PresenceView>(preferences.presence);
   let statusOpen = $state(false);
-  let ownStatus = $derived(preferences.presenceStatusMessage.trim());
+  let statusSaving = $state(false);
+  let statusError = $state<string | null>(null);
+  let ownStatus = $derived(userStatus?.text ?? '');
   let listedAccounts = $derived(
     accountSwitching
       ? core.accounts
@@ -93,9 +95,27 @@
     };
   });
 
-  function saveStatusMessage(): void {
-    setPreference('presenceStatusMessage', statusDraft.trim());
-    statusOpen = false;
+  async function saveStatusMessage(): Promise<void> {
+    statusSaving = true;
+    statusError = null;
+    const text = statusDraft.trim();
+    const status = text ? { text, emoji: userStatus?.emoji ?? null } : null;
+    try {
+      if (text !== ownStatus) {
+        await core.setProfileField(STATUS_FIELD, status);
+        for (const [field] of legacyDeletes(profile?.legacy_fields ?? [], LEGACY_STATUS_FIELDS)) {
+          await core.setProfileField(field, null);
+        }
+        profile = profile ? { ...profile, status } : await core.userProfile(activeUserId);
+      }
+      setPreference('presenceStatusMessage', text);
+      setPreference('presence', presenceDraft);
+      statusOpen = false;
+    } catch {
+      statusError = $i18n.t('settings.profileSaveFailed');
+    } finally {
+      statusSaving = false;
+    }
   }
 
   function reauthenticate(homeserver: string, accountId: string): Promise<void> {
@@ -141,13 +161,6 @@
   <title>{$i18n.t('nav.manageAccounts')} - Sable</title>
 </svelte:head>
 
-{#snippet profileActions()}
-  <Button class="profile-settings" variant="primary" onclick={() => void goto(resolve('settings'))}
-    ><GearIcon aria-hidden="true" />{$i18n.t('nav.settings')}</Button
-  >
-  <Pill onclick={() => void goto(resolve('settings/account'))}>{$i18n.t('nav.editProfile')}</Pill>
-{/snippet}
-
 {#snippet statusBubble()}
   <button
     class="status-bubble"
@@ -156,7 +169,9 @@
     aria-expanded={statusOpen}
     aria-label={`${$i18n.t('presence.setStatus')}: ${$i18n.t(`presence.${preferences.presence}`)}${ownStatus ? `, ${ownStatus}` : ''}`}
     onclick={() => {
-      statusDraft = preferences.presenceStatusMessage;
+      statusDraft = ownStatus;
+      presenceDraft = preferences.presence;
+      statusError = null;
       statusOpen = true;
     }}
   >
@@ -165,81 +180,100 @@
       {$i18n.t(`presence.${preferences.presence}`)}
     </span>
     <span class="status-bubble-text" class:placeholder={!ownStatus}
-      >{ownStatus || $i18n.t('presence.statusMessagePlaceholder')}</span
+      >{#if userStatus?.emoji}<span>{userStatus.emoji}</span>
+      {/if}{ownStatus || $i18n.t('presence.statusMessagePlaceholder')}</span
     >
   </button>
 {/snippet}
 
-<main class="account-manager">
-  <ProfileCard
-    variant="sheet"
-    {displayName}
-    userId={activeUserId}
-    avatarUrl={profile?.avatar_url}
-    color={profileColor}
-    heroColor={profile?.hero_color}
-    heroBrightness={profile?.hero_brightness}
-    bannerUrl={profile?.banner_url}
-    status={userStatus?.text}
-    statusEmoji={userStatus?.emoji}
-    nameColorLight={profile?.name_color_light}
-    nameColorDark={profile?.name_color_dark}
-    actions={profileActions}
-    crest={preferences.sendPresence ? statusBubble : undefined}
-  />
-
-  {#snippet addAccount()}
-    <Button
-      variant="secondary"
-      size="small"
-      onclick={() => void goto(resolve('login?addAccount=1'))}
-      ><PlusIcon aria-hidden="true" />{$i18n.t('nav.addAccount')}</Button
-    >
-  {/snippet}
-  <SettingsSection
-    headingId="account-list-title"
-    title={$i18n.t('nav.accounts')}
-    actions={accountSwitching ? addAccount : undefined}
+{#snippet editProfile()}
+  <Button variant="secondary" onclick={() => void goto(resolve('settings/account'))}
+    ><PencilSimpleIcon aria-hidden="true" />{$i18n.t('nav.editProfile')}</Button
   >
+{/snippet}
+
+<main class="account-manager" aria-label={$i18n.t('nav.profile')}>
+  <div class="account-profile">
+    <ProfileCard
+      variant="sheet"
+      {displayName}
+      userId={activeUserId}
+      avatarUrl={profile?.avatar_url}
+      color={profileColor}
+      heroColor={profile?.hero_color}
+      heroBrightness={profile?.hero_brightness}
+      bannerUrl={profile?.banner_url}
+      status={userStatus?.text}
+      statusEmoji={userStatus?.emoji}
+      nameColorLight={profile?.name_color_light}
+      nameColorDark={profile?.name_color_dark}
+      crest={preferences.sendPresence ? statusBubble : undefined}
+      actions={editProfile}
+    />
+    <Button variant="secondary" size="large" block onclick={() => void goto(resolve('settings'))}
+      ><GearIcon aria-hidden="true" />{$i18n.t('nav.settings')}</Button
+    >
+  </div>
+
+  <section class="account-list" aria-labelledby="account-list-title">
+    <header class="account-list-heading">
+      <h2 id="account-list-title">{$i18n.t('nav.accounts')}</h2>
+      {#if accountSwitching}
+        <Button variant="secondary" onclick={() => void goto(resolve('login?addAccount=1'))}
+          ><PlusIcon aria-hidden="true" />{$i18n.t('nav.addAccount')}</Button
+        >
+      {/if}
+    </header>
     {#if error}<Alert variant="critical" role="alert">{error}</Alert>{/if}
-    <ul class="settings-rows">
+    <ul class="account-rows">
       {#each listedAccounts as account (account.account_id)}
         {@const active = account.account_id === activeAccountId}
         {@const identity = accountProfiles.identity(account.user_id)}
-        <SettingsRow
-          class="account-row"
-          title={identity.displayName}
-          description={account.needs_reauth ? $i18n.t('nav.accountSignedOut') : account.user_id}
-        >
-          {#snippet before()}
+        <li class="account-row">
+          <Button
+            variant="ghost"
+            class="account-select"
+            aria-pressed={active}
+            aria-label={`${$i18n.t(active ? 'nav.activeAccount' : account.needs_reauth ? 'nav.accountSignInAgain' : 'nav.switchAccount')}: ${identity.displayName}, ${account.user_id}`}
+            disabled={active || switching}
+            onclick={() =>
+              void (account.needs_reauth
+                ? reauthenticate(account.homeserver, account.account_id)
+                : switchAccount(account.account_id))}
+          >
             <Avatar
               size="medium"
               id={account.user_id}
               name={identity.displayName}
               src={identity.avatarUrl}
             />
-          {/snippet}
-          {#if active}
-            <StatusBadge variant="success" label={$i18n.t('nav.activeAccount')} />
-          {:else}
-            <Button
-              variant="secondary"
-              size="small"
-              disabled={switching}
-              onclick={() =>
-                void (account.needs_reauth
-                  ? reauthenticate(account.homeserver, account.account_id)
-                  : switchAccount(account.account_id))}
-              >{$i18n.t(account.needs_reauth ? 'nav.accountSignInAgain' : 'nav.switch')}</Button
-            >
-            <ActionMenu label={$i18n.t('nav.moreOptions')}>
+            <span class="account-copy">
+              <span class="account-name">{identity.displayName}</span>
+              <span class="account-id">{account.user_id}</span>
+              {#if active}
+                <StatusBadge variant="success" label={$i18n.t('nav.activeAccount')} />
+              {:else}
+                <span class="account-status" aria-live="polite">
+                  {#if account.needs_reauth}
+                    <StatusBadge variant="neutral" label={$i18n.t('nav.accountSignedOut')} />
+                  {/if}
+                  <span
+                    >{$i18n.t(account.needs_reauth ? 'nav.accountSignInAgain' : 'nav.switch')}</span
+                  >
+                </span>
+              {/if}
+            </span>
+            {#if active}<CheckCircleIcon aria-hidden="true" />{/if}
+          </Button>
+          {#if !active}
+            <ActionMenu label={`${$i18n.t('nav.moreOptions')}: ${account.user_id}`}>
               {#snippet trigger({ props })}
                 <IconButton
                   {...props}
                   variant="ghost"
-                  size="small"
+                  size="large"
                   class="selection-open"
-                  label={$i18n.t('nav.moreOptions')}
+                  label={`${$i18n.t('nav.moreOptions')}: ${account.user_id}`}
                 >
                   <DotsThreeVerticalIcon />
                 </IconButton>
@@ -255,14 +289,14 @@
               </ActionMenuItem>
             </ActionMenu>
           {/if}
-        </SettingsRow>
+        </li>
       {/each}
     </ul>
-  </SettingsSection>
+  </section>
 
   <Button
-    variant="danger"
-    block
+    variant="secondary"
+    class="sign-out"
     loading={signOut.checking}
     onclick={() => void signOut.request(() => logoutWithPush(core, pushOverride()))}
     ><SignOutIcon aria-hidden="true" />{$i18n.t('settings.logout')}</Button
@@ -278,29 +312,38 @@
     class="status-sheet"
     onsubmit={(event) => {
       event.preventDefault();
-      saveStatusMessage();
+      void saveStatusMessage();
     }}
   >
     <h2>{$i18n.t('presence.title')}</h2>
     <OptionCards
       label={$i18n.t('presence.title')}
       options={presenceOptions}
-      value={preferences.presence}
-      onSelect={(value) => setPreference('presence', value)}
+      value={presenceDraft}
+      disabled={statusSaving}
+      onSelect={(value) => (presenceDraft = value)}
     />
     <FormField fieldId="presence-status-message" label={$i18n.t('presence.statusMessage')}>
-      <div class="status-message">
-        <TextInput
-          id="presence-status-message"
-          bind:value={statusDraft}
-          maxlength={120}
-          placeholder={$i18n.t('presence.statusMessagePlaceholder')}
-        />
-        <Button type="submit" disabled={statusDraft.trim() === preferences.presenceStatusMessage}
-          >{$i18n.t('presence.statusMessageSave')}</Button
-        >
-      </div>
+      <TextInput
+        id="presence-status-message"
+        bind:value={statusDraft}
+        disabled={statusSaving}
+        maxlength={120}
+        placeholder={$i18n.t('presence.statusMessagePlaceholder')}
+      />
     </FormField>
+    {#if statusError}<Alert variant="critical" role="alert">{statusError}</Alert>{/if}
+    <DialogActions>
+      <Button variant="ghost" disabled={statusSaving} onclick={() => (statusOpen = false)}
+        >{$i18n.t('settings.cancel')}</Button
+      >
+      <Button
+        type="submit"
+        loading={statusSaving}
+        disabled={statusDraft.trim() === ownStatus && presenceDraft === preferences.presence}
+        >{$i18n.t('presence.statusMessageSave')}</Button
+      >
+    </DialogActions>
   </form>
 </BottomSheet>
 
@@ -316,6 +359,12 @@
 >
   <div class="remove-dialog">
     <h2>{$i18n.t('nav.removeAccountConfirm')}</h2>
+    {#if accountToRemove}
+      <p class="remove-account-identity">
+        <strong>{accountProfiles.identity(accountToRemove.user_id).displayName}</strong>
+        <span>{accountToRemove.user_id}</span>
+      </p>
+    {/if}
     <p>{$i18n.t('nav.removeAccountDescription')}</p>
     <DialogActions>
       <Button variant="ghost" disabled={removing} onclick={() => (removeAccountId = null)}
@@ -331,8 +380,9 @@
 <style>
   .account-manager {
     align-content: start;
+    container-type: inline-size;
     display: grid;
-    gap: var(--space-500);
+    gap: var(--space-600);
     grid-auto-rows: max-content;
     margin: 0 auto;
     max-width: 42rem;
@@ -342,8 +392,85 @@
     width: 100%;
   }
 
-  .account-manager :global(.profile-settings) {
-    min-height: max(var(--control-height-400), var(--target-hit));
+  .account-profile {
+    display: grid;
+    gap: var(--space-300);
+  }
+
+  .account-profile :global(.profile-card) {
+    --profile-avatar-size: 5rem;
+  }
+
+  .account-profile :global(.profile-card .profile-card-cover) {
+    height: 8rem;
+  }
+
+  .account-profile :global(.profile-card-crest) {
+    align-items: start;
+    display: grid;
+    grid-template-columns: var(--profile-avatar-size) minmax(0, 1fr);
+  }
+
+  .account-profile :global(.profile-card-avatar-wrap),
+  .account-profile :global(.profile-card-crest-content),
+  .account-profile :global(.profile-card-status) {
+    margin-bottom: 0;
+    margin-top: calc(var(--profile-avatar-size) / -2);
+    transform: none;
+  }
+
+  .account-profile :global(.profile-card-identity) {
+    padding: var(--space-200) var(--space-400) var(--space-400);
+  }
+
+  .account-profile :global(.profile-card-name) {
+    font-size: calc(1.5rem * var(--text-scale));
+    line-height: var(--line-height-heading);
+  }
+
+  .account-profile :global(.profile-card-user-id) {
+    align-items: flex-start;
+    max-width: 100%;
+    padding-top: var(--space-100);
+  }
+
+  .account-profile :global(.profile-card-user-id svg) {
+    margin-top: 0.25em;
+  }
+
+  .account-list {
+    display: grid;
+    gap: var(--space-300);
+  }
+
+  .account-list-heading {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+    justify-content: space-between;
+  }
+
+  .account-list-heading h2 {
+    font-size: var(--font-size-subheading);
+    line-height: var(--line-height-heading);
+    margin: 0;
+  }
+
+  .account-rows {
+    background: var(--surface-var-container);
+    border: var(--border-width) solid var(--surface-var-container-line);
+    border-radius: var(--radius);
+    color: var(--surface-var-on-container);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .account-manager :global(.sign-out) {
+    --button-on-container: var(--crit-main);
+
+    justify-self: start;
   }
 
   .status-bubble {
@@ -410,32 +537,99 @@
     }
   }
 
-  .account-manager :global(.settings-section-header) {
-    align-items: center;
-  }
-
-  .account-manager :global(.setting-row.account-row) {
-    flex-wrap: nowrap;
-    gap: var(--space-300);
-  }
-
-  .account-manager :global(.account-row .row-copy) {
-    flex-basis: 0;
-  }
-
-  .account-manager :global(.account-row .row-copy .name),
-  .account-manager :global(.account-row .row-copy p) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .account-manager :global(.account-row .row-control) {
+  .account-row {
     align-items: center;
     display: flex;
-    flex: none;
+    min-width: 0;
+    padding-right: var(--space-100);
+  }
+
+  .account-row + .account-row {
+    border-top: var(--border-width) solid var(--surface-var-container-line);
+  }
+
+  .account-row :global(.account-select) {
+    align-items: center;
+    border-radius: var(--radius);
+    display: grid;
+    flex: 1;
+    gap: var(--space-300);
+    grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+    padding: var(--space-400);
+    text-align: start;
+  }
+
+  .account-row :global(.account-select[aria-pressed='true']) {
+    cursor: default;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    opacity: 1;
+  }
+
+  .account-copy {
+    display: grid;
     gap: var(--space-100);
+    justify-items: start;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .account-name {
+    font-weight: var(--font-weight-medium);
+  }
+
+  .account-id,
+  .account-status {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    line-height: var(--line-height-body);
+  }
+
+  .account-status {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-200);
+  }
+
+  @container (width < 20rem) {
+    .account-row {
+      display: block;
+      padding-right: 0;
+      position: relative;
+    }
+
+    .account-row :global(.account-select) {
+      grid-template-columns: auto minmax(0, 1fr) var(--control-height-large);
+      width: 100%;
+    }
+
+    .account-copy {
+      display: contents;
+    }
+
+    .account-name {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .account-id,
+    .account-status,
+    .account-copy > :global(.status-badge) {
+      grid-column: 1 / -1;
+    }
+
+    .account-row :global(.account-select > svg) {
+      grid-column: 3;
+      grid-row: 1;
+      justify-self: center;
+    }
+
+    .account-row :global(.selection-open) {
+      position: absolute;
+      right: var(--space-400);
+      top: var(--space-400);
+    }
   }
 
   .status-sheet {
@@ -449,10 +643,15 @@
     margin: 0;
   }
 
-  .status-message {
-    align-items: center;
-    display: flex;
-    gap: var(--space-200);
+  .status-sheet :global(.text-input) {
+    min-height: var(--control-height-large);
+  }
+
+  .remove-dialog .remove-account-identity {
+    color: var(--surface-on-container);
+    display: grid;
+    gap: var(--space-100);
+    overflow-wrap: anywhere;
   }
 
   .remove-dialog p {

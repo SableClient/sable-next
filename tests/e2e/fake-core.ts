@@ -48,7 +48,9 @@ type WorkerMode = RoomCoreMode;
 declare global {
   interface Window {
     __e2eCommands: string[];
+    __e2eAccounts?: SessionInfo[];
     __e2eCommandPayloads: Command[];
+    __e2eProfileSaveError?: boolean;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
@@ -793,7 +795,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         signedOut = true;
         return { type: 'logout' };
       },
-      list_accounts: () => ({ type: 'list_accounts', accounts: signedOut ? [] : [session] }),
+      list_accounts: () => ({
+        type: 'list_accounts',
+        accounts: signedOut ? [] : (window.__e2eAccounts ?? [session]),
+      }),
       switch_account: () => ({ type: 'switch_account', session }),
       homeserver_info: () => ({
         type: 'homeserver_info',
@@ -1120,6 +1125,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
             ...(window as { __e2eProfilePatch?: Partial<ProfileView> }).__e2eProfilePatch,
           },
         };
+      },
+      set_profile_field: () => {
+        if (window.__e2eProfileSaveError) throw new FakeCoreError('unavailable');
+        return bareReply('set_profile_field');
       },
       user_relations: () => ({ type: 'user_relations', mutual_rooms: [], ignored: false }),
       account_contacts: () => ({ type: 'account_contacts', emails: [] }),

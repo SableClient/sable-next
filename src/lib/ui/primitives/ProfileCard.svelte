@@ -182,7 +182,8 @@
             size="large"
             src={avatarUrl}
             name={displayName}
-            {color}
+            id={userId}
+            color={heroColor ? undefined : color}
             original
             decorative
           />
@@ -193,7 +194,8 @@
           size="large"
           src={avatarUrl}
           name={displayName}
-          {color}
+          id={userId}
+          color={heroColor ? undefined : color}
           original
           alt={displayName}
         />
@@ -554,7 +556,7 @@
 
   @media (pointer: coarse) {
     .profile-card-user-id {
-      min-height: var(--control-height-300);
+      min-height: var(--control-height-large);
     }
   }
 
