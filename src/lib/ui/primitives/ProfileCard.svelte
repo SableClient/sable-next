@@ -399,6 +399,7 @@
   .profile-card-avatar-wrap :global(.avatar-root.profile-card-avatar) {
     --avatar-size: var(--profile-avatar-size);
 
+    background: var(--profile-card-ground);
     box-shadow: 0 0 0 0.25rem var(--profile-card-ground);
   }
 
