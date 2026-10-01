@@ -311,7 +311,6 @@
       senderRole?.color ?? null
     )
   );
-  let senderFont = $derived(persona ? null : (senderCosmetics?.font ?? null));
   let senderRoleIcon = $derived(senderRole?.icon ?? null);
 
   $effect(() => {
@@ -603,7 +602,6 @@
           <SenderName
             displayName={senderName}
             colors={senderColors}
-            font={senderFont}
             {pronouns}
             nameClass="compact-name"
             onMention={nameMentions ? mentionSender : undefined}
@@ -655,7 +653,6 @@
             ><SenderName
               displayName={replyName}
               colors={replyColors}
-              font={replyCosmetics?.font ?? null}
               nameClass="reply-name"
               compact
             />
@@ -670,7 +667,6 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
-              font={senderFont}
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
@@ -720,7 +716,6 @@
               ><SenderName
                 displayName={replyName}
                 colors={replyColors}
-                font={replyCosmetics?.font ?? null}
                 nameClass="reply-name"
                 compact
               />
@@ -742,7 +737,6 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
-              font={senderFont}
               {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}

@@ -20,7 +20,6 @@ const SHARED = [
   'developerTools',
   'showPronouns',
   'renderRoomColors',
-  'renderRoomFonts',
   'captionPosition',
   'sendPresence',
   'showUnreadCounts',

@@ -1832,14 +1832,6 @@
         "description": "Setează-ți culoarea numelui în camera asta",
         "usage": "/color <#rrggbb|reset>"
       },
-      "font": {
-        "description": "Setează un font în camera asta",
-        "usage": "/font <nume|reset>"
-      },
-      "sfont": {
-        "description": "Setează-ți font-ul în tot spațiul ăsta",
-        "usage": "/sfont <nume|reset>"
-      },
       "pronoun": {
         "description": "Setează-ți pronumele în camera asta",
         "usage": "/pronoun <pronume|reset>"

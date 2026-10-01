@@ -94,7 +94,6 @@
         {displayName}
         {colors}
         {pronouns}
-        font={cosmetics?.font}
         nameClass="member-name"
         compact={pronouns.length === 0}
       />

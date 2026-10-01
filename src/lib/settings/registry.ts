@@ -54,7 +54,6 @@ import StickerIcon from 'phosphor-svelte/lib/StickerIcon';
 import SubtitlesIcon from 'phosphor-svelte/lib/SubtitlesIcon';
 import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
 import TextAlignLeftIcon from 'phosphor-svelte/lib/TextAlignLeftIcon';
-import TextTIcon from 'phosphor-svelte/lib/TextTIcon';
 import TranslateIcon from 'phosphor-svelte/lib/TranslateIcon';
 import TreeStructureIcon from 'phosphor-svelte/lib/TreeStructureIcon';
 import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
@@ -583,14 +582,6 @@ export const settingsCategories: SettingsCategory[] = [
         icon: PaletteIcon,
         name: 'settings.renderRoomColors',
         description: 'settings.renderRoomColorsHint',
-        type: 'boolean',
-      },
-      {
-        key: 'renderRoomFonts',
-        section: 'accessibility',
-        icon: TextTIcon,
-        name: 'settings.renderRoomFonts',
-        description: 'settings.renderRoomFontsHint',
         type: 'boolean',
       },
       {

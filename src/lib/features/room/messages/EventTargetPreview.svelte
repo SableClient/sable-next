@@ -130,13 +130,7 @@
 >
   {#if replyStyle !== 'connected'}<Icon class="target-icon" />{/if}
   <span class={['target-copy', { wrap: body !== undefined }]}>
-    <SenderName
-      displayName={name}
-      {colors}
-      font={cosmetics?.font ?? null}
-      nameClass="target-name"
-      compact
-    />
+    <SenderName displayName={name} {colors} nameClass="target-name" compact />
     {#if body}{@render body()}{:else}<span>{preview?.body ?? ''}</span>{/if}
   </span>
 </button>

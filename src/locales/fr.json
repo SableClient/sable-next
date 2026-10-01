@@ -2180,14 +2180,6 @@
         "description": "Définir la couleur de votre nom dans ce salon",
         "usage": "/color [light|dark] <#rrggbb|reset>"
       },
-      "font": {
-        "description": "Définir votre police dans ce salon",
-        "usage": "/font <nom|reset>"
-      },
-      "sfont": {
-        "description": "Définir votre police dans tout cet espace",
-        "usage": "/sfont <nom|reset>"
-      },
       "pronoun": {
         "description": "Définir vos pronoms dans ce salon",
         "usage": "/pronoun <pronoms|reset>"

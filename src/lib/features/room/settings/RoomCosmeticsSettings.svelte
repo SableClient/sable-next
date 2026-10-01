@@ -14,7 +14,6 @@
   } from '#lib/features/composer/slash-commands.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
-  import { cosmeticFont } from '#lib/rooms/cosmetic-fonts.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -52,7 +51,6 @@
 
   let colorOnLight = $state('');
   let colorOnDark = $state('');
-  let font = $state<string | null>(null);
   let name = $state('');
   let savedName = $state('');
   let profileName = $state<string | null>(null);
@@ -70,9 +68,6 @@
     canSendState(effectiveLevels, ownLevel, COSMETIC_EVENT_TYPES.pronoun)
   );
   let canManage = $derived(permissions?.can_change_power_levels ?? false);
-  let membersSetFonts = $derived(
-    effectiveLevels?.events[COSMETIC_EVENT_TYPES.font] === MEMBER_LEVEL
-  );
   let membersSetPronouns = $derived(
     effectiveLevels?.events[COSMETIC_EVENT_TYPES.pronoun] === MEMBER_LEVEL
   );
@@ -88,7 +83,6 @@
     senderDisplayColors(userId ?? '', null, null, false, {
       colorOnLight: colorOnLight || null,
       colorOnDark: colorOnDark || null,
-      font,
       pronouns: previewPronouns,
     })
   );
@@ -112,9 +106,8 @@
   async function load(target: string, self: string): Promise<void> {
     const current = ++run;
     try {
-      const [member, fontEvent, pronounEvent, profile] = await Promise.all([
+      const [member, pronounEvent, profile] = await Promise.all([
         core.commands.roomStateEvent(target, 'm.room.member', self),
-        core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.font, self),
         core.commands.roomStateEvent(target, COSMETIC_EVENT_TYPES.pronoun, self),
         core.userProfile(self).catch(() => null),
       ]);
@@ -129,7 +122,6 @@
       const memberName = text(record(member).displayname);
       name = memberName === profileName ? '' : memberName;
       savedName = name;
-      font = cosmeticFont(text(record(fontEvent).font))?.family ?? null;
       const sets = record(pronounEvent).pronouns;
       pronouns = Array.isArray(sets)
         ? sets
@@ -252,12 +244,7 @@
     description={$i18n.t(isSpace ? 'room.cosmeticsHintSpace' : 'room.cosmeticsHintRoom')}
   >
     <div class="preview" aria-hidden="true">
-      <SenderName
-        displayName={previewName}
-        colors={previewColors}
-        {font}
-        pronouns={previewPronouns}
-      />
+      <SenderName displayName={previewName} colors={previewColors} pronouns={previewPronouns} />
     </div>
     <ul class="settings-rows">
       {#if !isSpace}
@@ -376,21 +363,6 @@
             label={$i18n.t('room.cosmeticsMembersPronouns')}
             onCheckedChange={(allowed) => {
               allowMembers(COSMETIC_EVENT_TYPES.pronoun, allowed);
-            }}
-          />
-        </SettingsRow>
-        <SettingsRow
-          title={$i18n.t('room.cosmeticsMembersFonts')}
-          description={$i18n.t(
-            isSpace ? 'room.cosmeticsMembersFontsSpace' : 'room.cosmeticsMembersFontsRoom'
-          )}
-        >
-          <Switch
-            checked={membersSetFonts}
-            disabled={saving !== null}
-            label={$i18n.t('room.cosmeticsMembersFonts')}
-            onCheckedChange={(allowed) => {
-              allowMembers(COSMETIC_EVENT_TYPES.font, allowed);
             }}
           />
         </SettingsRow>

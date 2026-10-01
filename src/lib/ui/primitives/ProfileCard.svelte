@@ -40,7 +40,6 @@
     presenceLabel?: string;
     nameColorLight?: string | null;
     nameColorDark?: string | null;
-    nameFont?: string | null;
     variant?: 'popover' | 'sheet';
     insetBody?: boolean;
     class?: ClassValue;
@@ -72,7 +71,6 @@
     presenceLabel = '',
     nameColorLight = null,
     nameColorDark = null,
-    nameFont = null,
     variant = 'popover',
     insetBody = false,
     class: className = '',
@@ -224,12 +222,7 @@
   <div class="profile-card-body">
     <div class="profile-card-identity">
       <div class="profile-card-heading">
-        <h2
-          id={nameId}
-          class="profile-card-name"
-          class:tinted={nameColor}
-          style:font-family={nameFont ?? undefined}
-        >
+        <h2 id={nameId} class="profile-card-name" class:tinted={nameColor}>
           {displayName}
         </h2>
         {#if pronouns}{@render pronouns()}{/if}

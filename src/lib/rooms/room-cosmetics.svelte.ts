@@ -5,12 +5,9 @@ import type { CoreEvent, PronounView, SenderCosmeticsView } from '#src/generated
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
-import { cosmeticFont } from './cosmetic-fonts';
-
 export interface SenderCosmetics {
   colorOnLight: string | null;
   colorOnDark: string | null;
-  font: string | null;
   pronouns: readonly PronounView[];
 }
 
@@ -75,7 +72,6 @@ export class RoomCosmetics {
     return {
       colorOnLight: colors ? found.color_on_light : null,
       colorOnDark: colors ? found.color_on_dark : null,
-      font: preferences.renderRoomFonts ? (cosmeticFont(found.font)?.family ?? null) : null,
       pronouns: found.pronouns,
     };
   }

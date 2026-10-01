@@ -1156,7 +1156,6 @@ export type SenderCosmeticsView = {
 	user_id: string,
 	color_on_light: string | null,
 	color_on_dark: string | null,
-	font: string | null,
 	pronouns: PronounView[],
 };
 

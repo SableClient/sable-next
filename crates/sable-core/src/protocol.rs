@@ -3004,7 +3004,6 @@ pub struct SenderCosmeticsView {
     pub user_id: OwnedUserId,
     pub color_on_light: Option<String>,
     pub color_on_dark: Option<String>,
-    pub font: Option<String>,
     pub pronouns: Vec<PronounView>,
 }
 

@@ -76,7 +76,6 @@ export interface Preferences {
   quickCss: string;
   underlineLinks: boolean;
   renderRoomColors: boolean;
-  renderRoomFonts: boolean;
   reducedMotion: boolean;
   pageZoom: number;
   textScale: number;
@@ -321,7 +320,6 @@ const DEFAULTS: Preferences = {
   quickCss: '',
   underlineLinks: true,
   renderRoomColors: true,
-  renderRoomFonts: true,
   reducedMotion: prefersReducedMotion(),
   pageZoom: 1,
   textScale: 1,

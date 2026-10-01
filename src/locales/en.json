@@ -582,7 +582,7 @@
     "settingsCosmetics": "Your look",
     "cosmeticsTitleRoom": "Your look in this room",
     "cosmeticsTitleSpace": "Your look in this space",
-    "cosmeticsHintRoom": "Overrides your profile here only. People who turned off room colours or fonts still see your profile.",
+    "cosmeticsHintRoom": "Overrides your profile here only.",
     "cosmeticsHintSpace": "Applies in every room of this space that has no look of its own.",
     "cosmeticsColorLight": "Name colour on light themes",
     "cosmeticsColorDark": "Name colour on dark themes",
@@ -602,9 +602,6 @@
     "cosmeticsMembersPronouns": "Pronouns",
     "cosmeticsMembersPronounsRoom": "Let everyone set pronouns for this room.",
     "cosmeticsMembersPronounsSpace": "Let everyone set pronouns for every room of this space.",
-    "cosmeticsMembersFonts": "Fonts",
-    "cosmeticsMembersFontsRoom": "Let everyone set a name font for this room.",
-    "cosmeticsMembersFontsSpace": "Let everyone set a name font for every room of this space.",
     "historyTitle": "Message history visibility",
     "historyHint": "Only future messages are affected. Existing history keeps its old visibility.",
     "encryptionTitle": "End-to-end encryption",
@@ -1922,9 +1919,7 @@
     "nameColorCorrectionWeak": "Weak",
     "nameColorCorrectionOff": "Off",
     "renderRoomColors": "Room and space name colours",
-    "renderRoomFontsHint": "Shows the name font people pick for a room or space, from a short list of safe fonts.",
     "renderRoomColorsHint": "Shows the name colour people set for a room or space, instead of their account colour.",
-    "renderRoomFonts": "Room and space name fonts",
     "accessibilityTitle": "Accessibility",
     "fontScale": "Text size",
     "fontScaleHint": "Scales text only. Spacing, icons and pictures keep their size.",
@@ -2779,17 +2774,9 @@
         "description": "Set your name colour in this room",
         "usage": "/color [light|dark] <#rrggbb|reset>"
       },
-      "font": {
-        "description": "Set your font in this room",
-        "usage": "/font <name|reset>"
-      },
       "scolor": {
         "description": "Set your name colour across this space",
         "usage": "/scolor [light|dark] <#rrggbb|reset>"
-      },
-      "sfont": {
-        "description": "Set your font across this space",
-        "usage": "/sfont <name|reset>"
       },
       "pronoun": {
         "description": "Set your pronouns in this room",

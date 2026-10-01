@@ -734,7 +734,6 @@
       cosmetics?.colorOnDark ??
       currentProfile?.name_color_dark ??
       roleTag?.color)}
-  nameFont={cosmetics?.font}
   meta={profileLoading ? metaPlaceholder : hasMeta ? metaRow : undefined}
   below={profileBelow}
   pronouns={pronounRow}

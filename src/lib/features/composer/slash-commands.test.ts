@@ -701,37 +701,26 @@ function member(userId: string, membership: MemberView['membership'] = 'join'): 
   };
 }
 
-test.each([
-  ['font', 'moe.sable.room.cosmetics.font', 'Courier New', { font: 'Courier New' }],
-  [
-    'pronoun',
+test('/pronoun sets and resets your room pronouns', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/pronoun they/them', context(commands));
+
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!room:example.org',
     'moe.sable.room.cosmetics.pronouns',
-    'they/them',
-    { pronouns: [{ summary: 'they/them' }] },
-  ],
-] as const)(
-  '/%s sets a cosmetic state event for yourself',
-  async (name, eventType, value, content) => {
-    const commands = fakeCommands();
+    '@me:example.org',
+    { pronouns: [{ summary: 'they/them' }] }
+  );
 
-    await runSlash(`/${name} ${value}`, context(commands));
-
-    expect(commands.sendStateEvent).toHaveBeenCalledWith(
-      '!room:example.org',
-      eventType,
-      '@me:example.org',
-      content
-    );
-
-    await runSlash(`/${name} reset`, context(commands));
-    expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
-      '!room:example.org',
-      eventType,
-      '@me:example.org',
-      {}
-    );
-  }
-);
+  await runSlash('/pronoun reset', context(commands));
+  expect(commands.sendStateEvent).toHaveBeenLastCalledWith(
+    '!room:example.org',
+    'moe.sable.room.cosmetics.pronouns',
+    '@me:example.org',
+    {}
+  );
+});
 
 test('/colour writes the room colour into your own m.room.member', async () => {
   const commands = fakeCommands();
@@ -851,43 +840,41 @@ test('/pronoun understands a language-tagged list', async () => {
   );
 });
 
-test.each([
-  ['sfont', 'moe.sable.room.cosmetics.font', 'Comic Sans', { font: 'Comic Sans' }],
-  [
-    'spronoun',
+test('/spronoun sets your pronouns on the parent space', async () => {
+  const commands = fakeCommands();
+
+  await runSlash('/spronoun she/her', context(commands));
+
+  expect(commands.roomStateEvents).toHaveBeenCalledWith('!room:example.org', 'm.space.parent');
+  expect(commands.sendStateEvent).toHaveBeenCalledWith(
+    '!space:example.org',
     'moe.sable.room.cosmetics.pronouns',
-    'she/her',
-    { pronouns: [{ summary: 'she/her' }] },
-  ],
-] as const)(
-  '/%s sets your own cosmetic on the parent space',
-  async (name, eventType, value, content) => {
-    const commands = fakeCommands();
+    '@me:example.org',
+    { pronouns: [{ summary: 'she/her' }] }
+  );
+});
 
-    await runSlash(`/${name} ${value}`, context(commands));
-
-    expect(commands.roomStateEvents).toHaveBeenCalledWith('!room:example.org', 'm.space.parent');
-    expect(commands.sendStateEvent).toHaveBeenCalledWith(
-      '!space:example.org',
-      eventType,
-      '@me:example.org',
-      content
-    );
-  }
-);
-
-test('/sfont falls back to the room when it has no parent space', async () => {
+test('/spronoun falls back to the room when it has no parent space', async () => {
   const commands = fakeCommands();
   commands.roomStateEvents.mockResolvedValueOnce([]);
 
-  await runSlash('/sfont Georgia', context(commands));
+  await runSlash('/spronoun they/them', context(commands));
 
   expect(commands.sendStateEvent).toHaveBeenCalledWith(
     '!room:example.org',
-    'moe.sable.room.cosmetics.font',
+    'moe.sable.room.cosmetics.pronouns',
     '@me:example.org',
-    { font: 'Georgia' }
+    { pronouns: [{ summary: 'they/them' }] }
   );
+});
+
+test.each(['font', 'sfont'])('/%s is no longer supported', async (name) => {
+  const commands = fakeCommands();
+
+  await expect(runSlash(`/${name} Georgia`, context(commands))).rejects.toMatchObject({
+    key: 'composer.slashUnknown',
+  });
+  expect(commands.sendStateEvent).not.toHaveBeenCalled();
 });
 
 test('/scolor writes the colour into your membership of the parent space', async () => {
