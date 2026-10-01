@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 
 import { activeMarks, formatCommands, formattingInputRules } from './formatting';
 import { composerSchema } from './schema';
+import { serializeComposer } from './serialize';
 
 let view: EditorView | undefined;
 
@@ -307,27 +308,25 @@ test('an address inside a code span is left alone', () => {
   expect(marksOn('https://example.org')).toEqual(['code']);
 });
 
-test('a fence opens a block when a space follows its language', () => {
+test('a fence language followed by a space stays literal', () => {
   open();
   type('```rust ');
 
   const block = view?.state.doc.firstChild;
-  expect(block?.type.name).toBe('code_block');
-  expect(block?.attrs.language).toBe('rust');
-  expect(block?.textContent).toBe('');
+  expect(block?.type.name).toBe('paragraph');
+  expect(block?.textContent).toBe('```rust ');
 });
 
-test('a bare fence opens a block when followed by a space', () => {
+test('a space after a bare fence stays literal', () => {
   open();
   type('``` ');
 
   const block = view?.state.doc.firstChild;
-  expect(block?.type.name).toBe('code_block');
-  expect(block?.attrs.language).toBe('');
-  expect(block?.textContent).toBe('');
+  expect(block?.type.name).toBe('paragraph');
+  expect(block?.textContent).toBe('``` ');
 });
 
-test('a fence stays text until enter or a following space opens it', () => {
+test('an unfinished fence stays literal', () => {
   open();
   type('```go');
 
@@ -335,11 +334,83 @@ test('a fence stays text until enter or a following space opens it', () => {
   expect(view?.state.doc.textContent).toBe('```go');
 });
 
-test('three dashes become a rule rather than a paragraph of dashes', () => {
+test('three dashes stay literal while typing', () => {
   open();
   type('---');
 
-  expect(view?.state.doc.firstChild?.type.name).toBe('horizontal_rule');
+  expect(view?.state.doc.textContent).toBe('---');
+});
+
+describe('typed Markdown', () => {
+  test.each([
+    ['***both***', '<strong><em>both</em></strong>'],
+    ['say ***both*** now', 'say <strong><em>both</em></strong> now'],
+    ['__bold__', '<strong>bold</strong>'],
+    ['**a*b**', '<strong>a*b</strong>'],
+    ['**a *b* c**', '<strong>a <em>b</em> c</strong>'],
+    ['**a `b` c**', '<strong>a </strong><code>b</code><strong> c</strong>'],
+    ['`a` **b**', '<code>a</code> <strong>b</strong>'],
+    ['**💜a*b**', '<strong>💜a*b</strong>'],
+    ['[label](https://example.org)', '<a href="https://example.org">label</a>'],
+    [
+      '[**label**](https://example.org)',
+      '<strong><a href="https://example.org">label</a></strong>',
+    ],
+    ['`code` next', '<code>code</code> next'],
+    ['``code ` tick`` next', '<code>code ` tick</code> next'],
+    ['```code `` tick``` next', '<code>code `` tick</code> next'],
+    ['` **literal** `', '<code>**literal**</code>'],
+    ['`` ` ``', '<code>`</code>'],
+    ['`a\\`', '<code>a\\</code>'],
+  ])('%s renders as Markdown', (source, html) => {
+    const editor = open();
+    type(source);
+    expect(serializeComposer(editor.state.doc).formatted).toBe(html);
+  });
+
+  test.each([
+    '\\*literal\\*',
+    '\\_literal\\_',
+    '\\||literal\\||',
+    '\\`literal\\`',
+    '---literal',
+    '***',
+    '``code`',
+    '`code``',
+    '[label](javascript:alert(1))',
+  ])('%s stays literal', (source) => {
+    const editor = open();
+    type(source);
+    expect(editor.state.doc.textContent).toBe(source);
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test('inline code preserves stored formatting', () => {
+    const editor = open();
+    editor.dispatch(editor.state.tr.addStoredMark(composerSchema.marks.strong.create()));
+    type('`code` next');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(
+      '<code>code</code><strong> next</strong>'
+    );
+  });
+
+  test('Markdown formatting preserves mentions', () => {
+    const editor = open();
+    const mention = composerSchema.nodes.mention.create({
+      userId: '@one:example.org',
+      name: 'One',
+    });
+    const tr = editor.state.tr.replaceWith(
+      0,
+      editor.state.doc.content.size,
+      composerSchema.nodes.paragraph.create(null, [composerSchema.text('**hello '), mention])
+    );
+    editor.dispatch(tr.setSelection(Selection.atEnd(tr.doc)));
+    type('**');
+    expect(editor.state.doc.firstChild?.lastChild?.type.name).toBe('mention');
+    expect(editor.state.doc.firstChild?.lastChild?.attrs.userId).toBe('@one:example.org');
+    expect(serializeComposer(editor.state.doc).mentions.userIds).toEqual(['@one:example.org']);
+  });
 });
 
 test.each(['2 * 3 * 4', 'a ** b ** c', 'x ~~ y ~~ z', 'p _ q _ r'])(

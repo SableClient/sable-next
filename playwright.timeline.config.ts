@@ -21,6 +21,7 @@ export default defineConfig({
     'composer-scheduling.spec.ts',
     'composer-autocomplete.spec.ts',
     'composer-paste.spec.ts',
+    'composer-markdown.spec.ts',
     'emote-board-glyphs.spec.ts',
     'account-mobile.spec.ts',
     'settings-size.spec.ts',

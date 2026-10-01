@@ -1,38 +1,139 @@
 import { lift, setBlockType, toggleMark } from 'prosemirror-commands';
-import { InputRule } from 'prosemirror-inputrules';
-import type { Attrs, Mark, MarkType, Node as ProseMirrorNode, NodeType } from 'prosemirror-model';
+import { InputRule, undoInputRule } from 'prosemirror-inputrules';
+import { diffChars } from 'diff';
+import {
+  Fragment,
+  type Attrs,
+  type Mark,
+  type MarkType,
+  type Node as ProseMirrorNode,
+  type NodeType,
+} from 'prosemirror-model';
 import { liftListItem, sinkListItem, splitListItem, wrapInList } from 'prosemirror-schema-list';
 import { TextSelection, type Command, type EditorState, type Transaction } from 'prosemirror-state';
 import { canJoin, findWrapping } from 'prosemirror-transform';
 import { wrapIn } from 'prosemirror-commands';
 
 import { composerSchema } from './schema';
-import { atomText } from './serialize';
+import { atomText, markdownSlice } from './serialize';
 
 const nodes = composerSchema.nodes;
 const marks = composerSchema.marks;
 
-function markRule(pattern: RegExp, type: MarkType): InputRule {
-  /* `inCodeMark` defaults to true, so without this every rule still fires
-     inside an inline code span. `MarkSpec.code` is what it keys off. */
-  return new InputRule(
-    pattern,
-    (state, match, start, end) => {
-      const text = match[1];
-      if (text === '') return null;
+function escaped(text: string, index: number): boolean {
+  let slashes = 0;
+  while (index > 0 && text[--index] === '\\') slashes++;
+  return slashes % 2 === 1;
+}
 
-      /* Cut the delimiters rather than rebuilding the range as fresh text, or
-         the marks already inside it are lost: `**a ~~b~~ c**` drops the strike.
-         The closing delimiter is only partly in the document — the character
-         that triggered the rule has not been inserted yet. */
-      const delimiter = (match[0].length - text.length) / 2;
-      const tr = state.tr
-        .delete(start + delimiter + text.length, end)
-        .delete(start, start + delimiter);
-      return tr.addMark(start, start + text.length, type.create()).removeStoredMark(type);
-    },
-    { inCodeMark: false }
-  );
+function inlineMarkdownRule(): InputRule {
+  const delimiterMarks: Record<string, MarkType> = {
+    ')': marks.link,
+    '`': marks.code,
+    '~': marks.strike,
+    '|': marks.spoiler,
+  };
+  return new InputRule(/[\s\S]*[*_~|`)]$/, (state, match, start, end) => {
+    const stored = state.storedMarks ?? state.selection.$from.marks();
+    if (stored.some((mark) => mark.type === marks.code)) return null;
+    const source = match[0];
+    if (
+      source.length > end - start &&
+      source.endsWith('`') &&
+      marks.code.isInSet(state.selection.$from.nodeBefore?.marks ?? [])
+    ) {
+      let reverted: Transaction | undefined;
+      undoInputRule(state, (tr) => {
+        reverted = tr;
+      });
+      if (
+        reverted &&
+        reverted.doc.textBetween(reverted.selection.from - 1, reverted.selection.from) === '`'
+      ) {
+        return reverted.insertText('`');
+      }
+    }
+    const closing = /(?:\*+|_+|~+|\|+|`+|\))$/.exec(source)?.[0];
+    if (!closing) return null;
+    const code = closing[0] === '`';
+    if (!code && escaped(source, source.length - closing.length)) return null;
+    const runs = Array.from(source.matchAll(/\*+|_+|~+|\|+|`+|\[/g)).filter(
+      (run) =>
+        !escaped(source, run.index) &&
+        !state.doc.rangeHasMark(
+          start + run.index,
+          Math.min(end, start + run.index + run[0].length),
+          marks.code
+        )
+    );
+
+    for (const [index, run] of runs.entries()) {
+      const delimiter = run[0];
+      if (run.index + delimiter.length >= source.length) continue;
+      if (delimiter !== (closing === ')' ? '[' : closing)) continue;
+      const prefix = runs.slice(0, index);
+      if (!code && prefix.some((prior) => prior[0][0] === '`')) continue;
+      if (
+        prefix.some((prior) => prior[0][0] === delimiter[0] && prior[0].length > delimiter.length)
+      )
+        continue;
+      if (delimiter[0] === '_' && /[\p{L}\p{N}_]/u.test(source[run.index - 1] ?? '')) continue;
+
+      const raw = source.slice(run.index);
+      const parsed = markdownSlice(raw);
+      const first = parsed.content.firstChild;
+      const expected =
+        delimiterMarks[closing[0]] ?? (delimiter.length === 1 ? marks.em : marks.strong);
+      if (
+        !first?.isInline ||
+        parsed.content.content.some(
+          (node) => !expected.isInSet(node.marks) && !marks.code.isInSet(node.marks)
+        )
+      )
+        continue;
+
+      const from = start + run.index;
+      const text = parsed.content.textBetween(0, parsed.content.size, '', LINE_BREAK);
+      const positions: (number | null)[] = [];
+      let offset = 0;
+      for (const change of diffChars(raw, text)) {
+        if (!change.removed) {
+          for (let i = 0; i < change.value.length; i++) {
+            positions.push(change.added ? null : from + offset + i);
+          }
+        }
+        if (!change.added) offset += change.value.length;
+      }
+      const content: ProseMirrorNode[] = [];
+      let position = 0;
+      parsed.content.forEach((node) => {
+        if (!node.isText) {
+          content.push(node);
+          position++;
+          return;
+        }
+        for (const char of node.text ?? '') {
+          const originalPosition = positions[position] ?? null;
+          const original =
+            originalPosition !== null && originalPosition < end
+              ? state.doc.nodeAt(originalPosition)
+              : null;
+          const combined = (original?.marks ?? stored).reduce(
+            (set, mark) => mark.addToSet(set),
+            node.marks
+          );
+          content.push(
+            char === LINE_BREAK && original?.isInline && !original.isText
+              ? original.mark(combined)
+              : composerSchema.text(char, combined)
+          );
+          position += char.length;
+        }
+      });
+      return state.tr.replaceWith(from, end, Fragment.fromArray(content)).setStoredMarks(stored);
+    }
+    return null;
+  });
 }
 
 const URL_PATTERN =
@@ -124,12 +225,7 @@ function lineWrappingRule(
 }
 
 export const formattingInputRules: readonly InputRule[] = [
-  markRule(/\*\*([^*\s](?:[^*]*[^*\s])?)\*\*$/, marks.strong),
-  markRule(/(?<!\*)\*([^*\s](?:[^*]*[^*\s])?)\*$/, marks.em),
-  markRule(/(?<![\p{L}\p{N}_])_([^_\s](?:[^_]*[^_\s])?)_$/u, marks.em),
-  markRule(/~~([^~\s](?:[^~]*[^~\s])?)~~$/, marks.strike),
-  markRule(/\|\|([^|\s](?:[^|]*[^|\s])?)\|\|$/, marks.spoiler),
-  markRule(/`([^`]+)`$/, marks.code),
+  inlineMarkdownRule(),
   lineTextblockRule(/(?:^|\uFFFC)(#{1,3})\s$/, nodes.heading, (match) => ({
     level: match[1].length,
   })),
@@ -142,13 +238,6 @@ export const formattingInputRules: readonly InputRule[] = [
     (match) => ({ order: Number(match[1]) }),
     (match, node) => node.childCount + (node.attrs.order as number) === Number(match[1])
   ),
-  lineTextblockRule(/(?:^|\uFFFC)```([^`\s]*) $/, nodes.code_block, (match) => ({
-    language: match[1],
-  })),
-  lineRule(/(?:^|\uFFFC)(?:---|\*\*\*|___)$/, (tr, _match, start, end) => {
-    tr.replaceRangeWith(start, end, nodes.horizontal_rule.create()).scrollIntoView();
-    return true;
-  }),
   autolinkRule(),
 ];
 

@@ -78,14 +78,13 @@ test('an autolink keeps the space that is already in the document', () => {
   expect(linkOn('https://example.org')).toBe('https://example.org');
 });
 
-test('a fence opens after composition when a space follows its language', () => {
+test('a composed fence stays literal', () => {
   open();
   commit('```rust ');
 
   const block = editor().state.doc.firstChild;
-  expect(block?.type.name).toBe('code_block');
-  expect(block?.attrs.language).toBe('rust');
-  expect(block?.textContent).toBe('');
+  expect(block?.type.name).toBe('paragraph');
+  expect(block?.textContent).toBe('```rust ');
 });
 
 test('the flush is read once, so the next edit runs no rule', () => {
@@ -103,7 +102,7 @@ test('an edit with no composition before it runs no rule', () => {
   expect(editor().state.doc.textContent).toBe('~~b~~');
 });
 
-test('a fence composed on a soft line below other text opens a block after it', () => {
+test('a composed fence preserves the soft line', () => {
   open();
   editor().dispatch(
     editor().state.tr.insertText('look:').insert(6, composerSchema.nodes.hard_break.create())
@@ -111,10 +110,9 @@ test('a fence composed on a soft line below other text opens a block after it', 
   commit('```rust ');
 
   const doc = editor().state.doc;
-  expect(doc.childCount).toBe(2);
-  expect(doc.firstChild?.textContent).toBe('look:');
-  expect(doc.child(1).type.name).toBe('code_block');
-  expect(doc.child(1).attrs.language).toBe('rust');
+  expect(doc.childCount).toBe(1);
+  expect(doc.firstChild?.textContent).toBe('look:```rust ');
+  expect(doc.firstChild?.child(1).type.name).toBe('hard_break');
 });
 
 test('a bullet composed on a soft line makes a list after the text', () => {
