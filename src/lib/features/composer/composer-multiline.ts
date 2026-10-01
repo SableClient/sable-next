@@ -70,7 +70,7 @@ export function isMultiline({
   if (text.length === 0) return false;
 
   const width = inlineTextWidth(row, editable, before, after);
-  if (width <= 0) return false;
+  if (width <= 0) return row.clientWidth > 0;
 
   const style = getComputedStyle(editable);
   const copied = COPIED_PROPERTIES.map((property) => style[property]);

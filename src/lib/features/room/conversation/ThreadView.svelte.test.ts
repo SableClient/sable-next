@@ -18,7 +18,7 @@ vi.mock('../messages/event-items.svelte.js', () => ({
 
 import { core } from '#lib/core/__mocks__/context.js';
 
-import ThreadPanelHarness from './ThreadPanelHarness.test.svelte';
+import ThreadViewHarness from './ThreadViewHarness.test.svelte';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -72,7 +72,7 @@ test('an image in a thread opens the viewer on that image', async () => {
   });
   vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
   const user = userEvent.setup();
-  render(ThreadPanelHarness, {
+  render(ThreadViewHarness, {
     panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
   });
 
@@ -82,4 +82,52 @@ test('an image in a thread opens the viewer on that image', async () => {
   expect(viewer).toHaveTextContent('Alice');
   expect(viewer).toHaveTextContent('2 of 2');
   expect(core.fetchMedia).toHaveBeenCalledWith('mxc://example.org/second.png', 0, 0);
+});
+
+test('the header keeps a spoiler-safe topic visible', async () => {
+  const root = image('$root', 'first.png');
+  root.content = {
+    kind: 'message',
+    body: 'Release secret',
+    html: 'Release <span data-mx-spoiler>secret</span>',
+    emote: false,
+    notice: false,
+    edited: false,
+  };
+  vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (this: RoomTimeline) {
+    this.items = [root];
+    this.hasSnapshot = true;
+    return Promise.resolve();
+  });
+  vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+  render(ThreadViewHarness, {
+    panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
+  });
+  expect(await screen.findByRole('heading', { name: 'Release [Spoiler]' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Back to conversation' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Jump to original message' })).toBeVisible();
+});
+
+test('a failed subscription can be retried without replacing the composer', async () => {
+  let attempts = 0;
+  const start = vi.spyOn(RoomTimeline.prototype, 'startThread').mockImplementation(function (
+    this: RoomTimeline
+  ) {
+    this.mode = { kind: 'thread', rootEventId: '$root' };
+    attempts += 1;
+    this.error = attempts === 1 ? 'load_failed' : null;
+    this.hasSnapshot = attempts > 1;
+    if (attempts > 1) this.items = [image('$root', 'first.png')];
+    return Promise.resolve();
+  });
+  vi.spyOn(RoomTimeline.prototype, 'stop').mockResolvedValue();
+  const user = userEvent.setup();
+  const { container } = render(ThreadViewHarness, {
+    panel: { roomId: '!room:example.org', rootEventId: '$root', onClose: () => {} },
+  });
+  const composer = container.querySelector('.thread-composer');
+  await user.click(await screen.findByRole('button', { name: 'Try again' }));
+  expect(start).toHaveBeenCalledTimes(2);
+  expect(await screen.findByRole('heading', { name: 'first.png' })).toBeVisible();
+  expect(container.querySelector('.thread-composer')).toBe(composer);
 });

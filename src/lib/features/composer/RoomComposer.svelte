@@ -1639,6 +1639,16 @@
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
 
+  @media (width < 48rem), (pointer: coarse) {
+    .composer-stack {
+      --target: var(--control-height-touch);
+    }
+
+    .composer-stack :global(.icon-button-small) {
+      --button-height: var(--target);
+    }
+  }
+
   @media (width >= 32rem) {
     .composer-stack {
       --composer-gutter: var(--page-gutter);

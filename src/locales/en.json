@@ -781,6 +781,11 @@
     "flag": "Flags"
   },
   "timeline": {
+    "backToConversation": "Back to conversation",
+    "jumpToOriginal": "Jump to original message",
+    "originalMessage": "Original message",
+    "retryLoad": "Try again",
+    "resizeThread": "Resize thread",
     "label": "Timeline",
     "eventTimeline": "Event timeline",
     "back": "Back to rooms",
@@ -1439,6 +1444,10 @@
     "showOptions": "Show options"
   },
   "settings": {
+    "threadPresentation": "Threads and discussions",
+    "threadPresentationHint": "Choose how threads and forum discussions open on desktop. Small screens use the full conversation view.",
+    "threadPresentationTimeline": "Full conversation",
+    "threadPresentationPanel": "Side panel",
     "title": "Settings",
     "dialogDescription": "Choose a settings section.",
     "sections": "Settings sections",
@@ -3310,6 +3319,7 @@
     }
   },
   "forum": {
+    "backToForum": "Back to forum",
     "deleteThread": "Delete thread",
     "deleteThreadExplain": "This deletes all messages in this thread.",
     "deleteThreadTitle": "Delete thread?",

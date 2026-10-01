@@ -11,6 +11,7 @@ import { readV1Preferences } from '#lib/migrations/v1/preferences.js';
 
 export type { BadgeNotificationMode };
 
+export type ThreadPresentation = 'timeline' | 'panel';
 export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
@@ -66,6 +67,7 @@ export const COMPOSER_BUTTONS = [
 export interface Preferences {
   language: string;
   layout: TimelineLayout;
+  threadPresentation: ThreadPresentation;
   alignOwnMessages: boolean;
   messageSpacing: MessageSpacing;
   timelineEmoteSize: TimelineEmoteSize;
@@ -249,6 +251,7 @@ type EnumPreference = Exclude<
 const ENUMS = {
   language: languageValues,
   layout: ['modern', 'compact', 'bubble'],
+  threadPresentation: ['timeline', 'panel'],
   messageSpacing: ['compact', 'cozy', 'roomy'],
   timelineEmoteSize: ['default', '20', '24', '32', '48', '64'],
   theme: ['system', 'dark', 'light'],
@@ -309,6 +312,7 @@ export type RangePreference = keyof typeof PREFERENCE_RANGES;
 const DEFAULTS: Preferences = {
   language: SYSTEM_LANGUAGE,
   layout: 'modern',
+  threadPresentation: 'timeline',
   alignOwnMessages: true,
   messageSpacing: 'cozy',
   timelineEmoteSize: 'default',

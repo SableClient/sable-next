@@ -21,6 +21,7 @@ export const NON_SYNCABLE_KEYS = new Set<keyof Preferences>([
   'audioOutputDevice',
   'videoInputDevice',
   'layout',
+  'threadPresentation',
   'messageSpacing',
   'mediaAutoLoad',
   'callRingtoneVolume',

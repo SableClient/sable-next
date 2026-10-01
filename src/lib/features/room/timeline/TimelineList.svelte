@@ -78,6 +78,8 @@
     onLanded?: () => void;
     onRequestHistory: () => Promise<boolean>;
     onRequestFuture: () => Promise<void>;
+    onRetryLoad?: () => Promise<void>;
+    threadRootId?: string | null;
     onRead: (eventId: string) => Promise<void>;
     hasUnread?: boolean;
     onLoadReadMarker?: () => Promise<string | null>;
@@ -106,6 +108,7 @@
     canRedactOthers?: boolean;
     canPin?: boolean;
     encrypted?: boolean | null;
+    active?: boolean;
     scrollLocked?: boolean;
     nearLatest?: boolean;
     followingLive?: boolean;
@@ -123,6 +126,8 @@
     onLanded,
     onRequestHistory,
     onRequestFuture,
+    onRetryLoad,
+    threadRootId = null,
     onRead,
     hasUnread = false,
     onLoadReadMarker,
@@ -154,6 +159,7 @@
     canRedactOthers = false,
     canPin = true,
     encrypted = null,
+    active = true,
     scrollLocked = false,
     nearLatest = $bindable(true),
     /* eslint-disable-next-line no-useless-assignment */
@@ -203,7 +209,11 @@
     const units = groupMemberEvents(visibleItems);
     const unitItems = units.map((unit) => unit.item);
     return units.map(({ item, index: source, group }, index) => {
-      const collapsed = isCollapsed(unitItems, index, preferences.replyPreviewStyle);
+      const collapsed =
+        !(
+          threadRootId &&
+          (item.event_id === threadRootId || unitItems[index - 1]?.event_id === threadRootId)
+        ) && isCollapsed(unitItems, index, preferences.replyPreviewStyle);
       return {
         key: identity.key(visibleItems, source),
         value: {
@@ -306,7 +316,7 @@
   });
   $effect(() => {
     unread.resolve(timeline.items, oldestUnreadLoaded, eventItems);
-    if (revealed && unreadInView && document.visibilityState === 'visible') {
+    if (active && revealed && unreadInView && document.visibilityState === 'visible') {
       unread.observe(unread.firstEventId);
     }
   });
@@ -811,6 +821,13 @@
     unreadNavigation?.abort();
     unread.dismiss();
   }
+  export function jumpToEvent(eventId: string): void {
+    const key = entryFor(eventId)?.key;
+    if (!key || !controller) return;
+    focus.cancel();
+    void controller.jumpTo(key, 'start', !shouldReduceMotion());
+  }
+
   export function stepReply(direction: ReplyDirection): string | null {
     const target = replyTarget(eventItems, replyEventId, direction, preferences.showHiddenEvents);
     const key = entryFor(target)?.key;
@@ -845,7 +862,7 @@
 <TimelineReadReceipt
   {timeline}
   visibleEventId={readEventId}
-  enabled={!unread.blocking && !markingRead && !timeline.resumingLive}
+  enabled={active && !unread.blocking && !markingRead && !timeline.resumingLive}
   atLatest={windowState.pinned && timeline.forwardPagination === 'end'}
   onRead={markRead}
 />
@@ -969,6 +986,9 @@
                 data-index={row.index}
                 data-timeline-key={row.key}
               >
+                {#if threadRootId && item.event_id === threadRootId}
+                  <p class="thread-original">{$i18n.t('timeline.originalMessage')}</p>
+                {/if}
                 {#if timelineStart && item.content.kind === 'timeline_start'}
                   {@render timelineStart()}
                 {:else if group}
@@ -1036,7 +1056,13 @@
         {/snippet}
       </EmptyState>
     {:else if emptyFailure}
-      <EmptyState class="timeline-empty" title={$i18n.t('timeline.loadFailed')} />
+      <EmptyState class="timeline-empty" title={$i18n.t('timeline.loadFailed')}>
+        {#snippet actions()}
+          {#if onRetryLoad}
+            <Button onclick={() => void onRetryLoad?.()}>{$i18n.t('timeline.retryLoad')}</Button>
+          {/if}
+        {/snippet}
+      </EmptyState>
     {:else if visibleItems.length === 0}
       <EmptyState
         class="timeline-empty"
@@ -1073,6 +1099,12 @@
 </div>
 
 <style>
+  .thread-original {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: var(--space-200) var(--page-gutter) var(--space-100);
+  }
+
   :global(.timeline-error) {
     flex: 0 0 auto;
     font-size: var(--font-size-small);

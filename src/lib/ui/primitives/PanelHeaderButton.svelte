@@ -27,3 +27,11 @@
 >
   {@render children?.()}
 </IconButton>
+
+<style>
+  @media (width < 48rem), (pointer: coarse) {
+    :global(.panel-header-button) {
+      --button-height: var(--control-height-touch);
+    }
+  }
+</style>

@@ -422,6 +422,18 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'threadPresentation',
+        section: 'message-layout',
+        icon: LayoutIcon,
+        name: 'settings.threadPresentation',
+        description: 'settings.threadPresentationHint',
+        type: 'select',
+        options: [
+          { value: 'timeline', label: 'settings.threadPresentationTimeline' },
+          { value: 'panel', label: 'settings.threadPresentationPanel' },
+        ],
+      },
+      {
         key: 'alignOwnMessages',
         section: 'message-layout',
         icon: LayoutIcon,

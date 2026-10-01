@@ -330,6 +330,7 @@ html {
   --shadow-inset: inset 0 1px 3px var(--shadow-color);
   --shadow-float: var(--shadow-e300);
   --shadow-dialog: var(--shadow-e400);
+  --control-height-touch: 2.75rem;
   --control-height-300: 2rem;
   --control-height-400: 2.5rem;
   --control-height-500: 3rem;

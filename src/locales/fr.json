@@ -686,6 +686,11 @@
     "flag": "Drapeaux"
   },
   "timeline": {
+    "backToConversation": "Retour à la conversation",
+    "jumpToOriginal": "Aller au message d’origine",
+    "originalMessage": "Message d’origine",
+    "retryLoad": "Réessayer",
+    "resizeThread": "Redimensionner le fil",
     "label": "Fil de discussion",
     "back": "Retour aux salons",
     "loading": "Chargement des messages…",
@@ -1156,6 +1161,10 @@
     "showOptions": "Afficher les options"
   },
   "settings": {
+    "threadPresentation": "Fils et discussions",
+    "threadPresentationHint": "Choisissez comment ouvrir les fils et les discussions du forum sur ordinateur. Les petits écrans affichent la conversation entière.",
+    "threadPresentationTimeline": "Conversation entière",
+    "threadPresentationPanel": "Panneau latéral",
     "title": "Paramètres",
     "dialogDescription": "Choisissez une section de paramètres.",
     "sections": "Sections des paramètres",
@@ -2665,6 +2674,7 @@
     }
   },
   "forum": {
+    "backToForum": "Retour au forum",
     "deleteThread": "Supprimer le fil",
     "deleteThreadExplain": "Cette action supprime tous les messages de ce fil.",
     "deleteThreadTitle": "Supprimer le fil ?",

@@ -20,6 +20,7 @@ import type {
 export type RoomCoreMode =
   | 'ready'
   | 'thread_links'
+  | 'thread_error'
   | 'loading'
   | 'error'
   | 'delayed_history'
@@ -38,6 +39,7 @@ export type RoomCoreMode =
   | 'tombstoned'
   | 'voice'
   | 'calendar'
+  | 'forum'
   | 'unverified'
   | 'onboarding';
 
@@ -141,7 +143,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       is_tombstoned: false,
       is_voice: false,
       call_participants: [],
-      room_type: workerMode === 'calendar' ? 'chat.commet.calendar' : null,
+      room_type:
+        workerMode === 'calendar'
+          ? 'chat.commet.calendar'
+          : workerMode === 'forum'
+            ? 'pl.chrome.forum'
+            : null,
       supports_knock: false,
       supports_restricted: false,
       supports_knock_restricted: false,
@@ -791,6 +798,13 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       }),
       subscribe_timeline: (command) => {
         window.__e2eTimelineFocus.push(command.focus);
+        if (
+          workerMode === 'thread_error' &&
+          command.focus.kind === 'thread' &&
+          window.__e2eTimelineFocus.filter((focus) => focus.kind === 'thread').length === 1
+        ) {
+          throw new FakeCoreError('load_failed');
+        }
         if (workerMode === 'unread_context_error' && command.focus.kind === 'event') {
           throw new FakeCoreError('load_failed');
         }

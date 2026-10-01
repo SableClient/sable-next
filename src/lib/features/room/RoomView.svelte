@@ -34,7 +34,7 @@
   import { Conversation } from './conversation/conversation.svelte.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
-  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
+  import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
   import WidgetsPanel from '#lib/features/widgets/WidgetsPanel.svelte';
   import { copyRoomLink, roomSectionPath } from '#lib/rooms/permalink.js';
   import {
@@ -79,7 +79,7 @@
   import ThreadList from './conversation/ThreadList.svelte';
   import RoomAttachments from './media/RoomAttachments.svelte';
   import RoomSearchPanel from './RoomSearchPanel.svelte';
-  import ThreadPanel from './conversation/ThreadPanel.svelte';
+  import ThreadView from './conversation/ThreadView.svelte';
   import MentionProfile from './members/MentionProfile.svelte';
   import RoomHeader from './RoomHeader.svelte';
   import { openSettingsOver } from '#lib/features/settings/settings-navigation.js';
@@ -250,6 +250,8 @@
       composerClearance.px = 0;
     };
   }
+
+  holdOverlayBack(() => panels.threadRootId !== null, closeThread);
 
   function closeThread(): void {
     panels.threadRootId = null;
@@ -460,6 +462,7 @@
   let pinsOpen = $state(false);
   let pinsUnread = $state(0);
   let desktop = $derived(sidePanels.matches);
+  let threadInPanel = $derived(desktop && preferences.threadPresentation === 'panel');
   let voiceView = $derived(isVoiceRoom && (!voiceChat.open || desktop));
   let voiceChatBeside = $derived(isVoiceRoom && voiceChat.open && desktop);
   let typingUserIds = $derived(roomList.typingUserIds(resolvedRoomId));
@@ -889,6 +892,7 @@
       bind:this={timelineList}
       replyEventId={conversation.context?.kind === 'reply' ? conversation.context.eventId : null}
       {timeline}
+      active={panels.threadRootId === null || threadInPanel}
       focusEventId={timelineEventId}
       {landingEventId}
       onLanded={landed}
@@ -997,7 +1001,12 @@
   aria-label={$i18n.t('timeline.label')}
   data-inset-owner={voiceView ? 'top' : 'top bottom'}
 >
-  <div class="timeline" {@attach trackTimelineHeight}>
+  <div
+    class="timeline"
+    class:thread-covered={panels.threadRootId !== null && !threadInPanel}
+    inert={panels.threadRootId !== null && !threadInPanel}
+    {@attach trackTimelineHeight}
+  >
     {#snippet headerActions()}
       {#if !voiceView}
         <PanelHeaderButton
@@ -1134,8 +1143,37 @@
     {/if}
   </div>
 
+  {#if panels.threadRootId !== null}
+    {#key panels.threadRootId}
+      <ThreadView
+        roomId={resolvedRoomId}
+        rootEventId={panels.threadRootId}
+        focusEventId={threadEventId}
+        sidePanel={threadInPanel}
+        rootMessage={timeline.items.find((item) => item.event_id === panels.threadRootId)}
+        {roomName}
+        members={memberLoader.members}
+        readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
+        canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
+        canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
+        canReact={roomSession.permissions?.can_react ?? true}
+        canPin={roomSession.permissions?.can_pin ?? false}
+        encrypted={resolvedRoom?.encrypted ?? null}
+        onClose={closeThread}
+        onSenderProfile={openProfile}
+        onCopyLink={copyEventLink}
+      />
+    {/key}
+  {/if}
+
   {#if voiceChatBeside}
-    <aside class="voice-chat" style:width="{voiceChatWidth}px" aria-label={$i18n.t('call.chat')}>
+    <aside
+      class:thread-covered={panels.threadRootId !== null && !threadInPanel}
+      inert={panels.threadRootId !== null && !threadInPanel}
+      class="voice-chat"
+      style:width="{voiceChatWidth}px"
+      aria-label={$i18n.t('call.chat')}
+    >
       <ResizeHandle
         value={voiceChatWidth}
         min={VOICE_CHAT_MIN_WIDTH}
@@ -1193,26 +1231,6 @@
   {/if}
 
   {#if desktop}
-    {#if panels.threadRootId !== null}
-      {#key panels.threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={panels.threadRootId}
-          focusEventId={threadEventId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
-          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-          canReact={roomSession.permissions?.can_react ?? true}
-          canPin={roomSession.permissions?.can_pin ?? false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          onClose={closeThread}
-          onSenderProfile={openProfile}
-          onCopyLink={copyEventLink}
-        />
-      {/key}
-    {/if}
     {#if panels.desktopMembersOpen}
       <MembersDrawer
         members={memberLoader.members}
@@ -1249,30 +1267,6 @@
         onMemberProfile={openProfile}
       />
     </DialogFrame>
-  {/if}
-
-  {#if !desktop}
-    {#if panels.threadRootId !== null}
-      {#key panels.threadRootId}
-        <ThreadPanel
-          roomId={resolvedRoomId}
-          rootEventId={panels.threadRootId}
-          focusEventId={threadEventId}
-          {roomName}
-          members={memberLoader.members}
-          readOnly={roomSession.permissions ? !roomSession.permissions.can_post : false}
-          canRedactOwn={roomSession.permissions?.can_redact_own ?? true}
-          canRedactOthers={roomSession.permissions?.can_redact_others ?? false}
-          canReact={roomSession.permissions?.can_react ?? true}
-          canPin={roomSession.permissions?.can_pin ?? false}
-          encrypted={resolvedRoom?.encrypted ?? null}
-          modal
-          onClose={closeThread}
-          onSenderProfile={openProfile}
-          onCopyLink={copyEventLink}
-        />
-      {/key}
-    {/if}
   {/if}
 
   {#if !desktop}
@@ -1416,6 +1410,14 @@
     min-height: 0;
     min-width: 0;
     position: relative;
+  }
+
+  .timeline.thread-covered,
+  .voice-chat.thread-covered {
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
   }
 
   .call-stage {

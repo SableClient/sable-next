@@ -4,10 +4,10 @@
   import { Bookmarks, provideBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
   import { PinnedEvents, providePinnedEvents } from '../timeline/pinned-events.svelte.js';
-  import ThreadPanel from './ThreadPanel.svelte';
+  import ThreadView from './ThreadView.svelte';
 
   interface Props {
-    panel: ComponentProps<typeof ThreadPanel>;
+    panel: ComponentProps<typeof ThreadView>;
   }
 
   let { panel }: Props = $props();
@@ -27,5 +27,5 @@
 </script>
 
 <TooltipProvider>
-  <ThreadPanel {...panel} />
+  <ThreadView {...panel} />
 </TooltipProvider>

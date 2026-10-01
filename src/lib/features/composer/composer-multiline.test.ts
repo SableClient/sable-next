@@ -106,3 +106,7 @@ test('the single-line height is measured again after the style changes', () => {
   expect(lineMeasures()).toBe(2);
   expect(elements.measurer.style.lineHeight).toBe('40px');
 });
+
+test('controls that leave no room for text move below it', () => {
+  expect(measure('Draft', harness(300, 160))).toBe(true);
+});
