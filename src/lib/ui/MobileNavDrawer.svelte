@@ -3,8 +3,12 @@
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
+  import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
+  import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
   import SidebarNav from '#lib/features/sidebar/SidebarNav.svelte';
   import UserQuickTools from '#lib/features/sidebar/UserQuickTools.svelte';
+  import { providePageMeta } from '#lib/core/page-meta.js';
   import {
     finishSwipeGesture,
     startSwipeGesture,
@@ -13,6 +17,7 @@
   } from './swipe-gesture';
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
+  import { backToRoomList } from '#lib/features/room/room-navigation.js';
 
   interface Props {
     children: Snippet;
@@ -33,17 +38,31 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
   const BLANK_INDEX_PATHS = new Set(['/home', '/rooms']);
+  /** Routes on which the mobile quick tools bar should be shown; this should
+      match all routes linked from the mobile toolbar except for the root. */
+  const MOBILE_QUICK_TOOLS_PATHS = new Set(['/navigate', '/inbox', '/profile']);
   let pathname = $derived(page.url.pathname);
   let settledPath = $state(page.url.pathname);
   let routeChanging = $derived(pathname !== settledPath && page.params.roomId === undefined);
-  let showMobileQuickTools = $derived(page.params.roomId === undefined);
   let spaceIndex = $derived(/^\/space\/[^/]+$/.test(pathname));
   let defaultOpen = $derived(LIST_INDEX_PATHS.has(pathname) || spaceIndex);
   let pinnedOpen = $derived(BLANK_INDEX_PATHS.has(pathname) || spaceIndex);
-  let open = $derived(
-    pinnedOpen ||
-      (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
+  let pinnedClosed = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
+  let showMobileQuickTools = $derived(MOBILE_QUICK_TOOLS_PATHS.has(pathname));
+  let showMobileBackBar = $derived(
+    !appLayout.matches && !pinnedOpen && !showMobileQuickTools && page.params.roomId === undefined
   );
+  let open = $derived(
+    pinnedClosed
+      ? false
+      : pinnedOpen ||
+          (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
+  );
+  const pageMeta = $state({
+    title: '',
+  });
+  providePageMeta(pageMeta);
+  let pageTitle = $derived(pageMeta.title);
 
   // Navigating out from under a drag would otherwise leave the track pinned at
   // the gesture's last offset.
@@ -109,6 +128,9 @@
 
     const swipe = startSwipeGesture(event, open ? 0 : -width);
     if (!swipe) return;
+
+    if (pinnedClosed) return;
+
     gesture = { ...swipe, width };
   }
 
@@ -217,10 +239,23 @@
       class:with-quick-tools={showMobileQuickTools}
       inert={open && !appLayout.matches}
     >
+      {#if showMobileBackBar}
+        <PanelHeader class="mobile-back-bar" title={pageTitle}>
+          {#snippet prefix()}
+            <PanelHeaderButton
+              class="back-button"
+              label={$i18n.t('timeline.back')}
+              onclick={backToRoomList}
+            >
+              <BackIcon />
+            </PanelHeaderButton>
+          {/snippet}
+        </PanelHeader>
+      {/if}
       <div id="main-content" class="content" tabindex="-1">
         {@render children()}
       </div>
-      {#if showMobileQuickTools}
+      {#if !appLayout.matches}
         <div class="mobile-quick-tools"><UserQuickTools mobile /></div>
       {/if}
     </section>
@@ -275,8 +310,24 @@
     overflow: hidden;
   }
 
+  /* Note that visibility+height is used here deliberately instead of
+     display: none; otherwise the animation when clicking toolbar buttons
+     doesn't work when switching from /rooms (sidebar) to other pages
+     (drawer content). */
   .mobile-quick-tools {
     flex: 0 0 auto;
+    height: 0;
+    visibility: collapse;
+  }
+
+  .content-panel.with-quick-tools .mobile-quick-tools {
+    height: auto;
+    visibility: visible;
+  }
+
+  .content-panel:not(.with-quick-tools) :global(.app-page-shell .app-page-header h1) {
+    height: 0;
+    visibility: collapse;
   }
 
   @media (width < 48rem) {
