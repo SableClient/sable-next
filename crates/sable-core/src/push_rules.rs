@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use base64::Engine as _;
 use matrix_sdk::Client;
 use matrix_sdk::event_handler::EventHandlerDropGuard;
 use matrix_sdk::ruma::api::client::push::{
@@ -660,13 +661,16 @@ const fn mode_rank(mode: MentionNotificationModeView) -> u8 {
     }
 }
 
-fn keyword_rule_id(keyword: &str) -> String {
-    let id = keyword.replace(['/', '\\'], "_");
-    if id.starts_with('.') {
-        format!("keyword{id}")
-    } else {
-        id
+fn keyword_rule_id(rules: &Ruleset, keyword: &str) -> String {
+    let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(keyword);
+    let base = format!("moe.sable.keyword.{encoded}");
+    let mut id = base.clone();
+    let mut suffix = 1_u64;
+    while rules.content.iter().any(|rule| rule.rule_id == id) {
+        id = format!("{base}.{suffix}");
+        suffix += 1;
     }
+    id
 }
 
 /// # Errors
@@ -684,7 +688,7 @@ pub fn plan_add_keyword(rules: &Ruleset, keyword: &str) -> Result<Vec<RuleWrite>
             MentionNotificationModeView::Notify,
         ));
     }
-    let rule_id = keyword_rule_id(pattern);
+    let rule_id = keyword_rule_id(rules, pattern);
     Ok(vec![
         RuleWrite::Put(NewPushRule::Content(NewPatternedPushRule::new(
             rule_id.clone(),
@@ -712,13 +716,8 @@ pub fn plan_keyword_mode(
 
 #[must_use]
 pub fn plan_remove_keyword(rules: &Ruleset, keyword: &str) -> Vec<RuleWrite> {
-    let mut ids: Vec<String> = keyword_rules(rules, keyword)
+    keyword_rules(rules, keyword)
         .map(ToOwned::to_owned)
-        .collect();
-    if ids.is_empty() {
-        ids.push(keyword_rule_id(keyword));
-    }
-    ids.into_iter()
         .map(|rule_id| RuleWrite::Delete {
             kind: RuleKind::Content,
             rule_id,
@@ -1148,13 +1147,69 @@ mod tests {
         assert_eq!(
             describe(&plan_add_keyword(&rules, ".net").unwrap()),
             vec![
-                r#"put keyword.net ["notify",{"set_tweak":"highlight"}]"#,
-                "enabled content keyword.net true",
+                r#"put moe.sable.keyword.Lm5ldA ["notify",{"set_tweak":"highlight"}]"#,
+                "enabled content moe.sable.keyword.Lm5ldA true",
             ]
         );
         let rules = applied(rules.clone(), plan_add_keyword(&rules, "a/b").unwrap());
         assert_eq!(keywords(&rules)[0].keyword, "a/b");
         plan_add_keyword(&rules, "  ").unwrap_err();
+    }
+
+    #[test]
+    fn distinct_keywords_never_replace_each_other() {
+        let mut rules = Ruleset::server_default(me());
+        let patterns = ["a/b", "a_b", "a\\b", ".alert", "keyword.alert", "café"];
+        for pattern in patterns {
+            let writes = plan_add_keyword(&rules, pattern).unwrap();
+            rules = applied(rules, writes);
+        }
+        for pattern in patterns {
+            assert_eq!(
+                rules
+                    .content
+                    .iter()
+                    .filter(|rule| rule.pattern == pattern)
+                    .count(),
+                1
+            );
+        }
+        let removed = applied(rules.clone(), plan_remove_keyword(&rules, "a/b"));
+        assert!(
+            !keywords(&removed)
+                .iter()
+                .any(|entry| entry.keyword == "a/b")
+        );
+        assert!(
+            keywords(&removed)
+                .iter()
+                .any(|entry| entry.keyword == "a_b")
+        );
+        assert!(plan_remove_keyword(&removed, "a/b").is_empty());
+    }
+
+    #[test]
+    fn a_reserved_keyword_id_keeps_the_existing_rule() {
+        let mut rules = Ruleset::server_default(me());
+        rules.content.insert(
+            serde_json::from_value(json!({
+                "rule_id": "moe.sable.keyword.YS9i", "pattern": "other", "default": false,
+                "enabled": true, "actions": ["notify"]
+            }))
+            .unwrap(),
+        );
+        let writes = plan_add_keyword(&rules, "a/b").unwrap();
+        let updated = applied(rules, writes);
+        assert_eq!(
+            updated
+                .content
+                .iter()
+                .find(|rule| rule.rule_id == "moe.sable.keyword.YS9i")
+                .unwrap()
+                .pattern,
+            "other"
+        );
+        assert!(updated.content.iter().any(|rule| rule.pattern == "a/b"));
     }
 
     #[test]
@@ -1178,10 +1233,7 @@ mod tests {
 
         let removed = applied(loud.clone(), plan_remove_keyword(&loud, "sable"));
         assert!(keywords(&removed).is_empty());
-        assert_eq!(
-            describe(&plan_remove_keyword(&removed, "other")),
-            vec!["delete content other"]
-        );
+        assert!(plan_remove_keyword(&removed, "other").is_empty());
     }
 
     #[test]
