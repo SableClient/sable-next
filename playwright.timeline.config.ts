@@ -31,6 +31,7 @@ export default defineConfig({
     'overlay-stacking.spec.ts',
     'profile-mobile.spec.ts',
     'room-settings-mobile.spec.ts',
+    'room-settings-context.spec.ts',
     'mobile-drawer.spec.ts',
     'settings-slide.spec.ts',
     'profile-card-tint.spec.ts',
