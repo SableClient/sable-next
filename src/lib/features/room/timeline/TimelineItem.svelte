@@ -724,7 +724,9 @@
           </button>
         {/if}
         {#if item.forwarded}
-          <ForwardedLine forwarded={item.forwarded} {roomId} {onJumpToEvent} />
+          <div>
+            <ForwardedLine forwarded={item.forwarded} {roomId} {onJumpToEvent} />
+          </div>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
           {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}

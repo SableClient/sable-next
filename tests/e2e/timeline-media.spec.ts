@@ -547,6 +547,53 @@ test('a gallery keeps two columns on desktop', async ({
   expect(cells[1]).toBeCloseTo(cells[0] ?? 0, 0);
 });
 
+for (const mobile of [false, true]) {
+  test(`a forwarded gallery keeps its label above the media${mobile ? ' on mobile' : ''}`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await page.setViewportSize(mobile ? NARROW : { width: 1280, height: 900 });
+    await app.openRooms();
+    await app.openRoomFromList('General');
+    await timeline.expectRevealed();
+    await core.setTimelineItemById(await core.subscription(), 'general-19', {
+      ...timelineItem('general-19', ''),
+      forwarded: { room_id: '!random:example.test', event_id: '$original', timestamp: null },
+      read_by: ['@bob:example.test'],
+      content: {
+        kind: 'gallery',
+        body: '',
+        html: '',
+        items: ['one', 'two'].map((filename) => ({
+          kind: 'image',
+          filename,
+          caption: null,
+          source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+          mime: 'image/png',
+          width: 800,
+          height: 600,
+          size: null,
+          blurhash: null,
+          thumbnail: null,
+          spoiler: null,
+        })),
+      },
+    });
+    const row = page.locator('[data-item-id="general-19"] .message');
+    await expect(row.locator('.receipt-slot')).toHaveCount(1);
+    await expect(row.locator('.gallery img').first()).toBeVisible(MEDIA_LOADED);
+
+    const label = await row.locator('.forwarded').boundingBox();
+    const gallery = await row.locator('.gallery').boundingBox();
+    if (!label || !gallery) throw new Error('forwarded gallery missing');
+    expect(gallery.y).toBeGreaterThanOrEqual(label.y + label.height);
+  });
+}
+
 test('a pdf in a gallery opens in the viewer', async ({
   page,
   app,
