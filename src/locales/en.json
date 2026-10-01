@@ -288,6 +288,7 @@
     "menuJoinParentSpace": "Join {{space}}",
     "menuLeave": "Leave room",
     "menuLeaveSpace": "Leave space",
+    "menuShowSpaceTimeline": "Show space timeline",
     "menuCopyLink": "Copy room link",
     "leaveTitle": "Leave {{name}}?",
     "leaveBody": "You will stop receiving messages. Rejoining needs an invite unless the room is public.",

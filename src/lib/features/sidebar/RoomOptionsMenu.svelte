@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import type { RoomSummary, RoomTag } from '#src/generated/protocol';
   import ArrowLineUpIcon from 'phosphor-svelte/lib/ArrowLineUpIcon';
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
@@ -12,6 +13,7 @@
   import FlagIcon from 'phosphor-svelte/lib/FlagIcon';
   import GearIcon from 'phosphor-svelte/lib/GearIcon';
   import LinkIcon from 'phosphor-svelte/lib/LinkIcon';
+  import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import PushPinSlashIcon from 'phosphor-svelte/lib/PushPinSlashIcon';
   import SignInIcon from 'phosphor-svelte/lib/SignInIcon';
   import SignOutIcon from 'phosphor-svelte/lib/SignOutIcon';
@@ -21,6 +23,7 @@
 
   import RoomInviteDialog from '#lib/features/room/RoomInviteDialog.svelte';
   import RoomNotificationSubmenu from '#lib/features/room/RoomNotificationSubmenu.svelte';
+  import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -320,6 +323,16 @@
       >
         <FlagIcon />
         {$i18n.t('nav.lobby')}
+      </ActionMenuItem>
+    {/if}
+    {#if room.is_space}
+      <ActionMenuItem
+        onSelect={() => {
+          void goto(eventTimelinePath(room.room_id));
+        }}
+      >
+        <ListBulletsIcon />
+        {$i18n.t('room.menuShowSpaceTimeline')}
       </ActionMenuItem>
     {/if}
     <ActionMenuItem onSelect={copyLink}>

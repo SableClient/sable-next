@@ -34,6 +34,7 @@
   import EmptyState from '#lib/ui/primitives/EmptyState.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import {
@@ -521,16 +522,21 @@
     {#if space}
       <div class="hero-menu">
         {#if preferences.developerTools}
-          <IconButton
-            variant="ghost"
-            size="small"
-            label={$i18n.t('timeline.eventTimeline')}
-            onclick={() => {
-              void goto(eventTimelinePath(space.room_id));
-            }}
-          >
-            <ListBulletsIcon />
-          </IconButton>
+          <Tooltip label={$i18n.t('room.menuShowSpaceTimeline')} side="bottom">
+            {#snippet trigger({ props })}
+              <IconButton
+                {...props}
+                variant="ghost"
+                size="small"
+                label={$i18n.t('room.menuShowSpaceTimeline')}
+                onclick={() => {
+                  void goto(eventTimelinePath(space.room_id));
+                }}
+              >
+                <ListBulletsIcon />
+              </IconButton>
+            {/snippet}
+          </Tooltip>
         {/if}
         <IconButton
           variant="ghost"
