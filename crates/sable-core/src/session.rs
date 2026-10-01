@@ -468,29 +468,32 @@ async fn build_account_client(
 
     #[cfg(not(target_family = "wasm"))]
     let builder = {
-        static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-
         let _ = persistent_event_cache;
-        let holder = format!(
-            "sable-{}-{}-{}",
-            std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos(),
-            NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-        );
+        #[cfg(any(target_os = "android", target_os = "ios"))]
+        let lock = {
+            static NEXT_CLIENT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+            let holder = format!(
+                "sable-{}-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos(),
+                NEXT_CLIENT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            );
+            matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(holder)
+        };
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess;
+
         builder
             .sqlite_store_with_cache_path(
                 std::path::Path::new(store_id).join("store"),
                 std::path::Path::new(store_id).join("cache"),
                 None,
             )
-            .cross_process_store_config(
-                matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::multi_process(
-                    holder,
-                ),
-            )
+            .cross_process_store_config(lock)
     };
 
     #[cfg(not(target_family = "wasm"))]
@@ -954,6 +957,30 @@ mod tests {
             .await
             .unwrap();
         client
+    }
+
+    #[cfg(not(any(target_family = "wasm", target_os = "android", target_os = "ios")))]
+    #[tokio::test]
+    async fn idle_desktop_crypto_store_does_not_write() {
+        let root = tempfile::tempdir().unwrap();
+        let client = seed_crypto(root.path().to_str().unwrap(), &offline_session()).await;
+        let _sync = super::build_sync(client.clone()).await.unwrap();
+        let _guard = client.encryption().spin_lock_store(None).await.unwrap();
+        let observer = rusqlite::Connection::open_with_flags(
+            root.path().join("store/matrix-sdk-crypto.sqlite3"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let before: i64 = observer
+            .pragma_query_value(None, "data_version", |row| row.get(0))
+            .unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+        let after: i64 = observer
+            .pragma_query_value(None, "data_version", |row| row.get(0))
+            .unwrap();
+        assert_eq!(before, after, "idle crypto store committed database writes");
     }
 
     #[cfg(not(target_family = "wasm"))]
