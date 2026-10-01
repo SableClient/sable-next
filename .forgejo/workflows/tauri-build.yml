@@ -11,8 +11,8 @@ on:
         type: string
 permissions: {}
 concurrency:
-  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+  group: tauri-build-${{ github.event_name == 'workflow_dispatch' && (inputs.tag || github.run_id) || github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
 env:
   MISE_GITHUB_TOKEN: ${{ secrets.MISE_GITHUB_TOKEN }}
   CARGO_INCREMENTAL: 0
@@ -421,7 +421,7 @@ jobs:
   github-bundles:
     name: Wait for GitHub bundles
     needs: setup-release
-    runs-on: light
+    runs-on: ubuntu-latest
     # github-bundles.json is published by the GitHub-side handoff job, which
     # waits on the whole desktop/linux/ios matrix.
     timeout-minutes: 120
