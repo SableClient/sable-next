@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { inputRules } from 'prosemirror-inputrules';
+import { inputRules, undoInputRule } from 'prosemirror-inputrules';
 import { EditorState, Selection, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -342,6 +342,85 @@ test('three dashes stay literal while typing', () => {
 });
 
 describe('typed Markdown', () => {
+  test.each([
+    ['**', '<strong>test</strong>'],
+    ['*', '<em>test</em>'],
+    ['__', '<strong>test</strong>'],
+    ['_', '<em>test</em>'],
+    ['~~', '<del>test</del>'],
+    ['||', '<span data-mx-spoiler="">test</span>'],
+    ['`', '<code>test</code>'],
+    ['``', '<code>test</code>'],
+    ['***', '<strong><em>test</em></strong>'],
+  ])('typing between %s markers applies formatting', (delimiter, html) => {
+    const editor = open();
+    type(delimiter + delimiter);
+    editor.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 1 + delimiter.length))
+    );
+    type('test');
+
+    expect(editor.state.doc.textContent).toBe('test');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(html);
+  });
+
+  test('typing between markers preserves the following text and caret', () => {
+    const editor = open();
+    type('**** tail');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('test');
+
+    expect(editor.state.selection.from).toBe(5);
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>test</strong> tail');
+
+    editor.dispatch(editor.state.tr.setSelection(Selection.atEnd(editor.state.doc)));
+    type(' done');
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>test</strong> tail done');
+  });
+
+  test('replacing text between markers keeps formatting', () => {
+    const editor = open();
+    editor.dispatch(editor.state.tr.insertText('**old**'));
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3, 6)));
+    type('new');
+
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<strong>new</strong>');
+  });
+
+  test('undo restores both markers', () => {
+    const editor = open();
+    type('****');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('t');
+
+    expect(undoInputRule(editor.state, editor.dispatch)).toBe(true);
+    expect(editor.state.doc.textContent).toBe('**t**');
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test.each([
+    ['**__', 3, '**test__'],
+    ['\\****', 4, '\\**test**'],
+    ['__word', 2, '_test_word'],
+  ])('typing into %s keeps unmatched or escaped markers literal', (source, position, expected) => {
+    const editor = open();
+    type(source);
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, position)));
+    type('test');
+
+    expect(editor.state.doc.textContent).toBe(expected);
+    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test('markers inside code stay literal', () => {
+    const editor = open();
+    type('`****`');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 3)));
+    type('test');
+
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<code>**test**</code>');
+  });
+
   test.each([
     ['***both***', '<strong><em>both</em></strong>'],
     ['say ***both*** now', 'say <strong><em>both</em></strong> now'],

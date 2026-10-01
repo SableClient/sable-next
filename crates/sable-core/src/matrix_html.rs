@@ -1531,6 +1531,28 @@ mod tests {
     }
 
     #[test]
+    fn escaped_markdown_and_mfm_render_as_literal_text() {
+        for (body, formatted, visible) in [
+            ("\\*like so*", "*like so*", "*like so*"),
+            ("\\`code\\`", "`code`", "`code`"),
+            (
+                "\\$[unixtime 0]",
+                "<span>$</span>[unixtime 0]",
+                "$[unixtime 0]",
+            ),
+            (
+                "\\$[fg.color=f00 red]",
+                "<span>$</span>[fg.color=f00 red]",
+                "$[fg.color=f00 red]",
+            ),
+        ] {
+            let rendered = display_html(body, Some(formatted));
+            assert_eq!(rendered, formatted);
+            assert_eq!(preview_body(body, Some(&rendered)), visible);
+        }
+    }
+
+    #[test]
     fn a_colour_looks_for_its_close_within_a_bounded_span() {
         let near = format!("$[fg.color=f00 {}]", "a".repeat(100));
         assert!(render_plain_text(&near).starts_with("<span data-mx-color=\"#ff0000\">"));

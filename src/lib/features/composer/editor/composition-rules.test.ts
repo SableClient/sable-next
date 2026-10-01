@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { inputRules } from 'prosemirror-inputrules';
-import { EditorState } from 'prosemirror-state';
+import { EditorState, TextSelection } from 'prosemirror-state';
 import { EditorView } from 'prosemirror-view';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -68,6 +68,17 @@ test('a mark whose delimiters land after the composition ended still applies', (
 
   expect(editor().state.doc.textContent).toBe('Strikethrough');
   expect(marksOn('Strikethrough')).toEqual(['strike']);
+});
+
+test('composed text between markers is formatted', () => {
+  const target = open();
+  target.dispatch(target.state.tr.insertText('****'));
+  target.dispatch(target.state.tr.setSelection(TextSelection.create(target.state.doc, 3)));
+  commit('テスト');
+
+  expect(target.state.doc.textContent).toBe('テスト');
+  expect(marksOn('テスト')).toEqual(['strong']);
+  expect(target.state.selection.from).toBe(4);
 });
 
 test('an autolink keeps the space that is already in the document', () => {

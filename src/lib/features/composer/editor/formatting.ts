@@ -33,13 +33,12 @@ function inlineMarkdownRule(): InputRule {
     '~': marks.strike,
     '|': marks.spoiler,
   };
-  return new InputRule(/[\s\S]*[*_~|`)]$/, (state, match, start, end) => {
+  return new InputRule(/[\s\S]+$/, (state, match, start, end) => {
     const stored = state.storedMarks ?? state.selection.$from.marks();
     if (stored.some((mark) => mark.type === marks.code)) return null;
-    const source = match[0];
     if (
-      source.length > end - start &&
-      source.endsWith('`') &&
+      match[0].length > end - start &&
+      match[0].endsWith('`') &&
       marks.code.isInSet(state.selection.$from.nodeBefore?.marks ?? [])
     ) {
       let reverted: Transaction | undefined;
@@ -53,15 +52,26 @@ function inlineMarkdownRule(): InputRule {
         return reverted.insertText('`');
       }
     }
+    const $end = state.doc.resolve(end);
+    const after = $end.parent.textBetween(
+      $end.parentOffset,
+      $end.parent.content.size,
+      '',
+      LINE_BREAK
+    );
+    const suffix = /^(?:\*+|_+|~+|\|+|`+)/.exec(after)?.[0] ?? '';
+    if (suffix && state.doc.rangeHasMark(end, end + suffix.length, marks.code)) return null;
+    const source = match[0] + suffix;
     const closing = /(?:\*+|_+|~+|\|+|`+|\))$/.exec(source)?.[0];
     if (!closing) return null;
+    if (closing[0] === '_' && /[\p{L}\p{N}_]/u.test(after[suffix.length] ?? '')) return null;
     const code = closing[0] === '`';
     if (!code && escaped(source, source.length - closing.length)) return null;
     const runs = Array.from(source.matchAll(/\*+|_+|~+|\|+|`+|\[/g)).filter(
       (run) =>
         !escaped(source, run.index) &&
         !state.doc.rangeHasMark(
-          start + run.index,
+          Math.min(end, start + run.index),
           Math.min(end, start + run.index + run[0].length),
           marks.code
         )
@@ -130,7 +140,9 @@ function inlineMarkdownRule(): InputRule {
           position += char.length;
         }
       });
-      return state.tr.replaceWith(from, end, Fragment.fromArray(content)).setStoredMarks(stored);
+      return state.tr
+        .replaceWith(from, end + suffix.length, Fragment.fromArray(content))
+        .setStoredMarks(suffix ? (content[content.length - 1]?.marks ?? stored) : stored);
     }
     return null;
   });

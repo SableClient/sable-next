@@ -102,11 +102,13 @@ test('an existing time element survives a rich-text edit', () => {
 
 test('escaped and invalid MFM stay literal', () => {
   const source = '\\$[unixtime 0] $[fg.color=red bad]';
-  for (const serialize of [serializeComposer, serializePlain]) {
-    const message = serialize(textDoc(source));
-    expect(message.body).toBe(source);
-    expect(message.formatted).toBeNull();
-  }
+  const rich = serializeComposer(textDoc(source));
+  expect(rich.body).toBe(source);
+  expect(rich.formatted).toBeNull();
+
+  const plain = serializePlain(textDoc(source));
+  expect(plain.body).toBe(source);
+  expect(plain.formatted).toBe('<span>$</span>[unixtime 0] $[fg.color=red bad]');
 });
 
 test('MFM that runs past a spoiler stays literal inside it', () => {
@@ -454,6 +456,61 @@ describe('plain text mode', () => {
 
     expect(message.body).toBe('just words');
     expect(message.formatted).toBeNull();
+  });
+
+  test.each([
+    ['\\*like so*', '*like so*'],
+    ['\\*like so\\*', '*like so*'],
+    ['\\`code\\`', '`code`'],
+    ['\\_text\\_', '_text_'],
+    ['\\# heading', '# heading'],
+    ['one \\\\ two', 'one \\ two'],
+    ['\\[label](https://example.org)', '[label](https://example.org)'],
+    ['\\<tag>', '&lt;tag&gt;'],
+    ['&amp;', '&amp;'],
+    ['\\&amp;', '&amp;amp;'],
+    ['&#42;literal*', '*literal*'],
+  ])('Markdown escapes and entities in %j render as text', (source, rendered) => {
+    const message = serializePlain(textDoc(source));
+
+    expect(message.body).toBe(source);
+    expect(message.formatted).toBe(rendered);
+    expect(plainEditSource(message.body, message.formatted ?? '')).toBe(source);
+  });
+
+  test('all ASCII punctuation can be escaped', () => {
+    for (let codePoint = 33; codePoint <= 126; codePoint += 1) {
+      const character = String.fromCharCode(codePoint);
+      if (/[a-z0-9]/i.test(character)) continue;
+      const message = serializePlain(textDoc(`\\${character}`));
+      expect(message.formatted, character).not.toBeNull();
+      expect(plainTextOf(parseMatrixHtml(message.formatted ?? '')), character).toBe(character);
+    }
+  });
+
+  test.each(['C:\\path', '\\a', '\\→', 'trailing \\'])(
+    'a literal backslash in %j stays visible',
+    (source) => {
+      const message = serializePlain(textDoc(source));
+      expect(message.body).toBe(source);
+      expect(message.formatted).toBeNull();
+    }
+  );
+
+  test.each([
+    ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
+    ['$\\[unixtime 0]', '<span>$</span>[unixtime 0]'],
+    ['\\$[fg.color=f00 red]', '<span>$</span>[fg.color=f00 red]'],
+    ['**hi** \\$[unixtime 0]', '<strong>hi</strong> <span>$</span>[unixtime 0]'],
+    [
+      '\\$[unixtime 0] and \\$[fg.color=f00 red]',
+      '<span>$</span>[unixtime 0] and <span>$</span>[fg.color=f00 red]',
+    ],
+  ])('escaped MFM in %j stays literal in HTML', (source, rendered) => {
+    const message = serializePlain(textDoc(source));
+    expect(message.body).toBe(source);
+    expect(message.formatted).toBe(rendered);
+    expect(plainEditSource(message.body, message.formatted ?? '')).toBe(source);
   });
 
   test('strikethrough parses even though commonmark leaves it off', () => {

@@ -5,6 +5,84 @@ test.use({ storageState: SIGNED_OUT });
 for (const mobile of [false, true]) {
   const prefix = mobile ? 'mobile ' : '';
 
+  test(`${prefix}rich text formats text between markers`, async ({
+    page,
+    app,
+    installRoomCore,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: true }));
+    });
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+
+    let sent = 0;
+    for (const [delimiter, html] of [
+      ['**', '<strong>test</strong>'],
+      ['*', '<em>test</em>'],
+      ['__', '<strong>test</strong>'],
+      ['_', '<em>test</em>'],
+      ['~~', '<del>test</del>'],
+      ['||', '<span data-mx-spoiler="">test</span>'],
+      ['`', '<code>test</code>'],
+      ['``', '<code>test</code>'],
+      ['***', '<strong><em>test</em></strong>'],
+    ]) {
+      await app.composer.click();
+      await page.keyboard.type(delimiter + delimiter);
+      for (let step = 0; step < delimiter.length; step += 1) await page.keyboard.press('ArrowLeft');
+      await page.keyboard.type('test');
+      await expect(app.composer.locator('p').first()).toHaveJSProperty('innerHTML', html);
+      await page.keyboard.press('Enter');
+      sent += 1;
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.__e2eCommandPayloads.filter((c) => c.type === 'send_message').length
+          )
+        )
+        .toBe(sent);
+      expect(
+        await page.evaluate(() =>
+          window.__e2eCommandPayloads.findLast((c) => c.type === 'send_message')
+        )
+      ).toMatchObject({ formatted: html });
+      await expect(app.composer).toBeEmpty();
+    }
+  });
+
+  test(`${prefix}Markdown mode sends escaped punctuation as literal text`, async ({
+    page,
+    app,
+    installRoomCore,
+  }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: false }));
+    });
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+
+    for (const [source, formatted] of [
+      ['\\*like so*', '*like so*'],
+      ['\\`code\\`', '`code`'],
+      ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
+      ['**bold** and \\*literal*', '<strong>bold</strong> and *literal*'],
+    ]) {
+      await app.composer.click();
+      await page.keyboard.type(source);
+      await expect(app.composer).toHaveText(source);
+      await page.keyboard.press('Enter');
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            window.__e2eCommandPayloads.findLast((c) => c.type === 'send_message')
+          )
+        )
+        .toMatchObject({ type: 'send_message', body: source, formatted });
+      await expect(app.composer).toBeEmpty();
+    }
+  });
+
   test(`${prefix}typed Markdown handles formatting and literal delimiters`, async ({
     page,
     app,

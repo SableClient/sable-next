@@ -285,6 +285,27 @@ function html(doc: ProseMirrorNode): string {
     paragraph.replaceWith(...paragraph.childNodes);
   }
 
+  const texts = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+  const literalMfm: { node: Text; offset: number }[] = [];
+  for (let node = texts.nextNode(); node; node = texts.nextNode()) {
+    if (!(node instanceof Text) || node.parentElement?.closest('code, pre, a, time')) continue;
+    for (
+      let offset = node.data.indexOf('$[');
+      offset >= 0;
+      offset = node.data.indexOf('$[', offset + 2)
+    ) {
+      const source = node.data.slice(offset);
+      if (parseMfmUnixtime(source) || parseMfmColor(source)) literalMfm.push({ node, offset });
+    }
+  }
+  for (const { node, offset } of literalMfm.reverse()) {
+    const suffix = node.splitText(offset);
+    suffix.deleteData(0, 1);
+    const dollar = document.createElement('span');
+    dollar.textContent = '$';
+    suffix.before(dollar);
+  }
+
   const blocks = Array.from(holder.children);
   if (blocks.length === 1 && blocks[0]?.tagName === 'P') return blocks[0].innerHTML;
   return blocks.map((block) => block.outerHTML).join('');
@@ -650,7 +671,7 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   );
   return {
     body,
-    formatted: isPlain(parsed) ? null : html(parsed),
+    formatted: isPlain(parsed) && plainTextOf(parsed) === body ? null : html(parsed),
     mentions,
     ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
   };

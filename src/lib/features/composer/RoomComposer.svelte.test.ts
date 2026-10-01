@@ -232,6 +232,32 @@ test('the editor mounts as a labelled combobox surface', async () => {
   expect(editable?.getAttribute('contenteditable')).toBe('true');
 });
 
+test.each([
+  ['\\*like so*', '*like so*'],
+  ['\\`code\\`', '`code`'],
+  ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
+])('Markdown mode renders escapes in %j', async (source, formatted) => {
+  setPreference('richTextComposer', false);
+  writeDraft('!room:example.org', {
+    doc: textDoc(source).toJSON(),
+    staged: [],
+    nextStagedId: 0,
+  });
+  const send = vi.fn(async () => {});
+  setup({ roomId: '!room:example.org', onSend: send });
+  await tick();
+  expect(editorText()).toBe(source);
+
+  submit();
+
+  await vi.waitFor(() => {
+    expect(send).toHaveBeenCalledWith('!room:example.org', source, formatted, {
+      userIds: [],
+      room: false,
+    });
+  });
+});
+
 test('an unmount stops the typing notice for the room it was mounted with', async () => {
   const typing = vi.fn(async () => {});
   const instance = setup({ roomId: '!first:example.org', onTyping: typing });
