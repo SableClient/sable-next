@@ -13,6 +13,7 @@ export function signOutRisk(safety: SignOutSafetyView): SignOutRisk | null {
 }
 
 export class SignOutGuard {
+  open = $state(false);
   risk = $state<SignOutRisk | null>(null);
   checking = $state(false);
   signingOut = $state(false);
@@ -23,8 +24,8 @@ export class SignOutGuard {
     this.#core = core;
   }
 
-  async request(proceed: () => Promise<void>): Promise<void> {
-    if (this.checking || this.signingOut) return;
+  async request(proceed: () => Promise<void>, alreadyConfirmed = false): Promise<void> {
+    if (this.open || this.checking || this.signingOut) return;
 
     this.checking = true;
     let risk: SignOutRisk | null;
@@ -36,9 +37,10 @@ export class SignOutGuard {
       this.checking = false;
     }
 
-    if (risk === null) return proceed();
     this.#proceed = proceed;
     this.risk = risk;
+    if (alreadyConfirmed && risk === null) return this.confirm();
+    this.open = true;
   }
 
   async confirm(): Promise<void> {
@@ -57,5 +59,6 @@ export class SignOutGuard {
   dismiss(): void {
     this.#proceed = null;
     this.risk = null;
+    this.open = false;
   }
 }

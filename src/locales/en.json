@@ -1528,6 +1528,7 @@
     "security": "Security",
     "close": "Close",
     "logout": "Log out",
+    "logoutConfirmDescription": "Are you sure you want to log out?",
     "logoutWarning": {
       "title": "You could lose your encrypted messages",
       "unverified": "This session is not verified. Logging out deletes its message keys, so you may lose access to your encrypted messages.",
