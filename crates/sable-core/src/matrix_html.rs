@@ -159,7 +159,10 @@ fn sanitizer() -> Builder<'static> {
 }
 
 fn is_mxc_uri(value: &str) -> bool {
-    has_scheme(value, "mxc:") && <&MxcUri>::from(value).parts().is_ok()
+    has_scheme(value, "mxc:")
+        && <&MxcUri>::from(value)
+            .parts()
+            .is_ok_and(|(_, media_id)| !media_id.is_empty())
 }
 
 fn has_scheme(value: &str, scheme: &str) -> bool {
@@ -882,7 +885,27 @@ fn sanitize(formatted: &str) -> String {
     }
     let html = Html::parse(&rewrite_markup(formatted));
     html.sanitize_with(&MATRIX_POLICY);
+    for node in html.children() {
+        sanitize_emote_sources(&node);
+    }
     SANITIZER.clean(&html.to_string()).to_string()
+}
+
+fn sanitize_emote_sources(node: &NodeRef) {
+    if let NodeData::Element(element) = node.data()
+        && &*element.name.local == "img"
+    {
+        let mut attrs = element.attrs.borrow_mut();
+        if attrs
+            .iter()
+            .any(|attr| &*attr.name.local == "data-mx-emoticon")
+        {
+            attrs.retain(|attr| &*attr.name.local != "src" || is_mxc_uri(&attr.value));
+        }
+    }
+    for child in node.children() {
+        sanitize_emote_sources(&child);
+    }
 }
 
 const SPOILER_ATTRIBUTE: &str = "data-mx-spoiler";
@@ -973,6 +996,37 @@ mod tests {
         display_html, preview_body, render_plain_text, rewrite_markup, strip_profile_fallback_body,
         strip_profile_fallback_html,
     };
+
+    #[test]
+    fn custom_emotes_only_keep_valid_mxc_sources() {
+        for source in [
+            "https://tracker.example/pixel",
+            "http://tracker.example/pixel",
+            "mxc://example.org/",
+        ] {
+            let html = display_html(
+                "wave",
+                Some(&format!(
+                    "<img data-mx-emoticon src=\"{source}\" alt=\"wave\">"
+                )),
+            );
+            assert!(!html.contains("src="));
+        }
+        assert!(
+            display_html(
+                "wave",
+                Some("<img data-mx-emoticon src=\"mxc://example.org/wave\" alt=\"wave\">")
+            )
+            .contains("src=\"mxc://example.org/wave\"")
+        );
+        assert!(
+            display_html(
+                "photo",
+                Some("<img src=\"https://example.org/photo\" alt=\"photo\">")
+            )
+            .contains("src=\"https://example.org/photo\"")
+        );
+    }
 
     #[test]
     fn strips_the_per_message_profile_fallback() {

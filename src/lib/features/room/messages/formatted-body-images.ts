@@ -54,6 +54,10 @@ export class FormattedBodyImages {
       const source = this.#source(image);
       const emoticon = this.#isEmoticon(image);
       if (emoticon) image.dataset.mxEmoticon = '';
+      if (emoticon && !/^mxc:\/\/[^/?#\s]+\/[A-Za-z0-9_-]+$/u.test(source)) {
+        image.replaceWith(this.fallbackLabel(image, true));
+        continue;
+      }
       const scheme = source.slice(0, source.indexOf(':') + 1).toLowerCase();
       if (scheme === 'http:' || scheme === 'https:') {
         image.onerror = () => {

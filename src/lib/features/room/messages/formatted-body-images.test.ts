@@ -1,8 +1,16 @@
-import { expect, test } from 'vitest';
+import { Window } from 'happy-dom';
+import { expect, test, vi } from 'vitest';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
 import { FormattedBodyImages } from './formatted-body-images';
+
+vi.mock('#lib/ui/media-url.js', () => ({
+  cachedMediaUrl: () => 'blob:fixture',
+  holdMediaUrl: () => () => {},
+  loadMediaUrl: vi.fn(),
+  retryMediaUrl: vi.fn(),
+}));
 
 const images = new FormattedBodyImages(
   {} as CoreClient,
@@ -25,3 +33,20 @@ test('leaves source-like text and other attributes alone', () => {
   const html = '<p>src="mxc://example.org/image"</p><img data-src="backup" alt="Photo">';
   expect(images.defer(html)).toBe(html);
 });
+
+test.each(['https://tracker.example/pixel', 'http://tracker.example/pixel', 'mxc://example.org/'])(
+  'rejects custom emote source %s',
+  (source) => {
+    const window = new Window();
+    const node = window.document.createElement('div');
+    const resolver = new FormattedBodyImages(
+      {} as CoreClient,
+      () => 'wave',
+      () => {}
+    );
+    node.innerHTML = resolver.defer(`<img data-mx-emoticon src="${source}" alt="wave">`);
+    resolver.attach(node as unknown as HTMLElement, false);
+    expect(node.querySelector('img')).toBeNull();
+    expect(node.textContent).toBe('wave');
+  }
+);
