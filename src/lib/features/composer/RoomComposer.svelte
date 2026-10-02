@@ -1640,7 +1640,7 @@
     width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
   }
 
-  @media (width < 48rem), (pointer: coarse) {
+  @media (pointer: coarse) {
     .composer-stack {
       --target: var(--control-height-400);
     }
