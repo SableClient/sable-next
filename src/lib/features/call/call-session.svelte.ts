@@ -47,6 +47,7 @@ export type CallVoiceState = {
 export type CallDeviceError = 'microphone' | 'camera' | 'screen' | 'screenAudio';
 
 const OWN_KEY_TIMEOUT_MS = 10_000;
+const DEVICE_ERROR_TIMEOUT_MS = 5_000;
 
 type PendingEvent = Extract<
   CoreEvent,
@@ -112,6 +113,7 @@ export class CallSession {
   watchedScreenShareIds = $state<string[]>([]);
   views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
+  #deviceErrorTimer: ReturnType<typeof setTimeout> | undefined;
   choosingScreenAudio = $state(false);
   choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
   #pendingScreenSource: ScreenSource | null = null;
@@ -219,7 +221,7 @@ export class CallSession {
     this.#lastJoin = { roomId, media, serviceUrl };
     this.layout = { pinned: null, gridForced: false };
     this.watchedScreenShareIds = [];
-    this.deviceError = null;
+    this.clearDeviceError();
     const attempt = ++this.#attemptGeneration;
     const telemetry = new CallTelemetry({
       'call.microphone_requested': media.microphone,
@@ -395,7 +397,7 @@ export class CallSession {
     this.failure = null;
     this.roomId = null;
     this.connectedAt = null;
-    this.deviceError = null;
+    this.clearDeviceError();
   }
 
   clearFailure(): void {
@@ -412,16 +414,22 @@ export class CallSession {
   }
 
   clearDeviceError(): void {
+    clearTimeout(this.#deviceErrorTimer);
+    this.#deviceErrorTimer = undefined;
     this.deviceError = null;
   }
 
   async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<void> {
     try {
       await action();
-      if (this.deviceError === kind) this.deviceError = null;
+      if (this.deviceError === kind) this.clearDeviceError();
     } catch (error) {
       if (kind === 'screen' && error instanceof Error && error.name === 'NotAllowedError') return;
+      this.clearDeviceError();
       this.deviceError = error instanceof ScreenAudioError ? 'screenAudio' : kind;
+      this.#deviceErrorTimer = setTimeout(() => {
+        this.clearDeviceError();
+      }, DEVICE_ERROR_TIMEOUT_MS);
     }
   }
 

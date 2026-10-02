@@ -221,12 +221,12 @@ export function createMultiSfuTransport(
       if (failure) throw failure.reason;
     },
     setMicrophoneEnabled: async (enabled) => {
-      microphoneEnabled = enabled;
       await transports.get(publisherId ?? '')?.setMicrophoneEnabled(enabled);
+      microphoneEnabled = enabled;
     },
     setCameraEnabled: async (enabled) => {
-      cameraEnabled = enabled;
       await transports.get(publisherId ?? '')?.setCameraEnabled(enabled);
+      cameraEnabled = enabled;
     },
     setEncryptionKey: async (key: CallEncryptionKey) => {
       if (disposed) return;

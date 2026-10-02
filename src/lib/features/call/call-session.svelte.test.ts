@@ -1,4 +1,4 @@
-import { beforeEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { CoreEvent } from '#src/generated/protocol';
 import type { CoreClient } from '#lib/core/client.svelte.js';
@@ -116,6 +116,10 @@ const ownKey = (session = 7): CoreEvent => ({
 
 beforeEach(() => {
   resetCallOwner();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 test('an unencrypted call connects without waiting for a key', async () => {
@@ -792,6 +796,79 @@ test('a camera that cannot start is reported, not swallowed', async () => {
   session.clearDeviceError();
   expect(session.deviceError).toBeNull();
 });
+
+test('camera warnings expire without retrying', async () => {
+  vi.useFakeTimers();
+  const { client, transport, emitTransportState } = harness();
+  const session = new CallSession(client, { createTransport: () => transport });
+  await session.join('!room:example.org', { microphone: true, camera: false });
+  vi.mocked(transport.setCameraEnabled).mockRejectedValue(
+    new DOMException('No camera found', 'NotFoundError')
+  );
+
+  await session.setCameraEnabled(true);
+  expect(session.deviceError).toBe('camera');
+
+  vi.advanceTimersByTime(5_000);
+  expect(session.deviceError).toBeNull();
+  emitTransportState({ ...idleTransportState(), connection: 'reconnecting' });
+  emitTransportState({ ...idleTransportState(), connection: 'connected' });
+  expect(session.deviceError).toBeNull();
+  expect(transport.setCameraEnabled).toHaveBeenCalledOnce();
+
+  await session.setCameraEnabled(true);
+  expect(session.deviceError).toBe('camera');
+  await session.leave();
+});
+
+test.each(['camera', 'microphone'] as const)(
+  'repeated %s failures restart the warning timeout',
+  async (kind) => {
+    vi.useFakeTimers();
+    const { client, transport } = harness();
+    const session = new CallSession(client, { createTransport: () => transport });
+    await session.join('!room:example.org', { microphone: true, camera: false });
+    const error = new DOMException('Device not found', 'NotFoundError');
+    vi.mocked(transport.setCameraEnabled).mockRejectedValue(error);
+    vi.mocked(transport.setMicrophoneEnabled).mockRejectedValue(error);
+
+    await session.setCameraEnabled(true);
+    vi.advanceTimersByTime(4_000);
+    if (kind === 'camera') await session.setCameraEnabled(true);
+    else await session.setMicrophoneEnabled(true);
+
+    vi.advanceTimersByTime(1_000);
+    expect(session.deviceError).toBe(kind);
+    vi.advanceTimersByTime(4_000);
+    expect(session.deviceError).toBeNull();
+    await session.leave();
+  }
+);
+
+test.each(['dismiss', 'recover', 'leave'])(
+  '%s cancels the device warning timer',
+  async (action) => {
+    vi.useFakeTimers();
+    const { client, transport } = harness();
+    const session = new CallSession(client, { createTransport: () => transport });
+    await session.join('!room:example.org', { microphone: true, camera: false });
+    vi.mocked(transport.setCameraEnabled).mockRejectedValueOnce(
+      new DOMException('Device not found', 'NotFoundError')
+    );
+
+    await session.setCameraEnabled(true);
+    expect(session.deviceError).toBe('camera');
+    expect(vi.getTimerCount()).toBe(1);
+
+    if (action === 'dismiss') session.clearDeviceError();
+    else if (action === 'recover') await session.setCameraEnabled(true);
+    else await session.leave();
+
+    expect(session.deviceError).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+    await session.leave();
+  }
+);
 
 test('a transport with a camera switch flips the camera through it', async () => {
   const { client, transport } = harness();

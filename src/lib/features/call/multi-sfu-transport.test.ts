@@ -426,6 +426,43 @@ test('a publisher move republishes on the new backend and demotes the old one', 
   expect(subscriber.transport.setMicrophoneEnabled).not.toHaveBeenCalled();
 });
 
+test.each(['setCameraEnabled', 'setMicrophoneEnabled'] as const)(
+  'does not retry a failed %s request when the publisher changes',
+  async (method) => {
+    const created: ReturnType<typeof fakeTransport>[] = [];
+    const transport = createMultiSfuTransport(false, undefined, {
+      createTransport: () => {
+        const next = fakeTransport();
+        created.push(next);
+        return next;
+      },
+    });
+    await transport.connect({
+      url: '',
+      token: '',
+      microphoneEnabled: false,
+      cameraEnabled: false,
+      publisherId: 'old',
+      backends: [{ id: 'old', url: 'wss://old', jwt: 'old', identity: 'me' }],
+      encryptionKeys: [],
+    });
+    vi.mocked(created[0][method]).mockRejectedValueOnce(
+      new DOMException('Device not found', 'NotFoundError')
+    );
+    await expect(transport[method](true)).rejects.toThrow('Device not found');
+
+    await transport.reconcileBackends?.(
+      [{ id: 'new', url: 'wss://new', jwt: 'new', identity: 'me' }],
+      'new'
+    );
+
+    expect(created[1].connect).toHaveBeenCalledWith(
+      expect.objectContaining({ microphoneEnabled: false, cameraEnabled: false })
+    );
+    await transport.disconnect();
+  }
+);
+
 test('does not report connected when the publisher is absent', async () => {
   const transport = createMultiSfuTransport(false, undefined, {
     createTransport: () => fakeTransport(),
