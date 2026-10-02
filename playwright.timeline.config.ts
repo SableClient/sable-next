@@ -19,6 +19,7 @@ export default defineConfig({
     'composer-alignment.spec.ts',
     'composer-wrapping.spec.ts',
     'composer-scheduling.spec.ts',
+    'composer-send-failure.spec.ts',
     'composer-autocomplete.spec.ts',
     'composer-paste.spec.ts',
     'composer-markdown.spec.ts',

@@ -2,7 +2,7 @@ import type { CommandErr } from '#src/generated/protocol';
 
 import { SlashError } from './slash-commands';
 
-export type SendFailure = { key: string; values?: Record<string, string> };
+export type SendFailure = { key: string; values?: Record<string, string>; retryable: boolean };
 
 export class ScheduledOriginalKept extends Error {
   constructor(cause: unknown) {
@@ -27,16 +27,25 @@ export function isEncryptedScheduleUnsupported(cause: unknown): boolean {
 }
 
 export function sendFailure(cause: unknown): SendFailure {
-  if (cause instanceof SlashError) return { key: cause.key, values: cause.values };
+  if (cause instanceof SlashError)
+    return { key: cause.key, values: cause.values, retryable: false };
 
   switch (detailOf(cause)?.code) {
     case 'denied':
-      return { key: 'composer.sendDenied' };
+      return { key: 'composer.sendDenied', retryable: false };
     case 'rate_limited':
-      return { key: 'composer.sendRateLimited' };
+      return { key: 'composer.sendRateLimited', retryable: true };
     case 'invalid_media':
-      return { key: 'composer.sendInvalidMedia' };
+      return { key: 'composer.sendInvalidMedia', retryable: false };
+    case 'unavailable':
+      return { key: 'composer.sendUnavailable', retryable: true };
+    case 'media_server_unavailable':
+      return { key: 'composer.sendMediaServerUnavailable', retryable: true };
+    case 'account_locked':
+      return { key: 'composer.sendAccountLocked', retryable: false };
+    case 'account_suspended':
+      return { key: 'composer.sendAccountSuspended', retryable: false };
     default:
-      return { key: 'timeline.sendFailed' };
+      return { key: 'composer.sendFailed', retryable: true };
   }
 }

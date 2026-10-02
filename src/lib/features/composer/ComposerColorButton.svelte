@@ -59,13 +59,15 @@
           {label}
           aria-pressed={value !== null}
         >
-          <Icon />
-          <span
-            class="color-bar"
-            class:set={value !== null}
-            style:background={value ?? undefined}
-            aria-hidden="true"
-          ></span>
+          <span class="color-icon">
+            <Icon aria-hidden="true" />
+            <span
+              class="color-bar"
+              class:set={value !== null}
+              style:background={value ?? undefined}
+              aria-hidden="true"
+            ></span>
+          </span>
         </IconButton>
       {/snippet}
     </Tooltip>
@@ -75,18 +77,18 @@
     <div class="color-picker" class:sheet>
       <p class="color-title">{label}</p>
       <div class="swatches" role="group" aria-label={$i18n.t('composer.colorPresets')}>
-        {#each COLOR_PRESETS as preset (preset)}
+        {#each COLOR_PRESETS as preset (preset.value)}
           <button
             type="button"
             class="swatch"
-            style:background={preset}
-            aria-label={preset}
-            aria-pressed={value === preset}
+            style:background={preset.value}
+            aria-label={$i18n.t(preset.name)}
+            aria-pressed={value === preset.value}
             onclick={() => {
-              pick(preset);
+              pick(preset.value);
             }}
           >
-            {#if value === preset}<CheckIcon aria-hidden="true" weight="bold" />{/if}
+            {#if value === preset.value}<CheckIcon aria-hidden="true" weight="bold" />{/if}
           </button>
         {/each}
       </div>
@@ -134,14 +136,22 @@
     width: auto;
   }
 
-  :global(.color-trigger) {
-    flex-direction: column;
+  .color-icon {
+    flex: none;
+    height: var(--icon-size-small);
+    position: relative;
+    width: var(--icon-size-small);
+  }
+
+  .color-icon :global(svg) {
+    height: 100%;
+    width: 100%;
   }
 
   .color-bar {
-    background: var(--surface-var-on-container);
+    background: currentcolor;
     border-radius: var(--radii-200);
-    bottom: var(--space-100);
+    bottom: calc(-1 * var(--space-100));
     height: var(--space-050);
     left: 50%;
     opacity: 0.35;

@@ -67,6 +67,21 @@
     { action: 'details', label: 'composer.details', icon: CaretCircleDownIcon },
   ];
 
+  const primaryActions: FormatAction[] = [
+    'strong',
+    'em',
+    'link',
+    'bullet_list',
+    'ordered_list',
+    'blockquote',
+  ];
+  let available = $derived(
+    markdown ? buttons.filter((button) => MARKDOWN_FORMATS.includes(button.action)) : buttons
+  );
+  let primary = $derived(available.filter((button) => primaryActions.includes(button.action)));
+  let secondary = $derived(available.filter((button) => !primaryActions.includes(button.action)));
+  let visible = $derived([...primary, ...secondary]);
+
   function scrollSideways(event: WheelEvent & { currentTarget: HTMLDivElement }): void {
     const bar = event.currentTarget;
     if (event.ctrlKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
@@ -82,7 +97,7 @@
   aria-label={$i18n.t('composer.formatting')}
   onwheel={scrollSideways}
 >
-  {#each markdown ? buttons.filter( (button) => MARKDOWN_FORMATS.includes(button.action) ) : buttons as button (button.action)}
+  {#each visible as button (button.action)}
     <Tooltip label={$i18n.t(button.label)}>
       {#snippet trigger({ props })}
         <IconButton
@@ -107,18 +122,14 @@
     icon={TextTIcon}
     value={colors.fg}
     removable={!markdown}
-    onPick={(value) => {
-      onColor('fg', value);
-    }}
+    onPick={(value) => onColor('fg', value)}
   />
   <ComposerColorButton
     label={$i18n.t('composer.highlightColor')}
     icon={HighlighterIcon}
     value={colors.bg}
     removable={!markdown}
-    onPick={(value) => {
-      onColor('bg', value);
-    }}
+    onPick={(value) => onColor('bg', value)}
   />
   {#if source || !markdown}
     <Tooltip label={$i18n.t('composer.markdownSource')}>
@@ -144,28 +155,14 @@
 
 <style>
   .formatting {
-    background: oklch(from var(--surface-var-container) calc(l - 0.025) c h);
-    border-bottom: var(--border-width) solid var(--surface-container-line);
+    align-items: center;
     display: flex;
     gap: var(--space-050);
+    height: var(--target);
     min-width: 0;
     overflow-x: auto;
     overscroll-behavior-x: contain;
-    padding: var(--space-150) var(--space-200);
     scrollbar-width: none;
-  }
-
-  .formatting:first-child {
-    border-top-left-radius: var(--radius);
-    border-top-right-radius: var(--radius);
-  }
-
-  @media (pointer: coarse) {
-    .formatting {
-      border-bottom: 0;
-      border-top: var(--border-width) solid var(--surface-container-line);
-      order: 1;
-    }
   }
 
   .formatting::-webkit-scrollbar {

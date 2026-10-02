@@ -160,7 +160,6 @@ export interface Preferences {
   composerGifButton: boolean;
   composerStickerButton: boolean;
   composerEmoteButton: boolean;
-  composerVoiceButton: boolean;
   composerButtonOrder: ComposerButton[];
   scheduleInEncryptedRooms: boolean;
   sendAttachmentAsCaption: boolean;
@@ -417,7 +416,6 @@ const DEFAULTS: Preferences = {
   composerGifButton: true,
   composerStickerButton: true,
   composerEmoteButton: true,
-  composerVoiceButton: true,
   composerButtonOrder: [...COMPOSER_BUTTONS],
   scheduleInEncryptedRooms: true,
   sendAttachmentAsCaption: true,

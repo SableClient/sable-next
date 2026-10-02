@@ -9,7 +9,8 @@ import TooltipProvider from '#lib/ui/primitives/TooltipProvider.svelte';
 
 import ComposerFormatting from './ComposerFormatting.svelte';
 
-function renderBar(overflowing: boolean): HTMLElement {
+function renderBar() {
+  const onFormat = vi.fn();
   render(
     ComposerFormatting,
     {
@@ -17,38 +18,27 @@ function renderBar(overflowing: boolean): HTMLElement {
       source: false,
       markdown: false,
       colors: { fg: null, bg: null },
-      onFormat: vi.fn(),
+      onFormat,
       onColor: vi.fn(),
       onToggleSource: vi.fn(),
     },
     { wrapper: TooltipProvider }
   );
-  const bar = screen.getByRole('group', { name: 'composer.formatting' });
-  Object.defineProperty(bar, 'clientWidth', { value: 200 });
-  Object.defineProperty(bar, 'scrollWidth', { value: overflowing ? 800 : 200 });
-  return bar;
+  return { onFormat };
 }
 
-test('a vertical wheel scrolls an overflowing toolbar sideways', async () => {
-  const bar = renderBar(true);
+test('every format is offered without expanding the bar', async () => {
+  const { onFormat } = renderBar();
 
-  const handled = await fireEvent.wheel(bar, { deltaY: 120 });
+  await fireEvent.click(screen.getByRole('button', { name: 'composer.table' }));
 
-  expect(handled).toBe(false);
-  expect(bar.scrollLeft).toBe(120);
-});
-
-test('the wheel is left alone when the toolbar fits', async () => {
-  const bar = renderBar(false);
-
-  const handled = await fireEvent.wheel(bar, { deltaY: 120 });
-
-  expect(handled).toBe(true);
-  expect(bar.scrollLeft).toBe(0);
+  expect(onFormat).toHaveBeenCalledWith('table');
+  expect(screen.getByRole('button', { name: 'composer.textColor' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'composer.markdownSource' })).toBeInTheDocument();
 });
 
 test('a formatting button names itself on hover', async () => {
-  renderBar(true);
+  renderBar();
 
   await fireEvent.pointerMove(screen.getByRole('button', { name: 'composer.bold' }), {
     pointerType: 'mouse',

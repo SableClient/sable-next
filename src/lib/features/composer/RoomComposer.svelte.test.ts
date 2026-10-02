@@ -44,6 +44,7 @@ afterEach(() => {
   setPreference('richTextComposer', true);
   setPreference('sendAttachmentAsCaption', true);
   setPreference('sendAttachmentsAsGallery', true);
+  setPreference('enterForNewline', false);
 });
 
 const members: MemberView[] = [
@@ -230,6 +231,54 @@ test('the editor mounts as a labelled combobox surface', async () => {
   const editable = document.querySelector('[role="combobox"]');
   expect(editable?.getAttribute('aria-label')).toBe('Send a message…');
   expect(editable?.getAttribute('contenteditable')).toBe('true');
+});
+
+test.each([false, true])(
+  'the visible keyboard hint follows enterForNewline=%s',
+  async (newline) => {
+    setPreference('enterForNewline', newline);
+    setup({ roomId: '!room:example.org' });
+    await tick();
+
+    expect(document.querySelector('.composer-keyboard-hint')).toHaveTextContent(
+      newline
+        ? 'Shift+Enter to send · Enter for a new line'
+        : 'Enter to send · Shift+Enter for a new line'
+    );
+    expect(document.querySelector('.screen-reader-only[id^="composer-hint"]')?.textContent).toBe(
+      document.querySelector('.composer-keyboard-hint')?.textContent
+    );
+  }
+);
+
+test('editing names the save action and its keyboard hint', async () => {
+  setup({
+    roomId: '!room:example.org',
+    context: { kind: 'edit', eventId: '$one:example.org', body: 'original' },
+  });
+  await tick();
+
+  expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
+  expect(document.querySelector('.composer-keyboard-hint')).toHaveTextContent('Enter to save');
+});
+
+test('a staged attachment names caption mode and changes its placeholder with the toggle', async () => {
+  setup({ roomId: '!room:example.org' });
+  await tick();
+  await pick(new File(['one'], 'one.txt', { type: 'text/plain' }));
+
+  const toggle = screen.getByRole('button', { name: 'Caption' });
+  expect(document.querySelector('.editor')).toHaveAttribute(
+    'data-placeholder',
+    'Add a caption, or send as-is'
+  );
+
+  await press(toggle);
+  expect(toggle).toHaveTextContent('Separate message');
+  expect(document.querySelector('.editor')).toHaveAttribute(
+    'data-placeholder',
+    'Add a message, or send as-is'
+  );
 });
 
 test.each([
@@ -545,10 +594,10 @@ test('the caption toggle sends text beside a lone attachment', async () => {
   await pick(file);
   const toggle = document.querySelector('.staged-caption');
   if (!(toggle instanceof HTMLButtonElement)) throw new Error('caption toggle not found');
-  expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  expect(toggle).toHaveTextContent('Caption');
   await press(toggle);
   await tick();
-  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  expect(toggle).toHaveTextContent('Separate message');
 
   submit();
   await vi.waitFor(() => {
@@ -771,6 +820,38 @@ test.each([
   }
 );
 
+test('recording a voice message keeps the typed draft', async () => {
+  vi.stubGlobal('AudioContext', vi.fn());
+  vi.stubGlobal('Worker', vi.fn());
+  Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: () => Promise.reject(new DOMException('', 'NotAllowedError')) },
+  });
+  try {
+    writeDraft('!room:example.org', {
+      doc: textDoc('hold on').toJSON(),
+      staged: [],
+      nextStagedId: 0,
+    });
+    setup({ roomId: '!room:example.org' });
+    await tick();
+
+    await press(screen.getByRole('button', { name: 'Record a voice message' }));
+    await vi.waitFor(() => {
+      expect(document.querySelector('.voice-close')).not.toBeNull();
+    });
+    await press(document.querySelector('.voice-close'));
+
+    await vi.waitFor(() => {
+      expect(editorText()).toBe('hold on');
+    });
+    expect(screen.getByRole('button', { name: 'Record a voice message' })).toBeInTheDocument();
+  } finally {
+    vi.unstubAllGlobals();
+    Reflect.deleteProperty(navigator, 'mediaDevices');
+  }
+});
+
 test('a failed send puts the message back in the editor', async () => {
   setup({
     roomId: '!room:example.org',
@@ -787,6 +868,51 @@ test('a failed send puts the message back in the editor', async () => {
   });
 
   expect(editorText()).toBe('hold on');
+});
+
+test('a failed send offers a retry that sends the restored message', async () => {
+  const send = vi
+    .fn<() => Promise<void>>()
+    .mockRejectedValueOnce(new Error('offline'))
+    .mockResolvedValueOnce();
+  writeDraft('!room:example.org', {
+    doc: textDoc('hold on').toJSON(),
+    staged: [],
+    nextStagedId: 0,
+  });
+  setup({ roomId: '!room:example.org', onSend: send });
+  await tick();
+
+  submit();
+  await press(await screen.findByRole('button', { name: 'Retry' }));
+
+  await vi.waitFor(() => {
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+  expect(send).toHaveBeenLastCalledWith('!room:example.org', 'hold on', null, {
+    room: false,
+    userIds: [],
+  });
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('a refused send can be dismissed but not retried', async () => {
+  const refused = Object.assign(new Error('denied'), { detail: { code: 'denied' } });
+  writeDraft('!room:example.org', {
+    doc: textDoc('hold on').toJSON(),
+    staged: [],
+    nextStagedId: 0,
+  });
+  setup({ roomId: '!room:example.org', onSend: () => Promise.reject(refused) });
+  await tick();
+
+  submit();
+  const alert = await screen.findByRole('alert');
+  expect(alert).toHaveTextContent('You do not have permission to send that here');
+  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+
+  await press(screen.getByRole('button', { name: 'Dismiss' }));
+  expect(screen.queryByRole('alert')).toBeNull();
 });
 
 test('a partly sent batch only restages what did not go out', async () => {
@@ -819,7 +945,7 @@ test('a failed attachment keeps the file staged and reports the failure', async 
   await pick(new File(['one'], 'one.png', { type: 'image/png' }));
   submit();
   await vi.waitFor(() => {
-    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Failed to send');
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not send.');
   });
 
   expect(stagedNames()).toEqual(['one.png']);
@@ -1541,6 +1667,52 @@ function pressInEditor(init: KeyboardEventInit): void {
   if (!editor) throw new Error('editor not found');
   void fireEvent.keyDown(editor, init);
 }
+
+test('the expand button makes the editor taller and keeps focus in it', async () => {
+  setup({ roomId: '!room:example.org' });
+  await tick();
+  const toggle = screen.getByRole('button', { name: 'Expand composer' });
+
+  await press(toggle);
+
+  expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  expect(document.querySelector('.editor')).toHaveClass('expanded');
+  expect(document.querySelector('[contenteditable="true"]')).toHaveFocus();
+});
+
+test('the insert menu offers scheduling once there is something to send', async () => {
+  writeDraft('!room:example.org', {
+    doc: textDoc('later').toJSON(),
+    staged: [],
+    nextStagedId: 0,
+  });
+  setup({ roomId: '!room:example.org', onSchedule: vi.fn(async () => {}) });
+  await tick();
+
+  await press(screen.getByRole('button', { name: 'Insert' }));
+  await press(await screen.findByRole('menuitem', { name: 'Schedule message' }));
+
+  expect(await screen.findByText('Schedule this message')).toBeInTheDocument();
+});
+
+test('the placeholder names the room', async () => {
+  setup({ roomId: '!room:example.org', roomName: 'General' });
+  await tick();
+
+  expect(document.querySelector('.editor')).toHaveAttribute('data-placeholder', 'Message General…');
+});
+
+test('a reply names its target in the placeholder and announces itself', async () => {
+  setup({
+    roomId: '!room:example.org',
+    roomName: 'General',
+    context: { kind: 'reply', eventId: '$one:example.org', sender: 'Alice', body: 'Hello' },
+  });
+  await tick();
+
+  expect(document.querySelector('.editor')).toHaveAttribute('data-placeholder', 'Reply to Alice…');
+  expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('Replying to Alice');
+});
 
 test('Escape cancels a reply context', async () => {
   const cancel = vi.fn();

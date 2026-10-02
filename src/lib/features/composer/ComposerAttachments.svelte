@@ -9,6 +9,7 @@
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
 
   import { previewKind, type StagedFile } from './composer-files';
   import StagedMediaViewer from './StagedMediaViewer.svelte';
@@ -78,23 +79,23 @@
     {/each}
   </ul>
   {#if files.length === 1}
-    <IconButton
+    <Button
       variant="ghost"
       size="small"
       class="staged-caption"
       {disabled}
-      label={$i18n.t('composer.sendAsCaption')}
-      aria-pressed={preferences.sendAttachmentAsCaption}
       onclick={() => {
         setPreference('sendAttachmentAsCaption', !preferences.sendAttachmentAsCaption);
       }}
     >
       {#if preferences.sendAttachmentAsCaption}
         <SubtitlesIcon />
+        {$i18n.t('composer.caption')}
       {:else}
         <SubtitlesSlashIcon />
+        {$i18n.t('composer.separateMessage')}
       {/if}
-    </IconButton>
+    </Button>
   {/if}
 </div>
 
@@ -112,18 +113,20 @@
 
 <style>
   .attachments {
-    align-items: center;
+    align-items: stretch;
     display: flex;
+    flex-direction: column;
   }
 
   .attachments :global(.staged-caption) {
+    align-self: start;
     flex: none;
-    margin: var(--space-200) var(--space-200) 0 0;
+    margin: var(--space-100) var(--space-200) 0;
   }
 
   .staged {
     display: flex;
-    flex: 1;
+    flex: none;
     gap: var(--space-150);
     list-style: none;
     margin: 0;
@@ -206,11 +209,17 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .staged-item :global(.staged-control) {
+  .staged-item :global(.icon-button-small.staged-control) {
     --button-height: var(--size-x500);
     --button-icon-size: var(--size-x50);
 
     border-radius: var(--radius-inner);
+    position: absolute;
+  }
+
+  .staged-item :global(.staged-control)::after {
+    content: '';
+    inset: calc((var(--size-x500) - var(--target-hit)) / 2);
     position: absolute;
   }
 

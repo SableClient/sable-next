@@ -248,12 +248,14 @@
   :global(.composer-board-trigger)::after {
     border-radius: inherit;
     content: '';
-    inset: 0;
+    inset: calc((var(--target) - var(--target-hit)) / 2);
     position: absolute;
   }
 
-  :global(.composer-board-trigger:hover) {
-    background: var(--surface-container-hover);
+  @media (hover: hover) and (pointer: fine) {
+    :global(.composer-board-trigger:hover) {
+      background: var(--surface-container-hover);
+    }
   }
 
   :global(.composer-board-trigger:disabled) {

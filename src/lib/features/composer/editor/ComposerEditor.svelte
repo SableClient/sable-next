@@ -5,9 +5,10 @@
     editor: ComposerEditor;
     placeholder: string;
     showPlaceholder: boolean;
+    expanded?: boolean;
   }
 
-  let { editor, placeholder, showPlaceholder }: Props = $props();
+  let { editor, placeholder, showPlaceholder, expanded = false }: Props = $props();
 
   function mount(node: HTMLElement): () => void {
     const detach = editor.mount(node);
@@ -27,6 +28,7 @@
 <div
   class="editor"
   class:empty={showPlaceholder}
+  class:expanded
   data-placeholder={placeholder}
   {@attach mount}
 ></div>
@@ -63,6 +65,17 @@
 
   .editor :global([contenteditable='true'] p) {
     margin: 0;
+  }
+
+  @media (width >= 48rem) and (pointer: fine) {
+    .editor {
+      max-height: clamp(10rem, 30dvh, 20rem);
+    }
+  }
+
+  .editor.expanded {
+    height: clamp(10rem, calc((100dvh - var(--keyboard-overlap)) / 2), 40rem);
+    max-height: none;
   }
 
   .editor :global([contenteditable='true'] p + p) {
@@ -108,19 +121,19 @@
   }
 
   .editor :global(:not(pre) > code) {
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radii-300);
-    color: var(--surface-var-on-container);
+    color: var(--bg-on-container);
     font-family: var(--font-family-mono);
     padding: 0 var(--space-050);
   }
 
   .editor :global(pre) {
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
+    background: var(--bg-container);
+    border: var(--border-width) solid var(--bg-container-line);
     border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    color: var(--bg-on-container);
     font-family: var(--font-family-mono);
     margin: 0;
     overflow-x: auto;
@@ -204,6 +217,7 @@
     color: var(--surface-var-on-container);
     content: attr(data-placeholder);
     inset-inline: var(--space-200);
+    opacity: var(--opacity-placeholder);
     overflow: hidden;
     pointer-events: none;
     position: absolute;

@@ -8,7 +8,7 @@ async function colourSelection(page: Page, composer: ReturnType<Page['locator']>
   await composer.press('ControlOrMeta+a');
   await page.getByRole('button', { name: 'Text colour' }).click();
   await page.screenshot({ path: `test-results/composer-colors-${test.info().project.name}.png` });
-  await page.getByRole('button', { name: '#e5484d' }).click();
+  await page.getByRole('button', { name: 'Red', exact: true }).click();
   await expect(composer).toHaveText('$[fg.color=e5484d red words]');
 }
 

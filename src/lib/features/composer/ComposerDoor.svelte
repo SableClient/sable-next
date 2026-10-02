@@ -3,8 +3,8 @@
   import { DropdownMenu } from 'bits-ui';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
+  import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
-  import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -20,7 +20,7 @@
     onPick: (accept: string) => void;
     onPoll?: () => void;
     onLocation?: () => void;
-    onVoice?: () => void;
+    onSchedule?: () => void;
     onBeforeOpen?: () => void;
   }
 
@@ -30,7 +30,7 @@
     onPick,
     onPoll,
     onLocation,
-    onVoice,
+    onSchedule,
     onBeforeOpen,
   }: Props = $props();
   let open = $state(false);
@@ -91,10 +91,10 @@
             {$i18n.t('composer.location')}
           </DropdownMenu.Item>
         {/if}
-        {#if onVoice}
-          <DropdownMenu.Item class="menu-item" onclick={onVoice}>
-            <MicrophoneIcon />
-            {$i18n.t('composer.voiceMessage')}
+        {#if onSchedule}
+          <DropdownMenu.Item class="menu-item" onclick={onSchedule}>
+            <ClockIcon />
+            {$i18n.t('composer.scheduleMessage')}
           </DropdownMenu.Item>
         {/if}
       </DropdownMenu.Content>
@@ -168,17 +168,17 @@
           {$i18n.t('composer.location')}
         </Button>
       {/if}
-      {#if onVoice}
+      {#if onSchedule}
         <Button
           variant="ghost"
           class="door-action"
           onclick={() => {
             open = false;
-            onVoice();
+            onSchedule();
           }}
         >
-          <MicrophoneIcon />
-          {$i18n.t('composer.voiceMessage')}
+          <ClockIcon />
+          {$i18n.t('composer.scheduleMessage')}
         </Button>
       {/if}
     </div>
@@ -204,8 +204,14 @@
     width: 100%;
   }
 
-  :global(.door-action:hover:not(:disabled)) {
-    background: var(--surface-container-hover);
+  @media (hover: hover) and (pointer: fine) {
+    :global(.door-action:hover:not(:disabled)) {
+      background: var(--surface-container-hover);
+    }
+
+    :global(.composer-door:hover) {
+      background: var(--surface-container-hover);
+    }
   }
 
   :global(.door-action svg) {
@@ -219,7 +225,7 @@
     background: transparent;
     border: 0;
     border-radius: var(--radius);
-    color: var(--primary-main);
+    color: var(--surface-var-on-container);
     cursor: pointer;
     display: flex;
     flex: 0 0 auto;
@@ -234,10 +240,6 @@
     content: '';
     inset: calc((var(--target) - var(--target-hit)) / 2);
     position: absolute;
-  }
-
-  :global(.composer-door:hover) {
-    background: var(--surface-container-hover);
   }
 
   :global(.composer-door:disabled) {

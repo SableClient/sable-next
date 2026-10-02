@@ -8,11 +8,15 @@
   } from '#src/generated/protocol';
   import { mergeProps, Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
+  import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
+  import ArrowsInSimpleIcon from 'phosphor-svelte/lib/ArrowsInSimpleIcon';
+  import ArrowsOutSimpleIcon from 'phosphor-svelte/lib/ArrowsOutSimpleIcon';
   import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperPlaneIcon from 'phosphor-svelte/lib/PaperPlaneTiltIcon';
   import TextAaIcon from 'phosphor-svelte/lib/TextAaIcon';
+  import TrashIcon from 'phosphor-svelte/lib/TrashIcon';
   import type { Node as ProseMirrorNode } from 'prosemirror-model';
-  import { onDestroy, untrack } from 'svelte';
+  import { onDestroy, tick, untrack } from 'svelte';
 
   import type { OutgoingMentions } from '#lib/core/client.svelte.js';
   import type { SendAttachmentOptions } from '#lib/core/commands.svelte.js';
@@ -37,7 +41,6 @@
   import { isMacPlatform } from '#lib/ui/shortcuts/global-shortcuts.js';
   import { cachedMediaUrl, holdMediaUrl, loadMediaUrl } from '#lib/ui/media-url.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
-  import Alert from '#lib/ui/primitives/Alert.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Spinner from '#lib/ui/primitives/Spinner.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -49,6 +52,7 @@
   import type { GifResult } from '#lib/features/gif/providers.js';
   import ComposerBoard from './ComposerBoard.svelte';
   import ComposerContextBanner from './ComposerContextBanner.svelte';
+  import ComposerError from './ComposerError.svelte';
   import ComposerDoor from './ComposerDoor.svelte';
   import PersonaPicker from './PersonaPicker.svelte';
   import PollComposer from './PollComposer.svelte';
@@ -224,7 +228,8 @@
   let boardTab = $state<BoardTab>('emoticon');
   let boardQuery = $state('');
   let recording = $state(false);
-  let micDenied = $state(false);
+  let expanded = $state(false);
+  let recordingDraft: ProseMirrorNode | undefined;
   const voiceSupported = isVoiceRecordingSupported();
 
   function isGifSearchAction(value: unknown): value is ConversationSendResult {
@@ -241,6 +246,7 @@
   let staged = $state<StagedFile[]>([]);
   let inFlight = $state(0);
   let error = $state<string | null>(null);
+  let retry = $state<{ text: string; run: () => void } | null>(null);
   let pollOpen = $state(false);
   let locationOpen = $state(false);
   let scheduleOpen = $state(false);
@@ -287,26 +293,51 @@
   let hasContent = $derived(!empty || staged.length > 0 || editingCaption);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
   let editingScheduled = $derived(context?.kind === 'schedule');
-  let primaryAction = $derived(
-    !hasContent &&
-      !canDeleteEdited &&
-      preferences.composerVoiceButton &&
-      voiceSupported &&
-      !micDenied
-      ? 'record'
-      : 'send'
-  );
+  let showVoice = $derived(context?.kind !== 'edit' && !editingScheduled && voiceSupported);
   let sendLabel = $derived(
-    primaryAction === 'record'
-      ? $i18n.t('composer.voiceRecord')
-      : editingScheduled
-        ? $i18n.t('composer.scheduledSave')
+    editingScheduled
+      ? $i18n.t('composer.scheduledSave')
+      : context?.kind === 'edit'
+        ? !hasContent && canDeleteEdited
+          ? $i18n.t('timeline.deleteMessage')
+          : $i18n.t('composer.saveChanges')
         : $i18n.t('timeline.sendMessage')
+  );
+  let contextAnnouncement = $derived(
+    context?.kind === 'edit'
+      ? $i18n.t('composer.editing')
+      : context?.kind === 'schedule'
+        ? $i18n.t('composer.editingScheduled')
+        : context?.kind === 'reply'
+          ? $i18n.t('composer.replyingTo', { name: context.sender ?? '' })
+          : ''
   );
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
-  let canSchedule = $derived(
-    onSchedule !== undefined && primaryAction === 'send' && hasContent && !readOnly
+  let canSchedule = $derived(onSchedule !== undefined && hasContent && !readOnly);
+  let sendShortcut = $derived(preferences.enterForNewline ? 'Shift+Enter' : 'Enter');
+  let keyboardHint = $derived(
+    $i18n.t(
+      !hasContent && canDeleteEdited
+        ? 'composer.deleteHint'
+        : context?.kind === 'edit' || editingScheduled
+          ? 'composer.editHint'
+          : 'composer.sendHint',
+      {
+        shortcut: sendShortcut,
+        newline: preferences.enterForNewline ? 'Enter' : 'Shift+Enter',
+      }
+    )
+  );
+  let sendTooltip = $derived(
+    desktop
+      ? $i18n.t(canSchedule ? 'composer.sendScheduleTooltip' : 'composer.sendTooltip', {
+          action: sendLabel,
+          shortcut: sendShortcut,
+        })
+      : canSchedule
+        ? $i18n.t('composer.scheduleTooltip', { action: sendLabel })
+        : sendLabel
   );
 
   const sendPress = new LongPress({
@@ -407,8 +438,16 @@
   let active = $derived(Math.min(activeIndex, Math.max(0, suggestions.length - 1)));
   let placeholder = $derived(
     staged.length > 0
-      ? $i18n.t('composer.addMessageOrSend')
-      : $i18n.t('timeline.messagePlaceholder')
+      ? $i18n.t(
+          staged.length === 1 && preferences.sendAttachmentAsCaption
+            ? 'composer.addCaptionOrSend'
+            : 'composer.addMessageOrSend'
+        )
+      : context?.kind === 'reply' && context.sender
+        ? $i18n.t('composer.replyPlaceholder', { name: context.sender })
+        : roomName
+          ? $i18n.t('composer.roomPlaceholder', { room: roomName })
+          : $i18n.t('timeline.messagePlaceholder')
   );
 
   const media: EmoteMedia = {
@@ -796,6 +835,12 @@
     return $i18n.t(key, values);
   }
 
+  function failRetryably(cause: unknown, run: () => void): void {
+    const failure = sendFailure(cause);
+    error = $i18n.t(failure.key, failure.values);
+    retry = failure.retryable ? { text: error, run } : null;
+  }
+
   async function send(): Promise<void> {
     if (readOnly) return;
     if (editingScheduled) {
@@ -897,7 +942,7 @@
       console.debug('[sable composer] send failed', cause);
       if (doc && editor.isEmpty()) editor.setDoc(doc);
       staged = [...unsent, ...staged];
-      error = failureText(cause);
+      failRetryably(cause, () => void send());
     } finally {
       inFlight -= 1;
     }
@@ -958,8 +1003,21 @@
     }
   }
 
-  async function sendVoice(file: File): Promise<void> {
+  function startRecording(): void {
+    recordingDraft = editor.doc();
+    recording = true;
+  }
+
+  async function stopRecording(): Promise<void> {
+    const draft = recordingDraft;
+    recordingDraft = undefined;
     recording = false;
+    await tick();
+    if (draft && editor.isEmpty()) editor.setDoc(draft);
+  }
+
+  async function sendVoice(file: File): Promise<void> {
+    void stopRecording();
     inFlight += 1;
     error = null;
 
@@ -969,7 +1027,7 @@
       });
     } catch (cause) {
       console.debug('[sable composer] voice message failed', cause);
-      error = failureText(cause);
+      failRetryably(cause, () => void sendVoice(file));
     } finally {
       inFlight -= 1;
     }
@@ -1339,6 +1397,15 @@
             />
           {/key}
         {/if}
+        {#if error}
+          <ComposerError
+            message={error}
+            onRetry={retry?.text === error ? retry.run : undefined}
+            onDismiss={() => {
+              error = null;
+            }}
+          />
+        {/if}
         {#if staged.length > 0}
           <ComposerAttachments
             files={staged}
@@ -1360,26 +1427,10 @@
             }}
           />
         {/if}
-        {#if formattingOpen}
-          <ComposerFormatting
-            active={activeFormats}
-            source={sourceMode}
-            markdown={sourceMode || !richText}
-            colors={activeColors}
-            onFormat={(action: FormatAction) => {
-              editor.format(action);
-            }}
-            onColor={(kind: ColorKind, value: string | null) => {
-              editor.applyColor(kind, value);
-            }}
-            onToggleSource={() => {
-              sourceMode = editor.toggleSource();
-            }}
-          />
-        {/if}
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
+          class:formatting-open={formattingOpen}
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
@@ -1395,10 +1446,7 @@
                 void sendVoice(file);
               }}
               onCancel={() => {
-                recording = false;
-              }}
-              onDenied={() => {
-                micDenied = true;
+                void stopRecording();
               }}
             />
           {:else}
@@ -1416,14 +1464,15 @@
                       locationOpen = true;
                     }
                   : undefined}
-                onVoice={!preferences.composerVoiceButton && voiceSupported && !micDenied
+                onSchedule={canSchedule
                   ? () => {
-                      recording = true;
+                      scheduleOpen = true;
                     }
                   : undefined}
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
             </div>
+            <p class="composer-keyboard-hint" aria-hidden="true">{keyboardHint}</p>
             <input
               bind:this={fileInput}
               class="composer-file"
@@ -1436,8 +1485,46 @@
               onchange={stageFromInput}
             />
             <div class="composer-field">
-              <ComposerEditorView {editor} {showPlaceholder} {placeholder} />
+              <ComposerEditorView {editor} {showPlaceholder} {placeholder} {expanded} />
+              <Tooltip label={$i18n.t(expanded ? 'composer.collapse' : 'composer.expand')}>
+                {#snippet trigger({ props })}
+                  <IconButton
+                    {...mergeProps(props, {
+                      onclick: () => {
+                        expanded = !expanded;
+                        editor.focus();
+                      },
+                    })}
+                    variant="ghost"
+                    size="small"
+                    class="composer-expand"
+                    aria-pressed={expanded}
+                    label={$i18n.t('composer.expand')}
+                  >
+                    {#if expanded}<ArrowsInSimpleIcon />{:else}<ArrowsOutSimpleIcon />{/if}
+                  </IconButton>
+                {/snippet}
+              </Tooltip>
             </div>
+            {#if formattingOpen}
+              <div class="composer-formatting">
+                <ComposerFormatting
+                  active={activeFormats}
+                  source={sourceMode}
+                  markdown={sourceMode || !richText}
+                  colors={activeColors}
+                  onFormat={(action: FormatAction) => {
+                    editor.format(action);
+                  }}
+                  onColor={(kind: ColorKind, value: string | null) => {
+                    editor.applyColor(kind, value);
+                  }}
+                  onToggleSource={() => {
+                    sourceMode = editor.toggleSource();
+                  }}
+                />
+              </div>
+            {/if}
             {#snippet personaButton()}
               <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
             {/snippet}
@@ -1478,17 +1565,27 @@
                   ...(preferences.composerFormatButton && { format: formatButton }),
                 }}
               />
-              <div class="composer-separator"></div>
-              <Tooltip label={sendLabel}>
+              {#if showVoice}
+                <Tooltip label={$i18n.t('composer.voiceRecord')}>
+                  {#snippet trigger({ props })}
+                    <IconButton
+                      {...mergeProps(props, {
+                        onclick: startRecording,
+                      })}
+                      variant="ghost"
+                      size="small"
+                      class="composer-voice"
+                      label={$i18n.t('composer.voiceRecord')}
+                    >
+                      <MicrophoneIcon />
+                    </IconButton>
+                  {/snippet}
+                </Tooltip>
+              {/if}
+              <Tooltip label={sendTooltip}>
                 {#snippet trigger({ props })}
                   <IconButton
                     {...mergeProps(props, {
-                      onclick:
-                        primaryAction === 'record'
-                          ? () => {
-                              recording = true;
-                            }
-                          : undefined,
                       onpointerdown: sendPress.start,
                       onpointermove: sendPress.move,
                       onpointerup: sendPress.lift,
@@ -1501,13 +1598,13 @@
                         }
                       },
                     })}
-                    type={primaryAction === 'record' ? 'button' : 'submit'}
+                    type="submit"
                     variant="ghost"
                     size="small"
                     class="composer-send"
                     data-pressing={sendPress.pressing || undefined}
                     style="--press-ms: {SCHEDULE_PRESS_MS}ms"
-                    disabled={primaryAction === 'send' && !hasContent && !canDeleteEdited}
+                    disabled={!hasContent && !canDeleteEdited}
                     label={sendLabel}
                     onpointercancel={sendPress.end}
                     oncontextmenu={(event: MouseEvent) => {
@@ -1523,10 +1620,14 @@
                       if (hasContent) event.preventDefault();
                     }}
                   >
-                    {#if primaryAction === 'record'}
-                      <MicrophoneIcon />
-                    {:else if sending}
+                    {#if sending}
                       <Spinner small />
+                    {:else if context?.kind === 'edit' || editingScheduled}
+                      {#if !hasContent && canDeleteEdited}
+                        <TrashIcon />
+                      {:else}
+                        <CheckIcon weight="bold" />
+                      {/if}
                     {:else}
                       <PaperPlaneIcon weight="fill" />
                     {/if}
@@ -1555,15 +1656,11 @@
           />
         {/if}
         <div class="composer-measurer" bind:this={measurerEl} aria-hidden="true"></div>
-        <p class="screen-reader-only" id={hintId}>
-          {preferences.enterForNewline
-            ? $i18n.t('composer.hintSendModifier')
-            : $i18n.t('composer.hintSend')}
-        </p>
+        <p class="screen-reader-only" id={hintId}>{keyboardHint}</p>
+        <p class="screen-reader-only" aria-live="polite">{contextAnnouncement}</p>
       </div>
     </div>
   {/if}
-  {#if error}<Alert class="send-error" variant="critical" role="alert">{error}</Alert>{/if}
 </div>
 
 {#if onSendLocation}
@@ -1669,11 +1766,11 @@
   }
 
   .composer {
-    /* The panel behind is surface-container, so the fill has to be the variant. */
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
     border-radius: var(--radius);
     color: var(--surface-var-on-container);
+    container-type: inline-size;
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
@@ -1682,7 +1779,6 @@
     width: 100%;
   }
 
-  /* The text entry only: `:focus-within` ringed the bar for every button too. */
   .composer:has(:global([contenteditable='true']):focus) {
     border-color: var(--primary-main);
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
@@ -1728,9 +1824,9 @@
     display: grid;
     gap: var(--space-100);
     grid-template-areas:
-      'field field'
-      'before after';
-    grid-template-columns: auto 1fr;
+      'field field field'
+      'before hint after';
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: var(--space-100);
     width: 100%;
   }
@@ -1739,11 +1835,46 @@
     display: none;
   }
 
+  .composer-row.formatting-open {
+    grid-template-areas:
+      'field field field'
+      'before formatting after';
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .composer-formatting {
+    grid-area: formatting;
+    min-width: 0;
+  }
+
   .composer-before,
   .composer-after {
     align-items: center;
     display: flex;
     gap: var(--space-100);
+  }
+
+  @container (width < 24rem) {
+    .composer-row {
+      grid-template-areas:
+        'field field'
+        'before after';
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .composer-row.formatting-open {
+      grid-template-areas:
+        'field field'
+        'formatting formatting'
+        'before after';
+    }
+
+    .composer-after {
+      flex-wrap: wrap;
+      gap: 0;
+      justify-content: end;
+      min-width: 0;
+    }
   }
 
   .composer-row > :global(.voice-recorder) {
@@ -1781,11 +1912,44 @@
     position: relative;
   }
 
+  .composer-keyboard-hint {
+    display: none;
+    font-size: var(--font-size-small);
+    grid-area: hint;
+    margin: 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composer-row.formatting-open .composer-keyboard-hint {
+    display: none;
+  }
+
+  @media (pointer: fine) {
+    @container (width >= 32rem) {
+      .composer-keyboard-hint {
+        display: block;
+      }
+    }
+
+    @container (width >= 44rem) {
+      .composer-formatting :global(.formatting) {
+        flex-wrap: wrap;
+        height: auto;
+        justify-content: end;
+        overflow: visible;
+      }
+    }
+  }
+
   :global(.composer-separator) {
     align-self: center;
-    border-left: var(--border-width-400) solid var(--primary-container-line, rebeccapurple);
-    height: var(--size-x200);
-    width: 1px;
+    border-left: var(--border-width-500) solid var(--surface-var-container-line);
+    border-radius: var(--radius-pill);
+    height: var(--size-x400);
+    margin-inline: var(--space-100);
   }
 
   .composer-before {
@@ -1795,7 +1959,7 @@
 
   .composer-after {
     grid-area: after;
-    justify-self: end;
+    place-self: end;
   }
 
   .composer-file {
@@ -1829,7 +1993,8 @@
     width: var(--icon-size-small);
   }
 
-  :global(.composer-send) {
+  :global(.composer-send),
+  :global(.composer-voice) {
     border-radius: var(--radius);
     color: var(--primary-main);
     height: var(--target);
@@ -1838,19 +2003,27 @@
     width: var(--target);
   }
 
-  :global(.composer-send)::after {
+  :global(.composer-voice) {
+    color: var(--surface-var-on-container);
+  }
+
+  :global(.composer-send)::after,
+  :global(.composer-voice)::after {
     border-radius: inherit;
     content: '';
     inset: calc((var(--target) - var(--target-hit)) / 2);
     position: absolute;
   }
 
-  :global(.composer-send:disabled) {
+  :global(.composer-send:disabled),
+  :global(.composer-voice:disabled) {
     color: var(--sec-main);
   }
 
   :global(.composer-send:not(:disabled):hover),
-  :global(.composer-send:not(:disabled):focus-visible) {
+  :global(.composer-send:not(:disabled):focus-visible),
+  :global(.composer-voice:not(:disabled):hover),
+  :global(.composer-voice:not(:disabled):focus-visible) {
     background: var(--surface-container-hover);
   }
 
@@ -1858,15 +2031,11 @@
     background: var(--surface-container-hover);
   }
 
-  :global(.composer-send svg) {
+  :global(.composer-send svg),
+  :global(.composer-voice svg) {
     display: block;
     height: var(--icon-size-small);
     width: var(--icon-size-small);
-  }
-
-  :global(.send-error) {
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -1882,5 +2051,21 @@
     .composer {
       transition: border-color var(--motion-fast) var(--motion-easing-standard);
     }
+  }
+
+  .composer-field :global(.icon-button-small.composer-expand) {
+    --button-height: var(--size-x500);
+    --button-icon-size: var(--size-x50);
+
+    color: var(--sec-main);
+    inset-block-start: var(--space-050);
+    inset-inline-end: var(--space-050);
+    position: absolute;
+  }
+
+  .composer-field :global(.composer-expand)::after {
+    content: '';
+    inset: calc((var(--size-x500) - var(--target-hit)) / 2);
+    position: absolute;
   }
 </style>
