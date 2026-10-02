@@ -14,11 +14,13 @@ matrix-sdk-common = { version = "0.19.1", git = "https://github.com/matrix-org/m
 matrix-sdk = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e", default-features = false, features = [
   "e2e-encryption",
   "unstable-msc4274",
+  "unstable-msc4354",
   "experimental-send-custom-to-device",
   "federation-api",
 ] }
 matrix-sdk-ui = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e", features = [
   "unstable-msc4274",
+  "unstable-msc4354",
 ] }
 matrix-sdk-base = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e", default-features = false, features = [
   "e2e-encryption",

@@ -16,31 +16,48 @@ export class RoomPanels {
 
   openThread(rootEventId: string): void {
     this.reset();
+    this.widgetsOpen = false;
+    this.membersOpen = false;
     this.threadRootId = rootEventId;
   }
 
+  #closeAll(): void {
+    this.reset();
+    this.membersOpen = false;
+    this.desktopMembersOpen = false;
+    this.widgetsOpen = false;
+  }
+
   toggleThreads(): void {
-    this.threadsOpen = !this.threadsOpen;
-    this.attachmentsOpen = false;
-    this.searchOpen = false;
+    const open = !this.threadsOpen;
+    this.#closeAll();
+    this.threadsOpen = open;
   }
 
   toggleAttachments(): void {
-    this.attachmentsOpen = !this.attachmentsOpen;
-    this.threadsOpen = false;
-    this.searchOpen = false;
+    const open = !this.attachmentsOpen;
+    this.#closeAll();
+    this.attachmentsOpen = open;
   }
 
   toggleSearch(): void {
-    this.searchOpen = !this.searchOpen;
-    this.threadsOpen = false;
-    this.attachmentsOpen = false;
-    if (this.searchOpen) this.desktopMembersOpen = false;
+    const open = !this.searchOpen;
+    this.#closeAll();
+    this.searchOpen = open;
+  }
+
+  toggleWidgets(): void {
+    const open = !this.widgetsOpen;
+    this.#closeAll();
+    this.widgetsOpen = open;
   }
 
   toggleMembers(desktop: boolean): boolean {
-    if (desktop) return (this.desktopMembersOpen = !this.desktopMembersOpen);
-    return (this.membersOpen = !this.membersOpen);
+    const open = !(desktop ? this.desktopMembersOpen : this.membersOpen);
+    this.#closeAll();
+    if (desktop) this.desktopMembersOpen = open;
+    else this.membersOpen = open;
+    return open;
   }
 
   closeMembers(desktop: boolean): void {

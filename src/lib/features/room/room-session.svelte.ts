@@ -73,10 +73,13 @@ export class RoomDetails {
   }
 
   async removeWidget(widgetId: string): Promise<void> {
-    const roomId = this.#roomId;
+    await this.commands.sendStateEvent(this.#roomId, 'im.vector.modular.widgets', widgetId, {});
+    await this.refreshWidgets();
+  }
+
+  async refreshWidgets(): Promise<void> {
     const generation = this.#generation;
-    await this.commands.sendStateEvent(roomId, 'im.vector.modular.widgets', widgetId, {});
-    const widgets = await this.commands.roomStateEvents(roomId, 'im.vector.modular.widgets');
+    const widgets = await this.commands.roomStateEvents(this.#roomId, 'im.vector.modular.widgets');
     if (generation === this.#generation) this.widgets = parseWidgets(widgets);
   }
 }

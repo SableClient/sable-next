@@ -9,7 +9,7 @@ use wiremock::{
     matchers::{method, path_regex},
 };
 
-use super::{StickySync, send, send_delayed};
+use super::{StickySync, live_events, send, send_delayed};
 
 async fn room() -> (MatrixMockServer, matrix_sdk::Room) {
     let server = MatrixMockServer::new().await;
@@ -355,4 +355,48 @@ async fn test_delayed_send_refreshes_expired_credentials_and_preserves_sticky_qu
             == "org.matrix.msc4354.sticky_duration_ms"
             && value == "3600000")
     );
+}
+
+#[async_test]
+async fn test_members_in_the_sdk_sticky_map_feed_the_call() {
+    let (_server, room) = room().await;
+    let now = super::super::keys::now_ms();
+    let mut response = ruma::api::client::sync::sync_events::v5::Response::new("1".to_owned());
+    let mut sticky_room =
+        ruma::api::client::sync::sync_events::v5::response::StickyEventsRoom::default();
+    sticky_room.events.push(
+        ruma::serde::Raw::new(&json!({
+            "type": "m.rtc.member", "sender": "@other:example.org", "event_id": "$member",
+            "origin_server_ts": now, "msc4354_sticky": {"duration_ms": 900_000},
+            "content": {
+                "msc4354_sticky_key": "member", "slot_id": "m.call#ROOM",
+                "application": {"type": "m.call"},
+                "member": {"user_id": "@other:example.org", "device_id": "PHONE", "id": "member"},
+                "transports": {"published": [{"type": "livekit", "livekit_service_url": "https://sfu.example"}]}
+            }
+        }))
+        .unwrap()
+        .cast_unchecked(),
+    );
+    response
+        .extensions
+        .sticky_events
+        .rooms
+        .insert(room.room_id().to_owned(), sticky_room);
+    room.client()
+        .process_sliding_sync_test_helper(
+            &response,
+            &matrix_sdk_base::RequestedRequiredStates::default(),
+        )
+        .await
+        .unwrap();
+
+    let mut members = super::super::membership::StickyMemberships::default();
+    for event in live_events(&room) {
+        members.apply(&event, now);
+    }
+
+    let members = members.members(now);
+    assert_eq!(members.len(), 1);
+    assert_eq!(members[0].user_id, "@other:example.org");
 }

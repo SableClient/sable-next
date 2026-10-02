@@ -5,6 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [features]
+default = ["client"]
+client = []
+server = []
 unoptimized-build = []
 typegen = ["dep:specta", "dep:specta-serde", "dep:specta-typescript"]
 

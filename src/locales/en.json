@@ -3298,6 +3298,18 @@
     "capabilityReceiveState": "Read this room’s settings",
     "capabilitySendToDevice": "Send data directly to your other devices",
     "capabilityReceiveToDevice": "Receive data from your other devices",
+    "capabilityNavigate": "Open rooms and people in the app",
+    "capabilityTurnServers": "Use your homeserver’s call relay servers",
+    "capabilityUserDirectory": "Search the user directory",
+    "capabilityUploadFile": "Upload files to your homeserver",
+    "capabilityDownloadFile": "Download files from your homeserver",
+    "capabilityDelayedSend": "Schedule events to send later",
+    "capabilityDelayedUpdate": "Cancel, restart or send its scheduled events",
+    "capabilityStickySend": "Send events that stay active for a while",
+    "capabilityStickyReceive": "Read events that stay active for a while",
+    "capabilityRtcTransports": "Find your homeserver’s call servers",
+    "capabilityLivekitToken": "Get access to your homeserver’s call server",
+    "capabilityLivekitLeave": "Let your homeserver end your call if you disconnect",
     "capabilityOther": "{{capability}}"
   },
   "pdf": {

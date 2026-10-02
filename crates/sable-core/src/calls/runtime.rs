@@ -10,6 +10,7 @@ use matrix_sdk::ruma::{OwnedDeviceId, OwnedRoomId, OwnedUserId, TransactionId};
 use matrix_sdk::{Client, Room};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
+use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{Mutex, Notify};
 
 use super::keys::{self, KeyDistributor, Rolled};
@@ -247,6 +248,9 @@ async fn discover(
         } else {
             tracing::warn!("sticky call membership sync is unavailable");
         }
+    }
+    for event in sticky::live_events(room) {
+        sticky_members.apply(&event, keys::now_ms());
     }
     let slot_closed = sticky_sync.is_some() && super::slot_closed(room).await;
     let mut members = membership::active_members(room).await;
@@ -1083,11 +1087,17 @@ fn updates(
 ) -> crate::Task {
     spawn(async move {
         let mut renewed = keys::now_ms();
+        let mut sdk_sticky = room.sticky_events().subscribe();
+        let mut sdk_sticky_open = true;
         loop {
             if let Some(sync) = sync.as_mut() {
                 let synced = tokio::select! {
                     synced = sync.sync(&room, UPDATE_INTERVAL) => Some(synced),
                     () = wake.notified() => None,
+                    update = sdk_sticky.recv(), if sdk_sticky_open => {
+                        sdk_sticky_open = !matches!(update, Err(RecvError::Closed));
+                        None
+                    }
                 };
                 match synced {
                     Some(Ok(events)) => {
@@ -1113,6 +1123,15 @@ fn updates(
                 tokio::select! {
                     () = matrix_sdk::sleep::sleep(UPDATE_INTERVAL) => {}
                     () = wake.notified() => {}
+                    update = sdk_sticky.recv(), if sdk_sticky_open => {
+                        sdk_sticky_open = !matches!(update, Err(RecvError::Closed));
+                    }
+                }
+            }
+            {
+                let mut state = state.lock().await;
+                for event in sticky::live_events(&room) {
+                    state.sticky.apply(&event, keys::now_ms());
                 }
             }
             if core.session_generation.load(Ordering::SeqCst) != generation {

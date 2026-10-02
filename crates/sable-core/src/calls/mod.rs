@@ -1,11 +1,12 @@
 mod keys;
 mod membership;
+pub(crate) use membership::is_rtc_member_type;
 mod notify;
 
 pub(crate) use notify::is_call_event_type;
 mod runtime;
 mod sfu;
-mod sticky;
+pub(crate) mod sticky;
 
 use std::sync::Arc;
 use std::time::Duration;

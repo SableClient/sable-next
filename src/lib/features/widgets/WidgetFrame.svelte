@@ -1,10 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { resolve } from '$app/paths';
   import { type Capability, ClientWidgetApi, Widget } from 'matrix-widget-api';
 
   import { useCoreClient } from '#lib/core/context.js';
 
   import { SableWidgetDriver } from './widget-driver.js';
+  import { startWidgetFeed } from './widget-feed.js';
 
   interface Props {
     roomId: string;
@@ -31,9 +34,16 @@
 
     if (!node.contentWindow) return;
 
-    const driver = new SableWidgetDriver(core, room, approve);
+    const driver = new SableWidgetDriver(core, room, approve, (permalink) =>
+      goto(resolve('/(app)/to/[...permalink]', { permalink }))
+    );
     const api = new ClientWidgetApi(new Widget(definition), node, driver);
     api.setViewedRoomId(room);
+    core.commands
+      .knownRooms()
+      .then((roomIds) => driver.noteRooms(roomIds))
+      .catch(() => undefined);
+    const stopFeed = startWidgetFeed(core, api, driver);
 
     const onReady = (): void => {
       api.updateVisibility(true).catch(() => undefined);
@@ -41,6 +51,7 @@
     api.once('ready', onReady);
 
     return () => {
+      stopFeed();
       api.off('ready', onReady);
       api.stop();
     };
@@ -51,8 +62,8 @@
   class="widget-frame"
   title={name}
   src={url}
-  allow="autoplay; camera; clipboard-write; compute-pressure; display-capture; hid; microphone; screen-wake-lock"
-  sandbox="allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads"
+  allow="autoplay; camera; clipboard-read; clipboard-write; compute-pressure; display-capture; encrypted-media; fullscreen; hid; microphone; screen-wake-lock"
+  sandbox="allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads"
   {@attach widget}
 ></iframe>
 

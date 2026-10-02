@@ -583,8 +583,19 @@
     panels.closeMembers(desktop);
   }
 
+  $effect(() => {
+    const activeRoomId = resolvedRoomId;
+    return core.subscribeEvents((event) => {
+      if (event.type === 'room_widgets_changed' && event.room_id === activeRoomId) {
+        roomSession.details.refreshWidgets().catch((error: unknown) => {
+          console.debug('[sable room] widgets unavailable', error);
+        });
+      }
+    });
+  });
+
   function toggleWidgets(): void {
-    panels.widgetsOpen = !panels.widgetsOpen;
+    panels.toggleWidgets();
   }
 
   function closeWidgets(): void {
@@ -1026,7 +1037,12 @@
           aria-pressed={panels.widgetsOpen}
           onclick={toggleWidgets}
         >
-          <GridFourIcon weight={panels.widgetsOpen ? 'fill' : 'regular'} />
+          <span class="widgets-button-icon">
+            <GridFourIcon weight={panels.widgetsOpen ? 'fill' : 'regular'} />
+            {#if roomSession.widgets.length > 0}
+              <span class="widgets-count" aria-hidden="true">{roomSession.widgets.length}</span>
+            {/if}
+          </span>
         </PanelHeaderButton>
       {/if}
     {/snippet}
@@ -1383,6 +1399,34 @@
 </main>
 
 <style>
+  .widgets-button-icon {
+    display: inline-flex;
+    position: relative;
+  }
+
+  .widgets-button-icon > :global(svg) {
+    height: var(--button-icon-size);
+    width: var(--button-icon-size);
+  }
+
+  .widgets-count {
+    align-items: center;
+    background: var(--sec-main);
+    border-radius: var(--radii-pill);
+    color: var(--sec-on-main);
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-medium);
+    height: var(--size-x50);
+    inset-block-start: calc(var(--space-100) * -1);
+    inset-inline-start: calc(var(--space-100) * -1);
+    justify-content: center;
+    min-width: var(--size-x50);
+    padding: 0 var(--space-100);
+    pointer-events: none;
+    position: absolute;
+  }
+
   .room-view {
     --ghost-hover: var(--surface-container-hover);
     --ghost-active: var(--surface-container-active);

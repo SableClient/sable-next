@@ -46,6 +46,7 @@ import type {
   PushFetchView,
   ReactionShortcodeView,
   RegisteredPusherView,
+  RelationsView,
   RegistrationResultView,
   RoomAttachmentKind,
   RoomAttachmentView,
@@ -60,6 +61,7 @@ import type {
   RoomSummary,
   RoomTag,
   RoomVersionsView,
+  RtcLivekitEndpoint,
   ScheduledMessageView,
   SealedAccountDataView,
   SearchFilter,
@@ -74,6 +76,7 @@ import type {
   SyncStatus,
   TimelineFocusView,
   TimelineItemView,
+  TurnServerView,
   UrlPreviewView,
   UserDirectoryEntryView,
   UserSecurityView,
@@ -1218,6 +1221,7 @@ export function createCommands(transport: () => Transport) {
       roomId: string,
       eventType: string,
       msgtype: string | null,
+      stateKey: string | null,
       limit: number,
       since: string | null
     ): Promise<unknown[]> {
@@ -1226,6 +1230,7 @@ export function createCommands(transport: () => Transport) {
         room_id: roomId,
         event_type: eventType,
         msgtype,
+        state_key: stateKey,
         limit,
         since,
       });
@@ -1266,6 +1271,123 @@ export function createCommands(transport: () => Transport) {
     async openIdToken(): Promise<OpenIdTokenView> {
       const response = await transport().send({ type: 'open_id_token' });
       return response.token;
+    },
+
+    async widgetSendDelayedEvent(
+      roomId: string,
+      eventType: string,
+      stateKey: string | null,
+      content: unknown,
+      delayMs: number,
+      stickyDurationMs: number | null
+    ): Promise<string> {
+      const response = await transport().send({
+        type: 'widget_send_delayed_event',
+        room_id: roomId,
+        event_type: eventType,
+        state_key: stateKey,
+        content,
+        delay_ms: delayMs,
+        sticky_duration_ms: stickyDurationMs,
+      });
+      return response.delay_id;
+    },
+
+    async widgetSendStickyEvent(
+      roomId: string,
+      eventType: string,
+      content: unknown,
+      stickyDurationMs: number
+    ): Promise<string> {
+      const response = await transport().send({
+        type: 'widget_send_sticky_event',
+        room_id: roomId,
+        event_type: eventType,
+        content,
+        sticky_duration_ms: stickyDurationMs,
+      });
+      return response.event_id;
+    },
+
+    async restartDelayedEvent(delayId: string): Promise<void> {
+      await transport().send({ type: 'restart_delayed_event', delay_id: delayId });
+    },
+
+    async widgetSendToDevice(
+      eventType: string,
+      encrypted: boolean,
+      messages: unknown
+    ): Promise<void> {
+      await transport().send({
+        type: 'widget_send_to_device',
+        event_type: eventType,
+        encrypted,
+        messages,
+      });
+    },
+
+    async roomAccountDataRaw(roomId: string, eventType: string): Promise<unknown> {
+      const response = await transport().send({
+        type: 'room_account_data_raw',
+        room_id: roomId,
+        event_type: eventType,
+      });
+      return response.event;
+    },
+
+    async roomStickyEvents(roomId: string): Promise<unknown[]> {
+      const response = await transport().send({ type: 'room_sticky_events', room_id: roomId });
+      return response.events;
+    },
+
+    async roomEventRelations(
+      roomId: string,
+      eventId: string,
+      filter: {
+        relType?: string;
+        eventType?: string;
+        from?: string;
+        to?: string;
+        limit?: number;
+        direction?: PaginationDirection;
+      } = {}
+    ): Promise<RelationsView> {
+      const response = await transport().send({
+        type: 'room_event_relations',
+        room_id: roomId,
+        event_id: eventId,
+        rel_type: filter.relType ?? null,
+        event_type: filter.eventType ?? null,
+        from: filter.from ?? null,
+        to: filter.to ?? null,
+        limit: filter.limit ?? null,
+        direction: filter.direction ?? null,
+      });
+      return response.relations;
+    },
+
+    async turnServer(): Promise<TurnServerView> {
+      const response = await transport().send({ type: 'turn_server' });
+      return response.server;
+    },
+
+    async rtcTransports(): Promise<unknown> {
+      const response = await transport().send({ type: 'rtc_transports' });
+      return response.body;
+    },
+
+    async rtcLivekit(endpoint: RtcLivekitEndpoint, body: unknown): Promise<unknown> {
+      const response = await transport().send({ type: 'rtc_livekit', endpoint, body });
+      return response.body;
+    },
+
+    async setWidgetFeed(enabled: boolean): Promise<void> {
+      await transport().send({ type: 'set_widget_feed', enabled });
+    },
+
+    async knownRooms(): Promise<string[]> {
+      const response = await transport().send({ type: 'known_rooms' });
+      return response.room_ids;
     },
 
     async scheduleMessage(

@@ -60,6 +60,7 @@ use crate::outgoing::{gif_content, location_content, message_content, reply_to, 
 use crate::presence;
 use crate::profiles::profile_view;
 use crate::verification::{encryption_status, sign_out_safety};
+use crate::widgets::RelationsFilter;
 use crate::{Core, SubscriptionKind};
 use crate::{notifications, push_check, push_rules, session, view, webpush};
 
@@ -1474,6 +1475,7 @@ impl Core {
                 room_id,
                 event_type,
                 msgtype,
+                state_key,
                 limit,
                 since,
             } => Ok(CommandOk::RoomTimelineEvents {
@@ -1482,6 +1484,7 @@ impl Core {
                         &room_id,
                         &event_type,
                         msgtype.as_deref(),
+                        state_key.as_deref(),
                         limit,
                         since.as_ref(),
                     )
@@ -1516,6 +1519,98 @@ impl Core {
             }
             Command::OpenIdToken => Ok(CommandOk::OpenIdToken {
                 token: self.openid_token().await?,
+            }),
+            Command::WidgetSendDelayedEvent {
+                room_id,
+                event_type,
+                state_key,
+                content,
+                delay_ms,
+                sticky_duration_ms,
+            } => Ok(CommandOk::WidgetSendDelayedEvent {
+                delay_id: self
+                    .widget_send_delayed_event(
+                        &room_id,
+                        &event_type,
+                        state_key,
+                        content,
+                        delay_ms,
+                        sticky_duration_ms,
+                    )
+                    .await?,
+            }),
+            Command::WidgetSendStickyEvent {
+                room_id,
+                event_type,
+                content,
+                sticky_duration_ms,
+            } => Ok(CommandOk::WidgetSendStickyEvent {
+                event_id: self
+                    .widget_send_sticky_event(&room_id, &event_type, content, sticky_duration_ms)
+                    .await?,
+            }),
+            Command::RestartDelayedEvent { delay_id } => {
+                self.restart_delayed_event(delay_id).await?;
+                Ok(CommandOk::RestartDelayedEvent)
+            }
+            Command::WidgetSendToDevice {
+                event_type,
+                encrypted,
+                messages,
+            } => {
+                self.widget_send_to_device(&event_type, encrypted, messages)
+                    .await?;
+                Ok(CommandOk::WidgetSendToDevice)
+            }
+            Command::RoomAccountDataRaw {
+                room_id,
+                event_type,
+            } => Ok(CommandOk::RoomAccountDataRaw {
+                event: self.room_account_data_raw(&room_id, &event_type).await?,
+            }),
+            Command::RoomStickyEvents { room_id } => Ok(CommandOk::RoomStickyEvents {
+                events: self.room_sticky_events(&room_id).await?,
+            }),
+            Command::RoomEventRelations {
+                room_id,
+                event_id,
+                rel_type,
+                event_type,
+                from,
+                to,
+                limit,
+                direction,
+            } => Ok(CommandOk::RoomEventRelations {
+                relations: self
+                    .room_event_relations(
+                        &room_id,
+                        &event_id,
+                        RelationsFilter {
+                            rel_type: rel_type.as_deref(),
+                            event_type: event_type.as_deref(),
+                            from: from.as_deref(),
+                            to: to.as_deref(),
+                            limit,
+                            direction,
+                        },
+                    )
+                    .await?,
+            }),
+            Command::TurnServer => Ok(CommandOk::TurnServer {
+                server: self.turn_server().await?,
+            }),
+            Command::RtcTransports => Ok(CommandOk::RtcTransports {
+                body: self.rtc_transports().await?,
+            }),
+            Command::RtcLivekit { endpoint, body } => Ok(CommandOk::RtcLivekit {
+                body: self.rtc_livekit(endpoint, &body).await?,
+            }),
+            Command::SetWidgetFeed { enabled } => {
+                self.set_widget_feed(enabled);
+                Ok(CommandOk::SetWidgetFeed)
+            }
+            Command::KnownRooms => Ok(CommandOk::KnownRooms {
+                room_ids: self.known_room_ids().await?,
             }),
             Command::ScheduleMessage {
                 room_id,

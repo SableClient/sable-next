@@ -756,6 +756,8 @@ impl Core {
         self.watch_notification_settings(generation);
         self.watch_space_sidebar(&client, generation);
         self.watch_calendars(&client, generation);
+        self.watch_widget_feed(&client, generation);
+        self.watch_room_widgets(&client, generation);
         self.watch_cosmetics(&client, generation);
         self.watch_bot_commands(&client, generation);
         self.watch_image_packs(&client, generation);

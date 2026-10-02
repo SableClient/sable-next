@@ -84,6 +84,26 @@ impl StickySync {
     }
 }
 
+pub(crate) fn live_events(room: &Room) -> Vec<Value> {
+    room.sticky_events()
+        .live()
+        .iter()
+        .filter_map(|event| {
+            let mut json: Value = serde_json::from_str(event.raw().json().get()).ok()?;
+            let object = json.as_object_mut()?;
+            if !object.contains_key("msc4354_sticky") && !object.contains_key("sticky") {
+                let sent = object.get("origin_server_ts").and_then(Value::as_u64)?;
+                let expires = u64::from(event.expires_at.get());
+                object.insert(
+                    "msc4354_sticky".to_owned(),
+                    serde_json::json!({ "duration_ms": expires.saturating_sub(sent) }),
+                );
+            }
+            Some(json)
+        })
+        .collect()
+}
+
 pub(super) async fn send(
     client: &Client,
     room: &Room,
@@ -102,6 +122,7 @@ pub(super) async fn send(
 #[derive(Clone, Debug)]
 struct DelayedStickyRequest(
     ruma::api::client::delayed_events::delayed_message_event::unstable::Request,
+    u32,
 );
 
 type DelayedRequest = ruma::api::client::delayed_events::delayed_message_event::unstable::Request;
@@ -131,8 +152,9 @@ impl ruma::api::OutgoingRequest for DelayedStickyRequest {
             '?'
         };
         let uri = format!(
-            "{}{separator}org.matrix.msc4354.sticky_duration_ms={STICKY_DURATION_MS}",
-            request.uri()
+            "{}{separator}org.matrix.msc4354.sticky_duration_ms={}",
+            request.uri(),
+            self.1
         );
         *request.uri_mut() = uri.parse().map_err(http::Error::from)?;
         Ok(request)
@@ -145,14 +167,36 @@ pub(super) async fn send_delayed(
     content: Value,
     delay: Duration,
 ) -> Result<String, matrix_sdk::Error> {
+    send_delayed_event(
+        client,
+        room,
+        super::membership::RTC_MEMBER_EVENT_TYPE,
+        content,
+        delay,
+        STICKY_DURATION_MS,
+    )
+    .await
+}
+
+pub(crate) async fn send_delayed_event(
+    client: &Client,
+    room: &Room,
+    event_type: &str,
+    content: Value,
+    delay: Duration,
+    duration_ms: u32,
+) -> Result<String, matrix_sdk::Error> {
     let request = DelayedRequest::new_raw(
         room.room_id().to_owned(),
         ruma::TransactionId::new(),
-        MessageLikeEventType::from(super::membership::RTC_MEMBER_EVENT_TYPE),
+        MessageLikeEventType::from(event_type),
         ruma::api::client::delayed_events::DelayParameters::Timeout { timeout: delay },
         Raw::new(&content)?.cast_unchecked(),
     );
-    Ok(client.send(DelayedStickyRequest(request)).await?.delay_id)
+    Ok(client
+        .send(DelayedStickyRequest(request, duration_ms))
+        .await?
+        .delay_id)
 }
 
 #[cfg(test)]

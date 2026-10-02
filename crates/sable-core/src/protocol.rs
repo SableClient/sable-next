@@ -662,6 +662,8 @@ pub enum Command {
         event_type: String,
         #[serde(default)]
         msgtype: Option<String>,
+        #[serde(default)]
+        state_key: Option<String>,
         #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
         limit: u32,
         #[serde(default)]
@@ -686,6 +688,77 @@ pub enum Command {
         limit: Option<u32>,
     },
     OpenIdToken,
+    WidgetSendDelayedEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[serde(default)]
+        state_key: Option<String>,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        content: serde_json::Value,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        delay_ms: u64,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        sticky_duration_ms: Option<u32>,
+    },
+    WidgetSendStickyEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        event_type: String,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        content: serde_json::Value,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+        sticky_duration_ms: u32,
+    },
+    RestartDelayedEvent {
+        delay_id: String,
+    },
+    WidgetSendToDevice {
+        event_type: String,
+        encrypted: bool,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        messages: serde_json::Value,
+    },
+    RoomAccountDataRaw {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        event_type: String,
+    },
+    RoomStickyEvents {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    RoomEventRelations {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+        #[serde(default)]
+        rel_type: Option<String>,
+        #[serde(default)]
+        event_type: Option<String>,
+        #[serde(default)]
+        from: Option<String>,
+        #[serde(default)]
+        to: Option<String>,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+        limit: Option<u32>,
+        #[serde(default)]
+        direction: Option<PaginationDirection>,
+    },
+    TurnServer,
+    RtcTransports,
+    RtcLivekit {
+        endpoint: RtcLivekitEndpoint,
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        body: serde_json::Value,
+    },
+    SetWidgetFeed {
+        enabled: bool,
+    },
+    KnownRooms,
     ScheduleMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1622,6 +1695,42 @@ pub enum CommandOk {
     OpenIdToken {
         token: OpenIdTokenView,
     },
+    WidgetSendDelayedEvent {
+        delay_id: String,
+    },
+    WidgetSendStickyEvent {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
+    RestartDelayedEvent,
+    WidgetSendToDevice,
+    RoomAccountDataRaw {
+        #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
+        event: Option<serde_json::Value>,
+    },
+    RoomStickyEvents {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<specta_typescript::Unknown>))]
+        events: Vec<serde_json::Value>,
+    },
+    RoomEventRelations {
+        relations: RelationsView,
+    },
+    TurnServer {
+        server: TurnServerView,
+    },
+    RtcTransports {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        body: serde_json::Value,
+    },
+    RtcLivekit {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        body: serde_json::Value,
+    },
+    SetWidgetFeed,
+    KnownRooms {
+        #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
+        room_ids: Vec<OwnedRoomId>,
+    },
     ScheduleMessage {
         delay_id: String,
     },
@@ -2032,6 +2141,19 @@ pub enum CoreEvent {
     },
 
     /// A calendar entry, an answer or a redaction arrived in a calendar room.
+    RoomWidgetsChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
+    WidgetRoomEvent {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        event: serde_json::Value,
+    },
+    WidgetToDevice {
+        #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Unknown))]
+        event: serde_json::Value,
+        encrypted: bool,
+    },
     CalendarChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -3624,6 +3746,33 @@ pub struct UserDirectoryEntryView {
     pub user_id: String,
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+#[serde(rename_all = "snake_case")]
+pub enum RtcLivekitEndpoint {
+    GetToken,
+    DelegateDelayedLeave,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct TurnServerView {
+    pub username: String,
+    pub password: String,
+    pub uris: Vec<String>,
+    #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
+    pub ttl_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct RelationsView {
+    #[cfg_attr(feature = "typegen", specta(type = Vec<specta_typescript::Unknown>))]
+    pub chunk: Vec<serde_json::Value>,
+    pub next_batch: Option<String>,
+    pub prev_batch: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
