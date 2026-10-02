@@ -106,13 +106,13 @@
     {#if searching}
       {@render tiles(search.results)}
     {:else}
-      {#if recent.length > 0}
-        <h3>{$i18n.t('composer.gifRecent')}</h3>
-        {@render tiles(recent)}
-      {/if}
       {#if favorites.length > 0}
         <h3>{$i18n.t('composer.gifFavorites')}</h3>
         {@render tiles(favorites)}
+      {/if}
+      {#if recent.length > 0}
+        <h3>{$i18n.t('composer.gifRecent')}</h3>
+        {@render tiles(recent)}
       {/if}
     {/if}
     <p class="gif-attribution">
