@@ -147,6 +147,7 @@
   const touches = new SvelteMap<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
+  let pinchCenter: Vector2 | null = null;
   let panPointerId: number | null = null;
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
@@ -383,6 +384,15 @@
     return Math.hypot(second.x - first.x, second.y - first.y);
   }
 
+  function center(): Vector2 | null {
+    if (touches.size !== 2) return null;
+    const [first, second] = [...touches.values()] as [
+      { x: number; y: number },
+      { x: number; y: number },
+    ];
+    return { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+  }
+
   function toggleFileZoom(event: MouseEvent): void {
     if (!isPdf || event.button !== 0 || event.target instanceof HTMLButtonElement) return;
     setZoom(zoom === 1 ? 2 : 1);
@@ -410,6 +420,7 @@
       if (touches.size === 2) {
         pinchDistance = distance();
         pinchZoom = zoom;
+        pinchCenter = center();
         panPointerId = null;
         dragging = true;
         endSwipe();
@@ -453,7 +464,7 @@
     if (event.pointerType === 'touch' && touches.has(event.pointerId)) {
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size === 2 && pinchDistance > 0) {
-        setZoom(pinchZoom * (distance() / pinchDistance));
+        trackPinchZoom();
         return;
       }
     }
@@ -485,6 +496,21 @@
     }
     if (swipe.axis === 'vertical') swipeY = dy;
     if (swipe.axis === 'horizontal') swipeX = dx;
+  }
+
+  function trackPinchZoom() {
+    const newPinchCenter = center();
+    if (newPinchCenter) {
+      const nextZoom = pinchZoom * (distance() / pinchDistance);
+      zoomTowards({ clientX: newPinchCenter.x, clientY: newPinchCenter.y }, nextZoom);
+    }
+    if (newPinchCenter && pinchCenter) {
+      pan = clampCurrentPan({
+        x: pan.x + (newPinchCenter.x - pinchCenter.x),
+        y: pan.y + (newPinchCenter.y - pinchCenter.y),
+      });
+    }
+    pinchCenter = newPinchCenter;
   }
 
   function endSwipe(): void {
