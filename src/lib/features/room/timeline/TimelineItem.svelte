@@ -1104,8 +1104,9 @@
   .message {
     display: flex;
     gap: var(--timeline-row-gap);
+    margin-inline: calc(-1 * var(--page-gutter));
     overflow-wrap: anywhere;
-    padding: var(--timeline-row-padding) 0;
+    padding: var(--timeline-row-padding) var(--page-gutter);
     position: relative;
   }
 
@@ -1197,7 +1198,7 @@
   }
 
   .message.collapsed {
-    padding-left: calc(var(--avatar-size-small) + var(--timeline-row-gap));
+    padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap));
     padding-top: 0;
   }
 
@@ -1290,21 +1291,6 @@
   }
 
   @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
-    .message {
-      margin-inline: calc(-1 * var(--page-gutter));
-      padding-inline: var(--page-gutter);
-    }
-
-    .message.collapsed {
-      padding-left: calc(var(--page-gutter) + var(--avatar-size-small) + var(--timeline-row-gap));
-    }
-
-    /* `:root` outranks the layout block at the end of the file, which carries
-       the same three classes and would otherwise win on source order. */
-    :root .message.layout-compact.collapsed {
-      padding-inline: var(--page-gutter);
-    }
-
     /* Matches the base mention rule's specificity, so the gutter the row's
        negative margin assumes survives. */
     .message.mention-silent,
@@ -1748,7 +1734,7 @@
   }
 
   .message.layout-compact.collapsed {
-    padding-inline: 0;
+    padding-inline: var(--page-gutter);
   }
 
   .compact-gutter {
