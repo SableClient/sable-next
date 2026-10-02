@@ -11,8 +11,6 @@ declare global {
       settings?: { section: string; focus?: string };
       /** Open overlay levels, one history entry each, so back closes the top one. */
       overlay?: number;
-      /** Inbox opened as a shallow route over the page it was opened from. */
-      inbox?: true;
       /** Phone room-list drawer state, kept in history for native back gestures. */
       mobileDrawer?: 'open' | 'closed';
       mobileDrawerBack?: true;

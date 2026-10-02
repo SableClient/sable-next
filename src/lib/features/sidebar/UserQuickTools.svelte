@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
   import {
@@ -62,30 +61,6 @@
       return;
     }
 
-    if (
-      href === '/inbox' &&
-      (page.url.pathname === href || page.state.inbox === true) &&
-      !event.shiftKey &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      event.button === 0
-    ) {
-      event.preventDefault();
-      history.back();
-      return;
-    }
-
-    if (
-      href === '/inbox' &&
-      !event.shiftKey &&
-      !event.metaKey &&
-      !event.ctrlKey &&
-      event.button === 0
-    ) {
-      event.preventDefault();
-      void goto('', { shallow: true, state: { ...page.state, inbox: true } });
-    }
-
     if (href === '/settings' && !mobile) {
       openSettingsOver(event, defaultSettingsSection());
       if (event.defaultPrevented) return;
@@ -101,9 +76,6 @@
   }
 
   function isToolActive(href: string): boolean {
-    if (href === '/inbox') {
-      return (!mobile && page.state.inbox === true) || page.url.pathname === href;
-    }
     if (href === '/rooms')
       return ROOM_LIST_PATHS.some((path) => page.url.pathname.startsWith(path));
     return page.url.pathname.startsWith(href);
@@ -224,11 +196,7 @@
             {/if}
           </a>
         {/snippet}
-        <Tooltip
-          label={$i18n.t(item.label)}
-          disabled={item.href === '/inbox' && page.state.inbox === true}
-          {trigger}
-        />
+        <Tooltip label={$i18n.t(item.label)} {trigger} />
       {/each}
     </div>
   </nav>

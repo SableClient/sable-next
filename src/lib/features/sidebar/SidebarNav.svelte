@@ -2,7 +2,8 @@
   import { i18n } from '#lib/i18n.js';
   import type { RoomSummary } from '#src/generated/protocol';
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { useCoreClient } from '#lib/core/context.js';
   import ActiveCallBar from '#lib/features/call/ActiveCallBar.svelte';
   import { useCallSession } from '#lib/features/call/call-session.svelte.js';
@@ -60,6 +61,14 @@
   const core = useCoreClient();
   const roomList = useRoomList();
   const call = useCallSession();
+  let pathname = $state(page.url.pathname);
+  let spaceId = $state(page.params.spaceId);
+
+  afterNavigate(() => {
+    if (page.url.pathname === '/inbox') return;
+    pathname = page.url.pathname;
+    spaceId = page.params.spaceId;
+  });
 
   function setCallVolume(userId: string, volume: number): void {
     for (const member of call.members) {
@@ -237,6 +246,7 @@
     <nav class="mobile-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="navigation-main">
         <NavigationRail
+          {pathname}
           {spaces}
           {spaceUnread}
           {callSpaces}
@@ -250,6 +260,8 @@
           {...railProps}
         />
         <RoomNav
+          {pathname}
+          {spaceId}
           {onNavigate}
           callRoomId={call.active ? call.roomId : null}
           callVoiceStates={call.voiceStates}
@@ -263,6 +275,7 @@
     <nav class="desktop-navigation" aria-label={$i18n.t('nav.primary')}>
       <div class="desktop-navigation-main">
         <NavigationRail
+          {pathname}
           {spaces}
           {spaceUnread}
           {callSpaces}
@@ -275,6 +288,8 @@
           {...railProps}
         />
         <RoomNav
+          {pathname}
+          {spaceId}
           width={roomNavWidth}
           {collapsed}
           callRoomId={call.active ? call.roomId : null}

@@ -89,7 +89,9 @@
   let ownPowerLevel = $derived(permissions?.own_power_level ?? 0);
   let canSetPower = $derived(permissions?.can_change_power_levels ?? false);
   let isDirect = $derived(room?.is_direct ?? false);
-  let canInviteInline = $derived((permissions?.can_invite ?? false) && !isDirect && tab !== 'ban');
+  let canInviteInline = $derived(
+    (permissions?.can_invite ?? false) && !isDirect && tab !== 'ban' && tab !== 'knock'
+  );
   let inviteQuery = $derived(canInviteInline ? search.trim() : '');
   let candidates = $derived.by(() => {
     const typed =
@@ -115,7 +117,7 @@
 
   $effect(() => {
     void tab;
-    void roomId;
+    void room;
     void load();
   });
 
@@ -234,7 +236,7 @@
 
   async function act(
     userId: string,
-    action: () => Promise<void>,
+    action: () => Promise<unknown>,
     patch?: (member: MemberView) => MemberView
   ): Promise<void> {
     busy = userId;
@@ -242,7 +244,9 @@
       await action();
       await load();
       if (patch)
-        members = members.map((entry) => (entry.user_id === userId ? patch(entry) : entry));
+        members = members
+          .map((entry) => (entry.user_id === userId ? patch(entry) : entry))
+          .filter((entry) => matchesFilter(entry, tab));
     } catch (error) {
       console.warn('[sable room] member action failed', error);
       failed = true;
@@ -393,7 +397,11 @@
   {#if loading && members.length === 0}
     <p class="settings-status" role="status"><Spinner small /></p>
   {:else if shown.length === 0}
-    <p class="settings-status">{$i18n.t('timeline.noMembersFound')}</p>
+    <p class="settings-status">
+      {tab === 'knock' && !search.trim()
+        ? $i18n.t('room.membersNoRequests')
+        : $i18n.t('timeline.noMembersFound')}
+    </p>
   {:else}
     {#each groups as group (group.key)}
       {@const tag = powerTag(group.level ?? 0, $i18n.t, powerTags)}
@@ -421,7 +429,46 @@
                   {/snippet}
                 </MemberIdentityRow>
               {/snippet}
-              {#if tab === 'leave' || tab === 'kick'}
+              {#if tab === 'knock'}
+                {#if permissions?.can_invite}
+                  <Button
+                    size="small"
+                    disabled={busy !== null}
+                    onclick={() => {
+                      const target = roomId;
+                      if (target)
+                        void act(
+                          member.user_id,
+                          () => core.commands.inviteUser(target, member.user_id),
+                          (entry) => ({ ...entry, membership: 'invite' })
+                        );
+                    }}
+                  >
+                    {$i18n.t('room.membersApprove')}
+                  </Button>
+                {/if}
+                {#if permissions?.can_kick && !outranked(member)}
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={busy !== null}
+                    onclick={() => {
+                      const target = roomId;
+                      if (target)
+                        void act(
+                          member.user_id,
+                          () =>
+                            core.commands.sendStateEvent(target, 'm.room.member', member.user_id, {
+                              membership: 'leave',
+                            }),
+                          (entry) => ({ ...entry, membership: 'leave' })
+                        );
+                    }}
+                  >
+                    {$i18n.t('room.membersDeny')}
+                  </Button>
+                {/if}
+              {:else if tab === 'leave' || tab === 'kick'}
                 {#if permissions?.can_ban && !outranked(member)}
                   <Button
                     size="small"

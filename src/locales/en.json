@@ -75,6 +75,8 @@
     "displayOptions": "Sidebar display options"
   },
   "inbox": {
+    "invitesTab": "Invites",
+    "invitesEmpty": "No pending invitations.",
     "close": "Close inbox",
     "notifications": "Notifications",
     "invites": "Pending invites",
@@ -398,6 +400,12 @@
     "membersInvited": "Invited",
     "membersBanned": "Banned",
     "membersFailed": "That could not be done.",
+    "membersRequests": "Requests",
+    "membersNoRequests": "No pending join requests.",
+    "membersApprove": "Approve",
+    "membersDeny": "Deny",
+    "membersRequestsFailed": "Join requests could not be loaded.",
+    "membersRequestActionFailed": "The join request could not be updated. Try again.",
     "membersSearchOrInvite": "Search members or find people to invite",
     "membersInviteHeading": "Invite people",
     "membersInviteEmpty": "No one found. Enter a full user ID, like @name:server.",

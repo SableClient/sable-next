@@ -54,6 +54,24 @@ test('the mobile bar keeps a slot per tool', () => {
   expect(bar.querySelectorAll('.mobile-tool-slot')).toHaveLength(4);
 });
 
+test.each([{ compact: false }, { compact: true }])(
+  'the desktop inbox navigates to the full page with compact=$compact',
+  async (props) => {
+    setup(props);
+    const inbox = screen.getByRole('link', { name: 'nav.inbox' });
+    expect(inbox).toHaveAttribute('href', '/inbox');
+    expect(await fireEvent.click(inbox)).toBe(true);
+  }
+);
+
+test('the desktop inbox stays a page link when already selected', async () => {
+  visit('/inbox');
+  setup({ mobile: false });
+  const inbox = screen.getByRole('link', { name: 'nav.inbox' });
+  expect(inbox).toHaveAttribute('aria-current', 'page');
+  expect(await fireEvent.click(inbox)).toBe(true);
+});
+
 test('the mobile bar marks the profile tab as selected on the profile page', () => {
   visit('/profile');
   setup();

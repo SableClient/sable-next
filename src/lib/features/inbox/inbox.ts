@@ -6,6 +6,11 @@ import { hasUnread, type RoomUnread, roomUnread } from '#lib/rooms/unread.js';
 import type { UnreadCount } from '#lib/rooms/spaces.js';
 
 export type NotificationFilter = 'all' | 'mentions' | 'direct';
+export type InboxTab = 'notifications' | 'invites' | 'requests';
+
+export function parseInboxTab(value: string | null): InboxTab {
+  return value === 'invites' || value === 'requests' ? value : 'notifications';
+}
 
 export function parseFilter(value: string | null): NotificationFilter {
   return value === 'mentions' || value === 'direct' ? value : 'all';

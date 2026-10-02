@@ -73,6 +73,7 @@
   };
 
   interface Props {
+    pathname?: string;
     spaces: readonly RoomSummary[];
     spaceUnread?: ReadonlyMap<string, UnreadCount>;
     callSpaces?: ReadonlySet<string>;
@@ -98,6 +99,7 @@
   }
 
   let {
+    pathname = page.url.pathname,
     spaces,
     spaceUnread = new Map(),
     callSpaces = new Set(),
@@ -408,13 +410,10 @@
 
   function isActive(item: RailItem): boolean {
     if (item.initial) {
-      return (
-        page.url.pathname.startsWith(`${item.activePrefix}/`) ||
-        page.url.pathname === item.activePrefix
-      );
+      return pathname.startsWith(`${item.activePrefix}/`) || pathname === item.activePrefix;
     }
 
-    return page.url.pathname.startsWith(item.activePrefix);
+    return pathname.startsWith(item.activePrefix);
   }
 
   function navigate(item: RailItem): void {

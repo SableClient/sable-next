@@ -5,7 +5,6 @@
   import { on } from 'svelte/events';
   import { page } from '$app/state';
   import AppShell from '#lib/ui/AppShell.svelte';
-  import InboxPanel from '#lib/features/inbox/InboxPanel.svelte';
   import SettingsPanel from '#lib/features/settings/SettingsPanel.svelte';
   import { followSettingsLink } from '#lib/features/settings/settings-navigation.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -970,9 +969,6 @@
         section={page.state.settings.section}
         focus={page.state.settings.focus}
       />
-    {/if}
-    {#if page.state.inbox}
-      <InboxPanel />
     {/if}
     <CommandPalette bind:open={paletteState.open} />
     <ShortcutsHelpDialog bind:open={shortcutsHelpState.open} />

@@ -53,7 +53,7 @@ test('filters notifications, and says so when nothing matches', async ({
   await expect(inbox.getByRole('paragraph').filter({ hasText: 'No unread DMs.' })).toBeVisible();
 });
 
-test('answers a pending invitation above the feed', async ({ page, app, admin, guest }) => {
+test('answers a pending invitation from the invites tab', async ({ page, app, admin, guest }) => {
   const roomName = `Design crew ${String(Date.now())}`;
   const roomId = await guest.createRoom({
     name: roomName,
@@ -64,6 +64,7 @@ test('answers a pending invitation above the feed', async ({ page, app, admin, g
   await app.openInbox();
 
   const inbox = page.getByRole('main');
+  await inbox.getByRole('tab', { name: 'Invites', exact: true }).click();
   await expect(inbox.getByRole('heading', { name: /Pending invites/ })).toBeVisible({
     timeout: COLD_BOOT_TIMEOUT,
   });
@@ -99,6 +100,49 @@ test('marks a room read from its row', async ({ page, app, admin, guest }) => {
 
   await expect(row).toHaveCount(0);
 });
+
+for (const { isSpace, approve } of [
+  { isSpace: false, approve: true },
+  { isSpace: false, approve: false },
+  { isSpace: true, approve: true },
+  { isSpace: true, approve: false },
+]) {
+  test(`${approve ? 'approves' : 'denies'} a pending ${isSpace ? 'space' : 'room'} join request`, async ({
+    page,
+    app,
+    admin,
+    guest,
+  }) => {
+    await page.setViewportSize({ width: isSpace ? 390 : 1280, height: 900 });
+    const roomName = `Join request ${String(Date.now())}`;
+    const roomId = await admin.createRoom({ name: roomName, isSpace });
+    await admin.sendStateEvent(roomId, 'm.room.join_rules', '', { join_rule: 'knock' });
+    await guest.request('POST', `client/v3/knock/${encodeURIComponent(roomId)}`, {
+      reason: 'Let me in',
+    });
+
+    await app.openInbox();
+    const inbox = page.getByRole('main');
+    await inbox.getByRole('tab', { name: 'Requests', exact: true }).click();
+    const row = inbox.getByRole('listitem').filter({ hasText: roomName });
+    await expect(row).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
+    await expect(inbox).toHaveJSProperty(
+      'scrollWidth',
+      await inbox.evaluate((node) => node.clientWidth)
+    );
+    await row.getByRole('button', { name: approve ? 'Approve' : 'Deny' }).click();
+    await expect(row).toHaveCount(0);
+    await expect
+      .poll(async () => {
+        const content = await admin.request<{ membership: string }>(
+          'GET',
+          `client/v3/rooms/${encodeURIComponent(roomId)}/state/m.room.member/${encodeURIComponent(guest.userId)}`
+        );
+        return content.membership;
+      })
+      .toBe(approve ? 'invite' : 'leave');
+  });
+}
 
 test.describe('on a pristine account', () => {
   test.use({ storageState: SIGNED_OUT });

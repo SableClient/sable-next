@@ -22,6 +22,7 @@ const core = Object.assign(baseCore, {
   unbanUser: vi.fn<() => Promise<void>>(),
   setUserPowerLevel: vi.fn<() => Promise<void>>(),
   inviteUser: vi.fn<(roomId: string, userId: string) => Promise<void>>(),
+  sendStateEvent: vi.fn<() => Promise<string>>(),
   searchUserDirectory:
     vi.fn<() => Promise<{ limited: boolean; results: UserDirectoryEntryView[] }>>(),
 });
@@ -69,6 +70,45 @@ async function renderMembers(roomPermissions: RoomPermissionsView = permissions)
 
 const search = () => screen.getByRole('searchbox');
 const invites = () => screen.queryByRole('region', { name: 'Invite people' });
+
+test('offers approval and denial for join requests', async () => {
+  const requester: MemberView = { ...alice, membership: 'knock' };
+  core.roomMembers.mockResolvedValue([requester]);
+  render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole('tab', { name: 'Requests' }));
+  await screen.findByText('Alice');
+  expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+  expect(core.roomMembers).toHaveBeenLastCalledWith('!room:example.org', ['knock']);
+});
+
+test.each(['Approve', 'Deny'])('answers a join request with %s', async (action) => {
+  core.roomMembers.mockResolvedValue([{ ...alice, membership: 'knock' }]);
+  core.inviteUser.mockResolvedValue(undefined);
+  core.sendStateEvent.mockResolvedValue('$denied:example.org');
+  render(RoomMembersSettings, { room, permissions: { ...permissions, can_invite: true } });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('tab', { name: 'Requests' }));
+  await screen.findByText('Alice');
+  await user.click(screen.getByRole('button', { name: action }));
+
+  await vi.waitFor(() => {
+    if (action === 'Approve')
+      expect(core.inviteUser).toHaveBeenCalledWith(room.room_id, alice.user_id);
+    else
+      expect(core.sendStateEvent).toHaveBeenCalledWith(
+        room.room_id,
+        'm.room.member',
+        alice.user_id,
+        {
+          membership: 'leave',
+        }
+      );
+    expect(screen.queryByText('Alice')).not.toBeInTheDocument();
+  });
+});
 
 test('collects an optional reason before kicking a member', async () => {
   core.roomMembers.mockResolvedValue([alice]);

@@ -115,6 +115,8 @@
   }
 
   interface Props {
+    pathname?: string;
+    spaceId?: string;
     onNavigate?: (href: string) => void;
     width?: number;
     collapsed?: boolean;
@@ -124,6 +126,8 @@
   }
 
   let {
+    pathname = page.url.pathname,
+    spaceId = page.params.spaceId,
     onNavigate,
     width,
     collapsed = false,
@@ -176,13 +180,11 @@
   let leaveRoomId = $state<string | null>(null);
   let spacePermissions = $state<RoomPermissionsView | null>(null);
 
-  let directSection = $derived(page.url.pathname.startsWith('/direct'));
-  let unspacedSection = $derived(page.url.pathname.startsWith('/rooms'));
+  let directSection = $derived(pathname.startsWith('/direct'));
+  let unspacedSection = $derived(pathname.startsWith('/rooms'));
 
   let activeSpace = $derived(
-    page.url.pathname.startsWith('/space')
-      ? (findRoomByPathId(roomList.rooms, page.params.spaceId) ?? null)
-      : null
+    pathname.startsWith('/space') ? (findRoomByPathId(roomList.rooms, spaceId) ?? null) : null
   );
 
   // The id, not the summary: a room list diff hands back a fresh object for the
@@ -276,22 +278,22 @@
     home: HouseIcon,
   };
 
-  let section = $derived(navSectionKind(page.url.pathname));
+  let section = $derived(navSectionKind(pathname));
   let labels = $derived(navSectionLabels(section));
   let listLabel = $derived($i18n.t(labels.list));
   let listEmpty = $derived($i18n.t(labels.empty));
   let title = $derived.by(() => {
     if (section !== 'space') return $i18n.t(labels.title);
 
-    const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
+    const space = findRoomByPathId(roomList.rooms, spaceId);
 
     return space?.name ?? $i18n.t(labels.title);
   });
   let TitleIcon = $derived(SECTION_ICONS[section]);
   let spaceTree = $derived.by<SpaceTreeNode[]>(() => {
-    if (!page.url.pathname.startsWith('/space')) return [];
+    if (!pathname.startsWith('/space')) return [];
 
-    const space = findRoomByPathId(roomList.rooms, page.params.spaceId);
+    const space = findRoomByPathId(roomList.rooms, spaceId);
     if (!space?.is_space) return [];
 
     const roomsById = new Map(
@@ -312,7 +314,7 @@
         .sort(byRecency);
     }
 
-    if (page.url.pathname.startsWith('/space')) {
+    if (pathname.startsWith('/space')) {
       return spaceTree.filter((item): item is SpaceTreeRoom => item.kind === 'room');
     }
 
@@ -333,7 +335,7 @@
   });
   let favourites = $derived.by<RoomNavRow[]>(() => {
     if (!groupFavourites) return [];
-    const rows = page.url.pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
+    const rows = pathname.startsWith('/space') ? treeRows(spaceTree) : listedRooms;
     return rows
       .filter(
         (row, index) =>
@@ -358,7 +360,7 @@
       return pending.filter((room) => room.is_direct);
     }
 
-    if (page.url.pathname.startsWith('/space')) {
+    if (pathname.startsWith('/space')) {
       const children = new Set(activeSpace?.space_children.map((child) => child.room_id) ?? []);
       return pending.filter((room) => children.has(room.room_id));
     }
@@ -394,7 +396,7 @@
   function stillShownRow(item: RoomNavRow): boolean {
     const room = item.room;
     if (room === undefined) return false;
-    if (page.url.pathname === roomHref(item)) return true;
+    if (pathname === roomHref(item)) return true;
     return hasUnread(roomList.badgeUnreadFor(room));
   }
 
@@ -696,7 +698,7 @@
     {@const name = room ? roomLabel(room) : item.roomId}
     {@const avatarUrl = room ? roomAvatarUrl(room) : null}
     {@const href = roomHref(item)}
-    {@const active = (page.state.mobileRoomPath ?? page.url.pathname) === href}
+    {@const active = (page.state.mobileRoomPath ?? pathname) === href}
     {@const counts = room ? roomList.badgeUnreadFor(room) : NO_UNREAD}
     {@const mentions = counts.highlight}
     {@const unread = counts.unread}
@@ -945,7 +947,7 @@
     {@const room = item.room}
     {@const name = roomLabel(room)}
     {@const href = resolve('/(app)/space/[spaceId]/lobby', { spaceId: roomPathParam(room) })}
-    {@const active = page.url.pathname === href}
+    {@const active = pathname === href}
     <div class="room-row-wrap">
       {@render threadLines(item.threads)}
       {#snippet linkTrigger({ props }: { props: Record<string, unknown> })}
@@ -1011,7 +1013,7 @@
     <div class="room-nav-actions" class:collapsed>
       {#snippet action(href: string, label: string, icon: Component)}
         {@const Icon = icon}
-        {@const active = page.url.pathname === href}
+        {@const active = pathname === href}
         <a
           class="nav-action selection-current selection-layer"
           {href}
