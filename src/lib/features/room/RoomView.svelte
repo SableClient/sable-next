@@ -1225,7 +1225,7 @@
   {/if}
 
   {#if desktop}
-    {#if panels.desktopMembersOpen}
+    {#if panels.desktopMembersOpen && panels.threadRootId === null}
       <MembersDrawer
         members={memberLoader.members}
         loading={memberLoader.loading}

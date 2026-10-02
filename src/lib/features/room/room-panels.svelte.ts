@@ -17,7 +17,6 @@ export class RoomPanels {
   openThread(rootEventId: string): void {
     this.reset();
     this.threadRootId = rootEventId;
-    this.desktopMembersOpen = false;
   }
 
   toggleThreads(): void {

@@ -434,3 +434,42 @@ for (const context of ['desktop', 'mobile'] as const) {
     await expect(editor).toHaveText('Keep draft after retry');
   });
 }
+
+for (const threadPresentation of ['timeline', 'panel']) {
+  test(`leaving a thread restores the members drawer (${threadPresentation})`, async ({
+    page,
+    app,
+    core,
+    timeline,
+    installRoomCore,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.addInitScript((threadPresentation) => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ threadPresentation }));
+    }, threadPresentation);
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    await timeline.expectRevealed();
+    await expect(page.locator('.members-drawer')).toBeVisible();
+    const subscription = await core.subscription();
+    await core.setTimelineItemById(subscription, 'general-19', {
+      ...timelineItem('general-19', 'Thread root'),
+      thread_summary: {
+        num_replies: 3,
+        latest_body: 'Reply',
+        latest_sender: '@alice:example.test',
+      },
+    });
+    await page.locator('[data-item-id="general-19"] .thread-summary').click();
+    const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
+    await expect(thread).toBeVisible();
+    await expect(page.locator('.members-drawer')).toBeHidden();
+    await thread
+      .getByRole('button', {
+        name:
+          threadPresentation === 'panel' ? en.timeline.threadClose : en.timeline.backToConversation,
+      })
+      .click();
+    await expect(page.locator('.members-drawer')).toBeVisible();
+  });
+}
