@@ -677,11 +677,23 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   };
 }
 
-export function plainEditSource(body: string, html: string): string {
+export function plainEditDoc(body: string, html: string): ProseMirrorNode {
   const sent = serializePlain(textDoc(body)).formatted;
   const target = parseMatrixHtml(html);
-  if (sent !== null && parseMatrixHtml(sent).eq(target)) return body;
-  return composerMarkdown(target);
+  if (sent !== null && parseMatrixHtml(sent).eq(target)) return textDoc(body);
+
+  const atoms: ProseMirrorNode[] = [];
+  function replaceAtoms(node: ProseMirrorNode): ProseMirrorNode {
+    if (node.type === composerSchema.nodes.mention || node.type === composerSchema.nodes.emoticon) {
+      atoms.push(node);
+      return composerSchema.text(ATOM_PLACEHOLDER, node.marks);
+    }
+    if (node.isLeaf) return node;
+    return node.copy(Fragment.fromArray(node.children.map(replaceAtoms)));
+  }
+
+  const source = composerMarkdown(replaceAtoms(target));
+  return spliceAtoms(textDoc(source), atoms);
 }
 
 export function richFromPlain(doc: ProseMirrorNode): ProseMirrorNode {

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { Fragment, Slice, type Mark, type Node as ProseMirrorNode } from 'prosemirror-model';
+import { EditorState } from 'prosemirror-state';
 import { describe, expect, test } from 'vitest';
 
 import { composerSchema, parseMatrixHtml } from './schema';
@@ -8,7 +9,7 @@ import {
   composerMarkdown,
   markdownFromSlice,
   markdownSlice,
-  plainEditSource,
+  plainEditDoc,
   plainTextOf,
   richFromPlain,
   serializeComposer,
@@ -225,7 +226,7 @@ test('a plain-mode edit keeps a body that reproduces its html', () => {
   const body = 'look *here* and [there](https://a.b)';
   const html = serializePlain(textDoc(body)).formatted ?? '';
 
-  expect(plainEditSource(body, html)).toBe(body);
+  expect(plainTextOf(plainEditDoc(body, html))).toBe(body);
 });
 
 test('a plain-mode edit rebuilds the source when the body would not reproduce the html', () => {
@@ -236,10 +237,30 @@ test('a plain-mode edit rebuilds the source when the body would not reproduce th
     )
   );
   const html = message.formatted ?? '';
-  const source = plainEditSource(message.body, html);
+  const source = plainEditDoc(message.body, html);
 
-  expect(source).not.toBe(message.body);
-  expect(serializePlain(textDoc(source)).formatted).toBe(html);
+  expect(plainTextOf(source)).not.toBe(message.body);
+  expect(serializePlain(source).formatted).toBe(html);
+});
+
+test('a plain-mode edit keeps pills between markdown and across paragraphs', () => {
+  const html =
+    '<p><strong>hey</strong> <a href="https://matrix.to/#/@one:example.org">@_one</a></p>' +
+    '<p><a href="https://matrix.to/#/!room:example.org?via=example.org">#Room</a> ' +
+    '<img data-mx-emoticon="" src="mxc://other.org/wave" alt=":wave:" title=":wave:" height="32"></p>';
+  const edited = plainEditDoc('**hey** @_one\n\n#Room :wave:', html);
+
+  expect(plainTextOf(edited)).toBe('**hey** @_one\n\n#Room :wave:');
+  const changed = EditorState.create({ doc: edited }).tr.insertText(
+    '!',
+    edited.content.size - 1
+  ).doc;
+
+  expect(serializePlain(changed)).toEqual({
+    body: '**hey** @_one\n\n#Room :wave:!',
+    formatted: html.replace(/<\/p>$/, '!</p>'),
+    mentions: { userIds: ['@one:example.org'], room: false },
+  });
 });
 
 describe('source mode keeps markdown typed as text', () => {
@@ -475,7 +496,7 @@ describe('plain text mode', () => {
 
     expect(message.body).toBe(source);
     expect(message.formatted).toBe(rendered);
-    expect(plainEditSource(message.body, message.formatted ?? '')).toBe(source);
+    expect(plainTextOf(plainEditDoc(message.body, message.formatted ?? ''))).toBe(source);
   });
 
   test('all ASCII punctuation can be escaped', () => {
@@ -510,7 +531,7 @@ describe('plain text mode', () => {
     const message = serializePlain(textDoc(source));
     expect(message.body).toBe(source);
     expect(message.formatted).toBe(rendered);
-    expect(plainEditSource(message.body, message.formatted ?? '')).toBe(source);
+    expect(plainTextOf(plainEditDoc(message.body, message.formatted ?? ''))).toBe(source);
   });
 
   test('strikethrough parses even though commonmark leaves it off', () => {
@@ -940,7 +961,7 @@ describe('MSC references', () => {
   test('an edit of a linked message keeps its plain source', () => {
     const sent = serializePlain(textDoc('MSC4144 lands')).formatted ?? '';
 
-    expect(plainEditSource('MSC4144 lands', sent)).toBe('MSC4144 lands');
+    expect(plainTextOf(plainEditDoc('MSC4144 lands', sent))).toBe('MSC4144 lands');
     expect(serializeComposer(parseMatrixHtml(sent)).body).toBe('MSC4144 lands');
   });
 });

@@ -77,7 +77,7 @@
   import type { BoardTab } from '#lib/ui/primitives/emote-board.js';
   import {
     commandTextOf,
-    plainEditSource,
+    plainEditDoc,
     serializeComposer,
     serializePlain,
   } from './editor/serialize';
@@ -580,7 +580,7 @@
       const formatted = formattedForEditing(context.html);
       if (formatted === null) editor.setText(context.body);
       else if (richText) editor.setHtml(formatted);
-      else editor.setText(plainEditSource(context.body, formatted));
+      else editor.setDoc(plainEditDoc(context.body, formatted));
       prefilledDoc = editor.doc();
     } else if (context === null) {
       const wasEditing = prefilledFor !== null;

@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 import { composerSchema, parseMatrixHtml } from './schema';
 import {
   composerMarkdown,
-  plainEditSource,
+  plainEditDoc,
   richFromPlain,
   serializeComposer,
   serializePlain,
@@ -203,8 +203,8 @@ test('a plain-mode edit of any sent message reproduces its html', () => {
     fc.property(htmlDoc, (source) => {
       const message = serializeComposer(source);
       if (message.formatted === null) return;
-      const edited = plainEditSource(message.body, message.formatted);
-      expect(serializePlain(textDoc(edited)).formatted, JSON.stringify(edited)).toBe(
+      const edited = plainEditDoc(message.body, message.formatted);
+      expect(serializePlain(edited).formatted, JSON.stringify(edited.toJSON())).toBe(
         message.formatted
       );
     }),

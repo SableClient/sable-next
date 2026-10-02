@@ -442,6 +442,32 @@ test('stages files dropped on the composer, and drops one on demand', async () =
   expect(attachment).toHaveBeenCalledWith('!room:example.org', second, { spoiler: false });
 });
 
+test.each([true, false])(
+  'editing preserves mentions and custom emotes with richTextComposer=%s',
+  async (richTextComposer) => {
+    setPreference('richTextComposer', richTextComposer);
+    const message = vi.fn(async () => {});
+    const body = 'hey @_one:example.org :wave:';
+    const html =
+      'hey <a href="https://matrix.to/#/@one:example.org">@_one:example.org</a> <img data-mx-emoticon="" src="mxc://example.org/wave" alt=":wave:" title=":wave:" height="32">';
+    setup({
+      roomId: '!room:example.org',
+      onSend: message,
+      context: { kind: 'edit', eventId: '$one:example.org', body, html },
+    });
+    await tick();
+
+    submit();
+
+    await vi.waitFor(() => {
+      expect(message).toHaveBeenCalledWith('!room:example.org', body, html, {
+        userIds: ['@one:example.org'],
+        room: false,
+      });
+    });
+  }
+);
+
 test('text rides a lone attachment as its caption', async () => {
   const attachment = vi.fn(async () => {});
   const message = vi.fn(async () => {});
