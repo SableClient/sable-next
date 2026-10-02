@@ -205,6 +205,18 @@ impl Core {
         }
     }
 
+    pub async fn skip_v1_migration(&self) -> Result<(), String> {
+        let _restore = self.restore_lock.lock().await;
+        self.v1_migration.lock().await.take();
+        private_directory(Path::new(&self.store_id))?;
+        tokio::fs::write(
+            Path::new(&self.store_id).join("v1-migration-complete"),
+            b"1",
+        )
+        .await
+        .map_err(|error| error.to_string())
+    }
+
     pub async fn begin_v1_migration(
         &self,
         sessions: Vec<LegacySession>,

@@ -186,8 +186,6 @@ impl AccountRegistry {
             {
                 continue;
             }
-            // Allocated stores are siblings of the base directory. Older
-            // single-account installs keep their database in the base itself.
             account.store_id = if account
                 .store_id
                 .ends_with(&format!("-account-{}", account.account_id))
@@ -379,8 +377,6 @@ pub(crate) async fn restore_credentials(
     Ok(())
 }
 
-/// An existing device must retain its original encryption identity. Opening a
-/// missing or empty store and restoring credentials would create a new one.
 pub(crate) async fn validate_saved_crypto_store(
     store_id: &str,
     persisted: &PersistedSession,
@@ -467,7 +463,7 @@ async fn build_account_client(
         });
 
     #[cfg(not(target_family = "wasm"))]
-    let builder = {
+    {
         let _ = persistent_event_cache;
         #[cfg(any(target_os = "android", target_os = "ios"))]
         let lock = {
@@ -487,24 +483,41 @@ async fn build_account_client(
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         let lock = matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess;
 
-        builder
-            .sqlite_store_with_cache_path(
-                std::path::Path::new(store_id).join("store"),
-                std::path::Path::new(store_id).join("cache"),
-                None,
-            )
+        let store =
+            matrix_sdk::SqliteStoreConfig::new(std::path::Path::new(store_id).join("store"));
+        let cache = store
+            .clone()
+            .path(std::path::Path::new(store_id).join("cache"));
+        let (state, event_cache, media, crypto) = futures_util::try_join!(
+            matrix_sdk::SqliteStateStore::open_with_config(&store),
+            matrix_sdk::SqliteEventCacheStore::open_with_config(&cache),
+            matrix_sdk::SqliteMediaStore::open_with_config(&cache),
+            matrix_sdk::SqliteCryptoStore::open_with_config(&store),
+        )?;
+        let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
+            .state_store(state)
+            .event_cache_store(event_cache)
+            .media_store(media)
+            .crypto_store(crypto);
+        let base = std::sync::Arc::new(matrix_sdk_base::BaseClient::new(
+            config,
+            THREADING_SUPPORT,
+            matrix_sdk_base::DmRoomDefinition::MatrixSpec,
+        ));
+        let client = builder
             .cross_process_store_config(lock)
-    };
-
-    #[cfg(not(target_family = "wasm"))]
-    return builder.build().await;
+            .base_client((*base).clone())
+            .build()
+            .await?;
+        register_base_client(store_id, base, &client);
+        Ok(client)
+    }
 
     #[cfg(target_family = "wasm")]
     {
         // The SharedWorker is the sole IndexedDB owner in the web runtime.
         let lock = matrix_sdk::cross_process_lock::CrossProcessLockConfig::SingleProcess;
         let stores = matrix_sdk_indexeddb::IndexeddbStores::open(store_id, None).await?;
-        let close_stores = Box::new(stores.connection_closer());
         let config = matrix_sdk_base::store::StoreConfig::new(lock.clone())
             .state_store(stores.state)
             .media_store(stores.media)
@@ -524,9 +537,6 @@ async fn build_account_client(
             .base_client((*base).clone())
             .build()
             .await?;
-        INDEXEDDB_STORES.with_borrow_mut(|owners| {
-            owners.insert(store_id.to_owned(), close_stores);
-        });
         BASE_CLIENTS.with_borrow_mut(|bases| {
             bases.insert(store_id.to_owned(), std::rc::Rc::downgrade(&base));
         });
@@ -550,27 +560,72 @@ const fn session_timeout(proxied: bool) -> Duration {
 
 #[cfg(target_family = "wasm")]
 thread_local! {
-    static INDEXEDDB_STORES: std::cell::RefCell<
-        std::collections::HashMap<String, Box<dyn FnOnce()>>,
-    > = std::cell::RefCell::default();
     static BASE_CLIENTS: std::cell::RefCell<
         std::collections::HashMap<String, std::rc::Weak<matrix_sdk_base::BaseClient>>,
     > = std::cell::RefCell::default();
 }
 
 #[cfg(target_family = "wasm")]
-pub(crate) fn base_client(store_id: &str) -> Option<std::rc::Rc<matrix_sdk_base::BaseClient>> {
-    BASE_CLIENTS.with_borrow(|bases| bases.get(store_id)?.upgrade())
+pub(crate) type SharedBaseClient = std::rc::Rc<matrix_sdk_base::BaseClient>;
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) type SharedBaseClient = std::sync::Arc<matrix_sdk_base::BaseClient>;
+
+#[cfg(not(target_family = "wasm"))]
+static BASE_CLIENTS: std::sync::LazyLock<
+    std::sync::Mutex<
+        std::collections::HashMap<String, std::sync::Weak<matrix_sdk_base::BaseClient>>,
+    >,
+> = std::sync::LazyLock::new(std::sync::Mutex::default);
+
+#[cfg(not(target_family = "wasm"))]
+fn register_base_client(store_id: &str, base: SharedBaseClient, client: &Client) {
+    BASE_CLIENTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .insert(store_id.to_owned(), std::sync::Arc::downgrade(&base));
+    client.add_event_handler(
+        move |_: matrix_sdk::ruma::events::dummy::ToDeviceDummyEvent| {
+            let _owner = &base;
+            async {}
+        },
+    );
+}
+
+#[cfg(all(test, not(target_family = "wasm")))]
+pub(crate) async fn mock_account_client(
+    server: &matrix_sdk::test_utils::mocks::MatrixMockServer,
+    store_id: &str,
+) -> Client {
+    let base = std::sync::Arc::new(matrix_sdk_base::BaseClient::new(
+        matrix_sdk_base::store::StoreConfig::new(
+            matrix_sdk_common::cross_process_lock::CrossProcessLockConfig::SingleProcess,
+        ),
+        THREADING_SUPPORT,
+        matrix_sdk_base::DmRoomDefinition::MatrixSpec,
+    ));
+    let owned = (*base).clone();
+    let client = server
+        .client_builder()
+        .on_builder(move |builder| builder.base_client(owned))
+        .build()
+        .await;
+    register_base_client(store_id, base, &client);
+    client
 }
 
 #[cfg(target_family = "wasm")]
-pub(crate) fn close_account_stores(store_id: &str) {
-    BASE_CLIENTS.with_borrow_mut(|bases| bases.remove(store_id));
-    INDEXEDDB_STORES.with_borrow_mut(|owners| {
-        if let Some(stores) = owners.remove(store_id) {
-            stores();
-        }
-    });
+pub(crate) fn base_client(store_id: &str) -> Option<SharedBaseClient> {
+    BASE_CLIENTS.with_borrow(|bases| bases.get(store_id)?.upgrade())
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn base_client(store_id: &str) -> Option<SharedBaseClient> {
+    BASE_CLIENTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .get(store_id)?
+        .upgrade()
 }
 
 /// For dynamic client registration. The redirect URI must match the one handed

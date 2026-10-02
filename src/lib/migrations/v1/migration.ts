@@ -428,6 +428,13 @@ async function migrate(): Promise<void> {
   }
 }
 
+export async function skipV1Migration(): Promise<void> {
+  const { isTauri, invoke } = await import('@tauri-apps/api/core');
+  if (isTauri()) await invoke('skip_v1_migration');
+  else await markV1MigrationComplete();
+  pending = Promise.resolve();
+}
+
 export function migrateV1(): Promise<void> | undefined {
   if (!V1_MIGRATION_ENABLED || typeof localStorage === 'undefined') return undefined;
   pending ??= (async () => {

@@ -828,6 +828,7 @@ pub fn run() {
             v1_migration::begin_v1_migration,
             v1_migration::import_v1_crypto_batch,
             v1_migration::finish_v1_migration,
+            v1_migration::skip_v1_migration,
             submit_command,
             subscribe_events,
             fetch_media,

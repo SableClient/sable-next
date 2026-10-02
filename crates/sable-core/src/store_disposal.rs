@@ -1,14 +1,61 @@
+#[cfg_attr(target_family = "wasm", allow(clippy::unused_async))]
 pub(crate) async fn discard(base_store_id: &str, store_id: &str) -> Result<(), String> {
     if store_id != base_store_id
         && !crate::session::removable_account_store(base_store_id, store_id)
     {
         return Err("refusing to discard an unrelated account store".to_owned());
     }
-    discard_owned(base_store_id, store_id).await
+    #[cfg(not(target_family = "wasm"))]
+    return discard_files(base_store_id, store_id).await;
+    #[cfg(target_family = "wasm")]
+    discard_databases(store_id)
+}
+
+pub(crate) async fn carry_room_keys(
+    store_id: &str,
+    base: &matrix_sdk_base::BaseClient,
+) -> Result<usize, String> {
+    use matrix_sdk_base::crypto::store::CryptoStore;
+
+    #[cfg(not(target_family = "wasm"))]
+    let store = {
+        let path = std::path::Path::new(store_id).join("store");
+        if !tokio::fs::try_exists(path.join("matrix-sdk-crypto.sqlite3"))
+            .await
+            .map_err(|error| error.to_string())?
+        {
+            return Ok(0);
+        }
+        matrix_sdk::SqliteCryptoStore::open(path, None)
+            .await
+            .map_err(|error| error.to_string())?
+    };
+    #[cfg(target_family = "wasm")]
+    let store = matrix_sdk_indexeddb::IndexeddbCryptoStore::open_with_name(store_id)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    let sessions = store
+        .get_inbound_group_sessions()
+        .await
+        .map_err(|error| error.to_string())?;
+    drop(store);
+    let mut keys = Vec::with_capacity(sessions.len());
+    for session in sessions {
+        keys.push(session.export().await);
+    }
+    let machine = base.olm_machine().await;
+    let machine = machine.as_ref().ok_or("no olm machine")?;
+    let result = machine
+        .store()
+        .import_exported_room_keys(keys, |_, _| {})
+        .await
+        .map_err(|error| error.to_string())?;
+    Ok(result.imported_count)
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn discard_owned(base_store_id: &str, store_id: &str) -> Result<(), String> {
+async fn discard_files(base_store_id: &str, store_id: &str) -> Result<(), String> {
     let root = std::path::Path::new(store_id);
     let paths = if store_id == base_store_id {
         vec![root.join("store"), root.join("cache")]
@@ -26,14 +73,10 @@ async fn discard_owned(base_store_id: &str, store_id: &str) -> Result<(), String
 }
 
 #[cfg(target_family = "wasm")]
-async fn discard_owned(_base_store_id: &str, store_id: &str) -> Result<(), String> {
-    use js_sys::{Function, Promise};
-    use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-    use wasm_bindgen_futures::JsFuture;
-    use web_sys::IdbFactory;
+fn discard_databases(store_id: &str) -> Result<(), String> {
+    use wasm_bindgen::JsCast;
 
-    crate::session::close_account_stores(store_id);
-    let factory: IdbFactory = js_sys::Reflect::get(&js_sys::global(), &"indexedDB".into())
+    let factory: web_sys::IdbFactory = js_sys::Reflect::get(&js_sys::global(), &"indexedDB".into())
         .map_err(|error| format!("{error:?}"))?
         .dyn_into()
         .map_err(|_| "IndexedDB is not available".to_owned())?;
@@ -46,33 +89,9 @@ async fn discard_owned(_base_store_id: &str, store_id: &str) -> Result<(), Strin
         "::media",
         "::sable-search",
     ] {
-        let name = format!("{store_id}{suffix}");
-        let request = factory
-            .delete_database(&name)
+        factory
+            .delete_database(&format!("{store_id}{suffix}"))
             .map_err(|error| format!("{error:?}"))?;
-        let mut handlers: Vec<Closure<dyn FnMut()>> = Vec::new();
-        let promise = Promise::new(&mut |resolve: Function, reject: Function| {
-            let success = Closure::<dyn FnMut()>::new(move || {
-                let _ = resolve.call0(&JsValue::NULL);
-            });
-            let failure = Closure::<dyn FnMut()>::new(move || {
-                let _ = reject.call1(
-                    &JsValue::NULL,
-                    &"Account store deletion failed or is blocked".into(),
-                );
-            });
-            request.set_onsuccess(Some(success.as_ref().unchecked_ref()));
-            request.set_onerror(Some(failure.as_ref().unchecked_ref()));
-            request.set_onblocked(Some(failure.as_ref().unchecked_ref()));
-            handlers.push(success);
-            handlers.push(failure);
-        });
-        let result = JsFuture::from(promise).await;
-        request.set_onsuccess(None);
-        request.set_onerror(None);
-        request.set_onblocked(None);
-        drop(handlers);
-        result.map_err(|error| format!("{name}: {error:?}"))?;
     }
     Ok(())
 }

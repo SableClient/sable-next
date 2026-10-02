@@ -425,13 +425,6 @@ impl Core {
             .filter(|account| account.device_invalidated)
         {
             account.session.credentials.discard_tokens();
-            if let Err(error) = self.discard_account_store(&account.store_id).await {
-                tracing::error!(
-                    ?error,
-                    account_id = account.account_id,
-                    "could not discard retired account store"
-                );
-            }
         }
         if migrated
             || reanchored

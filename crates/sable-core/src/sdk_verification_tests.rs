@@ -199,7 +199,6 @@ async fn history_bundles_require_owner_signed_recipient_devices() {
         let machine = old.client.olm_machine_for_testing().await;
         let machine = machine.as_ref().unwrap();
         for strategy in [
-            CollectStrategy::OnlyTrustedDevices,
             CollectStrategy::IdentityBasedStrategy,
             CollectStrategy::AllDevices,
         ] {

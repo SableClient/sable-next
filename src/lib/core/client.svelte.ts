@@ -136,6 +136,7 @@ export class CoreClient {
   storageInterrupted = $state(false);
   restoreFailed = $state(false);
   migrationFailed = $state(false);
+  migrationError = $state<string | null>(null);
   sync = $state<SyncStatus | null>(null);
   /** This device's own verification and recovery state, pushed on change. */
   encryption = $state<EncryptionStatusView | null>(null);
@@ -817,6 +818,7 @@ export class CoreClient {
     const generation = ++this.generation;
     this.status = 'starting';
     this.migrationFailed = false;
+    this.migrationError = null;
 
     try {
       const transport = this.ensureTransport();
@@ -860,6 +862,7 @@ export class CoreClient {
       }
       this.restoreFailed = true;
       this.migrationFailed = error instanceof V1MigrationError;
+      this.migrationError = error instanceof V1MigrationError ? error.message : null;
       this.status = 'error';
       this.cleanupTransport();
     }

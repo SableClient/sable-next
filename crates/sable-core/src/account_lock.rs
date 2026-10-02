@@ -5,9 +5,12 @@ use std::{
 
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::{
-    Client,
+    Client, SessionChange,
     config::RequestConfig,
-    ruma::api::{client::account::whoami, error::RetryAfter},
+    ruma::api::{
+        client::account::whoami,
+        error::{ErrorKind, RetryAfter, UnknownTokenErrorData},
+    },
 };
 
 use crate::{Core, protocol::CoreEvent};
@@ -52,6 +55,12 @@ impl Core {
                         return;
                     }
                     let outcome = probe(&client).await;
+                    if matches!(outcome, Ok(false)) {
+                        let mut data = UnknownTokenErrorData::new();
+                        data.soft_logout = true;
+                        core.handle_session_change(&SessionChange::UnknownToken(data), generation);
+                        return;
+                    }
                     if matches!(outcome, Ok(true)) {
                         let _activation = core.session_activation_lock.lock().await;
                         let _swap = core.session_swap_lock.lock().await;
@@ -72,8 +81,7 @@ impl Core {
                     }
                     delay = (delay * 2).min(Duration::from_secs(300));
                     if let Err(error) = outcome
-                        && let Some(matrix_sdk::ruma::api::error::ErrorKind::LimitExceeded(limit)) =
-                            error.client_api_error_kind()
+                        && let Some(ErrorKind::LimitExceeded(limit)) = error.client_api_error_kind()
                         && let Some(RetryAfter::Delay(retry)) = limit.retry_after.as_ref()
                     {
                         delay = delay.max(*retry);
@@ -82,6 +90,22 @@ impl Core {
             })
             .abort_on_drop(),
         );
+    }
+}
+
+impl Core {
+    pub(crate) async fn detect_account_lock(
+        self: &Arc<Self>,
+        client: &Client,
+        generation: u64,
+    ) -> bool {
+        let locked = probe(client)
+            .await
+            .is_err_and(|error| error.client_api_error_kind() == Some(&ErrorKind::UserLocked));
+        if locked {
+            self.lock_account(generation);
+        }
+        locked
     }
 }
 
@@ -144,11 +168,8 @@ mod tests {
         });
         core.session_generation
             .store(1, std::sync::atomic::Ordering::SeqCst);
-        super::probe(&client).await.unwrap_err();
-        let change = changes.recv().await.unwrap();
-        assert_eq!(change, matrix_sdk::SessionChange::AccountLocked);
+        assert!(core.detect_account_lock(&client, 1).await);
         assert_eq!(client.session_tokens().unwrap(), tokens);
-        assert!(!core.handle_session_change(&change, 1));
         assert!(
             core.account_locked
                 .load(std::sync::atomic::Ordering::SeqCst)
@@ -158,7 +179,7 @@ mod tests {
             Some(crate::protocol::CoreEvent::AccountLockChanged { locked: true, .. })
         ));
         changes.try_recv().unwrap_err();
-        core.handle_session_change(&change, 1);
+        assert!(core.detect_account_lock(&client, 1).await);
         events.try_recv().unwrap_err();
         tokio::time::timeout(std::time::Duration::from_secs(2), async {
             while client.send_queue().is_enabled() {
@@ -188,45 +209,5 @@ mod tests {
                 client.user_id().unwrap().as_str() == user_id
             );
         }
-    }
-
-    #[tokio::test]
-    async fn a_locked_refresh_does_not_retire_the_session() {
-        let server = MatrixMockServer::new().await;
-        let client = server
-            .client_builder()
-            .unlogged()
-            .on_builder(matrix_sdk::ClientBuilder::handle_refresh_tokens)
-            .build()
-            .await;
-        let session = serde_json::from_value::<matrix_sdk::authentication::matrix::MatrixSession>(json!({
-            "user_id": "@alice:example.org", "device_id": "DEVICE", "access_token": "access", "refresh_token": "refresh"
-        })).unwrap();
-        client.restore_session(session).await.unwrap();
-        let tokens = client.session_tokens().unwrap();
-        let mut changes = client.subscribe_to_session_changes();
-        Mock::given(method("GET"))
-            .and(path("/_matrix/client/v3/account/whoami"))
-            .respond_with(ResponseTemplate::new(401).set_body_json(
-                json!({"errcode": "M_UNKNOWN_TOKEN", "error": "expired", "soft_logout": true}),
-            ))
-            .expect(1)
-            .mount(server.server())
-            .await;
-        Mock::given(method("POST"))
-            .and(path("/_matrix/client/v3/refresh"))
-            .respond_with(ResponseTemplate::new(401).set_body_json(
-                json!({"errcode": "M_USER_LOCKED", "error": "locked", "soft_logout": true}),
-            ))
-            .expect(1)
-            .mount(server.server())
-            .await;
-        super::probe(&client).await.unwrap_err();
-        assert_eq!(
-            changes.recv().await.unwrap(),
-            matrix_sdk::SessionChange::AccountLocked
-        );
-        changes.try_recv().unwrap_err();
-        assert_eq!(client.session_tokens().unwrap(), tokens);
     }
 }

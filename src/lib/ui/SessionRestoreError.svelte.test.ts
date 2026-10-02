@@ -4,6 +4,8 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { goto } from '$app/navigation';
 vi.mock('#lib/core/context.js');
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/migrations/v1/migration.js', () => ({ skipV1Migration: vi.fn() }));
+import { skipV1Migration } from '#lib/migrations/v1/migration.js';
 import { core } from '#lib/core/__mocks__/context.js';
 import SessionRestoreError from './SessionRestoreError.svelte';
 
@@ -11,6 +13,7 @@ beforeEach(() => {
   Object.assign(core, {
     status: 'error',
     migrationFailed: false,
+    migrationError: null,
     accounts: [],
     start: vi.fn(),
     beginSignInRecovery: vi.fn(),
@@ -99,4 +102,22 @@ test('migration failures preserve data and show retry without a misleading fresh
   expect(screen.getByText(/Your original data is still saved/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
+});
+
+test('a failed migration can be skipped so the app starts', async () => {
+  const start = vi.fn();
+  Object.assign(core, {
+    migrationFailed: true,
+    migrationError: 'A v1 account is incomplete; its data has been kept',
+    start,
+  });
+  render(SessionRestoreError);
+  expect(
+    screen.getByText('A v1 account is incomplete; its data has been kept')
+  ).toBeInTheDocument();
+  await fireEvent.click(screen.getByRole('button', { name: 'Continue without v1 data' }));
+  await vi.waitFor(() => {
+    expect(start).toHaveBeenCalledOnce();
+  });
+  expect(skipV1Migration).toHaveBeenCalledOnce();
 });

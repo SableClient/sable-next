@@ -51,6 +51,11 @@ pub async fn import_v1_crypto_batch(
 }
 
 #[tauri::command]
+pub async fn skip_v1_migration(state: State<'_, AppState>) -> Result<(), String> {
+    state.core.skip_v1_migration().await
+}
+
+#[tauri::command]
 pub async fn finish_v1_migration(state: State<'_, AppState>) -> Result<(), String> {
     state.core.finish_v1_migration().await
 }

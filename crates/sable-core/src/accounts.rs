@@ -360,11 +360,6 @@ impl Core {
         {
             return Err(CommandErr::NotLoggedIn);
         }
-        if let Some(expected) = reauth
-            && expected.device_invalidated
-        {
-            self.discard_account_store(&expected.store_id).await?;
-        }
         let mut updated = registry.clone();
         if let Some(expected) = reauth {
             updated
@@ -570,7 +565,6 @@ impl Core {
         };
         account.needs_reauth = true;
         account.device_invalidated = device_invalidated;
-        let store_id = account.store_id.clone();
         if device_invalidated {
             account.session.credentials.discard_tokens();
         }
@@ -579,22 +573,11 @@ impl Core {
             registry.active_account_id = None;
         }
         let bytes = serde_json::to_vec(registry).or_failed(self, "retire_session_serialize")?;
-        let client = self.account_clients.lock().await.get(account_id).cloned();
         self.invalidate_account_client(account_id).await;
         self.sessions
             .save(bytes)
             .await
-            .or_failed(self, "retire_session_save")?;
-        if device_invalidated {
-            if let Some(client) = client {
-                client
-                    .pause()
-                    .await
-                    .or_failed(self, "retire_session_close")?;
-            }
-            self.discard_account_store(&store_id).await?;
-        }
-        Ok(())
+            .or_failed(self, "retire_session_save")
     }
 
     async fn remove_account(&self, account_id: Option<&str>) -> Result<(), CommandErr> {
@@ -628,6 +611,30 @@ impl Core {
             self.discard_account_store(&store_id).await?;
         }
         Ok(())
+    }
+
+    pub(crate) async fn retire_replaced_store(
+        &self,
+        reauth: Option<&PersistedAccount>,
+        store_id: &str,
+    ) {
+        let Some(replaced) = reauth.filter(|account| account.device_invalidated) else {
+            return;
+        };
+        let Some(base) = session::base_client(store_id) else {
+            tracing::error!("could not carry room keys: the new client is gone");
+            return;
+        };
+        match crate::store_disposal::carry_room_keys(&replaced.store_id, &base).await {
+            Ok(imported) => tracing::info!(imported, "carried room keys to the new device"),
+            Err(error) => {
+                tracing::error!("could not carry room keys to the new device: {error}");
+                return;
+            }
+        }
+        if let Err(error) = self.discard_account_store(&replaced.store_id).await {
+            tracing::error!(?error, "could not discard the replaced account store");
+        }
     }
 
     pub(crate) async fn discard_account_store(&self, store_id: &str) -> Result<(), CommandErr> {
@@ -770,6 +777,7 @@ impl Core {
             .unwrap_or_else(|| self.store_id.clone());
         self.watch_search_index(&client, &store_id);
         self.watch_ignored_users(&client);
+        self.watch_backup_preference(&client);
         sync_service.start().await;
 
         client.send_queue().enable_upload_progress(true);
@@ -804,6 +812,9 @@ impl Core {
                     }
 
                     if stalled {
+                        if core.detect_account_lock(&support_client, generation).await {
+                            continue;
+                        }
                         if matches!(
                             core.require_sliding_sync(&support_client).await,
                             Err(CommandErr::SlidingSyncUnsupported)
@@ -953,10 +964,6 @@ impl Core {
         change: &matrix_sdk::SessionChange,
         generation: u64,
     ) -> bool {
-        if matches!(change, matrix_sdk::SessionChange::AccountLocked) {
-            self.lock_account(generation);
-            return false;
-        }
         let matrix_sdk::SessionChange::UnknownToken(data) = change else {
             if self.session_generation.load(Ordering::SeqCst) == generation {
                 self.emit(CoreEvent::SessionTokensRefreshed);
@@ -985,9 +992,6 @@ impl Core {
             let account_id = session.as_ref().map(|session| session.account_id.clone());
             if let Some(session) = session {
                 session.sync_service.stop().await;
-                if !soft_logout && let Err(error) = session.client.pause().await {
-                    tracing::error!("could not close rejected session stores: {error}");
-                }
             }
 
             let outcome = match account_id.as_deref() {
@@ -1258,7 +1262,7 @@ mod regression_tests {
     }
 
     #[tokio::test]
-    async fn rejected_devices_discard_credentials_and_sqlite_stores_only_on_hard_logout() {
+    async fn rejected_devices_discard_credentials_but_keep_their_stores() {
         use crate::session::{AccountRegistry, PersistedAccount, current_session};
         for hard in [false, true] {
             let server = MatrixMockServer::new().await;
@@ -1302,7 +1306,7 @@ mod regression_tests {
             core.mark_account_needs_reauth(Some("a1"), hard)
                 .await
                 .unwrap();
-            assert_eq!(database.exists(), !hard);
+            assert!(database.exists());
             let bytes = core.sessions.load().await.unwrap().unwrap();
             let (registry, _) = AccountRegistry::from_bytes(&bytes, base).unwrap();
             let account = &registry.accounts[0];

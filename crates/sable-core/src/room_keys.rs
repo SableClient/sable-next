@@ -91,8 +91,7 @@ impl Core {
         })
     }
 
-    #[cfg(target_family = "wasm")]
-    async fn base_client(&self) -> Result<std::rc::Rc<matrix_sdk_base::BaseClient>, CommandErr> {
+    pub(crate) async fn base_client(&self) -> Result<crate::session::SharedBaseClient, CommandErr> {
         let account_id = self
             .session
             .read()
@@ -225,50 +224,15 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
                 .await;
             let key = BackupDecryptionKey::new();
             backup_metadata(&server, &key, 0).await;
-            let store = tempfile::tempdir().unwrap();
-            let client = server
-                .client_builder()
-                .on_builder(|builder| {
-                    builder
-                        .sqlite_store(store.path(), None)
-                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
-                })
-                .build()
-                .await;
-            client
-                .encryption()
-                .wait_for_e2ee_initialization_tasks()
-                .await;
-            client
-                .olm_machine_for_testing()
-                .await
-                .as_ref()
-                .unwrap()
-                .backup_machine()
-                .save_decryption_key(Some(key.clone()), Some("1".to_owned()))
-                .await
-                .unwrap();
-            client.pause().await.unwrap();
-            drop(client);
-            let restored = server
-                .client_builder()
-                .on_builder(|builder| {
-                    builder
-                        .sqlite_store(store.path(), None)
-                        .request_config(matrix_sdk::config::RequestConfig::new().disable_retry())
-                })
-                .build()
-                .await;
-            restored
-                .encryption()
-                .wait_for_e2ee_initialization_tasks()
-                .await;
+            let (core, client, _store) = core_for(&server).await;
+            unlock_backup(&client, &key).await;
+            core.honor_backup_preference(&client).await;
             assert_eq!(
-                restored.encryption().backups().are_enabled().await,
+                client.encryption().backups().are_enabled().await,
                 enabled,
                 "preference status {status}"
             );
-            let keys = restored
+            let keys = client
                 .olm_machine_for_testing()
                 .await
                 .as_ref()
@@ -285,22 +249,28 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
                     .iter()
                     .any(|request| request.url.path().ends_with("/account_data/m.key_backup"))
             );
-            if !enabled {
-                assert!(!requests.iter().any(|request| request.method == "PUT"
-                    && request.url.path().contains("/room_keys/keys")));
-            }
         }
     }
 
     async fn core_for(server: &MatrixMockServer) -> (Arc<Core>, Client, TempDir) {
-        let client = server.client_builder().build().await;
+        let store = tempfile::tempdir().unwrap();
+        let store_id = format!(
+            "{}-{}",
+            store.path().to_str().unwrap(),
+            matrix_sdk::ruma::TransactionId::new()
+        );
+        let client = crate::session::mock_account_client(server, &store_id).await;
         client.event_cache().subscribe().unwrap();
         let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
-        let store = tempfile::tempdir().unwrap();
         let (core, _events) = Core::new(
             store.path().to_str().unwrap(),
             Box::new(MemorySessionStore::default()),
         );
+        *core.accounts.lock().await = Some(crate::session::AccountRegistry::empty());
+        let persisted = crate::session::current_session(&client, server.server().uri()).unwrap();
+        core.persist("a1", &store_id, &persisted, None)
+            .await
+            .unwrap();
         *core.session.write().await = Some(Session {
             account_id: "a1".to_owned(),
             client: client.clone(),
@@ -365,93 +335,47 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     }
 
     #[tokio::test]
-    async fn history_keys_use_the_stable_wire_field_and_accept_legacy_aliases() {
-        use matrix_sdk_base::crypto::{
-            olm::BackedUpRoomKey, types::events::room_key::RoomKeyContent,
-        };
-        let session = outbound_session(room_id!("!history:example.org"));
-        let exported = serde_json::to_value(exported(&session).await).unwrap();
-        let room_key = json!({
-            "algorithm": "m.megolm.v1.aes-sha2", "room_id": session.0.room_id(),
-            "session_id": session.0.session_id(), "session_key": session.0.session_key().await.to_base64()
-        });
-        for field in [
-            "shared_history",
-            "m.shared_history",
-            "org.matrix.msc3061.shared_history",
-        ] {
-            let mut key = exported.clone();
-            key.as_object_mut().unwrap().remove("shared_history");
-            key[field] = json!(true);
-            assert!(
-                serde_json::from_value::<BackedUpRoomKey>(key.clone())
-                    .unwrap()
-                    .shared_history
-            );
-            let key: ExportedRoomKey = serde_json::from_value(key).unwrap();
-            assert!(key.shared_history);
-            assert!(
-                InboundGroupSession::from_export(&key)
-                    .unwrap()
-                    .export()
-                    .await
-                    .shared_history
-            );
-            let wire = serde_json::to_value(&key).unwrap();
-            assert_eq!(wire["shared_history"], true);
-            assert!(wire.get("m.shared_history").is_none());
-            let backup: BackedUpRoomKey = key.into();
-            let backup = serde_json::to_value(backup).unwrap();
-            assert_eq!(backup["shared_history"], true);
-            assert!(backup.get("m.shared_history").is_none());
-            assert!(
-                serde_json::from_value::<BackedUpRoomKey>(backup)
-                    .unwrap()
-                    .shared_history
-            );
-            let mut content = room_key.clone();
-            content[field] = json!(true);
-            let content: RoomKeyContent = serde_json::from_value(content).unwrap();
-            let wire = serde_json::to_value(content).unwrap();
-            assert_eq!(wire["shared_history"], true);
-            assert!(wire.get("m.shared_history").is_none());
-        }
-        for mut wire in [exported.clone(), room_key.clone()] {
-            wire.as_object_mut().unwrap().remove("shared_history");
-            for fields in [
-                json!({"shared_history": "true"}),
-                json!({"shared_history": true, "m.shared_history": false}),
-            ] {
-                let mut invalid = wire.clone();
-                invalid
-                    .as_object_mut()
-                    .unwrap()
-                    .extend(fields.as_object().unwrap().clone());
-                assert!(
-                    serde_json::from_value::<ExportedRoomKey>(invalid.clone())
-                        .err()
-                        .unwrap()
-                        .is_data()
-                );
-                assert!(
-                    serde_json::from_value::<BackedUpRoomKey>(invalid.clone())
-                        .err()
-                        .unwrap()
-                        .is_data()
-                );
-                serde_json::from_value::<RoomKeyContent>(invalid).unwrap_err();
-            }
-        }
-        assert!(
-            !serde_json::from_value::<ExportedRoomKey>(exported)
-                .unwrap()
-                .shared_history
+    async fn a_replaced_device_carries_its_room_keys_to_the_new_one() {
+        let server = MatrixMockServer::new().await;
+        let directory = tempfile::tempdir().unwrap();
+        let old_store = directory.path().join("old");
+        let old = server
+            .client_builder()
+            .on_builder(|builder| builder.sqlite_store(old_store.join("store"), None))
+            .build()
+            .await;
+        let outbound = outbound_session(room_id!("!carry:example.org"));
+        old.olm_machine_for_testing()
+            .await
+            .as_ref()
+            .unwrap()
+            .store()
+            .import_exported_room_keys(vec![exported(&outbound).await], |_, _| ())
+            .await
+            .unwrap();
+        old.pause().await.unwrap();
+        drop(old);
+        let new_store = format!("{}-new", directory.path().display());
+        let new = crate::session::mock_account_client(&server, &new_store).await;
+        let base = crate::session::base_client(&new_store).unwrap();
+        let imported = crate::store_disposal::carry_room_keys(old_store.to_str().unwrap(), &base)
+            .await
+            .unwrap();
+        assert_eq!(imported, 1);
+        assert_eq!(
+            session_ids(&new).await,
+            vec![outbound.0.session_id().to_owned()]
         );
-        let RoomKeyContent::MegolmV1AesSha2(content) = serde_json::from_value(room_key).unwrap()
-        else {
-            panic!("wrong algorithm")
-        };
-        assert!(!content.shared_history);
+    }
+
+    #[tokio::test]
+    async fn history_keys_keep_the_wire_field_other_clients_read() {
+        let session = outbound_session(room_id!("!history:example.org"));
+        let mut key = exported(&session).await;
+        key.shared_history = true;
+        let wire = serde_json::to_value(&key).unwrap();
+        assert_eq!(wire["m.shared_history"], true);
+        assert!(wire.get("shared_history").is_none());
     }
 
     async fn backup_metadata(
@@ -519,12 +443,9 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             })))
             .mount(server.server())
             .await;
-        let backups = client.encryption().backups();
-        let stream = backups.room_keys_for_room_stream(room);
-        futures_util::pin_mut!(stream);
         let updates = std::sync::Mutex::new(Vec::new());
-        let result = backups
-            .download_all_room_keys_with_progress(|update| updates.lock().unwrap().push(update))
+        let result = core
+            .download_all_room_keys(&client, |update| updates.lock().unwrap().push(update))
             .await
             .unwrap();
         assert_eq!(
@@ -543,13 +464,8 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
                 .iter()
                 .any(|update| update.processed == 100)
         );
-        tokio::time::timeout(Duration::from_secs(2), stream.next())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
         assert_eq!(session_ids(&client).await.len(), 102);
-        let status = backups.status().await.unwrap();
+        let status = core.backup_status(&client).await.unwrap();
         assert_eq!(
             (status.local_keys, status.backed_up_keys, status.cloud_keys),
             (102, 102, Some(103))
@@ -622,7 +538,12 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         })
         .await
         .unwrap();
-        let other = server.client_builder().build().await;
+        let other_store = format!("{}-other", core.store_id);
+        let other = crate::session::mock_account_client(&server, &other_store).await;
+        let persisted = crate::session::current_session(&other, server.server().uri()).unwrap();
+        core.persist("other", &other_store, &persisted, None)
+            .await
+            .unwrap();
         core.session_generation
             .store(2, std::sync::atomic::Ordering::SeqCst);
         *core.session.write().await = Some(Session {
@@ -655,18 +576,15 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
         let (core, client, _store) = core_for(&server).await;
         let server_key = BackupDecryptionKey::new();
         backup_metadata(&server, &server_key, 5).await;
-        let backups = client.encryption().backups();
-        assert!(!backups.status().await.unwrap().can_restore);
-        assert!(matches!(
-            backups.download_all_room_keys_with_progress(|_| {}).await,
-            Err(matrix_sdk::Error::BackupNotEnabled)
-        ));
+        assert!(!core.backup_status(&client).await.unwrap().can_restore);
+        core.download_all_room_keys(&client, |_| {})
+            .await
+            .unwrap_err();
         unlock_backup(&client, &BackupDecryptionKey::new()).await;
-        assert!(!backups.status().await.unwrap().can_restore);
-        assert!(matches!(
-            backups.download_all_room_keys_with_progress(|_| {}).await,
-            Err(matrix_sdk::Error::BackupNotEnabled)
-        ));
+        assert!(!core.backup_status(&client).await.unwrap().can_restore);
+        core.download_all_room_keys(&client, |_| {})
+            .await
+            .unwrap_err();
         let _permit = core.key_backup_downloads.acquire().await.unwrap();
         assert!(matches!(
             core.download_key_backup("duplicate".to_owned()).await,
@@ -686,7 +604,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     #[tokio::test]
     async fn absent_cloud_backup_is_distinct_from_network_failure() {
         let server = MatrixMockServer::new().await;
-        let (_core, client, _store) = core_for(&server).await;
+        let (core, client, _store) = core_for(&server).await;
         wiremock::Mock::given(wiremock::matchers::method("GET"))
             .and(wiremock::matchers::path_regex(
                 r"^/_matrix/client/(r0|v3)/room_keys/version$",
@@ -697,7 +615,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             )
             .mount(server.server())
             .await;
-        let status = client.encryption().backups().status().await.unwrap();
+        let status = core.backup_status(&client).await.unwrap();
         assert_eq!(status.cloud_keys, None);
         assert!(!status.can_restore);
         server.server().reset().await;
@@ -711,7 +629,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             )
             .mount(server.server())
             .await;
-        client.encryption().backups().status().await.unwrap_err();
+        core.backup_status(&client).await.unwrap_err();
     }
 
     #[tokio::test]

@@ -169,6 +169,8 @@ impl Core {
             reauth.as_ref(),
         )
         .await?;
+        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
+            .await;
         tracing::info!(
             operation = "password_login",
             homeserver,
@@ -422,6 +424,8 @@ impl Core {
             reauth.as_ref(),
         )
         .await?;
+        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
+            .await;
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.pending_login.lock().await.take();
@@ -564,6 +568,8 @@ impl Core {
             reauth.as_ref(),
         )
         .await?;
+        self.retire_replaced_store(reauth.as_ref(), &account_store_id)
+            .await;
         self.start_session(client, homeserver, account_id.clone(), generation.value())
             .await?;
         self.pending_login.lock().await.take();
