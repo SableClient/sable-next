@@ -359,7 +359,7 @@
   }
 
   .profile-card-cover.has-banner {
-    --profile-cover-height: 6rem;
+    --profile-cover-height: 7rem;
   }
 
   /* Both dimensions, so the ratio MediaImage sets inline stops applying. */
