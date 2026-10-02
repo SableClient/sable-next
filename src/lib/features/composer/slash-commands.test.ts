@@ -39,7 +39,7 @@ function fakeCommands() {
     roomStateEvents: vi.fn(() =>
       Promise.resolve([{ state_key: '!space:example.org', content: {} }])
     ),
-    sendStateEvent: vi.fn(() => Promise.resolve('$created')),
+    sendStateEvent: vi.fn((..._args: unknown[]) => Promise.resolve('$created')),
     personas: vi.fn(() =>
       Promise.resolve({
         personas: [],
