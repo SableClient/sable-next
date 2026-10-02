@@ -54,6 +54,7 @@ declare global {
     __e2eSwitchAccountDelayMs?: number;
     __e2eCommandPayloads: Command[];
     __e2eProfileSaveError?: boolean;
+    __e2eSendError?: string;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eMembers?: MemberView[];
     __e2eMediaReady?: Promise<void>;
@@ -1033,6 +1034,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         return { type: 'unsubscribe' };
       },
       send_message: (command) => {
+        if (window.__e2eSendError) throw new FakeCoreError(window.__e2eSendError);
         receiveMessage(command.body, true);
         return { type: 'send_message' };
       },
@@ -1252,6 +1254,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         keywords: notificationKeywords.map((entry) => ({ ...entry })),
       }),
       timestamp_to_event: () => ({ type: 'timestamp_to_event', event_id: null }),
+      event_cached: () => ({ type: 'event_cached', cached: false }),
       room_account_data: (command) => ({
         type: 'room_account_data',
         content:

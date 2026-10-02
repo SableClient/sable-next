@@ -2158,3 +2158,45 @@ async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
     assert_eq!(document.content, Some(draft));
     assert!(document.can_seal);
 }
+
+#[allow(clippy::unwrap_used)]
+#[tokio::test]
+async fn event_cached_reports_only_events_the_cache_holds() {
+    use matrix_sdk::ruma::{event_id, user_id};
+    use matrix_sdk_test::event_factory::EventFactory;
+
+    let server = MatrixMockServer::new().await;
+    let client = server.client_builder().build().await;
+    client.event_cache().subscribe().unwrap();
+    let room_id = room_id!("!cached:example.org");
+    let factory = EventFactory::new()
+        .room(room_id)
+        .sender(user_id!("@alice:example.org"));
+    server
+        .sync_room(
+            &client,
+            JoinedRoomBuilder::new(room_id).add_timeline_event(
+                factory
+                    .text_msg("hello")
+                    .event_id(event_id!("$cached:example.org")),
+            ),
+        )
+        .await;
+    let core = core(&server, client).await;
+    for (event_id, expected) in [
+        (event_id!("$cached:example.org"), true),
+        (event_id!("$missing:example.org"), false),
+    ] {
+        let CommandOk::EventCached { cached } = core
+            .dispatch(Command::EventCached {
+                room_id: room_id.to_owned(),
+                event_id: event_id.to_owned(),
+            })
+            .await
+            .unwrap()
+        else {
+            panic!("unexpected response");
+        };
+        assert_eq!(cached, expected, "{event_id}");
+    }
+}

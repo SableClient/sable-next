@@ -40,6 +40,10 @@ class FakeCore {
     return Promise.resolve({ event_id: '$read' });
   }
 
+  eventCached(_roomId: string, _eventId: string): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   subscribeEvents(listener: (event: CoreEvent) => void) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -187,6 +191,36 @@ test('opens unread at its marker without paginating through the backlog', async 
   expect(timeline.forwardPagination).toBe('end');
   await timeline.resumeLive();
   expect(core.subscribeCalls.at(-1)?.focus).toEqual({ kind: 'live' });
+});
+
+test('opens a cached unread marker on the live timeline by paging from the cache', async () => {
+  const core = new FakeCore();
+  vi.spyOn(core, 'eventCached').mockResolvedValue(true);
+  vi.spyOn(core, 'paginate').mockImplementation((subscription, direction) => {
+    core.emit({
+      type: 'timeline_diff',
+      subscription,
+      diffs: [{ op: 'push_front', value: item('read') }],
+    });
+    return Promise.resolve({ direction, reached_end: false });
+  });
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  expect(core.subscribeCalls).toEqual([{ roomId: '!room:example.org', focus: { kind: 'live' } }]);
+  expect(timeline.mode).toEqual({ kind: 'live' });
+  expect(timeline.items.map((entry) => entry.event_id)).toEqual(['$read', '$initial']);
+});
+
+test('a cached unread marker out of paging reach opens its context', async () => {
+  const core = new FakeCore();
+  vi.spyOn(core, 'eventCached').mockResolvedValue(true);
+  const timeline = new RoomTimeline(core as unknown as CoreClient);
+  await timeline.start('!room:example.org', null, false, true);
+  expect(core.subscribeCalls.map((call) => call.focus)).toEqual([
+    { kind: 'live' },
+    { kind: 'event', event_id: '$read' },
+  ]);
+  expect(timeline.mode).toEqual({ kind: 'unread', eventId: '$read' });
 });
 
 test('repeating the room opening after a summary update keeps its unread context', async () => {

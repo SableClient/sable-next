@@ -482,6 +482,15 @@ export function createCommands(transport: () => Transport) {
       return response.event_id;
     },
 
+    async eventCached(roomId: string, eventId: string): Promise<boolean> {
+      const response = await transport().send({
+        type: 'event_cached',
+        room_id: roomId,
+        event_id: eventId,
+      });
+      return response.cached;
+    },
+
     async roomAccountData(roomId: string, eventType: string): Promise<unknown> {
       const response = await transport().send({
         type: 'room_account_data',

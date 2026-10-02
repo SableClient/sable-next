@@ -517,6 +517,12 @@ pub enum Command {
         room_id: OwnedRoomId,
         event_type: String,
     },
+    EventCached {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
+    },
     AccountDataTypes,
     AccessToken,
     AccountData {
@@ -821,8 +827,6 @@ pub enum Command {
         join_rule: Option<CreateJoinRuleView>,
         federate: bool,
     },
-    /// Reuses an existing DM with this user if there is one. `encrypted` picks
-    /// which kind to reuse or create; `None` reuses any and creates an encrypted one.
     CreateDm {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         user_id: OwnedUserId,
@@ -1534,6 +1538,9 @@ pub enum CommandOk {
     RoomAccountData {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
         content: Option<serde_json::Value>,
+    },
+    EventCached {
+        cached: bool,
     },
     AccountDataTypes {
         event_types: Vec<String>,
@@ -2603,7 +2610,6 @@ pub enum VerificationView {
     },
     /// The other device read our code and waits for us to say it shows success.
     Scanned,
-    /// QR scan succeeded; awaiting the other device's confirmation.
     Reciprocated,
     /// `decimals` is the fallback when the other side refused emoji.
     Compare {

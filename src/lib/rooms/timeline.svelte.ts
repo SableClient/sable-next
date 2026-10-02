@@ -20,6 +20,7 @@ const PAGINATION_DIFF_SETTLE_TIMEOUT = 2_000;
 const RESUME_PAGE_SIZE = 25;
 const MAX_EMPTY_RESUME_PAGES = 5;
 const MAX_EMPTY_THREAD_PAGES = 5;
+const MAX_CACHED_UNREAD_PAGES = 4;
 
 const sharedTimelines = new WeakMap<CoreClient, ActiveRoomTimeline>();
 
@@ -170,6 +171,7 @@ export class RoomTimeline {
   private forwardPaginationStartLastEventId: string | null = null;
   private forwardPaginationSettleTimer: ReturnType<typeof setTimeout> | null = null;
   private resumePromise: Promise<void> | null = null;
+  private cachedUnreadEventId: string | null = null;
   private stagedItems: TimelineItemView[] | null = null;
   private stagedAggregations: TimelineItemView[] | null = null;
   constructor(private readonly core: CoreClient) {}
@@ -311,12 +313,40 @@ export class RoomTimeline {
 
     try {
       await promise;
+      const cachedUnread = this.cachedUnreadEventId;
+      this.cachedUnreadEventId = null;
+      if (
+        cachedUnread !== null &&
+        session === this.session &&
+        request === this.startRequest &&
+        !(await this.pageToEvent(cachedUnread, session))
+      ) {
+        if (session === this.session && request === this.startRequest) {
+          await this.open(roomId, { kind: 'unread', eventId: cachedUnread }, hiddenEvents);
+        }
+      }
     } catch {
       if (session === this.session) this.error = 'load_failed';
     } finally {
       if (this.startPromise === promise) this.startPromise = null;
       if (session === this.session) this.loading = false;
     }
+  }
+
+  private async pageToEvent(eventId: string, session: number): Promise<boolean> {
+    const loaded = () => this.items.some((item) => item.event_id === eventId);
+    for (let page = 0; page < MAX_CACHED_UNREAD_PAGES; page++) {
+      if (session !== this.session || this.error !== null) return false;
+      if (loaded()) return true;
+      if (this.backwardPagination === 'end') return false;
+      try {
+        await this.paginateBackward(RESUME_PAGE_SIZE);
+      } catch {
+        return false;
+      }
+      await this.backwardPaginationSettled();
+    }
+    return session === this.session && loaded();
   }
 
   async paginateBackward(count: number): Promise<boolean> {
@@ -549,7 +579,12 @@ export class RoomTimeline {
         !response.items.some((item) => item.content.kind === 'read_marker')
       ) {
         const eventId = await this.unloadedReadMarker(roomId, response.items);
-        if (session === this.session && eventId !== null) {
+        const cached =
+          eventId !== null &&
+          (await this.core.commands.eventCached(roomId, eventId).catch(() => false));
+        if (session === this.session && cached) {
+          this.cachedUnreadEventId = eventId;
+        } else if (session === this.session && eventId !== null) {
           await this.core.commands.unsubscribe(response.subscription);
           if (session !== this.session) {
             stopEvents();

@@ -1203,6 +1203,21 @@ impl Core {
                 Ok(CommandOk::RoomAccountData { content })
             }
 
+            Command::EventCached { room_id, event_id } => {
+                let (cache, _handles) = self
+                    .room(&room_id)
+                    .await?
+                    .event_cache()
+                    .await
+                    .or_failed(self, "event_cached")?;
+                let cached = cache
+                    .find_event(&event_id)
+                    .await
+                    .or_failed(self, "event_cached")?
+                    .is_some();
+                Ok(CommandOk::EventCached { cached })
+            }
+
             Command::AccountDataTypes => Ok(CommandOk::AccountDataTypes {
                 event_types: self.account_data_types().await?,
             }),
