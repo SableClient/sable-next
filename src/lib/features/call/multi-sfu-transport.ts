@@ -4,6 +4,7 @@ import type { CallTelemetry } from './call-telemetry';
 import type {
   CallBackendGrant,
   CallEncryptionKey,
+  CallParticipant,
   CallTransport,
   CallTransportConnectOptions,
   CallTransportRoom,
@@ -17,6 +18,9 @@ export type MultiSfuTransportDeps = {
 };
 
 const MAX_CACHED_KEYS = 512;
+
+const publishes = (participant: CallParticipant): boolean =>
+  Boolean(participant.microphone ?? participant.camera ?? participant.screenShare);
 
 export function createMultiSfuTransport(
   encryptMedia: boolean,
@@ -70,12 +74,19 @@ export function createMultiSfuTransport(
       state: transport.getState(),
     }));
     const publisher = publisherId ? transports.get(publisherId)?.getState() : undefined;
+    const byIdentity = new Map<string, CallParticipant>();
+    for (const { backendId, state } of entries) {
+      for (const participant of state.participants) {
+        const seen = byIdentity.get(participant.identity);
+        if (!seen || (!publishes(seen) && publishes(participant))) {
+          byIdentity.set(participant.identity, { ...participant, backendId });
+        }
+      }
+    }
     state = {
       ...(publisher ?? idleTransportState()),
       connection: publisher?.connection ?? 'disconnected',
-      participants: entries.flatMap(({ backendId, state }) =>
-        state.participants.map((participant) => ({ ...participant, backendId }))
-      ),
+      participants: [...byIdentity.values()],
     };
     for (const listener of listeners) listener({ ...state, participants: [...state.participants] });
   };

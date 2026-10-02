@@ -39,6 +39,42 @@ test('connects each backend while publishing media only on the publisher and sha
   expect(created[1].transport.setEncryptionKey).toHaveBeenCalledOnce();
 });
 
+test('lists a peer subscribed on several backends once, on the backend it publishes to', async () => {
+  const created: ReturnType<typeof fakeTransport>[] = [];
+  const transport = createMultiSfuTransport(false, undefined, {
+    createTransport: () => {
+      const next = fakeTransport();
+      created.push(next);
+      return next;
+    },
+  });
+  await transport.connect({
+    url: '',
+    token: '',
+    microphoneEnabled: false,
+    cameraEnabled: false,
+    publisherId: 'publish',
+    backends: [
+      { id: 'publish', url: 'wss://one', jwt: 'one', identity: 'me' },
+      { id: 'remote', url: 'wss://two', jwt: 'two', identity: 'me-remote' },
+    ],
+    encryptionKeys: [],
+  });
+  created[0].getState().participants = [{ identity: 'peer' }];
+  created[1].getState().participants = [
+    { identity: 'peer', microphone: { id: 'mic', muted: false, subscribed: true } },
+  ];
+  created[1].emitConnection('connected');
+
+  expect(transport.getState().participants).toEqual([
+    {
+      identity: 'peer',
+      backendId: 'remote',
+      microphone: { id: 'mic', muted: false, subscribed: true },
+    },
+  ]);
+});
+
 test('starts the publisher and healthy subscribers while another subscriber is blocked', async () => {
   let releaseBlocked!: () => void;
   const blocked = new Promise<void>((resolve) => {
