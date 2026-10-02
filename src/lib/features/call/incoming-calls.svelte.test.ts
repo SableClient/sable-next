@@ -5,6 +5,7 @@ import type { CoreClient } from '#lib/core/client.svelte.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 const system = vi.hoisted(() => ({
+  platform: 'android',
   handler: null as ((action: { action: string; uuid: string; roomId?: string }) => void) | null,
   report: vi.fn((_call: { uuid: string }) => Promise.resolve(false)),
   end: vi.fn((_callId: string) => Promise.resolve(true)),
@@ -13,7 +14,7 @@ const system = vi.hoisted(() => ({
 vi.mock('#lib/platform/calls.js', () => ({
   reportIncomingSystemCall: system.report,
   endSystemCall: system.end,
-  systemCallKey: (callId: string) => callId,
+  systemCallKey: (callId: string, uuid: string) => (system.platform === 'ios' ? uuid : callId),
   listenSystemCallActions: (handler: typeof system.handler) => {
     system.handler = handler;
     return Promise.resolve(() => {});
@@ -58,6 +59,7 @@ const incoming = (overrides: Partial<Record<string, unknown>> = {}): CoreEvent =
 });
 
 beforeEach(() => {
+  system.platform = 'android';
   preferences.ringForGroupCalls = false;
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-08-24T12:00:00Z'));
@@ -174,12 +176,11 @@ test('answering in the system call UI joins the room and keeps the system call',
   await vi.waitFor(() => {
     expect(system.report).toHaveBeenCalled();
   });
-  const uuid = system.report.mock.calls[0]?.[0].uuid ?? '';
   await Promise.resolve();
-  system.handler?.({ action: 'answer', uuid });
+  system.handler?.({ action: 'answer', uuid: '$notify' });
 
   expect(onAnswer).toHaveBeenCalledWith({
-    uuid,
+    uuid: '$notify',
     callId: '$notify',
     roomId: '!room:example.org',
     hasVideo: true,
@@ -217,8 +218,47 @@ test('declining in the system call UI declines the Matrix call', async () => {
     expect(system.report).toHaveBeenCalled();
   });
   await Promise.resolve();
-  system.handler?.({ action: 'end', uuid: system.report.mock.calls.at(-1)?.[0].uuid ?? '' });
+  system.handler?.({ action: 'end', uuid: '$notify' });
 
   expect(declineCall).toHaveBeenCalledWith('!room:example.org', '$notify');
   expect(calls.calls).toEqual([]);
+});
+
+test('an iOS answer keeps its UUID as the system call key', async () => {
+  system.platform = 'ios';
+  system.report.mockResolvedValueOnce(true);
+  const { client, emit } = harness();
+  const onAnswer = vi.fn();
+  const calls = new IncomingCalls(client, onAnswer);
+  calls.start();
+  emit(incoming());
+  await Promise.resolve();
+  const uuid = system.report.mock.calls[0][0].uuid;
+
+  system.handler?.({ action: 'answer', uuid });
+
+  expect(onAnswer).toHaveBeenCalledWith(expect.objectContaining({ uuid, callId: uuid }));
+  expect(system.end).not.toHaveBeenCalled();
+});
+
+test('an answer before reporting completes keeps the system call alive', async () => {
+  let complete!: (taken: boolean) => void;
+  system.report.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        complete = resolve;
+      })
+  );
+  const { client, emit } = harness();
+  const onAnswer = vi.fn();
+  const calls = new IncomingCalls(client, onAnswer);
+  calls.start();
+  emit(incoming());
+
+  system.handler?.({ action: 'answer', uuid: '$notify' });
+  complete(true);
+  await Promise.resolve();
+
+  expect(onAnswer).toHaveBeenCalledOnce();
+  expect(system.end).not.toHaveBeenCalled();
 });

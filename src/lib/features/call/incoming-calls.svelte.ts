@@ -34,7 +34,7 @@ export class IncomingCalls {
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never rendered from
   readonly #system = new Set<string>();
   // eslint-disable-next-line svelte/prefer-svelte-reactivity -- never rendered from
-  readonly #uuids = new Map<string, string>();
+  readonly #uuids = new Map<string, { uuid: string; answered: boolean }>();
   readonly #onSystemAnswer: (answer: SystemAnswer) => void;
   #ringtone: Ringtone | undefined;
   #unsubscribe: (() => void) | undefined;
@@ -126,21 +126,24 @@ export class IncomingCalls {
   }
 
   #systemKey(notificationEventId: string): string {
-    return systemCallKey(notificationEventId, this.#uuids.get(notificationEventId) ?? '');
+    return systemCallKey(notificationEventId, this.#uuids.get(notificationEventId)?.uuid ?? '');
   }
 
   #onSystemAction(action: SystemCallAction): void {
     const call = this.calls.find(
-      (entry) => this.#uuids.get(entry.notificationEventId) === action.uuid
+      (entry) => this.#systemKey(entry.notificationEventId) === action.uuid
     );
     if (call) this.#system.delete(call.notificationEventId);
     if (action.action === 'answer') {
       const roomId = call?.roomId ?? action.roomId;
+      const callId = call ? this.#systemKey(call.notificationEventId) : action.uuid;
+      const reported = call && this.#uuids.get(call.notificationEventId);
+      if (reported) reported.answered = true;
       if (call) this.#drop(call.notificationEventId);
       if (roomId) {
         this.#onSystemAnswer({
           uuid: action.uuid,
-          callId: call ? this.#systemKey(call.notificationEventId) : action.uuid,
+          callId,
           roomId,
           hasVideo: call?.hasVideo ?? false,
         });
@@ -152,7 +155,8 @@ export class IncomingCalls {
 
   async #raiseSystemCall(call: IncomingCall): Promise<void> {
     const uuid = crypto.randomUUID();
-    this.#uuids.set(call.notificationEventId, uuid);
+    const reported = { uuid, answered: false };
+    this.#uuids.set(call.notificationEventId, reported);
     const taken = await reportIncomingSystemCall({
       callId: call.notificationEventId,
       uuid,
@@ -160,7 +164,7 @@ export class IncomingCalls {
       hasVideo: call.hasVideo,
       roomId: call.roomId,
     });
-    if (!taken) return;
+    if (!taken || reported.answered) return;
     if (!this.calls.some((c) => c.notificationEventId === call.notificationEventId)) {
       void endSystemCall(systemCallKey(call.notificationEventId, uuid));
       return;
