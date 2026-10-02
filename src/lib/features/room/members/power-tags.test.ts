@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { powerTag } from './power-tags';
+import { parsePowerLevelTags, withPowerLevelTag } from '../settings/power-level-tags';
+import { FOUNDER_POWER_LEVEL, powerTag } from './power-tags';
 
 const t = (key: string, options?: Record<string, unknown>): string =>
   options ? `${key}(${JSON.stringify(options)})` : key;
@@ -15,6 +16,14 @@ describe('powerTag', () => {
 
   it('names a room-version-12 creator, whose power level is infinite', () => {
     expect(powerTag(Number.MAX_SAFE_INTEGER + 1, t).name).toBe('timeline.powerTagFounder');
+  });
+
+  it('applies saved founder flair after reading the room state', () => {
+    const flair = { name: 'Founder', color: '#ff0000', icon: '👑' };
+    const content = withPowerLevelTag({}, FOUNDER_POWER_LEVEL, flair);
+    const tags = parsePowerLevelTags(content);
+
+    expect(powerTag(FOUNDER_POWER_LEVEL, t, tags)).toEqual(flair);
   });
 
   it('does not name the highest 32-bit power level as founder', () => {

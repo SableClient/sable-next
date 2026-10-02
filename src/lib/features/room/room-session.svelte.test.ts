@@ -5,6 +5,7 @@ import type {
   RoomStateEventView,
 } from '#src/generated/protocol';
 import { RoomSession } from './room-session.svelte.js';
+import { FOUNDER_POWER_LEVEL } from './settings/power-level-tags';
 
 function deferred<T>() {
   return Promise.withResolvers<T>();
@@ -62,6 +63,25 @@ function fixture() {
 async function settle() {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
+
+test('opening a room loads the saved founder flair', async () => {
+  const { commands, session } = fixture();
+  commands.roomOpen.mockResolvedValueOnce({
+    ...opened('$new'),
+    power_level_tags: {
+      [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#ff0000', icon: { key: '👑' } },
+    },
+  });
+
+  session.sync('!room', false, 0);
+  await settle();
+
+  expect(session.powerTags?.[FOUNDER_POWER_LEVEL]).toEqual({
+    name: 'Founder',
+    color: '#ff0000',
+    icon: '👑',
+  });
+});
 
 test('room changes discard stale details and pin updates', async () => {
   const { commands, pins, session } = fixture();

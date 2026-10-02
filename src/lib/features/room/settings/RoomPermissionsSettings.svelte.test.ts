@@ -176,6 +176,13 @@ test('lets a founder add colour and an icon to the founder role', async () => {
       [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#ff0000', icon: { key: '👑' } },
     }
   );
+
+  const row = founderRow.closest('li') ?? document.body;
+  expect(within(row).getByText('👑')).toBeInTheDocument();
+  expect(row.querySelector('.role-swatch')).toHaveStyle({ backgroundColor: '#ff0000' });
+  await user.click(within(row).getByRole('button', { name: 'Edit role' }));
+  expect(screen.getByRole('textbox', { name: 'Icon' })).toHaveValue('👑');
+  expect(screen.getByRole('textbox', { name: 'Role colour' })).toHaveValue('#ff0000');
 });
 
 test('uses tagged default roles in permission controls and opens their editor', async () => {

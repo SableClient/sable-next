@@ -28,6 +28,7 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
 import { setPreference } from '#lib/settings/preferences.svelte.js';
 
 import MembersDrawer from './MembersDrawer.svelte';
+import { FOUNDER_POWER_LEVEL, parsePowerLevelTags } from '../settings/power-level-tags';
 
 const observerBackup = globalThis.IntersectionObserver;
 
@@ -97,7 +98,10 @@ test('sorts members by power then name and opens their profile', async () => {
   expect(onMemberProfile).toHaveBeenCalledWith('@amy:example.org', amy);
 });
 
-test('uses a role tag for its group, member colour and emoji', async () => {
+test.each([
+  { level: 50, name: 'Sentinel', icon: '🛡️' },
+  { level: FOUNDER_POWER_LEVEL, name: 'Founder', icon: '👑' },
+])('shows saved $name flair in the member list', async ({ level, name, icon }) => {
   render(MembersDrawer, {
     props: {
       loading: false,
@@ -106,21 +110,23 @@ test('uses a role tag for its group, member colour and emoji', async () => {
           user_id: '@amy:example.org',
           display_name: 'Amy',
           avatar_url: null,
-          power_level: 50,
+          power_level: level,
           membership: 'join' as const,
           member_ts: null,
           kicked: false,
           service: false,
         },
       ],
-      powerTags: { 50: { name: 'Sentinel', color: '#ff0000', icon: '🛡️' } },
+      powerTags: parsePowerLevelTags({
+        [level]: { name, color: '#ff0000', icon: { key: icon } },
+      }),
       onClose: vi.fn(),
       onMemberProfile: vi.fn(),
     },
   });
   await tick();
 
-  expect(groups()).toEqual(['🛡️Sentinel']);
+  expect(groups()).toEqual([`${icon}${name}`]);
   expect(document.querySelector('.member-identity-row .role-tag-icon')).not.toBeInTheDocument();
   expect(screen.getByText('Amy')).toHaveAttribute('style', expect.stringContaining('#cf0000'));
 });

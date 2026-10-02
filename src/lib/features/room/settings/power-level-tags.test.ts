@@ -90,6 +90,27 @@ test('a power level is only valid within the safe integer range', () => {
   expect(isValidPowerLevel(1.5)).toBe(false);
 });
 
+test('tags reject levels outside the safe integer range except the founder key', () => {
+  expect(
+    parsePowerLevelTags({
+      [MIN_POWER_LEVEL]: { name: 'Minimum' },
+      [MAX_POWER_LEVEL]: { name: 'Maximum' },
+      '9007199254740992': { name: 'Founder' },
+      '9007199254740993': { name: 'Rounded to founder' },
+      '9007199254740994': { name: 'Too high' },
+      '-9007199254740992': { name: 'Too low' },
+    })
+  ).toEqual({
+    [MIN_POWER_LEVEL]: { name: 'Minimum', color: null, icon: null },
+    [MAX_POWER_LEVEL]: { name: 'Maximum', color: null, icon: null },
+    '9007199254740992': { name: 'Founder', color: null, icon: null },
+  });
+  expect(parsePowerLevelInput('9007199254740992', MAX_POWER_LEVEL + 1)).toEqual({
+    valid: false,
+    reason: 'out-of-range',
+  });
+});
+
 test('parsing the numeric input rejects non-integers and levels above the account', () => {
   expect(parsePowerLevelInput('75', 100)).toEqual({ valid: true, level: 75 });
   expect(parsePowerLevelInput(' -5 ', 100)).toEqual({ valid: true, level: -5 });

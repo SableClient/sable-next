@@ -59,6 +59,8 @@ import { preferences, setPreference } from '#lib/settings/preferences.svelte.js'
 
 import TimelineItemHarness from './TimelineItemHarness.test.svelte';
 import { senderColor } from './timeline-format';
+import { FOUNDER_POWER_LEVEL, powerTag } from '../members/power-tags';
+import { parsePowerLevelTags, tagForLevel } from '../settings/power-level-tags';
 
 const user = userEvent.setup({ delay: null });
 
@@ -281,6 +283,31 @@ test("shows the sender's role icon after their name", async () => {
   const icon = document.querySelector('header .role-tag-icon');
   expect(icon?.textContent).toBe('🛡️');
   expect(icon?.previousElementSibling?.classList.contains('sender-identity')).toBe(true);
+});
+
+test('displays saved founder flair on a message', async () => {
+  core.userProfile.mockResolvedValue({ name_color_light: null, name_color_dark: null });
+  const tags = parsePowerLevelTags({
+    [FOUNDER_POWER_LEVEL]: { name: 'Founder', color: '#c04040', icon: { key: '👑' } },
+  });
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: item(false), collapsed: false },
+      roles: {
+        '@alice:example.org': {
+          icon: tagForLevel(tags, FOUNDER_POWER_LEVEL)?.icon ?? null,
+          color: powerTag(FOUNDER_POWER_LEVEL, (key) => key, tags).color,
+        },
+      },
+    },
+  });
+  await tick();
+
+  expect(document.querySelector('header .role-tag-icon')?.textContent).toBe('👑');
+  const message = document.querySelector<HTMLElement>('.message');
+  expect(message?.style.getPropertyValue('--name-color-on-light')).toBe('#b8383a');
+  expect(message?.style.getPropertyValue('--name-color-on-dark')).toBe('#ee6a65');
 });
 
 test('reads an emote as one sentence, with the name only in the action', async () => {

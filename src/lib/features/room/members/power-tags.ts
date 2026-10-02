@@ -1,10 +1,11 @@
 import {
+  FOUNDER_POWER_LEVEL,
   tagForLevel,
   type PowerLevelTag,
   type PowerLevelTagMap,
 } from '../settings/power-level-tags';
 
-export const FOUNDER_POWER_LEVEL = Number.MAX_SAFE_INTEGER + 1;
+export { FOUNDER_POWER_LEVEL };
 
 const DEFAULT_TAGS: readonly { level: number; key: string }[] = [
   { level: FOUNDER_POWER_LEVEL, key: 'timeline.powerTagFounder' },

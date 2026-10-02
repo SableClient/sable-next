@@ -2,6 +2,7 @@ export const POWER_LEVEL_TAGS_EVENT_TYPE = 'in.cinny.room.power_level_tags';
 
 export const MIN_POWER_LEVEL = Number.MIN_SAFE_INTEGER;
 export const MAX_POWER_LEVEL = Number.MAX_SAFE_INTEGER;
+export const FOUNDER_POWER_LEVEL = MAX_POWER_LEVEL + 1;
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
@@ -43,7 +44,7 @@ export function parsePowerLevelTags(content: unknown): PowerLevelTagMap {
   for (const [key, value] of Object.entries(content as Record<string, unknown>)) {
     if (!/^-?\d+$/.test(key)) continue;
     const level = Number(key);
-    if (!isValidPowerLevel(level)) continue;
+    if (!isValidPowerLevel(level) && key !== String(FOUNDER_POWER_LEVEL)) continue;
     const tag = parseTag(value);
     if (tag) tags[level] = tag;
   }
