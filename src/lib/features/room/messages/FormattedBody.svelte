@@ -218,6 +218,12 @@
     }
   }
 
+  function isExplicitLink(anchor: HTMLAnchorElement): boolean {
+    return (
+      anchor.hasAttribute('data-mx-link') || anchor.hasAttribute('data-org.matrix.msc4550.link')
+    );
+  }
+
   function decorate(html: string) {
     return (node: HTMLElement) => {
       void html;
@@ -245,7 +251,7 @@
           anchor.target = '_blank';
           anchor.rel = 'noopener noreferrer';
 
-          const link = parseMatrixLink(anchor.href);
+          const link = isExplicitLink(anchor) ? null : parseMatrixLink(anchor.href);
           if (link) {
             anchor.dataset.matrixLink = link.kind;
             if (link.kind === 'user') continue;

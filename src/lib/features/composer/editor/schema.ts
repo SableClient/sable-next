@@ -1,10 +1,13 @@
 import { DOMParser, Schema, type ParseRule } from 'prosemirror-model';
 
 import { splitVia } from '#lib/rooms/join-address.js';
+import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
 
 import { canonicalDatetime, isOpaqueMatrixColor, utcFallbackLabel } from '../time-markup';
 
 export const matrixTo = 'https://matrix.to/#/';
+
+const notExplicit = ':not([data-mx-link]):not([data-org\\.matrix\\.msc4550\\.link])';
 
 export const ROOM_PING = '@room';
 
@@ -198,7 +201,9 @@ export const composerSchema = new Schema({
       attrs: { userId: {}, name: {}, via: { default: [] as string[] } },
       parseDOM: [
         {
-          tag: `a[href^="${matrixTo}@"], a[href^="${matrixTo}#"], a[href^="${matrixTo}!"]`,
+          tag: ['@', '#', '!']
+            .map((sigil) => `a[href^="${matrixTo}${sigil}"]${notExplicit}`)
+            .join(', '),
           priority: 60,
           getAttrs: (dom) => {
             const { href, via } = splitVia(dom.getAttribute('href') ?? '');
@@ -422,7 +427,12 @@ export const composerSchema = new Schema({
       attrs: { href: {} },
       inclusive: false,
       parseDOM: [{ tag: 'a[href]', getAttrs: (dom) => ({ href: dom.getAttribute('href') }) }],
-      toDOM: (mark) => ['a', { href: mark.attrs.href as string }, 0],
+      toDOM: (mark) => {
+        const href = mark.attrs.href as string;
+        return parseMatrixLink(href)
+          ? ['a', { href, 'data-org.matrix.msc4550.link': '' }, 0]
+          : ['a', { href }, 0];
+      },
     },
   },
 });

@@ -205,3 +205,15 @@ test('an emote description survives HTML and draft round trips', () => {
   });
   expect(composerSchema.nodeFromJSON(doc.toJSON()).eq(doc)).toBe(true);
 });
+
+test('an explicit matrix.to link stays a link and is re-marked on serialise', () => {
+  const doc = parse(
+    '<a data-org.matrix.msc4550.link href="https://matrix.to/#/@alice:example.org">DM me</a>'
+  );
+  let mentions = 0;
+  doc.descendants((node) => {
+    if (node.type.name === 'mention') mentions += 1;
+  });
+  expect(mentions).toBe(0);
+  expect(html(doc)).toContain('data-org.matrix.msc4550.link');
+});

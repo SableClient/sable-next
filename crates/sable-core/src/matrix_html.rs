@@ -72,7 +72,10 @@ const DESKTOP_APP_ORIGIN: &str = "tauri://localhost/";
 
 fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
     HashMap::from([
-        ("a", HashSet::from(["href"])),
+        (
+            "a",
+            HashSet::from(["href", "data-mx-link", "data-org.matrix.msc4550.link"]),
+        ),
         ("code", HashSet::from(["class"])),
         ("pre", HashSet::from(["class"])),
         ("ol", HashSet::from(["start"])),
@@ -185,6 +188,10 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
         }])
         .allow_attributes(
             [
+                PropertiesNames {
+                    parent: "a",
+                    properties: &["data-mx-link", "data-org.matrix.msc4550.link"],
+                },
                 PropertiesNames {
                     parent: "img",
                     properties: &["data-mx-emoticon"],
@@ -1214,6 +1221,19 @@ mod tests {
         );
 
         assert_eq!(html, "Answer");
+    }
+
+    #[test]
+    fn keeps_the_explicit_link_marker() {
+        for attribute in ["data-mx-link", "data-org.matrix.msc4550.link"] {
+            let html = display_html(
+                "",
+                Some(&format!(
+                    "<a {attribute} href=\"https://matrix.to/#/@alice:example.org\">DM me</a>"
+                )),
+            );
+            assert!(html.contains(attribute), "{attribute}: {html}");
+        }
     }
 
     #[test]
