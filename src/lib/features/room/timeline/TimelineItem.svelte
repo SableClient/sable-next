@@ -1125,6 +1125,7 @@
     display: flex;
     gap: var(--timeline-row-gap);
     margin-inline: calc(-1 * var(--page-gutter));
+    margin-inline: calc(-1 * var(--page-gutter));
     overflow-wrap: anywhere;
     padding: var(--timeline-row-padding) var(--page-gutter);
     position: relative;
