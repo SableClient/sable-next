@@ -50,6 +50,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
   let dragged: T | null = null;
   let hovered: T | null = null;
   let stopDocumentEnd: (() => void) | null = null;
+  let finishDrag: (() => void) | null = null;
 
   return {
     draggable(item, onDragging) {
@@ -58,6 +59,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           dragged = item;
           stopDocumentEnd?.();
           stopDocumentEnd = on(document, 'dragend', end, { capture: true });
+          finishDrag = end;
           onDragging(item);
           event.dataTransfer?.setData('text/plain', '');
           event.dataTransfer?.setData(REORDER_DRAG_TYPE, '');
@@ -68,6 +70,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
 
           stopDocumentEnd?.();
           stopDocumentEnd = null;
+          finishDrag = null;
           dragged = null;
           hovered = null;
           onDragging(null);
@@ -119,6 +122,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           hovered = null;
           onState(null);
           onDrop(source, item, instructionAt(event.clientY));
+          finishDrag?.();
         };
 
         return listen(
