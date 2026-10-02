@@ -95,7 +95,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
-    "@sentry/cli": "2.58.4",
+    "@sentry/cli": "2.58.6",
     "@sentry/sveltekit": "^11.0.0",
     "@storybook/addon-a11y": "10.6.0",
     "@storybook/addon-docs": "10.6.0",
@@ -144,7 +144,7 @@
       "version": "^24.14.0"
     }
   },
-  "packageManager": "pnpm@12.4.1",
+  "packageManager": "pnpm@12.7.0",
   "imports": {
     "#src/generated/*": "./src/generated/*.ts",
     "#src/generated/wasm/*.js": "./src/generated/wasm/*.js",
