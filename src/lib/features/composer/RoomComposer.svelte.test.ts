@@ -450,6 +450,17 @@ test('a sidebar reorder drag opens no drop overlay and stages nothing', async ()
   expect(stagedNames()).toEqual([]);
 });
 
+test('a drag started inside the page is stamped so the composer refuses it', () => {
+  setup({ roomId: '!room:example.org' });
+  const setData = vi.fn();
+  const start = new Event('dragstart', { bubbles: true });
+  Object.defineProperty(start, 'dataTransfer', { value: { setData } });
+
+  document.body.dispatchEvent(start);
+
+  expect(setData).toHaveBeenCalledWith(REORDER_DRAG_TYPE, '');
+});
+
 test('a file dropped outside the composer is staged', async () => {
   setup({ roomId: '!room:example.org' });
   const file = new File(['one'], 'one.png', { type: 'image/png' });

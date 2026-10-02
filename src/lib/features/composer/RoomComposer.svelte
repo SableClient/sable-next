@@ -1154,6 +1154,10 @@
     return event.dataTransfer?.types.includes(REORDER_DRAG_TYPE) ?? false;
   }
 
+  function markInPageDrag(event: DragEvent): void {
+    event.dataTransfer?.setData(REORDER_DRAG_TYPE, '');
+  }
+
   function handleDrop(event: DragEvent): void {
     dragging = false;
     if (event.defaultPrevented || readOnly || reorderDrag(event)) return;
@@ -1361,6 +1365,7 @@
 
 <svelte:window
   onkeydown={handleKeydown}
+  ondragstart={markInPageDrag}
   ondragover={handleDragover}
   ondragleave={handleDragleave}
   ondrop={handleDrop}
