@@ -407,6 +407,32 @@ test('backgrounding an interrupted touch settles queued updates without moving t
   }
 });
 
+test('layout preserves scrolling before the native scroll event arrives', async () => {
+  const { window, viewport, content, resize } = fixture();
+  await window.update(entries(1000));
+  await window.jumpTo('500', 'start');
+  await vi.advanceTimersByTimeAsync(200);
+  const anchor = content.querySelector<HTMLElement>('[data-timeline-key="500"]');
+  if (!anchor) throw new Error('Missing reader anchor');
+  const top = anchor.getBoundingClientRect().top;
+
+  viewport.scrollTop -= 45;
+  resize(50);
+
+  expect(anchor.getBoundingClientRect().top).toBe(top + 45);
+});
+
+test('an idle pinned layout stays at latest when rows resize before a scroll event', async () => {
+  const { window, viewport, content, resize } = fixture();
+  await window.update(entries(1000));
+  viewport.scrollTop -= 0.75;
+
+  resize(25);
+
+  expect(window.state.pinned).toBe(true);
+  expect(content.lastElementChild?.getBoundingClientRect().bottom).toBe(viewport.clientHeight);
+});
+
 test('a subpixel native bottom still follows an appended message', async () => {
   const { window, viewport } = fixture();
   await window.update(entries(10));

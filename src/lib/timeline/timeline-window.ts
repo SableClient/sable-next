@@ -549,7 +549,7 @@ export class TimelineWindow<T> {
     const viewportHeight = viewport.clientHeight;
     const contentHeight = this.contentHeight;
     this.top = this.height - contentHeight - Number.parseFloat(this.options.content.style.bottom);
-    if (this.active) this.trackMovement();
+    if (this.active || !this.pinned) this.trackMovement();
     const elements = this.elements();
     for (const element of elements) {
       const key = element.dataset.timelineKey;

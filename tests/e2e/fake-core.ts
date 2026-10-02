@@ -56,6 +56,8 @@ declare global {
     __e2eProfileSaveError?: boolean;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eMembers?: MemberView[];
+    __e2eMediaReady?: Promise<void>;
+    __e2eReleaseMedia: () => void;
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
@@ -1703,11 +1705,11 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           commandLog.push(`fetch_media ${String(width)}x${String(height)}`);
           window.setTimeout(
             () => {
-              void (window.__e2eFetchMedia?.(source, width, height) ?? servedPng(source)).then(
-                (bytes) => {
+              void Promise.resolve(window.__e2eMediaReady)
+                .then(() => window.__e2eFetchMedia?.(source, width, height) ?? servedPng(source))
+                .then((bytes) => {
                   this.onmessage?.({ data: { id: request.id, bytes } } as MessageEvent);
-                }
-              );
+                });
             },
             workerMode === 'delayed_media' ? 1_000 : 100
           );

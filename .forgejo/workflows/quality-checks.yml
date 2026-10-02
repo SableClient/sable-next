@@ -43,6 +43,9 @@ jobs:
         with:
           build: 'true'
 
+      - name: Record web assets revision
+        run: git rev-parse HEAD > dist/build-revision.txt
+
       - name: Upload web assets
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
         with:
@@ -123,6 +126,10 @@ jobs:
       - name: Run Vitest with coverage thresholds
         if: ${{ !cancelled() }}
         run: pnpm test:coverage
+
+      - name: Test web assets validation
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ci/check-web-assets.test.mjs
 
       - name: Upload coverage report
         if: ${{ !cancelled() }}

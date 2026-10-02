@@ -85,15 +85,18 @@ test('keeps the mobile quick tools visible on inbox', async ({ page }) => {
   await expect(page.getByRole('link', { name: en.nav.manageAccounts }).last()).toBeVisible();
 });
 
-test('dismissing the inbox popover returns to the previous page', async ({ page, app }) => {
+test('the desktop inbox link opens the inbox page, and back returns to the rooms', async ({
+  page,
+  app,
+}) => {
   await app.openRooms();
 
   await page.getByRole('link', { name: 'Inbox' }).first().click();
-  const inbox = page.getByRole('region', { name: 'Inbox' });
+  const inbox = page.getByRole('heading', { name: 'Inbox', level: 1 });
   await expect(inbox).toBeVisible();
-  await expect(page).toHaveURL(/\/rooms$/);
+  await expect(page).toHaveURL(/\/inbox$/);
 
-  await page.keyboard.press('Escape');
+  await page.goBack();
 
   await expect(inbox).toBeHidden();
   await expect(page).toHaveURL(/\/rooms$/);

@@ -1183,22 +1183,32 @@ test.describe('mobile', () => {
     await page.waitForTimeout(250);
     expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
     await timeline.expectAnchorHeld(anchor, { tolerance: 2 });
-    await timeline.viewport.dispatchEvent('touchend', { touches: [] });
-    for (let frame = 0; frame < 5; frame += 1) {
-      await timeline.viewport.evaluate((node) => {
+    const subscription = await core.subscription();
+    const older = timelineItem('ios-older-again', 'More iOS history');
+    const writes = await timeline.viewport.evaluate(
+      async (node, { subscription, older }) => {
         const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
         if (!descriptor?.set) throw new Error('missing native scrollTop setter');
-        descriptor.set.call(node, node.scrollTop - 6);
-      });
-      await timeline.viewport.dispatchEvent('scroll');
-      if (frame === 2) {
-        await core.emitTimelineDiff(await core.subscription(), [
-          { op: 'push_front', value: timelineItem('ios-older-again', 'More iOS history') },
-        ]);
-      }
-      await page.waitForTimeout(60);
-      expect(await page.evaluate(() => window.__e2eSelfWriteCount)).toBe(0);
-    }
+        node.dispatchEvent(Object.assign(new Event('touchend'), { touches: [] }));
+        const counts: number[] = [];
+        for (let frame = 0; frame < 5; frame += 1) {
+          descriptor.set.call(node, node.scrollTop - 6);
+          node.dispatchEvent(new Event('scroll'));
+          if (frame === 2) {
+            window.__e2eEmitTimelineEvent({
+              type: 'timeline_diff',
+              subscription,
+              diffs: [{ op: 'push_front', value: older }],
+            });
+          }
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          counts.push(window.__e2eSelfWriteCount);
+        }
+        return counts;
+      },
+      { subscription, older }
+    );
+    expect(writes).toEqual([0, 0, 0, 0, 0]);
     await expect(timeline.itemById(anchor.itemId)).toHaveAttribute('data-index', String(index + 2));
     await timeline.expectAnchorHeld({ ...anchor, y: anchor.y + 30 }, { tolerance: 2 });
   });

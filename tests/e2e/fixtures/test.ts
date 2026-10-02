@@ -184,7 +184,7 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
     } finally {
       page.off('pageerror', onError);
       expect(
-        errors.map((error) => error.stack ?? error.message),
+        errors.map((error) => error.stack || error.message),
         'Uncaught page errors'
       ).toEqual([]);
     }

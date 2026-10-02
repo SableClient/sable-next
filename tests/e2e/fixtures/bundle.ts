@@ -1,4 +1,5 @@
-import { readdir, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const WATCHED = ['src', 'crates', 'static', 'vite.config.ts', 'package.json'];
@@ -22,6 +23,15 @@ export async function assertBundleIsCurrent(): Promise<void> {
     builtAt = (await stat('dist/index.html')).mtimeMs;
   } catch {
     throw new Error('No dist/index.html: the app was never built for this run.');
+  }
+
+  if (process.env.CI && process.env.SABLE_E2E_PREBUILT) {
+    const revision = (await readFile('dist/build-revision.txt', 'utf8')).trim();
+    const expected = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+    if (revision !== expected) {
+      throw new Error(`Prebuilt web assets are from revision ${revision}, expected ${expected}.`);
+    }
+    return;
   }
 
   const sources = await Promise.all(WATCHED.map((path) => newestMtime(path).catch(() => 0)));

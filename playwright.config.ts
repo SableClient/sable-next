@@ -22,7 +22,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['html', { open: 'never' }], ['list']] : 'list',
   use: {
     baseURL: origin,
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     // A click must not land mid-transition.
     contextOptions: { reducedMotion: 'reduce' },
   },
@@ -51,16 +51,19 @@ export default defineConfig({
     },
     {
       name: 'migration',
+      dependencies: ['setup'],
       testMatch: 'v1-migration.spec.ts',
       use: { ...devices['Desktop Chrome'], baseURL: migrationOrigin },
     },
     {
       name: 'android',
+      dependencies: ['setup'],
       testMatch: SCRIPTED_TIMELINE_SPECS,
       use: { ...devices['Pixel 7'], browserName: 'chromium' },
     },
     {
       name: 'ios',
+      dependencies: ['setup'],
       testMatch: SCRIPTED_TIMELINE_SPECS,
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },

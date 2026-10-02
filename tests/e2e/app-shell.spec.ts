@@ -3,6 +3,7 @@
 
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { TIMELINE_MESSAGE_COUNT, TIMELINE_ROOM_NAME } from './fixtures/continuwuity';
+import { COLD_BOOT_TIMEOUT } from './pages/AppShell';
 
 test.use({ storageState: SIGNED_OUT });
 
@@ -117,7 +118,7 @@ test('keeps mobile bottom navigation with the room list panel', async ({ page, a
   await expect(app.mobileQuickTools).toBeInViewport();
 });
 
-test('back closes the mobile room list before leaving a room', async ({
+test('back from an open mobile room list returns to the previous route', async ({
   page,
   app,
   homeserver,
@@ -136,10 +137,12 @@ test('back closes the mobile room list before leaving a room', async ({
   );
 
   await page.goBack();
-  await expect(app.roomHeading(TIMELINE_ROOM_NAME)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Show room list' })).toHaveAttribute(
+  await expect(page).toHaveURL(/\/rooms$/);
+  await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible();
+  await expect(app.mobileQuickTools).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Show conversation' })).toHaveAttribute(
     'aria-pressed',
-    'false'
+    'true'
   );
 });
 
@@ -312,7 +315,8 @@ test('a matrix.to link redirects into the room it names', async ({
   await app.openMatrixToLink(homeserver.timelineRoomId, eventId);
 
   await expect(page).toHaveURL(
-    `/rooms/${encodeURIComponent(homeserver.timelineRoomId)}?event=${encodeURIComponent(eventId)}`
+    `/rooms/${encodeURIComponent(homeserver.timelineRoomId)}?event=${encodeURIComponent(eventId)}`,
+    { timeout: COLD_BOOT_TIMEOUT }
   );
   await expect(timeline.message('Timeline message 10')).toBeInViewport();
 });

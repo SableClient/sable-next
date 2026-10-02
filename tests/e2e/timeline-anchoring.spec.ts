@@ -194,7 +194,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
   core,
   installRoomCore,
 }) => {
-  await installRoomCore('delayed_media');
+  await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openRooms();
   await app.openRoomFromList('General');
@@ -205,6 +205,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
   const subscription = await core.subscription();
   const anchor = await timeline.anchorAt(3);
 
+  await core.holdMedia();
   await core.emitTimelineDiff(subscription, [
     { op: 'insert', index: 1, value: timelineImage('prepended-image') },
   ]);
@@ -214,6 +215,7 @@ test('keeps a visible event fixed when a prepended image loads', async ({
   const placeholderBounds = await timeline.image.boundingBox();
   if (!placeholderBounds) throw new Error('missing image placeholder bounds');
 
+  await core.releaseMedia();
   await expect(timeline.image.locator('img')).toBeVisible();
   const loadedBounds = await timeline.image.boundingBox();
   if (!loadedBounds) throw new Error('missing loaded image bounds');
@@ -234,10 +236,13 @@ test('keeps a visible event fixed while a prepend is measured during backward sc
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openRooms();
   await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await timeline.expectAtLatest(LATEST);
+  await timeline.waitForScrollSettled();
 
   const subscription = await core.subscription();
   await timeline.scrollAboveBottomAndNotify(300);
-  const anchor = await timeline.anchorAt(3, { visibleOnly: true });
+  const anchor = await timeline.fullyVisibleAnchor();
 
   const history = historyItems({
     idPrefix: 'measured-history',
@@ -256,7 +261,7 @@ test('keeps a visible event fixed while a prepend is measured during backward sc
     500
   );
 
-  await timeline.expectAnchorHeld(anchor);
+  await timeline.expectAnchorHeld({ ...anchor, y: positions[0] });
   expect(Math.max(...positions) - Math.min(...positions)).toBeLessThanOrEqual(2);
 });
 
@@ -303,27 +308,31 @@ test('only follows appended events while pinned at latest', async ({
   installRoomCore,
 }) => {
   await installRoomCore('ready');
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 420 });
   await app.openRooms();
   await app.openRoomFromList('General');
+  await timeline.expectRevealed();
+  await timeline.expectAtLatest(LATEST);
 
   const subscription = await core.subscription();
   await timeline.scrollToAndNotify(200);
-  const before = await timeline.scrollTop();
+  await timeline.waitForScrollSettled();
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+  const anchor = await timeline.fullyVisibleAnchor();
 
   await core.emitTimelineDiff(subscription, [
     { op: 'push_back', value: timelineItem('reader-append', 'Reader append') },
   ]);
-  await expect
-    .poll(() => timeline.viewport.evaluate((element) => element.scrollHeight))
-    .toBeGreaterThan(0);
-  expect(await timeline.scrollTop()).toBe(before);
+  await expect(timeline.itemById('reader-append')).toBeAttached();
+  await timeline.expectAnchorHeld(anchor);
+  await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
 
   await timeline.scrollToBottomAndNotify();
   await core.emitTimelineDiff(subscription, [
     { op: 'push_back', value: timelineItem('pinned-append', 'Pinned append') },
   ]);
 
+  await expect(timeline.itemById('pinned-append')).toBeVisible();
   await expect.poll(() => timeline.distanceFromBottom()).toBe(0);
 });
 
@@ -660,7 +669,7 @@ test('keeps a visible event fixed when an image without dimensions reshapes on l
   core,
   installRoomCore,
 }) => {
-  await installRoomCore('delayed_media');
+  await installRoomCore('ready');
   await page.setViewportSize({ width: 1280, height: 900 });
   await app.openRooms();
   await app.openRoomFromList('General');
@@ -671,6 +680,7 @@ test('keeps a visible event fixed when an image without dimensions reshapes on l
   const subscription = await core.subscription();
   const anchor = await timeline.anchorAt(3);
 
+  await core.holdMedia();
   await core.emitTimelineDiff(subscription, [
     { op: 'insert', index: 1, value: timelineWideImageWithoutDimensions('reshaping-image') },
   ]);
@@ -680,6 +690,7 @@ test('keeps a visible event fixed when an image without dimensions reshapes on l
   const placeholderBounds = await timeline.image.boundingBox();
   if (!placeholderBounds) throw new Error('missing image placeholder bounds');
 
+  await core.releaseMedia();
   await expect(timeline.image.locator('img')).toBeVisible();
   const loadedBounds = await timeline.image.boundingBox();
   if (!loadedBounds) throw new Error('missing loaded image bounds');

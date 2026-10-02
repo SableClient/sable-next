@@ -35,6 +35,20 @@ export class FakeCoreDriver {
     );
   }
 
+  async holdMedia(): Promise<void> {
+    await this.page.evaluate(() => {
+      window.__e2eMediaReady = new Promise<void>((resolve) => {
+        window.__e2eReleaseMedia = resolve;
+      });
+    });
+  }
+
+  async releaseMedia(): Promise<void> {
+    await this.page.evaluate(() => {
+      window.__e2eReleaseMedia();
+    });
+  }
+
   subscription(index = 0): Promise<number> {
     return this.page.evaluate((at) => window.__e2eTimelineSubscriptions[at], index);
   }
@@ -91,7 +105,11 @@ export class FakeCoreDriver {
         const positions: number[] = [];
         const sample = (): void => {
           const anchor = document.querySelector<HTMLElement>(`[data-item-id="${itemId}"]`);
-          positions.push(anchor ? anchor.getBoundingClientRect().top : Number.POSITIVE_INFINITY);
+          positions.push(
+            anchor
+              ? (anchor.firstElementChild ?? anchor).getBoundingClientRect().top
+              : Number.POSITIVE_INFINITY
+          );
         };
         sample();
         window.__e2eEmitTimelineEvent({ type: 'timeline_diff', subscription, diffs });
