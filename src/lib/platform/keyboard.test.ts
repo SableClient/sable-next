@@ -48,6 +48,24 @@ test('iOS viewport changes update the keyboard inset for fixed surfaces', async 
   expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('');
 });
 
+test('a focus change keeps measuring while the keyboard opens without a resize', async () => {
+  vi.useFakeTimers();
+  const viewport = Object.assign(new EventTarget(), { height: 800, offsetTop: 0 });
+  vi.stubGlobal('visualViewport', viewport);
+  vi.stubGlobal('innerHeight', 800);
+  document.documentElement.dataset.tauriOs = 'ios';
+  const stop = trackKeyboardInset();
+  try {
+    window.dispatchEvent(new FocusEvent('focusin'));
+    await vi.advanceTimersByTimeAsync(100);
+    viewport.height = 500;
+    await vi.advanceTimersByTimeAsync(400);
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('300px');
+  } finally {
+    stop();
+  }
+});
+
 test('browsers track keyboard geometry and clean up pending updates', async () => {
   vi.useFakeTimers();
   const viewport = Object.assign(new EventTarget(), { height: 500, offsetTop: 0 });

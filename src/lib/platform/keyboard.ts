@@ -23,6 +23,7 @@ export function trackKeyboardInset(): () => void {
   if (!viewport) return () => {};
 
   let frame = 0;
+  let settleFrame = 0;
   let last = -1;
 
   const write = (): void => {
@@ -39,16 +40,31 @@ export function trackKeyboardInset(): () => void {
     frame = requestAnimationFrame(write);
   };
 
+  const settle = (): void => {
+    cancelAnimationFrame(settleFrame);
+    const until = performance.now() + 1000;
+    const step = (): void => {
+      write();
+      settleFrame = performance.now() < until ? requestAnimationFrame(step) : 0;
+    };
+    settleFrame = requestAnimationFrame(step);
+  };
+
   write();
   const stopResize = on(viewport, 'resize', schedule);
   const stopScroll = on(viewport, 'scroll', schedule);
   const stopWindowScroll = on(window, 'scroll', schedule);
+  const stopFocusIn = on(window, 'focusin', settle);
+  const stopFocusOut = on(window, 'focusout', settle);
 
   return () => {
     if (frame) cancelAnimationFrame(frame);
+    cancelAnimationFrame(settleFrame);
     stopResize();
     stopScroll();
     stopWindowScroll();
+    stopFocusIn();
+    stopFocusOut();
     document.documentElement.style.removeProperty('--keyboard-height');
   };
 }
