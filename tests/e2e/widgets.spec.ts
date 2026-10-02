@@ -20,13 +20,14 @@ test('a widget renders in a sandboxed iframe with the room and user substituted'
   await app.openRoomShowing(roomId, toggle);
   await toggle.click();
 
-  await expect(page.getByRole('tab', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.locator('iframe.widget-frame')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Dashboard', exact: true }).click();
 
   const frame = page.locator('iframe.widget-frame');
   await expect(frame).toBeVisible();
   await expect(frame).toHaveAttribute(
     'sandbox',
-    'allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts allow-downloads'
+    'allow-forms allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts allow-downloads'
   );
 
   const url = new URL((await frame.getAttribute('src')) ?? '');
@@ -34,6 +35,8 @@ test('a widget renders in a sandboxed iframe with the room and user substituted'
   expect(url.searchParams.get('room')).toBe(roomId);
   expect(url.searchParams.get('widgetId')).toBe('dashboard');
 
+  await page.getByRole('button', { name: 'Back to widgets' }).click();
+  await expect(frame).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Remove Dashboard' })).toBeVisible();
 });
 
@@ -54,7 +57,7 @@ test('widget removal is hidden without permission to change room settings', asyn
   await app.openRoomShowing(roomId, page.getByRole('button', { name: 'Widgets' }));
 
   await page.getByRole('button', { name: 'Widgets' }).click();
-  await expect(page.locator('iframe.widget-frame')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Dashboard', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Remove Dashboard' })).toHaveCount(0);
 });
 

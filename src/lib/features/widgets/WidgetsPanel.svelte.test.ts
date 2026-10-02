@@ -51,8 +51,18 @@ test('shows an empty message when there are no widgets', () => {
   expect(container.querySelector('iframe')).not.toBeInTheDocument();
 });
 
-test('renders a sandboxed iframe for the first widget, templated', () => {
+test('lists the widgets without starting any', () => {
+  const { container } = render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
+
+  expect(screen.getByRole('button', { name: 'Jitsi' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Other' })).toBeInTheDocument();
+  expect(container.querySelector('iframe')).not.toBeInTheDocument();
+});
+
+test('renders a sandboxed iframe for the chosen widget, templated', async () => {
+  const user = userEvent.setup();
   render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
+  await user.click(screen.getByRole('button', { name: 'Jitsi' }));
 
   const iframe = screen.getByTitle<HTMLIFrameElement>('Jitsi');
   expect(iframe.tagName).toBe('IFRAME');
@@ -63,15 +73,17 @@ test('renders a sandboxed iframe for the first widget, templated', () => {
   expect(src.searchParams.get('wid')).toBe('widget-1');
 });
 
-test('switches the active widget on tab click', async () => {
+test('the back button stops the widget and returns to the list', async () => {
   const user = userEvent.setup();
-  render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
+  const { container } = render(WidgetsPanel, { ...commonProps, widgets, onClose: vi.fn() });
 
-  const tabs = screen.getAllByRole('tab');
-  expect(tabs.map((tab) => tab.textContent.trim())).toEqual(['Jitsi', 'Other']);
-  await user.click(screen.getByRole('tab', { name: 'Other' }));
-
+  await user.click(screen.getByRole('button', { name: 'Other' }));
   expect(screen.getByTitle('Other').tagName).toBe('IFRAME');
+
+  await user.click(screen.getByRole('button', { name: 'Back to widgets' }));
+
+  expect(container.querySelector('iframe')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Jitsi' })).toBeInTheDocument();
 });
 
 test('shows a remove action only when the caller can manage widgets', async () => {

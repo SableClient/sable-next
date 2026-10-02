@@ -3287,6 +3287,7 @@
     "title": "Widgets",
     "resize": "Resize widgets",
     "close": "Close widgets",
+    "back": "Back to widgets",
     "empty": "This room has no widgets.",
     "add": "Add widget",
     "addCustom": "Add custom widget",

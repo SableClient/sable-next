@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
@@ -115,9 +116,7 @@
     };
   }
 
-  let activeWidget = $derived(
-    widgets.find((widget) => widget.id === activeId) ?? widgets[0] ?? null
-  );
+  let activeWidget = $derived(widgets.find((widget) => widget.id === activeId) ?? null);
   let activeUrl = $derived(
     activeWidget
       ? templateWidgetUrl(activeWidget, {
@@ -148,7 +147,14 @@
       onCommit={() => localStorage.setItem(WIDTH_STORAGE_KEY, String(width))}
     />
   {/if}
-  <PanelHeader class="widgets-header" title={$i18n.t('widgets.title')}>
+  <PanelHeader class="widgets-header" title={activeWidget?.name || $i18n.t('widgets.title')}>
+    {#snippet prefix()}
+      {#if activeWidget}
+        <PanelHeaderButton label={$i18n.t('widgets.back')} onclick={() => (activeId = null)}>
+          <ArrowLeftIcon />
+        </PanelHeaderButton>
+      {/if}
+    {/snippet}
     {#snippet suffix()}
       <PanelHeaderButton label={$i18n.t('widgets.close')} onclick={onClose}>
         <XIcon />
@@ -156,21 +162,26 @@
     {/snippet}
   </PanelHeader>
 
-  {#if widgets.length === 0}
-    <p class="widgets-empty">{$i18n.t('widgets.empty')}</p>
+  {#if activeWidget && activeUrl}
+    {#key activeUrl}
+      <div class="widgets-frame">
+        <WidgetFrame
+          {roomId}
+          widgetId={activeWidget.id}
+          url={activeUrl}
+          name={activeWidget.name}
+          onCapabilities={requestCapabilities(activeWidget.name)}
+        />
+      </div>
+    {/key}
   {:else}
-    <div class="widgets-tabs" role="tablist">
+    <div class="widgets-list">
+      {#if widgets.length === 0}
+        <p class="widgets-empty">{$i18n.t('widgets.empty')}</p>
+      {/if}
       {#each widgets as widget (widget.id)}
-        <div
-          class="widgets-tab choice"
-          data-selected={widget.id === activeWidget?.id ? 'true' : undefined}
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={widget.id === activeWidget?.id}
-            onclick={() => (activeId = widget.id)}
-          >
+        <div class="widgets-item choice">
+          <button type="button" onclick={() => (activeId = widget.id)}>
             {widget.name}
           </button>
           {#if canManage}
@@ -188,23 +199,9 @@
         </div>
       {/each}
     </div>
-
-    {#if activeUrl && activeWidget}
-      {#key activeUrl}
-        <div class="widgets-frame">
-          <WidgetFrame
-            {roomId}
-            widgetId={activeWidget.id}
-            url={activeUrl}
-            name={activeWidget.name}
-            onCapabilities={requestCapabilities(activeWidget.name)}
-          />
-        </div>
-      {/key}
-    {/if}
   {/if}
 
-  {#if canManage && onAdd}
+  {#if !activeWidget && canManage && onAdd}
     <div class="widgets-manage">
       {#if showAddForm}
         <form class="widgets-add" onsubmit={submitAdd}>
@@ -273,7 +270,7 @@
     box-sizing: border-box;
     color: var(--surface-on-container);
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
     min-height: 0;
     overflow-x: hidden;
@@ -306,41 +303,44 @@
 
   .widgets-empty {
     color: var(--surface-var-on-container);
-    padding: var(--space-400);
+    padding: var(--space-100);
   }
 
-  .widgets-tabs {
+  .widgets-list {
     display: flex;
-    flex-wrap: nowrap;
+    flex-direction: column;
     gap: var(--space-100);
-    overflow-x: auto;
+    overflow-y: auto;
     padding: var(--space-300);
   }
 
-  .widgets-tab {
+  .widgets-item {
     align-items: center;
     background: var(--surface-var-container);
     border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius);
     color: var(--surface-var-on-container);
     display: flex;
-    flex-shrink: 0;
     gap: var(--space-100);
     padding-inline-end: var(--space-100);
   }
 
-  .widgets-tab button {
+  .widgets-item button:first-child {
     background: none;
     border: none;
     color: inherit;
     cursor: pointer;
+    flex: 1;
     font: inherit;
-    font-size: var(--font-size-small);
     min-height: 2.75rem;
+    overflow: hidden;
     padding: var(--space-100) var(--space-300);
+    text-align: start;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .widgets-tab :global(.icon-button) {
+  .widgets-item :global(.icon-button) {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }
