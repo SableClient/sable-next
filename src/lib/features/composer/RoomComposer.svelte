@@ -1491,7 +1491,6 @@
                 onBeforeOpen={!desktop ? blurEditor : undefined}
               />
             </div>
-            <p class="composer-keyboard-hint" aria-hidden="true">{keyboardHint}</p>
             <input
               bind:this={fileInput}
               class="composer-file"
@@ -1931,28 +1930,7 @@
     position: relative;
   }
 
-  .composer-keyboard-hint {
-    display: none;
-    font-size: var(--font-size-small);
-    grid-area: hint;
-    margin: 0;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .composer-row.formatting-open .composer-keyboard-hint {
-    display: none;
-  }
-
   @media (pointer: fine) {
-    @container (width >= 32rem) {
-      .composer-keyboard-hint {
-        display: block;
-      }
-    }
-
     @container (width >= 44rem) {
       .composer-formatting :global(.formatting) {
         flex-wrap: wrap;

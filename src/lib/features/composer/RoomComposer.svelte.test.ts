@@ -240,13 +240,10 @@ test.each([false, true])(
     setup({ roomId: '!room:example.org' });
     await tick();
 
-    expect(document.querySelector('.composer-keyboard-hint')).toHaveTextContent(
+    expect(document.querySelector('.screen-reader-only[id^="composer-hint"]')).toHaveTextContent(
       newline
         ? 'Shift+Enter to send · Enter for a new line'
         : 'Enter to send · Shift+Enter for a new line'
-    );
-    expect(document.querySelector('.screen-reader-only[id^="composer-hint"]')?.textContent).toBe(
-      document.querySelector('.composer-keyboard-hint')?.textContent
     );
   }
 );
@@ -259,7 +256,9 @@ test('editing names the save action and its keyboard hint', async () => {
   await tick();
 
   expect(screen.getByRole('button', { name: 'Save changes' })).toBeInTheDocument();
-  expect(document.querySelector('.composer-keyboard-hint')).toHaveTextContent('Enter to save');
+  expect(document.querySelector('.screen-reader-only[id^="composer-hint"]')).toHaveTextContent(
+    'Enter to save'
+  );
 });
 
 test('a staged attachment names caption mode and changes its placeholder with the toggle', async () => {
