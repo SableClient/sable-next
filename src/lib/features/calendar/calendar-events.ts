@@ -314,6 +314,24 @@ export function agenda(items: readonly CalendarItem[], from: number, to: number)
     .sort((left, right) => left.start - right.start);
 }
 
+export function monthGrid(monthStart: number, firstDay: number): number[] {
+  const first = new Date(monthStart);
+  const year = first.getFullYear();
+  const month = first.getMonth();
+  const lead = (first.getDay() - firstDay + 7) % 7;
+  const length = new Date(year, month + 1, 0).getDate();
+  const weeks = Math.ceil((lead + length) / 7);
+  return Array.from({ length: weeks * 7 }, (_, index) =>
+    new Date(year, month, 1 - lead + index).getTime()
+  );
+}
+
+export function occursOn(occurrence: Occurrence, day: number): boolean {
+  const date = new Date(day);
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+  return occurrence.start < next && Math.max(occurrence.end, occurrence.start + 1) > day;
+}
+
 export function tallyRsvps(
   rsvps: readonly CalendarRsvpView[],
   uid: string,

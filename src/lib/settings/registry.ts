@@ -850,6 +850,19 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'weekStart',
+        section: 'time-date',
+        icon: CalendarBlankIcon,
+        name: 'settings.weekStart',
+        description: 'settings.weekStartHint',
+        type: 'select',
+        options: [
+          { value: 'sunday', label: 'settings.weekStartSunday' },
+          { value: 'monday', label: 'settings.weekStartMonday' },
+          { value: 'saturday', label: 'settings.weekStartSaturday' },
+        ],
+      },
+      {
         key: 'hideMembershipEvents',
         section: 'room-events',
         icon: UsersIcon,

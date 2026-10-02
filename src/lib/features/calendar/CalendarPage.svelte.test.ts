@@ -172,3 +172,46 @@ test('answers and counts each occurrence of a recurring event on its own', async
     'm.relates_to': { rel_type: 'm.reference', event_id: '$weekly' },
   });
 });
+
+test("the month view lists the selected day's events", async () => {
+  core.calendarEntries.mockImplementation(() =>
+    Promise.resolve({
+      entries: [
+        {
+          event_id: '$raid',
+          sender: '@ana:x',
+          timestamp: 1,
+          event: { uid: 'raid', title: 'Raid', start: local(soon), duration: 'PT2H' },
+        },
+      ],
+      rsvps: [],
+    })
+  );
+  const user = userEvent.setup();
+  render(CalendarPage, { roomId: '!cal:x' });
+  await user.click(await screen.findByRole('button', { name: 'Month' }));
+  const date = soon.toLocaleDateString(undefined, { dateStyle: 'full' });
+  const cell = await screen.findByRole('gridcell', { name: `${date}, 1 event` });
+  expect(cell).toHaveAttribute('aria-selected', 'false');
+  expect(within(cell).getByText('Raid')).toBeTruthy();
+  await user.click(cell);
+  expect(await screen.findByRole('heading', { name: 'Raid', level: 3 })).toBeTruthy();
+});
+
+test('arrow keys move the selected day and Enter opens a new event on it', async () => {
+  const user = userEvent.setup();
+  render(CalendarPage, { roomId: '!cal:x' });
+  await user.click(await screen.findByRole('button', { name: 'Month' }));
+  const date = soon.toLocaleDateString(undefined, { dateStyle: 'full' });
+  const cell = await screen.findByRole('gridcell', { name: `${date}, 1 event` });
+  await user.click(cell);
+  cell.focus();
+  await user.keyboard('{ArrowRight}');
+  const next = new Date(soon.getFullYear(), soon.getMonth(), soon.getDate() + 1);
+  const moved = await screen.findByRole('gridcell', {
+    name: next.toLocaleDateString(undefined, { dateStyle: 'full' }),
+  });
+  expect(moved).toHaveAttribute('aria-selected', 'true');
+  await user.keyboard('{Enter}');
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+});

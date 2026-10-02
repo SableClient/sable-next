@@ -1,5 +1,12 @@
+<script module lang="ts">
+  const remembered = { mode: 'agenda' as 'agenda' | 'month', monthStart: null as number | null };
+</script>
+
 <script lang="ts">
+  import { tick } from 'svelte';
+
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
+  import NextIcon from 'phosphor-svelte/lib/CaretRightIcon';
   import ListBulletsIcon from 'phosphor-svelte/lib/ListBulletsIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
 
@@ -42,6 +49,8 @@
     RSVP_EVENT,
     agenda,
     buildEvent,
+    monthGrid,
+    occursOn,
     readEntry,
     tallyRsvps,
   } from './calendar-events.js';
@@ -50,6 +59,22 @@
   const DAY = 86_400_000;
   const WINDOW = 365 * DAY;
   const STATUSES: readonly RsvpStatus[] = ['accepted', 'tentative', 'declined'];
+  const CHIPS = 3;
+  const DOTS = 3;
+
+  function startOfMonth(at: number): number {
+    const date = new Date(at);
+    return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+  }
+
+  function startOfDay(at: number): number {
+    const date = new Date(at);
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  }
+
+  function firstWeekday(): number {
+    return { sunday: 0, monday: 1, saturday: 6 }[preferences.weekStart];
+  }
 
   interface Props {
     roomId: string;
@@ -71,6 +96,12 @@
   let permissions = $state<RoomPermissionsView | null>(null);
   let members = $state.raw<MemberView[]>([]);
   let showPast = $state(false);
+  let mode = $state(remembered.mode);
+  let monthStart = $state(remembered.monthStart ?? startOfMonth(Date.now()));
+  let pickedDay = $state<number | null>(null);
+  let newDay = $state<number | null>(null);
+  let listElement = $state<HTMLElement | null>(null);
+  let gridElement = $state<HTMLElement | null>(null);
   let editing = $state.raw<CalendarItem | null>(null);
   let dialogOpen = $state(false);
   let deleting = $state<CalendarItem | null>(null);
@@ -91,7 +122,42 @@
   let occurrences = $derived(
     showPast ? agenda(items, now - WINDOW, now).reverse() : agenda(items, now, now + WINDOW)
   );
-  let days = $derived(groupByDay(occurrences));
+  $effect(() => {
+    remembered.mode = mode;
+    remembered.monthStart = monthStart;
+  });
+
+  let grid = $derived(monthGrid(monthStart, firstWeekday()));
+  let gridOccurrences = $derived(
+    agenda(items, grid[0] ?? monthStart, startOfDay(grid.at(-1) ?? monthStart) + 2 * DAY)
+  );
+  let activeDay = $derived(
+    pickedDay ?? (startOfMonth(now) === monthStart ? startOfDay(now) : monthStart)
+  );
+  let dayOccurrences = $derived(gridOccurrences.filter((entry) => occursOn(entry, activeDay)));
+  let weeks = $derived(
+    Array.from({ length: grid.length / 7 }, (_, index) => grid.slice(index * 7, index * 7 + 7))
+  );
+  let days = $derived(
+    mode === 'month'
+      ? dayOccurrences.length === 0
+        ? []
+        : [
+            {
+              key: String(activeDay),
+              label: new Date(activeDay).toLocaleDateString(currentLocale(), {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+              }),
+              list: dayOccurrences,
+            },
+          ]
+      : groupByDay(occurrences)
+  );
+  let emptyKey = $derived(
+    mode === 'month' ? 'calendar.emptyDay' : showPast ? 'calendar.emptyPast' : 'calendar.empty'
+  );
 
   $effect(() => {
     const activeRoomId = resolvedRoomId;
@@ -175,7 +241,71 @@
     return item.sender === userId || (permissions?.can_redact_others ?? false);
   }
 
-  function openNew(): void {
+  function chips(day: number): Occurrence[] {
+    return gridOccurrences.filter((entry) => occursOn(entry, day));
+  }
+
+  function moveMonth(by: number): void {
+    const date = new Date(monthStart);
+    monthStart = new Date(date.getFullYear(), date.getMonth() + by, 1).getTime();
+    pickedDay = null;
+  }
+
+  function goToday(): void {
+    monthStart = startOfMonth(Date.now());
+    pickedDay = startOfDay(Date.now());
+  }
+
+  function mineOn(entry: Occurrence): RsvpStatus | null {
+    return tallyRsvps(view?.rsvps ?? [], entry.item.uid, entry.recurrenceId, userId).mine;
+  }
+
+  function dayLabel(day: number, count: number): string {
+    const date = new Date(day).toLocaleDateString(currentLocale(), { dateStyle: 'full' });
+    return count === 0 ? date : $i18n.t('calendar.dayEvents', { date, count });
+  }
+
+  function pickDay(day: number): void {
+    pickedDay = day;
+    void tick().then(() => listElement?.scrollIntoView({ block: 'nearest' }));
+  }
+
+  async function focusDay(day: number): Promise<void> {
+    const date = new Date(day);
+    if (date.getMonth() !== new Date(monthStart).getMonth()) monthStart = startOfMonth(day);
+    pickedDay = day;
+    await tick();
+    gridElement?.querySelector<HTMLElement>(`[data-day="${String(day)}"]`)?.focus();
+  }
+
+  function onGridKey(event: KeyboardEvent, day: number): void {
+    const date = new Date(day);
+    const shift = (days: number, months = 0): number =>
+      new Date(date.getFullYear(), date.getMonth() + months, date.getDate() + days).getTime();
+    const weekday = (date.getDay() - firstWeekday() + 7) % 7;
+    const target: Record<string, number> = {
+      ArrowLeft: shift(-1),
+      ArrowRight: shift(1),
+      ArrowUp: shift(-7),
+      ArrowDown: shift(7),
+      Home: shift(-weekday),
+      End: shift(6 - weekday),
+      PageUp: shift(0, -1),
+      PageDown: shift(0, 1),
+    };
+    if (event.key === 'Enter' && permissions?.can_post !== false) {
+      event.preventDefault();
+      openNew(day);
+      return;
+    }
+    const next = target[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    void focusDay(next);
+  }
+
+  function openNew(day: number | null = null): void {
+    newDay = day;
     editing = null;
     dialogOpen = true;
   }
@@ -294,7 +424,7 @@
         </PanelHeaderButton>
       {/if}
       {#if permissions?.can_post !== false}
-        <PanelHeaderButton label={$i18n.t('calendar.newTitle')} onclick={openNew}>
+        <PanelHeaderButton label={$i18n.t('calendar.newTitle')} onclick={() => openNew()}>
           <PlusIcon />
         </PanelHeaderButton>
       {/if}
@@ -315,91 +445,203 @@
 
   <div class="calendar-content">
     <div class="calendar-range">
-      <Button
-        size="small"
-        variant={showPast ? 'ghost' : 'secondary'}
-        aria-pressed={!showPast}
-        onclick={() => (showPast = false)}>{$i18n.t('calendar.upcoming')}</Button
-      >
-      <Button
-        size="small"
-        variant={showPast ? 'secondary' : 'ghost'}
-        aria-pressed={showPast}
-        onclick={() => (showPast = true)}>{$i18n.t('calendar.past')}</Button
-      >
+      <div class="calendar-segment" role="group" aria-label={$i18n.t('calendar.view')}>
+        <Button
+          size="small"
+          variant={mode === 'agenda' ? 'primary' : 'ghost'}
+          aria-pressed={mode === 'agenda'}
+          onclick={() => (mode = 'agenda')}>{$i18n.t('calendar.viewAgenda')}</Button
+        >
+        <Button
+          size="small"
+          variant={mode === 'month' ? 'primary' : 'ghost'}
+          aria-pressed={mode === 'month'}
+          onclick={() => (mode = 'month')}>{$i18n.t('calendar.viewMonth')}</Button
+        >
+      </div>
+      {#if mode === 'agenda'}
+        <div class="calendar-segment" role="group" aria-label={$i18n.t('calendar.range')}>
+          <Button
+            size="small"
+            variant={showPast ? 'ghost' : 'primary'}
+            aria-pressed={!showPast}
+            onclick={() => (showPast = false)}>{$i18n.t('calendar.upcoming')}</Button
+          >
+          <Button
+            size="small"
+            variant={showPast ? 'primary' : 'ghost'}
+            aria-pressed={showPast}
+            onclick={() => (showPast = true)}>{$i18n.t('calendar.past')}</Button
+          >
+        </div>
+      {/if}
     </div>
 
-    {#if view === null}
-      {#if failed}
-        <EmptyState title={$i18n.t('calendar.loadFailed')} />
-      {:else}
-        <div class="calendar-loading"><Spinner /></div>
-      {/if}
-    {:else if days.length === 0}
-      <EmptyState title={$i18n.t(showPast ? 'calendar.emptyPast' : 'calendar.empty')} />
-    {:else}
-      {#each days as day (day.key)}
-        <section class="calendar-day">
-          <h2>{day.label}</h2>
-          <ul>
-            {#each day.list as occurrence (`${occurrence.item.eventId}:${String(occurrence.start)}`)}
-              {@const item = occurrence.item}
-              {@const tally = tallyRsvps(
-                view?.rsvps ?? [],
-                item.uid,
-                occurrence.recurrenceId,
-                userId
-              )}
-              <li class="calendar-event">
-                <div class="calendar-event-time">{timeRange(occurrence)}</div>
-                <div class="calendar-event-body">
-                  <h3>{item.title || $i18n.t('calendar.untitled')}</h3>
-                  {#if item.location}
-                    <p class="calendar-event-location">{item.location}</p>
-                  {/if}
-                  {#if item.description}
-                    <p class="calendar-event-description">{item.description}</p>
-                  {/if}
-                  {#if STATUSES.some((status) => tally.people[status].length > 0)}
-                    <dl class="calendar-event-people">
-                      {#each STATUSES as status (status)}
-                        {#if tally.people[status].length > 0}
-                          <div>
-                            <dt>{$i18n.t(`calendar.people.${status}`)}</dt>
-                            <dd>{people(tally.people[status])}</dd>
-                          </div>
-                        {/if}
-                      {/each}
-                    </dl>
-                  {/if}
-                  <div class="calendar-event-actions">
-                    {#each STATUSES as status (status)}
-                      <Button
-                        size="small"
-                        variant={tally.mine === status ? 'primary' : 'secondary'}
-                        aria-pressed={tally.mine === status}
-                        disabled={permissions?.can_post === false}
-                        onclick={() => void answer(occurrence, status)}
-                      >
-                        {$i18n.t(`calendar.rsvp.${status}`, { count: tally[status] })}
-                      </Button>
+    {#if mode === 'month'}
+      <div class="calendar-month-nav">
+        <PanelHeaderButton label={$i18n.t('calendar.previousMonth')} onclick={() => moveMonth(-1)}>
+          <BackIcon />
+        </PanelHeaderButton>
+        <h2 class="calendar-month-title">
+          {new Date(monthStart).toLocaleDateString(currentLocale(), {
+            month: 'long',
+            year: 'numeric',
+          })}
+        </h2>
+        <PanelHeaderButton label={$i18n.t('calendar.nextMonth')} onclick={() => moveMonth(1)}>
+          <NextIcon />
+        </PanelHeaderButton>
+        <Button size="small" variant="ghost" onclick={goToday}>{$i18n.t('calendar.today')}</Button>
+      </div>
+      <div
+        class="calendar-grid"
+        role="grid"
+        aria-label={new Date(monthStart).toLocaleDateString(currentLocale(), {
+          month: 'long',
+          year: 'numeric',
+        })}
+        bind:this={gridElement}
+      >
+        <div class="calendar-week" role="row">
+          {#each weeks[0] ?? [] as weekday (weekday)}
+            <div class="calendar-weekday" role="columnheader">
+              {new Date(weekday).toLocaleDateString(currentLocale(), { weekday: 'short' })}
+            </div>
+          {/each}
+        </div>
+        {#each weeks as week (week[0])}
+          <div class="calendar-week" role="row">
+            {#each week as day (day)}
+              {@const inMonth = new Date(day).getMonth() === new Date(monthStart).getMonth()}
+              {@const found = chips(day)}
+              <button
+                type="button"
+                role="gridcell"
+                class="calendar-cell"
+                class:outside={!inMonth}
+                class:today={day === startOfDay(now)}
+                data-day={day}
+                tabindex={day === activeDay ? 0 : -1}
+                aria-selected={day === activeDay}
+                aria-current={day === startOfDay(now) ? 'date' : undefined}
+                aria-label={dayLabel(day, found.length)}
+                onclick={() => pickDay(day)}
+                ondblclick={() => {
+                  if (permissions?.can_post !== false) openNew(day);
+                }}
+                onkeydown={(event) => onGridKey(event, day)}
+              >
+                <span class="calendar-cell-number">{new Date(day).getDate()}</span>
+                {#each found.slice(0, CHIPS) as entry (`${entry.item.eventId}:${String(entry.start)}`)}
+                  <span class="calendar-chip" class:declined={mineOn(entry) === 'declined'}>
+                    {#if !entry.item.allDay}<span class="calendar-chip-time"
+                        >{formatTime(entry.start)}</span
+                      >{/if}
+                    {entry.item.title || $i18n.t('calendar.untitled')}
+                  </span>
+                {/each}
+                {#if found.length > 0}
+                  <span class="calendar-dots" aria-hidden="true">
+                    {#each found.slice(0, DOTS) as entry (`${entry.item.eventId}:${String(entry.start)}`)}
+                      <span class="calendar-dot"></span>
                     {/each}
-                    {#if canChange(item)}
-                      <Button size="small" variant="ghost" onclick={() => openEdit(item)}>
-                        {$i18n.t('calendar.edit')}
-                      </Button>
-                      <Button size="small" variant="ghost" onclick={() => (deleting = item)}>
-                        {$i18n.t('calendar.delete')}
-                      </Button>
-                    {/if}
-                  </div>
-                </div>
-              </li>
+                  </span>
+                {/if}
+                {#if found.length > CHIPS}
+                  <span class="calendar-more"
+                    >{$i18n.t('calendar.more', { count: found.length - CHIPS })}</span
+                  >
+                {/if}
+              </button>
             {/each}
-          </ul>
-        </section>
-      {/each}
+          </div>
+        {/each}
+      </div>
     {/if}
+
+    <div class="calendar-list" bind:this={listElement}>
+      {#if view === null}
+        {#if failed}
+          <EmptyState title={$i18n.t('calendar.loadFailed')}>
+            {#snippet actions()}
+              <Button size="small" onclick={() => void load(resolvedRoomId)}>
+                {$i18n.t('calendar.retry')}
+              </Button>
+            {/snippet}
+          </EmptyState>
+        {:else}
+          <div class="calendar-loading"><Spinner /></div>
+        {/if}
+      {:else if days.length === 0}
+        {#if mode === 'month'}
+          <p class="calendar-day-empty">{$i18n.t(emptyKey)}</p>
+        {:else}
+          <EmptyState title={$i18n.t(emptyKey)} />
+        {/if}
+      {:else}
+        {#each days as day (day.key)}
+          <section class="calendar-day">
+            <h2>{day.label}</h2>
+            <ul>
+              {#each day.list as occurrence (`${occurrence.item.eventId}:${String(occurrence.start)}`)}
+                {@const item = occurrence.item}
+                {@const tally = tallyRsvps(
+                  view?.rsvps ?? [],
+                  item.uid,
+                  occurrence.recurrenceId,
+                  userId
+                )}
+                <li class="calendar-event">
+                  <div class="calendar-event-time">{timeRange(occurrence)}</div>
+                  <div class="calendar-event-body">
+                    <h3>{item.title || $i18n.t('calendar.untitled')}</h3>
+                    {#if item.location}
+                      <p class="calendar-event-location">{item.location}</p>
+                    {/if}
+                    {#if item.description}
+                      <p class="calendar-event-description">{item.description}</p>
+                    {/if}
+                    {#if STATUSES.some((status) => tally.people[status].length > 0)}
+                      <dl class="calendar-event-people">
+                        {#each STATUSES as status (status)}
+                          {#if tally.people[status].length > 0}
+                            <div>
+                              <dt>{$i18n.t(`calendar.people.${status}`)}</dt>
+                              <dd>{people(tally.people[status])}</dd>
+                            </div>
+                          {/if}
+                        {/each}
+                      </dl>
+                    {/if}
+                    <div class="calendar-event-actions">
+                      {#each STATUSES as status (status)}
+                        <Button
+                          size="small"
+                          variant={tally.mine === status ? 'primary' : 'secondary'}
+                          aria-pressed={tally.mine === status}
+                          disabled={permissions?.can_post === false}
+                          onclick={() => void answer(occurrence, status)}
+                        >
+                          {$i18n.t(`calendar.rsvp.${status}`, { count: tally[status] })}
+                        </Button>
+                      {/each}
+                      {#if canChange(item)}
+                        <Button size="small" variant="ghost" onclick={() => openEdit(item)}>
+                          {$i18n.t('calendar.edit')}
+                        </Button>
+                        <Button size="small" variant="ghost" onclick={() => (deleting = item)}>
+                          {$i18n.t('calendar.delete')}
+                        </Button>
+                      {/if}
+                    </div>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/each}
+      {/if}
+    </div>
   </div>
 </main>
 
@@ -433,6 +675,7 @@
 <CalendarEventDialog
   open={dialogOpen}
   item={editing}
+  initialDay={newDay}
   onOpenChange={(open) => (dialogOpen = open)}
   onSave={save}
 />
@@ -477,7 +720,151 @@
 
   .calendar-range {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--space-200);
+  }
+
+  .calendar-segment {
+    background: var(--surface-container);
+    border-radius: var(--radii-400);
+    display: inline-flex;
+    gap: var(--space-100);
+    padding: var(--space-100);
+  }
+
+  .calendar-month-nav {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .calendar-month-title {
+    flex: 1;
+    font-size: var(--font-size-body);
+    margin: 0;
+    text-align: center;
+  }
+
+  .calendar-grid {
+    display: grid;
+    gap: var(--space-100);
+  }
+
+  .calendar-week {
+    display: grid;
+    gap: var(--space-100);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+
+  .calendar-weekday {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    text-align: center;
+  }
+
+  .calendar-cell {
+    align-items: stretch;
+    background: var(--surface-container);
+    border: 1px solid transparent;
+    border-radius: var(--radii-400);
+    color: var(--surface-on-container);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    font: inherit;
+    gap: var(--space-100);
+    min-height: 5.5rem;
+    min-width: 0;
+    overflow: hidden;
+    padding: var(--space-100) var(--space-200);
+    text-align: start;
+  }
+
+  .calendar-cell:hover {
+    background: var(--surface-container-hover);
+  }
+
+  .calendar-cell:focus-visible {
+    outline: 2px solid var(--surface-on-container);
+    outline-offset: 1px;
+  }
+
+  .calendar-cell.outside {
+    color: var(--surface-var-on-container);
+  }
+
+  .calendar-cell[aria-selected='true'] {
+    background: var(--surface-container-active);
+    border-color: var(--surface-on-container);
+  }
+
+  .calendar-cell-number {
+    align-items: center;
+    align-self: flex-start;
+    border-radius: var(--radii-300);
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    justify-content: center;
+    min-height: 1.5rem;
+    min-width: 1.5rem;
+  }
+
+  .calendar-cell.today .calendar-cell-number {
+    background: var(--primary-main);
+    color: var(--primary-on-main);
+    font-weight: 700;
+  }
+
+  .calendar-chip-time {
+    color: var(--surface-var-on-container);
+  }
+
+  .calendar-chip.declined {
+    color: var(--surface-var-on-container);
+    text-decoration: line-through;
+  }
+
+  .calendar-dots {
+    display: none;
+    gap: var(--space-100);
+    justify-content: center;
+  }
+
+  .calendar-dot {
+    background: var(--surface-on-container);
+    border-radius: 50%;
+    height: 0.375rem;
+    width: 0.375rem;
+  }
+
+  .calendar-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-400);
+  }
+
+  .calendar-day-empty {
+    color: var(--surface-var-on-container);
+    font-size: var(--font-size-small);
+    margin: 0;
+  }
+
+  .calendar-chip,
+  .calendar-more {
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .calendar-chip {
+    background: var(--surface-var-container);
+    border-radius: var(--radii-200);
+    padding: 0 var(--space-100);
+  }
+
+  .calendar-more {
+    color: var(--surface-var-on-container);
   }
 
   .calendar-loading {
@@ -487,8 +874,8 @@
   }
 
   .calendar-day h2 {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
+    font-size: var(--font-size-body);
+    font-weight: 700;
     margin: 0 0 var(--space-200);
   }
 
@@ -573,6 +960,20 @@
   @media (width < 36rem) {
     .calendar-event {
       grid-template-columns: 1fr;
+    }
+
+    .calendar-cell {
+      min-height: 3rem;
+      padding: var(--space-100);
+    }
+
+    .calendar-chip,
+    .calendar-more {
+      display: none;
+    }
+
+    .calendar-dots {
+      display: flex;
     }
   }
 </style>

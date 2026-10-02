@@ -5,9 +5,12 @@ import {
   buildEvent,
   formatDuration,
   localToEpoch,
+  monthGrid,
+  occursOn,
   parseDuration,
   readEntry,
   tallyRsvps,
+  type Occurrence,
 } from './calendar-events.js';
 
 function entry(event: Record<string, unknown>, eventId = '$a') {
@@ -293,5 +296,23 @@ describe('calendar events', () => {
     expect(
       dates({ frequency: 'yearly', byMonth: ['3'], byDay: [day('su', -1)] }, '2026-03-29T09:00:00')
     ).toEqual(['2026-03-29']);
+  });
+});
+
+describe('month grid', () => {
+  it('pads to whole weeks starting on the given weekday', () => {
+    const grid = monthGrid(new Date(2026, 9, 1).getTime(), 1);
+    expect(grid).toHaveLength(35);
+    expect(new Date(grid[0] ?? 0).getDay()).toBe(1);
+    expect(new Date(grid[0] ?? 0).getDate()).toBe(28);
+    expect(new Date(grid.at(-1) ?? 0).getDate()).toBe(1);
+  });
+
+  it('an event covers each day it spans', () => {
+    const start = new Date(2026, 9, 3, 22).getTime();
+    const occurrence = { start, end: start + 4 * 3_600_000 } as Occurrence;
+    expect(occursOn(occurrence, new Date(2026, 9, 3).getTime())).toBe(true);
+    expect(occursOn(occurrence, new Date(2026, 9, 4).getTime())).toBe(true);
+    expect(occursOn(occurrence, new Date(2026, 9, 5).getTime())).toBe(false);
   });
 });

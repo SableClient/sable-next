@@ -28,11 +28,12 @@
   interface Props {
     open: boolean;
     item: CalendarItem | null;
+    initialDay?: number | null;
     onOpenChange: (open: boolean) => void;
     onSave: (draft: CalendarDraft) => Promise<void>;
   }
 
-  let { open, item, onOpenChange, onSave }: Props = $props();
+  let { open, item, initialDay = null, onOpenChange, onSave }: Props = $props();
   const fieldId = $props.id();
 
   let title = $state('');
@@ -69,7 +70,11 @@
     if (!open) return;
     untrack(() => {
       const from = item ? localToEpoch(item.start, item.timeZone) : null;
-      const at = from ?? Math.ceil(Date.now() / HOUR) * HOUR;
+      const day = initialDay === null ? null : new Date(initialDay);
+      const fresh = day
+        ? new Date(day.getFullYear(), day.getMonth(), day.getDate(), 9).getTime()
+        : Math.ceil(Date.now() / HOUR) * HOUR;
+      const at = from ?? fresh;
       const length = item ? item.durationMs : HOUR;
       title = item?.title ?? '';
       start = epochToLocal(at).slice(0, 16);

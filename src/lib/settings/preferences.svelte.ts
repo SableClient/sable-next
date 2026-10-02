@@ -16,6 +16,7 @@ export type TimelineLayout = 'modern' | 'compact' | 'bubble';
 export type MessageSpacing = 'compact' | 'cozy' | 'roomy';
 export type TimelineEmoteSize = 'default' | '20' | '24' | '32' | '48' | '64';
 export type DateFormat = 'auto' | 'dmy' | 'mdy' | 'ymd';
+export type WeekStart = 'sunday' | 'monday' | 'saturday';
 export type ThemeMode = 'system' | 'dark' | 'light';
 export type ShowRoomIcon = 'always' | 'sometimes' | 'collapsed' | 'never';
 export type SearchIndexLimit = '128' | '256' | '512' | '1024' | '2048' | '4096';
@@ -131,6 +132,7 @@ export interface Preferences {
 
   hour24Clock: boolean;
   dateFormat: DateFormat;
+  weekStart: WeekStart;
 
   hideMembershipEvents: boolean;
   hideProfileChanges: boolean;
@@ -286,6 +288,7 @@ const ENUMS = {
   timelineEmoteSize: ['default', '20', '24', '32', '48', '64'],
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
+  weekStart: ['sunday', 'monday', 'saturday'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
   subspaceHierarchyLimit: SUBSPACE_DEPTHS,
@@ -388,6 +391,7 @@ const DEFAULTS: Preferences = {
 
   hour24Clock: false,
   dateFormat: 'auto',
+  weekStart: 'sunday',
 
   hideMembershipEvents: false,
   hideProfileChanges: true,
