@@ -1666,6 +1666,27 @@ function draftText(text: string): void {
   writeDraft('!room:example.org', { doc: doc.toJSON(), staged: [], nextStagedId: 0 });
 }
 
+test('clearing an attachment caption sends an edit without asking to delete', async () => {
+  const onSend = vi.fn(async () => {});
+  const onDeleteEdited = vi.fn();
+  setup({
+    roomId: '!room:example.org',
+    context: { kind: 'edit', eventId: '$image', body: '', mediaCaption: true },
+    onSend,
+    onDeleteEdited,
+  });
+  await tick();
+  submit();
+  await vi.waitFor(() => {
+    expect(onSend).toHaveBeenCalledWith('!room:example.org', '', null, {
+      userIds: [],
+      room: false,
+    });
+  });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(onDeleteEdited).not.toHaveBeenCalled();
+});
+
 test.each(['rich text', 'plain text'])(
   'selecting a quick reaction clears the %s composer',
   async (mode) => {

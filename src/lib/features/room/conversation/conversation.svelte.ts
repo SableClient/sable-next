@@ -114,7 +114,7 @@ export class Conversation {
     imageSourcePacks: ImageSourcePackReferenceView[] = []
   ): Promise<ConversationSendResult | undefined> => {
     const pending = this.context;
-    if (body === '') return;
+    if (body === '' && !(pending?.kind === 'edit' && pending.mediaCaption)) return;
 
     if (pending?.kind === 'edit') {
       const edited = this.#timeline.items.find(

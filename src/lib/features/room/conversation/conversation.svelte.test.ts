@@ -509,6 +509,18 @@ function encryptedScheduleFailure(): Error {
   return error;
 }
 
+test('an empty caption edit keeps the attachment', async () => {
+  const { conversation, editMessage } = setup([], '@kris:example.org');
+  conversation.edit('$image', 'caption', null, true);
+  await conversation.sendMessage(ROOM, '');
+  expect(editMessage).toHaveBeenCalledWith(
+    ROOM,
+    '$image',
+    '',
+    expect.objectContaining({ mediaCaption: true })
+  );
+});
+
 function proxying() {
   setPreference('personaProxying', true);
   return setup([], '@kris:example.org', {

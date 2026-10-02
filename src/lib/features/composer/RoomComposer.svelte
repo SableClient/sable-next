@@ -283,7 +283,8 @@
 
   let desktop = $derived(appLayout.matches);
   let sending = $derived(inFlight > 0);
-  let hasContent = $derived(!empty || staged.length > 0);
+  let editingCaption = $derived(context?.kind === 'edit' && context.mediaCaption === true);
+  let hasContent = $derived(!empty || staged.length > 0 || editingCaption);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
   let editingScheduled = $derived(context?.kind === 'schedule');
   let primaryAction = $derived(
@@ -813,6 +814,7 @@
 
     const doc = editor.doc();
     const rich = richSend;
+    const captionEdit = editingCaption;
     const asCaption = preferences.sendAttachmentAsCaption;
     let unsent = staged;
 
@@ -874,7 +876,7 @@
           unsent = rest;
         }
 
-        if (captioned || message.body === '') return;
+        if (captioned || (message.body === '' && !captionEdit)) return;
         const action = message.imageSourcePacks
           ? await onSend(
               roomId,
