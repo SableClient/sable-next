@@ -45,6 +45,7 @@ const RENAMED = {
   useRightBubbles: 'alignOwnMessages',
   editorToolbar: 'formattingToolbar',
   editorEmojiButton: 'composerEmoteButton',
+  editorMicButton: 'composerVoiceButton',
   editorGifButton: 'composerGifButton',
   editorStickerButton: 'composerStickerButton',
   editorButtonOrder: 'composerButtonOrder',

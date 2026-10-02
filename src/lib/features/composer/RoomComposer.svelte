@@ -293,7 +293,12 @@
   let hasContent = $derived(!empty || staged.length > 0 || editingCaption);
   let canDeleteEdited = $derived(context?.kind === 'edit' && onDeleteEdited !== undefined);
   let editingScheduled = $derived(context?.kind === 'schedule');
-  let showVoice = $derived(context?.kind !== 'edit' && !editingScheduled && voiceSupported);
+  let showVoice = $derived(
+    preferences.composerVoiceButton &&
+      context?.kind !== 'edit' &&
+      !editingScheduled &&
+      voiceSupported
+  );
   let sendLabel = $derived(
     editingScheduled
       ? $i18n.t('composer.scheduledSave')

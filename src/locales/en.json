@@ -2029,6 +2029,8 @@
     "composerStickerButtonHint": "Shows a sticker button beside the composer. It opens the picker on the sticker tab.",
     "composerEmoteButton": "Emote button",
     "composerEmoteButtonHint": "Shows an emote button beside the composer. It remains when all composer buttons are disabled.",
+    "composerVoiceButton": "Voice message button",
+    "composerVoiceButtonHint": "Shows a microphone beside Send for recording voice messages.",
     "composerButtonOrder": "Composer button order",
     "scheduleInEncryptedRooms": "Schedule in encrypted rooms",
     "scheduleInEncryptedRoomsHint": "Your homeserver cannot hold an encrypted message, so a scheduled one is kept in your account data as plain text until a device of yours sends it. Off refuses to schedule in encrypted rooms.",

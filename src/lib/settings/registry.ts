@@ -1066,6 +1066,14 @@ export const settingsCategories: SettingsCategory[] = [
         description: 'settings.composerEmoteButtonHint',
         type: 'boolean',
       },
+      {
+        key: 'composerVoiceButton',
+        section: 'composer-buttons',
+        icon: MicrophoneIcon,
+        name: 'settings.composerVoiceButton',
+        description: 'settings.composerVoiceButtonHint',
+        type: 'boolean',
+      },
     ],
   },
   {
