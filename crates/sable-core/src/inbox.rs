@@ -218,7 +218,9 @@ pub(crate) async fn receipt_ts(room: &Room) -> matrix_sdk::Result<u64> {
 fn notified(room: &Room) -> u64 {
     room.unread_notification_counts()
         .notification_count
+        .max(room.unread_notification_counts().highlight_count)
         .max(room.num_unread_notifications())
+        .max(room.num_unread_mentions())
 }
 
 async fn read_state(room: &Room) -> Result<RoomReadState, CommandErr> {
@@ -391,12 +393,12 @@ impl Core {
     ) -> Result<(Vec<InboxItemView>, bool), CommandErr> {
         let client = self.client().await?;
         let stored = load(&client).await?;
-        let mut rooms: HashMap<OwnedRoomId, Option<(Room, RoomReadState)>> = HashMap::new();
+        let mut rooms: HashMap<OwnedRoomId, Option<(bool, RoomReadState)>> = HashMap::new();
         let limit = usize::try_from(limit).unwrap_or(usize::MAX);
         let mut items = Vec::new();
         let mut has_more = false;
 
-        for entry in stored.entries {
+        for mut entry in stored.entries {
             if !rooms.contains_key(&entry.room_id) {
                 let joined = client
                     .get_room(&entry.room_id)
@@ -404,15 +406,16 @@ impl Core {
                 let state = match joined {
                     Some(room) => {
                         let read = read_state(&room).await?;
-                        Some((room, read))
+                        Some((room.is_direct().await.unwrap_or(entry.is_direct), read))
                     }
                     None => None,
                 };
                 rooms.insert(entry.room_id.clone(), state);
             }
-            let Some(Some((_, read))) = rooms.get_mut(&entry.room_id) else {
+            let Some(Some((direct, read))) = rooms.get_mut(&entry.room_id) else {
                 continue;
             };
+            entry.is_direct = *direct;
             let unread = is_unread(&entry, read);
             if !matches(&entry, filter)
                 || (!unread && !include_read)
@@ -612,6 +615,66 @@ mod tests {
             .unwrap();
         assert!(entry.encrypted);
         assert!(entry.body.is_none());
+    }
+
+    #[tokio::test]
+    async fn highlights_keep_inbox_notifications_unread() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        core.record_inbox(
+            &client,
+            vec![entry("unread", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room.room_id()).set_unread_notifications_count(
+                    json!({"notification_count": 0, "highlight_count": 1}),
+                ),
+            )
+            .await;
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::All, false, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(!items[0].read);
+    }
+
+    #[tokio::test]
+    async fn direct_filter_uses_current_room_status() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 1).await;
+        core.record_inbox(
+            &client,
+            vec![entry("unread", 200)],
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .await
+        .unwrap();
+        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(
+                    factory
+                        .direct()
+                        .add_user((*ALICE).to_owned().into(), room.room_id()),
+                );
+            })
+            .await;
+        assert!(room.is_direct().await.unwrap());
+        let (items, _) = core
+            .inbox_notifications(InboxFilter::Direct, false, 30, None)
+            .await
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(items[0].is_direct);
     }
 
     #[tokio::test]
