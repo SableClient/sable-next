@@ -120,44 +120,44 @@ url_api = "https://api.github.com/repos/evilmartians/lefthook/releases/assets/56
 provenance = "github-attestations"
 
 [[tools."aqua:watchexec/watchexec"]]
-version = "2.7.2"
+version = "2.7.3"
 backend = "aqua:watchexec/watchexec"
-specifiers = ["2.7.2"]
+specifiers = ["2.7.3"]
 
 [tools."aqua:watchexec/watchexec"."platforms.linux-arm64"]
-checksum = "sha256:b41387ec129119500085f34ffed619058cae2c944ed76fada63b30e37bc49b47"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-aarch64-unknown-linux-gnu.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730415"
+checksum = "sha256:02b3e2beddf96fef5fb2b88849902e3cf9e96da87968bdfb7a488700d64142cc"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-aarch64-unknown-linux-gnu.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495662"
 
 [tools."aqua:watchexec/watchexec"."platforms.linux-arm64-musl"]
-checksum = "sha256:83cbce2ffc85adaab14d6ded09b292f4383358ac6d9a51b4e4e083df0cb7c831"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-aarch64-unknown-linux-musl.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730412"
+checksum = "sha256:80bd9acfc25e4035624d99585b2f920add5ecbdc0c732c4e42fa1451b63d80a5"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-aarch64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495670"
 
 [tools."aqua:watchexec/watchexec"."platforms.linux-x64"]
-checksum = "sha256:b5b3cf6fd45ce2503bae90ba4017f85d62314b427b91c06818ff39a4c46930c4"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-x86_64-unknown-linux-gnu.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730436"
+checksum = "sha256:8ace3a1d2e752d189f28b6766311d58f155ab977fae66aba60b111ec8aec2f64"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-x86_64-unknown-linux-gnu.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495660"
 
 [tools."aqua:watchexec/watchexec"."platforms.linux-x64-musl"]
-checksum = "sha256:a2c01f82fb4cdafca1fa12cb88e4a1145dec63364dbdf92664efbaac3bb44dd2"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-x86_64-unknown-linux-musl.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730471"
+checksum = "sha256:b5bcd00ae3ebb53f7ea5d499fdf98bda14711589a7ecc0619e1847586beaa24d"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-x86_64-unknown-linux-musl.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495691"
 
 [tools."aqua:watchexec/watchexec"."platforms.macos-arm64"]
-checksum = "sha256:31e553b7160720796266168987c5e0728c388cc4776a26297b6a9feb00ab6437"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-aarch64-apple-darwin.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730424"
+checksum = "sha256:bb2a3acc02de5c64f87779fc0226274d47d79026c6df969c8c1034a110b2efad"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-aarch64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495664"
 
 [tools."aqua:watchexec/watchexec"."platforms.macos-x64"]
-checksum = "sha256:6a5481a14165f30da8826c7ae1ab3501402328834e7e2483d7c8b7ec4e608810"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-x86_64-apple-darwin.tar.xz"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730396"
+checksum = "sha256:ddca28bbd6b219a14ffec4893d56dad2e29cfc8b3e47f49e275706c9af20b4c2"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-x86_64-apple-darwin.tar.xz"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495778"
 
 [tools."aqua:watchexec/watchexec"."platforms.windows-x64"]
-checksum = "sha256:aeabeecbd3eaad0bc8f555790eb7437ecd6cf1caae9bb93fb4e678f43f342d1d"
-url = "https://github.com/watchexec/watchexec/releases/download/v2.7.2/watchexec-2.7.2-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/546730427"
+checksum = "sha256:c20d195ffe0a9f90bc3067db2cc0d991c33aaf1591b20531f4aa8999a20bce67"
+url = "https://github.com/watchexec/watchexec/releases/download/v2.7.3/watchexec-2.7.3-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/watchexec/watchexec/releases/assets/565495696"
 
 [[tools."github:AppImage/appimagetool"]]
 version = "1.9.1"
@@ -293,50 +293,50 @@ url_api = "https://api.github.com/repos/nextest-rs/nextest/releases/assets/57961
 provenance = "github-attestations"
 
 [[tools."github:wasm-bindgen/wasm-bindgen"]]
-version = "0.2.128"
+version = "0.2.129"
 backend = "github:wasm-bindgen/wasm-bindgen"
-specifiers = ["0.2.128"]
+specifiers = ["0.2.129"]
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-arm64"]
-checksum = "sha256:2f61267bbef279c2d6357b199649468b073223febde4ae108d30ac3d6b5540af"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035805"
+checksum = "sha256:1797c349a0f45d30946e8986b184135e12839ab576c9a04203e85febfc5dcb35"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769532"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-arm64-musl"]
-checksum = "sha256:079731dd1bc7798c1efa4f08fcc45130827cbcc9ff60a0b4c6047d64fc6fd25c"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035802"
+checksum = "sha256:2ed4351c35dd9440308bbb02767d47ea278efe851a52465300f3c94f5b6c2a87"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769523"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-x64"]
-checksum = "sha256:b51f0208fdff83515a787bd8ab9ac5865ed84dabb66d0c709957bb59793c645f"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035799"
+checksum = "sha256:82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769529"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.linux-x64-musl"]
-checksum = "sha256:b51f0208fdff83515a787bd8ab9ac5865ed84dabb66d0c709957bb59793c645f"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035799"
+checksum = "sha256:82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769529"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.macos-arm64"]
-checksum = "sha256:67ba17f260977725c0b541b516dbb5153538140f079a900329fb6077661b47ab"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035806"
+checksum = "sha256:81d4a23d56b3c3eb8187658329116d50e0b228a93b343825fb71f70179051cd1"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769526"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.macos-x64"]
-checksum = "sha256:59d9af11d0a61b8019898d555de31153c3a50e7f1797e9849fb38589d16add43"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-x86_64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035803"
+checksum = "sha256:7e028879a68ec53dae14048b55cc5215f6df75b17a9c1426fac8fa086d3202fd"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769520"
 provenance = "github-attestations"
 
 [tools."github:wasm-bindgen/wasm-bindgen"."platforms.windows-x64"]
-checksum = "sha256:8fd8e2165da16b21ee3f5efd19e7f97d8d27cb7832f54edaef4b18e830283ec0"
-url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.128/wasm-bindgen-0.2.128-x86_64-pc-windows-msvc.tar.gz"
-url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/545035796"
+checksum = "sha256:79e348c169d0c10c0b287647f1e753d0985353ca96800bc29be8f4261baf13e6"
+url = "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/wasm-bindgen/wasm-bindgen/releases/assets/587769522"
 provenance = "github-attestations"
 
 [[tools.nfpm]]
