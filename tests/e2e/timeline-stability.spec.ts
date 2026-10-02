@@ -1698,7 +1698,7 @@ test('shows jump to latest for a sent echo while reading a page back and returns
   await expect(timeline.jumpToLatest).toBeHidden();
 });
 
-test('an animated jump to a reply target settles on it instead of the end', async ({
+test('a reply target can be jumped to again after scrolling away', async ({
   page,
   app,
   timeline,
@@ -1729,15 +1729,23 @@ test('an animated jump to a reply target settles on it instead of the end', asyn
   ]);
   await timeline.expectAtLatest('Answering something older');
 
-  await timeline.container
+  const replyChip = timeline.container
     .locator('.item')
     .filter({ hasText: 'Answering something older' })
-    .locator('.reply-preview')
-    .click();
+    .locator('.reply-preview');
+  await replyChip.click();
 
   await expect.poll(() => new URL(page.url()).searchParams.get('event')).toBe(target);
   await timeline.waitForScrollSettled();
 
   await expect.poll(() => timeline.distanceFromBottom()).toBeGreaterThan(0);
+  await expect(timeline.itemByEventId(target)).toBeInViewport();
+
+  await timeline.scrollToBottomAndNotify();
+  await timeline.waitForScrollSettled();
+  await expect(timeline.itemByEventId(target)).not.toBeInViewport();
+
+  await replyChip.click();
+  await timeline.waitForScrollSettled();
   await expect(timeline.itemByEventId(target)).toBeInViewport();
 });

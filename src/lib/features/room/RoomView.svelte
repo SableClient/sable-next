@@ -678,6 +678,10 @@
 
   // A history entry, so back is a way out of the anchor.
   function jumpToEvent(eventId: string): void {
+    if (eventId === page.url.searchParams.get('event')) {
+      timelineList?.jumpToEvent(eventId);
+      return;
+    }
     void goto(roomUrl(eventId), { reset: false });
   }
 
