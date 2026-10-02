@@ -37,6 +37,7 @@
       {readers}
       {members}
       expanded={open}
+      onProfile={onMemberProfile}
       onOpen={(element) => {
         anchor = element;
         open = true;

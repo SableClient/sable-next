@@ -20,6 +20,7 @@
     open?: boolean;
     disabled?: boolean;
     trigger?: TriggerSnippet;
+    content?: Snippet;
     children?: Snippet;
   }
 
@@ -34,6 +35,7 @@
     open,
     disabled = false,
     trigger,
+    content,
     children,
   }: Props = $props();
 </script>
@@ -61,7 +63,7 @@
       sideOffset={8}
       {customAnchor}
     >
-      {label}
+      {#if content}{@render content()}{:else}{label}{/if}
     </BitsTooltip.Content>
   </BitsTooltip.Portal>
 </BitsTooltip.Root>

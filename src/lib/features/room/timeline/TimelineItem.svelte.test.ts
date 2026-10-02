@@ -319,7 +319,7 @@ test('badges a message with its own readers, and only in that placement', async 
   await tick();
 
   const badge = document.querySelector('.read-receipt-stack');
-  expect(badge?.getAttribute('title')).toBe('Bob');
+  expect(badge?.querySelector('[aria-label="Bob"]')).not.toBeNull();
 
   setPreference('readReceiptPlacement', 'room');
   await tick();

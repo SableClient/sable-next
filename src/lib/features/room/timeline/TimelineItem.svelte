@@ -477,6 +477,7 @@
       readers={receiptReaders}
       {members}
       expanded={dialogs.isOpen(item, 'receipts')}
+      onProfile={onSenderProfile}
       onOpen={() => {
         dialogs.open(item, { kind: 'receipts' });
       }}
