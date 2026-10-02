@@ -2565,6 +2565,8 @@
   "composer": {
     "insert": "Insert",
     "photoOrVideo": "Photo or video",
+    "takePhoto": "Take photo",
+    "recordVideo": "Record video",
     "attachFile": "Attach file",
     "stagedFiles": "Files ready to send",
     "removeAttachment": "Remove {{name}}",

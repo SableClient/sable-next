@@ -1,12 +1,14 @@
 <script lang="ts">
   import '#lib/ui/primitives/menu.css';
   import { DropdownMenu } from 'bits-ui';
+  import CameraIcon from 'phosphor-svelte/lib/CameraIcon';
   import ImageIcon from 'phosphor-svelte/lib/ImageIcon';
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
+  import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
 
   import { i18n } from '#lib/i18n.js';
   import BottomSheet from '#lib/ui/primitives/BottomSheet.svelte';
@@ -18,6 +20,7 @@
     desktop: boolean;
     disabled?: boolean;
     onPick: (accept: string) => void;
+    onCapture?: (accept: string) => void;
     onPoll?: () => void;
     onLocation?: () => void;
     onSchedule?: () => void;
@@ -28,6 +31,7 @@
     desktop,
     disabled = false,
     onPick,
+    onCapture,
     onPoll,
     onLocation,
     onSchedule,
@@ -131,6 +135,30 @@
         <ImageIcon />
         {$i18n.t('composer.photoOrVideo')}
       </Button>
+      {#if onCapture}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onCapture('image/*');
+          }}
+        >
+          <CameraIcon />
+          {$i18n.t('composer.takePhoto')}
+        </Button>
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onCapture('video/*');
+          }}
+        >
+          <VideoCameraIcon />
+          {$i18n.t('composer.recordVideo')}
+        </Button>
+      {/if}
       <Button
         variant="ghost"
         class="door-action"

@@ -29,7 +29,7 @@
   import { i18n } from '#lib/i18n.js';
   import { isPackChange, loadPacks } from '#lib/emoji/load-packs.js';
   import { listenNativeFileDrop } from '#lib/platform/file-drop.js';
-  import { pickFiles } from '#lib/platform/files.js';
+  import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
@@ -1126,8 +1126,16 @@
 
       if (!fileInput) return;
       fileInput.accept = accept;
+      fileInput.removeAttribute('capture');
       fileInput.click();
     })();
+  }
+
+  function capture(accept: string): void {
+    if (!fileInput) return;
+    fileInput.accept = accept;
+    fileInput.setAttribute('capture', 'environment');
+    fileInput.click();
   }
 
   function stageFromInput(event: Event): void {
@@ -1454,6 +1462,7 @@
               <ComposerDoor
                 {desktop}
                 onPick={pick}
+                onCapture={capturesFromCamera() ? capture : undefined}
                 onPoll={onCreatePoll
                   ? () => {
                       pollOpen = true;

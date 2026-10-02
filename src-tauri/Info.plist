@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Sable needs camera access for video calls.</string>
+	<string>Sable needs camera access for video calls, photos and videos.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Sable needs microphone access for voice and video calls.</string>
+	<string>Sable needs microphone access for calls and videos.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Sable connects to homeservers and call servers on your local network.</string>
 </dict>

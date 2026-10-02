@@ -1,5 +1,6 @@
 import { isTauri } from '@tauri-apps/api/core';
 
+import { isNativeMobile } from './os.js';
 import { rawInvoke } from './raw-invoke.js';
 
 export type SaveOutcome = 'saved' | 'cancelled' | 'failed';
@@ -18,6 +19,11 @@ export async function picksNatively(): Promise<boolean> {
   const { type } = await import('@tauri-apps/plugin-os');
   const os = type();
   return os === 'android' || os === 'ios';
+}
+
+export function capturesFromCamera(): boolean {
+  if (isNativeMobile()) return true;
+  return !isTauri() && typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 }
 
 export async function saveFile(url: string, filename: string): Promise<SaveOutcome> {
