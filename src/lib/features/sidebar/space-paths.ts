@@ -2,6 +2,8 @@ import { readJson, writeJson } from '#lib/platform/local-json.js';
 
 const STORAGE_KEY = 'sable-space-paths';
 
+export const HOME_PATHS_KEY = 'home';
+export const ROOMS_PATHS_KEY = 'rooms';
 export const DIRECT_PATHS_KEY = 'direct';
 
 type SpacePaths = Record<string, string>;

@@ -624,6 +624,34 @@ test('records the active desktop direct chat', async () => {
   expect(savedSpacePaths()).toEqual({ direct: '/direct/!dm%3Aexample.org' });
 });
 
+test('restores the home and rooms tabs to their last desktop room', async () => {
+  localStorage.setItem(
+    'sable-space-paths',
+    JSON.stringify({ home: '/home/!a%3Aexample.org', rooms: '/rooms/!b%3Aexample.org' })
+  );
+  setPreference('showHome', true);
+  renderRail({ spaces: [] });
+  await tick();
+
+  expect(tab('nav.home')).toHaveAttribute('href', '/home/!a%3Aexample.org');
+  expect(tab('nav.unspaced')).toHaveAttribute('href', '/rooms/!b%3Aexample.org');
+});
+
+test('records the active desktop home and rooms routes', async () => {
+  renderRail({ spaces: [] });
+  await tick();
+
+  visit('/home/!a%3Aexample.org');
+  navigated();
+  visit('/rooms/!b%3Aexample.org');
+  navigated();
+
+  expect(savedSpacePaths()).toEqual({
+    home: '/home/!a%3Aexample.org',
+    rooms: '/rooms/!b%3Aexample.org',
+  });
+});
+
 test('offers join by address from the add button', async () => {
   const visited: string[] = [];
   renderRail({
