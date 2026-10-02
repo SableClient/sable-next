@@ -1039,6 +1039,7 @@
     "deleteReason": "Reason (optional, shown to the room)",
     "cancel": "Cancel",
     "copyMessage": "Copy message",
+    "copySelection": "Copy selection",
     "copyLink": "Copy link",
     "copyMessageLink": "Copy link to message",
     "moreActions": "More actions",

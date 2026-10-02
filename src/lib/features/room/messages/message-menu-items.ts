@@ -38,6 +38,7 @@ export type MessageActions = {
   onReproxy?: () => void;
   onDelete?: () => void;
   onCopyText?: () => void;
+  copyTextLabel?: string;
   onCopyLink?: () => void;
   copyLinkLabel?: string;
   onPin?: () => void;
@@ -101,7 +102,7 @@ export function messageMenuRows(actions: MessageActions): MessageMenuRow[] {
   if (actions.onCopyText) {
     rows.push({
       key: 'copy',
-      label: 'timeline.copyMessage',
+      label: actions.copyTextLabel ?? 'timeline.copyMessage',
       icon: CopyIcon,
       run: actions.onCopyText,
     });

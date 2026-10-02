@@ -43,6 +43,7 @@
   import TimelineNotice from './TimelineNotice.svelte';
   import type { TimelineEventIndex } from './timeline-event-index';
   import MessageActions from '../messages/MessageActions.svelte';
+  import type { MessageActions as MessageActionSet } from '../messages/message-menu-items.js';
 
   import ThreadIcon from 'phosphor-svelte/lib/ChatCircleDotsIcon';
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -371,11 +372,30 @@
 
   let trailingReceiptBadge = $derived(actionable && showReceiptBadge && !receiptsInline);
 
+  function selectedText(): string {
+    const selection = getSelection();
+    if (!selection || selection.isCollapsed || !messageRow) return '';
+    if (!messageRow.contains(selection.anchorNode) || !messageRow.contains(selection.focusNode)) {
+      return '';
+    }
+    return selection.toString();
+  }
+
+  function withSelectedText(base: MessageActionSet, text: string): MessageActionSet {
+    if (!text) return base;
+    return {
+      ...base,
+      onCopyText: () => void navigator.clipboard.writeText(text),
+      copyTextLabel: 'timeline.copySelection',
+    };
+  }
+
   const rowPress = new LongPress({
     enabled: () => actionable,
     onPress: () => {
       openMessageMenu.set(item.id, false);
-      dialogs.open(item, { kind: 'sheet', actions: () => actions });
+      const selected = selectedText();
+      dialogs.open(item, { kind: 'sheet', actions: () => withSelectedText(actions, selected) });
     },
   });
 
@@ -435,8 +455,9 @@
       event.target instanceof Element
         ? event.target.closest<HTMLAnchorElement>('a[href]')?.href
         : null;
+    const selected = selectedText();
     openMessageMenu.open(item.id, { x: event.clientX, y: event.clientY }, () => ({
-      ...actions,
+      ...withSelectedText(actions, selected),
       onCopyLink: link ? () => void navigator.clipboard.writeText(link) : actions.onCopyLink,
       copyLinkLabel: link ? 'timeline.copyLink' : undefined,
     }));
