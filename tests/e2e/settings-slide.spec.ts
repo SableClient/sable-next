@@ -98,3 +98,60 @@ test('mobile: a released swipe slides the section off instead of dropping it', a
   expect(offsets.some((offset) => offset > 300 && offset < width - 1)).toBe(true);
   await expect(page).toHaveURL(/\/settings$/);
 });
+
+test('mobile: settings arrows and swipes remove categories from history', async ({
+  page,
+  installRoomCore,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', 'CDP touch input');
+  await installRoomCore('ready');
+  await page.goto('/navigate');
+  await page.locator('.content-panel .mobile-tools a[href="/profile"]').click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const sections = page.getByRole('navigation', { name: 'Settings sections' });
+  await expect(sections).toBeVisible();
+  await settled(page);
+
+  await sections.getByRole('link', { name: 'Timeline', exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/timeline$/);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+
+  await sections.getByRole('link', { name: 'Appearance', exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/appearance$/);
+  await page.waitForFunction(
+    () => document.querySelector('.settings-content')?.getAnimations().length === 0
+  );
+  await swipeRight(page, 40, 340);
+  await expect(page).toHaveURL(/\/settings$/);
+
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/navigate$/);
+});
+
+test('mobile: closing a settings category also removes the settings menu', async ({
+  page,
+  installRoomCore,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await installRoomCore('ready');
+  await page.goto('/navigate');
+  await page.locator('.content-panel .mobile-tools a[href="/profile"]').click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Settings sections' })
+    .getByRole('link', { name: 'Timeline', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/settings\/timeline$/);
+
+  await page
+    .locator('.settings-content')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/profile$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/navigate$/);
+});

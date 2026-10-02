@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
   import type { Snippet } from 'svelte';
   import { page } from '$app/state';
   import { i18n } from '#lib/i18n.js';
@@ -17,7 +17,7 @@
   } from './swipe-gesture';
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
-  import { backToRoomList } from '#lib/features/room/room-navigation.js';
+  import { backToRoomList, goToPage } from '#lib/features/room/room-navigation.js';
 
   interface Props {
     children: Snippet;
@@ -58,6 +58,31 @@
       : pinnedOpen ||
           (page.state.mobileDrawer === undefined ? defaultOpen : page.state.mobileDrawer === 'open')
   );
+  let enteredFromList = false;
+  beforeNavigate((navigation) => {
+    if (!navigation.shallow) enteredFromList = open;
+  });
+  afterNavigate((navigation) => {
+    if (appLayout.matches || (navigation.shallow && navigation.type !== 'popstate')) return;
+    if (navigation.type === 'popstate') {
+      if (navigation.delta < 0 && navigation.from?.params?.roomId && open) {
+        const fromPath = navigation.from.url.pathname;
+        const listPath = fromPath.slice(0, fromPath.lastIndexOf('/'));
+        if (pathname !== listPath && !pathname.startsWith(`${listPath}/`)) return;
+        void goto('', {
+          shallow: true,
+          replace: true,
+          state: { ...page.state, mobileRoomPath: fromPath },
+        });
+      }
+    } else if (enteredFromList && page.params.roomId) {
+      void goto('', {
+        shallow: true,
+        replace: true,
+        state: { ...page.state, mobileDrawerBack: true },
+      });
+    }
+  });
   const pageMeta = $state({
     title: '',
   });
@@ -104,11 +129,9 @@
   }
 
   function setOpen(next: boolean): void {
-    if (next === open || (!next && pinnedOpen)) return;
-    void goto('', {
-      shallow: true,
-      state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
-    });
+    if (next === open || (!next && pinnedOpen && !page.state.mobileRoomPath)) return;
+    if (next) backToRoomList();
+    else goToPage(page.state.mobileRoomPath ?? page.url.href);
     requestAnimationFrame(() => {
       if (next) {
         document.getElementById('drawer-toggle')?.focus();
@@ -171,9 +194,22 @@
   }
 
   function revealCurrentPage(event: MouseEvent) {
-    if (appLayout.matches || !(event.target instanceof Element)) return;
+    if (
+      appLayout.matches ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey ||
+      !(event.target instanceof Element)
+    )
+      return;
     const link = event.target.closest('a[href]');
-    if (link instanceof HTMLAnchorElement && link.pathname === pathname) setOpen(false);
+    if (!pinnedOpen && link instanceof HTMLAnchorElement && link.pathname === pathname) {
+      event.preventDefault();
+      goToPage(link.href);
+      requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+    }
   }
 
   function handleKeydown(event: KeyboardEvent) {

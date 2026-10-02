@@ -42,13 +42,24 @@ export function backToRoomList(): void {
     leaveRoomView();
     return;
   }
-  void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'open' } });
+  if (page.state.mobileDrawerBack) {
+    history.back();
+    return;
+  }
+  void goto('', { shallow: true, replace: true, state: { ...page.state, mobileDrawer: 'open' } });
 }
 
 export function goToPage(href: string): void {
   const samePage = new URL(href, page.url.href).pathname === page.url.pathname;
-  if (samePage && !window.matchMedia(BREAKPOINTS.appLayout).matches) {
-    void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'closed' } });
+  if (samePage && !page.state.mobileRoomPath && !window.matchMedia(BREAKPOINTS.appLayout).matches) {
+    void goto('', {
+      shallow: true,
+      state: {
+        ...page.state,
+        mobileDrawer: 'closed',
+        mobileDrawerBack: true,
+      },
+    });
     return;
   }
   void goto(href);

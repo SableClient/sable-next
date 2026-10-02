@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { afterNavigate, goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import type { Snippet } from 'svelte';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import SettingsSectionContent from './SettingsSectionContent.svelte';
   import SettingsNavigator from './SettingsNavigator.svelte';
@@ -14,13 +15,35 @@
   }
 
   let { section, shallow = false, focus = null, children }: Props = $props();
+  let enteredFromList = false;
+  let returnToOpeningPage = false;
+  let settingsDepth = 0;
+
+  afterNavigate((navigation) => {
+    if (navigation.shallow || matchMedia(BREAKPOINTS.appLayout).matches) return;
+    const from = navigation.from?.url.pathname;
+    enteredFromList = navigation.type !== 'popstate' && from === resolve('settings');
+    if (from && from !== resolve('settings') && !from.startsWith(`${resolve('settings')}/`)) {
+      returnToOpeningPage = navigation.type !== 'popstate';
+      settingsDepth = returnToOpeningPage ? 1 : 0;
+    } else if (navigation.type === 'popstate') {
+      settingsDepth = Math.max(0, settingsDepth + navigation.delta);
+    } else if (from && section !== null) {
+      settingsDepth += 1;
+    }
+  });
 
   function close(): void {
     if (shallow) {
       history.back();
       return;
     }
-    void goto(resolve('/(app)/rooms'));
+    const mobile = !matchMedia(BREAKPOINTS.appLayout).matches;
+    if (mobile && returnToOpeningPage && settingsDepth > 0) {
+      history.go(-settingsDepth);
+      return;
+    }
+    void goto(resolve('/(app)/rooms'), { replace: mobile });
   }
 
   function select(nextSection: string, focus?: string): void {
@@ -43,7 +66,8 @@
   }
 
   function back(): void {
-    void goto(resolve('settings'));
+    if (enteredFromList) history.back();
+    else void goto(resolve('settings'), { replace: true });
   }
 </script>
 
