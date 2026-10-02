@@ -39,3 +39,11 @@ test('a synced list that repeats a shortcode keeps its first place', async () =>
   const { parseShortcodes } = await loadStore();
   expect(parseShortcodes(['party', 'blobwave', 'party', 7])).toEqual(['party', 'blobwave']);
 });
+
+test('stickers and emotes keep separate recents', async () => {
+  const { readRecent, rememberEmote } = await loadStore();
+  rememberEmote('blobwave');
+  rememberEmote('party', 'sticker');
+  expect(readRecent()).toEqual(['blobwave']);
+  expect(readRecent('sticker')).toEqual(['party']);
+});

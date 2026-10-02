@@ -91,7 +91,7 @@
   let packs = $state.raw<ImagePackView[]>([]);
   let loading = $state(true);
   let failed = $state(false);
-  let recent = $derived(readRecent());
+  let recent = $derived(readRecent(tab === 'sticker' ? 'sticker' : 'emoticon'));
   let recentReactions = $derived(uniqueReactions());
   let preview = $state.raw<{ image: PackImageView; pack: ImagePackView } | null>(null);
   let activeCell = $state.raw<{ section: string; index: number }>({ section: '', index: 0 });
@@ -459,7 +459,7 @@
   }
 
   function pick(image: PackImageView): void {
-    rememberEmote(image.shortcode);
+    rememberEmote(image.shortcode, tab === 'sticker' ? 'sticker' : 'emoticon');
     onPick(image, tab as ImageUsageView);
   }
 

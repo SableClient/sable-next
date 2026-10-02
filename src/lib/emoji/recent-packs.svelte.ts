@@ -1,12 +1,20 @@
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 
-const storageKey = 'sable.composer.recentEmotes';
+export type RecentUsage = 'emoticon' | 'sticker';
+
+const storageKeys: Record<RecentUsage, string> = {
+  emoticon: 'sable.composer.recentEmotes',
+  sticker: 'sable.composer.recentStickers',
+};
 const limit = 32;
 
-const state = $state<{ shortcodes: string[] }>({ shortcodes: load() });
+const state = $state<Record<RecentUsage, string[]>>({
+  emoticon: load('emoticon'),
+  sticker: load('sticker'),
+});
 
-function load(): string[] {
-  return readJson(storageKey, parseShortcodes, []);
+function load(usage: RecentUsage): string[] {
+  return readJson(storageKeys[usage], parseShortcodes, []);
 }
 
 export function parseShortcodes(value: unknown): string[] {
@@ -17,15 +25,15 @@ export function parseShortcodes(value: unknown): string[] {
     : [];
 }
 
-export function readRecent(): string[] {
-  return state.shortcodes;
+export function readRecent(usage: RecentUsage = 'emoticon'): string[] {
+  return state[usage];
 }
 
-export function rememberEmote(shortcode: string): void {
-  writeRecent([shortcode, ...state.shortcodes.filter((entry) => entry !== shortcode)]);
+export function rememberEmote(shortcode: string, usage: RecentUsage = 'emoticon'): void {
+  writeRecent([shortcode, ...state[usage].filter((entry) => entry !== shortcode)], usage);
 }
 
-export function writeRecent(shortcodes: readonly string[]): void {
-  state.shortcodes = shortcodes.slice(0, limit);
-  writeJson(storageKey, state.shortcodes);
+export function writeRecent(shortcodes: readonly string[], usage: RecentUsage = 'emoticon'): void {
+  state[usage] = shortcodes.slice(0, limit);
+  writeJson(storageKeys[usage], state[usage]);
 }

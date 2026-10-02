@@ -78,6 +78,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       content: {
         v: DOCUMENT_VERSION,
         recentEmotes: readRecent(),
+        recentStickers: readRecent('sticker'),
         favoriteGifs: favoriteGifs(),
         recentGifs: recentGifs(),
         roomIcons: roomIconOverrides(),
@@ -92,6 +93,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       if (body === null) {
         return (
           readRecent().length === 0 &&
+          readRecent('sticker').length === 0 &&
           favoriteGifs().length === 0 &&
           recentGifs().length === 0 &&
           Object.keys(roomIconOverrides()).length === 0 &&
@@ -102,6 +104,7 @@ export function workspaceDocument(sidebar: SpaceSidebar): SyncedDocument {
       }
 
       writeRecent(parseShortcodes(body.recentEmotes));
+      writeRecent(parseShortcodes(body.recentStickers), 'sticker');
       adoptFavorites(parseFavorites(body.favoriteGifs));
       adoptRecentGifs(parseFavorites(body.recentGifs));
       adoptRoomIconOverrides(parseRoomIconOverrides(body.roomIcons));

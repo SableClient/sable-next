@@ -40,6 +40,7 @@ const gif = {
 
 function reset(): void {
   writeRecent([]);
+  writeRecent([], 'sticker');
   adoptFavorites([]);
   adoptRecentGifs([]);
   adoptRoomIconOverrides([]);
@@ -58,6 +59,7 @@ describe('the workspace document', () => {
     const document = workspaceDocument(sidebar);
 
     writeRecent(['blobwave']);
+    writeRecent(['party'], 'sticker');
     adoptFavorites([gif]);
     adoptRecentGifs([gif]);
     adoptRoomIconOverrides([['!room:example.org', 'never']]);
@@ -70,6 +72,7 @@ describe('the workspace document', () => {
     expect(document.adopt(content)).toBe(true);
 
     expect(readRecent()).toEqual(['blobwave']);
+    expect(readRecent('sticker')).toEqual(['party']);
     expect(favoriteGifs()).toEqual([gif]);
     expect(recentGifs()).toEqual([gif]);
     expect(roomIconOverrides()).toEqual({ '!room:example.org': 'never' });
