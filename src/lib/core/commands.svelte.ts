@@ -1385,6 +1385,11 @@ export function createCommands(transport: () => Transport) {
       await transport().send({ type: 'set_widget_feed', enabled });
     },
 
+    async integrationManagerUrl(roomId: string): Promise<string> {
+      const response = await transport().send({ type: 'integration_manager_url', room_id: roomId });
+      return response.url;
+    },
+
     async knownRooms(): Promise<string[]> {
       const response = await transport().send({ type: 'known_rooms' });
       return response.room_ids;

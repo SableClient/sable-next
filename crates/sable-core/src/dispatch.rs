@@ -1656,6 +1656,9 @@ impl Core {
             Command::KnownRooms => Ok(CommandOk::KnownRooms {
                 room_ids: self.known_room_ids().await?,
             }),
+            Command::IntegrationManagerUrl { room_id } => Ok(CommandOk::IntegrationManagerUrl {
+                url: self.integration_manager_url(&room_id).await?,
+            }),
             Command::ScheduleMessage {
                 room_id,
                 body,

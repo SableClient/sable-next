@@ -169,3 +169,29 @@ test('a member list revision keeps the current setting until the new one lands',
   await settle();
   expect(session.alwaysListedFrom).toBe(100);
 });
+
+test('adding a widget writes an enriched widget state event and reloads the list', async () => {
+  const { commands, session } = fixture();
+  commands.roomStateEvents.mockResolvedValueOnce([
+    { state_key: 'new', content: { type: 'm.custom', url: 'https://example.org/widget' } },
+  ]);
+  session.sync('!room', false, 0);
+  await settle();
+
+  await session.details.addWidget('Doom', 'https://example.org/widget', '@erwan:example.org');
+
+  const [roomId, type, , content] = commands.sendStateEvent.mock.calls[0] as [
+    string,
+    string,
+    string,
+    { url: string; type: string; name: string; creatorUserId: string },
+  ];
+  expect([roomId, type]).toEqual(['!room', 'im.vector.modular.widgets']);
+  expect(content).toMatchObject({
+    type: 'm.custom',
+    name: 'Doom',
+    creatorUserId: '@erwan:example.org',
+  });
+  expect(content.url).toContain('https://example.org/widget?matrix_user_id=$matrix_user_id');
+  expect(session.widgets).toHaveLength(1);
+});

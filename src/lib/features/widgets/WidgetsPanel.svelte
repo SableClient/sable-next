@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GridFourIcon from 'phosphor-svelte/lib/GridFourIcon';
+  import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
   import { onMount } from 'svelte';
 
@@ -7,10 +9,13 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import ResizeHandle from '#lib/ui/primitives/ResizeHandle.svelte';
+  import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
   import type { RoomWidget } from './widget-content.js';
   import { templateWidgetUrl } from './widget-url.js';
+  import IntegrationManagerDialog from './IntegrationManagerDialog.svelte';
   import WidgetCapabilitiesDialog from './WidgetCapabilitiesDialog.svelte';
   import WidgetFrame from './WidgetFrame.svelte';
 
@@ -23,6 +28,7 @@
     canManage?: boolean;
     modal?: boolean;
     onClose: () => void;
+    onAdd?: (name: string, url: string) => Promise<void>;
     onRemove?: (widgetId: string) => void;
   }
 
@@ -35,6 +41,7 @@
     canManage = false,
     modal = false,
     onClose,
+    onAdd,
     onRemove,
   }: Props = $props();
 
@@ -59,6 +66,34 @@
     if (Number.isFinite(stored)) width = clampWidth(stored);
   });
   let pendingRemoval = $state<RoomWidget | null>(null);
+  let newName = $state('');
+  let newUrl = $state('');
+  let adding = $state(false);
+  let showAddForm = $state(false);
+  let integrationsOpen = $state(false);
+
+  let addUrl = $derived.by(() => {
+    try {
+      const parsed = new URL(newUrl.trim());
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  });
+
+  async function submitAdd(event: SubmitEvent): Promise<void> {
+    event.preventDefault();
+    if (!onAdd || adding || addUrl === null || newName.trim() === '') return;
+    adding = true;
+    try {
+      await onAdd(newName.trim(), addUrl);
+      newName = '';
+      newUrl = '';
+      showAddForm = false;
+    } finally {
+      adding = false;
+    }
+  }
 
   interface PendingApproval {
     widgetName: string;
@@ -168,7 +203,45 @@
       {/key}
     {/if}
   {/if}
+
+  {#if canManage && onAdd}
+    <div class="widgets-manage">
+      {#if showAddForm}
+        <form class="widgets-add" onsubmit={submitAdd}>
+          <TextInput
+            bind:value={newName}
+            placeholder={$i18n.t('widgets.addName')}
+            aria-label={$i18n.t('widgets.addName')}
+          />
+          <TextInput
+            bind:value={newUrl}
+            type="url"
+            placeholder={$i18n.t('widgets.addUrl')}
+            aria-label={$i18n.t('widgets.addUrl')}
+          />
+          <Button type="submit" disabled={adding || addUrl === null || newName.trim() === ''}>
+            {$i18n.t('widgets.add')}
+          </Button>
+        </form>
+      {:else}
+        <Button variant="ghost" onclick={() => (integrationsOpen = true)}>
+          <GridFourIcon />
+          {$i18n.t('widgets.integrationManager')}
+        </Button>
+        <Button variant="ghost" onclick={() => (showAddForm = true)}>
+          <PlusIcon />
+          {$i18n.t('widgets.addCustom')}
+        </Button>
+      {/if}
+    </div>
+  {/if}
 </aside>
+
+<IntegrationManagerDialog
+  open={integrationsOpen}
+  {roomId}
+  onClose={() => (integrationsOpen = false)}
+/>
 
 {#if approval}
   {@const pending = approval}
@@ -200,7 +273,7 @@
     box-sizing: border-box;
     color: var(--surface-on-container);
     display: grid;
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     height: 100%;
     min-height: 0;
     overflow-x: hidden;
@@ -216,6 +289,19 @@
   .widgets-panel :global(.resize-handle) {
     left: -0.25rem;
     z-index: 1;
+  }
+
+  .widgets-manage {
+    align-self: start;
+    border-top: var(--border-width) solid var(--surface-container-line);
+    display: grid;
+    gap: var(--space-100);
+    padding: var(--space-300);
+  }
+
+  .widgets-add {
+    display: grid;
+    gap: var(--space-200);
   }
 
   .widgets-empty {

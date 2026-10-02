@@ -480,17 +480,19 @@ test('/addwidget sends a validated widget state event', async () => {
 
   await runSlash('/addwidget https://widget.example/app Room Widget', context(commands));
 
-  expect(commands.sendStateEvent).toHaveBeenCalledWith(
-    '!room:example.org',
-    'im.vector.modular.widgets',
-    expect.any(String),
-    expect.objectContaining({
-      type: 'm.custom',
-      url: 'https://widget.example/app',
-      name: 'Room Widget',
-      creatorUserId: '@me:example.org',
-    })
-  );
+  const [roomId, type, , content] = commands.sendStateEvent.mock.calls[0] as [
+    string,
+    string,
+    string,
+    { url: string; type: string; name: string; creatorUserId: string },
+  ];
+  expect([roomId, type]).toEqual(['!room:example.org', 'im.vector.modular.widgets']);
+  expect(content).toMatchObject({
+    type: 'm.custom',
+    name: 'Room Widget',
+    creatorUserId: '@me:example.org',
+  });
+  expect(content.url).toMatch(/^https:\/\/widget\.example\/app\?matrix_user_id=\$matrix_user_id&/);
 });
 
 test('/pmpproxy appends a persona trigger', async () => {

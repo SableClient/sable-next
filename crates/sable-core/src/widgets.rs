@@ -19,6 +19,7 @@ use matrix_sdk::ruma::api::client::relations::{
 use matrix_sdk::ruma::api::client::to_device::send_event_to_device;
 use matrix_sdk::ruma::api::client::user_directory::search_users;
 use matrix_sdk::ruma::api::client::voip::get_turn_server_info;
+use matrix_sdk::ruma::events::GlobalAccountDataEventType;
 use matrix_sdk::ruma::events::relation::RelationType;
 use matrix_sdk::ruma::events::{
     AnySyncStateEvent, AnySyncTimelineEvent, AnyTimelineEvent, MessageLikeEventType,
@@ -39,6 +40,8 @@ use crate::{Core, ResultExt};
 
 const MAX_TIMELINE_EVENTS: usize = 500;
 const WIDGET_STATE_TYPE: &str = "im.vector.modular.widgets";
+const DEFAULT_INTEGRATION_MANAGER: (&str, &str) =
+    ("https://scalar.vector.im/api", "https://scalar.vector.im");
 
 macro_rules! livekit_endpoint {
     ($module:ident, $path:literal) => {
@@ -119,6 +122,67 @@ fn with_room_id(mut event: Value, room_id: &matrix_sdk::ruma::RoomId) -> Value {
             .or_insert_with(|| Value::String(room_id.to_string()));
     }
     event
+}
+
+struct IntegrationManager {
+    api_url: String,
+    ui_url: String,
+}
+
+fn managers_from_well_known(well_known: &Value) -> Vec<IntegrationManager> {
+    well_known
+        .get("m.integrations")
+        .and_then(|integrations| integrations.get("managers"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|manager| {
+            Some(IntegrationManager {
+                api_url: manager.get("api_url")?.as_str()?.to_owned(),
+                ui_url: manager.get("ui_url")?.as_str()?.to_owned(),
+            })
+        })
+        .collect()
+}
+
+fn managers_from_account_data(widgets: &Value, known: &mut Vec<IntegrationManager>) {
+    for widget in widgets.as_object().into_iter().flat_map(|map| map.values()) {
+        if widget.get("type").and_then(Value::as_str) != Some("m.integration_manager") {
+            continue;
+        }
+        let Some(url) = widget.get("url").and_then(Value::as_str) else {
+            continue;
+        };
+        if known.iter().any(|manager| manager.ui_url == url) {
+            continue;
+        }
+        known.push(IntegrationManager {
+            api_url: widget
+                .get("data")
+                .and_then(|data| data.get("api_url"))
+                .and_then(Value::as_str)
+                .unwrap_or(url)
+                .to_owned(),
+            ui_url: url.to_owned(),
+        });
+    }
+}
+
+fn integration_manager_page(
+    ui_url: &str,
+    scalar_token: Option<&str>,
+    room_id: &matrix_sdk::ruma::RoomId,
+) -> Option<String> {
+    let mut url = url::Url::parse(ui_url).ok()?;
+    url.set_path("/index.html");
+    {
+        let mut query = url.query_pairs_mut();
+        if let Some(token) = scalar_token {
+            query.append_pair("scalar_token", token);
+        }
+        query.append_pair("room_id", room_id.as_str());
+    }
+    Some(url.to_string())
 }
 
 impl Core {
@@ -587,6 +651,77 @@ impl Core {
         }
         .map_err(|error| self.homeserver_http_error(LABEL, error))?;
         serde_json::from_slice(&response).or_failed(self, LABEL)
+    }
+
+    pub(crate) async fn integration_manager_url(
+        &self,
+        room_id: &OwnedRoomId,
+    ) -> Result<String, CommandErr> {
+        const LABEL: &str = "integration_manager_url";
+        let client = self.client().await?;
+
+        let mut managers = Vec::new();
+        if let Ok(base) = url::Url::parse(client.homeserver().as_str())
+            && let Ok(response) = client
+                .http_client()
+                .get(
+                    base.join("/.well-known/matrix/client")
+                        .or_failed(self, LABEL)?,
+                )
+                .send()
+                .await
+            && response.status().is_success()
+            && let Ok(text) = response.text().await
+            && let Ok(well_known) = serde_json::from_str::<Value>(&text)
+        {
+            managers = managers_from_well_known(&well_known);
+        }
+        if let Some(widgets) = self
+            .global_account_data(GlobalAccountDataEventType::from("m.widgets"), LABEL)
+            .await?
+            .and_then(|raw| serde_json::from_str::<Value>(raw.json().get()).ok())
+        {
+            managers_from_account_data(&widgets, &mut managers);
+        }
+        let manager = managers.into_iter().next().unwrap_or(IntegrationManager {
+            api_url: DEFAULT_INTEGRATION_MANAGER.0.to_owned(),
+            ui_url: DEFAULT_INTEGRATION_MANAGER.1.to_owned(),
+        });
+
+        let scalar_token = self.scalar_token(&manager.api_url).await;
+        integration_manager_page(&manager.ui_url, scalar_token.as_deref(), room_id)
+            .ok_or_else(|| self.failed(LABEL, "the integration manager URL is invalid"))
+    }
+
+    async fn scalar_token(&self, api_url: &str) -> Option<String> {
+        let token = self.openid_token().await.ok()?;
+        let response = self
+            .client()
+            .await
+            .ok()?
+            .http_client()
+            .post(format!("{}/register", api_url.trim_end_matches('/')))
+            .header("Content-Type", "application/json")
+            .body(
+                serde_json::json!({
+                    "access_token": token.access_token,
+                    "token_type": token.token_type,
+                    "matrix_server_name": token.matrix_server_name,
+                    "expires_in": token.expires_in_ms / 1000,
+                })
+                .to_string(),
+            )
+            .send()
+            .await
+            .ok()?;
+        if !response.status().is_success() {
+            return None;
+        }
+        serde_json::from_str::<Value>(&response.text().await.ok()?)
+            .ok()?
+            .get("scalar_token")?
+            .as_str()
+            .map(str::to_owned)
     }
 
     pub(crate) async fn known_room_ids(&self) -> Result<Vec<OwnedRoomId>, CommandErr> {
@@ -1249,6 +1384,93 @@ mod tests {
         .await
         .expect("a widgets change");
         assert_eq!(changed, room_id);
+    }
+
+    #[tokio::test]
+    async fn the_integration_manager_page_carries_a_scalar_token_from_the_openid_exchange() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        let uri = server.server().uri();
+        Mock::given(method("GET"))
+            .and(path("/.well-known/matrix/client"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "m.integrations": {"managers": [
+                    {"api_url": format!("{uri}/scalar/api"), "ui_url": format!("{uri}/scalar")}
+                ]}
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path_regex(
+                "/_matrix/client/v3/user/.*/account_data/m.widgets",
+            ))
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(json!({"errcode": "M_NOT_FOUND", "error": "Not found"})),
+            )
+            .mount(server.server())
+            .await;
+        Mock::given(method("POST"))
+            .and(path_regex(
+                "/_matrix/client/v3/user/.*/openid/request_token",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "access_token": "openid", "token_type": "Bearer",
+                "matrix_server_name": "example.org", "expires_in": 3600
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/scalar/api/register"))
+            .and(body_json(json!({
+                "access_token": "openid", "token_type": "Bearer",
+                "matrix_server_name": "example.org", "expires_in": 3600
+            })))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"scalar_token": "s3"})))
+            .expect(1)
+            .mount(server.server())
+            .await;
+        let core = core_with(&server, client).await;
+
+        let url = core
+            .integration_manager_url(&room_id!("!room:example.org").to_owned())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            url,
+            format!("{uri}/index.html?scalar_token=s3&room_id=%21room%3Aexample.org")
+        );
+    }
+
+    #[test]
+    fn integration_managers_come_from_well_known_then_account_data_without_duplicates() {
+        let mut managers = super::managers_from_well_known(&json!({
+            "m.integrations": {"managers": [
+                {"api_url": "https://a/api", "ui_url": "https://a"},
+                {"api_url": "https://broken"}
+            ]}
+        }));
+        super::managers_from_account_data(
+            &json!({
+                "one": {"type": "m.integration_manager", "url": "https://a"},
+                "two": {"type": "m.integration_manager", "url": "https://b", "data": {"api_url": "https://b/api"}},
+                "three": {"type": "m.custom", "url": "https://c"}
+            }),
+            &mut managers,
+        );
+
+        let urls: Vec<_> = managers
+            .iter()
+            .map(|manager| (manager.ui_url.as_str(), manager.api_url.as_str()))
+            .collect();
+        assert_eq!(
+            urls,
+            [
+                ("https://a", "https://a/api"),
+                ("https://b", "https://b/api")
+            ]
+        );
     }
 
     #[tokio::test]

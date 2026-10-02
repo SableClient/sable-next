@@ -45,3 +45,29 @@ export function templateWidgetUrl(widget: RoomWidget, vars: WidgetTemplateVars):
     return resolved;
   }
 }
+
+const TEMPLATE_PARAMS = [
+  'matrix_user_id=$matrix_user_id',
+  'matrix_display_name=$matrix_display_name',
+  'matrix_avatar_url=$matrix_avatar_url',
+  'matrix_room_id=$matrix_room_id',
+  'matrix_widget_id=$matrix_widget_id',
+  'theme=$org.matrix.msc2873.client_theme',
+  'matrix_client_id=$org.matrix.msc2873.client_id',
+  'matrix_client_language=$org.matrix.msc2873.client_language',
+  'matrix_device_id=$org.matrix.msc3819.matrix_device_id',
+  'matrix_base_url=$org.matrix.msc4039.matrix_base_url',
+].join('&');
+
+export function enrichWidgetUrl(rawUrl: string): string {
+  if (rawUrl.includes('$matrix_') || rawUrl.includes('$org.matrix.')) return rawUrl;
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hash.includes('?')) return `${rawUrl}&${TEMPLATE_PARAMS}`;
+    if (parsed.hash) return `${rawUrl}?${TEMPLATE_PARAMS}`;
+    return `${rawUrl}${parsed.search ? '&' : '?'}${TEMPLATE_PARAMS}`;
+  } catch {
+    return rawUrl;
+  }
+}

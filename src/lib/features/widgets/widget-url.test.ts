@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
 import type { RoomWidget } from './widget-content.js';
-import { templateWidgetUrl, WIDGET_CLIENT_ID } from './widget-url.js';
+import { enrichWidgetUrl, templateWidgetUrl, WIDGET_CLIENT_ID } from './widget-url.js';
 
 const vars = {
   userId: '@erwan:example.org',
@@ -106,4 +106,15 @@ test('percent-encodes a value that would otherwise break out of the query string
 test('returns the templated string unchanged if the result is not a valid url', () => {
   const url = templateWidgetUrl(widget('not a url $matrix_user_id'), vars);
   expect(url).toBe(`not a url ${encodeURIComponent(vars.userId)}`);
+});
+
+test('enriches a plain URL with the template parameters, once', () => {
+  const plain = enrichWidgetUrl('https://widget.example/app');
+  expect(plain).toMatch(/^https:\/\/widget\.example\/app\?matrix_user_id=\$matrix_user_id&/);
+  expect(enrichWidgetUrl(plain)).toBe(plain);
+  expect(enrichWidgetUrl('https://widget.example/app?a=1')).toContain('?a=1&matrix_user_id=');
+  expect(enrichWidgetUrl('https://widget.example/#/call?a=1')).toContain(
+    '#/call?a=1&matrix_user_id='
+  );
+  expect(enrichWidgetUrl('not a url')).toBe('not a url');
 });

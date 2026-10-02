@@ -759,6 +759,10 @@ pub enum Command {
         enabled: bool,
     },
     KnownRooms,
+    IntegrationManagerUrl {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     ScheduleMessage {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1730,6 +1734,9 @@ pub enum CommandOk {
     KnownRooms {
         #[cfg_attr(feature = "typegen", specta(type = Vec<String>))]
         room_ids: Vec<OwnedRoomId>,
+    },
+    IntegrationManagerUrl {
+        url: String,
     },
     ScheduleMessage {
         delay_id: String,

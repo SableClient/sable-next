@@ -1409,6 +1409,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
           expires_in_ms: 3_600_000,
         },
       }),
+      discover_push_gateway: () => ({ type: 'discover_push_gateway', gateway: null }),
       widget_send_delayed_event: () => ({
         type: 'widget_send_delayed_event',
         delay_id: 'e2e-widget-delay',
@@ -1433,6 +1434,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       rtc_livekit: () => ({ type: 'rtc_livekit', body: {} }),
       set_widget_feed: () => ({ type: 'set_widget_feed' }),
       known_rooms: () => ({ type: 'known_rooms', room_ids: [] }),
+      integration_manager_url: () => ({
+        type: 'integration_manager_url',
+        url: 'https://integrations.example.test/index.html',
+      }),
       schedule_message: () => ({ type: 'schedule_message', delay_id: 'e2e-delay' }),
       schedule_attachment: () => ({ type: 'schedule_attachment', delay_id: 'e2e-attachment' }),
       scheduled_messages: () => ({ type: 'scheduled_messages', messages: [] }),

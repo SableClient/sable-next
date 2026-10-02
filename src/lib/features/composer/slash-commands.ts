@@ -1,5 +1,6 @@
 import type { MemberView, MessageKind } from '#src/generated/protocol';
 
+import { enrichWidgetUrl } from '#lib/features/widgets/widget-url.js';
 import type { CoreCommands } from '#lib/core/commands.svelte.js';
 import { parseJoinAddress } from '#lib/rooms/join-address.js';
 import { currentFix } from '#lib/platform/geolocation.js';
@@ -713,7 +714,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       await commands.sendStateEvent(roomId, 'im.vector.modular.widgets', id, {
         type: 'm.custom',
-        url: url.toString(),
+        url: enrichWidgetUrl(url.toString()),
         name,
         id,
         creatorUserId: userId,

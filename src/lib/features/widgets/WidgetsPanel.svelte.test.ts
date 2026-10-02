@@ -122,3 +122,45 @@ test('leaves the drawer variant unresizable', () => {
 
   expect(screen.queryByRole('slider')).not.toBeInTheDocument();
 });
+
+test('a manager adds a widget by name and URL, and an invalid URL cannot be submitted', async () => {
+  const onAdd = vi.fn().mockResolvedValue(undefined);
+  render(WidgetsPanel, { ...commonProps, widgets: [], canManage: true, onAdd, onClose: vi.fn() });
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: 'Add custom widget' }));
+  const add = screen.getByRole('button', { name: 'Add widget' });
+
+  await user.type(screen.getByLabelText('Widget name'), 'Doom');
+  await user.type(screen.getByLabelText(/Widget URL/), 'not a url');
+  expect(add).toBeDisabled();
+
+  await user.clear(screen.getByLabelText(/Widget URL/));
+  await user.type(screen.getByLabelText(/Widget URL/), 'https://doom.example/play');
+  await user.click(add);
+
+  expect(onAdd).toHaveBeenCalledWith('Doom', 'https://doom.example/play');
+});
+
+test('a non-manager sees no add form', () => {
+  render(WidgetsPanel, { ...commonProps, widgets: [], onAdd: vi.fn(), onClose: vi.fn() });
+
+  expect(screen.queryByLabelText('Widget name')).not.toBeInTheDocument();
+});
+
+test('the integration manager opens from the manager actions', async () => {
+  const integrationManagerUrl = vi.fn().mockReturnValue(new Promise(() => undefined));
+  (core.commands as unknown as Record<string, unknown>).integrationManagerUrl =
+    integrationManagerUrl;
+  render(WidgetsPanel, {
+    ...commonProps,
+    widgets: [],
+    canManage: true,
+    onAdd: vi.fn(),
+    onClose: vi.fn(),
+  });
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole('button', { name: 'Integration manager' }));
+
+  expect(integrationManagerUrl).toHaveBeenCalledWith('!room:example.org');
+});
