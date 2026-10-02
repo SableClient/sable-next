@@ -259,9 +259,17 @@
         <p class="meta">
           {#if room.is_space}
             <StatusBadge label={$i18n.t('inbox.inviteSpace')} variant="secondary" />
+          {:else if room.is_direct}
+            <StatusBadge label={$i18n.t('inbox.inviteDirect')} variant="secondary" />
+          {/if}
+          {#if invite.group === 'strangers'}
+            <StatusBadge label={$i18n.t('inbox.inviteNoSharedRooms')} variant="warning" />
           {/if}
           {#if from && fromName}
-            <span title={from}>{$i18n.t('inbox.invitedBy', { name: fromName })}</span>
+            <span class="inviter">
+              {$i18n.t('inbox.invitedBy', { name: fromName })}
+              <span>({from})</span>
+            </span>
           {/if}
           {#if room.latest_event?.timestamp}
             <span>{formatDate(room.latest_event.timestamp)}</span>
@@ -438,6 +446,10 @@
   .meta > span + span::before {
     content: '·';
     padding-right: var(--space-200);
+  }
+
+  .inviter {
+    overflow-wrap: anywhere;
   }
 
   .alias {

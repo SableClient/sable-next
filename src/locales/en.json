@@ -104,6 +104,8 @@
     "invitedBy": "Invited by {{name}}",
     "inviteEncrypted": "Encrypted",
     "inviteSpace": "Space",
+    "inviteDirect": "Direct message",
+    "inviteNoSharedRooms": "No rooms in common",
     "bookmarks": "Bookmarks",
     "bookmarksEmpty": "Star a message to save it here.",
     "bookmarksSearchLabel": "Search bookmarks",

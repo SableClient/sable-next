@@ -115,3 +115,28 @@ test('invites are grouped by sender and accept all only covers people you know',
     '!b:example.org',
   ]);
 });
+
+test('a stranger DM invite shows the inviter id and both badges', async () => {
+  rooms.push({ ...invite('!a:example.org', 'Alpha'), is_direct: true });
+  triaged([['!a:example.org', '@stranger:elsewhere.org', false]]);
+  dismissedInvites.start(core as unknown as CoreClient);
+  render(InviteList);
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Alpha']);
+  });
+  expect(screen.getByText('(@stranger:elsewhere.org)')).toBeTruthy();
+  expect(screen.getByText('No rooms in common')).toBeTruthy();
+  expect(screen.getByText('Direct message')).toBeTruthy();
+});
+
+test('an invite from someone you know has neither badge', async () => {
+  rooms.push(invite('!a:example.org', 'Alpha'));
+  triaged([['!a:example.org', '@friend:example.org', true]]);
+  dismissedInvites.start(core as unknown as CoreClient);
+  render(InviteList);
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Alpha']);
+  });
+  expect(screen.queryByText('No rooms in common')).toBeNull();
+  expect(screen.queryByText('Direct message')).toBeNull();
+});
