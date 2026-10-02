@@ -9,16 +9,27 @@ import {
   UNSTABLE_PROFILE_OVERRIDES_EVENT,
 } from './profile-overrides.svelte';
 
-function core(data: Record<string, unknown>) {
+function core(
+  data: Record<string, unknown>,
+  seal: { state: 'plain' | 'sealed' | 'locked'; can_seal: boolean } = {
+    state: 'plain',
+    can_seal: false,
+  }
+) {
   const setAccountData = vi.fn(() => Promise.resolve());
+  const setSealedAccountData = vi.fn(() => Promise.resolve());
   const client = {
     subscribeEvents: () => () => {},
     commands: {
       accountData: vi.fn((type: string) => Promise.resolve(data[type] ?? null)),
+      sealedAccountData: vi.fn((type: string) =>
+        Promise.resolve({ content: data[type] ?? null, ...seal })
+      ),
       setAccountData,
+      setSealedAccountData,
     },
   } as unknown as CoreClient;
-  return { client, setAccountData };
+  return { client, setAccountData, setSealedAccountData };
 }
 
 afterEach(() => {
@@ -72,7 +83,7 @@ test('the stable event wins, and saving writes back to the type it was read from
 });
 
 test('saving keeps fields this client does not edit', async () => {
-  const { client, setAccountData } = core({
+  const { client, setSealedAccountData } = core({
     [UNSTABLE_PROFILE_OVERRIDES_EVENT]: { '@alex:example.com': { 'm.tz': 'Europe/Paris' } },
   });
   profileOverrides.start(client);
@@ -82,7 +93,42 @@ test('saving keeps fields this client does not edit', async () => {
 
   await profileOverrides.set('@alex:example.com', { displayname: 'Alex (accounting)' });
 
-  expect(setAccountData).toHaveBeenCalledWith(UNSTABLE_PROFILE_OVERRIDES_EVENT, {
+  expect(setSealedAccountData).toHaveBeenCalledWith(UNSTABLE_PROFILE_OVERRIDES_EVENT, {
     '@alex:example.com': { 'm.tz': 'Europe/Paris', displayname: 'Alex (accounting)' },
   });
+});
+
+test('an encrypted avatar is shown as its file object, and plaintext is resealed', async () => {
+  const file = {
+    v: 'v2',
+    iv: 'iv',
+    hashes: { sha256: 'hash' },
+    key: { k: 'key', kty: 'oct' },
+    url: 'mxc://example.org/enc',
+  };
+  const { client, setSealedAccountData } = core(
+    { [UNSTABLE_PROFILE_OVERRIDES_EVENT]: { '@sarah:example.org': { avatar_url: file } } },
+    { state: 'plain', can_seal: true }
+  );
+  profileOverrides.start(client);
+  await vi.waitFor(() => {
+    expect(setSealedAccountData).toHaveBeenCalledTimes(1);
+  });
+
+  const source = profileOverrides.avatar('@sarah:example.org', null);
+  expect(JSON.parse(source ?? '')).toMatchObject({ url: file.url });
+});
+
+test('a locked document is empty and refuses edits', async () => {
+  const { client, setSealedAccountData } = core(
+    { [UNSTABLE_PROFILE_OVERRIDES_EVENT]: null },
+    { state: 'locked', can_seal: false }
+  );
+  profileOverrides.start(client);
+  await vi.waitFor(() => {
+    expect(profileOverrides.protection).toBe('locked');
+  });
+
+  await expect(profileOverrides.set('@a:b.c', { displayname: 'x' })).rejects.toThrow();
+  expect(setSealedAccountData).not.toHaveBeenCalled();
 });

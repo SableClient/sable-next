@@ -2,8 +2,9 @@
   import { useCoreClient } from '#lib/core/context.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { downscaledAvatar, encryptAttachment } from '#lib/profile/encrypted-file.js';
   import { NAME_COLOR_FIELD } from '#lib/profile/fields.js';
-  import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+  import { avatarSource, profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import ConfirmDialog from '#lib/ui/primitives/ConfirmDialog.svelte';
@@ -25,7 +26,10 @@
 
   let name = $state('');
   let color = $state('');
-  let avatar = $state<string | undefined>(undefined);
+  let avatar = $state.raw<unknown>(undefined);
+  let avatarSrc = $derived(avatarSource(avatar) ?? undefined);
+  let locked = $derived(profileOverrides.protection === 'locked');
+  let sealed = $derived(profileOverrides.protection === 'sealed' || profileOverrides.canSeal);
   let busy = $state(false);
   let failed = $state(false);
 
@@ -35,7 +39,7 @@
     const colors = profileOverrides.colors(userId);
     name = typeof current?.displayname === 'string' ? current.displayname : '';
     color = colors?.light ?? colors?.dark ?? '';
-    avatar = typeof current?.avatar_url === 'string' ? current.avatar_url : undefined;
+    avatar = avatarSource(current?.avatar_url) ? current?.avatar_url : undefined;
     failed = false;
   });
 
@@ -44,10 +48,21 @@
     busy = true;
     try {
       const upright = await uprightJpeg(file);
-      avatar = await core.commands.uploadMedia(
-        upright.type || 'image/*',
-        new Uint8Array(await upright.arrayBuffer())
-      );
+      if (sealed) {
+        const scaled = await downscaledAvatar(upright);
+        const { ciphertext, file: encrypted } = await encryptAttachment(
+          new Uint8Array(await scaled.arrayBuffer())
+        );
+        avatar = {
+          ...encrypted,
+          url: await core.commands.uploadMedia('application/octet-stream', ciphertext),
+        };
+      } else {
+        avatar = await core.commands.uploadMedia(
+          upright.type || 'image/*',
+          new Uint8Array(await upright.arrayBuffer())
+        );
+      }
     } catch (error) {
       console.warn('[sable profile] override avatar upload failed', error);
       failed = true;
@@ -87,16 +102,22 @@
   {open}
   {onOpenChange}
   title={$i18n.t('timeline.profileOverrideTitle')}
-  description={$i18n.t('timeline.profileOverrideHint')}
+  description={$i18n.t(
+    locked
+      ? 'timeline.profileOverrideLocked'
+      : sealed
+        ? 'timeline.profileOverrideSealedHint'
+        : 'timeline.profileOverrideHint'
+  )}
   confirmLabel={$i18n.t('timeline.profileOverrideSave')}
   confirmVariant="secondary"
   cancelLabel={$i18n.t('timeline.profileOverrideCancel')}
-  {busy}
+  busy={busy || locked}
   error={failed ? $i18n.t('errors.actionFailed') : null}
   onConfirm={confirm}
 >
   <div class="override-avatar">
-    <Avatar id={userId} src={avatar ?? realAvatar} alt="" name={name || realName} size="large" />
+    <Avatar id={userId} src={avatarSrc ?? realAvatar} alt="" name={name || realName} size="large" />
     <label class="file-button btn btn-secondary btn-small">
       <input
         type="file"

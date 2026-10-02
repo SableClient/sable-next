@@ -1205,6 +1205,8 @@
     "profileOverride": "Set a nickname",
     "profileOverrideTitle": "How you see this person",
     "profileOverrideHint": "Only your devices show these. They are stored in your account data, which your homeserver can read.",
+    "profileOverrideSealedHint": "Only your devices show these. They are encrypted in your account data, so your homeserver cannot read them.",
+    "profileOverrideLocked": "These are encrypted and this device does not have the key. Unlock encrypted sync in settings to see or change them.",
     "profileOverrideName": "Name",
     "profileOverrideAvatar": "Choose a picture",
     "profileOverrideAvatarReset": "Use their picture",
