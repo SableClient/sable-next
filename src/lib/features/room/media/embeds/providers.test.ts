@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
+import InstagramEmbed from './InstagramEmbed.svelte';
 import { findEmbed } from './providers';
 import TiktokEmbed from './TiktokEmbed.svelte';
 import YoutubeEmbed from './YoutubeEmbed.svelte';
@@ -13,6 +14,7 @@ afterEach(() => {
   preferences.encryptedClientEmbeds = false;
   preferences.youtubeEmbeds = false;
   preferences.tiktokEmbeds = false;
+  preferences.instagramEmbeds = false;
 });
 
 describe('findEmbed', () => {
@@ -47,5 +49,13 @@ describe('findEmbed', () => {
     expect(findEmbed(post, false)).toBeNull();
     preferences.tiktokEmbeds = true;
     expect(findEmbed(post, false)).toBe(TiktokEmbed);
+  });
+
+  it('embeds an Instagram post only when its own switch is on', () => {
+    const post = 'https://www.instagram.com/p/CxYz_123-ab/';
+    preferences.clientEmbeds = true;
+    expect(findEmbed(post, false)).toBeNull();
+    preferences.instagramEmbeds = true;
+    expect(findEmbed(post, false)).toBe(InstagramEmbed);
   });
 });

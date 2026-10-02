@@ -196,6 +196,7 @@ export interface Preferences {
   encryptedClientEmbeds: boolean;
   youtubeEmbeds: boolean;
   tiktokEmbeds: boolean;
+  instagramEmbeds: boolean;
 
   systemNotifications: boolean;
   badgeDefaultDirect: BadgeNotificationMode;
@@ -457,6 +458,7 @@ const DEFAULTS: Preferences = {
   encryptedClientEmbeds: false,
   youtubeEmbeds: false,
   tiktokEmbeds: false,
+  instagramEmbeds: false,
 
   systemNotifications: true,
   badgeDefaultDirect: 'all',
