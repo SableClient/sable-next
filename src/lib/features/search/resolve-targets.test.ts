@@ -9,6 +9,8 @@ import {
   resolveSpaceRooms,
   resolveSpaceTarget,
   resolveUserTarget,
+  suggestRoomTarget,
+  suggestUserTarget,
 } from './resolve-targets';
 
 function room(overrides: Partial<RoomSummary>): RoomSummary {
@@ -200,4 +202,27 @@ test('with: resolves a person to every direct room they are in', () => {
 test('with: someone you have no direct room with resolves to nothing', () => {
   expect(resolveDirectRooms(directRooms, '@nobody:example.org')).toBeUndefined();
   expect(resolveDirectRooms(directRooms, '')).toBeUndefined();
+});
+
+test('a partial room name suggests the room it would have matched', () => {
+  const rooms = [
+    room({ room_id: '!a:x', name: 'General chat', canonical_alias: '#general:x' }),
+    room({ room_id: '!s:x', name: 'General space', is_space: true }),
+  ];
+
+  expect(suggestRoomTarget(rooms, 'gen')).toEqual({ label: 'General chat', value: '#general:x' });
+  expect(suggestRoomTarget(rooms, '#gen', true)).toEqual({
+    label: 'General space',
+    value: '!s:x',
+  });
+  expect(suggestRoomTarget(rooms, 'nothing')).toBeUndefined();
+  expect(suggestRoomTarget(rooms, '  ')).toBeUndefined();
+});
+
+test('a partial name or localpart suggests the person', () => {
+  const people = [{ userId: '@ada:x', displayName: 'Ada Lovelace' }];
+
+  expect(suggestUserTarget(people, 'love')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
+  expect(suggestUserTarget(people, '@ad')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
+  expect(suggestUserTarget(people, 'bob')).toBeUndefined();
 });

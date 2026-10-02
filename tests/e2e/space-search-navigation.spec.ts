@@ -22,6 +22,7 @@ test('reopening a space after search restores its lobby, including after a reloa
 
   await page.getByRole('link', { name: en.nav.messageSearch }).click();
   await expect(page).toHaveURL(/\/search\?q=.+&space=/);
+  await expect(page.getByRole('link', { name: en.nav.lobby, exact: true })).toBeVisible();
   await rail.getByRole('link', { name: en.nav.unspaced, exact: true }).click();
   await space.click();
 

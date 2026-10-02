@@ -102,3 +102,43 @@ export function resolveUserTarget(
       candidate.displayName.toLocaleLowerCase() === folded
   )?.userId;
 }
+
+export interface TargetSuggestion {
+  label: string;
+  value: string;
+}
+
+export function suggestRoomTarget(
+  rooms: readonly RoomSummary[],
+  value: string,
+  spacesOnly = false
+): TargetSuggestion | undefined {
+  const wanted = value.trim().toLocaleLowerCase().replace(/^#/, '');
+  if (wanted === '') return undefined;
+
+  const room = rooms.find(
+    (candidate) =>
+      candidate.is_space === spacesOnly &&
+      (candidate.name?.toLocaleLowerCase().includes(wanted) ||
+        candidate.canonical_alias?.toLocaleLowerCase().includes(wanted))
+  );
+  if (!room) return undefined;
+
+  const target = room.canonical_alias ?? room.room_id;
+  return { label: room.name ?? target, value: target };
+}
+
+export function suggestUserTarget(
+  candidates: readonly UserCandidate[],
+  value: string
+): TargetSuggestion | undefined {
+  const wanted = value.trim().toLocaleLowerCase().replace(/^@/, '');
+  if (wanted === '') return undefined;
+
+  const candidate = candidates.find(
+    (entry) =>
+      entry.userId.toLocaleLowerCase().includes(wanted) ||
+      entry.displayName.toLocaleLowerCase().includes(wanted)
+  );
+  return candidate ? { label: candidate.displayName, value: candidate.userId } : undefined;
+}

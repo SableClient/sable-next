@@ -34,6 +34,7 @@ export class MessageSearch {
   order = $state<SearchOrder>('rank');
   hits = $state.raw<SearchHitView[]>([]);
   searching = $state(false);
+  refining = $state(false);
   failed = $state(false);
   exhausted = $state(true);
   older = $state(false);
@@ -88,6 +89,7 @@ export class MessageSearch {
     if (!this.runnable) {
       this.hits = [];
       this.searching = false;
+      this.refining = false;
       this.failed = false;
       this.exhausted = true;
       return;
@@ -96,12 +98,14 @@ export class MessageSearch {
     if (this.unresolved.length > 0 || this.resolved.matchesNothing) {
       this.hits = [];
       this.searching = false;
+      this.refining = false;
       this.failed = false;
       this.exhausted = true;
       return;
     }
 
     this.searching = true;
+    this.refining = true;
     this.#debounce = setTimeout(() => void this.#run(generation), DEBOUNCE_MS);
   }
 
@@ -158,7 +162,10 @@ export class MessageSearch {
       this.failed = true;
       this.exhausted = true;
     } finally {
-      if (generation === this.#generation) this.searching = false;
+      if (generation === this.#generation) {
+        this.searching = false;
+        if (offset === 0) this.refining = false;
+      }
     }
   }
 

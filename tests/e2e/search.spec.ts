@@ -8,7 +8,7 @@ const test = base.extend({
   storageState: ({ workerSearchCorpus }, use) => use(workerSearchCorpus.statePath),
 });
 
-const SEARCH_FIELD = en.search.placeholder;
+const SEARCH_FIELD = en.search.title;
 const INDEXED = { timeout: COLD_BOOT_TIMEOUT };
 
 function group(page: Page, name: string) {
@@ -205,7 +205,9 @@ test('a query with no matches says so instead of staying blank', async ({ page }
 
   await searchField(page).fill('zzzznothingmatches');
 
-  await expect(page.locator('.announcement')).toHaveText('No messages matched.');
+  await expect(page.locator('.announcement')).toHaveText(
+    /^(No messages matched|Nothing found yet)\./
+  );
   await expect(page.locator('.empty')).toBeVisible();
 });
 
@@ -249,7 +251,7 @@ test('from: accepts a sender localpart rather than a full id', async ({
   await searchField(page).fill(`message from:${localpart}`);
 
   await expect(page.locator('.hit-row').first()).toBeVisible(INDEXED);
-  await expect(page.getByText('No messages matched.')).toHaveCount(0);
+  await expect(page.getByText(/No messages matched|Nothing found yet/)).toHaveCount(0);
 });
 
 test('an unknown from: yields nothing rather than every message', async ({ page }) => {
@@ -257,7 +259,9 @@ test('an unknown from: yields nothing rather than every message', async ({ page 
 
   await searchField(page).fill('message from:nobody');
 
-  await expect(page.locator('.announcement')).toHaveText('No messages matched.');
+  await expect(page.locator('.announcement')).toHaveText(
+    /^(No messages matched|Nothing found yet)\./
+  );
   await expect(page.getByText(/No match for from:nobody/)).toBeVisible();
 });
 
@@ -271,6 +275,31 @@ test('typing an operator prefix offers completions and Tab accepts one', async (
 
   await field.press('Tab');
   await expect(field).toHaveValue('from:');
+});
+
+test('completing an operator with Tab offers its values', async ({ page }) => {
+  await page.goto('/search');
+  const field = searchField(page);
+
+  await field.fill('in');
+  await field.press('Tab');
+
+  await expect(field).toHaveValue('in:');
+  await expect(
+    page.getByRole('listbox', { name: 'Search suggestions' }).getByRole('option').first()
+  ).toBeVisible();
+});
+
+test('an operator prefix is not highlighted until the list is arrowed', async ({ page }) => {
+  await page.goto('/search');
+  const field = searchField(page);
+
+  await field.fill('fr');
+  const option = page.getByRole('option', { name: 'from:' });
+  await expect(option).toHaveAttribute('aria-selected', 'false');
+
+  await field.press('ArrowDown');
+  await expect(option).toHaveAttribute('aria-selected', 'true');
 });
 
 test('Enter searches a word that merely starts an operator', async ({ page }) => {
@@ -348,7 +377,9 @@ test('zero results are announced and offer a way out', async ({ page, searchCorp
 
   await searchField(page).fill(`zzznothing in:${searchCorpus.generalId}`);
 
-  await expect(page.locator('.announcement')).toHaveText('No messages matched.');
+  await expect(page.locator('.announcement')).toHaveText(
+    /^(No messages matched|Nothing found yet)\./
+  );
   await expect(page.getByText(/Remove a filter/)).toBeVisible();
 });
 
@@ -649,4 +680,35 @@ test('an empty field lists every operator, even after a chip', async ({ page }) 
   const listbox = page.getByRole('listbox');
   await expect(listbox.getByRole('option', { name: /^from:/ })).toBeVisible();
   await expect(listbox.getByRole('option', { name: /^mentions:/ })).toBeVisible();
+});
+
+test('a starter filter begins a filter and offers its values', async ({ page }) => {
+  await page.goto('/search');
+
+  await page.getByRole('button', { name: 'in:' }).click();
+
+  await expect(searchField(page)).toBeFocused();
+  await expect(page.getByRole('listbox')).toBeVisible();
+});
+
+test('arrow down from the field reaches the results and enter opens one', async ({ page }) => {
+  await page.goto('/search');
+  await awaitIndexed(page);
+
+  await searchField(page).press('ArrowDown');
+  await expect(page.locator('.hit-row').first()).toBeFocused();
+
+  await page.keyboard.press('Enter');
+  await expect.poll(() => new URL(page.url()).searchParams.get('event')).toMatch(/^\$/);
+});
+
+test('an unresolved room offers the nearest match', async ({ page }) => {
+  await page.goto('/search');
+
+  await searchField(page).fill('welcome in:gener ');
+
+  await page.getByRole('button', { name: /^Use General/ }).click();
+
+  await expect(chips(page)).toContainText(['General']);
+  await expect(hit(page, /Welcome to General/)).toBeVisible(INDEXED);
 });

@@ -65,7 +65,7 @@
   let spaceId = $state(page.params.spaceId);
 
   afterNavigate(() => {
-    if (page.url.pathname === '/inbox') return;
+    if (page.url.pathname === '/inbox' || page.url.pathname === '/search') return;
     pathname = page.url.pathname;
     spaceId = page.params.spaceId;
   });

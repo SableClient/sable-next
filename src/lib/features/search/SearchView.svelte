@@ -3,6 +3,7 @@
   import { onDestroy, onMount, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import WarningIcon from 'phosphor-svelte/lib/WarningIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
   import { useCoreClient } from '#lib/core/context.js';
@@ -12,9 +13,12 @@
   import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import Alert from '#lib/ui/primitives/Alert.svelte';
   import AppPageShell from '#lib/ui/primitives/AppPageShell.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
+  import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
+  import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { whenVisible } from '#lib/ui/when-visible.js';
   import '#lib/ui/primitives/form-control.css';
 
@@ -28,6 +32,9 @@
     resolveSpaceRooms,
     resolveSpaceTarget,
     resolveUserTarget,
+    suggestRoomTarget,
+    suggestUserTarget,
+    type TargetSuggestion,
   } from './resolve-targets';
   import { coverageMessage } from './coverage';
   import { snippetAround } from './highlight';
@@ -67,6 +74,7 @@
 
   const LOOKUP_DELAY_MS = 300;
   const PEOPLE_OPERATORS: readonly string[] = ['from', 'mentions', 'with'];
+  const STARTER_OPERATORS: readonly string[] = ['from', 'in', 'has', 'before', 'is'];
   let lookupTimer: ReturnType<typeof setTimeout> | undefined;
   let destroyed = false;
 
@@ -85,7 +93,8 @@
 
   let suggestionsOpen = $state(false);
   let activeSuggestion = $state(0);
-  let navigated = false;
+  let navigated = $state(false);
+  const compact = createMediaQuery(`(width < ${BREAKPOINTS.compactContent})`);
   const listboxId = $props.id();
   const optionId = (index: number): string => `${listboxId}-${String(index)}`;
 
@@ -133,7 +142,9 @@
           )
         : []
   );
+  let suggestionHighlighted = $derived(showingRecent || enterAccepts(search.query, navigated));
   let input = $state<HTMLInputElement>();
+  let results = $state<HTMLElement>();
 
   let terms = $derived([...search.parsed.text.split(/\s+/), ...search.parsed.phrases]);
 
@@ -145,17 +156,40 @@
     )
   );
 
+  let countLabel = $derived(
+    $i18n.t(search.exhausted ? 'search.count' : 'search.countMore', { count: search.hits.length })
+  );
+
+  let showCoverage = $derived(coverage !== '' && core.searchCoverage?.state !== 'complete');
+
+  let emptyLabel = $derived(
+    search.older
+      ? $i18n.t('search.emptyRecent')
+      : showCoverage
+        ? $i18n.t('search.emptyIndexing')
+        : $i18n.t('search.empty')
+  );
+
   let status = $derived.by(() => {
     if (!search.runnable) return '';
-    if (search.failed) return $i18n.t('search.failed');
-    if (search.searching && search.hits.length === 0) return $i18n.t('search.searching');
-    if (search.hits.length === 0) return $i18n.t('search.empty');
-    return $i18n.t('search.count', { count: search.hits.length });
+    if (search.failed) return '';
+    if (search.searching && (search.hits.length === 0 || search.refining))
+      return $i18n.t('search.searching');
+    if (search.hits.length === 0) return showCoverage ? `${emptyLabel} ${coverage}` : emptyLabel;
+    return countLabel;
   });
+
+  let unresolvedFixes = $derived(
+    search.unresolved.flatMap((token) => {
+      const suggestion = suggestionFor(token);
+      return suggestion ? [{ token, suggestion }] : [];
+    })
+  );
 
   let recoveries = $derived.by(() => {
     const hints: string[] = [];
-    const { tokens, phrases, exclude } = search.parsed;
+    const { tokens, phrases, exclude, text } = search.parsed;
+    const wordCount = text.split(/\s+/).filter(Boolean).length + phrases.length;
 
     if (tokens.length > 0)
       hints.push(
@@ -165,7 +199,7 @@
       );
     if (phrases.length > 0) hints.push($i18n.t('search.recoveryPhrase'));
     if (exclude.length > 0) hints.push($i18n.t('search.recoveryExclude'));
-    hints.push($i18n.t('search.recoveryTerms'));
+    if (wordCount > 1) hints.push($i18n.t('search.recoveryTerms'));
     return hints;
   });
 
@@ -184,6 +218,46 @@
       .map((userId) => senders.identity(userId));
   }
 
+  function suggestionFor(token: SearchToken): TargetSuggestion | undefined {
+    switch (token.operator) {
+      case 'in':
+        return suggestRoomTarget(roomList.rooms, token.value);
+      case 'space':
+        return suggestRoomTarget(roomList.rooms, token.value, true);
+      case 'from':
+      case 'mentions':
+      case 'with':
+        return suggestUserTarget(knownSenders(), token.value);
+      default:
+        return undefined;
+    }
+  }
+
+  function applyFix(token: SearchToken, suggestion: TargetSuggestion): void {
+    const value = suggestion.value.includes(' ') ? `"${suggestion.value}"` : suggestion.value;
+    const replacement = `${token.negated ? '-' : ''}${token.operator}:${value}`;
+    search.query = `${search.query.slice(0, token.start)}${replacement}${search.query.slice(token.end)}`;
+    runSearch();
+    input?.focus();
+  }
+
+  function startFilter(operator: string): void {
+    const base = search.query.replace(/\s*$/, ' ').trimStart();
+    search.query = `${base}${operator}:`;
+    activeSuggestion = 0;
+    navigated = false;
+    showOperatorList = false;
+    suggestionsOpen = true;
+    input?.focus();
+  }
+
+  function showAllFilters(): void {
+    showOperatorList = true;
+    suggestionsOpen = true;
+    activeSuggestion = 0;
+    input?.focus();
+  }
+
   function accept(suggestion: Suggestion): void {
     if (suggestion.id === CLEAR_RECENT) {
       if (userId !== null) clearRecentSearches(userId);
@@ -191,7 +265,7 @@
       return;
     }
     search.query = applySuggestion(search.query, suggestion);
-    suggestionsOpen = false;
+    suggestionsOpen = suggestion.insert.endsWith(':');
     activeSuggestion = 0;
     navigated = false;
     runSearch();
@@ -207,6 +281,37 @@
       return spaceId === undefined ? chip.value : roomList.labelFor(spaceId);
     }
     return chip.value;
+  }
+
+  function isUnresolved(chip: SearchToken): boolean {
+    return search.unresolved.some((token) => token.start === chip.start);
+  }
+
+  function hitRows(): HTMLElement[] {
+    return Array.from(results?.querySelectorAll<HTMLElement>('.hit-row') ?? []);
+  }
+
+  function onHitKeydown(event: KeyboardEvent, hit: SearchHitView): void {
+    if (event.target !== event.currentTarget || event.isComposing) return;
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      void openHit(hit);
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      input?.focus();
+      return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+
+    event.preventDefault();
+    const rows = hitRows();
+    const target =
+      rows[rows.indexOf(event.currentTarget as HTMLElement) + (event.key === 'ArrowDown' ? 1 : -1)];
+    if (target) target.focus();
+    else if (event.key === 'ArrowUp') input?.focus();
   }
 
   function dropChip(chip: SearchToken): void {
@@ -245,6 +350,13 @@
     }
     if (suggestions.length === 0) {
       if (event.key === 'Enter') remember();
+      else if (event.key === 'ArrowDown') {
+        const first = hitRows()[0];
+        if (first) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
       return;
     }
 
@@ -257,6 +369,7 @@
       navigated = true;
       activeSuggestion = (activeSuggestion - 1 + suggestions.length) % suggestions.length;
     } else if (event.key === 'Tab') {
+      if (field.draft.trim() === '' && !navigated) return;
       event.preventDefault();
       accept(suggestions[activeSuggestion]);
     } else if (event.key === 'Enter') {
@@ -361,6 +474,32 @@
   ]);
 </script>
 
+{#snippet loadMore()}
+  {#if !search.exhausted}
+    <div class="load-more">
+      {#key search.pages}
+        <div
+          class="load-sentinel"
+          aria-hidden="true"
+          {@attach whenVisible(() => void search.loadMore())}
+        ></div>
+      {/key}
+      <Button
+        variant="ghost"
+        size="small"
+        disabled={search.searching}
+        onclick={() => void search.loadMore()}
+      >
+        {search.searching
+          ? $i18n.t('search.searching')
+          : search.older
+            ? $i18n.t('search.loadOlder')
+            : $i18n.t('search.loadMore')}
+      </Button>
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet contextLine(line: SearchContextView)}
   <span class="hit-context" hidden={line.body.startsWith('mxc://')}>
     <span class="hit-context-sender">{senders.identity(line.sender).displayName}</span>
@@ -377,7 +516,7 @@
 {/if}
 
 {#snippet content()}
-  <div class="search-view">
+  <div class="search-view" class:panel>
     <div class="search-bar">
       <div class="field">
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -392,9 +531,13 @@
           {#if field.chips.length > 0}
             <ul class="chips" aria-label={$i18n.t('search.activeFilters')}>
               {#each field.chips as chip (chip.start)}
-                <li class="chip" class:negated={chip.negated}>
+                <li class="chip" class:negated={chip.negated} class:unresolved={isUnresolved(chip)}>
+                  {#if isUnresolved(chip)}<WarningIcon />{/if}
                   <span class="chip-operator">{chip.negated ? '-' : ''}{chip.operator}:</span>
                   <span class="chip-value">{chipLabel(chip)}</span>
+                  {#if isUnresolved(chip)}
+                    <span class="visually-hidden">{$i18n.t('search.chipUnresolved')}</span>
+                  {/if}
                   <button
                     class="chip-remove"
                     type="button"
@@ -423,13 +566,15 @@
             enterkeyhint="search"
             role="combobox"
             aria-expanded={suggestions.length > 0}
-            aria-controls={listboxId}
+            aria-controls={suggestions.length > 0 ? listboxId : undefined}
             aria-autocomplete="list"
-            aria-activedescendant={suggestions.length > 0
+            aria-activedescendant={suggestions.length > 0 && suggestionHighlighted
               ? `${listboxId}-${String(activeSuggestion)}`
               : undefined}
-            placeholder={field.chips.length > 0 ? '' : $i18n.t('search.placeholder')}
-            aria-label={$i18n.t('search.placeholder')}
+            placeholder={field.chips.length > 0
+              ? ''
+              : $i18n.t(compact.matches ? 'search.placeholderShort' : 'search.placeholder')}
+            aria-label={$i18n.t('search.title')}
             oninput={onInput}
             onkeydown={onKeydown}
             onfocus={() => {
@@ -461,7 +606,7 @@
                 ? $i18n.t('search.recentSearches')
                 : $i18n.t('search.suggestions')}
               {suggestions}
-              active={activeSuggestion}
+              active={suggestionHighlighted ? activeSuggestion : -1}
               onSelect={accept}
             />
           </div>
@@ -484,28 +629,79 @@
       </p>
     {/if}
 
-    {#if search.unresolved.length > 0}
-      <p class="notice">
-        {$i18n.t('search.unresolved', {
-          targets: search.unresolved.map((token) => `${token.operator}:${token.value}`).join(', '),
-        })}
-      </p>
-    {/if}
-
     <p class="announcement" role="status" aria-live="polite">{status}</p>
 
-    <div class="results">
+    <div
+      class="results"
+      class:refining={search.refining && search.hits.length > 0}
+      aria-busy={search.refining}
+      bind:this={results}
+    >
       {#if !search.runnable}
-        <p class="hint">{$i18n.t('search.hint')}</p>
+        <div class="starter">
+          <p class="hint">{$i18n.t('search.hint')}</p>
+          <ul class="starter-filters" aria-label={$i18n.t('search.startFilter')}>
+            {#each STARTER_OPERATORS as operator (operator)}
+              <li>
+                <button
+                  class="starter-filter"
+                  type="button"
+                  onclick={() => {
+                    startFilter(operator);
+                  }}
+                >
+                  {operator}:
+                </button>
+              </li>
+            {/each}
+            <li>
+              <button class="starter-filter more" type="button" onclick={showAllFilters}>
+                {$i18n.t('search.allFilters')}
+              </button>
+            </li>
+          </ul>
+          <p class="hint">{$i18n.t('search.hintExample')}</p>
+          <p class="hint">{$i18n.t('search.hintSyntax')}</p>
+        </div>
       {:else if search.failed}
-        <p class="hint">{$i18n.t('search.failed')}</p>
+        <Alert variant="critical" role="alert">
+          <p>{$i18n.t('search.failed')}</p>
+          <div class="alert-actions">
+            <Button size="small" onclick={() => search.schedule()}>{$i18n.t('search.retry')}</Button
+            >
+          </div>
+        </Alert>
       {:else if search.searching && search.hits.length === 0}
         <p class="hint">{$i18n.t('search.searching')}</p>
       {:else if search.hits.length === 0}
         <div class="empty">
-          <p>{$i18n.t('search.empty')}</p>
-          {#if coverage}
-            <p class="coverage">{coverage}</p>
+          {#if search.unresolved.length > 0}
+            <p>
+              {$i18n.t('search.unresolved', {
+                targets: search.unresolved
+                  .map((token) => `${token.operator}:${token.value}`)
+                  .join(', '),
+              })}
+            </p>
+            {#each unresolvedFixes as { token, suggestion } (token.start)}
+              <Button
+                variant="ghost"
+                size="small"
+                onclick={() => {
+                  applyFix(token, suggestion);
+                }}
+              >
+                {$i18n.t('search.didYouMean', { label: suggestion.label })}
+              </Button>
+            {/each}
+          {:else}
+            <p>{emptyLabel}</p>
+            {#if coverage}
+              <p class="coverage">{coverage}</p>
+            {/if}
+            {#if search.older}
+              {@render loadMore()}
+            {/if}
           {/if}
           <ul>
             {#each recoveries as recovery (recovery)}
@@ -514,19 +710,38 @@
           </ul>
         </div>
       {:else}
-        <p class="count">{$i18n.t('search.count', { count: search.hits.length })}</p>
+        <p class="count">
+          {countLabel}{#if showCoverage}<span class="count-coverage">{coverage}</span>{/if}
+        </p>
         {#each search.groups as group (group.key)}
+          {@const room = roomList.byId(group.roomId)}
+          {@const label = roomList.labelFor(group.roomId)}
           <section class="group">
-            <h2>{roomList.labelFor(group.roomId)}</h2>
+            <h2 class:visually-hidden={panel && search.groups.length === 1}>
+              <Avatar id={group.roomId} src={room?.avatar_url ?? null} name={label} size="small" />
+              <span class="group-name">{label}</span>
+              <span class="group-count">{group.hits.length}</span>
+            </h2>
             <ul class="hit-list">
               {#each group.hits as hit (hit.event_id)}
                 {@const snippet = snippetAround(hit.body, terms)}
+                {@const openLabel = $i18n.t('search.openResultFrom', {
+                  sender: senders.identity(hit.sender).displayName,
+                  room: roomList.labelFor(hit.room_id),
+                  time: formatFullTimestamp(hit.origin_server_ts),
+                })}
                 <li class="hit">
-                  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
                   <div
                     class="hit-row"
+                    role="group"
+                    tabindex="-1"
+                    aria-label={openLabel}
                     onclick={(event) => {
                       if (opensFrom(event)) void openHit(hit);
+                    }}
+                    onkeydown={(event) => {
+                      onHitKeydown(event, hit);
                     }}
                   >
                     {#each hit.context_before as line, index (`${index}:${line.event_id}`)}
@@ -538,7 +753,7 @@
                         eventId={hit.event_id}
                         loadPreviewProfile
                         timeAction={{
-                          label: $i18n.t('search.openResult'),
+                          label: openLabel,
                           run: () => void openHit(hit),
                         }}
                       >
@@ -577,7 +792,7 @@
                                 <button
                                   class="hit-time-action"
                                   type="button"
-                                  aria-label={$i18n.t('search.openResult')}
+                                  aria-label={openLabel}
                                   onclick={() => void openHit(hit)}
                                 >
                                   <time
@@ -611,29 +826,7 @@
           </section>
         {/each}
 
-        {#if !search.exhausted}
-          <div class="load-more">
-            {#key search.pages}
-              <div
-                class="load-sentinel"
-                aria-hidden="true"
-                {@attach whenVisible(() => void search.loadMore())}
-              ></div>
-            {/key}
-            <Button
-              variant="ghost"
-              size="small"
-              disabled={search.searching}
-              onclick={() => void search.loadMore()}
-            >
-              {search.searching
-                ? $i18n.t('search.searching')
-                : search.older
-                  ? $i18n.t('search.loadOlder')
-                  : $i18n.t('search.loadMore')}
-            </Button>
-          </div>
-        {/if}
+        {@render loadMore()}
       {/if}
     </div>
   </div>
@@ -664,11 +857,18 @@
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
   }
 
+  @media (width < 32rem) {
+    .token-field {
+      max-block-size: 7rem;
+      overflow-y: auto;
+    }
+  }
+
   .token-input {
     background: none;
     border: 0;
     color: inherit;
-    flex: 1 1 8rem;
+    flex: 1 1 4rem;
     font: inherit;
     font-size: max(var(--font-size-label), var(--font-size-input-min));
     min-width: 0;
@@ -739,6 +939,22 @@
     color: var(--crit-on-container);
   }
 
+  .chip.unresolved {
+    background: var(--warn-container);
+    border-color: var(--warn-container-line);
+    border-style: dashed;
+    color: var(--warn-on-container);
+  }
+
+  .visually-hidden {
+    block-size: 1px;
+    clip-path: inset(50%);
+    inline-size: 1px;
+    overflow: hidden;
+    position: absolute;
+    white-space: nowrap;
+  }
+
   .chip-operator {
     flex: 0 0 auto;
     opacity: 0.75;
@@ -786,6 +1002,11 @@
     background: var(--crit-container-hover);
   }
 
+  .chip.unresolved .chip-remove:hover,
+  .chip.unresolved .chip-remove:focus-visible {
+    background: var(--warn-container-hover);
+  }
+
   .search-autocomplete :global(.autocomplete) {
     bottom: auto;
     top: calc(100% + 0.25rem);
@@ -808,9 +1029,23 @@
   }
 
   .empty .coverage {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
     margin-block-start: var(--space-100);
+  }
+
+  .results.refining {
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .results {
+      transition: none;
+    }
+  }
+
+  @media (pointer: coarse) {
+    .starter-filter {
+      min-block-size: var(--target-hit);
+    }
   }
 
   .announcement {
@@ -837,13 +1072,66 @@
   }
 
   .search-bar .field {
-    flex: 1 1 18rem;
+    flex: 1 1 12rem;
     min-width: 0;
   }
 
   .search-bar :global(.order-select) {
     flex: none;
     width: auto;
+  }
+
+  .count-coverage {
+    display: block;
+    margin-block-start: var(--space-050);
+  }
+
+  .starter {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-300);
+  }
+
+  .starter-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-150);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .starter-filter {
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius-pill);
+    color: var(--surface-on-container);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-small);
+    min-block-size: var(--control-height-300);
+    padding-inline: var(--space-300);
+  }
+
+  .starter-filter.more {
+    background: none;
+    border-style: dashed;
+    color: var(--surface-var-on-container);
+  }
+
+  .starter-filter:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .starter-filter:hover {
+      background: var(--surface-container-hover);
+    }
+  }
+
+  .alert-actions {
+    display: flex;
   }
 
   .load-more {
@@ -868,13 +1156,30 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-400);
+    transition: opacity 150ms ease-out;
   }
 
   .group h2 {
+    align-items: center;
+    display: flex;
     font-size: var(--font-size-small);
     font-weight: var(--font-weight-medium);
+    gap: var(--space-200);
     margin: 0 0 var(--space-200);
     padding-inline: var(--space-100);
+  }
+
+  .group-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .group-count {
+    color: var(--surface-var-on-container);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-normal);
   }
 
   .hit-list {
@@ -897,12 +1202,25 @@
     box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
+  .search-view.panel .hit {
+    padding-inline-start: var(--space-500);
+  }
+
   .hit-row {
     cursor: pointer;
     display: flex;
     flex-direction: column;
     min-width: 0;
     padding-block: var(--space-100);
+  }
+
+  .hit-row:focus-visible {
+    outline: none;
+  }
+
+  .hit:has(.hit-row:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+    outline-offset: calc(-1 * var(--focus-ring-width));
   }
 
   .hit :global(.message.mention-silent),
@@ -951,10 +1269,21 @@
     text-decoration: underline;
   }
 
+  .hit-message {
+    container-type: inline-size;
+  }
+
+  @container (width < 30rem) {
+    .hit-message :global(.sender-identity-pronouns) {
+      display: none;
+    }
+  }
+
   .hit-context {
     color: var(--surface-var-on-container);
     display: none;
     font-size: var(--font-size-small);
+    opacity: 0.75;
     overflow: hidden;
     padding-inline-start: calc(var(--avatar-size-small) + var(--space-300));
     text-overflow: ellipsis;
@@ -969,6 +1298,12 @@
 
   .hit-context-sender {
     font-weight: var(--font-weight-medium);
+  }
+
+  .hit-body mark {
+    background: var(--primary-container);
+    border-radius: var(--radius-inner);
+    color: var(--primary-on-container);
   }
 
   .hit-body {

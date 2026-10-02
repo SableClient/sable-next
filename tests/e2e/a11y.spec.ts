@@ -66,7 +66,7 @@ test('the signed-in surfaces have no accessibility violations', async ({
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/search');
-  const field = page.getByRole('combobox', { name: en.search.placeholder });
+  const field = page.getByRole('combobox', { name: en.search.title });
   await field.fill('in:Timeline from:e2e ');
   await expect(
     page.getByRole('list', { name: en.search.activeFilters }).getByRole('listitem')
