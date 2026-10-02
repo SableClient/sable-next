@@ -761,7 +761,6 @@
               displayName={senderName}
               accountName={persona ? accountName : undefined}
               colors={senderColors}
-              {pronouns}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
               onViaProfile={persona ? openSenderProfileAt : undefined}
