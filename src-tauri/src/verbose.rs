@@ -49,7 +49,6 @@ pub(crate) fn log_console(level: ConsoleLevel, message: &str) -> Result<(), &'st
     if !enabled() {
         return Err("console forwarding requires --verbose");
     }
-    // Bypass SABLE_LOG and Sentry for local console output.
     let _ = writeln!(
         std::io::stderr().lock(),
         "[webview:{}] {message}",

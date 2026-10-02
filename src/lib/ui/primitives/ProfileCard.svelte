@@ -452,7 +452,6 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  /* Keep the bubble in the crest's flow so expansion clears the identity row. */
   .profile-card-status {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);

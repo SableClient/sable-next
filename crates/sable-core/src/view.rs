@@ -2078,7 +2078,6 @@ fn thread_summary(content: &TimelineItemContent) -> Option<ThreadSummaryView> {
     })
 }
 
-// Standalone thread roots lack timeline thread state, so read the server's bundled summary.
 fn bundled_thread_summary(unsigned: &serde_json::Value) -> Option<ThreadSummaryView> {
     let summary = unsigned.pointer("/m.relations/m.thread")?;
     let count = u32::try_from(summary.get("count")?.as_u64()?).ok()?;

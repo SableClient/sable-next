@@ -84,7 +84,6 @@ export interface Transport {
 
   subscribeCrash(onCrash: (message: string) => void): () => void;
 
-  /** Called when WebKit loses the IndexedDB transaction backing the core. */
   subscribeStorageFailure?(onStorageFailure: () => void): () => void;
 
   subscribeStall(onStall: (stalled: boolean) => void): () => void;

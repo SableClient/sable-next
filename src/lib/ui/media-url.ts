@@ -12,8 +12,6 @@ const objectUrls = new Map<string, CachedMediaUrl>();
 const pending = new Map<string, Promise<string>>();
 const holds = new Map<string, number>();
 const displaced = new Map<string, string[]>();
-/* Keep small previews across virtualized rows; the byte cap bounds blob memory.
-   Held entries are exempt from both limits. */
 const MAX_OBJECT_URLS = 512;
 const MAX_OBJECT_URL_BYTES = 32 * 1024 * 1024;
 const MAX_MEDIA_METADATA = 512;
@@ -35,7 +33,6 @@ function cacheKey(
   width: number,
   height: number
 ): string {
-  // Encrypted media always returns the original file, regardless of display size.
   if (isEncryptedMedia(source) || width === 0 || height === 0) {
     width = 0;
     height = 0;

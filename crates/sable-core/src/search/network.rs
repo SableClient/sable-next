@@ -21,7 +21,6 @@ impl Default for CrawlNetwork {
         Self(
             watch::channel(Policy {
                 unmetered_only: true,
-                // Wait for the first native report on mobile.
                 unmetered: !cfg!(any(target_os = "android", target_os = "ios")),
             })
             .0,
@@ -43,7 +42,6 @@ impl CrawlNetwork {
         self.0.borrow().allows_crawl()
     }
 
-    /// Cancel the request and SDK retries when crawling is restricted.
     pub(crate) async fn run<F: Future>(&self, request: F) -> Option<F::Output> {
         let mut policy = self.0.subscribe();
         tokio::select! {

@@ -15,7 +15,6 @@
   }
 
   let { room, telemetry, deafened = false, volumeOf = () => 1 }: Props = $props();
-  // Keep participant updates from restarting playback.
   let playbackRoom = $derived(room);
   let node = $state<HTMLDivElement>();
   let audioElements = $state.raw<HTMLMediaElement[]>([]);

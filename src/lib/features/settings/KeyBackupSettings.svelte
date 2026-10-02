@@ -32,7 +32,6 @@
 
   $effect(() => {
     const accountId = core.session?.account_id;
-    // Reload when recovery unlocks the backup.
     void core.encryption?.backup_unlocked;
     let active = true;
     let fetching = false;

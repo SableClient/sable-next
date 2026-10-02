@@ -55,7 +55,6 @@ pub fn stream_to<R: Runtime>(
 ) -> Result<(), CommandErr> {
     let dir = cache_dir(app)?;
     let key = hex(&Sha256::digest(source.as_bytes()));
-    // Invalidate cached conversions without duration or seek metadata.
     let cached = dir.join(format!("{key}.v2.webm"));
 
     if is_fresh(&cached) {
@@ -136,7 +135,6 @@ fn encode(
             .map("1:a:0")
             .arg("-shortest");
     }
-    // Write to a seekable file so ffmpeg can finalize duration and seek metadata.
     command.args(ENCODE_ARGS).output(partial.to_string_lossy());
     if tracing::enabled!(tracing::Level::DEBUG) {
         command.print_command();
@@ -323,7 +321,6 @@ mod tests {
                 assert!(probe.status.success());
                 let duration = String::from_utf8(probe.stdout)?.trim().parse::<f64>()?;
                 assert!(duration.is_finite() && (1.0..1.2).contains(&duration));
-                // Matroska Cues element ID.
                 let bytes = fs::read(&partial)?;
                 assert!(bytes.windows(4).any(|id| id == [0x1c, 0x53, 0xbb, 0x6b]));
                 assert_eq!(

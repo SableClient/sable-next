@@ -17,7 +17,6 @@ pub struct FileSessionStore {
     owner: Option<std::sync::Arc<std::fs::File>>,
 }
 
-/// Acquire ownership on first use so startup can retry storage failures.
 #[cfg(not(target_family = "wasm"))]
 pub struct ExclusiveFileSessionStore {
     directory: std::path::PathBuf,

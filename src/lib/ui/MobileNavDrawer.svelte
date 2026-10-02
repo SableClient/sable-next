@@ -38,8 +38,6 @@
       so room-list hydration cannot flash the sidebar over a room. */
   const LIST_INDEX_PATHS = new Set(['/home', '/rooms', '/direct']);
   const BLANK_INDEX_PATHS = new Set(['/home', '/rooms']);
-  /** Routes on which the mobile quick tools bar should be shown; this should
-      match all routes linked from the mobile toolbar except for the root. */
   const MOBILE_QUICK_TOOLS_PATHS = new Set(['/navigate', '/inbox', '/profile']);
   let pathname = $derived(page.url.pathname);
   let settledPath = $state(page.url.pathname);
@@ -349,10 +347,6 @@
     overflow: hidden;
   }
 
-  /* Note that visibility+height is used here deliberately instead of
-     display: none; otherwise the animation when clicking toolbar buttons
-     doesn't work when switching from /rooms (sidebar) to other pages
-     (drawer content). */
   .mobile-quick-tools {
     flex: 0 0 auto;
     height: 0;

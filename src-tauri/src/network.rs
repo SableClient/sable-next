@@ -2,7 +2,6 @@ use std::sync::{Arc, Mutex, Weak};
 
 use sable_core::Core;
 
-// Android can report before the core is initialized.
 static CONNECTION: Mutex<(bool, Option<Weak<Core>>)> = Mutex::new((false, None));
 
 pub(crate) fn attach(core: &Arc<Core>) {

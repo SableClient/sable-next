@@ -517,8 +517,6 @@ fn push_event_view(item: NotificationItem) -> Option<PushEventView> {
 
 pub use crate::push_rules::notifies;
 
-/// Match the member count used by the SDK push-condition context. MSC4171
-/// service-member hints do not change `room_member_count` push conditions.
 #[must_use]
 pub fn uses_direct_push_rules(room: &matrix_sdk::Room) -> bool {
     room.active_members_count() == 2

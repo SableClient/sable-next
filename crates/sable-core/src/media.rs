@@ -50,11 +50,6 @@ pub struct GalleryAttachment {
 }
 
 impl Core {
-    /// The server's upload limit in bytes, cached by the SDK.
-    ///
-    /// # Errors
-    ///
-    /// Fails when logged out or when the server configuration is unavailable.
     pub(crate) async fn max_upload_size(&self) -> Result<u64, CommandErr> {
         self.client()
             .await?
@@ -91,8 +86,6 @@ impl Core {
         self.fetch_media(source, width, height, false).await
     }
 
-    /// Fetches media, leaving concurrency to the caller for background transfers.
-    ///
     /// # Errors
     ///
     /// Returns an error for invalid media, missing sessions, or failed downloads.
@@ -113,11 +106,9 @@ impl Core {
         }
 
         let client = self.client().await?;
-        // Read disk before waiting for a download slot.
         if let Some(bytes) = cached_media(&client, &source, width, height).await {
             return Ok(bytes);
         }
-        // Pack exports and emote stealing keep their own concurrency limits.
         let _download = if background {
             None
         } else {
@@ -129,7 +120,6 @@ impl Core {
                         .acquire()
                         .await
                         .map_err(|_| CommandErr::Unavailable)?;
-                    // A preceding download may have filled the cache while we waited.
                     if let Some(bytes) = cached_media(&client, &source, width, height).await {
                         return Ok(bytes);
                     }
@@ -859,7 +849,6 @@ async fn fetch_sdk_media(
     client: &MatrixClient,
     request: &MediaRequestParameters,
 ) -> matrix_sdk::Result<Vec<u8>> {
-    // The caller already checked disk. Keep cache writes without another read.
     let content = client.media().get_media_content(request, false).await?;
     client
         .media_store()

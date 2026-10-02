@@ -296,7 +296,6 @@
   let rowIndex = $derived(new Map(pickerRows.map((row, index) => [row.id, index])));
 
   function pickerRowKey(index: number): string | number {
-    // VirtualList keys old visible indices before dropping them when the row count shrinks.
     return pickerRows[index]?.id ?? index;
   }
 

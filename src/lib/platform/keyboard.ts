@@ -6,8 +6,6 @@ function keyboardInset(viewport: VisualViewport): number {
   return Math.max(0, Math.round(window.innerHeight - (viewport.height * scale + offset)));
 }
 
-// Inner containers do the app's scrolling, so a nonzero document offset is a
-// WebKit keyboard-reveal side effect that touch panning cannot undo. Zero it.
 export function resetDocumentScroll(): void {
   const scroller = document.scrollingElement;
   if (!scroller || window.scrollY === 0) return;

@@ -11,7 +11,6 @@ use crate::protocol::{CommandErr, CommandOk, ReactionShortcodeView};
 
 const MAX_SHORTCODE_BYTES: usize = 100;
 
-/// Check the original event JSON, even when displaying an edit.
 pub(crate) fn can_annotate<T>(event: &Raw<T>) -> bool {
     let content = event
         .get_field::<serde_json::Value>("content")
@@ -106,7 +105,6 @@ fn shortcodes(events: &[TimelineEvent], target: &EventId) -> Vec<ReactionShortco
         let Ok(Some(content)) = event.raw().get_field::<serde_json::Value>("content") else {
             continue;
         };
-        // Relation lookups include reactions to reactions.
         if content
             .pointer("/m.relates_to/event_id")
             .and_then(serde_json::Value::as_str)
