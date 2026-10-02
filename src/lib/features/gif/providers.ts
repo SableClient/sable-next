@@ -1,4 +1,4 @@
-import { stringToBase64 } from 'uint8array-extras';
+import { base64ToString, stringToBase64 } from 'uint8array-extras';
 
 import { isRecord } from '#lib/guards.js';
 
@@ -287,6 +287,51 @@ export function proxiedGif(gif: GifResult, proxyUrl: string | null): ProxiedGif 
   return {
     mxcUrl: `mxc://${server}/${provider.id}_${stringToBase64(payload, { urlSafe: true })}`,
     mimetype: gif.mimetype,
+  };
+}
+
+const proxiedMxc = /^mxc:\/\/[^/]+\/(klipy|tenor|giphy)_([A-Za-z0-9_-]+)$/;
+
+function providerMediaUrl(provider: string, payload: string): { url: string; id: string } {
+  if (provider === 'klipy') return { url: `https://static.klipy.com/ii/${payload}`, id: '' };
+  if (provider === 'tenor') return { url: `https://c.tenor.com/${payload}/tenor.gif`, id: '' };
+  const dot = payload.lastIndexOf('.');
+  const id = dot === -1 ? payload : payload.slice(0, dot);
+  return {
+    url: `https://i.giphy.com/media/${id}/giphy${dot === -1 ? '.gif' : payload.slice(dot)}`,
+    id,
+  };
+}
+
+export function gifFromProxiedMxc(
+  source: string,
+  filename: string,
+  width: number | null,
+  height: number | null,
+  size: number | null,
+  mimetype: string | null
+): GifResult | undefined {
+  const match = proxiedMxc.exec(source);
+  if (!match) return undefined;
+
+  let payload: string;
+  try {
+    payload = base64ToString(match[2]);
+  } catch {
+    return undefined;
+  }
+  const { url, id } = providerMediaUrl(match[1], payload);
+  if (!isAllowedGifMediaUrl(url)) return undefined;
+
+  return {
+    id,
+    title: filename.replace(/\.[^.]+$/, '') || 'GIF',
+    mediaUrl: url,
+    previewUrl: url,
+    width: width ?? 0,
+    height: height ?? 0,
+    size: size ?? 0,
+    mimetype: mimetype ?? mimetypeOf(url),
   };
 }
 

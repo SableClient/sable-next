@@ -48,3 +48,11 @@ test('mark unread is offered only when the room can carry it', () => {
     false
   );
 });
+
+test('the gif row reads back whether the gif is already saved', () => {
+  const saved = messageMenuRows({ onFavoriteGif: () => {}, gifFavorited: true });
+  const unsaved = messageMenuRows({ onFavoriteGif: () => {} });
+
+  expect(saved[0]?.label).toBe('composer.gifUnfavorite');
+  expect(unsaved[0]?.label).toBe('composer.gifFavorite');
+});

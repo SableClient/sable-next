@@ -5,6 +5,8 @@ import type { CursorAnchor } from '#lib/ui/cursor-anchor.js';
 import { t } from '#lib/i18n.js';
 import { toasts } from '#lib/ui/toasts.svelte.js';
 import { saveBytes, savesNatively } from '#lib/platform/files.js';
+import { favoriteGifs, isFavorite, toggleFavorite } from '#lib/features/gif/favorites.svelte.js';
+import { gifFromProxiedMxc } from '#lib/features/gif/providers.js';
 import { downloadCandidates, emoteCandidates } from '#lib/features/emotes/steal-emotes.js';
 import { pinErrorMessage, type PinnedEvents } from '../timeline/pinned-events.svelte.js';
 import type { Bookmarks } from '#lib/rooms/bookmarks.svelte.js';
@@ -96,6 +98,17 @@ export class MessageActionExecutor {
       bookmarked,
       stealCount: stealable.length,
     });
+    const gif =
+      item.content.kind === 'image'
+        ? gifFromProxiedMxc(
+            item.content.source,
+            item.content.filename,
+            item.content.width,
+            item.content.height,
+            item.content.size,
+            item.content.mime
+          )
+        : undefined;
     const downloadMedia = async (media: {
       source: string;
       filename: string;
@@ -269,6 +282,12 @@ export class MessageActionExecutor {
       onDownload: policy.download
         ? () => {
             if (policy.media) void downloadMedia(policy.media);
+          }
+        : undefined,
+      gifFavorited: gif !== undefined && isFavorite(favoriteGifs(), gif),
+      onFavoriteGif: gif
+        ? () => {
+            toggleFavorite(gif);
           }
         : undefined,
       stealCount: policy.stealCount,

@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 
 import {
   gifFilename,
+  gifFromProxiedMxc,
   gifProvider,
   gifProviders,
   gifSearchAvailable,
@@ -170,4 +171,26 @@ test('a filename gets the extension the proxy will actually serve', () => {
   expect(gifFilename('a cat.gif', 'image/gif')).toBe('a-cat.gif');
   expect(gifFilename('a cat', 'image/webp')).toBe('a-cat.webp');
   expect(gifFilename('  ', 'image/gif')).toBe('gif.gif');
+});
+
+test('a proxied mxc round-trips to the provider url it was made from', () => {
+  const tenor = gif();
+  const giphy = gif({ id: 'giphy-id', mediaUrl: 'https://i.giphy.com/media/giphy-id/giphy.gif' });
+
+  for (const original of [tenor, giphy]) {
+    const mxc = proxiedGif(original, 'gifs.example')?.mxcUrl ?? '';
+    const back = gifFromProxiedMxc(mxc, 'cat.gif', 4, 3, 10, 'image/gif');
+
+    expect(back && proxiedGif(back, 'gifs.example')?.mxcUrl).toBe(mxc);
+    expect(back?.title).toBe('cat');
+  }
+});
+
+test('an mxc that is not a proxied provider gif is not a favorite candidate', () => {
+  expect(gifFromProxiedMxc('mxc://example.org/abc', 'a.gif', null, null, null, null)).toBe(
+    undefined
+  );
+  expect(gifFromProxiedMxc('mxc://gifs.example/tenor_!!!', 'a.gif', null, null, null, null)).toBe(
+    undefined
+  );
 });

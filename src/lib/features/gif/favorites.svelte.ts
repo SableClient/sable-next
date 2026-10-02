@@ -1,7 +1,7 @@
 import { isRecord } from '#lib/guards.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
 
-import { isAllowedGifMediaUrl, type GifResult } from './providers';
+import { isAllowedGifMediaUrl, proxiedGif, type GifResult } from './providers';
 
 const storageKey = 'sable.composer.favoriteGifs';
 const recentKey = 'sable.composer.recentGifs';
@@ -52,8 +52,14 @@ export function favoriteGifs(): GifResult[] {
   return state.gifs;
 }
 
+function sameGif(a: GifResult, b: GifResult): boolean {
+  if (a.mediaUrl === b.mediaUrl) return true;
+  const key = proxiedGif(a, 'identity')?.mxcUrl;
+  return key !== undefined && key === proxiedGif(b, 'identity')?.mxcUrl;
+}
+
 export function isFavorite(gifs: readonly GifResult[], gif: GifResult): boolean {
-  return gifs.some((entry) => entry.mediaUrl === gif.mediaUrl);
+  return gifs.some((entry) => sameGif(entry, gif));
 }
 
 export function recentGifs(): GifResult[] {
@@ -74,7 +80,7 @@ function writeRecent(gifs: readonly GifResult[]): void {
 }
 
 export function toggleFavorite(gif: GifResult): void {
-  const without = state.gifs.filter((entry) => entry.mediaUrl !== gif.mediaUrl);
+  const without = state.gifs.filter((entry) => !sameGif(entry, gif));
   write(without.length === state.gifs.length ? [gif, ...without] : without);
 }
 
