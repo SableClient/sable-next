@@ -224,7 +224,7 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
 
         LatestEventValue::Remote(event) => Some(LatestEventView {
             sender: event.sender(),
-            body: remote_preview(&event)?,
+            body: remote_preview(&event).unwrap_or_default(),
             timestamp: event.timestamp().map(|at| at.0.into()),
             sending: false,
             event_id: event.event_id().map(ToOwned::to_owned),
@@ -244,7 +244,7 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
         LatestEventValue::LocalIsSending(local) | LatestEventValue::LocalCannotBeSent(local) => {
             Some(LatestEventView {
                 sender: None,
-                body: local_preview(&local)?,
+                body: local_preview(&local).unwrap_or_default(),
                 timestamp: Some(local.timestamp.0.into()),
                 sending: true,
                 event_id: None,
@@ -253,7 +253,7 @@ fn latest_event(item: &RoomListItem) -> Option<LatestEventView> {
 
         LatestEventValue::LocalHasBeenSent { value, event_id } => Some(LatestEventView {
             sender: None,
-            body: local_preview(&value)?,
+            body: local_preview(&value).unwrap_or_default(),
             timestamp: Some(value.timestamp.0.into()),
             sending: false,
             event_id: Some(event_id),
