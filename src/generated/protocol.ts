@@ -21,7 +21,7 @@ export type AudioMetadataView = {
 	title: string | null,
 	artist: string | null,
 	album: string | null,
-	cover_art: string | null,
+	cover_art_blurhash: string | null,
 };
 
 export type AuthIntent = "login" | "register";

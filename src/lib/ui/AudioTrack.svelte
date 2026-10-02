@@ -15,7 +15,7 @@
   const COVER_SIZE = 32;
 
   let cover = $derived(
-    metadata.cover_art ? blurhashDataUrl(metadata.cover_art, COVER_SIZE, COVER_SIZE) : null
+    metadata.cover_art_blurhash ? blurhashDataUrl(metadata.cover_art_blurhash, COVER_SIZE, COVER_SIZE) : null
   );
   let byline = $derived([metadata.artist, metadata.album].filter(Boolean).join(' · '));
 </script>

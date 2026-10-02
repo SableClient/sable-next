@@ -1607,12 +1607,12 @@ pub(crate) fn audio_metadata(content: Option<&serde_json::Value>) -> Option<Audi
         title: text("title", AUDIO_METADATA_MAX_CHARS),
         artist: text("artist", AUDIO_METADATA_MAX_CHARS),
         album: text("album", AUDIO_METADATA_MAX_CHARS),
-        cover_art: text("cover_art", BLURHASH_MAX_CHARS),
+        cover_art_blurhash: text("cover_art_blurhash", BLURHASH_MAX_CHARS),
     };
     (view.title.is_some()
         || view.artist.is_some()
         || view.album.is_some()
-        || view.cover_art.is_some())
+        || view.cover_art_blurhash.is_some())
     .then_some(view)
 }
 
@@ -2397,7 +2397,7 @@ mod tests {
         let unstable = audio_metadata(Some(&json!({"info": {
             "org.matrix.msc4549.audio_metadata": {
                 "title": " Moonwalker ", "artist": "Jake Chudnow", "album": "",
-                "cover_art": "LBEpAr~VM{x[004:oyM|9GM|xtIU"
+                "cover_art_blurhash": "LBEpAr~VM{x[004:oyM|9GM|xtIU"
             }
         }})))
         .expect("metadata");
@@ -2405,7 +2405,7 @@ mod tests {
         assert_eq!(unstable.artist.as_deref(), Some("Jake Chudnow"));
         assert_eq!(unstable.album, None);
         assert_eq!(
-            unstable.cover_art.as_deref(),
+            unstable.cover_art_blurhash.as_deref(),
             Some("LBEpAr~VM{x[004:oyM|9GM|xtIU")
         );
 

@@ -58,13 +58,13 @@ export async function readAudioTags(file: Blob): Promise<AudioMetadataView | nul
     const { parseBlob } = await import('music-metadata');
     const { common } = await parseBlob(file);
     const picture = common.picture?.[0];
-    const cover_art = picture ? await coverBlurhash(picture.data, picture.format) : null;
+    const cover_art_blurhash = picture ? await coverBlurhash(picture.data, picture.format) : null;
     const text = (value: string | undefined) => value?.trim() || null;
     const tags = {
       title: text(common.title),
       artist: text(common.artist),
       album: text(common.album),
-      cover_art,
+      cover_art_blurhash,
     };
     return Object.values(tags).some((value) => value !== null) ? tags : null;
   } catch (error) {

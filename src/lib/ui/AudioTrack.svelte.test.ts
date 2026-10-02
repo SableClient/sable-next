@@ -7,7 +7,7 @@ import AudioTrack from './AudioTrack.svelte';
 
 test('shows the track title, then artist and album', () => {
   const { container } = render(AudioTrack, {
-    metadata: { title: 'Moonwalker', artist: 'Jake Chudnow', album: 'The Moon', cover_art: null },
+    metadata: { title: 'Moonwalker', artist: 'Jake Chudnow', album: 'The Moon', cover_art_blurhash: null },
     fallbackTitle: 'Moonwalker.flac',
   });
 
@@ -18,7 +18,7 @@ test('shows the track title, then artist and album', () => {
 
 test('falls back to the file name when the track has no title', () => {
   render(AudioTrack, {
-    metadata: { title: null, artist: 'Jake Chudnow', album: null, cover_art: null },
+    metadata: { title: null, artist: 'Jake Chudnow', album: null, cover_art_blurhash: null },
     fallbackTitle: 'Moonwalker.flac',
   });
 

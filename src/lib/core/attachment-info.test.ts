@@ -223,7 +223,7 @@ test('reads the title, artist and album tags of a music file', async () => {
     title: 'Moonwalker',
     artist: 'Jake Chudnow',
     album: 'The Moon',
-    cover_art: null,
+    cover_art_blurhash: null,
   });
   expect(
     await readAudioTags(new File([new Uint8Array(8)], 'x.mp3', { type: 'audio/mpeg' }))

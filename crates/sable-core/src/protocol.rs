@@ -4122,7 +4122,7 @@ pub struct AudioMetadataView {
     pub title: Option<String>,
     pub artist: Option<String>,
     pub album: Option<String>,
-    pub cover_art: Option<String>,
+    pub cover_art_blurhash: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
