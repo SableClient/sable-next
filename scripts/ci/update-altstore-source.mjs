@@ -11,6 +11,11 @@ if (!sourcePath || !version || !build || !sizeStr || !downloadURL || !date || !d
   process.exit(1);
 }
 
+if (!downloadURL.endsWith('.ipa')) {
+  console.error(`downloadURL must point to an IPA (got: ${downloadURL})`);
+  process.exit(1);
+}
+
 const size = Number(sizeStr);
 if (!Number.isInteger(size) || size <= 0) {
   console.error(`ipa-size must be a positive integer (got: ${sizeStr})`);
@@ -63,6 +68,8 @@ const existing = versions.findIndex((candidate) => candidate.version === normali
 if (existing >= 0) versions[existing] = entry;
 else versions.unshift(entry);
 
-app.versions = versions.slice(0, maxVersions);
+app.versions = versions
+  .filter((candidate) => candidate.downloadURL?.endsWith('.ipa'))
+  .slice(0, maxVersions);
 writeFileSync(sourcePath, `${JSON.stringify(source, null, 2)}\n`);
 console.log(`Updated ${sourcePath}: ${app.bundleIdentifier} ${normalized} -> ${downloadURL}`);

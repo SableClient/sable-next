@@ -226,7 +226,6 @@ jobs:
       id-token: write
       attestations: write
     outputs:
-      ipa_name: ${{ steps.ipa.outputs.name }}
       ipa_size: ${{ steps.ipa.outputs.size }}
       ipa_version: ${{ steps.ipa.outputs.version }}
       ipa_build: ${{ steps.ipa.outputs.build }}
@@ -301,7 +300,6 @@ jobs:
 
           {
             echo "path=$target"
-            echo "name=$(basename "$target")"
             echo "size=$(stat -f%z "$target")"
             echo "version=$short_version"
             echo "build=$bundle_version"
@@ -668,7 +666,6 @@ jobs:
     env:
       TAG: ${{ needs.setup-release.outputs.tag }}
       VERSION: ${{ needs.setup-release.outputs.version }}
-      IPA_NAME: ${{ needs.ios.outputs.ipa_name }}
       IPA_SIZE: ${{ needs.ios.outputs.ipa_size }}
       IPA_VERSION: ${{ needs.ios.outputs.ipa_version }}
       IPA_BUILD: ${{ needs.ios.outputs.ipa_build }}
@@ -682,7 +679,7 @@ jobs:
         run: |
           jq -n \
             --arg version "$VERSION" \
-            --arg name "$IPA_NAME" \
+            --arg name "sable-next-${VERSION}-ios-arm64.ipa" \
             --arg size "$IPA_SIZE" \
             --arg ipa_version "$IPA_VERSION" \
             --arg build "$IPA_BUILD" \
