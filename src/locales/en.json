@@ -2546,6 +2546,7 @@
     "storageInterrupted": "Sable's local storage was interrupted. Reload to reconnect.",
     "coreUnresponsive": "Sable is not responding.",
     "syncFailed": "Sync failed: {{message}}",
+    "offline": "You are offline. Reconnecting…",
     "localNetworkBlocked": "Your browser is blocking Sable from reaching {{host}} on your local network. Allow local network access for this site in the browser's site settings. In Firefox, add {{host}} to network.lna.skip-domains in about:config.",
     "actionFailed": "Could not complete that action. Try again.",
     "copyFailed": "Could not copy the link.",

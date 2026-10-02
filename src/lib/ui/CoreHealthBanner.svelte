@@ -5,6 +5,17 @@
 
   const core = useCoreClient();
 
+  let offlineSettled = $state(false);
+
+  $effect(() => {
+    if (core.sync?.state !== 'offline') {
+      offlineSettled = false;
+      return;
+    }
+    const timer = setTimeout(() => (offlineSettled = true), 3000);
+    return () => clearTimeout(timer);
+  });
+
   const notice = $derived.by(() => {
     if (core.crashed !== null) {
       return { kind: 'crash' as const, text: $i18n.t('errors.coreCrashed') };
@@ -26,6 +37,9 @@
         kind: 'warn' as const,
         text: $i18n.t('errors.syncFailed', { message: core.sync.message }),
       };
+    }
+    if (offlineSettled) {
+      return { kind: 'warn' as const, text: $i18n.t('errors.offline') };
     }
     return null;
   });
