@@ -960,6 +960,10 @@
     opacity: 0.75;
   }
 
+  .chip.unresolved .chip-operator {
+    opacity: 1;
+  }
+
   .chip-value {
     overflow: hidden;
     text-overflow: ellipsis;
