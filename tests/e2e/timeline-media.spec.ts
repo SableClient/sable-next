@@ -797,3 +797,49 @@ test('a picture that will not decode falls back to the original once, then stops
   await expect.poll(() => core.commands()).toContain('forget_media');
   await expect.poll(async () => (await core.mediaFetches()).length).toBeGreaterThan(fetches.length);
 });
+
+test('square article previews use thumbnails while landscape previews stay large', async ({
+  page,
+  app,
+  core,
+  timeline,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await app.openRoom('!room:example.test');
+  await timeline.expectRevealed();
+  const subscription = await core.subscription();
+  const row = page.locator('[data-item-id="general-19"]');
+  for (const [width, height, thumbnail] of [
+    [400, 400, true],
+    [300, 600, true],
+    [1200, 630, false],
+  ] as const) {
+    await core.setTimelineItemById(subscription, 'general-19', {
+      ...timelineItem('general-19', 'https://example.test/article'),
+      bundled_link_previews: [
+        {
+          url: 'https://example.test/article',
+          title: 'Article title',
+          description: 'Article description',
+          site_name: 'Example',
+          image: 'mxc://example.test/preview',
+          image_mime: 'image/png',
+          image_width: width,
+          image_height: height,
+        },
+      ],
+    });
+    const image = row.locator('.link-preview-image');
+    await expect(image).toBeVisible();
+    const box = await image.boundingBox();
+    if (!box) throw new Error('Preview image is not laid out');
+    if (thumbnail) {
+      expect(box.width).toBeLessThanOrEqual(80);
+      expect(box.height).toBeLessThanOrEqual(80);
+    } else {
+      expect(box.width).toBeGreaterThan(200);
+    }
+    await expect(row.getByRole('link', { name: 'Article title' })).toBeVisible();
+  }
+});

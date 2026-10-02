@@ -45,6 +45,12 @@
   });
 
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
+  let compactImage = $derived(
+    preview?.image_width != null &&
+      preview.image_height != null &&
+      preview.image_width > 0 &&
+      preview.image_width <= preview.image_height
+  );
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
   const openMediaViewer = hasMediaViewerOpener() ? useMediaViewerOpener() : null;
@@ -93,14 +99,14 @@
     onclick={openMediaViewer ? openPreviewImage : undefined}
   />
 {:else if preview}
-  <div class="link-preview">
+  <div class="link-preview" class:compact={compactImage}>
     {#if preview.image && !mediaHidden}
       <MediaImage
         class="link-preview-image"
         source={preview.image}
         alt=""
-        width={400}
-        height={225}
+        width={compactImage ? 80 : 400}
+        height={compactImage ? 80 : 225}
         intrinsicWidth={preview.image_width}
         intrinsicHeight={preview.image_height}
         bind:spoilerHidden={imageHidden}
@@ -148,6 +154,17 @@
     border-color: var(--primary-main);
   }
 
+  .link-preview.compact {
+    flex-direction: row-reverse;
+  }
+
+  .compact :global(.link-preview-image) {
+    flex: 0 0 5rem;
+    height: 5rem;
+    margin: var(--space-200);
+    width: 5rem;
+  }
+
   :global(.link-preview-image) {
     display: block;
     width: 100%;
@@ -160,6 +177,11 @@
     gap: var(--space-100);
     padding: var(--space-200) var(--space-250);
     text-decoration: none;
+  }
+
+  .compact .link-preview-text {
+    flex: 1;
+    min-width: 0;
   }
 
   .link-preview-site {
