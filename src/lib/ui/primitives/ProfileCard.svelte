@@ -458,7 +458,6 @@
     border: var(--border-width) solid var(--profile-line);
     border-radius: var(--radius);
     color: var(--surface-var-on-container);
-    flex-shrink: 1;
     font-size: var(--font-size-label);
     line-height: var(--line-height-small);
     margin-left: var(--space-100);
