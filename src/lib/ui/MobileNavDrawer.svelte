@@ -143,6 +143,7 @@
 
   function handleTouchStart(event: TouchEvent) {
     cancelSettling();
+    if (appLayout.matches) return;
     const target = event.currentTarget;
     if (!(target instanceof HTMLDivElement)) return;
 
