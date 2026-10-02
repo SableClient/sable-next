@@ -473,3 +473,51 @@ for (const threadPresentation of ['timeline', 'panel']) {
     await expect(page.locator('.members-drawer')).toBeVisible();
   });
 }
+
+for (const threadPresentation of ['timeline', 'panel']) {
+  test(`threads load older messages without pagination errors (${threadPresentation})`, async ({
+    page,
+    app,
+    core,
+    timeline,
+    installRoomCore,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.addInitScript((threadPresentation) => {
+      localStorage.setItem('sable-preferences', JSON.stringify({ threadPresentation }));
+    }, threadPresentation);
+    await installRoomCore('ready');
+    await app.openRoom('!room:example.test');
+    await timeline.expectRevealed();
+    const subscription = await core.subscription();
+    await core.setTimelineItemById(subscription, 'general-19', {
+      ...timelineItem('general-19', 'Thread root'),
+      thread_summary: {
+        num_replies: 3,
+        latest_body: 'Reply',
+        latest_sender: '@alice:example.test',
+      },
+    });
+    await page.locator('[data-item-id="general-19"] .thread-summary').click();
+    const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
+    await expect(thread).toBeVisible();
+    const threadSubscription = await core.subscription(1);
+    await thread.locator('.viewport').hover();
+    await page.mouse.wheel(0, -1000);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          (subscription) =>
+            window.__e2eCommandPayloads
+              .filter(
+                (command) => command.type === 'paginate' && command.subscription === subscription
+              )
+              .map((command) => (command.type === 'paginate' ? command.direction : null)),
+          threadSubscription
+        )
+      )
+      .toContain('backward');
+    expect(await page.evaluate(() => window.__e2ePaginationDirections)).not.toContain('forward');
+    await expect(thread.getByText(en.timeline.loadFailed)).toHaveCount(0);
+  });
+}

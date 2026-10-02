@@ -688,14 +688,15 @@ test('clears a failed backward pagination error after a successful retry', async
   expect(timeline.error).toBe(null);
 });
 
-test('paginates a thread timeline forwards', async () => {
+test('a thread starts at its live end and never paginates forwards', async () => {
   const core = new FakeCore();
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   await timeline.startThread('!room:example.org', '$root');
+  expect(timeline.forwardPagination).toBe('end');
 
   await timeline.paginateForward(25);
 
-  expect(core.paginateSubscriptions).toEqual([1]);
+  expect(core.paginateSubscriptions).toEqual([]);
   expect(timeline.forwardPagination).toBe('end');
 });
 

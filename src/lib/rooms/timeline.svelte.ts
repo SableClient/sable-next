@@ -303,6 +303,7 @@ export class RoomTimeline {
       this.stagedAggregations = [];
     }
     this.mode = mode;
+    this.forwardPagination = mode.kind === 'thread' ? 'end' : 'idle';
     this.loading = true;
     this.error = null;
     const promise = this.startSubscription(roomId, mode, hiddenEvents, unread);
@@ -370,7 +371,12 @@ export class RoomTimeline {
 
   async paginateForward(count: number): Promise<boolean> {
     const subscription = this.subscription;
-    if (this.mode.kind === 'live' || subscription === null || this.forwardPagination !== 'idle') {
+    if (
+      this.mode.kind === 'live' ||
+      this.mode.kind === 'thread' ||
+      subscription === null ||
+      this.forwardPagination !== 'idle'
+    ) {
       return true;
     }
 
