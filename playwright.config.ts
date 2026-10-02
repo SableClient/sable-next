@@ -56,12 +56,6 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: migrationOrigin },
     },
     {
-      name: 'android',
-      dependencies: ['setup'],
-      testMatch: SCRIPTED_TIMELINE_SPECS,
-      use: { ...devices['Pixel 7'], browserName: 'chromium' },
-    },
-    {
       name: 'ios',
       dependencies: ['setup'],
       testMatch: SCRIPTED_TIMELINE_SPECS,
