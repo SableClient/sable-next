@@ -486,6 +486,14 @@ export const settingsCategories: SettingsCategory[] = [
         ],
       },
       {
+        key: 'showSpaceEvents',
+        section: 'sidebar',
+        icon: CalendarBlankIcon,
+        name: 'settings.showSpaceEvents',
+        description: 'settings.showSpaceEventsHint',
+        type: 'boolean',
+      },
+      {
         key: 'uniformIcons',
         section: 'sidebar',
         icon: SquaresFourIcon,

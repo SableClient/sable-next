@@ -129,6 +129,7 @@ export interface Preferences {
   showPingCounts: boolean;
   showUnreadDots: boolean;
   uniformIcons: boolean;
+  showSpaceEvents: boolean;
 
   hour24Clock: boolean;
   dateFormat: DateFormat;
@@ -389,6 +390,7 @@ const DEFAULTS: Preferences = {
   showPingCounts: true,
   showUnreadDots: true,
   uniformIcons: false,
+  showSpaceEvents: true,
 
   hour24Clock: false,
   dateFormat: 'auto',

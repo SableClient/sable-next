@@ -51,7 +51,8 @@
     buildEvent,
     monthGrid,
     occursOn,
-    readEntry,
+    readEntries,
+    startOfDay,
     tallyRsvps,
   } from './calendar-events.js';
   import CalendarEventDialog from './CalendarEventDialog.svelte';
@@ -65,11 +66,6 @@
   function startOfMonth(at: number): number {
     const date = new Date(at);
     return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
-  }
-
-  function startOfDay(at: number): number {
-    const date = new Date(at);
-    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   }
 
   function firstWeekday(): number {
@@ -113,12 +109,7 @@
   let reportOpen = $state(false);
   let leaveOpen = $state(false);
 
-  let items = $derived(
-    (view?.entries ?? []).flatMap((entry) => {
-      const item = readEntry(entry);
-      return item ? [item] : [];
-    })
-  );
+  let items = $derived(readEntries(view?.entries ?? []));
   let occurrences = $derived(
     showPast ? agenda(items, now - WINDOW, now).reverse() : agenda(items, now, now + WINDOW)
   );

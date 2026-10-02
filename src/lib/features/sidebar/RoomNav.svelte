@@ -71,6 +71,7 @@
   import { bannerChanges, readRoomBanner } from '#lib/features/room/room-banner.svelte.js';
   import { goToPage, scopedSearchPath } from '#lib/features/room/room-navigation.js';
   import { CALENDAR_ROOM_TYPE } from '#lib/features/calendar/calendar-events.js';
+  import SpaceEvents from '#lib/features/calendar/SpaceEvents.svelte';
 
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
@@ -376,6 +377,12 @@
   $effect(() => {
     publishVisibleRoomOrder(sectionRooms.map((row) => row.roomId));
   });
+  let calendarRooms = $derived(
+    spaceTree
+      .filter((item): item is SpaceTreeRoom => item.kind === 'room')
+      .map((item) => item.room)
+      .filter((room) => room.room_type === CALENDAR_ROOM_TYPE)
+  );
   let subspaces = $derived(spaceRootItems.filter((item) => item.kind !== 'room'));
   let visibleSubspaces = $derived<RoomNavItem[]>(
     flattenSpaceTree(subspaces, {
@@ -1073,6 +1080,10 @@
         {@render action(searchHref, $i18n.t('nav.messageSearch'), MagnifyingGlassIcon)}
       {/if}
     </div>
+
+    {#if !collapsed && activeSpace && preferences.showSpaceEvents && calendarRooms.length > 0}
+      <SpaceEvents spaceId={roomPathParam(activeSpace)} rooms={calendarRooms} {onNavigate} />
+    {/if}
 
     {#if favourites.length > 0}
       {#if !collapsed}

@@ -308,6 +308,18 @@ function occurrences(item: CalendarItem, from: number, to: number): Occurrence[]
   return found;
 }
 
+export function readEntries(entries: readonly CalendarEntryView[]): CalendarItem[] {
+  return entries.flatMap((entry) => {
+    const item = readEntry(entry);
+    return item ? [item] : [];
+  });
+}
+
+export function startOfDay(at: number, daysAhead = 0): number {
+  const date = new Date(at);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + daysAhead).getTime();
+}
+
 export function agenda(items: readonly CalendarItem[], from: number, to: number): Occurrence[] {
   return items
     .flatMap((item) => occurrences(item, from, to))
