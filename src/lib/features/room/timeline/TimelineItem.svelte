@@ -1125,7 +1125,6 @@
     display: flex;
     gap: var(--timeline-row-gap);
     margin-inline: calc(-1 * var(--page-gutter));
-    margin-inline: calc(-1 * var(--page-gutter));
     overflow-wrap: anywhere;
     padding: var(--timeline-row-padding) var(--page-gutter);
     position: relative;
@@ -1851,6 +1850,7 @@
   .message:not(.layout-bubble.own.align-own)
     .message-main:has(> .receipt-tail)
     > :global(.reactions):nth-last-child(2) {
+    flex-basis: calc(100% - var(--receipt-reserve) - var(--space-200));
     max-width: calc(100% - var(--receipt-reserve) - var(--space-200));
   }
 
