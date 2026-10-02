@@ -99,7 +99,7 @@
 
 .nav-tab-bottom::before {
   border-radius: var(--radii-300) var(--radii-300) 0 0;
-  bottom: -14.5px;
+  bottom: -16.5px;
   height: 6px;
   transform: scaleY(1);
   transform-origin: center bottom;
