@@ -31,7 +31,7 @@ test('sends a message with the send button', async ({ app, timeline, scratchRoom
   await expect(app.roomHeading(scratchRoom.name)).toBeVisible();
 
   const body = `Composed with the button ${String(Date.now())}`;
-  await expect(app.sendMessage).toHaveCount(0);
+  await expect(app.sendMessage).toBeDisabled();
   await app.composer.fill(body);
   await expect(app.sendMessage).toBeEnabled();
   await app.sendMessage.click();
@@ -72,6 +72,6 @@ test('does not send an empty message', async ({ app, timeline, scratchRoom, sign
 
   await app.composer.press('Enter');
 
-  await expect(app.sendMessage).toHaveCount(0);
+  await expect(app.sendMessage).toBeDisabled();
   await expect(timeline.items.last()).toHaveText(newest);
 });

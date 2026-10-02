@@ -72,10 +72,14 @@ test('mobile: an expanded status stays inside the card and above its controls', 
   await expect.poll(() => status.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
 });
 
-test('mobile: opening a chat from the profile sheet lands on the direct message', async ({
-  page,
-}) => {
-  await page.getByRole('dialog').getByRole('button', { name: 'Open chat' }).click();
-  await expect(page).toHaveURL(/\/direct\/!dm%3Aexample\.test$/);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+test.describe('on a phone', () => {
+  test.use({ hasTouch: true, viewport: { width: 412, height: 915 } });
+
+  test('mobile: opening a chat from the profile sheet lands on the direct message', async ({
+    page,
+  }) => {
+    await page.getByRole('dialog').getByRole('button', { name: 'Open chat' }).click();
+    await expect(page).toHaveURL(/\/direct\/!dm%3Aexample\.test$/);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
 });

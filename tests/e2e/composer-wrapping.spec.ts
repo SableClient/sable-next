@@ -13,7 +13,7 @@ test('formatting uses the footer space on desktop and mobile', async ({
   await page.addInitScript(() => {
     localStorage.setItem('sable-preferences', JSON.stringify({ richTextComposer: true }));
   });
-  if (!isMobile) await page.setViewportSize({ width: 1440, height: 900 });
+  if (!isMobile) await page.setViewportSize({ width: 1920, height: 1080 });
   await installRoomCore('ready');
   await app.openRoom('!room:example.test');
   await app.composer.fill('draft words');
