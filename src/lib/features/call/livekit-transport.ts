@@ -35,6 +35,7 @@ import type {
 import { idleTransportState, ignoreError, ScreenAudioError } from './call-transport';
 import { MatrixKeyProvider } from './key-provider';
 import { createMicrophoneFilter, supportsVoiceFilter } from './voice-filter';
+import { videoPublishOptions, videoResolution } from './video-quality';
 import type { CallTelemetry } from './call-telemetry';
 
 const qualityOf = (quality: ConnectionQuality): CallConnectionQuality => {
@@ -120,6 +121,26 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   const worker = keyProvider ? (options.createWorker ?? defaultWorker)() : undefined;
   const voiceIsolation = preferences.noiseSuppression && preferences.voiceIsolation;
   const filterMicrophone = voiceIsolation && supportsVoiceFilter();
+  const cameraCapture = {
+    ...(preferences.videoInputDevice ? { deviceId: preferences.videoInputDevice } : {}),
+    ...(preferences.callCameraResolution !== 'auto'
+      ? { resolution: videoResolution(preferences.callCameraResolution) }
+      : {}),
+  };
+  const cameraPublish = videoPublishOptions(
+    'camera',
+    preferences.callCameraBitrate,
+    preferences.callCameraCodec
+  );
+  const screenCapture: ScreenShareCaptureOptions =
+    preferences.callScreenResolution === 'auto'
+      ? {}
+      : { resolution: videoResolution(preferences.callScreenResolution) };
+  const screenPublish = videoPublishOptions(
+    'screen',
+    preferences.callScreenBitrate,
+    preferences.callScreenCodec
+  );
 
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({
     adaptiveStream: true,
@@ -131,9 +152,7 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
       ...(voiceIsolation && !filterMicrophone ? { voiceIsolation: true } : {}),
       ...(preferences.audioInputDevice ? { deviceId: preferences.audioInputDevice } : {}),
     },
-    ...(preferences.videoInputDevice
-      ? { videoCaptureDefaults: { deviceId: preferences.videoInputDevice } }
-      : {}),
+    videoCaptureDefaults: cameraCapture,
     ...(preferences.audioOutputDevice
       ? { audioOutput: { deviceId: preferences.audioOutputDevice } }
       : {}),
@@ -420,7 +439,11 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
           room.localParticipant.setMicrophoneEnabled(connectOptions.microphoneEnabled)
         );
         await publishTrack('call.camera.set', () =>
-          room.localParticipant.setCameraEnabled(connectOptions.cameraEnabled)
+          room.localParticipant.setCameraEnabled(
+            connectOptions.cameraEnabled,
+            cameraCapture,
+            cameraPublish
+          )
         );
       }
 
@@ -548,7 +571,9 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
     },
     setCameraEnabled: async (enabled) => {
       if (disposed || options.publishMedia === false) return;
-      await step('call.camera.set', () => room.localParticipant.setCameraEnabled(enabled));
+      await step('call.camera.set', () =>
+        room.localParticipant.setCameraEnabled(enabled, cameraCapture, cameraPublish)
+      );
       syncLocal();
     },
     setEncryptionKey: (key: CallEncryptionKey) =>
@@ -568,14 +593,21 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
           if (enabled && source?.kind === 'hdr') {
             await step('call.screen_share.hdr', async () => {
               const track = new LocalVideoTrack(
-                await startHdrShare(source.monitor, () => {
-                  void stopHdrScreen().then(stopSharingAudio).then(syncLocal);
-                }),
+                await startHdrShare(
+                  source.monitor,
+                  () => {
+                    void stopHdrScreen().then(stopSharingAudio).then(syncLocal);
+                  },
+                  screenCapture.resolution
+                ),
                 undefined,
                 true
               );
               hdrScreen = track;
-              await room.localParticipant.publishTrack(track, { source: Track.Source.ScreenShare });
+              await room.localParticipant.publishTrack(track, {
+                ...screenPublish,
+                source: Track.Source.ScreenShare,
+              });
             });
             const audioShared = await shareAudio(audio);
             syncLocal();
@@ -588,15 +620,15 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
             syncLocal();
             return;
           }
-          await step('call.screen_share.set', () =>
-            enabled && !screenAudioSupported()
-              ? room.localParticipant.setScreenShareEnabled(
-                  true,
-                  DISPLAY_AUDIO_CAPTURE,
-                  SCREEN_AUDIO_PUBLISH
-                )
-              : room.localParticipant.setScreenShareEnabled(enabled)
-          );
+          await step('call.screen_share.set', () => {
+            if (!enabled) return room.localParticipant.setScreenShareEnabled(false);
+            const browserAudio = !screenAudioSupported();
+            return room.localParticipant.setScreenShareEnabled(
+              true,
+              { ...(browserAudio ? DISPLAY_AUDIO_CAPTURE : {}), ...screenCapture },
+              { ...(browserAudio ? SCREEN_AUDIO_PUBLISH : {}), ...screenPublish }
+            );
+          });
           const audioShared =
             enabled && room.localParticipant.isScreenShareEnabled ? await shareAudio(audio) : true;
           if (!enabled) await stopSharingAudio();

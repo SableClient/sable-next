@@ -64,13 +64,31 @@ export async function listHdrMonitors(): Promise<HdrMonitor[]> {
 
 let active: { stop: () => Promise<void> } | null = null;
 
-function frameFrom(data: ArrayBuffer, offset: number, width: number, height: number): VideoFrame {
-  return new VideoFrame(new Uint8Array(data, offset, width * height * 4), {
-    format: 'BGRX',
-    codedWidth: width,
-    codedHeight: height,
-    timestamp: Math.round(performance.now() * 1000),
-  });
+function frameReader(resolution?: { width: number; height: number }) {
+  const canvas = resolution ? new OffscreenCanvas(1, 1) : undefined;
+  const context = canvas?.getContext('2d');
+  return (data: ArrayBuffer, offset: number, width: number, height: number): VideoFrame => {
+    const timestamp = Math.round(performance.now() * 1000);
+    const frame = new VideoFrame(new Uint8Array(data, offset, width * height * 4), {
+      format: 'BGRX',
+      codedWidth: width,
+      codedHeight: height,
+      timestamp,
+    });
+    if (!resolution || !canvas || !context) return frame;
+    const scale = Math.min(1, resolution.width / width, resolution.height / height);
+    if (scale === 1) return frame;
+    const scaledWidth = Math.max(2, Math.floor((width * scale) / 2) * 2);
+    const scaledHeight = Math.max(2, Math.floor((height * scale) / 2) * 2);
+    if (canvas.width !== scaledWidth) canvas.width = scaledWidth;
+    if (canvas.height !== scaledHeight) canvas.height = scaledHeight;
+    try {
+      context.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      return new VideoFrame(canvas, { timestamp });
+    } finally {
+      frame.close();
+    }
+  };
 }
 
 function writeFrame(writer: WritableStreamDefaultWriter<VideoFrame>, frame: VideoFrame): void {
@@ -83,22 +101,25 @@ function writeFrame(writer: WritableStreamDefaultWriter<VideoFrame>, frame: Vide
     returns it as a video track the page can publish like any screen share. */
 export async function startHdrShare(
   index: number,
-  onEnded: () => void = () => undefined
+  onEnded: () => void = () => undefined,
+  resolution?: { width: number; height: number }
 ): Promise<MediaStreamTrack> {
   await stopHdrShare();
   const Generator = generatorConstructor();
   if (!Generator) throw new Error('hdr share unsupported');
   return osType() === 'linux'
-    ? startPortalShare(Generator, onEnded)
-    : startWindowsShare(Generator, index);
+    ? startPortalShare(Generator, onEnded, resolution)
+    : startWindowsShare(Generator, index, resolution);
 }
 
 async function startPortalShare(
   Generator: GeneratorConstructor,
-  onEnded: () => void
+  onEnded: () => void,
+  resolution?: { width: number; height: number }
 ): Promise<MediaStreamTrack> {
   const generator = new Generator({ kind: 'video' });
   const writer = generator.writable.getWriter();
+  const frameFrom = frameReader(resolution);
   const frames = new Channel<ArrayBuffer>();
   const stop = async (): Promise<void> => {
     frames.onmessage = () => undefined;
@@ -132,7 +153,8 @@ async function startPortalShare(
 
 async function startWindowsShare(
   Generator: GeneratorConstructor,
-  index: number
+  index: number,
+  resolution?: { width: number; height: number }
 ): Promise<MediaStreamTrack> {
   const webview = bridge();
   if (!webview) throw new Error('hdr share unsupported');
@@ -152,6 +174,7 @@ async function startWindowsShare(
 
   const generator = new Generator({ kind: 'video' });
   const writer = generator.writable.getWriter();
+  const frameFrom = frameReader(resolution);
   const unlisten: UnlistenFn = await listen<SlotData>('hdr-frame', ({ payload }) => {
     const buffer = buffers.get(payload.slot);
     try {

@@ -73,6 +73,9 @@ import { syncTelemetryConsent } from '#lib/platform/telemetry.js';
 import { supportsDesktopWindow, supportsTray } from '#lib/platform/window-decorations.js';
 
 import {
+  CALL_VIDEO_BITRATES,
+  CALL_VIDEO_CODECS,
+  CALL_VIDEO_RESOLUTIONS,
   SEARCH_BASE_EVENTS,
   SEARCH_BATCH_SIZES,
   SEARCH_CRAWL_PAUSES,
@@ -101,6 +104,22 @@ export interface SettingOption {
   label: string;
   literal?: true;
 }
+
+const callResolutionOptions: SettingOption[] = CALL_VIDEO_RESOLUTIONS.map((value) =>
+  value === 'auto'
+    ? { value, label: 'settings.callVideoAutomatic' }
+    : { value, label: `${value}p`, literal: true }
+);
+const callBitrateOptions: SettingOption[] = CALL_VIDEO_BITRATES.map((value) =>
+  value === 'auto'
+    ? { value, label: 'settings.callVideoAutomatic' }
+    : { value, label: `${value} kbps`, literal: true }
+);
+const callCodecOptions: SettingOption[] = CALL_VIDEO_CODECS.map((value) =>
+  value === 'auto'
+    ? { value, label: 'settings.callVideoAutomatic' }
+    : { value, label: value === 'h264' ? 'H.264' : value.toUpperCase(), literal: true }
+);
 
 interface BaseSetting {
   name: string;
@@ -1319,11 +1338,72 @@ export const settingsCategories: SettingsCategory[] = [
     sections: [
       { id: 'call-devices', name: 'settings.callDevicesTitle' },
       { id: 'microphone', name: 'settings.groups.microphone' },
+      { id: 'call-camera', name: 'settings.callCameraQuality' },
       { id: 'ringing', name: 'settings.groups.ringing' },
       { id: 'call-button', name: 'settings.groups.callButton' },
       { id: 'call-screens', name: 'settings.groups.callScreens' },
     ],
     items: [
+      {
+        key: 'callCameraResolution',
+        section: 'call-camera',
+        icon: MonitorIcon,
+        name: 'settings.callCameraResolution',
+        description: 'settings.callVideoResolutionHint',
+        type: 'select',
+        options: callResolutionOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callCameraBitrate',
+        section: 'call-camera',
+        icon: MonitorIcon,
+        name: 'settings.callCameraBitrate',
+        description: 'settings.callVideoBitrateHint',
+        type: 'select',
+        options: callBitrateOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callCameraCodec',
+        section: 'call-camera',
+        icon: MonitorIcon,
+        name: 'settings.callCameraCodec',
+        description: 'settings.callVideoCodecHint',
+        type: 'select',
+        options: callCodecOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callScreenResolution',
+        section: 'call-screens',
+        icon: MonitorIcon,
+        name: 'settings.callScreenResolution',
+        description: 'settings.callVideoResolutionHint',
+        type: 'select',
+        options: callResolutionOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callScreenBitrate',
+        section: 'call-screens',
+        icon: MonitorIcon,
+        name: 'settings.callScreenBitrate',
+        description: 'settings.callVideoBitrateHint',
+        type: 'select',
+        options: callBitrateOptions,
+        supported: () => !hasNativeCalls(),
+      },
+      {
+        key: 'callScreenCodec',
+        section: 'call-screens',
+        icon: MonitorIcon,
+        name: 'settings.callScreenCodec',
+        description: 'settings.callVideoCodecHint',
+        type: 'select',
+        options: callCodecOptions,
+        supported: () => !hasNativeCalls(),
+      },
       {
         key: 'noiseSuppression',
         section: 'microphone',

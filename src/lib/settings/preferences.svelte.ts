@@ -55,6 +55,29 @@ export type ReplyPreviewStyle = 'connected' | 'compact' | 'expanded';
 export type CaptionPosition = 'above' | 'below' | 'inline' | 'hidden';
 export type UsernameClick = 'mention' | 'profile';
 export type CallRingtoneVolume = 'quiet' | 'normal' | 'loud';
+export const CALL_VIDEO_RESOLUTIONS = [
+  'auto',
+  '360',
+  '480',
+  '720',
+  '1080',
+  '1440',
+  '2160',
+] as const;
+export const CALL_VIDEO_BITRATES = [
+  'auto',
+  '250',
+  '500',
+  '1000',
+  '2000',
+  '4000',
+  '8000',
+  '16000',
+] as const;
+export const CALL_VIDEO_CODECS = ['auto', 'vp8', 'h264', 'vp9', 'av1'] as const;
+export type CallVideoResolution = (typeof CALL_VIDEO_RESOLUTIONS)[number];
+export type CallVideoBitrate = (typeof CALL_VIDEO_BITRATES)[number];
+export type CallVideoCodec = (typeof CALL_VIDEO_CODECS)[number];
 export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
@@ -197,6 +220,12 @@ export interface Preferences {
   audioInputDevice: string;
   audioOutputDevice: string;
   videoInputDevice: string;
+  callCameraResolution: CallVideoResolution;
+  callCameraBitrate: CallVideoBitrate;
+  callCameraCodec: CallVideoCodec;
+  callScreenResolution: CallVideoResolution;
+  callScreenBitrate: CallVideoBitrate;
+  callScreenCodec: CallVideoCodec;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -276,6 +305,12 @@ const ENUMS = {
   captionPosition: ['above', 'below', 'inline', 'hidden'],
   usernameClick: ['mention', 'profile'],
   callRingtoneVolume: ['quiet', 'normal', 'loud'],
+  callCameraResolution: CALL_VIDEO_RESOLUTIONS,
+  callCameraBitrate: CALL_VIDEO_BITRATES,
+  callCameraCodec: CALL_VIDEO_CODECS,
+  callScreenResolution: CALL_VIDEO_RESOLUTIONS,
+  callScreenBitrate: CALL_VIDEO_BITRATES,
+  callScreenCodec: CALL_VIDEO_CODECS,
   badgeDefaultDirect: ['all', 'mentions'],
   badgeDefaultGroup: ['all', 'mentions'],
   memberSort: ['name-asc', 'name-desc', 'newest', 'oldest'],
@@ -442,6 +477,12 @@ const DEFAULTS: Preferences = {
   audioInputDevice: '',
   audioOutputDevice: '',
   videoInputDevice: '',
+  callCameraResolution: 'auto',
+  callCameraBitrate: 'auto',
+  callCameraCodec: 'auto',
+  callScreenResolution: 'auto',
+  callScreenBitrate: 'auto',
+  callScreenCodec: 'auto',
 
   pushGatewayUrl: '',
   pushVapidKey: '',

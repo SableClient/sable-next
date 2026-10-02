@@ -157,3 +157,65 @@ test('on Linux an empty message means the desktop ended the capture', async () =
   expect(tauri.invoke).not.toHaveBeenCalledWith('hdr_frame_done');
   os.type.mockReturnValue('windows');
 });
+
+test.each(['windows', 'linux'])(
+  'scales %s HDR frames to the selected resolution',
+  async (platform) => {
+    os.type.mockReturnValue(platform);
+    const drawImage = vi.fn();
+    const close = vi.fn();
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        constructor(
+          public width: number,
+          public height: number
+        ) {}
+        getContext() {
+          return { drawImage };
+        }
+      }
+    );
+    vi.stubGlobal(
+      'VideoFrame',
+      class {
+        readonly init: { codedWidth: number; codedHeight: number };
+        constructor(
+          data: { width?: number; height?: number },
+          init: { codedWidth?: number; codedHeight?: number }
+        ) {
+          this.init = {
+            codedWidth: init.codedWidth ?? data.width ?? 0,
+            codedHeight: init.codedHeight ?? data.height ?? 0,
+          };
+        }
+        close = close;
+      }
+    );
+    try {
+      await startHdrShare(0, undefined, { width: 640, height: 360 });
+      const width = 1920;
+      const height = 1200;
+      if (platform === 'linux') {
+        const frame = new ArrayBuffer(8 + width * height * 4);
+        new DataView(frame).setUint32(0, width, true);
+        new DataView(frame).setUint32(4, height, true);
+        portalFrames()(frame);
+      } else {
+        bufferListener?.({
+          additionalData: { sableHdr: { generation: 1, slot: 0, width, height } },
+          getBuffer: () => new ArrayBuffer(width * height * 4),
+        });
+        tauri.listeners.get('hdr-frame')?.({ payload: { generation: 1, slot: 0, width, height } });
+      }
+      await vi.waitFor(() => {
+        expect(written).toHaveLength(1);
+      });
+      expect(written[0]?.init).toEqual({ codedWidth: 576, codedHeight: 360 });
+      expect(drawImage).toHaveBeenCalledOnce();
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      os.type.mockReturnValue('windows');
+    }
+  }
+);
