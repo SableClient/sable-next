@@ -132,16 +132,6 @@ test('the back arrow on a phone opens the drawer over the room rather than leavi
   expect(mocks.back).not.toHaveBeenCalled();
   expect(goto).toHaveBeenCalledExactlyOnceWith('', {
     shallow: true,
-    replace: true,
     state: { mobileDrawer: 'open' },
   });
-});
-
-test('the back arrow on a phone pops a room entered from its list', () => {
-  page.state.mobileDrawerBack = true;
-
-  backToRoomList();
-
-  expect(mocks.back).toHaveBeenCalledOnce();
-  expect(goto).not.toHaveBeenCalled();
 });

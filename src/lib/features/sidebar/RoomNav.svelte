@@ -705,7 +705,7 @@
     {@const name = room ? roomLabel(room) : item.roomId}
     {@const avatarUrl = room ? roomAvatarUrl(room) : null}
     {@const href = roomHref(item)}
-    {@const active = (page.state.mobileRoomPath ?? pathname) === href}
+    {@const active = pathname === href}
     {@const counts = room ? roomList.badgeUnreadFor(room) : NO_UNREAD}
     {@const mentions = counts.highlight}
     {@const unread = counts.unread}
