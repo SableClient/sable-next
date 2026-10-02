@@ -117,6 +117,12 @@
       copied = false;
     }, 2000);
   }
+  function resetStatusScroll(e: { currentTarget: HTMLElement }): void {
+    const text = e.currentTarget.querySelector('.profile-card-status-text');
+    if (text instanceof HTMLElement && !text.matches(':hover, :focus')) {
+      text.scrollTop = 0;
+    }
+  }
 </script>
 
 <section
@@ -208,15 +214,24 @@
     {#if crest}
       <div class="profile-card-crest-content">{@render crest()}</div>
     {:else if status}
-      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-      <p
-        class="profile-card-status explicit-scrollbar"
-        role="region"
-        aria-label={$i18n.t('settings.status')}
-        tabindex="0"
+      <div
+        class="profile-card-status"
+        role="group"
+        onpointerleave={resetStatusScroll}
+        onfocusout={resetStatusScroll}
+        data-ui-before
+        data-ui-after
       >
-        {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
-      </p>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <p
+          class="profile-card-status-text explicit-scrollbar"
+          role="region"
+          aria-label={$i18n.t('settings.status')}
+          tabindex="0"
+        >
+          {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
+        </p>
+      </div>
     {/if}
   </div>
   <div class="profile-card-body">
@@ -366,9 +381,9 @@
   .profile-card-crest {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-300);
+    gap: var(--space-100);
     min-height: calc(var(--profile-avatar-size) / 2);
-    padding: 0 var(--space-400);
+    padding: 0 var(--space-200);
     pointer-events: none;
     position: relative;
   }
@@ -437,8 +452,7 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  /* Rounded like the bio panel, not pill like the action row: this is something
-     the owner wrote, not a control. */
+  /* Keep the bubble in the crest's flow so expansion clears the identity row. */
   .profile-card-status {
     background: var(--profile-panel-ground);
     border: var(--border-width) solid var(--profile-line);
@@ -446,19 +460,66 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-label);
     line-height: var(--line-height-small);
-    margin: 0;
-    max-height: calc(2 * var(--line-height-small) + 2 * var(--space-200) + 2 * var(--border-width));
-    min-width: 0;
-    overflow-wrap: anywhere;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    padding: var(--space-200) var(--space-300);
-    transform: translateY(-50%);
+    margin-left: var(--space-100);
+    margin-top: calc(-1 * var(--space-600));
+    min-width: var(--space-700);
+    padding: var(--space-200) var(--space-200);
+    position: relative;
+    z-index: 1;
   }
 
-  .profile-card-status:focus-visible {
+  .profile-card-status::before {
+    background: inherit;
+    border: var(--border-width) solid var(--profile-line);
+    border-bottom-width: 0;
+    border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+    content: '';
+    height: 0.4rem;
+    left: 0.25rem;
+    position: absolute;
+    top: calc(-1 * var(--space-150));
+    width: 0.8rem;
+    z-index: -1;
+  }
+
+  .profile-card-status::after {
+    background: inherit;
+    border: var(--border-width) solid var(--profile-line);
+    border-radius: var(--radius-pill);
+    content: '';
+    height: 8px;
+    left: -3px;
+    position: absolute;
+    top: -12px;
+    width: 8px;
+    z-index: -1;
+  }
+
+  .profile-card-status-text {
+    -webkit-box-orient: vertical;
+    box-orient: vertical;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    margin: 0;
+    max-height: var(--space-1000);
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    overscroll-behavior: contain;
+    padding: 0;
+  }
+
+  .profile-card-status-text:focus-visible {
     outline: var(--focus-ring-width) solid var(--focus-ring);
     outline-offset: calc(-1 * var(--focus-ring-width));
+  }
+
+  .profile-card-status:hover .profile-card-status-text,
+  .profile-card-status:focus-within .profile-card-status-text {
+    display: block;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+    overflow-y: auto;
   }
 
   .profile-card-status-emoji {

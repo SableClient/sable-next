@@ -37,6 +37,7 @@ export default defineConfig({
     'mobile-drawer.spec.ts',
     'settings-slide.spec.ts',
     'profile-card-tint.spec.ts',
+    'profile-card-status.spec.ts',
     'reply-name-color.spec.ts',
     'thread-panel.spec.ts',
     'thread-actions.spec.ts',
