@@ -7,6 +7,7 @@
   import type { ImagePackView, MemberView, TimelineItemView } from '#src/generated/protocol';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { shortcodeFor } from '#lib/emoji/emoji.js';
   import { i18n } from '#lib/i18n.js';
   import MediaImage from '#lib/ui/MediaImage.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
@@ -183,10 +184,37 @@
         <span class="reaction-count">{reaction.senders.length}</span>
       </button>
     {/snippet}
+    {@const emojiShortcode = isCustomReaction(reaction.key) ? null : shortcodeFor(reaction.key)}
+    {@const summary = reactionSummary(
+      reaction.senders,
+      emojiShortcode ? `:${emojiShortcode}:` : label,
+      members,
+      $i18n.t
+    )}
+    {#snippet emoteCard()}
+      <span class="emote-card">
+        {#if isCustomReaction(reaction.key)}
+          <MediaImage
+            class="emote-card-image"
+            source={reaction.key}
+            alt=""
+            width={64}
+            height={64}
+            original
+          />
+        {:else}
+          <span class="emote-card-emoji" aria-hidden="true">{reaction.key}</span>
+        {/if}
+        <span>{summary}</span>
+      </span>
+    {/snippet}
     <Tooltip
-      label={reactionSummary(reaction.senders, label, members, $i18n.t)}
+      label={summary}
       side="top"
       trigger={reactionTrigger}
+      content={isCustomReaction(reaction.key) && (mediaHidden || failedImages.has(reaction.key))
+        ? undefined
+        : emoteCard}
     />
   {/each}
   {#if actionable && onReact}
@@ -278,6 +306,25 @@
     max-width: 9.375rem;
     object-fit: contain;
     width: calc(1.125rem * var(--media-ratio));
+  }
+
+  .emote-card {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+  }
+
+  .emote-card :global(.emote-card-image) {
+    flex: none;
+    height: var(--space-900);
+    object-fit: contain;
+    width: var(--space-900);
+  }
+
+  .emote-card-emoji {
+    flex: none;
+    font-size: var(--font-size-emoji-display);
+    line-height: 1;
   }
 
   .reaction-key {

@@ -55,8 +55,12 @@
   const bodyImages = new FormattedBodyImages(core, fallbackLabel, paint);
   let definitionAnchor = $state.raw<HTMLElement | null>(null);
   let definitionPinned = $state(false);
+  let emote = $derived(
+    definitionAnchor?.tagName === 'IMG' ? (definitionAnchor as HTMLImageElement) : null
+  );
   let definition = $derived(
     definitionAnchor?.dataset.abbrDefinition ??
+      (emote ? emoteShortcode(emote) : null) ??
       (definitionAnchor ? timeDetail(definitionAnchor) : null) ??
       ''
   );
@@ -194,6 +198,11 @@
     return emoticon ? `:${label}:` : label;
   }
 
+  function emoteShortcode(image: HTMLImageElement): string | null {
+    const label = image.alt.replace(/^:|:$/g, '');
+    return label ? `:${label}:` : null;
+  }
+
   async function renderMaths(elements: NodeListOf<HTMLElement>): Promise<void> {
     const [{ default: katex }] = await Promise.all([
       import('katex'),
@@ -260,6 +269,10 @@
         }
         for (const element of node.querySelectorAll<HTMLElement>('[data-mx-bg-color]')) {
           element.style.backgroundColor = element.dataset.mxBgColor ?? '';
+        }
+        for (const image of node.querySelectorAll<HTMLImageElement>('img[data-mx-emoticon]')) {
+          image.alt ||= image.title;
+          image.removeAttribute('title');
         }
         for (const element of node.querySelectorAll<HTMLTimeElement>('time[datetime]')) {
           if (element.parentElement?.classList.contains('time-chip')) continue;
@@ -499,7 +512,9 @@
   function definitionOf(target: EventTarget | null): HTMLElement | null {
     const found =
       target instanceof Element
-        ? target.closest<HTMLElement>('abbr[data-abbr-definition], .time-chip')
+        ? target.closest<HTMLElement>(
+            'abbr[data-abbr-definition], .time-chip, img[data-mx-emoticon]'
+          )
         : null;
     const spoiler = found?.closest<HTMLElement>('[data-mx-spoiler]');
     return spoiler && spoiler.ariaPressed !== 'false' ? null : found;
@@ -593,6 +608,19 @@
   </Button>
 {/if}
 
+{#snippet emoteCard()}
+  <span class="emote-card">
+    {#if emote?.src}
+      <img
+        class={['emote-card-image', { pixelated: emote.classList.contains('pixelated') }]}
+        src={emote.src}
+        alt=""
+      />
+    {/if}
+    <span class="emote-card-name">{definition}</span>
+  </span>
+{/snippet}
+
 {#if definitionAnchor && definition}
   <Tooltip
     label={definition}
@@ -600,10 +628,32 @@
     open
     customAnchor={definitionAnchor}
     side="top"
+    content={emote ? emoteCard : undefined}
   />
 {/if}
 
 <style>
+  .emote-card {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+  }
+
+  .emote-card-image {
+    height: var(--space-800);
+    object-fit: contain;
+    width: var(--space-800);
+  }
+
+  .emote-card-image.pixelated {
+    image-rendering: pixelated;
+  }
+
+  .emote-card-name {
+    font-size: var(--font-size-subheading);
+    font-weight: var(--font-weight-medium);
+  }
+
   .formatted-body + :global(.reveal-images) {
     margin-top: var(--space-100);
   }
