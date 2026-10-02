@@ -184,6 +184,10 @@
     padding-left: var(--space-050);
   }
 
+  .faces > :global(* + *) {
+    margin-left: calc(-1 * var(--space-150));
+  }
+
   :global(.read-receipt-stack .t-avatar) {
     transform: translateY(var(--shift, 0)) scale(var(--scale-active, 1));
     transform-origin: center;
@@ -223,15 +227,23 @@
     font: inherit;
     font-size: var(--font-size-small);
     font-variant-numeric: tabular-nums;
-    height: var(--avatar-size-200);
+    height: 1.125rem;
     justify-content: center;
     line-height: 1;
-    min-width: var(--avatar-size-200);
+    min-width: 1.125rem;
     padding: 0 var(--space-050);
+    position: relative;
   }
 
   .chip .overflow {
     cursor: inherit;
+  }
+
+  button.overflow::after {
+    border-radius: inherit;
+    content: '';
+    inset: -0.35rem 0;
+    position: absolute;
   }
 
   button.overflow:hover {

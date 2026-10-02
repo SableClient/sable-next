@@ -72,19 +72,24 @@
   .face {
     align-items: center;
     background: transparent;
-    block-size: var(--avatar-size-200);
     border: 0;
     border-radius: 50%;
     cursor: default;
     display: inline-flex;
-    inline-size: var(--avatar-size-200);
-    justify-content: center;
     margin: 0;
     padding: 0;
+    position: relative;
   }
 
   .face.interactive {
     cursor: pointer;
+  }
+
+  .face::after {
+    border-radius: 50%;
+    content: '';
+    inset: -0.35rem 0;
+    position: absolute;
   }
 
   .face:focus-visible {

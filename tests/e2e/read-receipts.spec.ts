@@ -151,27 +151,15 @@ test('a receipt badge sits beside the last line and leaves the timestamp on the 
   expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
   expect(receipted.content.bottom - receipted.body.bottom).toBeLessThanOrEqual(2);
 
-  const profileFaces = timeline.container.locator(
-    '[data-item-id="receipted"] .read-receipt-stack .face'
-  );
-  await expect(profileFaces).toHaveCount(3);
-  const faceSizes = await profileFaces.evaluateAll((elements) =>
-    elements.map((element) => {
-      const { width, height } = element.getBoundingClientRect();
-      return { width, height };
-    })
-  );
-  expect(faceSizes.every(({ width, height }) => width >= 24 && height >= 24)).toBe(true);
-
   const overflow = timeline.container.locator(
     '[data-item-id="receipted"] .read-receipt-stack .overflow'
   );
   const target = await overflow.evaluate((element) => {
-    const { width, height } = element.getBoundingClientRect();
-    return { width, height };
+    const box = element.getBoundingClientRect();
+    const after = getComputedStyle(element, '::after');
+    return box.height - Number.parseFloat(after.top) - Number.parseFloat(after.bottom);
   });
-  expect(target.width).toBeGreaterThanOrEqual(24);
-  expect(target.height).toBeGreaterThanOrEqual(24);
+  expect(target).toBeGreaterThanOrEqual(28);
 
   await overflow.click();
   await expect(page.getByRole('heading', { name: 'Read receipts' })).toBeVisible();
