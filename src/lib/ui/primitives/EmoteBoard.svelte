@@ -272,7 +272,19 @@
         null
       );
     } else {
-      addCells('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells);
+      if (tab === 'sticker') {
+        if (recentImages.length > 0) {
+          rows.push({
+            id: 'emoji-recent',
+            kind: 'header',
+            label: $i18n.t('timeline.frequentlyUsed'),
+            pack: null,
+          });
+          addImages('recent', recentImages, null);
+        }
+      } else {
+        addCells('recent', $i18n.t('timeline.frequentlyUsed'), frequentCells);
+      }
       for (const section of sections) {
         const id = sectionId(section.pack);
         rows.push({ id, kind: 'header', label: packName(section.pack), pack: section.pack });
