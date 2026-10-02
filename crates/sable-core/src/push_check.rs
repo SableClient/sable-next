@@ -121,6 +121,52 @@ pub async fn ping_gateway(url: &str) -> Option<bool> {
     }
 }
 
+#[cfg(not(target_family = "wasm"))]
+const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(5);
+
+#[cfg(not(target_family = "wasm"))]
+fn advertises_matrix_gateway(body: &[u8]) -> bool {
+    #[derive(serde::Deserialize)]
+    struct Advertisement {
+        unifiedpush: Option<UnifiedPush>,
+    }
+    #[derive(serde::Deserialize)]
+    struct UnifiedPush {
+        gateway: Option<String>,
+    }
+
+    serde_json::from_slice::<Advertisement>(body).is_ok_and(|answer| {
+        answer.unifiedpush.and_then(|up| up.gateway).as_deref() == Some("matrix")
+    })
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn discover_gateway(endpoint: &str) -> Option<String> {
+    let mut url = url::Url::parse(endpoint).ok()?;
+    url.set_path(crate::notifications::GATEWAY_PATH);
+    url.set_query(None);
+    let gateway = crate::notifications::gateway(url.as_str()).ok()?;
+    let http = crate::tls::apply(matrix_sdk::reqwest::Client::builder())
+        .timeout(DISCOVERY_TIMEOUT)
+        .build()
+        .ok()?;
+    let response = http
+        .get(&gateway)
+        .send()
+        .await
+        .and_then(matrix_sdk::reqwest::Response::error_for_status)
+        .inspect_err(|error| tracing::debug!(%error, %gateway, "push gateway discovery failed"))
+        .ok()?;
+    let body = response.bytes().await.ok()?;
+    advertises_matrix_gateway(&body).then_some(gateway)
+}
+
+#[cfg(target_family = "wasm")]
+#[allow(clippy::unused_async)]
+pub async fn discover_gateway(_endpoint: &str) -> Option<String> {
+    None
+}
+
 /// # Errors
 ///
 /// When the homeserver's pusher list cannot be read or the gateway refuses.
@@ -223,6 +269,16 @@ mod tests {
             "event_id_only"
         );
         assert!(body["notification"].get("counts").is_none());
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    #[test]
+    fn only_the_matrix_gateway_advertisement_is_accepted() {
+        use super::advertises_matrix_gateway as advertised;
+        assert!(advertised(br#"{"unifiedpush":{"gateway":"matrix"}}"#));
+        assert!(!advertised(br#"{"unifiedpush":{"gateway":"other"}}"#));
+        assert!(!advertised(br#"{"unifiedpush":{}}"#));
+        assert!(!advertised(b"<html></html>"));
     }
 
     #[cfg(not(target_family = "wasm"))]

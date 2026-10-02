@@ -23,7 +23,7 @@ use crate::session::{AccountRegistry, PersistedAccount};
 #[cfg(not(target_family = "wasm"))]
 use crate::store::{FileSessionStore, SessionStore};
 
-const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
+pub(crate) const GATEWAY_PATH: &str = "/_matrix/push/v1/notify";
 
 pub(crate) async fn pusher_display_name(client: &Client, fallback: String) -> String {
     let Some(device_id) = client.device_id() else {

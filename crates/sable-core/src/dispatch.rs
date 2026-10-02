@@ -2035,6 +2035,10 @@ impl Core {
                 reached: push_check::ping_gateway(&url).await,
             }),
 
+            Command::DiscoverPushGateway { endpoint } => Ok(CommandOk::DiscoverPushGateway {
+                gateway: push_check::discover_gateway(&endpoint).await,
+            }),
+
             Command::SendDiagnosticPush { pushkey, app_id } => Ok(CommandOk::SendDiagnosticPush {
                 push: push_check::send_diagnostic_push(&self.client().await?, &pushkey, &app_id)
                     .await

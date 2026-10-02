@@ -1034,6 +1034,9 @@ pub enum Command {
     PingPushGateway {
         url: String,
     },
+    DiscoverPushGateway {
+        endpoint: String,
+    },
     SendDiagnosticPush {
         pushkey: String,
         app_id: String,
@@ -1396,6 +1399,9 @@ pub enum CommandOk {
     },
     PingPushGateway {
         reached: Option<bool>,
+    },
+    DiscoverPushGateway {
+        gateway: Option<String>,
     },
     SendDiagnosticPush {
         push: DiagnosticPushView,

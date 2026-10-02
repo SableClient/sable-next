@@ -751,6 +751,39 @@ fn registration_gateway<'a>(
     }
 }
 
+#[cfg(mobile)]
+async fn distributor_gateway(
+    core: &Arc<sable_core::Core>,
+    registration: &Registration,
+    config: &PushConfig,
+) -> Option<String> {
+    if !is_direct_unified_push(registration, config) {
+        return None;
+    }
+    let command = sable_core::protocol::Command::DiscoverPushGateway {
+        endpoint: registration.token.clone(),
+    };
+    gateway_from_response(Box::pin(core.dispatch(command)).await)
+}
+
+#[cfg(any(mobile, test))]
+fn is_direct_unified_push(registration: &Registration, config: &PushConfig) -> bool {
+    !config.gateway_override
+        && registration.p256dh.is_none()
+        && registration.auth.is_none()
+        && is_unified_push_endpoint(&registration.token)
+}
+
+#[cfg(any(mobile, test))]
+fn gateway_from_response(
+    response: Result<sable_core::protocol::CommandOk, CommandErr>,
+) -> Option<String> {
+    match response {
+        Ok(sable_core::protocol::CommandOk::DiscoverPushGateway { gateway }) => gateway,
+        _ => None,
+    }
+}
+
 /// # Errors
 ///
 /// When the platform refuses a push registration, or the homeserver rejects the
@@ -820,12 +853,15 @@ pub async fn register_push<R: Runtime>(
         .await;
     }
 
-    let gateway_url = registration_gateway(&registration, &config)
-        .ok_or_else(|| {
-            log::warn!("no UnifiedPush gateway is configured for this distributor");
-            PushRegistrationError::NoGateway
-        })?
-        .to_owned();
+    let gateway_url = match distributor_gateway(core, &registration, &config).await {
+        Some(gateway) => gateway,
+        None => registration_gateway(&registration, &config)
+            .ok_or_else(|| {
+                log::warn!("no UnifiedPush gateway is configured for this distributor");
+                PushRegistrationError::NoGateway
+            })?
+            .to_owned(),
+    };
 
     let Some((app_id, pushkey, web_push)) = pusher(
         registration,
@@ -1033,6 +1069,49 @@ mod tests {
             )),
             Ok(None)
         ));
+    }
+
+    #[test]
+    fn only_a_direct_unifiedpush_endpoint_asks_its_distributor_for_a_gateway() {
+        let mut config: super::PushConfig = serde_json::from_value(serde_json::json!({
+            "gateway_url": "https://sygnal.example/_matrix/push/v1/notify",
+            "vapid_key": "key", "web_app_id": "web", "event_id_only": true,
+        }))
+        .expect("push config");
+        let mut registration = Registration {
+            token: "https://ntfy.example/topic".to_owned(),
+            p256dh: None,
+            auth: None,
+        };
+        assert!(super::is_direct_unified_push(&registration, &config));
+        config.gateway_override = true;
+        assert!(!super::is_direct_unified_push(&registration, &config));
+        config.gateway_override = false;
+        registration.p256dh = Some("key".to_owned());
+        registration.auth = Some("auth".to_owned());
+        assert!(!super::is_direct_unified_push(&registration, &config));
+        registration.p256dh = None;
+        registration.auth = None;
+        registration.token = "fcm-token".to_owned();
+        assert!(!super::is_direct_unified_push(&registration, &config));
+    }
+
+    #[test]
+    fn a_failed_discovery_falls_back_to_the_configured_gateway() {
+        assert_eq!(
+            super::gateway_from_response(Ok(
+                sable_core::protocol::CommandOk::DiscoverPushGateway {
+                    gateway: Some("https://ntfy.example/_matrix/push/v1/notify".to_owned())
+                }
+            ))
+            .as_deref(),
+            Some("https://ntfy.example/_matrix/push/v1/notify")
+        );
+        assert!(super::gateway_from_response(Err(super::CommandErr::Unavailable)).is_none());
+        assert!(
+            super::gateway_from_response(Ok(sable_core::protocol::CommandOk::SetWebPusher))
+                .is_none()
+        );
     }
 
     #[test]
