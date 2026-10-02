@@ -206,7 +206,7 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
                     windowInsets: WindowInsetsCompat,
                     runningAnimations: MutableList<WindowInsetsAnimationCompat>,
                 ): WindowInsetsCompat {
-                    cachedKeyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+                    cachedKeyboardVisible = isKeyboardDocked(windowInsets)
                     cachedKeyboardHeight = windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom
                     injectSafeAreaToWebView(cachedInsets, cachedKeyboardVisible, cachedKeyboardHeight)
 
@@ -219,7 +219,7 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
                     val rootWindowInsets = ViewCompat.getRootWindowInsets(hostView) ?: return
                     syncInjectedInsets(
                         currentInjectedSafeArea(rootWindowInsets),
-                        rootWindowInsets.isVisible(WindowInsetsCompat.Type.ime()),
+                        isKeyboardDocked(rootWindowInsets),
                         rootWindowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom,
                     )
                 }
@@ -233,7 +233,7 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
         ViewCompat.setOnApplyWindowInsetsListener(hostView) { view, windowInsets ->
             val systemBarsInsets = windowInsets.getInsets(systemBarsAndCutoutMask())
             val imeInsets = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
-            val keyboardVisible = windowInsets.isVisible(WindowInsetsCompat.Type.ime())
+            val keyboardVisible = isKeyboardDocked(windowInsets)
             val rawSafeAreaInsets = calcSafeAreaInsets(windowInsets)
 
             cachedRawInsets = rawSafeAreaInsets.toSafeAreaInsets()
@@ -334,7 +334,7 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun calcSafeAreaInsets(windowInsets: WindowInsetsCompat): Insets {
         val safeArea = windowInsets.getInsets(systemBarsAndCutoutMask())
-        return if (windowInsets.isVisible(WindowInsetsCompat.Type.ime())) {
+        return if (isKeyboardDocked(windowInsets)) {
             Insets.of(safeArea.left, safeArea.top, safeArea.right, 0)
         } else {
             Insets.of(safeArea.left, safeArea.top, safeArea.right, safeArea.bottom)
@@ -371,6 +371,11 @@ class EdgeToEdgePlugin(private val activity: Activity) : Plugin(activity) {
         val info = WebViewCompat.getCurrentWebViewPackage(activity)
         val versionName = info?.versionName ?: return 0
         return versionName.split(".").firstOrNull()?.toIntOrNull() ?: 0
+    }
+
+    private fun isKeyboardDocked(windowInsets: WindowInsetsCompat): Boolean {
+        return windowInsets.isVisible(WindowInsetsCompat.Type.ime()) &&
+            windowInsets.getInsets(WindowInsetsCompat.Type.ime()).bottom > 0
     }
 
     private fun getBottomInset(systemBarsInsets: Insets, keyboardVisible: Boolean): Int {
