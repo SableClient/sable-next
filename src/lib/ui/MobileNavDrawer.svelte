@@ -105,6 +105,7 @@
     if (next === open || (!next && pinnedOpen)) return;
     void goto('', {
       shallow: true,
+      replace: true,
       state: { ...page.state, mobileDrawer: next ? 'open' : 'closed' },
     });
     requestAnimationFrame(() => {

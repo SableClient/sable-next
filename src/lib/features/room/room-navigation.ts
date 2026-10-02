@@ -44,13 +44,21 @@ export function backToRoomList(): void {
     void leaveRoomView();
     return;
   }
-  void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'open' } });
+  void goto('', {
+    shallow: true,
+    replace: true,
+    state: { ...page.state, mobileDrawer: 'open' },
+  });
 }
 
 export function goToPage(href: string): void {
   const samePage = new URL(href, page.url.href).pathname === page.url.pathname;
   if (samePage && !window.matchMedia(BREAKPOINTS.appLayout).matches) {
-    void goto('', { shallow: true, state: { ...page.state, mobileDrawer: 'closed' } });
+    void goto('', {
+      shallow: true,
+      replace: true,
+      state: { ...page.state, mobileDrawer: 'closed' },
+    });
     return;
   }
   void goto(href);

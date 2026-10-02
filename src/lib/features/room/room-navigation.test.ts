@@ -132,6 +132,7 @@ test('the back arrow on a phone opens the drawer over the room rather than leavi
   expect(mocks.back).not.toHaveBeenCalled();
   expect(goto).toHaveBeenCalledExactlyOnceWith('', {
     shallow: true,
+    replace: true,
     state: { mobileDrawer: 'open' },
   });
 });
