@@ -650,6 +650,14 @@ describe('markup the renderer accepts survives an edit', () => {
     );
   });
 
+  test('a description list keeps its terms and details', () => {
+    const html = '<dl><dt>term</dt><dd>details</dd><dd><ul><li>a</li></ul></dd></dl>';
+    const message = serializeComposer(parseMatrixHtml(html));
+
+    expect(message.formatted).toBe(html);
+    expect(message.body).toBe('**term**\n\ndetails\n\n* a');
+  });
+
   test('colours, scripts and rules are kept', () => {
     expect(roundTrip('<p><span data-mx-color="#ff0000">red</span></p>')).toBe(
       '<span data-mx-color="#ff0000">red</span>'

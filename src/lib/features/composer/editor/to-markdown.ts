@@ -197,8 +197,11 @@ function block(node: ProseMirrorNode): BlockContent[] {
     case nodes.table:
       return [{ type: 'table', children: node.children.map(tableRow) }];
     case nodes.details:
+    case nodes.description_list:
+    case nodes.description_details:
       return blocks(node);
     case nodes.summary:
+    case nodes.description_term:
       return [{ type: 'paragraph', children: [{ type: 'strong', children: inline(node) }] }];
     case nodes.math_block:
       return [{ type: 'verbatim', value: `$$\n${node.attrs.latex as string}\n$$` }];

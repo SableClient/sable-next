@@ -196,6 +196,14 @@
     font-weight: var(--font-weight-bold);
   }
 
+  .editor :global(dt) {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .editor :global(dd) {
+    margin-inline-start: var(--space-600);
+  }
+
   .editor :global([data-mx-maths]) {
     font-family: var(--font-family-mono);
   }

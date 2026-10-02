@@ -59,6 +59,17 @@ function cellLine(row: ProseMirrorNode): string {
   return `| ${cells.join(' | ')} |`;
 }
 
+function renderContent(state: MarkdownSerializerState, node: ProseMirrorNode): void {
+  state.renderContent(node);
+}
+
+function boldBlock(state: MarkdownSerializerState, node: ProseMirrorNode): void {
+  state.write('**');
+  state.renderInline(node);
+  state.write('**');
+  state.closeBlock(node);
+}
+
 const markdown = new MarkdownSerializer(
   {
     ...defaultMarkdownSerializer.nodes,
@@ -88,15 +99,11 @@ const markdown = new MarkdownSerializer(
       state.renderInline(node, false);
       state.closeBlock(node);
     },
-    details: (state, node) => {
-      state.renderContent(node);
-    },
-    summary: (state, node) => {
-      state.write('**');
-      state.renderInline(node);
-      state.write('**');
-      state.closeBlock(node);
-    },
+    details: renderContent,
+    summary: boldBlock,
+    description_list: renderContent,
+    description_term: boldBlock,
+    description_details: renderContent,
     table: (state, node) => {
       node.forEach((row, _offset, index) => {
         state.write(cellLine(row));
@@ -281,7 +288,7 @@ function expandMfm(node: ProseMirrorNode): ProseMirrorNode {
 function html(doc: ProseMirrorNode): string {
   const holder = document.createElement('div');
   holder.append(DOMSerializer.fromSchema(composerSchema).serializeFragment(doc.content));
-  for (const paragraph of holder.querySelectorAll('li > p:only-child')) {
+  for (const paragraph of holder.querySelectorAll('li > p:only-child, dd > p:only-child')) {
     paragraph.replaceWith(...paragraph.childNodes);
   }
 

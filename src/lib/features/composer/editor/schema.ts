@@ -124,6 +124,24 @@ export const composerSchema = new Schema({
       parseDOM: [{ tag: 'summary' }],
       toDOM: () => ['summary', 0],
     },
+    description_list: {
+      content: '(description_term | description_details)+',
+      group: 'block',
+      parseDOM: [{ tag: 'dl' }],
+      toDOM: () => ['dl', 0],
+    },
+    description_term: {
+      content: 'inline*',
+      defining: true,
+      parseDOM: [{ tag: 'dt' }],
+      toDOM: () => ['dt', 0],
+    },
+    description_details: {
+      content: 'block+',
+      defining: true,
+      parseDOM: [{ tag: 'dd' }],
+      toDOM: () => ['dd', 0],
+    },
     table: {
       content: 'table_row+',
       group: 'block',

@@ -16,16 +16,19 @@ use matrix_sdk::ruma::html::{
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
 use time::OffsetDateTime;
 
-const ALLOWED_TAGS: [&str; 38] = [
+const ALLOWED_TAGS: [&str; 41] = [
     "a",
     "b",
     "blockquote",
     "br",
     "caption",
     "code",
+    "dd",
     "del",
     "details",
     "div",
+    "dl",
+    "dt",
     "em",
     "h1",
     "h2",
@@ -175,7 +178,7 @@ static MATRIX_POLICY: LazyLock<SanitizerConfig> = LazyLock::new(|| {
     SanitizerConfig::compat()
         .remove_reply_fallback()
         .remove_elements(["script", "style", "textarea", "option", "noscript"])
-        .allow_elements(["time"], ListBehavior::Add)
+        .allow_elements(["time", "dl", "dt", "dd"], ListBehavior::Add)
         .remove_attributes([PropertiesNames {
             parent: "a",
             properties: &["target"],
@@ -978,6 +981,8 @@ fn push_preview_text(node: &NodeRef, out: &mut String) {
                     | "h6"
                     | "li"
                     | "tr"
+                    | "dt"
+                    | "dd"
             );
             if block && !out.is_empty() && !out.ends_with('\n') {
                 out.push('\n');
@@ -1291,6 +1296,13 @@ mod tests {
         assert!(html.contains("data-mx-color=\"#ff0000\""));
         assert!(!html.contains("\"red\""));
         assert!(html.contains("class=\"language-rust\""));
+    }
+
+    #[test]
+    fn keeps_description_lists() {
+        let markup = "<dl><dt>term</dt><dd>details</dd></dl>";
+        assert_eq!(display_html("", Some(markup)), markup);
+        assert_eq!(preview_body("", Some(markup)), "term\ndetails");
     }
 
     #[test]

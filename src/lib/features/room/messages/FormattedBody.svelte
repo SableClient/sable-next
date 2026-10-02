@@ -770,6 +770,18 @@
     padding-inline-start: var(--space-200);
   }
 
+  .formatted-body :global(dl) {
+    margin: var(--space-200) 0;
+  }
+
+  .formatted-body :global(dt) {
+    font-weight: var(--font-weight-bold);
+  }
+
+  .formatted-body :global(dd) {
+    margin-inline-start: var(--space-600);
+  }
+
   .formatted-body :global(a) {
     color: var(--tc-link, var(--primary-main));
     text-decoration: var(--link-decoration);
