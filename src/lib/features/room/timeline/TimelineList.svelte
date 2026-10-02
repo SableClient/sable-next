@@ -1338,6 +1338,6 @@
     box-shadow: var(--shadow-float);
     inset-inline-end: var(--page-gutter);
     position: absolute;
-    z-index: 1;
+    z-index: 4;
   }
 </style>
