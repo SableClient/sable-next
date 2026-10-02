@@ -784,6 +784,54 @@ fn gateway_from_response(
     }
 }
 
+/// A subscription bound to a VAPID key makes a distributor's Matrix gateway
+/// demand a VAPID header that a Matrix notify never carries, so a direct
+/// endpoint with such a gateway is registered again without the key.
+#[cfg(mobile)]
+async fn register_with_distributor<R: Runtime>(
+    app: &AppHandle<R>,
+    core: &Arc<sable_core::Core>,
+    config: &PushConfig,
+    server_vapid: Option<&str>,
+) -> Result<Registration, PushRegistrationError> {
+    let provider = provider_for_server_delivery(server_vapid, config.provider.as_deref());
+    let register = |vapid: Option<String>| async {
+        let registered = app
+            .notifications()
+            .register_for_push_notifications(
+                vapid,
+                provider.clone(),
+                config.embedded_gateway_url.clone(),
+                config.user_id.clone(),
+                config.device_id.clone(),
+            )
+            .await
+            .map_err(|error| {
+                log::warn!("could not register for push: {error}");
+                PushRegistrationError::Platform {
+                    message: error.to_string(),
+                }
+            })?;
+        Ok::<_, PushRegistrationError>(Registration {
+            token: registered.device_token,
+            p256dh: registered.p256dh,
+            auth: registered.auth,
+        })
+    };
+    let registration = register(Some(
+        server_vapid.map_or_else(|| config.vapid_key.clone(), str::to_owned),
+    ))
+    .await?;
+    if server_vapid.is_none()
+        && distributor_gateway(core, &registration, config)
+            .await
+            .is_some()
+    {
+        return register(None).await;
+    }
+    Ok(registration)
+}
+
 /// # Errors
 ///
 /// When the platform refuses a push registration, or the homeserver rejects the
@@ -812,33 +860,8 @@ pub async fn register_push<R: Runtime>(
         server_vapid_from_response(Box::pin(core.dispatch(Command::WebPusherSupport)).await)
             .map_err(|_| PushRegistrationError::Capabilities)?
     };
-    let registered = app
-        .notifications()
-        .register_for_push_notifications(
-            Some(
-                server_vapid
-                    .as_deref()
-                    .unwrap_or(&config.vapid_key)
-                    .to_owned(),
-            ),
-            provider_for_server_delivery(server_vapid.as_deref(), config.provider.as_deref()),
-            config.embedded_gateway_url.clone(),
-            config.user_id.clone(),
-            config.device_id.clone(),
-        )
-        .await
-        .map_err(|error| {
-            log::warn!("could not register for push: {error}");
-            PushRegistrationError::Platform {
-                message: error.to_string(),
-            }
-        })?;
-
-    let registration = Registration {
-        token: registered.device_token,
-        p256dh: registered.p256dh,
-        auth: registered.auth,
-    };
+    let registration =
+        register_with_distributor(app, core, &config, server_vapid.as_deref()).await?;
     if server_vapid.is_some()
         && let Some(pusher) =
             server_web_pusher(&registration, &config.web_app_id, config.event_id_only)
