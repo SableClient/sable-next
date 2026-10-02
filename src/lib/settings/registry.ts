@@ -61,6 +61,7 @@ import UserCircleIcon from 'phosphor-svelte/lib/UserCircleIcon';
 import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
 import WheelchairMotionIcon from 'phosphor-svelte/lib/WheelchairMotionIcon';
+import TiktokLogoIcon from 'phosphor-svelte/lib/TiktokLogoIcon';
 import YoutubeLogoIcon from 'phosphor-svelte/lib/YoutubeLogoIcon';
 
 import { playNotificationSound } from '#lib/features/notifications/sound.js';
@@ -1232,6 +1233,15 @@ export const settingsCategories: SettingsCategory[] = [
         section: 'embeds',
         icon: YoutubeLogoIcon,
         name: 'settings.youtubeEmbeds',
+        type: 'boolean',
+        gatedBy: 'clientEmbeds',
+      },
+      {
+        key: 'tiktokEmbeds',
+        section: 'embeds',
+        icon: TiktokLogoIcon,
+        name: 'settings.tiktokEmbeds',
+        description: 'settings.tiktokEmbedsHint',
         type: 'boolean',
         gatedBy: 'clientEmbeds',
       },

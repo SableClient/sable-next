@@ -5,6 +5,8 @@ import type { UrlPreviewView } from '#src/generated/protocol';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 import type { BooleanPreference } from '#lib/settings/registry.js';
 
+import { parseTiktokLink } from './tiktok';
+import TiktokEmbed from './TiktokEmbed.svelte';
 import { parseYoutubeLink } from './youtube';
 import YoutubeEmbed from './YoutubeEmbed.svelte';
 
@@ -27,6 +29,11 @@ const PROVIDERS: EmbedProvider[] = [
     preference: 'youtubeEmbeds',
     matches: (url) => parseYoutubeLink(url) !== null,
     component: YoutubeEmbed,
+  },
+  {
+    preference: 'tiktokEmbeds',
+    matches: (url) => parseTiktokLink(url) !== null,
+    component: TiktokEmbed,
   },
 ];
 

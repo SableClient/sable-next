@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 import { findEmbed } from './providers';
+import TiktokEmbed from './TiktokEmbed.svelte';
 import YoutubeEmbed from './YoutubeEmbed.svelte';
 
 const VIDEO = 'https://youtu.be/MTn_bhTVr2U';
@@ -11,6 +12,7 @@ afterEach(() => {
   preferences.clientEmbeds = false;
   preferences.encryptedClientEmbeds = false;
   preferences.youtubeEmbeds = false;
+  preferences.tiktokEmbeds = false;
 });
 
 describe('findEmbed', () => {
@@ -37,5 +39,13 @@ describe('findEmbed', () => {
     expect(findEmbed(VIDEO, encrypted)).toBeNull();
     preferences.encryptedClientEmbeds = true;
     expect(findEmbed(VIDEO, encrypted)).toBe(YoutubeEmbed);
+  });
+
+  it('embeds a TikTok post only when its own switch is on', () => {
+    const post = 'https://www.tiktok.com/@scout2015/video/6718335390845095173';
+    preferences.clientEmbeds = true;
+    expect(findEmbed(post, false)).toBeNull();
+    preferences.tiktokEmbeds = true;
+    expect(findEmbed(post, false)).toBe(TiktokEmbed);
   });
 });
