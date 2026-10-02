@@ -571,6 +571,24 @@
     await memberLoader.load(activeRoomId, (roomId) => core.commands.roomMembers(roomId));
   }
 
+  let memberChangeKey = $derived.by(() => {
+    for (let index = timeline.items.length - 1; index >= 0; index -= 1) {
+      const { content, event_id: eventId } = timeline.items[index];
+      if (eventId && (content.kind === 'membership' || content.kind === 'profile_change')) {
+        return eventId;
+      }
+    }
+    return null;
+  });
+
+  $effect(() => {
+    if (memberChangeKey === null) return;
+    const activeRoomId = untrack(() => resolvedRoomId);
+    void untrack(() =>
+      memberLoader.refresh(activeRoomId, (roomId) => core.commands.roomMembers(roomId))
+    );
+  });
+
   function loadMembership(membership: MembershipView): Promise<MemberView[]> {
     return core.commands.roomMembers(resolvedRoomId, [membership]);
   }

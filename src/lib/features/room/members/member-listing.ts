@@ -1,5 +1,7 @@
 import type { MemberView, MembershipView } from '#src/generated/protocol';
 
+import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
+
 export type MemberSort = 'name-asc' | 'name-desc' | 'newest' | 'oldest';
 export type MembershipFilter = 'join' | 'invite' | 'knock' | 'leave' | 'kick' | 'ban';
 
@@ -38,7 +40,7 @@ export function membershipFor(filter: MembershipFilter): MembershipView {
 }
 
 export function memberName(member: MemberView): string {
-  return member.display_name ?? member.user_id;
+  return profileOverrides.name(member.user_id, member.display_name ?? member.user_id);
 }
 
 export function matchesFilter(member: MemberView, filter: MembershipFilter): boolean {

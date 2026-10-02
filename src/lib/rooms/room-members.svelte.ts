@@ -43,6 +43,21 @@ export class RoomMemberLoader {
     }
   }
 
+  async refresh(
+    roomId: string,
+    fetchMembers: (roomId: string) => Promise<MemberView[]>
+  ): Promise<void> {
+    if (this.attemptedRoomId !== roomId) return;
+    const generation = this.generation;
+    try {
+      const members = await fetchMembers(roomId);
+      this.cache.set(roomId, members);
+      if (generation === this.generation) this.members = members;
+    } catch (error) {
+      console.debug('[sable room] members unavailable', error);
+    }
+  }
+
   setPowerLevel(roomId: string, userId: string, level: number): void {
     if (this.attemptedRoomId !== roomId) return;
     const members = this.members.map((member) =>
