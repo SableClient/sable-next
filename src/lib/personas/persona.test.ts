@@ -49,6 +49,16 @@ describe('resolveProxy', () => {
     expect(resolveProxy([kris], '[hello]')?.body).toBe('hello');
   });
 
+  it.each([
+    [trigger('k:'), 'k: \thello\n ', 'hello'],
+    [trigger(null, '-k'), ' \thello\n -k', 'hello'],
+    [trigger('[', ']'), '[ \thello\n ]', 'hello'],
+    [trigger('[', ']'), '[ \t\n ]', ''],
+    [trigger('k:', null, true), 'k: hello ', 'k: hello '],
+  ])('trims whitespace exposed by stripping %j', (wrapper, body, expected) => {
+    expect(resolveProxy([persona('Kris', [wrapper])], body)?.body).toBe(expected);
+  });
+
   it('keeps the trigger when the persona asks it to', () => {
     const kris = persona('Kris', [trigger('k:', null, true)]);
     expect(resolveProxy([kris], 'k:hello')?.body).toBe('k:hello');
@@ -90,6 +100,12 @@ describe('stripProxyHtml', () => {
 
   it('retains formatting after removing a circumfix trigger', () => {
     expect(stripProxyHtml('[<em>test</em>]', trigger('[', ']'))).toBe('<em>test</em>');
+  });
+
+  it('trims exposed whitespace across formatted text nodes', () => {
+    expect(stripProxyHtml('<p>[ <em> hello </em> ]</p>', trigger('[', ']'))).toBe(
+      '<p><em>hello</em></p>'
+    );
   });
 
   it('does not strip HTML that does not contain the trigger as text', () => {

@@ -95,7 +95,9 @@ export function resolveProxy(
 
     return {
       persona,
-      body: body.slice(trigger.prefix?.length ?? 0, body.length - (trigger.suffix?.length ?? 0)),
+      body: body
+        .slice(trigger.prefix?.length ?? 0, body.length - (trigger.suffix?.length ?? 0))
+        .trim(),
       trigger,
     };
   }
@@ -137,8 +139,9 @@ export function stripProxyHtml(
     }
   };
 
-  remove(prefix.length, false);
-  remove(suffix.length, true);
+  const body = text.slice(prefix.length, text.length - suffix.length);
+  remove(prefix.length + body.length - body.trimStart().length, false);
+  remove(suffix.length + body.length - body.trimEnd().length, true);
   return document.body.innerHTML;
 }
 

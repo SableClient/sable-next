@@ -509,6 +509,61 @@ function encryptedScheduleFailure(): Error {
   return error;
 }
 
+function proxying() {
+  setPreference('personaProxying', true);
+  return setup([], '@kris:example.org', {
+    personas: [
+      {
+        id: 'kris',
+        display_name: 'Kris',
+        avatar_url: null,
+        pronouns: [],
+        color_on_light: null,
+        color_on_dark: null,
+        triggers: [{ prefix: 'k:', suffix: null, keep_trigger: false }],
+        pluralkit: null,
+      },
+    ],
+  });
+}
+
+test.each([
+  ['k:hello', 'k:<em>hello</em>'],
+  ['k: hello ', 'k: <em>hello</em> '],
+])('attachment captions apply persona triggers in %j', async (caption, formattedCaption) => {
+  const { conversation, sendAttachment } = proxying();
+  const file = new File(['picture'], 'picture.png', { type: 'image/png' });
+  await conversation.sendAttachment(ROOM, file, { caption, formattedCaption });
+  expect(sendAttachment.mock.lastCall).toMatchObject([
+    ROOM,
+    file,
+    {
+      caption: 'hello',
+      formattedCaption: '<em>hello</em>',
+      persona: { id: 'kris' },
+    },
+  ]);
+});
+
+test('messages trim whitespace after removing persona triggers', async () => {
+  const { conversation, sendMessage } = proxying();
+  await conversation.sendMessage(ROOM, 'k: hello ', 'k: <em>hello</em> ');
+  expect(sendMessage.mock.lastCall).toMatchObject([
+    ROOM,
+    'hello',
+    {
+      formatted: '<em>hello</em>',
+      persona: { id: 'kris' },
+    },
+  ]);
+});
+
+test('messages containing only a persona trigger and whitespace are not sent', async () => {
+  const { conversation, sendMessage } = proxying();
+  await conversation.sendMessage(ROOM, 'k: \t\n ');
+  expect(sendMessage).not.toHaveBeenCalled();
+});
+
 test('personas off in a room ignore the selection and proxy triggers', async () => {
   setPreference('personaProxying', true);
   const kris = {

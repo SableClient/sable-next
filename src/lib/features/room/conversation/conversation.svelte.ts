@@ -170,6 +170,7 @@ export class Conversation {
       outcome.body,
       untouched ? (outcome.formatted ?? formatted) : (outcome.formatted ?? null)
     );
+    if (outgoing.body === '') return;
     const linkPreviews = await this.#bundledLinkPreviews(outgoing.formatted);
     await this.#core.commands.sendMessage(targetRoomId, outgoing.body, {
       inReplyTo: pending?.eventId ?? null,
@@ -209,14 +210,20 @@ export class Conversation {
     options: SendAttachmentOptions = {}
   ): Promise<void> => {
     await this.#beforeSend();
-    const persona = this.#personaFor(targetRoomId, '', null).persona;
+    const outgoing = this.#personaFor(
+      targetRoomId,
+      options.caption ?? '',
+      options.formattedCaption ?? null
+    );
     const reply = this.#consumeReply();
     await this.#core.commands.sendAttachment(targetRoomId, file, {
       ...options,
+      caption: options.caption == null ? options.caption : outgoing.body,
+      formattedCaption: outgoing.formatted,
       inReplyTo: reply?.eventId ?? null,
       silentReply: reply?.silentReply ?? options.silentReply ?? false,
       threadRoot: this.#threadRoot,
-      persona,
+      persona: outgoing.persona,
     });
   };
 
