@@ -79,11 +79,11 @@
     display: flex;
     font-size: var(--font-size-small);
     gap: var(--space-100);
-    max-width: calc(100% - var(--space-200));
     padding: var(--space-100);
   }
 
   .hidden .media-image-spoiler-chip {
+    max-width: calc(100% - var(--space-200));
     padding: var(--space-200) var(--space-300);
     text-align: start;
   }
