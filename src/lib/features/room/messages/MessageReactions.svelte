@@ -212,9 +212,13 @@
       label={summary}
       side="top"
       trigger={reactionTrigger}
-      content={isCustomReaction(reaction.key) && (mediaHidden || failedImages.has(reaction.key))
-        ? undefined
-        : emoteCard}
+      content={(
+        isCustomReaction(reaction.key)
+          ? !mediaHidden && !failedImages.has(reaction.key)
+          : emojiShortcode !== null
+      )
+        ? emoteCard
+        : undefined}
     />
   {/each}
   {#if actionable && onReact}
