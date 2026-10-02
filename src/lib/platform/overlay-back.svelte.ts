@@ -62,6 +62,7 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
     if (!open()) return;
 
     let mine = true;
+    const href = location.href;
     const depth = (pushed += 1);
     if (queued > 0) {
       queued -= 1;
@@ -80,6 +81,10 @@ export function holdOverlayBack(open: () => boolean, close: () => void): void {
       mine = false;
       held = 0;
       if (armed === 0 || depth > pushed) return;
+      if (location.href !== href) {
+        pushed = depth - 1;
+        return;
+      }
 
       popEntries(pushed - depth + 1);
       pushed = depth - 1;

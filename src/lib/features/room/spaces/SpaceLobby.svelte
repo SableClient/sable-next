@@ -12,6 +12,7 @@
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   import { goto } from '$app/navigation';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { resolve } from '$app/paths';
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
@@ -107,9 +108,13 @@
     if (link.kind === 'user') return;
     topicOpen = false;
     const { via } = splitVia(anchor.href);
-    void goto(
-      roomSectionPath(roomList.rooms, link.roomId, link.kind === 'event' ? link.eventId : null, via)
+    const target = roomSectionPath(
+      roomList.rooms,
+      link.roomId,
+      link.kind === 'event' ? link.eventId : null,
+      via
     );
+    void afterOverlayPops().then(() => goto(target));
   }
   let permissions = $state<RoomPermissionsView | null>(null);
 

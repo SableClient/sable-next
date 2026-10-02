@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { resolve } from '$app/paths';
   import type { RoomPowerLevelsView, RoomSummary, RoomVersionsView } from '#src/generated/protocol';
 
@@ -124,6 +125,7 @@
       const next = await core.commands.upgradeRoom(id, target, allowCreators ? creators : []);
       open = false;
       onClose();
+      await afterOverlayPops();
       await goto(roomPath(next));
     } catch (error) {
       console.warn('[sable room] upgrade failed', error);
@@ -142,7 +144,7 @@
 
   function openRoom(id: string): void {
     onClose();
-    void goto(roomPath(id));
+    void afterOverlayPops().then(() => goto(roomPath(id)));
   }
 </script>
 

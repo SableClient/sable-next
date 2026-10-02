@@ -53,7 +53,7 @@
     if (!status || status.verification === 'unknown') return;
     if (status.verification === 'verified' && !reset.busy) {
       untrack(leaveView);
-      if (!untrack(() => prompted)) onComplete();
+      if (!untrack(() => prompted)) void afterOverlayPops().then(onComplete);
     }
     prompted = true;
   });

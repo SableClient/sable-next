@@ -27,6 +27,7 @@
   import { profileOverrides } from '#lib/profile/profile-overrides.svelte.js';
   import { PresenceStore, providePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { goto } from '$app/navigation';
+  import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
   import { resolve } from '$app/paths';
   import { i18n } from '#lib/i18n.js';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -234,10 +235,11 @@
     return incomingCalls.start();
   });
 
-  function acceptIncoming(call: IncomingCall): void {
+  async function acceptIncoming(call: IncomingCall): Promise<void> {
     incomingCalls.accept(call);
-    void goto(roomSectionPath(roomList.rooms, call.roomId));
     void callSession.join(call.roomId, { microphone: true, camera: call.hasVideo });
+    await afterOverlayPops();
+    await goto(roomSectionPath(roomList.rooms, call.roomId));
   }
 
   function answerFromNotification(

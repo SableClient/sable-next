@@ -1,4 +1,5 @@
 import { afterNavigate, goto } from '$app/navigation';
+import { afterOverlayPops } from '#lib/platform/overlay-back.svelte.js';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 
@@ -27,19 +28,20 @@ function roomListPath(): string {
   return resolve('/(app)/rooms');
 }
 
-export function leaveRoomView(): void {
+export async function leaveRoomView(): Promise<void> {
+  await afterOverlayPops();
   const target = roomListPath();
   if (enteredFrom === target) {
     enteredFrom = null;
     history.back();
     return;
   }
-  void goto(target);
+  await goto(target);
 }
 
 export function backToRoomList(): void {
   if (window.matchMedia(BREAKPOINTS.appLayout).matches) {
-    leaveRoomView();
+    void leaveRoomView();
     return;
   }
   if (page.state.mobileDrawerBack) {
