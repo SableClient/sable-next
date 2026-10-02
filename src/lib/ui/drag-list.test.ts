@@ -159,6 +159,47 @@ describe('the drag protocol', () => {
     for (const cleanup of cleanups) cleanup?.();
   });
 
+  it('forgets the drag when it is dropped on itself', () => {
+    const { source } = mount(40);
+    const list = createDragList<Ref>(refsEqual);
+    const dragging: (Ref | null)[] = [];
+    const dropped: Drop[] = [];
+    const cleanups = [
+      list.draggable(ref('!a'), (next) => dragging.push(next))(source),
+      list.dropTarget(ref('!a'), {
+        allowInto: true,
+        onState: () => undefined,
+        onDrop: (from, to, instruction) => dropped.push({ from, to, instruction }),
+      })(source),
+    ];
+
+    source.dispatchEvent(dragEvent('dragstart'));
+    const over = dragEvent('dragover', 20);
+    source.dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    source.dispatchEvent(dragEvent('drop', 20));
+
+    expect(dragging).toEqual([ref('!a'), null]);
+    expect(dropped).toEqual([]);
+
+    for (const cleanup of cleanups) cleanup?.();
+  });
+
+  it('forgets the drag when pointer events resume without a dragend', async () => {
+    const { source } = mount(40);
+    const list = createDragList<Ref>(refsEqual);
+    const dragging: (Ref | null)[] = [];
+    const cleanup = list.draggable(ref('!a'), (next) => dragging.push(next))(source);
+
+    source.dispatchEvent(dragEvent('dragstart'));
+    await Promise.resolve();
+    source.dispatchEvent(new Event('pointermove', { bubbles: true }));
+
+    expect(dragging).toEqual([ref('!a'), null]);
+
+    cleanup?.();
+  });
+
   it('forgets the drag when it ends', () => {
     const { source, target } = mount(40);
     const list = createDragList<Ref>(refsEqual);

@@ -58,7 +58,10 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
         const start = (event: DragEvent): void => {
           dragged = item;
           stopDocumentEnd?.();
-          stopDocumentEnd = on(document, 'dragend', end, { capture: true });
+          stopDocumentEnd = listen(
+            on(document, 'dragend', end, { capture: true }),
+            on(document, 'pointermove', end, { capture: true })
+          );
           finishDrag = end;
           onDragging(item);
           event.dataTransfer?.setData('text/plain', '');
@@ -96,9 +99,13 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
         };
 
         const over = (event: DragEvent): void => {
-          if (dragged === null || equals(dragged, item)) return;
+          if (dragged === null) return;
 
           event.preventDefault();
+          if (equals(dragged, item)) {
+            event.stopPropagation();
+            return;
+          }
           event.stopPropagation();
           if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move';
 
@@ -115,13 +122,13 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
 
         const drop = (event: DragEvent): void => {
           const source = dragged;
-          if (source === null || equals(source, item)) return;
+          if (source === null) return;
 
           event.preventDefault();
           event.stopPropagation();
           hovered = null;
           onState(null);
-          onDrop(source, item, instructionAt(event.clientY));
+          if (!equals(source, item)) onDrop(source, item, instructionAt(event.clientY));
           finishDrag?.();
         };
 
