@@ -153,8 +153,8 @@ test('uses the local room-list name before requesting a preview', async () => {
 
 test('sends external links to a new tab instead of the handler', async () => {
   const onMatrixLink = vi.fn();
-  render(FormattedBody, {
-    props: { html: '<a href="https://example.org/">Link</a>', onMatrixLink },
+  render(FormattedBodyHarness, {
+    props: { html: '<a href="https://example.org/">Link</a>', entries: [], onMatrixLink },
   });
   await tick();
 
@@ -542,6 +542,32 @@ test('shows a room abbreviation definition in a tooltip on hover', async () => {
   expect(document.querySelector('.tooltip')?.textContent.trim()).toBe(
     'Free and open source software'
   );
+});
+
+test('shows the target of a link whose text differs from it on hover', async () => {
+  render(FormattedBodyHarness, {
+    props: { html: '<p><a href="https://example.com/a">click here</a></p>', entries: [] },
+  });
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  await user.hover(screen.getByRole('link', { name: 'click here' }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(document.querySelector('.tooltip')?.textContent.trim()).toBe('https://example.com/a');
+});
+
+test('shows no tooltip for a link whose text is its own address', async () => {
+  render(FormattedBodyHarness, {
+    props: { html: '<p><a href="https://example.com/">https://example.com/</a></p>', entries: [] },
+  });
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  await user.hover(screen.getByRole('link', { name: 'https://example.com/' }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  expect(document.querySelector('.tooltip')).not.toBeInTheDocument();
 });
 
 const TIME = '<time datetime="1970-01-01T00:00:00Z">1 Jan 1970, 00:00 (UTC)</time>';

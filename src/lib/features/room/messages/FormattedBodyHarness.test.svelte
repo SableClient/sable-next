@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ComponentProps } from 'svelte';
   import FormattedBody from './FormattedBody.svelte';
   import { provideRoomAbbreviations, RoomAbbreviations } from '../room-abbreviations.svelte.js';
   import type { AbbreviationEntry } from '../settings/abbreviations';
@@ -8,9 +9,10 @@
     html: string;
     entries: AbbreviationEntry[];
     senderTimezone?: string | null;
+    onMatrixLink?: ComponentProps<typeof FormattedBody>['onMatrixLink'];
   }
 
-  let { html, entries, senderTimezone = null }: Props = $props();
+  let { html, entries, senderTimezone = null, onMatrixLink }: Props = $props();
   const abbreviations = new RoomAbbreviations({
     roomStateEvent: () => Promise.resolve({ entries }),
   });
@@ -19,5 +21,5 @@
 </script>
 
 <TooltipProvider>
-  <FormattedBody {html} {senderTimezone} />
+  <FormattedBody {html} {senderTimezone} {onMatrixLink} />
 </TooltipProvider>

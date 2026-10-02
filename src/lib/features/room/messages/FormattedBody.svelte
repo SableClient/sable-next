@@ -58,10 +58,14 @@
   let emote = $derived(
     definitionAnchor?.tagName === 'IMG' ? (definitionAnchor as HTMLImageElement) : null
   );
+  let link = $derived(
+    definitionAnchor?.tagName === 'A' ? (definitionAnchor as HTMLAnchorElement) : null
+  );
   let definition = $derived(
     definitionAnchor?.dataset.abbrDefinition ??
       (emote ? emoteShortcode(emote) : null) ??
       (definitionAnchor ? timeDetail(definitionAnchor) : null) ??
+      (link ? linkTarget(link) : null) ??
       ''
   );
   let renderedHtml = $derived(bodyImages.defer(html));
@@ -515,13 +519,20 @@
     return true;
   }
 
+  function linkTarget(anchor: HTMLAnchorElement): string | null {
+    if (anchor.dataset.matrixLink || anchor.dataset.settingsLink) return null;
+    const text = anchor.textContent.trim();
+    return text === anchor.href || text === anchor.getAttribute('href') ? null : anchor.href;
+  }
+
   function definitionOf(target: EventTarget | null): HTMLElement | null {
-    const found =
+    let found =
       target instanceof Element
         ? target.closest<HTMLElement>(
-            'abbr[data-abbr-definition], .time-chip, img[data-mx-emoticon]'
+            'abbr[data-abbr-definition], .time-chip, img[data-mx-emoticon], a[href]'
           )
         : null;
+    if (found instanceof HTMLAnchorElement && !linkTarget(found)) found = null;
     const spoiler = found?.closest<HTMLElement>('[data-mx-spoiler]');
     return spoiler && spoiler.ariaPressed !== 'false' ? null : found;
   }
@@ -533,6 +544,12 @@
 
   function handleDefinitionOver(event: PointerEvent | FocusEvent): void {
     const abbr = definitionOf(event.target);
+    if (
+      abbr instanceof HTMLAnchorElement &&
+      'pointerType' in event &&
+      event.pointerType === 'touch'
+    )
+      return;
     if (abbr) definitionAnchor = abbr;
   }
 
@@ -627,6 +644,10 @@
   </span>
 {/snippet}
 
+{#snippet linkCard()}
+  <span class="link-card">{definition}</span>
+{/snippet}
+
 {#if definitionAnchor && definition}
   <Tooltip
     label={definition}
@@ -634,7 +655,7 @@
     open
     customAnchor={definitionAnchor}
     side="top"
-    content={emote ? emoteCard : undefined}
+    content={emote ? emoteCard : link ? linkCard : undefined}
   />
 {/if}
 
@@ -655,7 +676,8 @@
     image-rendering: pixelated;
   }
 
-  .emote-card-name {
+  .emote-card-name,
+  .link-card {
     font-size: var(--font-size-subheading);
     font-weight: var(--font-weight-medium);
   }
