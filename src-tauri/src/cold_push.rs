@@ -3,7 +3,7 @@ use std::sync::{Arc, OnceLock};
 use jni::objects::{JClass, JString};
 use jni::{Env, EnvUnowned};
 use sable_core::Core;
-use sable_core::notifications::ColdPush;
+use sable_core::notifications::{ColdPush, settle_refreshes};
 use sable_core::protocol::PushFetchView;
 
 pub static CORE: OnceLock<Arc<Core>> = OnceLock::new();
@@ -77,7 +77,7 @@ fn decrypt_push<'frame>(
         let event_json = event_json.to_string();
         let core = CORE.get();
         let decrypt = async {
-            tokio::time::timeout(
+            settle_refreshes(Box::pin(tokio::time::timeout(
                 std::time::Duration::from_secs(20),
                 sable_core::notifications::decrypt_cold_push(
                     core.map(Arc::as_ref),
@@ -88,7 +88,7 @@ fn decrypt_push<'frame>(
                     &event_json,
                     fetch_keys,
                 ),
-            )
+            )))
             .await
             .unwrap_or(ColdPush::Undecryptable)
         };
@@ -130,7 +130,7 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeFe
         let event_id = event_id.to_string();
         let core = CORE.get();
         let fetch = async {
-            tokio::time::timeout(
+            settle_refreshes(Box::pin(tokio::time::timeout(
                 std::time::Duration::from_secs(20),
                 sable_core::notifications::fetch_cold_push_event(
                     core.map(Arc::as_ref),
@@ -140,7 +140,7 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeFe
                     &room_id,
                     &event_id,
                 ),
-            )
+            )))
             .await
             .unwrap_or(PushFetchView::Unavailable)
         };
@@ -190,10 +190,10 @@ pub extern "system" fn Java_app_tauri_notification_PushPayloadDecryptor_nativeMa
                     .build()
                     .ok()?;
                 runtime.block_on(async {
-                    tokio::time::timeout(
+                    settle_refreshes(Box::pin(tokio::time::timeout(
                         std::time::Duration::from_secs(20),
                         crate::notifications::maintain_background_push(&root, operation),
-                    )
+                    )))
                     .await
                     .ok()?
                     .ok()

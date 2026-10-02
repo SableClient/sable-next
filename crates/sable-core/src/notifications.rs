@@ -177,11 +177,36 @@ async fn cold_push_from_store(
     .await
 }
 
+#[cfg(not(target_family = "wasm"))]
+#[derive(Clone, Default)]
+struct PendingRefreshes(std::sync::Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>>);
+
+#[cfg(not(target_family = "wasm"))]
+tokio::task_local! {
+    static PENDING_REFRESHES: PendingRefreshes;
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub async fn settle_refreshes<T>(operation: impl std::future::Future<Output = T>) -> T {
+    let pending = PendingRefreshes::default();
+    let result = PENDING_REFRESHES.scope(pending.clone(), operation).await;
+    let tasks = std::mem::take(
+        &mut *pending
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner),
+    );
+    for task in tasks {
+        let _ = task.await;
+    }
+    result
+}
+
 /// A notification operation owns refreshes separately from SDK background tasks.
 #[cfg(not(target_family = "wasm"))]
 pub struct PushClient {
     client: Client,
-    owner: Option<FileSessionStore>,
+    owner: Option<std::sync::Arc<FileSessionStore>>,
     base_store: String,
     account_id: String,
 }
@@ -198,19 +223,43 @@ impl std::ops::Deref for PushClient {
 #[cfg(not(target_family = "wasm"))]
 impl PushClient {
     async fn refresh(&self) -> bool {
-        let Some(store) = &self.owner else {
+        let Some(store) = self.owner.clone() else {
             return false;
         };
-        if self.client.refresh_access_token().await.is_err() {
+        if !self.token_rejected().await {
             return false;
         }
-        match persist_push_session(store, &self.base_store, &self.account_id, &self.client).await {
-            Ok(()) => true,
-            Err(error) => {
-                tracing::error!("could not persist push session: {error}");
-                false
-            }
-        }
+        let client = self.client.clone();
+        let base_store = self.base_store.clone();
+        let account_id = self.account_id.clone();
+        let (sent, refreshed) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let refreshed = client.refresh_access_token().await.is_ok()
+                && persist_push_session(&store, &base_store, &account_id, &client)
+                    .await
+                    .inspect_err(|error| tracing::error!("could not persist push session: {error}"))
+                    .is_ok();
+            drop(store);
+            let _ = sent.send(refreshed);
+        });
+        let _ = PENDING_REFRESHES.try_with(|pending| {
+            pending
+                .0
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(task);
+        });
+        refreshed.await.unwrap_or(false)
+    }
+
+    async fn token_rejected(&self) -> bool {
+        matches!(
+            self.client.whoami().await,
+            Err(error) if matches!(
+                error.client_api_error_kind(),
+                Some(matrix_sdk::ruma::api::error::ErrorKind::UnknownToken(_))
+            )
+        )
     }
 
     /// Retry a failed notification request once with refreshed credentials.
@@ -241,7 +290,8 @@ pub async fn restore_push_client(
     let owner = tokio::task::spawn_blocking(move || FileSessionStore::try_exclusive(directory))
         .await
         .ok()?
-        .ok()?;
+        .ok()?
+        .map(std::sync::Arc::new);
     let stored = FileSessionStore::new(store_dir).load().await.ok()??;
     let base_store = store_dir.to_str()?;
     let (mut accounts, _) = AccountRegistry::from_bytes(&stored, base_store).ok()?;
@@ -1288,6 +1338,139 @@ mod tests {
         );
 
         drop(lingering);
+        tokio::fs::remove_dir_all(&data_dir).await.unwrap();
+    }
+
+    async fn seeded_cold_store(
+        server: &MatrixMockServer,
+        name: &str,
+    ) -> (std::path::PathBuf, std::path::PathBuf, FileSessionStore) {
+        let data_dir = std::env::temp_dir().join(format!("sable-{name}-{}", std::process::id()));
+        let store_dir = cold_push_store_dir(&data_dir);
+        let persisted: PersistedSession = serde_json::from_value(json!({
+            "homeserver": server.uri(), "resolved_homeserver": server.uri(),
+            "credentials": {"kind": "password", "user_id": "@alice:example.org",
+                "device_id": "A", "access_token": "old-access", "refresh_token": "old-refresh"}
+        }))
+        .unwrap();
+        let seeded = crate::session::restore_client(store_dir.to_str().unwrap(), &persisted, true)
+            .await
+            .unwrap();
+        crate::session::restore_credentials(&seeded, &persisted)
+            .await
+            .unwrap();
+        drop(seeded);
+        let store = FileSessionStore::new(&store_dir);
+        store
+            .save(serde_json::to_vec(&persisted).unwrap())
+            .await
+            .unwrap();
+        (data_dir, store_dir, store)
+    }
+
+    async fn saved_refresh_token(store: &FileSessionStore, store_dir: &std::path::Path) -> String {
+        let saved = store.load().await.unwrap().unwrap();
+        let (accounts, _) =
+            crate::session::AccountRegistry::from_bytes(&saved, store_dir.to_str().unwrap())
+                .unwrap();
+        let session = serde_json::to_value(&accounts.accounts[0].session).unwrap();
+        session["credentials"]["refresh_token"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_cold_push_cut_short_still_saves_the_rotated_tokens() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{header, method, path},
+        };
+
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let (data_dir, store_dir, store) = seeded_cold_store(&server, "cold-push-cut-short").await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/refresh"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(
+                        json!({"access_token": "new-access", "refresh_token": "new-refresh"}),
+                    )
+                    .set_delay(std::time::Duration::from_millis(1500)),
+            )
+            .expect(1)
+            .mount(server.server())
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/account/whoami"))
+            .and(header("authorization", "Bearer old-access"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+                "errcode": "M_UNKNOWN_TOKEN", "error": "expired"
+            })))
+            .mount(server.server())
+            .await;
+
+        let cold_dir = store_dir.clone();
+        tokio::task::spawn_blocking(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(super::settle_refreshes(tokio::time::timeout(
+                    std::time::Duration::from_millis(500),
+                    async {
+                        let client = restore_push_client(&cold_dir, "@alice:example.org", "A")
+                            .await
+                            .unwrap();
+                        let _ = client.retry(|| client.whoami()).await;
+                    },
+                )))
+                .unwrap_err();
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(saved_refresh_token(&store, &store_dir).await, "new-refresh");
+        tokio::fs::remove_dir_all(&data_dir).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_cold_push_failure_with_a_live_token_does_not_rotate_it() {
+        use wiremock::{
+            Mock, ResponseTemplate,
+            matchers::{method, path},
+        };
+
+        let server = MatrixMockServer::new().await;
+        server.mock_versions().ok().mount().await;
+        let (data_dir, store_dir, store) = seeded_cold_store(&server, "cold-push-live-token").await;
+        Mock::given(method("GET"))
+            .and(path("/_matrix/client/v3/account/whoami"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "user_id": "@alice:example.org", "device_id": "A"
+            })))
+            .mount(server.server())
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/refresh"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(
+                json!({"access_token": "new-access", "refresh_token": "new-refresh"}),
+            ))
+            .expect(0)
+            .mount(server.server())
+            .await;
+
+        let client = restore_push_client(&store_dir, "@alice:example.org", "A")
+            .await
+            .unwrap();
+        client
+            .retry(|| async { Err::<(), _>("the room key has not arrived") })
+            .await
+            .unwrap_err();
+
+        assert_eq!(saved_refresh_token(&store, &store_dir).await, "old-refresh");
+        drop(client);
         tokio::fs::remove_dir_all(&data_dir).await.unwrap();
     }
 
