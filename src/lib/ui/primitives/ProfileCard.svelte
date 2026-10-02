@@ -381,7 +381,7 @@
   .profile-card-crest {
     align-items: flex-start;
     display: flex;
-    gap: var(--space-300);
+    gap: var(--space-100);
     min-height: calc(var(--profile-avatar-size) / 2);
     padding: 0 var(--space-200);
     pointer-events: none;
