@@ -32,6 +32,7 @@ vi.mock('#lib/settings/preferences.svelte.js', () => ({ preferences: { errorRepo
 vi.mock('#src/transport', () => ({ CoreError: class CoreError extends Error {} }));
 vi.mock('./worker/core.worker.ts?sharedworker&url', () => ({ default: 'core.worker.js' }));
 vi.mock('#src/generated/wasm/sable_wasm_version.js', () => ({ default: 'test-wasm-version' }));
+vi.mock('#lib/migrations/v1/migration.js', () => ({ migrateV1: vi.fn() }));
 
 afterEach(async () => {
   await Sentry.close(0);

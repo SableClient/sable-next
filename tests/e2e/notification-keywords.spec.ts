@@ -42,7 +42,7 @@ test.describe('against the homeserver', () => {
 
     await expect
       .poll(() =>
-        admin.pushRules().then((rules) => (rules.global.content ?? []).map((r) => r.rule_id))
+        admin.pushRules().then((rules) => (rules.global.content ?? []).map((r) => r.pattern))
       )
       .toContain(word);
   });
@@ -80,7 +80,7 @@ test.describe('against the homeserver', () => {
     await expect(keyword(page, word)).toHaveCount(0);
     await expect
       .poll(() =>
-        admin.pushRules().then((rules) => (rules.global.content ?? []).map((r) => r.rule_id))
+        admin.pushRules().then((rules) => (rules.global.content ?? []).map((r) => r.pattern))
       )
       .not.toContain(word);
   });
@@ -102,7 +102,9 @@ test.describe('when the server refuses', () => {
   }) => {
     const { input, add } = fields(page);
     const word = `refused${String(Date.now())}`;
-    homeserverProxy.fail(new RegExp(`PUT /_matrix/client/v3/pushrules/global/content/${word}`));
+    homeserverProxy.fail(
+      /PUT \/_matrix\/client\/v3\/pushrules\/global\/content\/moe\.sable\.keyword\./
+    );
 
     await input.fill(word);
     await add.click();
@@ -119,7 +121,9 @@ test.describe('when the server refuses', () => {
     await add.click();
     await expect(keyword(page, word)).toBeVisible();
 
-    homeserverProxy.fail(new RegExp(`DELETE /_matrix/client/v3/pushrules/global/content/${word}`));
+    homeserverProxy.fail(
+      /DELETE \/_matrix\/client\/v3\/pushrules\/global\/content\/moe\.sable\.keyword\./
+    );
     await removeButton(page, word).click();
 
     const dialog = page.getByRole('dialog', { name: `Remove keyword ${word}?` });

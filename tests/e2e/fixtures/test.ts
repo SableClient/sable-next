@@ -141,10 +141,12 @@ async function saveSignedInState(
   homeserverUrl: string,
   username: string,
   path: string,
-  settle?: (page: Page) => Promise<void>
+  settle?: (page: Page) => Promise<void>,
+  prepare?: (page: Page) => Promise<void>
 ): Promise<void> {
   const context = await browser.newContext({ baseURL });
   const page = await context.newPage();
+  await prepare?.(page);
   await signInThroughUi(page, homeserverUrl, username);
   await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible({
     timeout: 30_000,
@@ -316,12 +318,49 @@ export const test = base.extend<Fixtures, WorkerFixtures>({
               page.locator('.timeline-viewport .item[data-event-id]').first()
             ).toBeVisible({ timeout: 30_000 });
           }
+          await expect
+            .poll(
+              async () => {
+                const state = (await page.context().storageState({ indexedDB: true })) as {
+                  origins: {
+                    indexedDB?: {
+                      name: string;
+                      stores: { records: { key: unknown }[] }[];
+                    }[];
+                  }[];
+                };
+                return state.origins
+                  .flatMap((origin) => origin.indexedDB ?? [])
+                  .filter((database) => database.name.endsWith('::sable-search'))
+                  .flatMap((database) =>
+                    database.stores.flatMap((store) =>
+                      store.records.map((record) =>
+                        typeof record.key === 'string' ? record.key : ''
+                      )
+                    )
+                  );
+              },
+              { timeout: 120_000, intervals: [1_000] }
+            )
+            .toEqual(
+              expect.arrayContaining(
+                [generalId, randomId, clubhouseId].map((roomId) => `sable.search.room.${roomId}`)
+              )
+            );
+        },
+        async (page) => {
+          await page.addInitScript(() => {
+            localStorage.setItem(
+              'sable-preferences',
+              JSON.stringify({ searchFlushInterval: '20' })
+            );
+          });
         }
       );
 
       await use({ statePath, generalId, randomId, clubId, clubhouseId, sender });
     },
-    { scope: 'worker' },
+    { scope: 'worker', timeout: 180_000 },
   ],
 
   searchCorpus: async ({ workerSearchCorpus }, use) => {

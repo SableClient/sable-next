@@ -10,6 +10,7 @@ export default mergeConfig(
   defineConfig({
     resolve: process.env.VITEST ? { conditions: ['browser'] } : undefined,
     test: {
+      maxWorkers: 4,
       alias: {
         '$app/paths/internal/client': new URL(
           './node_modules/@sveltejs/kit/src/runtime/app/paths/internal/client.js',

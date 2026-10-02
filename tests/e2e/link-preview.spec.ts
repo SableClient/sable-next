@@ -39,7 +39,7 @@ test('a message with a link renders a preview when link previews are enabled', a
 
   const preview = page.locator('.link-preview');
   await expect(preview).toBeVisible({ timeout: 20_000 });
-  await expect(preview).toHaveAttribute('href', ARTICLE);
+  await expect(preview.locator('.link-preview-text')).toHaveAttribute('href', ARTICLE);
   await expect(preview.locator('.link-preview-title')).toHaveText('The Example Article');
   await expect(preview.locator('.link-preview-site')).toHaveText('Example');
 });

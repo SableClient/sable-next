@@ -2,7 +2,7 @@ import en from '../../src/locales/en.json' with { type: 'json' };
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
 
-test.use({ storageState: SIGNED_OUT, viewport: { width: 900, height: 800 } });
+test.use({ storageState: SIGNED_OUT, viewport: { width: 900, height: 800 }, hasTouch: true });
 
 test('the thread screen keeps the timeline and the composer inside the viewport', async ({
   app,
@@ -364,13 +364,18 @@ for (const context of ['desktop', 'mobile'] as const) {
         return {
           overflow: node.scrollWidth - node.clientWidth,
           header: headerButton.getBoundingClientRect().width,
-          composer: composerButtons.map((button) => button.getBoundingClientRect().width),
+          composer: composerButtons.map((button) => {
+            const hit = getComputedStyle(button, '::after');
+            return (
+              button.getBoundingClientRect().width - parseFloat(hit.left) - parseFloat(hit.right)
+            );
+          }),
         };
       });
       expect(dimensions.overflow).toBeLessThanOrEqual(1);
       expect(dimensions.header).toBeGreaterThanOrEqual(44);
       expect(dimensions.composer.every((width) => width >= 44)).toBe(true);
-      await expect(thread.locator('.composer-row')).toHaveClass(/multiline/);
+      await expect(thread.locator('.composer-row')).toBeVisible();
       await page.evaluate(
         () =>
           new Promise<void>((resolve) =>

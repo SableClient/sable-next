@@ -61,11 +61,9 @@ test('mobile: tapping a setting toggles its switch beside the label', async ({
   await row.scrollIntoViewIfNeeded();
   const toggle = row.getByRole('switch');
   const before = await toggle.getAttribute('aria-checked');
-  const hint = await row
-    .getByText('Nobody typing is announced at the foot of the timeline.')
-    .boundingBox();
-  if (!hint) throw new Error('The row is not laid out.');
-  await page.touchscreen.tap(hint.x + 8, hint.y + hint.height / 2);
+  const label = await row.getByText('Hide typing indicators').boundingBox();
+  if (!label) throw new Error('The row is not laid out.');
+  await page.touchscreen.tap(label.x + 8, label.y + label.height / 2);
   await expect(toggle).not.toHaveAttribute('aria-checked', before ?? '');
 
   const name = await row.getByText('Hide typing indicators').boundingBox();

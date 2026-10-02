@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
 
-test.use({ storageState: SIGNED_OUT });
+test.use({ storageState: SIGNED_OUT, hasTouch: true });
 
 const NARROW = { width: 390, height: 800 };
 const MEDIA_LOADED = { timeout: 15_000 };
@@ -21,7 +21,7 @@ function picture(width: number, height: number) {
       filename: 'shot.png',
       caption: null,
       html: null,
-      source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+      source: 'mxc://example.test/history-image',
       mime: 'image/png',
       width,
       height,
@@ -38,7 +38,7 @@ function undecodablePicture() {
     ...item,
     content: {
       ...item.content,
-      source: JSON.stringify({ Plain: 'mxc://example.test/undecodable-shot' }),
+      source: 'mxc://example.test/undecodable-shot',
     },
   };
 }
@@ -118,6 +118,7 @@ for (const mobile of [false, true]) {
       },
     });
     const open = timeline.container.getByRole('button', { name: 'Open shot.png' });
+    await expect(open.locator('img')).toHaveCSS('opacity', '1');
     await open.click();
 
     const viewer = page.getByRole('dialog', { name: 'Media viewer', exact: true });

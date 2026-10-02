@@ -12,7 +12,7 @@ export function isMacPlatform(): boolean {
 
 export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void {
   return on(window, 'keydown', (event) => {
-    if (isDialogOpen()) return;
+    if (event.defaultPrevented || isDialogOpen()) return;
 
     const isMac = isMacPlatform();
 

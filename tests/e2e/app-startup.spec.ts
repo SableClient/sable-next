@@ -15,7 +15,7 @@ test('renders a startup state while the core is restoring', async ({ app, instal
   await expect(app.startupHeading).toBeVisible();
 });
 
-test('returns to login when the core cannot restore the session', async ({
+test('offers recovery when the core cannot restore the session', async ({
   page,
   app,
   installEmptyCore,
@@ -23,7 +23,12 @@ test('returns to login when the core cannot restore the session', async ({
   await installEmptyCore('error');
   await app.openRooms();
 
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(
+    page.getByRole('heading', { name: 'Unable to restore your session.' })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/login\?addAccount=1$/);
   await expect(page.getByRole('heading', { name: 'Welcome to Sable' })).toBeVisible();
 });
 

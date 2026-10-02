@@ -36,3 +36,22 @@ test('a shortcut not allowed in editable fields stays out of the composer', () =
 
   expect(handler).not.toHaveBeenCalled();
 });
+
+test('a shortcut handled by the focused field does not switch rooms', () => {
+  const handler = vi.fn();
+  cleanup = registerGlobalShortcuts({ 'navigation.nextRoom': handler });
+  const input = document.createElement('input');
+  input.addEventListener('keydown', (event) => {
+    event.preventDefault();
+  });
+  document.body.append(input);
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      altKey: true,
+      bubbles: true,
+      cancelable: true,
+    })
+  );
+  expect(handler).not.toHaveBeenCalled();
+});

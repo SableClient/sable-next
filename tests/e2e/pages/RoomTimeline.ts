@@ -93,7 +93,7 @@ export class RoomTimeline {
           previous = current;
           return settled;
         },
-        { intervals: [100, 100, 100, 100, 100, 100], timeout: 5_000 }
+        { intervals: [200], timeout: 5_000 }
       )
       .toBe(true);
   }

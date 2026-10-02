@@ -10,7 +10,7 @@ vi.mock('#lib/core/context.js');
 import { core } from '#lib/core/__mocks__/context.js';
 
 import MediaImage from './MediaImage.svelte';
-import { cachedMediaUrl } from './media-url.js';
+import { cachedMediaUrl, loadMediaUrl } from './media-url.js';
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
@@ -108,9 +108,7 @@ test('a 2540-emote pack restores an evicted preview while other media is pending
   });
   core.fetchMedia.mockResolvedValue(new Uint8Array([1]));
   for (let index = 0; index < 2540; index += 1) {
-    const row = render(MediaImage, { props: props(index) });
-    await settle();
-    row.unmount();
+    await loadMediaUrl({ session: null, commands: core }, props(index).source, 144, 144);
   }
   expect(core.fetchMedia).toHaveBeenCalledTimes(2540);
   expect(cachedMediaUrl({ session: null }, props(0).source, 144, 144)).toBeUndefined();

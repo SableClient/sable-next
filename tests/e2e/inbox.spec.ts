@@ -49,8 +49,8 @@ test('filters notifications, and says so when nothing matches', async ({
   await expect(page).toHaveURL(/\?filter=mentions$/);
   await expect(row).toBeVisible();
 
-  await inbox.getByRole('button', { name: 'Chats' }).click();
-  await expect(inbox.getByRole('paragraph').filter({ hasText: 'No unread chats.' })).toBeVisible();
+  await inbox.getByRole('button', { name: 'DMs' }).click();
+  await expect(inbox.getByRole('paragraph').filter({ hasText: 'No unread DMs.' })).toBeVisible();
 });
 
 test('answers a pending invitation above the feed', async ({ page, app, admin, guest }) => {

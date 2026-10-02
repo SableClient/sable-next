@@ -153,7 +153,7 @@ for (const mobile of [false, true]) {
       await installRoomCore('ready');
       await app.openRoom('!room:example.test');
       await page.getByRole('button', { name: "Open Alice's profile" }).last().click();
-      const status = page.locator('.profile-card-status');
+      const status = page.locator('.profile-card-status-text');
       await expect(status).toBeVisible();
 
       expect(await status.evaluate((element) => element.scrollHeight)).toBeGreaterThan(

@@ -29,7 +29,13 @@ test('a tombstoned room replaces the composer with a banner offering the success
   });
 });
 
-test('an upgraded room leads back to the room it replaced', async ({ page, app, admin, guest }) => {
+test('an upgraded room leads back to the room it replaced', async ({
+  page,
+  app,
+  admin,
+  guest,
+  timeline,
+}) => {
   const roomId = await guest.createRoom({
     name: `Old Room ${String(Date.now())}`,
     invite: [admin.userId],
@@ -40,7 +46,10 @@ test('an upgraded room leads back to the room it replaced', async ({ page, app, 
   await guest.invite(successorId, admin.userId);
   await admin.join(successorId);
 
-  await app.openRoom(successorId, { settled: false });
+  await app.openRooms();
+  await page.locator(`a[href="/rooms/${encodeURIComponent(successorId)}"]`).click();
+  await timeline.expectRevealed();
+  await timeline.scrollToAndNotify(0);
 
   await expect(page.getByText(en.timeline.predecessor)).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: en.timeline.predecessorOpen }).click();

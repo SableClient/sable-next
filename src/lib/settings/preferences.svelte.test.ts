@@ -34,11 +34,11 @@ test('keeps a resized banner height across a reload', () => {
   expect(sanitize({ roomBannerHeight: 9000 }, preferences).roomBannerHeight).toBe(500);
 });
 
-test('an older button order gains the persona and format buttons at the end', () => {
+test('an older button order gains the separator, persona and format buttons at the end', () => {
   expect(
     sanitize({ composerButtonOrder: ['emoticon', 'gif', 'sticker'] }, preferences)
       .composerButtonOrder
-  ).toEqual(['emoticon', 'gif', 'sticker', 'persona', 'format']);
+  ).toEqual(['emoticon', 'gif', 'sticker', 'separator', 'persona', 'format']);
 });
 
 test('threads default to full conversations and keep a saved panel choice', () => {

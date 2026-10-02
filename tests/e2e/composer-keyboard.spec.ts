@@ -152,12 +152,12 @@ test('mobile emote sheet keeps its grid above the keyboard', async ({
   });
   await expect(page.locator('html')).toHaveCSS('--keyboard-height', '336px');
   await page.getByRole('button', { name: en.composer.emotesAndStickers }).tap();
-  const grid = page.locator('.board.sheet .grid').first();
+  const grid = page.locator('.board.sheet [role="grid"]').first();
   await expect(grid).toBeVisible();
 
   const measured = await page.evaluate(() => {
     const board = document.querySelector('.board.sheet');
-    const firstGrid = document.querySelector('.board.sheet .grid');
+    const firstGrid = document.querySelector('.board.sheet [role="grid"]');
     if (!board || !firstGrid || !window.visualViewport) throw new Error('missing board');
     return {
       board: board.getBoundingClientRect().bottom,

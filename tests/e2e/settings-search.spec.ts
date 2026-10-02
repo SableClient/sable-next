@@ -28,11 +28,11 @@ test('typing filters settings by their name across categories', async ({ page })
 });
 
 test('typing matches on the translated description, not just the name', async ({ page }) => {
-  await searchField(page).fill('have not read');
+  await searchField(page).fill('only the room and sender');
 
   const results = resultsList(page).getByRole('listitem');
   await expect(results).toHaveCount(1);
-  await expect(results.filter({ hasText: 'System notifications' })).toBeVisible();
+  await expect(results.filter({ hasText: 'Show message content' })).toBeVisible();
   await expect(results.filter({ hasText: 'In Notifications' })).toBeVisible();
 });
 

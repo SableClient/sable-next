@@ -603,7 +603,13 @@
     if (tail === sentEcho) return;
     const seeded = sentEcho !== undefined;
     sentEcho = tail;
-    if (seeded && last?.is_own && untrack(() => nearLatest)) void engine.jumpTo(null, 'start');
+    if (
+      seeded &&
+      (timeline.mode.kind === 'live' || timeline.mode.kind === 'thread') &&
+      last?.is_own &&
+      untrack(() => nearLatest)
+    )
+      void engine.jumpTo(null, 'start');
   });
   export function composerFocused(event: FocusEvent): void {
     if (!controller || !revealed || !isEditableTarget(event.target)) return;

@@ -60,6 +60,20 @@ export function instrumentSelfWrites(viewport: HTMLElement): void {
     },
   });
   window.__e2eUnexpectedScrolls = [];
+  const canvas = viewport.querySelector<HTMLElement>('.items');
+  if (canvas) {
+    Object.defineProperty(canvas.style, 'height', {
+      configurable: true,
+      get() {
+        return canvas.style.getPropertyValue('height');
+      },
+      set(value: string) {
+        const before = read(viewport);
+        canvas.style.setProperty('height', value);
+        record.writes += read(viewport) - before;
+      },
+    });
+  }
   for (const method of ['scroll', 'scrollTo', 'scrollBy'] as const) {
     const native = viewport[method].bind(viewport);
     viewport[method] = ((...args: [number, number] | [ScrollToOptions]) => {

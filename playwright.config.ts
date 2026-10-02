@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = process.env.SABLE_PREVIEW_PORT ?? '4173';
 const origin = `http://127.0.0.1:${port}`;
+const migrationOrigin = 'http://127.0.0.1:4186';
 const SCRIPTED_TIMELINE_SPECS =
   /(?:^|\/)(?:timeline-(?:anchoring|stability|gap|keyboard|lifecycle|media)|thread-links)\.spec\.ts$/;
 
@@ -37,7 +38,7 @@ export default defineConfig({
     {
       name: 'chromium',
       dependencies: ['setup'],
-      testIgnore: /global\.(setup|teardown)\.ts/,
+      testIgnore: /(?:global\.(?:setup|teardown)|v1-migration\.spec)\.ts/,
       use: devices['Desktop Chrome'],
     },
     {
@@ -47,6 +48,11 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /(?:^|\/)(?:app-shell|login|navigation|window-activity|thread-links)\.spec\.ts$/,
       use: devices['Desktop Safari'],
+    },
+    {
+      name: 'migration',
+      testMatch: 'v1-migration.spec.ts',
+      use: { ...devices['Desktop Chrome'], baseURL: migrationOrigin },
     },
     {
       name: 'android',
@@ -59,14 +65,23 @@ export default defineConfig({
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
   ],
-  webServer: {
-    command: `${build}pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
-    url: origin,
-    reuseExistingServer: !process.env.CI,
-    timeout: 600_000,
-    gracefulShutdown: {
-      signal: 'SIGTERM',
-      timeout: 5_000,
+  webServer: [
+    {
+      command: `${build}pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+      url: origin,
+      reuseExistingServer: !process.env.CI,
+      timeout: 600_000,
+      gracefulShutdown: {
+        signal: 'SIGTERM',
+        timeout: 5_000,
+      },
     },
-  },
+    {
+      command:
+        'SABLE_WASM_OUTPUT=src/generated/wasm pnpm exec vite dev --host 127.0.0.1 --port 4186 --strictPort',
+      url: migrationOrigin,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });

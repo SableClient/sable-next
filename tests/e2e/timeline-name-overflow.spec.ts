@@ -14,6 +14,7 @@ for (const name of [
     timeline,
     installRoomCore,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await installRoomCore('ready');
     await app.openRoom('!room:example.test');
     await timeline.expectRevealed();
@@ -60,7 +61,7 @@ for (const name of [
       });
       expect(overflowing).toEqual([]);
     }).toPass({ timeout: 5_000 });
-    await subject.click();
+    await page.getByRole('button', { name: `Open ${name}'s profile`, exact: true }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
   });
 }

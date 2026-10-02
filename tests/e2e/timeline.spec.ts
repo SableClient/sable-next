@@ -13,15 +13,16 @@ test('mobile timeline truncates a long emote sender instead of scrolling sideway
   timeline,
   homeserver,
   signIn,
+  scratchRoom,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn();
-  await app.openRoomFromList(TIMELINE_ROOM_NAME);
+  await app.openRoomFromList(scratchRoom.name);
   await expect(timeline.loading).toHaveCount(0);
   const body = `long emote sender ${String(Date.now())}`;
 
   const response = await fetch(
-    `${homeserver.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(homeserver.timelineRoomId)}/send/m.room.message/long-emote-sender`,
+    `${homeserver.baseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(scratchRoom.roomId)}/send/m.room.message/long-emote-sender`,
     {
       method: 'PUT',
       headers: {
@@ -119,16 +120,17 @@ test('keeps the live subscription when another tab restores the shared session',
   timeline,
   homeserver,
   signIn,
+  scratchRoom,
 }) => {
   await page.setViewportSize({ width: 1280, height: 420 });
   await signIn();
-  await expect(app.roomLink(TIMELINE_ROOM_NAME)).toBeVisible({ timeout: 15_000 });
-  await app.openRoomFromList(TIMELINE_ROOM_NAME);
+  await expect(app.roomLink(scratchRoom.name)).toBeVisible({ timeout: 15_000 });
+  await app.openRoomFromList(scratchRoom.name);
   await expect(timeline.loading).toHaveCount(0);
 
   const secondPage = await context.newPage();
   await secondPage.goto('/rooms');
-  await expect(secondPage.getByRole('link', { name: TIMELINE_ROOM_NAME })).toBeVisible({
+  await expect(secondPage.getByRole('link', { name: scratchRoom.name })).toBeVisible({
     timeout: 15_000,
   });
 
@@ -136,7 +138,7 @@ test('keeps the live subscription when another tab restores the shared session',
   await sendTimelineMessage(
     homeserver.baseUrl,
     homeserver.accessToken,
-    homeserver.timelineRoomId,
+    scratchRoom.roomId,
     `live-${String(Date.now())}`,
     body
   );

@@ -116,6 +116,9 @@ test('a topic older than the sync window is paged in', async ({ page, admin }) =
 });
 
 test('opening a topic shows the thread panel', async ({ page, admin }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ threadPresentation: 'panel' }));
+  });
   const roomId = await admin.createRoom({
     name: `Forum thread ${String(Date.now())}`,
     roomType: 'pl.chrome.forum',
@@ -131,12 +134,15 @@ test('opening a topic shows the thread panel', async ({ page, admin }) => {
   await expect(threads).toBeVisible({ timeout: 30_000 });
   await threads.getByRole('listitem').first().click();
 
-  const thread = page.getByRole('complementary', { name: 'Thread' });
+  const thread = page.getByRole('region', { name: 'Thread' });
   await expect(thread).toBeVisible();
   await expect(thread).toContainText('The answer');
 });
 
 test('resizes a forum thread panel with the keyboard', async ({ page, admin }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ threadPresentation: 'panel' }));
+  });
   const roomId = await admin.createRoom({
     name: `Forum resize ${String(Date.now())}`,
     roomType: 'pl.chrome.forum',

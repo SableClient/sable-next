@@ -20,6 +20,10 @@ test('signing out reaches the sign-in page without a render failure', async ({
 
   await page.goto('/settings/account');
   await page.getByRole('button', { name: 'Log out' }).click();
+  await page
+    .getByRole('dialog', { name: 'Log out', exact: true })
+    .getByRole('button', { name: 'Log out' })
+    .click();
 
   await expect(page).toHaveURL(/\/login$/, { timeout: 20_000 });
   await expect(page.getByRole('combobox', { name: 'Account provider' })).toBeVisible();

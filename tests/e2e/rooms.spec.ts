@@ -39,8 +39,7 @@ for (const entry of ['sidebar', 'header'] as const) {
     if (entry === 'sidebar') {
       await trigger.hover();
     } else {
-      await trigger.focus();
-      await page.keyboard.press('ArrowRight');
+      await trigger.press('ArrowRight');
     }
 
     await expect(page.getByRole('menuitem', { name: 'All messages', exact: true })).toBeVisible();

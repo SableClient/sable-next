@@ -1,10 +1,10 @@
-// A pusher write is a real request to the homeserver, so what these guard is
-// that nothing leaves until Apply.
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-import { expect, test } from './fixtures/test';
+test.use({ storageState: SIGNED_OUT });
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, installRoomCore }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
+  await installRoomCore('ready');
 });
 
 const GATEWAY = 'https://sygnal.example.test/_matrix/push/v1/notify';

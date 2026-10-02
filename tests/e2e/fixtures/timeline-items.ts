@@ -54,7 +54,7 @@ export function timelineImage(id: string): TimelineItemView {
       filename: 'History image',
       caption: null,
       html: null,
-      source: JSON.stringify({ Plain: 'mxc://example.test/history-image' }),
+      source: 'mxc://example.test/history-image',
       mime: 'image/png',
       size: null,
       blurhash: null,

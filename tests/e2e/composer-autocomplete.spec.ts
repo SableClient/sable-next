@@ -1,6 +1,6 @@
 import { expect, test, SIGNED_OUT } from './fixtures/test';
 
-test.use({ storageState: SIGNED_OUT, keepUnverifiedBanner: true });
+test.use({ storageState: SIGNED_OUT, keepUnverifiedBanner: true, hasTouch: true });
 
 test('quick reaction autocomplete selects with Enter or Tab', async ({
   page,

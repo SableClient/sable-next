@@ -237,6 +237,34 @@ test('a permalink whose context does not fill the viewport paginates on its own'
   expect(future).toHaveBeenCalled();
 });
 
+test('own historical messages added to a permalink do not jump to the end', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('target')];
+  roomTimeline.mode = { kind: 'focused', eventId: '$target' };
+  roomTimeline.forwardPagination = 'end';
+  roomTimeline.backwardPagination = 'end';
+  const jumps = vi.spyOn(TimelineWindow.prototype, 'jumpTo');
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        focusEventId: '$target',
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  viewport();
+  await runAnimationFrames();
+  jumps.mockClear();
+
+  roomTimeline.items = [...roomTimeline.items, { ...item('own-history'), is_own: true }];
+  await runAnimationFrames();
+
+  expect(jumps).not.toHaveBeenCalledWith(null, 'start');
+});
+
 test('stops focused automatic pagination after a failed or empty page', async () => {
   const roomTimeline = timeline();
   roomTimeline.items = [item('target')];
@@ -1352,6 +1380,24 @@ test('follows an own echo appended while the reader is still near latest', async
   expect(document.querySelectorAll('.item')).toHaveLength(21);
   expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
   expect(followingLive()).toBe(true);
+});
+
+test('follows an own message sent in a thread while the reader is near latest', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = liveItems(20);
+  const { element, end, setScrollHeight } = await mountLive(roomTimeline);
+  roomTimeline.mode = { kind: 'thread', rootEventId: '$root' };
+  await tick();
+
+  await dragTo(element, end, end - 30);
+  touch(element, 'touchend', 170);
+  await finishWheelGesture(element);
+
+  roomTimeline.items = [...roomTimeline.items, { ...item('own-thread-message'), is_own: true }];
+  setScrollHeight(2_100);
+  await runAnimationFrames();
+
+  expect(element.scrollHeight - element.clientHeight - element.scrollTop).toBe(0);
 });
 
 test('follows an own message that arrives already sent while the reader is near latest', async () => {

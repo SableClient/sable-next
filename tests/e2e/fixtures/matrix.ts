@@ -225,7 +225,7 @@ export class MatrixAdmin {
     );
   }
 
-  pushRules(): Promise<{ global: { content?: { rule_id: string }[] } }> {
+  pushRules(): Promise<{ global: { content?: { rule_id: string; pattern?: string }[] } }> {
     return this.request<{ global: { content?: { rule_id: string }[] } }>(
       'GET',
       'client/v3/pushrules/'

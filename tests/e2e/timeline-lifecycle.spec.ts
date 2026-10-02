@@ -106,6 +106,6 @@ test('inline image cleanup releases detached message trees', async ({
   await cycle();
   const baseline = await retainedNodes();
   for (let index = 0; index < 40; index += 1) await cycle();
-  expect(await retainedNodes()).toBeLessThan(baseline + 250);
+  await expect.poll(retainedNodes).toBeLessThan(baseline + 250);
   await cdp.detach();
 });

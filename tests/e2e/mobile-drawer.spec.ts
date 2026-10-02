@@ -110,19 +110,12 @@ test('mobile: scrolling a page into view behind the open list cannot shift the d
   installRoomCore,
 }) => {
   await installRoomCore('ready');
-  await page.goto('/rooms');
-  await page.locator('.navigation-panel .mobile-tools a[href="/navigate"]').click({
-    timeout: 30_000,
-  });
-  await expect(page.locator('.content .jump-list [role=option]').first()).toBeVisible();
+  await page.goto('/direct');
 
   const drawer = page.locator('#drawer-toggle');
-  await drawer.evaluate((node: HTMLButtonElement) => {
-    node.click();
-  });
   await expect(drawer).toHaveAttribute('aria-pressed', 'true');
-  await page.evaluate(() => {
-    document.querySelector('.jump-list [role=option]')?.scrollIntoView({ block: 'nearest' });
+  await page.getByLabel('User id').evaluate((node) => {
+    node.scrollIntoView({ block: 'nearest' });
   });
 
   expect(await page.locator('.drawer-viewport').evaluate((node) => node.scrollLeft)).toBe(0);

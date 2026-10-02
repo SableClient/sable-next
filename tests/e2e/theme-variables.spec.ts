@@ -180,6 +180,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     installRoomCore,
   }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await installRoomCore('ready');
     await installTheme(page, theme);
     await page.goto('/settings');
