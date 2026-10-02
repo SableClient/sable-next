@@ -1385,6 +1385,13 @@ export type UploadProgressView = {
 	total: number,
 };
 
+export type UrlPreviewVideoView = {
+	source: string,
+	mime: string | null,
+	width: number | null,
+	height: number | null,
+};
+
 export type UrlPreviewView = {
 	url: string,
 	title: string | null,
@@ -1394,6 +1401,10 @@ export type UrlPreviewView = {
 	image_mime: string | null,
 	image_width: number | null,
 	image_height: number | null,
+	video: UrlPreviewVideoView | null,
+	theme_color: string | null,
+	card: string | null,
+	author_name: string | null,
 };
 
 export type UserDeviceView = {

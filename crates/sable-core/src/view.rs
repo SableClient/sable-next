@@ -1717,6 +1717,10 @@ fn bundled_link_previews(content: Option<&serde_json::Value>) -> Vec<UrlPreviewV
                         image_mime: text("og:image:type").map(ToOwned::to_owned),
                         image_width: dimension("og:image:width"),
                         image_height: dimension("og:image:height"),
+                        video: crate::dispatch::preview_video(bundle),
+                        theme_color: crate::dispatch::preview_theme_color(bundle),
+                        card: crate::dispatch::preview_card(bundle),
+                        author_name: text(crate::dispatch::PREVIEW_AUTHOR).map(ToOwned::to_owned),
                     })
                 })
                 .filter(|preview| seen.insert(preview.url.clone()))

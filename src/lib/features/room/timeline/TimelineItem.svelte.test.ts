@@ -27,6 +27,10 @@ const core = Object.assign(baseCore, {
       image_mime: null,
       image_width: null,
       image_height: null,
+      video: null,
+      theme_color: null,
+      card: null,
+      author_name: null,
     })
   ),
 });
@@ -1475,6 +1479,10 @@ test('a message whose embeds were removed renders none, bundled or found', async
         image_mime: null,
         image_width: null,
         image_height: null,
+        video: null,
+        theme_color: null,
+        card: null,
+        author_name: null,
       },
     ],
     link_previews_removed: true,

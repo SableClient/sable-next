@@ -73,6 +73,10 @@ test('falls back to the homeserver preview for a video YouTube will not describe
     image_mime: null,
     image_width: null,
     image_height: null,
+    video: null,
+    theme_color: null,
+    card: null,
+    author_name: null,
   };
   render(YoutubeEmbed, { url: bundled.url, encrypted: false, bundled });
   await settle();
@@ -97,6 +101,10 @@ test('shows no homeserver preview while YouTube has not answered', async () => {
     image_mime: null,
     image_width: null,
     image_height: null,
+    video: null,
+    theme_color: null,
+    card: null,
+    author_name: null,
   };
   render(YoutubeEmbed, { url: bundled.url, encrypted: false, bundled });
   await settle();

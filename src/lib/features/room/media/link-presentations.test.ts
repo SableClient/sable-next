@@ -14,6 +14,10 @@ const preview: UrlPreviewView = {
   image_mime: null,
   image_width: null,
   image_height: null,
+  video: null,
+  theme_color: null,
+  card: null,
+  author_name: null,
 };
 
 describe('findLinkPresentation', () => {

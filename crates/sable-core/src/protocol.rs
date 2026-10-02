@@ -3091,6 +3091,21 @@ pub struct UrlPreviewView {
     pub image_width: Option<u64>,
     #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
     pub image_height: Option<u64>,
+    pub video: Option<UrlPreviewVideoView>,
+    pub theme_color: Option<String>,
+    pub card: Option<String>,
+    pub author_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typegen", derive(specta::Type))]
+pub struct UrlPreviewVideoView {
+    pub source: String,
+    pub mime: Option<String>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub width: Option<u64>,
+    #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Number>))]
+    pub height: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

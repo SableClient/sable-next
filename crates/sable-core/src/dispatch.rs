@@ -48,7 +48,8 @@ use crate::protocol::{
     Command, CommandErr, CommandOk, CoreEvent, CreateJoinRuleView, CreateRoomKind,
     HomeserverSoftwareView, ImageSourcePackReferenceView, ImageSourcePackView, MembershipView,
     MessageKind, MutualRoomView, PackImageInfoView, PaginationDirection, ProfilePropagationView,
-    RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView, UrlPreviewView,
+    RoomOpenView, RoomStateEventView, RoomTag, RoomVersionView, RoomVersionsView,
+    UrlPreviewVideoView, UrlPreviewView,
 };
 use matrix_sdk_ui::notification_client::NotificationProcessSetup;
 
@@ -73,6 +74,41 @@ fn preview_refused(error: &matrix_sdk::HttpError) -> bool {
         .is_some_and(|api_error| api_error.status_code.as_u16() == 403)
 }
 
+pub(crate) const PREVIEW_THEME_COLOR: &str = "com.sable.theme_color";
+pub(crate) const PREVIEW_CARD: &str = "com.sable.card";
+pub(crate) const PREVIEW_AUTHOR: &str = "com.sable.author_name";
+
+pub(crate) fn preview_video(data: &serde_json::Value) -> Option<UrlPreviewVideoView> {
+    let source = data
+        .get("og:video")?
+        .as_str()
+        .filter(|source| source.starts_with("mxc://"))?
+        .to_owned();
+    let mime = data
+        .get("og:video:type")
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned);
+    let number = |key: &str| data.get(key).and_then(serde_json::Value::as_u64);
+    Some(UrlPreviewVideoView {
+        source,
+        mime,
+        width: number("og:video:width"),
+        height: number("og:video:height"),
+    })
+}
+
+pub(crate) fn preview_theme_color(data: &serde_json::Value) -> Option<String> {
+    let color = data.get(PREVIEW_THEME_COLOR)?.as_str()?;
+    let digits = color.strip_prefix('#')?;
+    (matches!(digits.len(), 3 | 4 | 6 | 8) && digits.chars().all(|c| c.is_ascii_hexdigit()))
+        .then(|| color.to_owned())
+}
+
+pub(crate) fn preview_card(data: &serde_json::Value) -> Option<String> {
+    let card = data.get(PREVIEW_CARD)?.as_str()?;
+    matches!(card, "summary" | "summary_large_image").then(|| card.to_owned())
+}
+
 fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> {
     let text = |key: &str| {
         data.get(key)
@@ -92,9 +128,17 @@ fn url_preview(url: String, data: &serde_json::Value) -> Option<UrlPreviewView> 
         image_mime: text("og:image:type"),
         image_width: number("og:image:width"),
         image_height: number("og:image:height"),
+        video: preview_video(data),
+        theme_color: preview_theme_color(data),
+        card: preview_card(data),
+        author_name: text(PREVIEW_AUTHOR),
     };
 
-    if preview.title.is_none() && preview.description.is_none() && preview.image.is_none() {
+    if preview.title.is_none()
+        && preview.description.is_none()
+        && preview.image.is_none()
+        && preview.video.is_none()
+    {
         return None;
     }
     Some(preview)
@@ -3155,6 +3199,27 @@ fn bundled_link_previews(previews: &[UrlPreviewView]) -> Option<serde_json::Valu
                     if let Some(height) = preview.image_height {
                         bundle.insert("og:image:height".to_owned(), height.into());
                     }
+                    if let Some(video) = &preview.video {
+                        bundle.insert("og:video".to_owned(), video.source.clone().into());
+                        if let Some(mime) = &video.mime {
+                            bundle.insert("og:video:type".to_owned(), mime.clone().into());
+                        }
+                        if let Some(width) = video.width {
+                            bundle.insert("og:video:width".to_owned(), width.into());
+                        }
+                        if let Some(height) = video.height {
+                            bundle.insert("og:video:height".to_owned(), height.into());
+                        }
+                    }
+                    if let Some(color) = &preview.theme_color {
+                        bundle.insert(PREVIEW_THEME_COLOR.to_owned(), color.clone().into());
+                    }
+                    if let Some(card) = &preview.card {
+                        bundle.insert(PREVIEW_CARD.to_owned(), card.clone().into());
+                    }
+                    if let Some(author) = &preview.author_name {
+                        bundle.insert(PREVIEW_AUTHOR.to_owned(), author.clone().into());
+                    }
                     serde_json::Value::Object(bundle)
                 })
                 .collect(),
@@ -3427,6 +3492,47 @@ mod tests {
         let empty = serde_json::json!({ "og:title": "   ", "og:image": "https://cdn/x.png" });
         assert!(super::url_preview("https://e".to_owned(), &empty).is_none());
         assert!(super::url_preview("https://e".to_owned(), &serde_json::json!({})).is_none());
+    }
+
+    #[test]
+    fn a_video_alone_is_a_preview() {
+        let data = serde_json::json!({
+            "og:video": "mxc://s/clip",
+            "og:video:type": "video/mp4",
+            "og:video:width": 1280,
+            "og:video:height": 720,
+        });
+        let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
+        let video = preview.video.expect("a video");
+        assert_eq!(video.source, "mxc://s/clip");
+        assert_eq!(video.mime.as_deref(), Some("video/mp4"));
+        assert_eq!((video.width, video.height), (Some(1280), Some(720)));
+
+        let remote = serde_json::json!({ "og:video": "https://cdn.example/clip.mp4" });
+        assert!(super::url_preview("https://e".to_owned(), &remote).is_none());
+    }
+
+    #[test]
+    fn presentation_hints_are_validated() {
+        let data = serde_json::json!({
+            "og:title": "Title",
+            "com.sable.theme_color": "#ff4500",
+            "com.sable.card": "summary_large_image",
+            "com.sable.author_name": "someone",
+        });
+        let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
+        assert_eq!(preview.theme_color.as_deref(), Some("#ff4500"));
+        assert_eq!(preview.card.as_deref(), Some("summary_large_image"));
+        assert_eq!(preview.author_name.as_deref(), Some("someone"));
+
+        let data = serde_json::json!({
+            "og:title": "Title",
+            "com.sable.theme_color": "red; background:url(x)",
+            "com.sable.card": "player",
+        });
+        let preview = super::url_preview("https://e".to_owned(), &data).expect("a preview");
+        assert_eq!(preview.theme_color, None);
+        assert_eq!(preview.card, None);
     }
 
     #[test]

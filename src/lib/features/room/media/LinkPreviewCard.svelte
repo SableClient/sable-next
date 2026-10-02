@@ -3,6 +3,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
+  import MediaContent from '#lib/ui/MediaContent.svelte';
   import MediaImage from '#lib/ui/MediaImage.svelte';
 
   import { imageMimeFromUrl } from './link-preview.js';
@@ -46,10 +47,14 @@
 
   let title = $derived(preview?.title ?? preview?.site_name ?? url);
   let compactImage = $derived(
-    preview?.image_width != null &&
-      preview.image_height != null &&
-      preview.image_width > 0 &&
-      preview.image_width <= preview.image_height
+    preview?.card === 'summary'
+      ? true
+      : preview?.card === 'summary_large_image'
+        ? false
+        : preview?.image_width != null &&
+          preview.image_height != null &&
+          preview.image_width > 0 &&
+          preview.image_width <= preview.image_height
   );
   const roomMedia = hasRoomMediaPreviews() ? useRoomMediaPreviews() : null;
   let mediaHidden = $derived(roomMedia?.hidden ?? false);
@@ -84,6 +89,17 @@
 
 {#if preview && Presentation}
   <Presentation {url} {preview} {mediaHidden} />
+{:else if preview?.video && !mediaHidden && preview.title === null && preview.site_name === null}
+  <MediaContent
+    class="link-preview-inline"
+    source={preview.video.source}
+    mime={preview.video.mime}
+    filename={url}
+    kind="video"
+    width={preview.video.width}
+    height={preview.video.height}
+    thumbnail={preview.image}
+  />
 {:else if preview?.image && !mediaHidden && preview.title === null && preview.site_name === null}
   <MediaImage
     class="link-preview-inline"
@@ -99,8 +115,24 @@
     onclick={openMediaViewer ? openPreviewImage : undefined}
   />
 {:else if preview}
-  <div class="link-preview" class:compact={compactImage}>
-    {#if preview.image && !mediaHidden}
+  <div
+    class="link-preview"
+    class:compact={compactImage && !preview.video}
+    class:accented={preview.theme_color !== null}
+    style:--link-preview-accent={preview.theme_color}
+  >
+    {#if preview.video && !mediaHidden}
+      <MediaContent
+        class="link-preview-video"
+        source={preview.video.source}
+        mime={preview.video.mime}
+        filename={url}
+        kind="video"
+        width={preview.video.width}
+        height={preview.video.height}
+        thumbnail={preview.image}
+      />
+    {:else if preview.image && !mediaHidden}
       <MediaImage
         class="link-preview-image"
         source={preview.image}
@@ -122,6 +154,7 @@
       aria-label={title}
     >
       {#if preview.site_name}<span class="link-preview-site">{preview.site_name}</span>{/if}
+      {#if preview.author_name}<span class="link-preview-author">{preview.author_name}</span>{/if}
       <span class="link-preview-title">{title}</span>
       {#if preview.description}
         <span class="link-preview-description">{preview.description}</span>
@@ -150,6 +183,10 @@
     text-decoration: none;
   }
 
+  .link-preview.accented {
+    border-inline-start: var(--space-100) solid var(--link-preview-accent);
+  }
+
   .link-preview:hover {
     border-color: var(--primary-main);
   }
@@ -163,6 +200,11 @@
     height: 5rem;
     margin: var(--space-200);
     width: 5rem;
+  }
+
+  :global(.link-preview-video) {
+    display: block;
+    width: 100%;
   }
 
   :global(.link-preview-image) {
@@ -188,6 +230,13 @@
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
     text-transform: uppercase;
+  }
+
+  .link-preview-author {
+    font-size: var(--font-size-small);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .link-preview-title {

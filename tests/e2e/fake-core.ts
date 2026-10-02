@@ -1244,6 +1244,10 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
                 image_mime: null,
                 image_width: null,
                 image_height: null,
+                video: null,
+                theme_color: null,
+                card: null,
+                author_name: null,
               }
             : null,
       }),
