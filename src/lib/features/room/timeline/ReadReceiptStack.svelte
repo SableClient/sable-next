@@ -211,6 +211,7 @@
   :global(.avatar-root.receipt-face) {
     --avatar-size: 1.125rem;
 
+    background: var(--stack-ring);
     box-shadow: 0 0 0 0.125rem var(--stack-ring);
     font-size: var(--font-size-small);
   }

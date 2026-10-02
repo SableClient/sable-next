@@ -9,6 +9,7 @@ import type {
   KeywordNotificationView,
   MentionNotificationsView,
   ProfileView,
+  MemberView,
   RoomSummary,
   SessionInfo,
   SidebarItemView,
@@ -54,6 +55,7 @@ declare global {
     __e2eCommandPayloads: Command[];
     __e2eProfileSaveError?: boolean;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
+    __e2eMembers?: MemberView[];
     __e2eAnchorPositions: number[];
     __e2eTimelineRooms: string[];
     __e2eTimelineSubscriptions: number[];
@@ -1011,7 +1013,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       },
       room_members: () => ({
         type: 'room_members',
-        members: [
+        members: window.__e2eMembers ?? [
           {
             user_id: '@alice:example.test',
             display_name: 'Alice',

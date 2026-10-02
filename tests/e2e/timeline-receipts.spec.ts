@@ -261,3 +261,76 @@ test('bubble receipts sit beside trailing reactions on either side', async ({
     expect(await measure(['@bob:example.test']), String(own)).toBe(plain);
   }
 });
+
+for (const device of ['desktop', 'mobile']) {
+  test.describe(`read receipts on ${device}`, () => {
+    test.use({
+      viewport: device === 'mobile' ? { width: 412, height: 839 } : { width: 1280, height: 800 },
+    });
+    test('transparent avatars cover the preceding avatar', async ({
+      page,
+      app,
+      core,
+      timeline,
+      installRoomCore,
+    }) => {
+      await page.addInitScript(() => {
+        window.__e2eMembers = ['opaque', 'transparent'].map((name) => ({
+          user_id: `@${name}:example.test`,
+          display_name: name,
+          avatar_url: `mxc://example.test/${name}`,
+          power_level: 0,
+          membership: 'join',
+          member_ts: null,
+          kicked: false,
+          service: false,
+        }));
+        window.__e2eFetchMedia = async (source) => {
+          const canvas = new OffscreenCanvas(96, 96);
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('No canvas context');
+          context.fillStyle = source.endsWith('/transparent') ? '#ffffff' : '#ff0000';
+          if (source.endsWith('/transparent')) context.fillRect(32, 32, 32, 32);
+          else context.fillRect(0, 0, 96, 96);
+          return new Uint8Array(
+            await (await canvas.convertToBlob({ type: 'image/png' })).arrayBuffer()
+          );
+        };
+      });
+      await installRoomCore('ready');
+      await app.openRoom('!room:example.test');
+      await timeline.expectRevealed();
+      const subscription = await core.subscription();
+      await core.setTimelineItemById(subscription, 'general-19', {
+        ...timelineItem('general-19', 'Read this'),
+        read_by: ['@opaque:example.test', '@transparent:example.test'],
+      });
+      const row = page.locator('[data-item-id="general-19"] .read-receipt-stack');
+      await expect(row.locator('.avatar-root img')).toHaveCount(2);
+      await expect
+        .poll(() =>
+          row
+            .locator('img')
+            .evaluateAll((images) =>
+              images.every(
+                (image) =>
+                  (image as HTMLImageElement).complete &&
+                  (image as HTMLImageElement).naturalWidth > 0
+              )
+            )
+        )
+        .toBe(true);
+      const box = await row.locator('.avatar-root').nth(1).boundingBox();
+      if (!box) throw new Error('Receipt avatar is not laid out');
+      const clip = { x: box.x + 2, y: box.y + box.height / 2 - 2, width: 2, height: 4 };
+      const withPrevious = await page.screenshot({ clip });
+      await row
+        .locator('.face-slot')
+        .first()
+        .evaluate((node: HTMLElement) => {
+          node.style.visibility = 'hidden';
+        });
+      expect((await page.screenshot({ clip })).equals(withPrevious)).toBe(true);
+    });
+  });
+}
