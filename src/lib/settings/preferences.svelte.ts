@@ -384,7 +384,7 @@ const DEFAULTS: Preferences = {
   searchCrawlPause: '3',
   searchTricklePause: '10',
   searchFlushInterval: '60',
-  searchBatchSize: '100',
+  searchBatchSize: '50',
   searchBaseEvents: '20000',
   searchMaxEvents: '200000',
   searchCrawler: true,

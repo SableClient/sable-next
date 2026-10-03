@@ -4871,7 +4871,8 @@ mod tests {
         let room_id = room_id!("!resume:localhost").to_owned();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@erwan:localhost"))
+            .server_ts(super::now_ms());
 
         server.mock_room_state_encryption().plain().mount().await;
         let room = server
@@ -4974,7 +4975,8 @@ mod tests {
         let room_id = room_id!("!crawl:localhost").to_owned();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@erwan:localhost"))
+            .server_ts(super::now_ms());
 
         server.mock_room_state_encryption().plain().mount().await;
         let room = server
@@ -5508,7 +5510,8 @@ mod tests {
         let room_id = room_id!("!walked:localhost").to_owned();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@erwan:localhost"))
+            .server_ts(super::now_ms());
 
         server.mock_room_state_encryption().plain().mount().await;
         let room = server

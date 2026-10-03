@@ -18,8 +18,10 @@ use crate::protocol::{
 };
 
 const CRAWL_BATCH: u16 = 100;
+const CRAWL_DEFAULT_BATCH: u16 = 50;
 const CRAWL_PAUSE: Duration = Duration::from_secs(3);
 const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
+const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
 const MAX_CRAWLED_EVENTS: usize = 200_000;
@@ -36,7 +38,7 @@ impl Default for SearchTuning {
             crawl_pause_ms: duration_ms(CRAWL_READABLE_PAUSE),
             trickle_pause_ms: duration_ms(CRAWL_TRICKLE_PAUSE),
             flush_interval_secs: PERSIST_INTERVAL_SECS,
-            batch: u32::from(CRAWL_BATCH),
+            batch: u32::from(CRAWL_DEFAULT_BATCH),
             base_events: u32::try_from(CRAWL_BASE_EVENTS).unwrap_or(u32::MAX),
             max_events: u32::try_from(MAX_CRAWLED_EVENTS).unwrap_or(u32::MAX),
         }
@@ -662,6 +664,7 @@ impl Core {
 
         let mut options = MessagesOptions::backward().from(from.as_deref());
         options.limit = UInt::from(batch);
+        options.filter.not_types = vec!["m.reaction".to_owned()];
         let requested = now_ms();
         let Some(messages) = self.search_network.run(room.messages(options)).await else {
             return Ok(CrawlOutcome::Paused);
@@ -677,7 +680,12 @@ impl Core {
             return Ok(CrawlOutcome::gone());
         }
 
-        let floor = self.search_index.lock().await.floor_of(room_id);
+        let floor = self
+            .search_index
+            .lock()
+            .await
+            .floor_of(room_id)
+            .max(now_ms().saturating_sub(CRAWL_MAX_AGE_MS));
         if floor > 0
             && !messages.chunk.is_empty()
             && messages.chunk.iter().all(|event| {
@@ -1301,7 +1309,8 @@ mod tests {
         let room_id = room();
         let factory = EventFactory::new()
             .room(&room_id)
-            .sender(user_id!("@erwan:localhost"));
+            .sender(user_id!("@erwan:localhost"))
+            .server_ts(super::now_ms());
         server.mock_room_state_encryption().plain().mount().await;
         let joined = server
             .sync_room(
@@ -1371,11 +1380,14 @@ mod tests {
         server
             .mock_room_messages()
             .ok(RoomMessagesResponseTemplate::default()
-                .events(vec![factory.text_msg("deleted history").server_ts(
-                    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(matrix_sdk::ruma::UInt::from(
-                        10_u32,
-                    )),
-                )])
+                .events(vec![
+                    factory.text_msg("deleted history").server_ts(
+                        matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(
+                            matrix_sdk::ruma::UInt::try_from(super::now_ms() - 1_000)
+                                .expect("a timestamp"),
+                        ),
+                    ),
+                ])
                 .end_token("deeper"))
             .mount()
             .await;
@@ -1387,7 +1399,64 @@ mod tests {
         {
             let mut index = core.search_index.lock().await;
             let mut room_index = super::super::RoomIndex::new();
-            room_index.floor = 1_000;
+            room_index.floor = super::now_ms();
+            index.rooms.insert(room_id.clone(), room_index);
+        }
+
+        let outcome = core
+            .crawl_once(&client, &room_id)
+            .await
+            .expect("crawl one batch");
+        assert!(matches!(
+            outcome,
+            CrawlOutcome::Batch(CrawlBatch {
+                exhausted: true,
+                ..
+            })
+        ));
+        assert_eq!(core.search_index.lock().await.documents(), 0);
+
+        drop(joined);
+    }
+
+    #[async_test]
+    async fn test_the_crawl_stops_a_room_older_than_its_age_limit() {
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().expect("event cache");
+
+        let room_id = room();
+        let factory = EventFactory::new()
+            .room(&room_id)
+            .sender(user_id!("@erwan:localhost"));
+        server.mock_room_state_encryption().plain().mount().await;
+        let joined = server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(&room_id)
+                    .set_timeline_limited()
+                    .set_timeline_prev_batch("previous"),
+            )
+            .await;
+        server
+            .mock_room_messages()
+            .ok(RoomMessagesResponseTemplate::default()
+                .events(vec![factory.text_msg("deleted history").server_ts(
+                    matrix_sdk::ruma::MilliSecondsSinceUnixEpoch(matrix_sdk::ruma::UInt::from(
+                        10_u32,
+                    )),
+                )])
+                .end_token("deeper"))
+            .mount()
+            .await;
+
+        let (core, _events) = crate::Core::new(
+            "crawl-age",
+            Box::new(crate::store::MemorySessionStore::default()),
+        );
+        {
+            let mut index = core.search_index.lock().await;
+            let room_index = super::super::RoomIndex::new();
             index.rooms.insert(room_id.clone(), room_index);
         }
 
