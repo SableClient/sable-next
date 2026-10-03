@@ -33,6 +33,7 @@ use matrix_sdk::ruma::events::room::message::{
 use matrix_sdk::ruma::events::{
     AnySyncMessageLikeEvent, AnySyncStateEvent, AnySyncTimelineEvent, Mentions,
     SyncMessageLikeEvent, room::redaction::SyncRoomRedactionEvent,
+    sticker::OriginalSyncStickerEvent,
 };
 use matrix_sdk::ruma::room_version_rules::RedactionRules;
 use matrix_sdk::ruma::{EventId, OwnedEventId, OwnedRoomId, OwnedUserId, RoomId};
@@ -1537,6 +1538,15 @@ impl MessageIndex {
                 continue;
             }
 
+            if let AnySyncMessageLikeEvent::Sticker(SyncMessageLikeEvent::Original(sticker)) =
+                &message
+            {
+                if !index.redacted.contains(&sticker.event_id) {
+                    index.upsert(sticker_document(sticker));
+                }
+                continue;
+            }
+
             match message {
                 AnySyncMessageLikeEvent::RoomMessage(message) => {
                     let Some(message) = message.as_original() else {
@@ -2116,6 +2126,17 @@ fn poll_start_document(message: &AnySyncMessageLikeEvent) -> Option<Document> {
         }
         _ => None,
     }
+}
+
+fn sticker_document(sticker: &OriginalSyncStickerEvent) -> Document {
+    let mut document = poll_document(
+        sticker.event_id.clone(),
+        sticker.sender.clone(),
+        sticker.origin_server_ts.get().into(),
+        std::iter::once(sticker.content.body.as_str()),
+    );
+    document.attachments = Vec::new();
+    document
 }
 
 fn poll_document<'text>(
@@ -3042,6 +3063,26 @@ mod tests {
         ));
 
         (index, room)
+    }
+
+    #[test]
+    fn a_sticker_is_searchable_by_its_description() {
+        let sticker: super::OriginalSyncStickerEvent = serde_json::from_value(json!({
+            "type": "m.sticker",
+            "event_id": "$sticker:localhost",
+            "sender": "@ginger:localhost",
+            "origin_server_ts": 1,
+            "content": {
+                "body": "moai",
+                "info": {},
+                "url": "mxc://localhost/moai"
+            }
+        }))
+        .unwrap();
+
+        let document = super::sticker_document(&sticker);
+        assert_eq!(document.body, "moai");
+        assert!(document.attachments.is_empty());
     }
 
     #[test]
