@@ -480,17 +480,17 @@ describe('plain text mode', () => {
   });
 
   test.each([
-    ['\\*like so*', '<span>*</span>like so*'],
-    ['\\*like so\\*', '<span>*</span>like so*'],
-    ['\\`code\\`', '<span>`</span>code`'],
-    ['\\_text\\_', '<span>_</span>text_'],
+    ['\\*like so*', '<span>*</span>like so<span>*</span>'],
+    ['\\*like so\\*', '<span>*</span>like so<span>*</span>'],
+    ['\\`code\\`', '<span>`</span>code<span>`</span>'],
+    ['\\_text\\_', '<span>_</span>text<span>_</span>'],
     ['\\# heading', '# heading'],
     ['one \\\\ two', 'one \\ two'],
     ['\\[label](https://example.org)', '[label](https://example.org)'],
     ['\\<tag>', '&lt;tag&gt;'],
     ['&amp;', '&amp;'],
     ['\\&amp;', '&amp;amp;'],
-    ['&#42;literal*', '<span>*</span>literal*'],
+    ['&#42;literal*', '<span>*</span>literal<span>*</span>'],
   ])('Markdown escapes and entities in %j render as text', (source, rendered) => {
     const message = serializePlain(textDoc(source));
 

@@ -395,12 +395,13 @@ describe('typed Markdown', () => {
 
     expect(undoInputRule(editor.state, editor.dispatch)).toBe(true);
     expect(editor.state.doc.textContent).toBe('**t**');
-    expect(serializeComposer(editor.state.doc).formatted).toBe('<span>*</span>*t**');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(
+      '<span>*</span><span>*</span>t<span>*</span><span>*</span>'
+    );
   });
 
   test.each([
     ['**__', 3, '**test__'],
-    ['\\****', 4, '\\**test**'],
     ['__word', 2, '_test_word'],
   ])('typing into %s keeps unmatched or escaped markers literal', (source, position, expected) => {
     const editor = open();
@@ -410,6 +411,18 @@ describe('typed Markdown', () => {
 
     expect(editor.state.doc.textContent).toBe(expected);
     expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+  });
+
+  test('an escaped marker the receiver would still pair is split', () => {
+    const editor = open();
+    type('\\****');
+    editor.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 4)));
+    type('test');
+
+    expect(editor.state.doc.textContent).toBe('\\**test**');
+    expect(serializeComposer(editor.state.doc).formatted).toBe(
+      '\\<span>*</span><span>*</span>test<span>*</span><span>*</span>'
+    );
   });
 
   test('markers inside code stay literal', () => {

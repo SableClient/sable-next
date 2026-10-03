@@ -63,10 +63,10 @@ for (const mobile of [false, true]) {
     await app.openRoom('!room:example.test');
 
     for (const [source, formatted] of [
-      ['\\*like so*', '<span>*</span>like so*'],
-      ['\\`code\\`', '<span>`</span>code`'],
+      ['\\*like so*', '<span>*</span>like so<span>*</span>'],
+      ['\\`code\\`', '<span>`</span>code<span>`</span>'],
       ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
-      ['**bold** and \\*literal*', '<strong>bold</strong> and <span>*</span>literal*'],
+      ['**bold** and \\*literal*', '<strong>bold</strong> and <span>*</span>literal<span>*</span>'],
     ]) {
       await app.composer.click();
       await page.keyboard.type(source);

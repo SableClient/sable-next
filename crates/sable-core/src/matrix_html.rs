@@ -5,6 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
+use std::ops::Range;
 use std::sync::{LazyLock, Mutex, PoisonError};
 
 use ammonia::{Builder, UrlRelative};
@@ -14,6 +15,7 @@ use matrix_sdk::ruma::html::{
     SanitizerConfig,
 };
 use matrix_sdk::ruma::{MatrixUri, MxcUri};
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use time::OffsetDateTime;
 
 const ALLOWED_TAGS: [&str; 41] = [
@@ -434,105 +436,27 @@ fn linkify_urls(text: &str) -> String {
     html
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Marker {
-    Strong,
-    Emphasis,
-    Strike,
-    Spoiler,
-}
-
-impl Marker {
-    const fn open(self) -> &'static str {
-        match self {
-            Self::Strong => "<strong>",
-            Self::Emphasis => "<em>",
-            Self::Strike => "<del>",
-            Self::Spoiler => "<span data-mx-spoiler=\"\">",
-        }
-    }
-
-    const fn close(self) -> &'static str {
-        match self {
-            Self::Strong => "</strong>",
-            Self::Emphasis => "</em>",
-            Self::Strike => "</del>",
-            Self::Spoiler => "</span>",
-        }
-    }
-}
-
-fn marker_span(text: &str, index: usize) -> Option<(usize, Marker, &str)> {
-    let rest = text.get(index..)?;
-    let first = rest.chars().next()?;
-    let run = rest.chars().take_while(|c| *c == first).count();
-    let marker = match (first, run) {
-        ('*' | '_', 1) => Marker::Emphasis,
-        ('*' | '_', 2) => Marker::Strong,
-        ('~', 2) => Marker::Strike,
-        ('|', 2) => Marker::Spoiler,
-        _ => return None,
-    };
+fn spoiler_bars(text: &str, index: usize) -> Option<(usize, &str)> {
+    let body = text.get(index..)?.strip_prefix("||")?;
     let before = text.get(..index)?.chars().next_back();
-    if !before.is_none_or(|c| c.is_whitespace() || "([{<\"'*_~|".contains(c)) {
+    if !before.is_none_or(|c| c.is_whitespace() || "([{<\"'".contains(c)) {
         return None;
     }
-    let body = rest.get(run..)?;
-    if body
-        .chars()
-        .next()
-        .is_none_or(|c| c.is_whitespace() || c == first)
-    {
+    if body.starts_with(|c: char| c == '|' || c.is_whitespace()) {
         return None;
     }
-    let mut chars = body.char_indices();
-    let mut previous = None;
-    while let Some((at, c)) = chars.next() {
-        if c == '\\' {
-            chars.next();
-            previous = Some(c);
-            continue;
-        }
-        if c == first {
-            let length = body.get(at..)?.chars().take_while(|x| *x == first).count();
-            let after = body.get(at + length..)?.chars().next();
-            if length == run
-                && previous.is_some_and(|p: char| !p.is_whitespace())
-                && (first != '_' || after.is_none_or(|a| !a.is_alphanumeric()))
-            {
-                return Some((run + at + length, marker, body.get(..at)?));
-            }
-            for _ in 1..length {
-                chars.next();
-            }
-            previous = Some(first);
-            continue;
-        }
-        previous = Some(c);
+    let inner = body.get(..body.find("||")?)?;
+    if inner.ends_with(char::is_whitespace) {
+        return None;
     }
-    None
-}
-
-fn code_span(rest: &str, ticks: usize) -> Option<(usize, &str)> {
-    let body = rest.get(ticks..)?;
-    let mut at = 0;
-    while let Some(found) = body.get(at..)?.find('`') {
-        let start = at + found;
-        let length = body.get(start..)?.chars().take_while(|c| *c == '`').count();
-        if length == ticks {
-            let inner = body.get(..start)?;
-            return (!inner.is_empty()).then_some((ticks + start + length, inner));
-        }
-        at = start + length;
-    }
-    None
+    Some((inner.len() + 4, inner))
 }
 
 fn hide_spoiler_bars(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut index = 0;
     while let Some(rest) = text.get(index..).filter(|rest| !rest.is_empty()) {
-        if let Some((consumed, Marker::Spoiler, _)) = marker_span(text, index) {
+        if let Some((consumed, _)) = spoiler_bars(text, index) {
             out.push_str(SPOILER_PLACEHOLDER);
             index += consumed;
         } else {
@@ -542,6 +466,79 @@ fn hide_spoiler_bars(text: &str) -> String {
         }
     }
     out
+}
+
+fn link_words(text: &str) -> Vec<Range<usize>> {
+    let mut words = Vec::new();
+    let mut start = None;
+    for (index, character) in text.char_indices().chain([(text.len(), ' ')]) {
+        if character.is_whitespace() {
+            if let Some(from) = start.take()
+                && let Some(word) = text.get(from..index)
+                && (word.contains("://")
+                    || ["www.", "mailto:", "matrix:"]
+                        .iter()
+                        .any(|prefix| word.starts_with(prefix)))
+            {
+                words.push(from..index);
+            }
+        } else if start.is_none() {
+            start = Some(index);
+        }
+    }
+    words
+}
+
+fn inline_markdown(segment: &str) -> String {
+    let trimmed = segment.trim();
+    let lead = segment.get(..segment.len() - segment.trim_start().len());
+    let trail = segment.get(segment.trim_end().len()..);
+    let mut html = String::with_capacity(segment.len());
+    let mut formatted = false;
+    let links = link_words(trimmed);
+    for (event, range) in Parser::new_ext(trimmed, Options::ENABLE_STRIKETHROUGH).into_offset_iter()
+    {
+        if matches!(
+            event,
+            Event::Start(Tag::Emphasis | Tag::Strong | Tag::Strikethrough) | Event::Code(_)
+        ) {
+            formatted = true;
+            if links
+                .iter()
+                .any(|word| range.start < word.end && word.start < range.end)
+            {
+                return linkify_urls(segment);
+            }
+        }
+        match event {
+            Event::Start(Tag::Paragraph) => {
+                if !html.is_empty() {
+                    html.push_str("\n\n");
+                }
+            }
+            Event::End(TagEnd::Paragraph) => {}
+            Event::Start(Tag::Emphasis) => html.push_str("<em>"),
+            Event::End(TagEnd::Emphasis) => html.push_str("</em>"),
+            Event::Start(Tag::Strong) => html.push_str("<strong>"),
+            Event::End(TagEnd::Strong) => html.push_str("</strong>"),
+            Event::Start(Tag::Strikethrough) => html.push_str("<del>"),
+            Event::End(TagEnd::Strikethrough) => html.push_str("</del>"),
+            Event::Code(code) => {
+                let _ = write!(html, "<code>{}</code>", escape_html(&code));
+            }
+            Event::Text(text) => html.push_str(&linkify_urls(&text)),
+            Event::SoftBreak | Event::HardBreak => html.push('\n'),
+            _ => return linkify_urls(segment),
+        }
+    }
+    if !formatted {
+        return linkify_urls(segment);
+    }
+    format!(
+        "{}{html}{}",
+        lead.map(escape_html).unwrap_or_default(),
+        trail.map(escape_html).unwrap_or_default()
+    )
 }
 
 fn rewrite_mfm(text: &str) -> String {
@@ -570,17 +567,6 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
         }
         if rest.starts_with('`') {
             let ticks = rest.bytes().take_while(|byte| *byte == b'`').count();
-            if code_ticks.is_none()
-                && let Some((consumed, inner)) = code_span(rest, ticks)
-            {
-                if let Some(before) = text.get(plain_start..index) {
-                    html.push_str(&linkify_urls(before));
-                }
-                let _ = write!(html, "<code>{}</code>", escape_html(inner));
-                index += consumed;
-                plain_start = index;
-                continue;
-            }
             match code_ticks {
                 Some(open) if open == ticks => code_ticks = None,
                 None => code_ticks = Some(ticks),
@@ -594,7 +580,7 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
             && let Some((consumed, element)) = mfm_element(rest, depth)
         {
             if let Some(before) = text.get(plain_start..index) {
-                html.push_str(&linkify_urls(before));
+                html.push_str(&inline_markdown(before));
             }
             html.push_str(&element);
             index += consumed;
@@ -603,14 +589,16 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
         }
         if code_ticks.is_none()
             && depth < MAX_MFM_DEPTH
-            && let Some((consumed, marker, inner)) = marker_span(text, index)
+            && let Some((consumed, inner)) = spoiler_bars(text, index)
         {
             if let Some(before) = text.get(plain_start..index) {
-                html.push_str(&linkify_urls(before));
+                html.push_str(&inline_markdown(before));
             }
-            html.push_str(marker.open());
-            html.push_str(&rewrite_mfm_at_depth(inner, depth + 1));
-            html.push_str(marker.close());
+            let _ = write!(
+                html,
+                "<span data-mx-spoiler=\"\">{}</span>",
+                rewrite_mfm_at_depth(inner, depth + 1)
+            );
             index += consumed;
             plain_start = index;
             continue;
@@ -618,7 +606,7 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
         index += rest.chars().next().map_or(1, char::len_utf8);
     }
     if let Some(tail) = text.get(plain_start..) {
-        html.push_str(&linkify_urls(tail));
+        html.push_str(&inline_markdown(tail));
     }
     html
 }
@@ -1484,6 +1472,10 @@ mod tests {
             assert!(html.contains(expected), "{expected} in {html}");
         }
         assert_eq!(
+            display_html("", Some("***a***")),
+            "<em><strong>a</strong></em>"
+        );
+        assert_eq!(
             display_html("", Some("**a _b_ c**")),
             "<strong>a <em>b</em> c</strong>"
         );
@@ -1494,11 +1486,9 @@ mod tests {
         for formatted in [
             "2 * 3 * 4",
             "snake_case_name and a_b_c",
-            "a*b*c",
             "https://example.org/_a_/*b*",
             "a ~~ b ~~ c",
             "lonely *star",
-            "***bold italic***",
             "<code>**x**</code>",
         ] {
             let html = display_html("", Some(formatted));

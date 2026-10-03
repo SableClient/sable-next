@@ -18,7 +18,6 @@ import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
-import { literalPieces, markerOpeners } from './literal-markers';
 import { mfmPlugin } from './mfm';
 import { isMscLink, linkMscs } from './msc-links';
 import { composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
@@ -322,8 +321,8 @@ function html(doc: ProseMirrorNode): string {
     }
   }
   for (const node of protectedTexts) {
-    const pieces = literalPieces(node.data);
-    if (pieces.length === 1) continue;
+    if (!receiverFormats(node.data)) continue;
+    const pieces = node.data.split(/([*_~`|])/u);
     node.replaceWith(
       ...pieces.map((piece, index) => {
         if (index % 2 === 0) return document.createTextNode(piece);
@@ -404,7 +403,7 @@ export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const linked = linkMscs(flat);
   const imageSourcePacks = imageSourcePacksOf(flat);
   const plainBody = plainTextOf(source).trim();
-  if (isPlain(linked) && markerOpeners(plainBody).length === 0) {
+  if (isPlain(linked) && !receiverFormats(plainBody)) {
     return {
       body: plainBody,
       formatted: null,
@@ -472,6 +471,20 @@ export function mentionsOf(doc: ProseMirrorNode): OutgoingMentions {
 const tokenizer = MarkdownIt('commonmark', { html: false })
   .enable(['strikethrough', 'table'])
   .use(mfmPlugin);
+
+const RECEIVER_FORMATS = new Set([
+  'em_open',
+  'strong_open',
+  's_open',
+  'code_inline',
+  'spoiler_open',
+]);
+
+function receiverFormats(text: string): boolean {
+  return tokenizer
+    .parseInline(text, {})
+    .some((token) => token.children?.some((child) => RECEIVER_FORMATS.has(child.type)));
+}
 
 tokenizer.block.ruler.before(
   'heading',
@@ -701,7 +714,7 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   return {
     body,
     formatted:
-      isPlain(parsed) && plainTextOf(parsed) === body && markerOpeners(body).length === 0
+      isPlain(parsed) && plainTextOf(parsed) === body && !receiverFormats(body)
         ? null
         : html(parsed),
     mentions,
