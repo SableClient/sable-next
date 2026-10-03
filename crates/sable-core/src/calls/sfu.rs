@@ -164,10 +164,18 @@ pub(crate) async fn provision_remote(
     service_url: &str,
     device_id: &DeviceId,
     member_id: &str,
+    matrix2: bool,
 ) -> Result<Provisioned, ProvisionError> {
-    match provision_matrix2(room, service_url, device_id, member_id).await {
-        Ok(provisioned) => Ok(provisioned),
-        Err(_) => provision(room, service_url, device_id).await,
+    if matrix2 {
+        match provision_matrix2(room, service_url, device_id, member_id).await {
+            Ok(provisioned) => Ok(provisioned),
+            Err(_) => provision(room, service_url, device_id).await,
+        }
+    } else {
+        match provision(room, service_url, device_id).await {
+            Ok(provisioned) => Ok(provisioned),
+            Err(_) => provision_matrix2(room, service_url, device_id, member_id).await,
+        }
     }
 }
 

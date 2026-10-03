@@ -775,6 +775,7 @@ async fn provision_missing(
             &service,
             &own.device_id,
             own.member_id.as_deref().unwrap_or(&own.identity),
+            own.mode == CallMode::Matrix2,
         )
         .await
         {

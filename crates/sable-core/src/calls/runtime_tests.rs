@@ -648,3 +648,46 @@ async fn a_legacy_publisher_stays_put_when_the_oldest_focus_will_not_let_it_publ
     assert_eq!(state.own.foci, own.foci);
     assert!(state.backends.is_empty());
 }
+
+#[tokio::test]
+async fn a_legacy_call_subscribes_to_another_focus_under_its_publishing_identity() {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let (_homeserver, _sfu, room, own, _oldest, _state) = legacy_move_fixture(true).await;
+    let jwt = |sub: &str| {
+        let claims = serde_json::json!({"sub": sub, "video": {"room": "r"}});
+        format!(
+            "x.{}.x",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(claims.to_string())
+        )
+    };
+    let focus = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/sfu/get"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({"url": "wss://remote.example.org", "jwt": jwt(&own.identity)}),
+        ))
+        .mount(&focus)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/get_token"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(
+            serde_json::json!({"url": "wss://remote.example.org", "jwt": jwt("hashed")}),
+        ))
+        .expect(0)
+        .mount(&focus)
+        .await;
+
+    let provisioned = super::sfu::provision_remote(
+        &room,
+        &focus.uri(),
+        &own.device_id,
+        own.member_id.as_deref().unwrap(),
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(provisioned.identity, own.identity);
+}
