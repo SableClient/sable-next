@@ -173,7 +173,9 @@
   function revealCurrentPage(event: MouseEvent) {
     if (appLayout.matches || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
-    if (link instanceof HTMLAnchorElement && link.pathname === pathname) setOpen(false);
+    if (!(link instanceof HTMLAnchorElement) || link.pathname !== pathname) return;
+    event.preventDefault();
+    setOpen(false);
   }
 
   function handleKeydown(event: KeyboardEvent) {
