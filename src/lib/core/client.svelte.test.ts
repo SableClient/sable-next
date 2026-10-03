@@ -1028,6 +1028,49 @@ test('a profile lookup that stayed rate limited is not remembered as failed', as
   }
 });
 
+test('lookups slow down after a rate limit that carries no hint', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  fake.send
+    .mockRejectedValueOnce(new CoreError({ code: 'rate_limited', retry_after_ms: null }))
+    .mockResolvedValue({ profile: {} });
+  try {
+    const first = core.userProfile('@a:example.org');
+    const second = core.userProfile('@b:example.org');
+    await vi.advanceTimersByTimeAsync(299);
+    expect(fake.send).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fake.send).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(299);
+    expect(fake.send).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await Promise.all([first, second]);
+    expect(fake.send).toHaveBeenCalledTimes(3);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
+test('a rate-limit hint longer than 30s is capped', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  fake.send
+    .mockRejectedValueOnce(new CoreError({ code: 'rate_limited', retry_after_ms: 3_600_000 }))
+    .mockResolvedValueOnce({ profile: {} });
+  try {
+    const lookup = core.userProfile('@remote:example.org');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await lookup;
+    expect(fake.send).toHaveBeenCalledTimes(2);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('a sign-in the core cannot reach but the page can blames the local network', async () => {
   localNetwork.gated = true;
   vi.stubGlobal(

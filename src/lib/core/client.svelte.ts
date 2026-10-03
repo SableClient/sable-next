@@ -43,6 +43,8 @@ const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 const PROFILE_LOOKUP_GAP_MS = 150;
+const PROFILE_LOOKUP_MAX_GAP_MS = 4000;
+const PROFILE_RETRY_AFTER_CAP_MS = 30_000;
 
 async function discoverBaseUrl(origin: URL): Promise<string | null> {
   try {
@@ -172,6 +174,7 @@ export class CoreClient {
     { accountId: string | null; error: unknown }
   >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
   private profileNextAt = 0;
+  private profileGap = PROFILE_LOOKUP_GAP_MS;
   private readonly relationsCache = new QuickLRU<
     string,
     { accountId: string | null; relations: UserRelations }
@@ -543,18 +546,26 @@ export class CoreClient {
       ) {
         await new Promise((resolve) => setTimeout(resolve, wait));
       }
-      this.profileNextAt = Date.now() + PROFILE_LOOKUP_GAP_MS;
+      this.profileNextAt = Date.now() + this.profileGap;
       try {
-        return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
-          .profile;
+        const response = await this.ensureTransport().send({
+          type: 'user_profile',
+          user_id: userId,
+        });
+        this.profileGap = Math.max(PROFILE_LOOKUP_GAP_MS, this.profileGap * 0.95);
+        return response.profile;
       } catch (error) {
-        if (retried || !(error instanceof CoreError) || error.detail.code !== 'rate_limited') {
-          throw error;
-        }
+        if (!(error instanceof CoreError) || error.detail.code !== 'rate_limited') throw error;
+        this.profileGap = Math.min(PROFILE_LOOKUP_MAX_GAP_MS, this.profileGap * 2);
         this.profileNextAt = Math.max(
           this.profileNextAt,
-          Date.now() + (error.detail.retry_after_ms ?? 1000)
+          Date.now() +
+            Math.max(
+              Math.min(error.detail.retry_after_ms ?? 0, PROFILE_RETRY_AFTER_CAP_MS),
+              this.profileGap
+            )
         );
+        if (retried) throw error;
       }
     }
   }
