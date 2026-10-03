@@ -1598,8 +1598,11 @@
     }
 
     .room-row-wrap:hover .room-status,
+    .room-row-wrap:hover .voice-live,
     .room-row-wrap:focus-within .room-status,
-    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) .room-status {
+    .room-row-wrap:focus-within .voice-live,
+    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) .room-status,
+    .room-row-wrap:has(:global(.room-options-trigger[data-state='open'])) .voice-live {
       opacity: 0;
       pointer-events: none;
     }
