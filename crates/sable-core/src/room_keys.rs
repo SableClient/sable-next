@@ -203,7 +203,7 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
             (
                 500,
                 json!({"errcode": "M_UNKNOWN", "error": "Unavailable"}),
-                false,
+                true,
             ),
         ] {
             let server = MatrixMockServer::new().await;

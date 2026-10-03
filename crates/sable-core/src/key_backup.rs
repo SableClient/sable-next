@@ -266,7 +266,7 @@ fn matches_backup(
 
 impl Core {
     pub(crate) async fn honor_backup_preference(&self, client: &Client) {
-        if matches!(backups_marked_disabled(client).await, Ok(false)) {
+        if !matches!(backups_marked_disabled(client).await, Ok(true)) {
             return;
         }
         let Ok(base) = self.base_client().await else {
