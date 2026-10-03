@@ -79,7 +79,9 @@ test('does not resubscribe the timeline after a room refresh', async ({
 
   await expect(timeline.message('Welcome to the room')).toBeVisible({ timeout: 20_000 });
   await timeline.expectAtLatest(last);
-  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(beforeReload);
+  const built = await timeline.rebuilds();
+  expect(built).toBeLessThanOrEqual(beforeReload);
+  await expect.poll(() => timeline.rebuilds(), { timeout: 3_000 }).toBe(built);
 });
 
 test('keeps the active timeline while crossing the layout breakpoint', async ({

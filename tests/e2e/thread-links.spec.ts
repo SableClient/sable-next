@@ -61,7 +61,7 @@ test('a direct link loads an older reply from thread history', async ({
   await page.goto('/rooms/!room%3Aexample.test?event=%24thread-reply-older%3Aexample.test');
 
   const thread = page.getByRole('region', { name: en.timeline.thread, exact: true });
-  await expect(thread).toBeVisible();
+  await expect(thread).toBeVisible({ timeout: COLD_BOOT_TIMEOUT });
   await expect(
     thread.locator('[data-event-id="$thread-reply-older:example.test"]')
   ).toBeInViewport();

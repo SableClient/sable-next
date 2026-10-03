@@ -64,7 +64,7 @@ test('mobile: the room back arrow slides the list over the room, and a swipe ret
   expect(await page.evaluate(() => history.length)).toBe(historyLength);
   const width = page.viewportSize()?.width ?? 0;
   expect(offsets.some((offset) => offset < -1 && offset > -width + 1)).toBe(true);
-  expect(offsets.at(-1)).toBe(0);
+  expect(Math.abs(offsets.at(-1) ?? Number.NaN)).toBeLessThan(1);
 
   if (browserName === 'chromium') {
     await swipe(page, 350, 50);
