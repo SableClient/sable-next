@@ -624,6 +624,17 @@
       uniform
     />
     <h1>{space?.name ?? $i18n.t('nav.space')}</h1>
+    {#if space?.topic}
+      <button
+        type="button"
+        class="topic"
+        onclick={() => {
+          topicOpen = true;
+        }}
+      >
+        <span class="topic-text">{space.topic}</span>
+      </button>
+    {/if}
     {#if canManage && space}
       {@const managed = space}
       <div class="hero-actions">
@@ -714,17 +725,6 @@
           {$i18n.t('room.lobbyJoinAll', { count: candidates.length })}
         </Button>
       </div>
-    {/if}
-    {#if space?.topic}
-      <button
-        type="button"
-        class="topic"
-        onclick={() => {
-          topicOpen = true;
-        }}
-      >
-        <span class="topic-text">{space.topic}</span>
-      </button>
     {/if}
   </header>
 
