@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { untrack } from 'svelte';
 
   import type { RoomPreviewView } from '#src/generated/protocol';
 
@@ -39,12 +40,19 @@
 
   $effect(() => {
     const address = roomId;
+    void listedKey;
     let active = true;
     preview = null;
     failed = false;
 
     core.commands
-      .roomPreview(address, viaFor(address, listed))
+      .roomPreview(
+        address,
+        viaFor(
+          address,
+          untrack(() => listed)
+        )
+      )
       .then((result) => {
         if (active) preview = result;
       })
@@ -68,6 +76,7 @@
 
   let parent = $derived(childRouting(roomList.rooms, roomId));
   let listed = $derived(via.length > 0 ? via : parent.via);
+  let listedKey = $derived(listed.join(','));
 
   // The alias resolves on servers that have never seen the room id.
   let address = $derived(preview?.canonical_alias ?? roomId);
@@ -193,7 +202,7 @@
     flex: 1;
     flex-direction: column;
     gap: var(--space-300);
-    justify-content: center;
+    justify-content: safe center;
     min-height: 100%;
     min-width: 0;
     padding: var(--space-700) var(--space-600);
@@ -201,8 +210,9 @@
   }
 
   .join h1 {
-    font-size: var(--font-size-heading);
-    margin: 0;
+    font-size: var(--font-size-display);
+    line-height: var(--line-height-heading);
+    margin: var(--space-200) 0 0;
     overflow-wrap: anywhere;
   }
 
@@ -226,7 +236,35 @@
     justify-self: start;
   }
 
+  .join-address,
+  .join-members {
+    font-size: var(--font-size-label);
+  }
+
+  .join-members {
+    margin-block-end: var(--space-200);
+  }
+
   .join-topic {
+    background: var(--surface-var-container);
+    border-radius: var(--radius);
+    box-sizing: border-box;
     line-height: var(--line-height-body);
+    margin-block-end: var(--space-200);
+    max-height: 40dvh;
+    overflow-wrap: anywhere;
+    overflow-y: auto;
+    padding: var(--space-400) var(--space-500);
+    scrollbar-width: thin;
+    text-align: start;
+    width: min(100%, 32rem);
+  }
+
+  .join-topic :global(p:first-child) {
+    margin-block-start: 0;
+  }
+
+  .join-topic :global(p:last-child) {
+    margin-block-end: 0;
   }
 </style>
