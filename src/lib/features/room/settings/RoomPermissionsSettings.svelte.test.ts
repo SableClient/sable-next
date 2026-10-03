@@ -128,13 +128,7 @@ test('saves a role emoji with its name and colour', async () => {
 
   const user = userEvent.setup();
   render(RoomPermissionsSettings, { room, permissions });
-  await vi.waitFor(() => {
-    expect(document.querySelector('.role-chip')).toHaveTextContent('Sentinel');
-  });
-
-  const row = within(
-    document.querySelector<HTMLElement>('.role-chip')?.closest('li') ?? document.body
-  );
+  const row = within((await screen.findByText('Sentinel (50)')).closest('li') ?? document.body);
   await user.click(row.getByRole('button', { name: 'Edit role' }));
   await user.type(screen.getByRole('textbox', { name: 'Icon' }), '🛡️{Enter}');
 
@@ -161,7 +155,7 @@ test('lets a founder add colour and an icon to the founder role', async () => {
     room,
     permissions: { ...permissions, own_power_level: FOUNDER_POWER_LEVEL },
   });
-  const founderRow = await screen.findByText(/^Founder \(/);
+  const founderRow = await screen.findByText(/^Founder$/);
   await user.click(
     within(founderRow.closest('li') ?? document.body).getByRole('button', { name: 'Edit role' })
   );

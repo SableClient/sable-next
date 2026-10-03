@@ -97,9 +97,6 @@
       })),
   ]);
 
-  let numberDrafts = $state.raw<Record<string, string>>({});
-  let numberErrors = $state.raw<Record<string, string>>({});
-
   let editingLevel = $state<number | null>(null);
   let editingNewRole = $state(false);
   let editingRole = $derived(editingNewRole || editingLevel !== null);
@@ -118,6 +115,9 @@
   let roomId = $derived(room?.room_id ?? null);
   let groups = $derived(permissionGroups(room?.is_space ?? false));
   let canEdit = $derived(permissions?.can_change_power_levels ?? false);
+  let pickedColor = $derived(
+    /^#[0-9a-f]{6}$/i.test(roleColorDraft.trim()) ? roleColorDraft.trim() : undefined
+  );
   let ownLevel = $derived(permissions?.own_power_level ?? 0);
   let canEditMemberList = $derived(canSendState(levels, ownLevel, MEMBER_LIST_EVENT_TYPE));
 
@@ -255,35 +255,6 @@
     return [{ value: String(current), label: String(current) }, ...known];
   }
 
-  function locationKey(location: PermissionLocation): string {
-    return JSON.stringify(location);
-  }
-
-  function withoutKey(record: Record<string, string>, key: string): Record<string, string> {
-    return Object.fromEntries(Object.entries(record).filter(([entryKey]) => entryKey !== key));
-  }
-
-  async function commitNumber(
-    location: PermissionLocation,
-    key: string,
-    raw: string
-  ): Promise<void> {
-    const result = parsePowerLevelInput(raw, ownLevel);
-    if (!result.valid) {
-      const messages = {
-        'not-a-number': $i18n.t('room.permLevelNumberInvalid'),
-        'out-of-range': $i18n.t('room.permLevelNumberOutOfRange'),
-        'exceeds-own': $i18n.t('room.permLevelNumberExceedsOwn'),
-      } as const;
-      numberErrors = { ...numberErrors, [key]: messages[result.reason] };
-      return;
-    }
-
-    numberDrafts = withoutKey(numberDrafts, key);
-    numberErrors = withoutKey(numberErrors, key);
-    await setLevel(location, result.level);
-  }
-
   function startEditRole(level: number): void {
     const tag = tagForLevel(roleTags, level);
     editingLevel = level;
@@ -418,6 +389,9 @@
   {#if loading && levels === null}
     <p class="settings-status" role="status"><Spinner small /></p>
   {:else if levels}
+    {#if !canEdit}
+      <Alert variant="info" role="status">{$i18n.t('room.permReadOnly')}</Alert>
+    {/if}
     {#if founders.length > 0}
       <SettingsSection
         headingId="room-perm-founders"
@@ -444,9 +418,15 @@
       <ul class="settings-rows">
         {#each roleLevels as level (level)}
           {@const tag = tagForLevel(roleTags, level)}
-          <SettingsRow title={`${levelLabel(level)} (${level})`}>
+          <SettingsRow
+            title={level === FOUNDER_POWER_LEVEL
+              ? levelLabel(level)
+              : `${levelLabel(level)} (${level})`}
+          >
             {#if tag?.icon}<RoleTagIcon icon={tag.icon} class="role-icon" />{/if}
-            <span class="role-swatch" style:background-color={tag?.color ?? undefined}></span>
+            {#if tag?.color}
+              <span class="role-swatch" style:background-color={tag.color}></span>
+            {/if}
             <IconButton
               variant="subtle"
               size="small"
@@ -495,7 +475,7 @@
           {/if}
         {/each}
         {#if canEdit}
-          <li class="settings-row role-add-row">
+          <li class="settings-form role-add-row">
             <Button variant="secondary" onclick={startAddRole} disabled={saving}>
               {$i18n.t('room.permRoleAdd')}
             </Button>
@@ -593,10 +573,18 @@
           {#each group.items as item (item.label)}
             {@const level = levelAt(levels, item.location)}
             {@const tag = tagForLevel(roleTags, level)}
-            {@const key = locationKey(item.location)}
-            {@const numberErrorId = `room-perm-number-error-${item.label.replace(/\./g, '-')}`}
             <SettingsRow title={$i18n.t(item.label)}>
-              {#if tag}
+              {#if canEdit && level <= ownLevel}
+                <Select
+                  value={String(level)}
+                  aria-label={$i18n.t(item.label)}
+                  disabled={saving}
+                  items={options(level)}
+                  onValueChange={(next: string) => {
+                    void setLevel(item.location, Number(next));
+                  }}
+                />
+              {:else if tag}
                 <span class="role-chip">
                   <span
                     class="role-swatch"
@@ -608,55 +596,6 @@
                 </span>
               {:else}
                 <span class="level">{levelLabel(level)}</span>
-              {/if}
-              {#if canEdit && level <= ownLevel}
-                <IconButton
-                  variant="subtle"
-                  size="small"
-                  label={$i18n.t('room.permRoleEdit')}
-                  disabled={saving}
-                  onclick={() => startEditRole(level)}
-                >
-                  <PencilIcon />
-                </IconButton>
-                <Select
-                  value={String(level)}
-                  aria-label={$i18n.t(item.label)}
-                  disabled={saving}
-                  items={options(level)}
-                  onValueChange={(next: string) => {
-                    void setLevel(item.location, Number(next));
-                  }}
-                />
-                <div class="number-field">
-                  <TextInput
-                    inputmode="numeric"
-                    aria-label={$i18n.t('room.permLevelCustomLabel', {
-                      permission: $i18n.t(item.label),
-                    })}
-                    aria-invalid={numberErrors[key] ? 'true' : undefined}
-                    aria-describedby={numberErrors[key] ? numberErrorId : undefined}
-                    disabled={saving}
-                    bind:value={
-                      () => numberDrafts[key] ?? String(level),
-                      (value) => {
-                        numberDrafts = { ...numberDrafts, [key]: value };
-                      }
-                    }
-                    onchange={(event: Event) => {
-                      void commitNumber(
-                        item.location,
-                        key,
-                        (event.currentTarget as HTMLInputElement).value
-                      );
-                    }}
-                  />
-                  {#if numberErrors[key]}
-                    <p id={numberErrorId} class="number-error" role="alert">
-                      {numberErrors[key]}
-                    </p>
-                  {/if}
-                </div>
               {/if}
             </SettingsRow>
           {/each}
@@ -693,11 +632,23 @@
             <TextInput id="room-perm-role-name" bind:value={roleNameDraft} required />
           </FormField>
           <FormField fieldId="room-perm-role-color" label={$i18n.t('room.permRoleColor')}>
-            <TextInput
-              id="room-perm-role-color"
-              bind:value={roleColorDraft}
-              placeholder={$i18n.t('room.permRoleColorHint')}
-            />
+            <div class="color-field">
+              <input
+                class="color-picker"
+                type="color"
+                aria-label={$i18n.t('room.permRoleColorPick')}
+                value={pickedColor}
+                oninput={(event) => {
+                  roleColorDraft = event.currentTarget.value;
+                }}
+              />
+              <TextInput
+                id="room-perm-role-color"
+                class="color-text"
+                bind:value={roleColorDraft}
+                placeholder={$i18n.t('room.permRoleColorHint')}
+              />
+            </div>
           </FormField>
           <FormField fieldId="room-perm-role-icon" label={$i18n.t('room.permRoleIcon')}>
             <div class="icon-field">
@@ -838,7 +789,7 @@
   }
 
   .role-add-row {
-    justify-content: flex-end;
+    justify-items: start;
   }
 
   .role-name {
@@ -920,17 +871,37 @@
     width: var(--control-height-medium);
   }
 
+  .color-field {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
+  }
+
+  .color-field :global(.color-text) {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .color-picker {
+    background: none;
+    block-size: var(--control-height-medium);
+    border: var(--border-width) solid var(--surface-container-line);
+    border-radius: var(--radius);
+    cursor: pointer;
+    flex: 0 0 auto;
+    inline-size: var(--control-height-medium);
+    padding: var(--space-050);
+  }
+
+  .color-picker:focus-visible {
+    outline: var(--focus-ring-width) solid var(--focus-ring);
+  }
+
   .icon-input {
     height: 0;
     opacity: 0;
     position: absolute;
     width: 0;
-  }
-
-  .number-field {
-    display: grid;
-    gap: var(--space-100);
-    width: 6rem;
   }
 
   .number-error {
