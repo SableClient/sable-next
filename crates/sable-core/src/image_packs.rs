@@ -448,6 +448,9 @@ impl Core {
         let mut complete = true;
         let mut seen: BTreeSet<OwnedRoomId> = BTreeSet::from([room_id.to_owned()]);
         let mut frontier = parents;
+        if let Some(room) = client.get_room(room_id) {
+            frontier.extend(crate::view::restricted_parents(client, &room).await);
+        }
 
         for _ in 0..MAX_SPACE_CHAIN {
             let spaces: Vec<matrix_sdk::Room> = frontier
@@ -464,13 +467,15 @@ impl Core {
                     let found = self
                         .room_packs(client, &space, ImagePackOriginView::Space, None, network)
                         .await;
-                    (space.room_id().to_owned(), found)
+                    let listed_in = crate::view::restricted_parents(client, &space).await;
+                    (space.room_id().to_owned(), found, listed_in)
                 })
                 .buffered(STATE_FETCH_CONCURRENCY)
                 .collect()
                 .await;
             let mut next = Vec::new();
-            for (space_id, found) in found {
+            for (space_id, found, listed_in) in found {
+                next.extend(listed_in);
                 match found {
                     Ok(found) => {
                         complete &= found.complete;
@@ -527,6 +532,56 @@ impl Core {
         }
 
         Ok(CommandOk::AllImagePacks { packs })
+    }
+
+    pub(crate) async fn copy_room_packs(
+        &self,
+        client: &matrix_sdk::Client,
+        from: &RoomId,
+        to: &RoomId,
+    ) {
+        let events = match client
+            .send(get_state_events::v3::Request::new(from.to_owned()))
+            .await
+        {
+            Ok(response) => response.room_state,
+            Err(error) => {
+                tracing::warn!(room = %from, %error, "image packs not copied to the upgraded room");
+                return;
+            }
+        };
+        for event in events {
+            let Ok(value) = event.deserialize_as_unchecked::<serde_json::Value>() else {
+                continue;
+            };
+            let event_type = value
+                .get("type")
+                .and_then(|t| t.as_str())
+                .unwrap_or_default();
+            let Some(content) = value.get("content").filter(|content| {
+                [ROOM_EMOTES, ROOM_IMAGE_PACK].contains(&event_type)
+                    && content.as_object().is_some_and(|map| !map.is_empty())
+            }) else {
+                continue;
+            };
+            let state_key = value
+                .get("state_key")
+                .and_then(|k| k.as_str())
+                .unwrap_or_default();
+            let Ok(body) = Raw::new(content).map(Raw::cast_unchecked) else {
+                continue;
+            };
+            let request =
+                matrix_sdk::ruma::api::client::state::send_state_event::v3::Request::new_raw(
+                    to.to_owned(),
+                    StateEventType::from(event_type),
+                    state_key.to_owned(),
+                    body,
+                );
+            if let Err(error) = client.send(request).await {
+                tracing::warn!(room = %to, event_type, %error, "image pack not copied to the upgraded room");
+            }
+        }
     }
 
     async fn room_pack_state(

@@ -911,12 +911,14 @@ impl Core {
                 );
                 request.additional_creators = additional_creators;
 
-                let response = self
-                    .client()
-                    .await?
+                let client = self.client().await?;
+                let old_room = request.room_id.clone();
+                let response = client
                     .send(request)
                     .await
                     .map_err(|error| self.room_error("upgrade_room", error.into()))?;
+                self.copy_room_packs(&client, &old_room, &response.replacement_room)
+                    .await;
 
                 Ok(CommandOk::UpgradeRoom {
                     replacement_room: response.replacement_room,
