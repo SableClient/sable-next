@@ -23,6 +23,7 @@ matrix-sdk-base = { workspace = true }
 ruma.workspace = true
 mime = "0.3"
 http = "1.5"
+web-time = "1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 futures-util = { workspace = true }

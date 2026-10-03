@@ -5,10 +5,25 @@ use matrix_sdk::authentication::oauth::error::{
 };
 use matrix_sdk::encryption::{recovery::RecoveryError, secret_storage::SecretStorageError};
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
+use web_time::SystemTime;
 
 use crate::protocol::CommandErr;
 
 use crate::Core;
+
+pub(crate) fn retry_delay_ms(retry_after: &RetryAfter) -> Option<u64> {
+    let delay = match retry_after {
+        RetryAfter::Delay(delay) => *delay,
+        RetryAfter::DateTime(at) => {
+            let at = at.duration_since(web_time::UNIX_EPOCH).unwrap_or_default();
+            let now = SystemTime::now()
+                .duration_since(web_time::UNIX_EPOCH)
+                .unwrap_or_default();
+            at.saturating_sub(now)
+        }
+    };
+    delay.as_millis().try_into().ok()
+}
 
 pub(crate) trait ResultExt<T> {
     fn or_failed(self, core: &Core, label: &str) -> Result<T, CommandErr>;
@@ -103,12 +118,7 @@ impl Core {
                 return CommandErr::Denied;
             }
             Some(ErrorKind::LimitExceeded(limit)) => {
-                let retry_after_ms = limit.retry_after.as_ref().and_then(|retry_after| {
-                    let RetryAfter::Delay(delay) = retry_after else {
-                        return None;
-                    };
-                    delay.as_millis().try_into().ok()
-                });
+                let retry_after_ms = limit.retry_after.as_ref().and_then(retry_delay_ms);
                 tracing::warn!(context, category = "rate_limited", "room operation refused");
                 return CommandErr::RateLimited { retry_after_ms };
             }
@@ -136,12 +146,7 @@ impl Core {
                     "homeserver request failed"
                 );
                 CommandErr::RateLimited {
-                    retry_after_ms: limit.retry_after.as_ref().and_then(|retry_after| {
-                        let RetryAfter::Delay(delay) = retry_after else {
-                            return None;
-                        };
-                        delay.as_millis().try_into().ok()
-                    }),
+                    retry_after_ms: limit.retry_after.as_ref().and_then(retry_delay_ms),
                 }
             }
             _ if error
@@ -203,13 +208,16 @@ mod tests {
     use std::{
         io::{self, Write},
         sync::{Arc, Mutex, PoisonError},
+        time::Duration,
     };
+
+    use matrix_sdk::ruma::api::error::RetryAfter;
 
     use crate::Core;
     use crate::protocol::CommandErr;
     use crate::store::MemorySessionStore;
 
-    use super::ResultExt;
+    use super::{ResultExt, retry_delay_ms};
 
     #[derive(Clone)]
     struct TestWriter(Arc<Mutex<Vec<u8>>>);
@@ -252,5 +260,22 @@ mod tests {
                 .unwrap()
                 .contains("context=\"test_label\"")
         );
+    }
+
+    #[test]
+    fn retry_after_reads_a_delay() {
+        assert_eq!(
+            retry_delay_ms(&RetryAfter::Delay(Duration::from_secs(2))),
+            Some(2000)
+        );
+    }
+
+    #[test]
+    fn retry_after_reads_an_http_date() {
+        let at = web_time::SystemTime::now() + Duration::from_secs(60);
+        let ms = retry_delay_ms(&RetryAfter::DateTime(at)).unwrap();
+        assert!((58_000..=60_000).contains(&ms), "{ms}");
+        let past = web_time::SystemTime::now() - Duration::from_secs(60);
+        assert_eq!(retry_delay_ms(&RetryAfter::DateTime(past)), Some(0));
     }
 }

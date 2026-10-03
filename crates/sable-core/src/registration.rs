@@ -5,10 +5,11 @@ use matrix_sdk::ruma::api::client::uiaa::{
     AuthData, AuthFlow, AuthType, EmailIdentity, MatrixUserIdentifier, Password,
     ThirdpartyIdCredentials, UiaaInfo, UserIdentifier,
 };
-use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
+use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::{ClientSecret, OwnedClientSecret, OwnedSessionId, UInt};
 
 use crate::ResultExt;
+use crate::errors::retry_delay_ms;
 use crate::protocol::{CommandErr, CommandOk, RegistrationResultView};
 use crate::session::{Credentials, PersistedSession};
 use crate::{Core, protocol, session};
@@ -220,12 +221,7 @@ impl Core {
             Some(ErrorKind::ThreepidAuthFailed) => CommandErr::EmailVerificationFailed,
             Some(ErrorKind::WeakPassword) => CommandErr::WeakPassword,
             Some(ErrorKind::LimitExceeded(limit)) => CommandErr::RateLimited {
-                retry_after_ms: limit.retry_after.as_ref().and_then(|retry_after| {
-                    let RetryAfter::Delay(delay) = retry_after else {
-                        return None;
-                    };
-                    delay.as_millis().try_into().ok()
-                }),
+                retry_after_ms: limit.retry_after.as_ref().and_then(retry_delay_ms),
             },
             _ => match error {
                 matrix_sdk::Error::Http(error) => self.homeserver_http_error("register", *error),
