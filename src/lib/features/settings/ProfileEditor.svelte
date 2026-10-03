@@ -38,6 +38,7 @@
   import '#lib/ui/primitives/settings-row.css';
   import './profile-editor.css';
   import SpaceProfileEditor from './SpaceProfileEditor.svelte';
+  import { isActiveSpace } from '#lib/features/sidebar/nav-rooms.js';
   import { bioHtml, bioMarkdown, bioTexts } from './bio-markdown.js';
   import ColorSetting from './ColorSetting.svelte';
 
@@ -104,7 +105,7 @@
   let scopeItems = $derived([
     { value: 'default', label: t('settings.profileScopeDefault') },
     ...roomList.rooms
-      .filter((room) => room.is_space && room.state === 'joined')
+      .filter(isActiveSpace)
       .map((room) => ({ value: room.room_id, label: roomLabel(room) }))
       .sort((a, b) => a.label.localeCompare(b.label)),
   ]);
