@@ -41,12 +41,17 @@
   const roomCosmetics = useRoomCosmetics();
   let profile = $state<ProfileView | null>(null);
   let member = $derived(findMember(members, userId));
-  let displayName = $derived(
-    profileOverrides.name(userId, member?.display_name ?? profile?.display_name ?? userId)
+  let shown = $derived(
+    roomCosmetics?.identity(userId, {
+      name: member?.display_name ?? profile?.display_name ?? null,
+      avatar: member?.avatar_url ?? profile?.avatar_url ?? null,
+    }) ?? {
+      name: member?.display_name ?? profile?.display_name ?? null,
+      avatar: member?.avatar_url ?? profile?.avatar_url ?? null,
+    }
   );
-  let avatarUrl = $derived(
-    profileOverrides.avatar(userId, member?.avatar_url ?? profile?.avatar_url ?? null)
-  );
+  let displayName = $derived(profileOverrides.name(userId, shown.name ?? userId));
+  let avatarUrl = $derived(profileOverrides.avatar(userId, shown.avatar));
   let cosmetics = $derived(roomCosmetics?.for(userId) ?? null);
   let colors = $derived(
     senderDisplayColors(userId, profile, null, false, cosmetics, powerTag?.color ?? null)

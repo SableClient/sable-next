@@ -151,8 +151,13 @@
     }
   });
 
-  let realName = $derived(roomMember?.display_name ?? currentProfile?.display_name ?? userId);
-  let realAvatar = $derived(roomMember?.avatar_url ?? currentProfile?.avatar_url ?? null);
+  let ownIdentity = $derived({
+    name: roomMember?.display_name ?? currentProfile?.display_name ?? null,
+    avatar: roomMember?.avatar_url ?? currentProfile?.avatar_url ?? null,
+  });
+  let shownIdentity = $derived(roomCosmetics?.identity(userId, ownIdentity) ?? ownIdentity);
+  let realName = $derived(shownIdentity.name ?? userId);
+  let realAvatar = $derived(shownIdentity.avatar);
   let displayName = $derived(profileOverrides.name(userId, realName));
   let avatarUrl = $derived(profileOverrides.avatar(userId, realAvatar));
   let overrideColors = $derived(profileOverrides.colors(userId));

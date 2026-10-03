@@ -1160,6 +1160,8 @@ export type SenderCosmeticsView = {
 	color_on_light: string | null,
 	color_on_dark: string | null,
 	pronouns: PronounView[],
+	space_display_name: string | null,
+	space_avatar_url: string | null,
 };
 
 export type SessionInfo = {

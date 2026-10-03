@@ -53,11 +53,12 @@
   let fetched = $state<Preview | null>(null);
   let loaded = $derived(events?.get(eventId) ?? null);
   let preview = $derived(loaded ? previewOf(loaded, $i18n.t) : fetched);
-  let name = $derived(
-    preview?.sender
-      ? (loaded?.sender_name ?? null) || memberName(members, preview.sender)
-      : $i18n.t('timeline.unknownSender')
-  );
+  let name = $derived.by(() => {
+    if (!preview?.sender) return $i18n.t('timeline.unknownSender');
+    const own = (loaded?.sender_name ?? null) || memberName(members, preview.sender);
+    const shown = roomCosmetics?.identity(preview.sender, { name: own, avatar: null });
+    return shown?.name ?? own;
+  });
 
   let persona = $derived(loaded?.per_message_profile ?? null);
   let cosmetics = $derived(persona ? null : (roomCosmetics?.for(preview?.sender) ?? null));

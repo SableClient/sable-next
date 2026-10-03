@@ -3164,6 +3164,8 @@ pub struct SenderCosmeticsView {
     pub color_on_light: Option<String>,
     pub color_on_dark: Option<String>,
     pub pronouns: Vec<PronounView>,
+    pub space_display_name: Option<String>,
+    pub space_avatar_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

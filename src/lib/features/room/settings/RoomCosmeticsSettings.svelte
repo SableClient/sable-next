@@ -14,6 +14,7 @@
   } from '#lib/features/composer/slash-commands.js';
   import ColorSetting from '#lib/features/settings/ColorSetting.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
@@ -40,6 +41,7 @@
 
   let { room, permissions, levels }: Props = $props();
   const core = useCoreClient();
+  const roomList = useRoomList();
   const uid = $props.id();
 
   let roomId = $derived(room?.room_id ?? null);
@@ -61,12 +63,48 @@
   let savedPronouns = $state('');
   let saving = $state<string | null>(null);
   let failed = $state(false);
+  let applied = $state<{ done: number; failed: number; total: number } | null>(null);
   let run = 0;
 
   let canSetColor = $derived(canSendState(effectiveLevels, ownLevel, 'm.room.member'));
   let canSetPronouns = $derived(
     canSendState(effectiveLevels, ownLevel, COSMETIC_EVENT_TYPES.pronoun)
   );
+  let applyTargets = $derived.by(() => {
+    const found: string[] = [];
+    const seen: string[] = [];
+    const walk = (space: RoomSummary | undefined) => {
+      for (const edge of space?.space_children ?? []) {
+        if (seen.includes(edge.room_id)) continue;
+        seen.push(edge.room_id);
+        const child = roomList.byId(edge.room_id);
+        if (child?.state !== 'joined') continue;
+        if (child.is_space) walk(child);
+        else found.push(child.room_id);
+      }
+    };
+    if (room) {
+      seen.push(room.room_id);
+      walk(room);
+    }
+    return found;
+  });
+  let applyDescription = $derived.by(() => {
+    if (saving === 'apply' && applied)
+      return $i18n.t('room.cosmeticsApplying', {
+        done: applied.done + applied.failed,
+        total: applied.total,
+      });
+    if (applied?.failed)
+      return $i18n.t('room.cosmeticsAppliedPartial', {
+        count: applied.done,
+        failed: applied.failed,
+      });
+    if (applied) return $i18n.t('room.cosmeticsApplied', { count: applied.done });
+    if (applyTargets.length === 0) return $i18n.t('room.cosmeticsApplyRoomsNone');
+    if (name !== savedName) return $i18n.t('room.cosmeticsApplyRoomsSaveFirst');
+    return $i18n.t('room.cosmeticsApplyRoomsHint', { count: applyTargets.length });
+  });
   let canManage = $derived(permissions?.can_change_power_levels ?? false);
   let membersSetPronouns = $derived(
     effectiveLevels?.events[COSMETIC_EVENT_TYPES.pronoun] === MEMBER_LEVEL
@@ -163,25 +201,24 @@
   async function writeMember(
     target: string,
     self: string,
-    field: 'displayname' | 'avatar_url',
-    value: string | null
+    fields: Partial<Record<'displayname' | 'avatar_url', string | null>>
   ): Promise<void> {
     const rest = Object.fromEntries(
       Object.entries(
         record(await core.commands.roomStateEvent(target, 'm.room.member', self))
-      ).filter(([key]) => key !== field)
+      ).filter(([key]) => !(key in fields))
     );
     await core.commands.sendStateEvent(target, 'm.room.member', self, {
       ...rest,
       membership: 'join',
-      ...(value ? { [field]: value } : {}),
+      ...Object.fromEntries(Object.entries(fields).filter(([, value]) => value)),
     });
   }
 
   function saveName(): void {
     void save('name', async (target, self) => {
       const next = name.trim() || profileName;
-      await writeMember(target, self, 'displayname', next);
+      await writeMember(target, self, { displayname: next });
       name = next === profileName ? '' : (next ?? '');
       savedName = name;
     });
@@ -195,15 +232,38 @@
       const upright = await uprightJpeg(file);
       const bytes = new Uint8Array(await upright.arrayBuffer());
       const uri = await core.commands.uploadMedia(upright.type || 'image/*', bytes);
-      await writeMember(target, self, 'avatar_url', uri);
+      await writeMember(target, self, { avatar_url: uri });
       avatar = uri;
     });
   }
 
   function resetAvatar(): void {
     void save('avatar', async (target, self) => {
-      await writeMember(target, self, 'avatar_url', profileAvatar);
+      await writeMember(target, self, { avatar_url: profileAvatar });
       avatar = null;
+    });
+  }
+
+  function applyToRooms(): void {
+    const total = applyTargets.length;
+    let progress = { done: 0, failed: 0, total };
+    applied = progress;
+    void save('apply', async (_target, self) => {
+      for (const child of applyTargets) {
+        try {
+          await writeMember(child, self, {
+            displayname: name.trim() || profileName,
+            avatar_url: avatar ?? profileAvatar,
+          });
+        } catch (error) {
+          console.warn('[sable room] look not applied to a room', error);
+          progress = { ...progress, failed: progress.failed + 1 };
+          applied = progress;
+          continue;
+        }
+        progress = { ...progress, done: progress.done + 1 };
+        applied = progress;
+      }
     });
   }
 
@@ -247,50 +307,65 @@
       <SenderName displayName={previewName} colors={previewColors} pronouns={previewPronouns} />
     </div>
     <ul class="settings-rows">
-      {#if !isSpace}
-        <SettingsRow
-          title={$i18n.t('room.cosmeticsAvatar')}
-          description={$i18n.t('room.cosmeticsAvatarHint')}
-        >
-          {#snippet before()}
-            <Avatar id={userId} src={avatar ?? profileAvatar} name={previewName} />
-          {/snippet}
-          <Button size="small" disabled={saving !== null} onclick={() => avatarInput?.click()}>
-            {$i18n.t('room.cosmeticsAvatarChange')}
+      <SettingsRow
+        title={$i18n.t(isSpace ? 'room.cosmeticsAvatarSpace' : 'room.cosmeticsAvatar')}
+        description={$i18n.t(
+          isSpace ? 'room.cosmeticsAvatarHintSpace' : 'room.cosmeticsAvatarHint'
+        )}
+      >
+        {#snippet before()}
+          <Avatar id={userId} src={avatar ?? profileAvatar} name={previewName} />
+        {/snippet}
+        <Button size="small" disabled={saving !== null} onclick={() => avatarInput?.click()}>
+          {$i18n.t('room.cosmeticsAvatarChange')}
+        </Button>
+        {#if avatar}
+          <Button size="small" variant="ghost" disabled={saving !== null} onclick={resetAvatar}>
+            {$i18n.t('room.cosmeticsAvatarReset')}
           </Button>
-          {#if avatar}
-            <Button size="small" variant="ghost" disabled={saving !== null} onclick={resetAvatar}>
-              {$i18n.t('room.cosmeticsAvatarReset')}
-            </Button>
-          {/if}
-          <input
-            bind:this={avatarInput}
-            class="avatar-input"
-            type="file"
-            accept="image/*"
-            tabindex="-1"
-            aria-hidden="true"
-            onchange={uploadAvatar}
+        {/if}
+        <input
+          bind:this={avatarInput}
+          class="avatar-input"
+          type="file"
+          accept="image/*"
+          tabindex="-1"
+          aria-hidden="true"
+          onchange={uploadAvatar}
+        />
+      </SettingsRow>
+      <SettingsRow
+        title={$i18n.t(isSpace ? 'room.cosmeticsNameSpace' : 'room.cosmeticsName')}
+        description={$i18n.t(isSpace ? 'room.cosmeticsNameHintSpace' : 'room.cosmeticsNameHint')}
+        wide
+      >
+        <div class="inline-field">
+          <TextInput
+            id={`${uid}-name`}
+            bind:value={name}
+            placeholder={profileName ?? userId ?? ''}
+            aria-label={$i18n.t(isSpace ? 'room.cosmeticsNameSpace' : 'room.cosmeticsName')}
           />
-        </SettingsRow>
+          <Button
+            variant="secondary"
+            disabled={name === savedName || saving === 'name'}
+            onclick={saveName}>{$i18n.t('room.cosmeticsSave')}</Button
+          >
+        </div>
+      </SettingsRow>
+      {#if isSpace}
         <SettingsRow
-          title={$i18n.t('room.cosmeticsName')}
-          description={$i18n.t('room.cosmeticsNameHint')}
-          wide
+          title={$i18n.t('room.cosmeticsApplyRooms')}
+          description={applyDescription}
+          disabled={applyTargets.length === 0 || name !== savedName}
         >
-          <div class="inline-field">
-            <TextInput
-              id={`${uid}-name`}
-              bind:value={name}
-              placeholder={profileName ?? userId ?? ''}
-              aria-label={$i18n.t('room.cosmeticsName')}
-            />
-            <Button
-              variant="secondary"
-              disabled={name === savedName || saving === 'name'}
-              onclick={saveName}>{$i18n.t('room.cosmeticsSave')}</Button
-            >
-          </div>
+          <Button
+            size="small"
+            disabled={saving !== null || applyTargets.length === 0 || name !== savedName}
+            onclick={applyToRooms}
+          >
+            {$i18n.t('room.cosmeticsApplyRoomsAction')}
+          </Button>
         </SettingsRow>
       {/if}
       {#if canSetColor}
