@@ -79,6 +79,7 @@ export const CALL_VIDEO_CODECS = ['auto', 'vp8', 'h264', 'vp9', 'av1'] as const;
 export type CallVideoResolution = (typeof CALL_VIDEO_RESOLUTIONS)[number];
 export type CallVideoBitrate = (typeof CALL_VIDEO_BITRATES)[number];
 export type CallVideoCodec = (typeof CALL_VIDEO_CODECS)[number];
+export type ComposerForm = 'short' | 'adaptive' | 'tall';
 export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
@@ -155,6 +156,7 @@ export interface Preferences {
   pronounPillLimit: PronounPillLimit;
   pronounPillLength: PronounPillLength;
 
+  composerForm: ComposerForm;
   enterForNewline: boolean;
   mentionInReplies: boolean;
   formattingToolbar: boolean;
@@ -417,6 +419,7 @@ const DEFAULTS: Preferences = {
   pronounPillLimit: '3',
   pronounPillLength: 'all',
 
+  composerForm: 'tall',
   enterForNewline: false,
   mentionInReplies: true,
   formattingToolbar: false,

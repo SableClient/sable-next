@@ -997,12 +997,26 @@ export const settingsCategories: SettingsCategory[] = [
     name: 'settings.composerTitle',
     icon: PencilSimpleIcon,
     sections: [
+      { id: 'form', name: 'settings.groups.form' },
       { id: 'writing', name: 'settings.groups.writing' },
       { id: 'sending', name: 'settings.groups.sending' },
       { id: 'composer-buttons', name: 'settings.groups.buttons' },
       { id: 'composer-button-order', name: 'settings.composerButtonOrder' },
     ],
     items: [
+      {
+        key: 'composerForm',
+        section: 'form',
+        icon: PencilSimpleIcon,
+        name: 'settings.composerForm',
+        description: 'settings.composerFormHint',
+        type: 'select',
+        options: [
+          { value: 'short', label: 'settings.composerFormShort' },
+          { value: 'adaptive', label: 'settings.composerFormAdaptive' },
+          { value: 'tall', label: 'settings.composerFormTall' },
+        ],
+      },
       {
         key: 'enterForNewline',
         section: 'writing',
