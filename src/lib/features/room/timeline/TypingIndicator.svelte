@@ -67,8 +67,12 @@
     border: 0;
     color: inherit;
     cursor: pointer;
+    display: inline-block;
     font: inherit;
+    max-width: 24ch;
+    overflow: hidden;
     padding: 0;
+    text-overflow: ellipsis;
   }
 
   button:hover {

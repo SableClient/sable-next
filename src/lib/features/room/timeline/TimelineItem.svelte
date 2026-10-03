@@ -1635,6 +1635,10 @@
     white-space: nowrap;
   }
 
+  :global(.reply-name) {
+    display: inline-block; /* can't */
+  }
+
   .reply-compact {
     gap: var(--space-100);
     padding: 0;
