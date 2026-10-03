@@ -12,7 +12,7 @@ export function isMacPlatform(): boolean {
 
 export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void {
   return on(window, 'keydown', (event) => {
-    if (event.defaultPrevented || isDialogOpen()) return;
+    if (event.defaultPrevented) return;
 
     const isMac = isMacPlatform();
 
@@ -21,6 +21,7 @@ export function registerGlobalShortcuts(handlers: ShortcutHandlers): () => void 
       if (!handler) continue;
       if (!shortcut.allowInEditable && isEditableTarget(event.target)) continue;
       if (!matchesBinding(shortcut.binding, event, isMac)) continue;
+      if (isDialogOpen()) return;
 
       event.preventDefault();
       handler(event);
