@@ -25,7 +25,7 @@ async function closePresented(tags: ReadonlySet<string>): Promise<void> {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
   const registration = await navigator.serviceWorker.getRegistration().catch(() => undefined);
-  if (registration === undefined) return;
+  if (registration === undefined || !('getNotifications' in registration)) return;
 
   for (const notification of await registration.getNotifications()) {
     if (tags.has(notification.tag)) notification.close();

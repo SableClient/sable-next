@@ -266,6 +266,7 @@ async function focused(): Promise<boolean> {
 }
 
 async function conversation(tag: string): Promise<ReturnType<typeof readLines>> {
+  if (!('getNotifications' in worker.registration)) return [];
   const open = await worker.registration.getNotifications({ tag });
   const previous = open.at(-1)?.data as { lines?: unknown } | undefined;
   return readLines(previous?.lines);

@@ -44,6 +44,16 @@ test('closes the alerts of read rooms and nothing else', async () => {
   ]);
 });
 
+test('a browser that cannot list notifications still retires native alerts', async () => {
+  vi.stubGlobal('navigator', {
+    serviceWorker: { getRegistration: () => Promise.resolve({}) },
+  });
+
+  await retireReadAlerts('@me:example.org', ['!read:example.org']);
+
+  expect(mocks.dismissRead).toHaveBeenCalledOnce();
+});
+
 test('asks nothing of the platform when no room is read', async () => {
   presented();
 
