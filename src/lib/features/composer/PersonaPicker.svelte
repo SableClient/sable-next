@@ -2,8 +2,9 @@
   import { Popover } from 'bits-ui';
   import UserSwitchIcon from 'phosphor-svelte/lib/UserSwitchIcon';
 
-  import type { PersonaView } from '#src/generated/protocol';
+  import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
+  import MessageReproxyDialog from '#lib/features/room/messages/MessageReproxyDialog.svelte';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
@@ -19,9 +20,13 @@
   interface Props {
     roomId: string;
     onBeforeOpen?: () => void;
+    edit?: {
+      current: PerMessageProfileView | null;
+      onChoose: (persona: PersonaView | null) => void;
+    };
   }
 
-  let { roomId, onBeforeOpen }: Props = $props();
+  let { roomId, onBeforeOpen, edit }: Props = $props();
   const personas = usePersonaStore();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
@@ -42,11 +47,13 @@
           ) ??
           null)
   );
+  let shown = $derived(edit ? edit.current : active);
   let label = $derived(
-    active
-      ? $i18n.t('personas.sendingAs', { name: active.display_name })
+    shown
+      ? $i18n.t('personas.sendingAs', { name: shown.display_name })
       : $i18n.t('personas.pickerLabel')
   );
+  let editOpen = $state(false);
 
   function handleOpenChange(next: boolean): void {
     open = next;
@@ -82,7 +89,33 @@
   }
 </script>
 
-{#if desktop}
+{#if edit}
+  <IconButton
+    variant="ghost"
+    size="small"
+    class="persona-button-format selection-open"
+    {label}
+    aria-haspopup="dialog"
+    aria-expanded={editOpen}
+    data-state={editOpen ? 'open' : 'closed'}
+    onclick={() => {
+      onBeforeOpen?.();
+      editOpen = true;
+    }}
+  >
+    {#if shown}
+      <Avatar id={shown.id} src={shown.avatar_url ?? null} name={shown.display_name} size="small" />
+    {:else}
+      <UserSwitchIcon />
+    {/if}
+  </IconButton>
+  <MessageReproxyDialog
+    bind:open={editOpen}
+    personas={personas.personas}
+    current={edit.current}
+    onChoose={edit.onChoose}
+  />
+{:else if desktop}
   <Popover.Root {open} onOpenChange={handleOpenChange}>
     <Tooltip {label}>
       {#snippet trigger({ props: tip })}
@@ -172,16 +205,30 @@
 
 <style>
   :global(.persona-picker-popover) {
-    background: var(--bg-container);
+    background: var(--surface-container);
+    border: var(--border-width) solid var(--surface-container-line);
     border-radius: var(--radius);
-    box-shadow: var(--shadow-dialog);
-    color: var(--bg-on-container);
+    box-shadow: var(--shadow-float);
+    color: var(--surface-on-container);
     padding: var(--space-200);
     width: min(18rem, calc(100vw - 2rem));
   }
 
   :global(.persona-button-format) {
+    border-radius: var(--radius);
     color: var(--surface-var-on-container);
+    flex: 0 0 auto;
+    height: var(--target);
+    min-height: var(--target);
+    position: relative;
+    width: var(--target);
+  }
+
+  :global(.persona-button-format)::after {
+    border-radius: inherit;
+    content: '';
+    inset: calc((var(--target) - var(--target-hit)) / 2);
+    position: absolute;
   }
 
   :global(.persona-button-format .avatar-root) {
