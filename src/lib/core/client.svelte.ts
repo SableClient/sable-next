@@ -42,7 +42,7 @@ const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
-const MAX_PROFILE_LOOKUPS = 4;
+const PROFILE_LOOKUP_GAP_MS = 150;
 
 async function discoverBaseUrl(origin: URL): Promise<string | null> {
   try {
@@ -171,9 +171,7 @@ export class CoreClient {
     string,
     { accountId: string | null; error: unknown }
   >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
-  private profileLookups = 0;
-  private readonly profileLookupQueue: (() => void)[] = [];
-  private profileResumeAt = 0;
+  private profileNextAt = 0;
   private readonly relationsCache = new QuickLRU<
     string,
     { accountId: string | null; relations: UserRelations }
@@ -520,7 +518,8 @@ export class CoreClient {
         return profile;
       })
       .catch((error: unknown) => {
-        if (this.profileRequests.get(userId)?.request === request) {
+        const rateLimited = error instanceof CoreError && error.detail.code === 'rate_limited';
+        if (!rateLimited && this.profileRequests.get(userId)?.request === request) {
           this.profileFailures.set(userId, { accountId, error });
         }
         throw error;
@@ -536,26 +535,27 @@ export class CoreClient {
   }
 
   private async lookUpProfile(userId: string): Promise<ProfileView> {
-    if (this.profileLookups < MAX_PROFILE_LOOKUPS) this.profileLookups += 1;
-    else await new Promise<void>((resolve) => this.profileLookupQueue.push(resolve));
-    try {
-      for (let retried = false; ; retried = true) {
-        const wait = this.profileResumeAt - Date.now();
-        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-        try {
-          return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
-            .profile;
-        } catch (error) {
-          if (retried || !(error instanceof CoreError) || error.detail.code !== 'rate_limited') {
-            throw error;
-          }
-          this.profileResumeAt = Date.now() + (error.detail.retry_after_ms ?? 1000);
-        }
+    for (let retried = false; ; retried = true) {
+      for (
+        let wait = this.profileNextAt - Date.now();
+        wait > 0;
+        wait = this.profileNextAt - Date.now()
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, wait));
       }
-    } finally {
-      const next = this.profileLookupQueue.shift();
-      if (next) next();
-      else this.profileLookups -= 1;
+      this.profileNextAt = Date.now() + PROFILE_LOOKUP_GAP_MS;
+      try {
+        return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
+          .profile;
+      } catch (error) {
+        if (retried || !(error instanceof CoreError) || error.detail.code !== 'rate_limited') {
+          throw error;
+        }
+        this.profileNextAt = Math.max(
+          this.profileNextAt,
+          Date.now() + (error.detail.retry_after_ms ?? 1000)
+        );
+      }
     }
   }
 

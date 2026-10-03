@@ -963,24 +963,25 @@ test('failed profile lookups cool down across repeated timeline mounts and retry
   }
 });
 
-test('profile lookups run four at a time', async () => {
+test('profile lookups are spaced out', async () => {
+  vi.useFakeTimers();
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
-  let inFlight = 0;
-  let peak = 0;
-  fake.send.mockImplementation(async () => {
-    peak = Math.max(peak, ++inFlight);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    inFlight -= 1;
-    return { profile: {} };
-  });
+  fake.send.mockResolvedValue({ profile: {} });
   try {
-    await Promise.all(
-      Array.from({ length: 20 }, (_, index) => core.userProfile(`@user${index}:example.org`))
+    const lookups = Array.from({ length: 3 }, (_, index) =>
+      core.userProfile(`@user${index}:example.org`)
     );
-    expect(peak).toBe(4);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(150);
+    expect(fake.send).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(150);
+    await Promise.all(lookups);
+    expect(fake.send).toHaveBeenCalledTimes(3);
   } finally {
     core.stop();
+    vi.useRealTimers();
   }
 });
 
@@ -998,6 +999,29 @@ test('a rate-limited profile lookup waits out the hint and retries', async () =>
     await vi.advanceTimersByTimeAsync(1);
     await expect(lookup).resolves.toEqual({ user_id: '@remote:example.org' });
     expect(fake.send).toHaveBeenCalledTimes(2);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
+test('a profile lookup that stayed rate limited is not remembered as failed', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const limited = new CoreError({ code: 'rate_limited', retry_after_ms: 1000 });
+  fake.send
+    .mockRejectedValueOnce(limited)
+    .mockRejectedValueOnce(limited)
+    .mockResolvedValueOnce({ profile: { user_id: '@remote:example.org' } });
+  try {
+    const first = core.userProfile('@remote:example.org');
+    const failed = expect(first).rejects.toBe(limited);
+    await vi.advanceTimersByTimeAsync(5000);
+    await failed;
+    await expect(core.userProfile('@remote:example.org')).resolves.toEqual({
+      user_id: '@remote:example.org',
+    });
   } finally {
     core.stop();
     vi.useRealTimers();
