@@ -963,6 +963,47 @@ test('failed profile lookups cool down across repeated timeline mounts and retry
   }
 });
 
+test('profile lookups run four at a time', async () => {
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  let inFlight = 0;
+  let peak = 0;
+  fake.send.mockImplementation(async () => {
+    peak = Math.max(peak, ++inFlight);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    inFlight -= 1;
+    return { profile: {} };
+  });
+  try {
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) => core.userProfile(`@user${index}:example.org`))
+    );
+    expect(peak).toBe(4);
+  } finally {
+    core.stop();
+  }
+});
+
+test('a rate-limited profile lookup waits out the hint and retries', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  fake.send
+    .mockRejectedValueOnce(new CoreError({ code: 'rate_limited', retry_after_ms: 1000 }))
+    .mockResolvedValueOnce({ profile: { user_id: '@remote:example.org' } });
+  try {
+    const lookup = core.userProfile('@remote:example.org');
+    await vi.advanceTimersByTimeAsync(999);
+    expect(fake.send).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(lookup).resolves.toEqual({ user_id: '@remote:example.org' });
+    expect(fake.send).toHaveBeenCalledTimes(2);
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('a sign-in the core cannot reach but the page can blames the local network', async () => {
   localNetwork.gated = true;
   vi.stubGlobal(

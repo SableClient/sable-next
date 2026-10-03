@@ -42,6 +42,7 @@ const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
+const MAX_PROFILE_LOOKUPS = 4;
 
 async function discoverBaseUrl(origin: URL): Promise<string | null> {
   try {
@@ -170,6 +171,9 @@ export class CoreClient {
     string,
     { accountId: string | null; error: unknown }
   >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
+  private profileLookups = 0;
+  private readonly profileLookupQueue: (() => void)[] = [];
+  private profileResumeAt = 0;
   private readonly relationsCache = new QuickLRU<
     string,
     { accountId: string | null; relations: UserRelations }
@@ -509,12 +513,11 @@ export class CoreClient {
       throw failure.error;
     }
 
-    const request = this.ensureTransport()
-      .send({ type: 'user_profile', user_id: userId })
-      .then((response) => {
+    const request = this.lookUpProfile(userId)
+      .then((profile) => {
         this.profileFailures.delete(userId);
-        this.profileCache.set(userId, { accountId, profile: response.profile });
-        return response.profile;
+        this.profileCache.set(userId, { accountId, profile });
+        return profile;
       })
       .catch((error: unknown) => {
         if (this.profileRequests.get(userId)?.request === request) {
@@ -530,6 +533,30 @@ export class CoreClient {
     };
     void request.then(clearRequest, clearRequest);
     return request;
+  }
+
+  private async lookUpProfile(userId: string): Promise<ProfileView> {
+    if (this.profileLookups < MAX_PROFILE_LOOKUPS) this.profileLookups += 1;
+    else await new Promise<void>((resolve) => this.profileLookupQueue.push(resolve));
+    try {
+      for (let retried = false; ; retried = true) {
+        const wait = this.profileResumeAt - Date.now();
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        try {
+          return (await this.ensureTransport().send({ type: 'user_profile', user_id: userId }))
+            .profile;
+        } catch (error) {
+          if (retried || !(error instanceof CoreError) || error.detail.code !== 'rate_limited') {
+            throw error;
+          }
+          this.profileResumeAt = Date.now() + (error.detail.retry_after_ms ?? 1000);
+        }
+      }
+    } finally {
+      const next = this.profileLookupQueue.shift();
+      if (next) next();
+      else this.profileLookups -= 1;
+    }
   }
 
   /**
