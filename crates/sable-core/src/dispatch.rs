@@ -23,7 +23,7 @@ use matrix_sdk::ruma::events::InitialStateEvent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
-use matrix_sdk::ruma::events::room::create::RoomCreateEventContent;
+use matrix_sdk::ruma::events::room::create::{PreviousRoom, RoomCreateEventContent};
 use matrix_sdk::ruma::events::room::encryption::RoomEncryptionEventContent;
 use matrix_sdk::ruma::events::room::message::Relation;
 use matrix_sdk::ruma::events::room::power_levels::{RoomPowerLevels, RoomPowerLevelsEventContent};
@@ -2679,6 +2679,7 @@ impl Core {
                 room_version,
                 join_rule,
                 federate,
+                predecessor,
             } => {
                 let client = self.client().await?;
                 let mut request = create_room::v3::Request::new();
@@ -2710,10 +2711,11 @@ impl Core {
                         Some(RoomType::from(crate::calendar::CALENDAR_ROOM_TYPE))
                     }
                 };
-                if room_type.is_some() || !federate {
+                if room_type.is_some() || !federate || predecessor.is_some() {
                     let mut creation = RoomCreateEventContent::new_v11();
                     creation.room_type = room_type;
                     creation.federate = federate;
+                    creation.predecessor = predecessor.map(PreviousRoom::new);
                     request.creation_content = Some(
                         Raw::new(&creation)
                             .or_failed(self, "create_room_creation_content")?

@@ -111,6 +111,7 @@ export type CreateRoomOptions = {
   roomVersion?: string | null;
   joinRule?: CreateJoinRuleView | null;
   federate?: boolean;
+  predecessor?: string | null;
 };
 
 export interface OutgoingMentions {
@@ -686,6 +687,7 @@ export function createCommands(transport: () => Transport) {
         room_version: options.roomVersion ?? null,
         join_rule: options.joinRule ?? null,
         federate: options.federate ?? true,
+        predecessor: options.predecessor ?? null,
       });
       return response.room_id;
     },

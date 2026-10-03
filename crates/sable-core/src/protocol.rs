@@ -903,6 +903,9 @@ pub enum Command {
         room_version: Option<String>,
         join_rule: Option<CreateJoinRuleView>,
         federate: bool,
+        #[serde(default)]
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        predecessor: Option<OwnedRoomId>,
     },
     CreateDm {
         #[cfg_attr(feature = "typegen", specta(type = String))]

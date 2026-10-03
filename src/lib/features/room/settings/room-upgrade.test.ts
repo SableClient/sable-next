@@ -4,6 +4,7 @@ import {
   additionalCreatorsSupported,
   readCreate,
   readFounders,
+  readReplacementId,
   readTombstone,
 } from './room-upgrade';
 
@@ -59,4 +60,12 @@ test('a room before version 12 has no founders', () => {
     []
   );
   expect(readFounders(null)).toEqual([]);
+});
+
+test('a replacement is a room id, never an alias or a free string', () => {
+  expect(readReplacementId(' !new:example.org ')).toBe('!new:example.org');
+  expect(readReplacementId('!hashonlyv12')).toBe('!hashonlyv12');
+  expect(readReplacementId('#room:example.org')).toBeNull();
+  expect(readReplacementId('!has space:example.org')).toBeNull();
+  expect(readReplacementId('')).toBeNull();
 });

@@ -11,14 +11,21 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormField from '#lib/ui/primitives/FormField.svelte';
+  import OptionCards from '#lib/ui/primitives/OptionCards.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
+  import Switch from '#lib/ui/primitives/Switch.svelte';
 
   import '#lib/ui/primitives/settings-row.css';
   import TextInput from '#lib/ui/primitives/TextInput.svelte';
 
-  import { additionalCreatorsSupported, readCreate, readTombstone } from './room-upgrade';
+  import {
+    additionalCreatorsSupported,
+    readCreate,
+    readReplacementId,
+    readTombstone,
+  } from './room-upgrade';
   import { canSendState } from './permission-groups';
 
   interface Props {
@@ -40,6 +47,10 @@
 
   let open = $state(false);
   let target = $state('');
+  let mode = $state<'server' | 'custom' | 'redirect'>('server');
+  let encrypted = $state(true);
+  let replacementDraft = $state('');
+  let messageDraft = $state('');
   let creators = $state.raw<string[]>([]);
   let creatorDraft = $state('');
   let creatorInvalid = $state(false);
@@ -50,7 +61,41 @@
   let roomId = $derived(room?.room_id ?? null);
   let isSpace = $derived(room?.is_space ?? false);
   let canUpgrade = $derived(canSendState(levels, ownPowerLevel, 'm.room.tombstone'));
-  let allowCreators = $derived(additionalCreatorsSupported(target));
+  let allowCreators = $derived(mode === 'server' && additionalCreatorsSupported(target));
+  let replacementId = $derived.by(() => {
+    const parsed = readReplacementId(replacementDraft);
+    return parsed === roomId ? null : parsed;
+  });
+  let replacementInvalid = $derived(replacementDraft.trim() !== '' && replacementId === null);
+  let encryptable = $derived(room?.join_rule !== 'public');
+  let defaultBody = $derived(
+    isSpace ? $i18n.t('room.upgradeReplacedSpace') : $i18n.t('room.upgradeReplacedRoom')
+  );
+  let modeOptions = $derived([
+    {
+      value: 'server' as const,
+      label: $i18n.t('room.upgradeModeServer'),
+      hint: $i18n.t('room.upgradeModeServerHint'),
+    },
+    {
+      value: 'custom' as const,
+      label: $i18n.t('room.upgradeModeCustom'),
+      hint: $i18n.t('room.upgradeModeCustomHint'),
+    },
+    {
+      value: 'redirect' as const,
+      label: $i18n.t('room.upgradeModeRedirect'),
+      hint: $i18n.t('room.upgradeModeRedirectHint'),
+    },
+  ]);
+  let actionLabel = $derived(
+    mode === 'redirect'
+      ? $i18n.t('room.upgradeActionRedirect')
+      : mode === 'custom'
+        ? $i18n.t('room.upgradeActionReplace')
+        : $i18n.t('room.upgradeAction')
+  );
+  let canSubmit = $derived(mode === 'redirect' ? replacementId !== null : target !== '');
   let versionOptions = $derived(
     (versions?.available ?? []).map((entry) => ({
       value: entry.id,
@@ -88,6 +133,10 @@
     creators = [];
     creatorDraft = '';
     creatorInvalid = false;
+    mode = 'server';
+    encrypted = room?.encrypted ?? true;
+    replacementDraft = '';
+    messageDraft = '';
     failed = false;
     open = true;
 
@@ -115,14 +164,43 @@
     creatorDraft = '';
   }
 
+  async function replaceWithNewRoom(id: string): Promise<string> {
+    const kind = isSpace ? 'space' : room?.is_voice ? 'voice' : 'text';
+    const next = await core.commands.createRoom({
+      name: room?.name,
+      topic: room?.topic,
+      kind,
+      public: room?.join_rule === 'public',
+      encrypted,
+      roomVersion: target,
+      predecessor: id,
+    });
+    await core.commands.sendStateEvent(id, 'm.room.tombstone', '', {
+      body: messageDraft.trim() || defaultBody,
+      replacement_room: next,
+    });
+    return next;
+  }
+
   async function upgrade(): Promise<void> {
     const id = roomId;
-    if (!id || target === '' || upgrading) return;
+    if (!id || !canSubmit || upgrading) return;
 
     upgrading = true;
     failed = false;
     try {
-      const next = await core.commands.upgradeRoom(id, target, allowCreators ? creators : []);
+      let next: string;
+      if (mode === 'redirect') {
+        next = replacementId ?? '';
+        await core.commands.sendStateEvent(id, 'm.room.tombstone', '', {
+          body: messageDraft.trim() || defaultBody,
+          replacement_room: next,
+        });
+      } else if (mode === 'custom') {
+        next = await replaceWithNewRoom(id);
+      } else {
+        next = await core.commands.upgradeRoom(id, target, allowCreators ? creators : []);
+      }
       open = false;
       onClose();
       await afterOverlayPops();
@@ -204,16 +282,77 @@
 >
   <div class="upgrade">
     <h2>{isSpace ? $i18n.t('room.upgradeSpaceTitle') : $i18n.t('room.upgradeRoomTitle')}</h2>
-    <Alert variant="warning" role="status">{$i18n.t('room.upgradeIrreversible')}</Alert>
+    <OptionCards
+      label={$i18n.t('room.upgradeMode')}
+      value={mode}
+      disabled={upgrading}
+      options={modeOptions}
+      onSelect={(next) => {
+        mode = next;
+        failed = false;
+      }}
+    />
 
-    <FormField fieldId="room-upgrade-version" label={$i18n.t('room.upgradeVersion')}>
-      <Select
-        id="room-upgrade-version"
-        bind:value={target}
-        items={versionOptions}
-        disabled={upgrading || versionOptions.length === 0}
-      />
-    </FormField>
+    {#if mode === 'redirect'}
+      <FormField fieldId="room-upgrade-replacement" label={$i18n.t('room.upgradeReplacement')}>
+        <p class="hint">{$i18n.t('room.upgradeReplacementHint')}</p>
+        <TextInput
+          id="room-upgrade-replacement"
+          bind:value={replacementDraft}
+          placeholder="!room:example.org"
+          disabled={upgrading}
+          autocapitalize="off"
+          autocorrect="off"
+          spellcheck={false}
+        />
+        {#if replacementInvalid}
+          <p class="error">{$i18n.t('room.upgradeReplacementInvalid')}</p>
+        {/if}
+      </FormField>
+    {:else}
+      <FormField fieldId="room-upgrade-version" label={$i18n.t('room.upgradeVersion')}>
+        <Select
+          id="room-upgrade-version"
+          bind:value={target}
+          items={versionOptions}
+          disabled={upgrading || versionOptions.length === 0}
+        />
+      </FormField>
+    {/if}
+
+    {#if mode === 'custom'}
+      <div class="toggle-row">
+        <div>
+          <p class="toggle-label">{$i18n.t('room.createEncryptionLabel')}</p>
+          <p class="hint">
+            {!encryptable
+              ? $i18n.t('room.createEncryptionUnavailable')
+              : encrypted
+                ? $i18n.t('room.createEncryptionHint')
+                : $i18n.t('room.upgradeEncryptionOff')}
+          </p>
+        </div>
+        <Switch
+          checked={encryptable && encrypted}
+          disabled={upgrading || !encryptable}
+          label={$i18n.t('room.createEncryptionLabel')}
+          onCheckedChange={(next: boolean) => {
+            encrypted = next;
+          }}
+        />
+      </div>
+    {/if}
+
+    {#if mode !== 'server'}
+      <FormField fieldId="room-upgrade-message" label={$i18n.t('room.upgradeMessage')}>
+        <TextInput
+          id="room-upgrade-message"
+          bind:value={messageDraft}
+          placeholder={defaultBody}
+          disabled={upgrading}
+        />
+      </FormField>
+    {/if}
 
     {#if allowCreators}
       <FormField fieldId="room-upgrade-creator" label={$i18n.t('room.upgradeCreators')}>
@@ -263,6 +402,12 @@
       <Alert variant="critical" role="alert">{$i18n.t('room.upgradeFailed')}</Alert>
     {/if}
 
+    <Alert variant="warning" role="status">
+      {mode === 'server'
+        ? $i18n.t('room.upgradeIrreversible')
+        : $i18n.t('room.upgradeIrreversibleManual')}
+    </Alert>
+
     <div class="actions">
       <Button
         variant="ghost"
@@ -276,12 +421,12 @@
       <Button
         variant="danger"
         loading={upgrading}
-        disabled={target === ''}
+        disabled={!canSubmit}
         onclick={() => {
           void upgrade();
         }}
       >
-        {$i18n.t('room.upgradeAction')}
+        {actionLabel}
       </Button>
     </div>
   </div>
@@ -302,6 +447,17 @@
   .hint {
     color: var(--surface-var-on-container);
     font-size: var(--font-size-small);
+    margin: 0;
+  }
+
+  .toggle-row {
+    align-items: center;
+    display: flex;
+    gap: var(--space-300);
+    justify-content: space-between;
+  }
+
+  .toggle-label {
     margin: 0;
   }
 

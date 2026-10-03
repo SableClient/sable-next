@@ -47,3 +47,8 @@ export function readTombstone(content: unknown): {
     body: typeof tombstone.body === 'string' && tombstone.body !== '' ? tombstone.body : null,
   };
 }
+
+export function readReplacementId(input: string): string | null {
+  const id = input.trim();
+  return /^![^\s:]+(:\S+)?$/.test(id) ? id : null;
+}

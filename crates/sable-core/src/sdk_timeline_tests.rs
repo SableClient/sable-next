@@ -3415,6 +3415,7 @@ async fn a_new_calendar_room_is_set_up_by_its_creator() {
             room_version: None,
             join_rule: None,
             federate: true,
+            predecessor: None,
         })
         .await
         .unwrap();
@@ -3466,6 +3467,7 @@ async fn an_encrypted_private_space_includes_encryption_in_its_creation_request(
             room_version: None,
             join_rule: None,
             federate: true,
+            predecessor: None,
         })
         .await
         .unwrap();
