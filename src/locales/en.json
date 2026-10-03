@@ -2070,7 +2070,7 @@
     "composerFormHint": "Decides whether the composer is tall or short. Either may be preferable depending on how many buttons are visible in the composer, screen size, or familiarity with other platforms.",
     "composerFormTall": "Tall",
     "composerFormAdaptive": "Adapts to screen width",
-    "composerFormShort": "Always short (Unsupported)",
+    "composerFormShort": "Always short",
     "composerSeparator": "Separator",
     "composerGifButton": "GIF button",
     "composerGifButtonHint": "Shows a GIF button beside the composer. It opens the picker on the GIF tab.",

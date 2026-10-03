@@ -209,6 +209,11 @@
   const roomList = useRoomList();
   const personas = usePersonaStore();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  const roomyPointer = createMediaQuery('(width >= 32rem) and (pointer: fine)');
+  const composerShort = $derived(
+    preferences.composerForm === 'short' ||
+      (preferences.composerForm === 'adaptive' && roomyPointer.matches)
+  );
   const uid = $props.id();
   const hintId = `composer-hint-${uid}`;
   const listboxId = `composer-suggestions-${uid}`;
@@ -1451,8 +1456,7 @@
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <form
           class="composer-row"
-          class:short={preferences.composerForm === 'short'}
-          class:adaptive={preferences.composerForm === 'adaptive'}
+          class:short={composerShort}
           class:formatting-open={formattingOpen}
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
@@ -2077,13 +2081,6 @@
     position: absolute;
   }
 
-  /*
-    for discord users 
-    if you change any rules in this block please
-    change them in the .composer-row.adaptive rule
-    below. css limitation sorry. erwan plz fix
-    ~josie f0rest
-  */
   .composer-row.short {
     grid-template-areas: 'before field after';
 
@@ -2110,37 +2107,6 @@
     .composer-before,
     .composer-after {
       align-self: start;
-    }
-  }
-
-  @media (width >= 32rem) and (pointer: fine) {
-    .composer-row.adaptive {
-      grid-template-areas: 'before field after';
-
-      &.formatting-open {
-        grid-template-areas:
-          'formatting formatting formatting'
-          'before field after';
-      }
-
-      :global(.composer-expand),
-      :global(.composer-separator) {
-        display: none;
-      }
-
-      :global(.editor) {
-        padding: var(--space-200);
-        padding-block: var(--space-100);
-
-        &::before {
-          top: var(--space-100);
-        }
-      }
-
-      .composer-before,
-      .composer-after {
-        align-self: start;
-      }
     }
   }
 </style>
