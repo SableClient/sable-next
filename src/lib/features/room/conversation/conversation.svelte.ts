@@ -4,6 +4,7 @@ import type {
   ImageSourcePackReferenceView,
   MessageKind,
   PerMessageProfileView,
+  PersonaView,
   TimelineItemView,
   UrlPreviewView,
 } from '#src/generated/protocol';
@@ -135,7 +136,7 @@ export class Conversation {
           kind: editedKind(edited),
           mediaCaption: pending.mediaCaption,
           threadRoot: this.#threadRoot,
-          persona: edited?.per_message_profile ?? null,
+          persona: pending.persona ?? null,
         }
       );
       this.context = null;
@@ -495,6 +496,15 @@ export class Conversation {
       this.reply(eventId);
   };
 
+  readonly setEditPersona = (persona: PersonaView | null): void => {
+    const pending = this.context;
+    if (pending?.kind !== 'edit') return;
+    this.context = {
+      ...pending,
+      persona: persona ? projectPersona(persona, preferences.personaFallback) : null,
+    };
+  };
+
   readonly toggleSilentReply = (): void => {
     const pending = this.context;
     if (pending?.kind !== 'reply') return;
@@ -510,7 +520,15 @@ export class Conversation {
     const item = this.#timeline.items.find(
       (entry) => entry.event_id === eventId || entry.transaction_id === eventId
     );
-    this.context = { kind: 'edit', eventId, timelineItemId: item?.id, body, html, mediaCaption };
+    this.context = {
+      kind: 'edit',
+      eventId,
+      timelineItemId: item?.id,
+      body,
+      html,
+      mediaCaption,
+      persona: item?.per_message_profile ?? null,
+    };
   };
 
   #editTimelineItem(item: TimelineItemView, itemId: string): boolean {

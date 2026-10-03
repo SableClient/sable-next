@@ -1,3 +1,5 @@
+import type { PerMessageProfileView } from '#src/generated/protocol';
+
 export interface ScheduledTarget {
   source: 'server' | 'queue';
   dueTs: number | null;
@@ -13,6 +15,7 @@ export interface ComposerContext {
   html?: string | null;
   mediaCaption?: boolean;
   scheduled?: ScheduledTarget;
+  persona?: PerMessageProfileView | null;
 }
 
 export function formattedForEditing(html: string | null | undefined): string | null {

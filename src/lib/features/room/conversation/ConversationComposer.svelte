@@ -21,6 +21,7 @@
     | 'onQuickReact'
     | 'context'
     | 'onCancelContext'
+    | 'onEditPersona'
     | 'onToggleSilentReply'
   > & {
     conversation: Conversation;
@@ -51,5 +52,6 @@
   onQuickReact={conversation.quickReact}
   context={conversation.context}
   onCancelContext={conversation.clearContext}
+  onEditPersona={conversation.setEditPersona}
   onToggleSilentReply={conversation.toggleSilentReply}
 />

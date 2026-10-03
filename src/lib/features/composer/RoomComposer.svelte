@@ -5,6 +5,7 @@
     PackImageInfoView,
     ImageSourcePackView,
     PackImageView,
+    PersonaView,
   } from '#src/generated/protocol';
   import { mergeProps, Portal } from 'bits-ui';
   import FileIcon from 'phosphor-svelte/lib/FileIcon';
@@ -167,6 +168,7 @@
     /** What the next send relates to: a message being replied to, or edited. */
     context?: ComposerContext | null;
     onCancelContext?: () => void;
+    onEditPersona?: (persona: PersonaView | null) => void;
     onToggleSilentReply?: () => void;
     onDeleteEdited?: (eventId: string, reason: string | null) => void;
     onEditLast?: (before?: string) => void;
@@ -194,6 +196,7 @@
     encrypted = null,
     context = null,
     onCancelContext,
+    onEditPersona,
     onToggleSilentReply,
     onDeleteEdited,
     onEditLast,
@@ -1544,7 +1547,13 @@
               </div>
             {/if}
             {#snippet personaButton()}
-              <PersonaPicker {roomId} onBeforeOpen={!desktop ? blurEditor : undefined} />
+              <PersonaPicker
+                {roomId}
+                onBeforeOpen={!desktop ? blurEditor : undefined}
+                edit={context?.kind === 'edit' && onEditPersona
+                  ? { current: context.persona ?? null, onChoose: onEditPersona }
+                  : undefined}
+              />
             {/snippet}
             {#snippet formatButton()}
               <Tooltip label={$i18n.t('composer.formatting')}>
