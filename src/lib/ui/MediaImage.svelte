@@ -543,6 +543,7 @@
         interactive: !showUnavailable && (manualGif || onclick || href),
         gif: manualGif,
         pixelated,
+        painted,
       },
       { spoilered: spoilerHidden && !showUnavailable },
     ]}
@@ -645,6 +646,10 @@
   .spoilerable-media {
     background: var(--surface-var-container);
     border-radius: var(--radius);
+  }
+
+  .spoilerable-media.painted {
+    background: none;
   }
 
   .spoilered .media-image-visual {
