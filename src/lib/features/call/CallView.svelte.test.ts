@@ -4,7 +4,11 @@ import { render, screen, within } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
 
-import type { CallSession } from './call-session.svelte.js';
+vi.mock('./call-telemetry', () => ({ CallTelemetry: vi.fn() }));
+
+import type { CoreClient } from '#lib/core/client.svelte.js';
+
+import { CallSession } from './call-session.svelte.js';
 import type { CallParticipant } from './call-transport';
 import { idleTransportState } from './call-transport';
 import CallViewHarness from './CallViewHarness.test.svelte';
@@ -17,7 +21,7 @@ function mountBothSharing(
   otherUserId = '@there:x',
   watchedScreenShareIds = [shared.id]
 ) {
-  const watchScreenShare = vi.fn();
+  const toggleWatchScreenShare = vi.fn();
   const session = {
     lifecycle: 'active',
     mediaReady: true,
@@ -57,9 +61,9 @@ function mountBothSharing(
       participants: others,
     },
     roomFor: () => undefined,
-    watchScreenShare,
+    toggleWatchScreenShare,
   } as unknown as CallSession;
-  return { session, watchScreenShare, ...render(CallViewHarness, { session, members: [] }) };
+  return { session, toggleWatchScreenShare, ...render(CallViewHarness, { session, members: [] }) };
 }
 
 test('pins either screen of an account sharing from two devices, and unpins to the grid', async () => {
@@ -88,17 +92,64 @@ test('pins either screen of an account sharing from two devices, and unpins to t
   expect(container.querySelector('.grid')).toBeInTheDocument();
 });
 
-test('does not show a remote screen until it is watched', async () => {
+test('offers a separate tile for an available remote screen', async () => {
   const user = userEvent.setup();
-  const { container, watchScreenShare } = mountBothSharing(
+  const { container, toggleWatchScreenShare } = mountBothSharing(
     { identity: 'me:AAAA', local: true },
     [{ identity: 'me:BBBB', screenShare: shared }],
     '@there:x',
     []
   );
   expect(container.querySelector('.featured')).not.toBeInTheDocument();
+  expect(screen.getByText("@there:x's screen")).toBeInTheDocument();
+  expect(container.querySelector('video')).not.toBeInTheDocument();
   await user.click(screen.getByRole('button', { name: "Watch @there:x's screen" }));
-  expect(watchScreenShare).toHaveBeenCalledWith('s');
+  expect(toggleWatchScreenShare).toHaveBeenCalledWith('s');
+});
+
+test('stopping a pinned screen keeps other screens playing', async () => {
+  const user = userEvent.setup();
+  const session = new CallSession({} as CoreClient);
+  session.lifecycle = 'active';
+  session.mediaReady = true;
+  session.transport = {
+    ...idleTransportState(),
+    connection: 'connected',
+    self: { identity: '@here:x', local: true },
+    participants: [
+      { identity: '@there:x', screenShare: shared },
+      { identity: '@another:x', screenShare: { ...shared, id: 'other' } },
+    ],
+  };
+  const { container } = render(CallViewHarness, { session, members: [] });
+
+  expect(screen.getByText("@there:x's screen")).toBeInTheDocument();
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: "Watch @there:x's screen" }));
+  expect(container.querySelector('.featured video')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: "Watch @another:x's screen" }));
+  expect(container.querySelectorAll('.featured video')).toHaveLength(2);
+  await user.click(screen.getByRole('button', { name: "Pin @there:x's screen" }));
+  await user.click(screen.getByRole('button', { name: "Stop watching @there:x's screen" }));
+  expect(screen.getByText("@there:x's screen")).toBeInTheDocument();
+  expect(container.querySelectorAll('video')).toHaveLength(1);
+  expect(
+    screen.getByRole('button', { name: "Stop watching @another:x's screen" })
+  ).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: "Stop watching @another:x's screen" }));
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  expect(container.querySelector('.featured')).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: "Watch @there:x's screen" }));
+  expect(container.querySelector('.featured video')).toBeInTheDocument();
+
+  session.transport = {
+    ...session.transport,
+    participants: [{ identity: '@another:x', screenShare: { ...shared, id: 'other' } }],
+  };
+  await vi.waitFor(() => {
+    expect(screen.queryByText("@there:x's screen")).not.toBeInTheDocument();
+    expect(container.querySelector('video')).not.toBeInTheDocument();
+  });
 });
 
 test('features every remote screen together and keeps the people in the strip', () => {

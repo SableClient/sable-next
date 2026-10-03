@@ -97,3 +97,12 @@ test('shows nothing without a remote screen or a room to draw it from', () => {
   });
   expect(screen.queryByRole('region')).not.toBeInTheDocument();
 });
+
+test('an available but unwatched screen does not open a floating preview', () => {
+  const available = session([{ identity: 'alice:A', screenShare: shared }]);
+  available.watchedScreenShareIds = [];
+  render(ScreenSharePreview, { session: available, onReturn: vi.fn() });
+
+  expect(screen.queryByRole('region')).not.toBeInTheDocument();
+  expect(track.attach).not.toHaveBeenCalled();
+});

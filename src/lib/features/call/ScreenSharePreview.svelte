@@ -37,7 +37,7 @@
         ? [session.transport.self, ...session.transport.participants]
         : session.transport.participants,
       session.watchedScreenShareIds
-    ).filter((tile) => tile.source === 'screen' && !tile.participant.local)
+    ).filter((tile) => tile.source === 'screen' && tile.watching && !tile.participant.local)
   );
   let shown = $derived.by<CallTile | undefined>(() => {
     const featured = featuredTiles(tiles, session.layout.pinned).find(

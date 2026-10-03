@@ -125,7 +125,9 @@
   let featured = $derived(pinned === null && gridForced ? [] : featuredTiles(tiles, pinned));
   let spotlight = $derived(featured.length > 0);
   let strip = $derived(spotlight ? tiles.filter((tile) => !featured.includes(tile)) : []);
-  let canSpotlight = $derived(pinned !== null || tiles.some((tile) => tile.source === 'screen'));
+  let canSpotlight = $derived(
+    featured.length > 0 || tiles.some((tile) => tile.source === 'screen' && tile.watching)
+  );
 
   let noticeHeight = $state(0);
   let mediaWidth = $state(0);
@@ -457,6 +459,7 @@
 
 {#snippet tile(item: CallTile, large: boolean)}
   {@const profile = profileOf(item.participant.identity)}
+  {@const screenShare = item.participant.screenShare}
   <CallParticipantTile
     participant={item.participant}
     source={item.source}
@@ -467,9 +470,12 @@
     avatar={profile.avatar}
     featured={large}
     pinned={featured.length === 1 && featured[0].key === item.key}
-    onPin={tiles.length > 1 ? () => pin(item) : undefined}
-    onWatchScreen={item.source === 'camera' && item.participant.screenShare
-      ? () => session.watchScreenShare(item.participant.screenShare?.id ?? '')
+    onPin={tiles.length > 1 && (item.source === 'camera' || item.watching)
+      ? () => pin(item)
+      : undefined}
+    watchingScreen={item.watching}
+    onWatchScreen={item.source === 'screen' && !item.participant.local && screenShare
+      ? () => session.toggleWatchScreenShare(screenShare.id)
       : undefined}
     onVolumeChange={(identity, volume) => void session.setParticipantVolume(identity, volume)}
   />

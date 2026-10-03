@@ -3,6 +3,8 @@
 import { render, screen } from '@testing-library/svelte';
 import { userEvent } from '@testing-library/user-event';
 import { expect, test, vi } from 'vitest';
+import { flushSync } from 'svelte';
+import type { Room } from 'livekit-client';
 
 import CallParticipantTile from './CallParticipantTile.svelte';
 
@@ -89,6 +91,7 @@ function mountScreen(screenShareAudio: boolean, onVolumeChange = vi.fn()) {
         : undefined,
     },
     source: 'screen',
+    watchingScreen: true,
     room: undefined,
     name: 'Bob',
     userId: '@bob:example.org',
@@ -120,30 +123,74 @@ test('a shared screen without sound offers no volume', () => {
   expect(screen.queryByRole('button', { name: "Volume of Bob's screen" })).not.toBeInTheDocument();
 });
 
-function mountSharer(onWatchScreen?: () => void) {
-  render(CallParticipantTile, {
+test('attaches screen video only while watching and detaches it when stopped', async () => {
+  const track = { attach: vi.fn(), detach: vi.fn() };
+  const onWatchScreen = vi.fn();
+  const room = {
+    remoteParticipants: new Map([['bob', { getTrackPublication: () => ({ track }) }]]),
+  } as unknown as Room;
+  const { container, rerender } = render(CallParticipantTile, {
     participant: {
-      identity: '@bob:example.org:DEVICE',
-      screenShare: { id: 'TR_video', muted: false, subscribed: true },
+      identity: 'bob',
+      screenShare: { id: 'video', muted: false, subscribed: true },
+      screenShareAudio: { id: 'audio', muted: false, subscribed: true },
     },
-    source: 'camera',
-    room: undefined,
+    source: 'screen',
+    room,
     name: 'Bob',
     userId: '@bob:example.org',
     avatar: null,
+    watchingScreen: false,
     onWatchScreen,
   });
-}
+  expect(screen.getByText("Bob's screen")).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: "Watch Bob's screen" })).toHaveTextContent('Watch');
+  expect(track.attach).not.toHaveBeenCalled();
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: "Volume of Bob's screen" })).not.toBeInTheDocument();
 
-test('a tile whose person is sharing carries a live badge that opens the share', async () => {
-  const onWatchScreen = vi.fn();
-  mountSharer(onWatchScreen);
-
-  await userEvent.setup().click(screen.getByRole('button', { name: "Watch Bob's screen" }));
+  await rerender({ watchingScreen: true });
+  const video = container.querySelector('video');
+  expect(track.attach).toHaveBeenCalledWith(video);
+  await userEvent.setup().click(screen.getByRole('button', { name: "Stop watching Bob's screen" }));
   expect(onWatchScreen).toHaveBeenCalledOnce();
+
+  await rerender({ watchingScreen: false });
+  expect(track.detach).toHaveBeenCalledWith(video);
+  expect(container.querySelector('video')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: "Watch Bob's screen" })).toBeInTheDocument();
 });
 
-test('a tile with no share has no live badge', () => {
-  mountTile();
-  expect(screen.queryByText('Live')).not.toBeInTheDocument();
+test('a watched screen attaches the track that arrives after a resubscribe', () => {
+  const first = { attach: vi.fn(), detach: vi.fn() };
+  const second = { attach: vi.fn(), detach: vi.fn() };
+  let track: typeof first | undefined = first;
+  const room = {
+    remoteParticipants: new Map([['bob', { getTrackPublication: () => ({ track }) }]]),
+  } as unknown as Room;
+  const participant = $state({
+    identity: 'bob',
+    screenShare: { id: 'video', muted: false, subscribed: true },
+  });
+  const { container } = render(CallParticipantTile, {
+    participant,
+    source: 'screen',
+    room,
+    name: 'Bob',
+    userId: '@bob:example.org',
+    avatar: null,
+    watchingScreen: true,
+  });
+  const video = container.querySelector('video');
+  expect(first.attach).toHaveBeenCalledWith(video);
+
+  track = undefined;
+  participant.screenShare.subscribed = false;
+  flushSync();
+  expect(first.detach).toHaveBeenCalledWith(video);
+
+  track = second;
+  participant.screenShare.subscribed = true;
+  flushSync();
+  expect(second.attach).toHaveBeenCalledWith(video);
 });

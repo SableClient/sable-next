@@ -151,10 +151,23 @@ test('a call the account cannot publish to is joined listen-only', async () => {
   expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
 });
 
+test('toggling a watched screen leaves other watched screens open', () => {
+  const { client } = harness();
+  const session = new CallSession(client);
+  session.toggleWatchScreenShare('first');
+  session.toggleWatchScreenShare('second');
+
+  session.toggleWatchScreenShare('first');
+  expect(session.watchedScreenShareIds).toEqual(['second']);
+
+  session.toggleWatchScreenShare('first');
+  expect(session.watchedScreenShareIds).toEqual(['second', 'first']);
+});
+
 test('joining clears screen shares watched in an earlier call', async () => {
   const { client, transport } = harness();
   const session = new CallSession(client, { createTransport: () => transport });
-  session.watchScreenShare('screen');
+  session.toggleWatchScreenShare('screen');
 
   await session.join('!room:example.org', { microphone: true, camera: false });
 

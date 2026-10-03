@@ -119,10 +119,10 @@ export class CallSession {
   choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
   #pendingScreenSource: ScreenSource | null = null;
 
-  watchScreenShare(trackId: string): void {
-    if (!this.watchedScreenShareIds.includes(trackId)) {
-      this.watchedScreenShareIds = [...this.watchedScreenShareIds, trackId];
-    }
+  toggleWatchScreenShare(trackId: string): void {
+    this.watchedScreenShareIds = this.watchedScreenShareIds.includes(trackId)
+      ? this.watchedScreenShareIds.filter((id) => id !== trackId)
+      : [...this.watchedScreenShareIds, trackId];
   }
 
   get startedAt(): number | null {

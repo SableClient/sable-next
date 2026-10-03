@@ -14,6 +14,7 @@
   import { Track } from 'livekit-client';
 
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
+  import Button from '#lib/ui/primitives/Button.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
 
@@ -38,6 +39,7 @@
     pinned?: boolean;
     featured?: boolean;
     onPin?: () => void;
+    watchingScreen?: boolean;
     onWatchScreen?: () => void;
     onVolumeChange?: (identity: string, volume: number) => void;
   }
@@ -53,6 +55,7 @@
     pinned = false,
     featured = false,
     onPin,
+    watchingScreen = false,
     onWatchScreen,
     onVolumeChange,
   }: Props = $props();
@@ -65,16 +68,19 @@
   let screen = $derived(source === 'screen');
   let volumeKey = $derived(screen ? screenVolumeKey(userId) : userId);
   let adjustable = $derived(
-    !participant.local && (!screen || participant.screenShareAudio !== undefined)
+    !participant.local &&
+      (!screen || (watchingScreen && participant.screenShareAudio !== undefined))
   );
   let volumeLabel = $derived(
     screen ? $i18n.t('call.screenVolume', { name }) : $i18n.t('call.participantVolume', { name })
   );
-  let videoOn = $derived(screen || cameraVisible(participant));
-  let sharing = $derived(
-    !screen && participant.screenShare !== undefined && !participant.screenShare.muted
+  let videoOn = $derived(
+    screen ? participant.local === true || watchingScreen : cameraVisible(participant)
   );
-  let watchable = $derived(!participant.local && sharing && onWatchScreen !== undefined);
+  let videoTrackId = $derived.by(() => {
+    const published = screen ? participant.screenShare : participant.camera;
+    return published?.subscribed || participant.local ? published?.id : undefined;
+  });
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
@@ -129,6 +135,7 @@
   }
 
   function attachVideo(node: HTMLVideoElement) {
+    if (videoTrackId === undefined) return;
     const identity = untrack(() => participant.identity);
     const trackSource = untrack(() => (screen ? Track.Source.ScreenShare : Track.Source.Camera));
     const owner: Participant | undefined = untrack(() => participant.local)
@@ -165,39 +172,42 @@
       playsinline
       {@attach attachVideo}
     ></video>
+  {:else if screen}
+    <div class="share-placeholder">
+      <MonitorIcon aria-hidden="true" />
+      <p class="name" title={label}>{label}</p>
+      {#if onWatchScreen}
+        <Button
+          variant="primary"
+          size="small"
+          aria-label={$i18n.t('call.watchScreen', { name })}
+          onclick={onWatchScreen}
+        >
+          {$i18n.t('call.watch')}
+        </Button>
+      {/if}
+    </div>
   {:else}
     <div class="placeholder">
       <Avatar src={avatar} {name} id={userId} size="large" />
     </div>
   {/if}
 
-  {#if sharing}
-    {#if watchable}
-      <button
-        type="button"
-        class="live"
-        title={$i18n.t('call.watchScreen', { name })}
-        onclick={onWatchScreen}
-      >
-        {$i18n.t('call.live')}
-      </button>
-    {:else}
-      <span class="live">{$i18n.t('call.live')}</span>
-    {/if}
-  {/if}
-
-  <div class="actions">
-    {#if watchable}
-      <IconButton
+  {#if screen && videoOn && onWatchScreen}
+    <div class="stop-watching">
+      <Button
         variant="ghost"
         size="small"
         class="tile-action"
-        label={$i18n.t('call.watchScreen', { name })}
+        aria-label={$i18n.t('call.stopWatchingScreen', { name })}
         onclick={onWatchScreen}
       >
-        <MonitorIcon />
-      </IconButton>
-    {/if}
+        {$i18n.t('call.stopWatching')}
+      </Button>
+    </div>
+  {/if}
+
+  <div class="actions">
     {#if onPin}
       <IconButton
         variant="ghost"
@@ -233,30 +243,32 @@
     {/if}
   </div>
 
-  <div class="tag">
-    {#if screen}
-      <MonitorIcon aria-hidden="true" weight="fill" />
-    {:else if muted}
-      <span class="muted" title={$i18n.t('call.muted')}>
-        <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
-        <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
-      </span>
-    {/if}
-    <span class="name">{label}</span>
-    {#if quality === 'poor'}
-      <span class="quality" title={$i18n.t('call.connectionPoor')}>
-        <CellSignalLowIcon aria-hidden="true" weight="fill" />
-        <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
-      </span>
-    {:else if quality === 'lost'}
-      <span class="quality lost" title={$i18n.t('call.connectionLost')}>
-        <CellSignalSlashIcon aria-hidden="true" weight="fill" />
-        <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
-      </span>
-    {/if}
-  </div>
+  {#if !screen || videoOn}
+    <div class="tag">
+      {#if screen}
+        <MonitorIcon aria-hidden="true" weight="fill" />
+      {:else if muted}
+        <span class="muted" title={$i18n.t('call.muted')}>
+          <MicrophoneSlashIcon aria-hidden="true" weight="fill" />
+          <span class="screen-reader-only">{$i18n.t('call.muted')}</span>
+        </span>
+      {/if}
+      <span class="name">{label}</span>
+      {#if quality === 'poor'}
+        <span class="quality" title={$i18n.t('call.connectionPoor')}>
+          <CellSignalLowIcon aria-hidden="true" weight="fill" />
+          <span class="screen-reader-only">{$i18n.t('call.connectionPoor')}</span>
+        </span>
+      {:else if quality === 'lost'}
+        <span class="quality lost" title={$i18n.t('call.connectionLost')}>
+          <CellSignalSlashIcon aria-hidden="true" weight="fill" />
+          <span class="screen-reader-only">{$i18n.t('call.connectionLost')}</span>
+        </span>
+      {/if}
+    </div>
+  {/if}
 
-  {#if volumeOpen}
+  {#if volumeOpen && adjustable}
     <div class="volume" {@attach dismissVolume}>
       <Slider
         min={0}
@@ -313,7 +325,6 @@
       inset 0 0 0 0.3125rem color-mix(in srgb, var(--success-main) 30%, transparent);
   }
 
-  .tile.screen,
   .tile.video-on {
     background: var(--picker-black);
   }
@@ -339,6 +350,34 @@
     display: flex;
     inline-size: 100%;
     justify-content: center;
+  }
+
+  .share-placeholder {
+    align-items: center;
+    block-size: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-100);
+    justify-content: center;
+    padding: var(--space-200);
+  }
+
+  .share-placeholder :global(svg) {
+    block-size: var(--size-x500);
+    flex: none;
+    inline-size: var(--size-x500);
+  }
+
+  @container (height < 9rem) {
+    .share-placeholder :global(svg) {
+      display: none;
+    }
+  }
+
+  .stop-watching {
+    inset: var(--space-200) auto auto var(--space-200);
+    position: absolute;
   }
 
   .placeholder :global(.avatar-root) {
@@ -387,6 +426,12 @@
     white-space: nowrap;
   }
 
+  .share-placeholder .name {
+    font-size: var(--font-size-small);
+    margin: 0;
+    max-inline-size: 100%;
+  }
+
   .muted {
     color: var(--crit-main);
     display: inline-flex;
@@ -401,24 +446,6 @@
 
   .quality.lost {
     color: var(--crit-main);
-  }
-
-  .live {
-    background: var(--crit-main);
-    border: 0;
-    border-radius: var(--radii-300);
-    color: var(--crit-on-main);
-    font-size: var(--font-size-small);
-    font-weight: var(--font-weight-bold);
-    inset: var(--space-200) auto auto var(--space-200);
-    letter-spacing: 0.04em;
-    padding: var(--space-050) var(--space-200);
-    position: absolute;
-    text-transform: uppercase;
-  }
-
-  button.live {
-    cursor: pointer;
   }
 
   .actions {
@@ -452,7 +479,8 @@
     }
   }
 
-  .actions :global(.tile-action) {
+  .actions :global(.tile-action),
+  .stop-watching :global(.tile-action) {
     --button-container: var(--tile-scrim);
     --button-container-hover: color-mix(in srgb, var(--picker-black) 80%, transparent);
     --button-container-active: var(--picker-black);

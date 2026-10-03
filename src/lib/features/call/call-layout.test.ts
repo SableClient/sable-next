@@ -50,9 +50,21 @@ describe('callTiles', () => {
     ]);
   });
 
-  it('hides a remote screen until it is watched', () => {
+  it('offers a remote screen before it is watched', () => {
     const sharer: CallParticipant = { identity: 'a', screenShare: track() };
-    expect(callTiles([sharer]).map((tile) => tile.key)).toEqual(['legacy:a:camera']);
+    expect(callTiles([sharer]).map((tile) => [tile.key, tile.watching])).toEqual([
+      ['legacy:a:camera', false],
+      ['legacy:a:screen', false],
+    ]);
+    expect(callTiles([sharer], ['t'])[1].watching).toBe(true);
+  });
+
+  it('includes unsubscribed screen shares', () => {
+    const sharer: CallParticipant = {
+      identity: 'a',
+      screenShare: { ...track(), subscribed: false },
+    };
+    expect(callTiles([sharer])[1]).toMatchObject({ source: 'screen', watching: false });
   });
 });
 
@@ -90,6 +102,10 @@ describe('featuredTiles', () => {
 
   it('falls back to the grid when nothing is shared or pinned', () => {
     expect(featuredTiles(callTiles([{ identity: 'x' }], watched), 'gone')).toEqual([]);
+  });
+
+  it('keeps an unwatched screen in the grid even if it was pinned', () => {
+    expect(featuredTiles(callTiles([remote]), 'legacy:them:screen')).toEqual([]);
   });
 });
 
