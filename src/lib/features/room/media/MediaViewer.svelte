@@ -936,6 +936,10 @@
             {#if preview}
               <MediaImage
                 class="viewer-preview"
+                style={[
+                  preview.width ? `--preview-width: ${String(preview.width)}px` : '',
+                  preview.height ? `--preview-height: ${String(preview.height)}px` : '',
+                ].join(';')}
                 source={preview.source}
                 thumbnail={preview.thumbnail}
                 alt=""
@@ -1266,6 +1270,9 @@
     aspect-ratio: auto;
     inset: var(--stage-padding-block) var(--stage-padding-right) var(--stage-padding-block)
       var(--stage-padding-left);
+    margin: auto;
+    max-height: var(--preview-height, none);
+    max-width: var(--preview-width, none);
     position: absolute;
   }
 
