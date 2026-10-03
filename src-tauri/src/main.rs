@@ -177,6 +177,11 @@ fn is_cef_subprocess() -> bool {
 }
 
 #[cfg(all(feature = "cef", target_os = "linux"))]
+fn is_crash_reporter() -> bool {
+    std::env::var_os("_CRASH_REPORTER_SERVER").is_some()
+}
+
+#[cfg(all(feature = "cef", target_os = "linux"))]
 fn is_cef_views() -> bool {
     std::env::var_os("SABLE_CEF_VIEWS").is_some()
 }
@@ -318,6 +323,11 @@ fn main() {
 
         if is_cef_subprocess() {
             tauri_runtime_cef::run_cef_helper_process();
+            return;
+        }
+
+        if is_crash_reporter() {
+            app_lib::run();
             return;
         }
 
