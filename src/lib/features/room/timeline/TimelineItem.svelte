@@ -192,6 +192,7 @@
       : { name: persona?.display_name ?? accountName, pronouns: [] }
   );
   let senderName = $derived(senderIdentity.name);
+  let emoteName = $derived(splitDisplayNamePronouns(senderName).name);
   let senderAvatar = $derived(
     persona?.avatar_url === ''
       ? null
@@ -758,12 +759,10 @@
             {@attach inlineReceipts ? receiptReserve : undefined}
           >
             * <SenderName
-              displayName={senderName}
-              accountName={persona ? accountName : undefined}
+              displayName={emoteName}
               colors={senderColors}
               onMention={nameMentions ? mentionSender : undefined}
               onProfile={nameOpensProfile ? openSenderProfileAt : undefined}
-              onViaProfile={persona ? openSenderProfileAt : undefined}
             />
             <FormattedBody html={item.content.html} {senderTimezone} {onMatrixLink} />
             {#if inlineReceipts}
