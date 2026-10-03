@@ -374,7 +374,8 @@
     padding: var(--space-300);
   }
 
-  .dock :global(.btn.test-mic[aria-disabled='true']) {
-    opacity: var(--opacity-disabled);
+  .dock :global(.btn.test-mic) {
+    border-radius: var(--radius-inner);
+    border-width: var(--border-width);
   }
 </style>

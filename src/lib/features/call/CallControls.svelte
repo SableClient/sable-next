@@ -422,6 +422,25 @@
       margin-inline-start: var(--space-100);
       width: calc(var(--button-height) * 1.3);
     }
+
+    .controls:not(.compact):has(.action) {
+      box-sizing: border-box;
+      flex-wrap: wrap;
+      max-inline-size: 100%;
+    }
+
+    .controls:not(.compact) .action {
+      flex: 1 1 100%;
+      margin-inline-start: 0;
+    }
+
+    .controls:not(.compact) .action :global(.btn) {
+      inline-size: 100%;
+    }
+  }
+
+  .controls :global(.btn:not(.icon-button)) {
+    white-space: nowrap;
   }
 
   .controls.compact {
