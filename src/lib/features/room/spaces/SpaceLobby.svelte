@@ -395,7 +395,7 @@
   ): Promise<void> {
     if (joining.has(child.room_id)) return;
     try {
-      if (await trackedJoin(child, via, parentId)) open(child);
+      await trackedJoin(child, via, parentId);
     } catch (error) {
       console.warn('[sable lobby] join failed', error);
       joinErrors.set(child.room_id, joinErrorMessage(error));
