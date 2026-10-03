@@ -171,6 +171,7 @@ pub fn tracing_filter(
         .target()
         .starts_with("matrix_sdk_base::room::display_name")
         || metadata.target().starts_with("matrix_sdk::latest_events")
+        || metadata.target().starts_with("matrix_sdk::http_client")
     {
         return EventFilter::Ignore;
     }
@@ -270,6 +271,7 @@ mod tests {
                 tracing::error!(target: "sable_core", "core failed");
                 tracing::error!(target: "matrix_sdk::encryption", "encryption failed");
                 tracing::error!(target: "matrix_sdk::latest_events", "known noisy event");
+                tracing::error!(target: "matrix_sdk::http_client", "Error while sending request");
             });
         });
         assert!(client.flush(Some(std::time::Duration::from_secs(1))));
@@ -302,6 +304,7 @@ mod tests {
         }
         assert_eq!(logs.len(), 5);
         assert!(logs.contains(&"update failed"));
+        assert!(!logs.contains(&"Error while sending request"));
     }
 
     #[test]
