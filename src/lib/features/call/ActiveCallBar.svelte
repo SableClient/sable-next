@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '#lib/i18n.js';
+  import UsersIcon from 'phosphor-svelte/lib/UsersIcon';
   import WaveformIcon from 'phosphor-svelte/lib/WaveformIcon';
 
   import CallControls from './CallControls.svelte';
@@ -21,6 +22,9 @@
       session.transport.connection === 'connected'
   );
   let reconnecting = $derived(session.transport.connection === 'reconnecting');
+  let count = $derived(
+    session.members.length > 0 ? session.members.length : session.transport.self ? 1 : 0
+  );
   let statusLabel = $derived(
     $i18n.t(
       callStatusKey({
@@ -50,6 +54,13 @@
     {#if !collapsed}
       <span class="status">{statusLabel}</span>
       <span class="room">{roomName}</span>
+    {/if}
+    {#if count > 0}
+      <span class="count" title={$i18n.t('call.participants', { count })}>
+        <UsersIcon aria-hidden="true" weight="bold" />
+        {count}
+        <span class="screen-reader-only">{$i18n.t('call.participants', { count })}</span>
+      </span>
     {/if}
   </button>
   <span class="screen-reader-only" role="status">{statusLabel}</span>
@@ -95,7 +106,7 @@
     cursor: pointer;
     display: grid;
     font: inherit;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     padding: var(--space-100);
     text-align: left;
   }
@@ -123,11 +134,27 @@
     background: var(--ghost-hover);
   }
 
-  .call-room :global(svg) {
+  .call-room > :global(svg) {
     color: var(--call-bar-tone);
     grid-row: span 2;
     height: var(--icon-size-medium);
     width: var(--icon-size-medium);
+  }
+
+  .count {
+    align-items: center;
+    color: var(--surface-var-on-container);
+    display: inline-flex;
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    gap: var(--space-050);
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .count :global(svg) {
+    height: var(--icon-size-small);
+    width: var(--icon-size-small);
   }
 
   .status {
@@ -148,6 +175,13 @@
   .collapsed .call-room {
     grid-template-columns: auto;
     justify-content: center;
+    justify-items: center;
+    row-gap: var(--space-050);
+  }
+
+  .collapsed .count {
+    grid-column: 1;
+    grid-row: auto;
   }
 
   .call-bar:not(.collapsed) :global(.control:last-child) {
