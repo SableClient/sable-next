@@ -284,6 +284,17 @@ pub fn room_mode(rules: &Ruleset, room_id: &RoomId) -> Option<NotificationModeVi
     })
 }
 
+#[must_use]
+pub fn dm_notifies(rules: &Ruleset, room_id: &RoomId) -> bool {
+    match room_mode(rules, room_id) {
+        Some(NotificationModeView::Mute | NotificationModeView::Mentions) => false,
+        Some(NotificationModeView::All) => true,
+        None => rules
+            .get(RuleKind::Underride, message_rule(true).as_str())
+            .is_none_or(rule_notifies),
+    }
+}
+
 const fn message_rule(direct: bool) -> PredefinedUnderrideRuleId {
     if direct {
         PredefinedUnderrideRuleId::RoomOneToOne

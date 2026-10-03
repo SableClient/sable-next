@@ -17,6 +17,7 @@ use crate::ResultExt;
 use crate::notifications;
 use crate::preview;
 use crate::protocol::{CommandErr, CoreEvent, InboxFilter, InboxItemView};
+use crate::push_rules;
 
 const SCHEMA: u32 = 1;
 const KEY: &[u8] = b"sable.inbox.notifications";
@@ -215,16 +216,46 @@ pub(crate) async fn receipt_ts(room: &Room) -> matrix_sdk::Result<u64> {
     Ok(latest)
 }
 
-fn notified(room: &Room) -> u64 {
-    room.unread_notification_counts()
+async fn is_dm(room: &Room) -> bool {
+    !room.is_space()
+        && (room.is_direct().await.unwrap_or(false) || room.joined_members_count() == 2)
+}
+
+async fn dm_notifies(room: &Room) -> bool {
+    is_dm(room).await
+        && room
+            .client()
+            .account()
+            .push_rules()
+            .await
+            .is_ok_and(|rules| push_rules::dm_notifies(&rules, room.room_id()))
+}
+
+async fn notified(room: &Room) -> u64 {
+    let counted = room
+        .unread_notification_counts()
         .notification_count
         .max(room.unread_notification_counts().highlight_count)
         .max(room.num_unread_notifications())
-        .max(room.num_unread_mentions())
+        .max(room.num_unread_mentions());
+    if dm_notifies(room).await {
+        counted.max(room.num_unread_messages())
+    } else {
+        counted
+    }
+}
+
+const fn is_dm_message(event: &AnySyncTimelineEvent) -> bool {
+    matches!(
+        event,
+        AnySyncTimelineEvent::MessageLike(
+            AnySyncMessageLikeEvent::RoomMessage(_) | AnySyncMessageLikeEvent::Sticker(_)
+        )
+    )
 }
 
 async fn read_state(room: &Room) -> Result<RoomReadState, CommandErr> {
-    let remaining = notified(room);
+    let remaining = notified(room).await;
     if remaining == 0 {
         return Ok(RoomReadState {
             receipt_ts: 0,
@@ -268,7 +299,7 @@ async fn backfill_candidates(
             ));
             continue;
         }
-        if notified(&room) == 0 {
+        if notified(&room).await == 0 {
             continue;
         }
         let read = read_state(&room).await?;
@@ -313,10 +344,13 @@ impl Core {
         raw: &Raw<AnySyncTimelineEvent>,
         actions: &[Action],
     ) -> Option<Entry> {
-        if !notifications::notifies(actions) || crate::calls::is_call_event_type(raw) {
+        if crate::calls::is_call_event_type(raw) {
             return None;
         }
         let event = raw.deserialize().ok()?;
+        if !(notifications::notifies(actions) || is_dm_message(&event) && dm_notifies(room).await) {
+            return None;
+        }
         if event.sender() == room.own_user_id() {
             return None;
         }
@@ -335,7 +369,7 @@ impl Core {
             sender_name,
             body: self.inbox_body(&event, encrypted),
             highlight: actions.iter().any(Action::is_highlight),
-            is_direct: room.is_direct().await.unwrap_or(false),
+            is_direct: is_dm(room).await,
             encrypted,
         })
     }
@@ -406,7 +440,7 @@ impl Core {
                 let state = match joined {
                     Some(room) => {
                         let read = read_state(&room).await?;
-                        Some((room.is_direct().await.unwrap_or(entry.is_direct), read))
+                        Some((is_dm(&room).await, read))
                     }
                     None => None,
                 };
@@ -487,9 +521,7 @@ impl Core {
                         reached_read = true;
                         break;
                     }
-                    let Some(actions) = event.push_actions() else {
-                        continue;
-                    };
+                    let actions = event.push_actions().unwrap_or_default();
                     if every_encrypted && notifications::raw_is_encrypted(event.raw()) {
                         continue;
                     }
@@ -675,6 +707,27 @@ mod tests {
             .unwrap();
         assert_eq!(items.len(), 1);
         assert!(items[0].is_direct);
+    }
+
+    #[tokio::test]
+    async fn a_direct_room_records_messages_the_push_rules_did_not_notify() {
+        let server = MatrixMockServer::new().await;
+        let (core, client, room) = setup(&server, 0).await;
+        let raw = serde_json::from_value(message("$bridged", 200, None)).unwrap();
+        assert!(core.inbox_entry(&room, &raw, &[]).await.is_none());
+        let factory = EventFactory::new().room(room.room_id()).sender(*ALICE);
+        server
+            .mock_sync()
+            .ok_and_run(&client, |builder| {
+                builder.add_global_account_data(
+                    factory
+                        .direct()
+                        .add_user((*ALICE).to_owned().into(), room.room_id()),
+                );
+            })
+            .await;
+        let entry = core.inbox_entry(&room, &raw, &[]).await.unwrap();
+        assert!(entry.is_direct);
     }
 
     #[tokio::test]
