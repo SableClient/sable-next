@@ -1136,7 +1136,7 @@
     position: relative;
   }
 
-  @media (pointer: fine) {
+  @media (any-pointer: fine) {
     .message {
       user-select: text;
     }
@@ -1322,7 +1322,7 @@
     color: var(--primary-on-container);
   }
 
-  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+  @media (width >= 48rem) and (any-hover: hover) and (any-pointer: fine) {
     /* Matches the base mention rule's specificity, so the gutter the row's
        negative margin assumes survives. */
     .message.mention-silent,

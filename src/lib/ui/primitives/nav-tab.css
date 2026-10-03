@@ -134,7 +134,7 @@
       transform var(--duration-fast) var(--ease-smooth-out);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     html:not([data-reduced-motion='on']) .nav-tab-side:hover {
       transform: translateX(0.125rem);
     }

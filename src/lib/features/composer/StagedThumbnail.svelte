@@ -102,7 +102,7 @@
     scale: 1.2;
   }
 
-  @media (hover: hover) {
+  @media (any-hover: hover) {
     .thumb:hover:not(.thumb-spoiler) .thumb-media {
       scale: 1.04;
     }

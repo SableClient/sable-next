@@ -901,7 +901,7 @@
     position: absolute;
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .query-clear:hover {
       background: var(--bg-container-hover);
     }
@@ -1128,7 +1128,7 @@
     outline-offset: var(--focus-ring-offset);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .starter-filter:hover {
       background: var(--surface-container-hover);
     }

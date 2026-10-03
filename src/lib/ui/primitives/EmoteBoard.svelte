@@ -830,7 +830,7 @@
     width: 100%;
   }
 
-  @media (hover: none) {
+  @media (any-hover: none) {
     .board.sheet .preview:has(.preview-hint) {
       display: none;
     }

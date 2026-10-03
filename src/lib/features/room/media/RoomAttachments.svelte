@@ -770,7 +770,7 @@
     opacity: 1;
   }
 
-  @media (hover: none) {
+  @media (any-hover: none) {
     .tile-meta {
       opacity: 1;
     }

@@ -252,7 +252,7 @@
     position: absolute;
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     :global(.composer-board-trigger:hover) {
       background: var(--surface-container-hover);
     }

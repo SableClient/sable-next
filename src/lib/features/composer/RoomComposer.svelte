@@ -210,7 +210,7 @@
   const roomList = useRoomList();
   const personas = usePersonaStore();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
-  const roomyPointer = createMediaQuery('(width >= 32rem) and (pointer: fine)');
+  const roomyPointer = createMediaQuery('(width >= 32rem) and (any-pointer: fine)');
   const composerShort = $derived(
     preferences.composerForm === 'short' ||
       (preferences.composerForm === 'adaptive' && roomyPointer.matches)
@@ -1943,7 +1943,7 @@
     position: relative;
   }
 
-  @media (pointer: fine) {
+  @media (any-pointer: fine) {
     @container (width >= 44rem) {
       .composer-formatting :global(.formatting) {
         flex-wrap: wrap;

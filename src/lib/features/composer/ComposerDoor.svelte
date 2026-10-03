@@ -254,7 +254,7 @@
     width: 100%;
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     :global(.door-action:hover:not(:disabled)) {
       background: var(--surface-container-hover);
     }

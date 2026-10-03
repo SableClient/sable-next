@@ -94,7 +94,7 @@
     }
   }
 
-  @media (hover: hover) {
+  @media (any-hover: hover) {
     .anchor-link {
       opacity: 0;
     }

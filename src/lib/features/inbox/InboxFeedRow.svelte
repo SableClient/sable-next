@@ -49,7 +49,7 @@
     border-top: var(--border-width) solid var(--bg-container-line);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .row:hover {
       background: var(--bg-container-hover);
     }

@@ -387,7 +387,7 @@
     }
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .reaction:hover:not(:disabled, [aria-pressed='true']) {
       background: var(--surface-var-container-hover);
     }

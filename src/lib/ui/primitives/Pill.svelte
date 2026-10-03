@@ -85,7 +85,7 @@
     opacity: var(--opacity-disabled, 0.38);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .pill-outline:hover:not([aria-expanded='true']) {
       background: color-mix(in oklab, var(--pill-state, var(--bg-on-container)) 12%, transparent);
     }

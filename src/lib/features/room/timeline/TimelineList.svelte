@@ -1140,7 +1140,7 @@
     --timeline-row-padding: var(--space-200);
   }
 
-  @media (width >= 48rem) and (hover: hover) and (pointer: fine) {
+  @media (width >= 48rem) and (any-hover: hover) and (any-pointer: fine) {
     .timeline-content {
       --line-height-body: 1.47;
     }

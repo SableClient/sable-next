@@ -528,7 +528,7 @@
     color: var(--profile-text-muted);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .status-bubble:hover {
       border-color: var(--profile-text-muted);
     }

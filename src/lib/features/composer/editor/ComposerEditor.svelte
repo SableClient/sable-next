@@ -67,7 +67,7 @@
     margin: 0;
   }
 
-  @media (width >= 48rem) and (pointer: fine) {
+  @media (width >= 48rem) and (any-pointer: fine) {
     .editor {
       max-height: clamp(10rem, 30dvh, 20rem);
     }

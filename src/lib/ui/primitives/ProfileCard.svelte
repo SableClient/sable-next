@@ -610,7 +610,7 @@
     flex: none;
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .profile-card-popover.profile-card-inset-body .profile-card-user-id :global(svg) {
       opacity: 0;
     }

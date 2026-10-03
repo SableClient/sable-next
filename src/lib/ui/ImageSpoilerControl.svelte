@@ -114,7 +114,7 @@
     font-size: var(--font-size-x-small);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .media-image-spoiler:not(.hidden) {
       opacity: 0;
     }

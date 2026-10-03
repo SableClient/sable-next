@@ -140,7 +140,7 @@
     }
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .message-actions :global(button:hover) {
       background: var(--surface-var-container-hover);
       color: var(--surface-var-on-container);

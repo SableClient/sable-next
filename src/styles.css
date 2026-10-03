@@ -728,7 +728,7 @@ a:not([class]):hover {
     scale: 0.96;
   }
 
-  @media (hover: none) {
+  @media (any-hover: none) {
     .btn:hover,
     .btn:active,
     .menu-item:hover,

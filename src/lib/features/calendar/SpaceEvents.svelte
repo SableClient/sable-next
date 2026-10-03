@@ -151,7 +151,7 @@
     background: var(--bg-container-hover);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .space-event:hover {
       background: var(--bg-container-hover);
     }

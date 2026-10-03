@@ -177,7 +177,7 @@
     color: var(--surface-on-container);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .forum-thread-card:hover :global(.message-actions),
     .forum-thread-card:focus-within :global(.message-actions) {
       opacity: 1;
