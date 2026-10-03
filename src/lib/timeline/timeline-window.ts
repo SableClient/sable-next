@@ -299,7 +299,7 @@ export class TimelineWindow<T> {
     this.active = smooth;
     this.missedDelta = 0;
     this.writeOffset(target, smooth);
-    if (!smooth && this.atEnd()) this.pinned = true;
+    if (!smooth && this.atEnd(1)) this.pinned = true;
     if (smooth) this.scheduleSettle();
     this.publish(this.capture());
     if (this.pending) this.scheduleSettle();
@@ -560,7 +560,7 @@ export class TimelineWindow<T> {
       this.start === 0 && this.end === this.items.length && contentHeight <= viewportHeight;
     const reachedEnd =
       canFollowLatest &&
-      (contentFits || (this.ready && viewportHeight > this.viewportHeight && this.atEnd()));
+      (contentFits || (this.ready && viewportHeight > this.viewportHeight && this.atEnd(1)));
     if (reachedEnd) this.pinned = true;
     this.viewportHeight = viewportHeight;
     if (this.pinned && this.active && !this.jumping) {
@@ -620,7 +620,7 @@ export class TimelineWindow<T> {
     if (this.disposed) return;
     const viewport = this.options.viewport;
     const delta = this.trackMovement();
-    if (delta === 0 && viewport.scrollHeight !== this.scrollHeight && this.atEnd()) {
+    if (delta === 0 && viewport.scrollHeight !== this.scrollHeight && this.atEnd(1)) {
       this.pinned = true;
       this.publish();
     }

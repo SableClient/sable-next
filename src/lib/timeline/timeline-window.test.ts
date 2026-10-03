@@ -145,6 +145,25 @@ test('holding an anchor skips rows the caller cannot restore', async () => {
   expect(window.anchorKey((value) => value !== 80)).toBe('81');
 });
 
+test('a jump that clamps to the end re-pins when the offset rounds down to a whole pixel', async () => {
+  const { window, viewport, resizeViewport } = fixture();
+  await window.update(entries(10));
+  viewport.scrollTop = 0;
+  viewport.dispatchEvent(new Event('scroll'));
+  await vi.advanceTimersByTimeAsync(200);
+  resizeViewport(300.25, false);
+  let offset = viewport.scrollTop;
+  Object.defineProperty(viewport, 'scrollTop', {
+    get: () => offset,
+    set: (value: number) => {
+      offset = Math.floor(value);
+    },
+  });
+  await window.jumpTo('9', 'start');
+  expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeGreaterThan(0.5);
+  expect(window.state.pinned).toBe(true);
+});
+
 test('the end of a historical snapshot preserves the reader when newer pages append', async () => {
   const { window, content } = fixture(undefined, undefined, () => false);
   await window.update(entries(2));
