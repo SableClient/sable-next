@@ -93,6 +93,7 @@ export type CallGrant = {
   identity: string;
   encryptMedia: boolean;
   mode?: 'legacy' | 'compatibility' | 'matrix_2';
+  canPublish?: boolean;
   publisherId?: string;
   backends?: CallBackendGrant[];
 };
@@ -610,6 +611,7 @@ export function createCommands(transport: () => Transport) {
         identity: response.identity,
         encryptMedia: response.encrypt_media,
         mode: response.mode,
+        canPublish: response.can_publish,
         publisherId: response.publisher_id,
         backends: response.backends,
       };

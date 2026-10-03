@@ -3286,6 +3286,7 @@
     "failed": "Call failed",
     "retry": "Try again",
     "dismiss": "Dismiss",
+    "listenOnly": "This call's server does not let your account speak. You can listen, but others will not hear you.",
     "microphoneUnavailable": "Microphone unavailable. Check that Sable is allowed to use it.",
     "cameraUnavailable": "Camera unavailable. Check that Sable is allowed to use it.",
     "screenShareUnavailable": "Could not share your screen.",

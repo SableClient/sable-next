@@ -28,6 +28,109 @@ fn member(mode: CallMode, created_ts: u64, foci: &[&str]) -> CallMember {
     }
 }
 
+async fn discover_with_peers(
+    mode: CallMode,
+    peers: &[(u64, &str)],
+    configured: Option<&str>,
+) -> super::Discovered {
+    use matrix_sdk::ruma::{events::AnySyncStateEvent, serde::Raw};
+    use matrix_sdk_test::JoinedRoomBuilder;
+    use serde_json::json;
+    use wiremock::matchers::{method, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    let server = MatrixMockServer::new().await;
+    server
+        .mock_versions()
+        .with_feature("org.matrix.msc4354", mode == CallMode::Matrix2)
+        .ok()
+        .mount()
+        .await;
+    let client = server.client_builder().no_server_versions().build().await;
+    let room_id = owned_room_id!("!call:example.org");
+    let now = super::keys::now_ms();
+    let mut builder = JoinedRoomBuilder::new(&room_id);
+    let mut sticky_events = Vec::new();
+    for (age, service) in peers {
+        let mut peer = member(mode, now - age, &[service]);
+        peer.user_id = owned_user_id!("@peer:example.org");
+        peer.device_id = format!("DEVICE{age}").into();
+        peer.member_id = Some(format!("peer-{age}"));
+        let mut event = json!({
+            "type": if mode == CallMode::Matrix2 {
+                super::membership::RTC_MEMBER_EVENT_TYPE
+            } else {
+                "org.matrix.msc3401.call.member"
+            },
+            "event_id": format!("$peer-{age}"), "sender": peer.user_id,
+            "origin_server_ts": peer.created_ts,
+            "content": super::content_at(&room_id, &peer, None, now),
+        });
+        if mode == CallMode::Matrix2 {
+            event["msc4354_sticky"] = json!({"duration_ms": 3_600_000});
+            sticky_events.push(event);
+        } else {
+            event["state_key"] = format!("_{}_{}_m.call", peer.user_id, peer.device_id).into();
+            builder = builder.add_state_event(
+                Raw::new(&event)
+                    .unwrap()
+                    .cast_unchecked::<AnySyncStateEvent>(),
+            );
+        }
+    }
+    let room = server.sync_room(&client, builder).await;
+    if mode == CallMode::Matrix2 {
+        Mock::given(method("POST"))
+            .and(path_regex(".*sync.*"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "pos": "p1",
+                "extensions": {"org.matrix.msc4354.sticky_events": {
+                    "next_batch": "s1", "rooms": {room_id.as_str(): {"events": sticky_events}}
+                }}
+            })))
+            .expect(1)
+            .mount(server.server())
+            .await;
+    }
+    let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+    let discovered = super::discover(
+        &core,
+        &room,
+        CallSessionId(1),
+        configured.map(str::to_owned),
+        peers.is_empty().then_some(mode),
+    )
+    .await
+    .unwrap();
+    assert_eq!(discovered.own.mode, mode);
+    discovered
+}
+
+const PEERS: [(u64, &str); 2] = [
+    (1_000, "https://later.example.org"),
+    (2_000, "https://oldest.example.org"),
+];
+
+#[tokio::test]
+async fn joining_an_existing_call_uses_the_oldest_focus_in_every_mode() {
+    for mode in [CallMode::Legacy, CallMode::Compatibility, CallMode::Matrix2] {
+        let discovered = discover_with_peers(mode, &PEERS, Some("https://own.example.org")).await;
+        assert_eq!(
+            discovered.own.foci,
+            vec!["https://oldest.example.org"],
+            "{mode:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn joining_a_call_without_a_focus_uses_the_configured_fallback() {
+    for mode in [CallMode::Legacy, CallMode::Compatibility, CallMode::Matrix2] {
+        let discovered = discover_with_peers(mode, &[], Some("https://own.example.org")).await;
+        assert_eq!(discovered.own.foci, vec!["https://own.example.org"]);
+    }
+}
+
 #[test]
 fn legacy_mode_uses_the_oldest_state_membership_focus() {
     let oldest = member(CallMode::Compatibility, 1, &["https://old.example.org"]);
@@ -647,6 +750,54 @@ async fn a_legacy_publisher_stays_put_when_the_oldest_focus_will_not_let_it_publ
     let state = state.lock().await;
     assert_eq!(state.own.foci, own.foci);
     assert!(state.backends.is_empty());
+}
+
+#[tokio::test]
+async fn a_publisher_refused_on_the_calls_focus_moves_to_its_own_in_every_mode() {
+    use wiremock::matchers::{method, path, path_regex};
+    use wiremock::{Mock, ResponseTemplate};
+
+    for (mode, moved_mode) in [
+        (CallMode::Legacy, CallMode::Compatibility),
+        (CallMode::Compatibility, CallMode::Compatibility),
+        (CallMode::Matrix2, CallMode::Matrix2),
+    ] {
+        let (homeserver, sfu, room, mut own, _oldest, _state) = legacy_move_fixture(true).await;
+        own.mode = mode;
+        let claims = serde_json::json!({
+            "sub": own.identity, "video": {"room": "r", "canPublish": true},
+        });
+        let jwt = format!(
+            "x.{}.x",
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(claims.to_string())
+        );
+        Mock::given(method("POST"))
+            .and(path("/get_token"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({"url": "wss://own.example.org", "jwt": jwt})),
+            )
+            .mount(&sfu)
+            .await;
+        Mock::given(method("PUT"))
+            .and(path_regex(r"/rooms/.*/send/"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"event_id": "$moved"})),
+            )
+            .mount(homeserver.server())
+            .await;
+        let (core, _events) = Core::new("test", Box::new(MemorySessionStore::default()));
+
+        let (moved, provision) =
+            super::publish_elsewhere(&core, &room, &own, Some(sfu.uri()), None)
+                .await
+                .unwrap_or_else(|| panic!("{mode:?} did not move"));
+
+        assert_eq!(moved.mode, moved_mode, "{mode:?}");
+        assert_eq!(moved.foci, vec![sfu.uri()], "{mode:?}");
+        assert!(provision.can_publish, "{mode:?}");
+        assert_eq!(provision.identity, own.identity, "{mode:?}");
+    }
 }
 
 #[tokio::test]

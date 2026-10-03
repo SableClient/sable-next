@@ -1451,6 +1451,7 @@ pub enum CommandOk {
         identity: String,
         encrypt_media: bool,
         mode: CallMode,
+        can_publish: bool,
         publisher_id: String,
         backends: Vec<CallBackendView>,
     },

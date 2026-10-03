@@ -270,18 +270,10 @@ async fn discover(
     };
     let mode = select_mode(requested, &members, sticky_sync.is_some())?;
     members.sort_by_key(|member| member.created_ts);
-    let focus_members = if mode == CallMode::Legacy {
-        members.as_slice()
-    } else {
-        &[]
-    };
-    let service = match core.resolve_focus(focus_members, configured, room).await {
-        Some(service) => service,
-        None => core
-            .resolve_focus(&members, None, room)
-            .await
-            .ok_or(CommandErr::NoCallFocus)?,
-    };
+    let service = core
+        .resolve_focus(&members, configured, room)
+        .await
+        .ok_or(CommandErr::NoCallFocus)?;
     let member_id = if mode == CallMode::Matrix2 {
         TransactionId::new().to_string()
     } else {
@@ -418,7 +410,11 @@ async fn publish_elsewhere(
         return None;
     }
     let moved = CallMember {
-        mode: CallMode::Compatibility,
+        mode: if own.mode == CallMode::Legacy {
+            CallMode::Compatibility
+        } else {
+            own.mode
+        },
         foci: vec![service.clone()],
         ..own.clone()
     };
@@ -426,7 +422,18 @@ async fn publish_elsewhere(
         tracing::warn!(%error, "could not move the call membership to our own focus");
         return None;
     }
-    match sfu::provision(room, &service, &moved.device_id).await {
+    let provisioned = if moved.mode == CallMode::Matrix2 {
+        sfu::provision_matrix2(
+            room,
+            &service,
+            &moved.device_id,
+            moved.member_id.as_deref().unwrap_or(&moved.identity),
+        )
+        .await
+    } else {
+        sfu::provision(room, &service, &moved.device_id).await
+    };
+    match provisioned {
         Ok(provision) if provision.identity == moved.identity && provision.can_publish => {
             Some((moved, provision))
         }
@@ -452,7 +459,6 @@ async fn publish_where_allowed(
     let service = own.foci.first().cloned().ok_or(CommandErr::NoCallFocus)?;
     let mut published = publish(core, room, &own, &service, encrypted, intent).await?;
     if !published.provision.can_publish
-        && own.mode == CallMode::Legacy
         && let Some((moved, provision)) =
             publish_elsewhere(core, room, &own, configured, intent).await
     {
@@ -460,12 +466,7 @@ async fn publish_where_allowed(
         published.provision = provision;
     }
     if !published.provision.can_publish {
-        drop(published.postpone);
-        retract(core, room, &own, published.delay).await;
-        return Err(core.failed(
-            "join_call",
-            "the call's focus does not let this account publish",
-        ));
+        tracing::warn!("no focus lets this account publish, joining listen-only");
     }
     state.lock().await.own = own.clone();
     Ok((own, published))
@@ -633,6 +634,7 @@ pub(super) async fn join(
         identity: provision.identity,
         encrypt_media,
         mode,
+        can_publish: provision.can_publish,
         publisher_id,
         backends,
     })

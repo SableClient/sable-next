@@ -113,6 +113,7 @@ export class CallSession {
   watchedScreenShareIds = $state<string[]>([]);
   views = $state(0);
   deviceError = $state<CallDeviceError | null>(null);
+  listenOnly = $state(false);
   #deviceErrorTimer: ReturnType<typeof setTimeout> | undefined;
   choosingScreenAudio = $state(false);
   choosingScreenSource = $state.raw<HdrMonitor[] | null>(null);
@@ -331,6 +332,7 @@ export class CallSession {
       });
 
       this.#grant = grant;
+      this.listenOnly = grant.canPublish === false;
 
       this.encryptsMedia = grant.encryptMedia;
       this.mediaReady = false;
@@ -350,8 +352,8 @@ export class CallSession {
         await transport.connect({
           url: grant.url,
           token: grant.jwt,
-          microphoneEnabled: media.microphone,
-          cameraEnabled: media.camera,
+          microphoneEnabled: media.microphone && !this.listenOnly,
+          cameraEnabled: media.camera && !this.listenOnly,
           encryptionKeys: encryptionKeys.map(({ key }) => key),
           publisherId: connectPublisherId,
           backends: connectBackends,
@@ -420,6 +422,7 @@ export class CallSession {
   }
 
   async #device(kind: CallDeviceError, action: () => Promise<void> | undefined): Promise<void> {
+    if (this.listenOnly) return;
     try {
       await action();
       if (this.deviceError === kind) this.clearDeviceError();
@@ -712,6 +715,7 @@ export class CallSession {
     this.#media = undefined;
     this.#livekit = undefined;
     this.#grant = undefined;
+    this.listenOnly = false;
     this.#session = undefined;
     this.#buffer = [];
     this.#pendingKeys = [];

@@ -30,7 +30,9 @@ type Harness = {
   leaveCall: ReturnType<typeof vi.fn>;
 };
 
-function harness(options: { encryptMedia?: boolean; joinError?: Error } = {}): Harness {
+function harness(
+  options: { encryptMedia?: boolean; joinError?: Error; canPublish?: boolean } = {}
+): Harness {
   const listeners = new Set<(event: CoreEvent) => void>();
   const transportListeners = new Set<(state: CallTransportState) => void>();
   const connected: CallTransportState[] = [];
@@ -73,6 +75,7 @@ function harness(options: { encryptMedia?: boolean; joinError?: Error } = {}): H
       jwt: 'jwt',
       identity: '@erwan:example.org:LAPTOP',
       encryptMedia: options.encryptMedia ?? false,
+      canPublish: options.canPublish,
     });
   });
   const leaveCall = vi.fn(() => Promise.resolve());
@@ -131,6 +134,21 @@ test('an unencrypted call connects without waiting for a key', async () => {
   expect(session.lifecycle).toBe('active');
   expect(session.mediaReady).toBe(true);
   expect(transport.connect).toHaveBeenCalledOnce();
+});
+
+test('a call the account cannot publish to is joined listen-only', async () => {
+  const { client, transport } = harness({ canPublish: false });
+  const session = new CallSession(client, { createTransport: () => transport });
+
+  await session.join('!room:example.org', { microphone: true, camera: true });
+  await session.setMicrophoneEnabled(true);
+
+  expect(session.lifecycle).toBe('active');
+  expect(session.listenOnly).toBe(true);
+  expect(transport.connect).toHaveBeenCalledWith(
+    expect.objectContaining({ microphoneEnabled: false, cameraEnabled: false })
+  );
+  expect(transport.setMicrophoneEnabled).not.toHaveBeenCalled();
 });
 
 test('joining clears screen shares watched in an earlier call', async () => {

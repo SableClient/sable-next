@@ -332,6 +332,11 @@
   {/if}
 
   <div class="notices" bind:clientHeight={noticeHeight}>
+    {#if session.listenOnly}
+      <Alert variant="warning" class="notice">
+        <p>{$i18n.t('call.listenOnly')}</p>
+      </Alert>
+    {/if}
     {#if session.deviceError}
       <Alert variant="critical" class="notice" role="alert">
         <WarningCircleIcon aria-hidden="true" weight="fill" />
@@ -359,7 +364,7 @@
 
   <div
     class="media"
-    class:with-notice={session.deviceError !== null}
+    class:with-notice={session.deviceError !== null || session.listenOnly}
     class:locked={busy}
     style:--tile-aspect={aspect}
     style:--notice-height="{noticeHeight}px"

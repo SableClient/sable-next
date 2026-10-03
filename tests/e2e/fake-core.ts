@@ -1051,6 +1051,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         identity: `${session.user_id}:${session.device_id}`,
         encrypt_media: false,
         mode: 'legacy',
+        can_publish: true,
         publisher_id: 'legacy',
         backends: [
           {
