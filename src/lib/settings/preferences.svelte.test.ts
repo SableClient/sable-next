@@ -48,3 +48,9 @@ test('threads default to full conversations and keep a saved panel choice', () =
     'timeline'
   );
 });
+
+test('reads a stored boolean enterForNewline as its enum equivalent', () => {
+  expect(sanitize({ enterForNewline: true }, preferences).enterForNewline).toBe('newline');
+  expect(sanitize({ enterForNewline: false }, preferences).enterForNewline).toBe('adaptive');
+  expect(sanitize({ enterForNewline: 'send' }, preferences).enterForNewline).toBe('send');
+});

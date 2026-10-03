@@ -16,7 +16,7 @@ let dispose: (() => void) | undefined;
 const defaultUserAgent = navigator.userAgent;
 
 afterEach(() => {
-  preferences.enterForNewline = false;
+  preferences.enterForNewline = 'send';
   preferences.richTextComposer = true;
   dispose?.();
   dispose = undefined;
@@ -581,7 +581,7 @@ describe('Android enter', () => {
 
   test('submits on insertLineBreak when Enter makes newlines', () => {
     setUserAgent(androidUserAgent);
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const submit = vi.fn();
     const editor = openWith({ onSubmit: submit });
     editor.setText('hi');
@@ -1109,7 +1109,7 @@ describe('block editing', () => {
   });
 
   test('enter on an empty line inside a quote lifts out of it', () => {
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     editor.setHtml('<blockquote><p>a</p><p></p></blockquote>');
     const quote = view(editor).state.doc.firstChild;
@@ -1144,7 +1144,7 @@ test('the enter key hint follows the preference', () => {
   const editor = open();
   expect(surface().getAttribute('enterkeyhint')).toBe('send');
 
-  preferences.enterForNewline = true;
+  preferences.enterForNewline = 'newline';
   editor.syncKeyHint();
 
   expect(surface().getAttribute('enterkeyhint')).toBe('enter');
@@ -1915,7 +1915,7 @@ describe('the editor api the composer component drives', () => {
   test('the enter key hint follows the newline preference', () => {
     const editor = open();
     expect(surface().getAttribute('enterkeyhint')).toBe('send');
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     editor.syncKeyHint();
     expect(surface().getAttribute('enterkeyhint')).toBe('enter');
   });
@@ -2030,7 +2030,7 @@ describe('Enter for a newline', () => {
 
   test('breaks the line instead of starting a paragraph', () => {
     preferences.richTextComposer = false;
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     typeLines(editor, ['a', 'b']);
 
@@ -2041,7 +2041,7 @@ describe('Enter for a newline', () => {
 
   test('breaks the line in the rich composer too', () => {
     preferences.richTextComposer = true;
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     typeLines(editor, ['a', 'b']);
 
@@ -2052,7 +2052,7 @@ describe('Enter for a newline', () => {
 
   test('keeps a typed fence as markdown, with its lines single-spaced', () => {
     preferences.richTextComposer = false;
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     typeLines(editor, ['```', 'a', 'b', '```']);
 
@@ -2175,7 +2175,7 @@ describe('code indentation in the composer', () => {
 
   test('a paste from an editor into a code block keeps its lines in the rich composer', () => {
     preferences.richTextComposer = true;
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     type(editor, '```');
     press(editor, 'Enter');
@@ -2205,7 +2205,7 @@ describe('code indentation in the composer', () => {
 
   test('Tab indents inside a code block', () => {
     preferences.richTextComposer = true;
-    preferences.enterForNewline = true;
+    preferences.enterForNewline = 'newline';
     const editor = open();
     type(editor, '```');
     press(editor, 'Enter');

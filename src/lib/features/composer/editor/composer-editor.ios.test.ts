@@ -17,7 +17,7 @@ import { ComposerEditor } from './composer-editor';
 let dispose: (() => void) | undefined;
 
 afterEach(() => {
-  preferences.enterForNewline = false;
+  preferences.enterForNewline = 'send';
   dispose?.();
   dispose = undefined;
   document.body.replaceChildren();
@@ -65,7 +65,7 @@ test.each([
   'on iOS the Enter key %s (shift %s, enter for newline %s)',
   (_, shiftKey, enterForNewline, submits, doc) => {
     vi.useFakeTimers();
-    preferences.enterForNewline = enterForNewline;
+    preferences.enterForNewline = enterForNewline ? 'newline' : 'send';
     const submit = vi.fn();
     const editor = open(submit);
     editor.setText('hi');

@@ -1023,7 +1023,12 @@ export const settingsCategories: SettingsCategory[] = [
         icon: KeyReturnIcon,
         name: 'settings.enterForNewline',
         description: 'settings.enterForNewlineHint',
-        type: 'boolean',
+        type: 'select',
+        options: [
+          { value: 'adaptive', label: 'settings.enterForNewlineAdaptive' },
+          { value: 'newline', label: 'settings.enterForNewlineNewline' },
+          { value: 'send', label: 'settings.enterForNewlineSend' },
+        ],
       },
       {
         key: 'richTextComposer',

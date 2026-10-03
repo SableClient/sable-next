@@ -17,7 +17,7 @@ import {
 import { preferences } from '#lib/settings/preferences.svelte.js';
 
 afterEach(() => {
-  preferences.enterForNewline = false;
+  preferences.enterForNewline = 'send';
   resetModel();
 });
 
@@ -138,7 +138,7 @@ test('a mark survives a soft line break', () => {
 });
 
 test('a mark survives enter when enter makes newlines', () => {
-  preferences.enterForNewline = true;
+  preferences.enterForNewline = 'newline';
   const model = cm('<p>|</p>');
   strike(model);
   replaceText(model, 'foo');

@@ -80,6 +80,7 @@ export type CallVideoResolution = (typeof CALL_VIDEO_RESOLUTIONS)[number];
 export type CallVideoBitrate = (typeof CALL_VIDEO_BITRATES)[number];
 export type CallVideoCodec = (typeof CALL_VIDEO_CODECS)[number];
 export type ComposerForm = 'short' | 'adaptive' | 'tall';
+export type EnterKey = 'adaptive' | 'newline' | 'send';
 export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
 export const COMPOSER_BUTTONS = [
   'gif',
@@ -157,7 +158,7 @@ export interface Preferences {
   pronounPillLength: PronounPillLength;
 
   composerForm: ComposerForm;
-  enterForNewline: boolean;
+  enterForNewline: EnterKey;
   mentionInReplies: boolean;
   formattingToolbar: boolean;
   composerFormatButton: boolean;
@@ -293,6 +294,7 @@ const ENUMS = {
   timelineEmoteSize: ['default', '20', '24', '32', '48', '64'],
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
+  enterForNewline: ['adaptive', 'newline', 'send'],
   weekStart: ['sunday', 'monday', 'saturday'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
@@ -420,7 +422,7 @@ const DEFAULTS: Preferences = {
   pronounPillLength: 'all',
 
   composerForm: 'tall',
-  enterForNewline: false,
+  enterForNewline: 'adaptive',
   mentionInReplies: true,
   formattingToolbar: false,
   composerFormatButton: true,
@@ -537,10 +539,14 @@ function read(key: string): Record<string, unknown> | null {
 
 export const PREFERENCE_KEYS = Object.keys(DEFAULTS) as (keyof Preferences)[];
 
+function legacyEnterKey(value: unknown): unknown {
+  return typeof value === 'boolean' ? (value ? 'newline' : 'adaptive') : value;
+}
+
 export function sanitize(stored: Record<string, unknown>, base: Preferences): Preferences {
   const next = { ...base };
   for (const key of PREFERENCE_KEYS) {
-    const value = stored[key];
+    const value = key === 'enterForNewline' ? legacyEnterKey(stored[key]) : stored[key];
     const allowed: readonly string[] | undefined =
       key in ENUMS ? ENUMS[key as keyof typeof ENUMS] : undefined;
     if (allowed) {

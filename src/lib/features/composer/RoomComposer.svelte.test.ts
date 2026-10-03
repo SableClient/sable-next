@@ -44,7 +44,7 @@ afterEach(() => {
   setPreference('richTextComposer', true);
   setPreference('sendAttachmentAsCaption', true);
   setPreference('sendAttachmentsAsGallery', true);
-  setPreference('enterForNewline', false);
+  setPreference('enterForNewline', 'send');
 });
 
 const members: MemberView[] = [
@@ -233,7 +233,7 @@ test('the editor mounts as a labelled combobox surface', async () => {
   expect(editable?.getAttribute('contenteditable')).toBe('true');
 });
 
-test.each([false, true])(
+test.each(['send', 'newline'] as const)(
   'the visible keyboard hint follows enterForNewline=%s',
   async (newline) => {
     setPreference('enterForNewline', newline);
@@ -241,7 +241,7 @@ test.each([false, true])(
     await tick();
 
     expect(document.querySelector('.screen-reader-only[id^="composer-hint"]')).toHaveTextContent(
-      newline
+      newline === 'newline'
         ? 'Shift+Enter to send · Enter for a new line'
         : 'Enter to send · Shift+Enter for a new line'
     );

@@ -33,6 +33,7 @@
   import { capturesFromCamera, pickFiles } from '#lib/platform/files.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
+  import { enterInsertsNewline } from '#lib/settings/enter-key.svelte.js';
   import { preferences, setPreference } from '#lib/settings/preferences.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { formatByteSize } from '#lib/ui/byte-size.js';
@@ -324,7 +325,7 @@
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
   let canSchedule = $derived(onSchedule !== undefined && hasContent && !readOnly);
-  let sendShortcut = $derived(preferences.enterForNewline ? 'Shift+Enter' : 'Enter');
+  let sendShortcut = $derived(enterInsertsNewline() ? 'Shift+Enter' : 'Enter');
   let keyboardHint = $derived(
     $i18n.t(
       !hasContent && canDeleteEdited
@@ -334,7 +335,7 @@
           : 'composer.sendHint',
       {
         shortcut: sendShortcut,
-        newline: preferences.enterForNewline ? 'Enter' : 'Shift+Enter',
+        newline: enterInsertsNewline() ? 'Enter' : 'Shift+Enter',
       }
     )
   );
