@@ -390,7 +390,7 @@
   <title>{roomName}</title>
 </svelte:head>
 
-<main class="calendar-page" aria-label={$i18n.t('calendar.label')}>
+<main class="calendar-page" aria-label={$i18n.t('calendar.label')} data-inset-owner="top">
   <PanelHeader title={roomName} titleSize="h1">
     {#snippet prefix()}
       <PanelHeaderButton label={$i18n.t('timeline.back')} onclick={backToRoomList}>

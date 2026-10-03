@@ -226,7 +226,7 @@
 />
 <MessageContextMenu menu={messageMenu} />
 
-<main class="forum-page" aria-label={$i18n.t('forum.label')}>
+<main class="forum-page" aria-label={$i18n.t('forum.label')} data-inset-owner="top">
   <div
     class="forum-main"
     class:thread-covered={threadRootId !== null && !threadInPanel}
