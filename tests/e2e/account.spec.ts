@@ -13,17 +13,7 @@ test('keeps account settings in profile order', async ({ page }) => {
   const account = new AccountSettings(page);
   await account.open();
 
-  const headings = [
-    account.profile,
-    account.status,
-    account.colors,
-    account.identity,
-    account.biography,
-    account.animal,
-    account.matrixId,
-    account.contacts,
-    account.blockedUsers,
-  ];
+  const headings = [account.profile, account.contacts, account.blockedUsers];
   for (const heading of headings) await expect(heading).toBeVisible();
   const positions = [];
   for (const heading of headings) positions.push(await heading.boundingBox());
@@ -42,10 +32,35 @@ test('saves a display name onto the account', async ({ admin, page }) => {
 
   const name = `Updated ${String(Date.now())}`;
   await account.displayName.fill(name);
-  await account.displayName.press('Enter');
-  await expect(page.getByText('Display name saved')).toBeVisible();
+  await account.save.click();
+  await expect(page.getByText('Profile saved')).toBeVisible();
 
   await expect.poll(() => admin.profile().then((profile) => profile.displayname)).toBe(name);
+});
+
+test('cancel drops unsaved profile edits', async ({ page }) => {
+  const account = new AccountSettings(page);
+  await account.open();
+
+  await expect(account.save).toBeDisabled();
+  const original = await account.displayName.inputValue();
+  await account.displayName.fill(`${original} edited`);
+  await expect(account.save).toBeEnabled();
+  await account.cancel.click();
+  await expect(account.displayName).toHaveValue(original);
+  await expect(account.save).toBeDisabled();
+});
+
+test('typing pronouns enables Save and Cancel restores them', async ({ page }) => {
+  const account = new AccountSettings(page);
+  await account.open();
+
+  const pronouns = page.getByLabel('Pronouns');
+  const original = await pronouns.inputValue();
+  await pronouns.fill('en:xe/xem');
+  await expect(account.save).toBeEnabled();
+  await account.cancel.click();
+  await expect(pronouns).toHaveValue(original);
 });
 
 test('a saved name color survives a reload', async ({ page }) => {
@@ -54,8 +69,8 @@ test('a saved name color survives a reload', async ({ page }) => {
 
   await account.colorValue('Dark theme name color').fill('#336699');
   await expect(account.colorValue('Dark theme name color')).toHaveValue('#336699');
-  await account.colorValue('Dark theme name color').press('Enter');
-  await expect(page.getByText('Profile colors saved')).toBeVisible();
+  await account.save.click();
+  await expect(page.getByText('Profile saved')).toBeVisible();
 
   await page.reload();
   await expect(account.colorValue('Dark theme name color')).toHaveValue('#336699');

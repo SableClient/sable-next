@@ -13,3 +13,11 @@ export function bioTexts(markdown: string): { body: string; mimetype?: string }[
   const { body, formatted } = serializePlain(textDoc(markdown));
   return formatted === null ? [{ body }] : [{ body: formatted, mimetype: 'text/html' }, { body }];
 }
+
+export function bioHtml(markdown: string): string | null {
+  if (markdown === '') return null;
+  const { body, formatted } = serializePlain(textDoc(markdown));
+  return (
+    formatted ?? `<p>${body.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`
+  );
+}

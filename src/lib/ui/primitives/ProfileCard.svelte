@@ -49,6 +49,8 @@
     headerAction?: Snippet;
     crest?: Snippet;
     pronouns?: Snippet;
+    nameField?: Snippet;
+    statusField?: Snippet;
     children?: Snippet;
     footer?: Snippet;
     composer?: Snippet;
@@ -62,6 +64,8 @@
     onAvatarClick,
     color,
     pronouns,
+    nameField,
+    statusField,
     heroColor = null,
     heroBrightness = null,
     bannerUrl = null,
@@ -126,7 +130,7 @@
 </script>
 
 <section
-  aria-labelledby={nameId}
+  aria-labelledby={nameField ? undefined : nameId}
   class={[
     'profile-card',
     `profile-card-${variant}`,
@@ -213,7 +217,7 @@
     </div>
     {#if crest}
       <div class="profile-card-crest-content">{@render crest()}</div>
-    {:else if status}
+    {:else if status || statusField}
       <div
         class="profile-card-status"
         role="group"
@@ -222,24 +226,33 @@
         data-ui-before
         data-ui-after
       >
-        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-        <p
-          class="profile-card-status-text explicit-scrollbar"
-          role="region"
-          aria-label={$i18n.t('settings.status')}
-          tabindex="0"
-        >
-          {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span>{/if}{status}
-        </p>
+        {#if statusField}
+          {@render statusField()}
+        {:else}
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+          <p
+            class="profile-card-status-text explicit-scrollbar"
+            role="region"
+            aria-label={$i18n.t('settings.status')}
+            tabindex="0"
+          >
+            {#if statusEmoji}<span class="profile-card-status-emoji">{statusEmoji}</span
+              >{/if}{status}
+          </p>
+        {/if}
       </div>
     {/if}
   </div>
   <div class="profile-card-body">
     <div class="profile-card-identity">
       <div class="profile-card-heading">
-        <h2 id={nameId} class="profile-card-name" class:tinted={nameColor}>
-          {displayName}
-        </h2>
+        {#if nameField}
+          <div class="profile-card-name-field">{@render nameField()}</div>
+        {:else}
+          <h2 id={nameId} class="profile-card-name" class:tinted={nameColor}>
+            {displayName}
+          </h2>
+        {/if}
         {#if pronouns}{@render pronouns()}{/if}
         {#if headerAction}{@render headerAction()}{/if}
       </div>
@@ -270,7 +283,7 @@
           <div
             class="profile-card-bio explicit-scrollbar"
             role="region"
-            aria-labelledby={nameId}
+            aria-labelledby={nameField ? undefined : nameId}
             tabindex="0"
           >
             {@render children()}

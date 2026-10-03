@@ -13,8 +13,8 @@ test('mobile: the account page with a banner fits the screen', async ({
   });
   await installRoomCore('ready');
   await page.goto('/settings/account');
-  await expect(page.locator('.profile-preview')).toBeVisible();
-  await expect(page.locator('.banner-setting')).toBeVisible();
+  await expect(page.locator('.profile-hero')).toBeVisible();
+  await expect(page.locator('.profile-form')).toBeVisible();
 
   const overflowing = await page.evaluate(() => {
     const width = document.documentElement.clientWidth;
@@ -60,8 +60,8 @@ for (const pageZoom of [1, 1.25]) {
     }, pageZoom);
     await installRoomCore('ready');
     await page.goto('/settings/account');
-    await expect(page.locator('.profile-preview')).toBeVisible();
-    await expect(page.locator('.banner-setting')).toBeVisible();
+    await expect(page.locator('.profile-hero')).toBeVisible();
+    await expect(page.locator('.profile-form')).toBeVisible();
 
     const overflowing = await page.evaluate(() => {
       const width = document.documentElement.clientWidth;

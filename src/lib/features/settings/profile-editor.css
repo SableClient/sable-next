@@ -1,0 +1,178 @@
+.profile-section .settings-section-content {
+  background: var(--surface-container);
+  overflow: clip;
+}
+
+.profile-section .profile-hero {
+  border-bottom: var(--border-width) solid var(--surface-var-container-line);
+}
+
+.profile-section .profile-hero .profile-card {
+  border: 0;
+  border-radius: 0;
+}
+
+.profile-section .profile-hero .profile-card-bio {
+  max-height: none;
+  overflow: visible;
+}
+
+.profile-section .inline-edit,
+.profile-section .color-controls .text-input {
+  --form-control-container: color-mix(
+    in oklab,
+    var(--profile-ink, var(--surface-on-container)) 7%,
+    transparent
+  );
+  --form-control-line: color-mix(
+    in oklab,
+    var(--profile-ink, var(--surface-on-container)) 40%,
+    transparent
+  );
+  --form-control-color: inherit;
+}
+
+.profile-section .inline-edit:hover:not(:focus),
+.profile-section .color-controls .text-input:hover:not(:focus) {
+  --form-control-line: color-mix(
+    in oklab,
+    var(--profile-ink, var(--surface-on-container)) 60%,
+    transparent
+  );
+}
+
+.profile-section .hero-name {
+  font-weight: var(--font-weight-bold);
+}
+
+.profile-section .timezone-select {
+  flex: 0 1 12rem;
+  width: auto;
+}
+
+.profile-section .caption-field {
+  display: grid;
+  gap: var(--space-100);
+  min-width: 0;
+}
+
+.profile-section .caption {
+  color: var(--profile-text-muted, var(--surface-var-on-container));
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.profile-section .timezone-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-200);
+}
+
+.profile-section .sr-only {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.profile-section .file-button {
+  cursor: pointer;
+}
+
+.profile-section .file-button:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-width);
+}
+
+.profile-section .file-button input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.profile-section .profile-form {
+  gap: var(--space-400);
+}
+
+.profile-section .group {
+  border: 0;
+  display: grid;
+  gap: var(--space-300);
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.profile-section .group legend {
+  font-weight: var(--font-weight-medium);
+  margin-block-end: var(--space-200);
+  padding: 0;
+}
+
+.profile-section .actions {
+  align-items: center;
+  background: var(--surface-container);
+  border-top: var(--border-width) solid var(--surface-var-container-line);
+  bottom: 0;
+  display: flex;
+  gap: var(--space-200);
+  padding: var(--space-300) var(--space-400);
+  position: sticky;
+}
+
+.profile-section .actions-note {
+  color: var(--surface-var-on-container);
+  flex: 1;
+  font-size: var(--font-size-small);
+  margin: 0;
+}
+
+.profile-section .actions-note.critical {
+  color: var(--crit-main);
+}
+
+.profile-section .scope-select {
+  min-width: 12rem;
+}
+
+.profile-section .card-fields {
+  display: grid;
+  gap: var(--space-400);
+  padding: var(--space-300);
+}
+
+.profile-section .card-fields legend {
+  color: var(--profile-text-muted, var(--surface-var-on-container));
+  font-size: var(--font-size-small);
+}
+
+.profile-section .field-grid {
+  display: grid;
+  gap: var(--space-300);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.profile-section .bio-toolbar {
+  color: var(--profile-ink, var(--surface-on-container));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-050);
+}
+
+.profile-section .bio-toolbar .btn {
+  color: inherit;
+}
+
+.profile-section .card-fields .color-setting > span {
+  color: var(--profile-text-muted, var(--surface-var-on-container));
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.profile-section .timezone-row .btn {
+  white-space: nowrap;
+}
