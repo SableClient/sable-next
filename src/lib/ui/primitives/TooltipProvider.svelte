@@ -9,6 +9,11 @@
   let { children }: Props = $props();
 </script>
 
-<BitsTooltip.Provider delayDuration={400} skipDelayDuration={80} ignoreNonKeyboardFocus>
+<BitsTooltip.Provider
+  delayDuration={400}
+  skipDelayDuration={80}
+  ignoreNonKeyboardFocus
+  disableHoverableContent
+>
   {@render children()}
 </BitsTooltip.Provider>
