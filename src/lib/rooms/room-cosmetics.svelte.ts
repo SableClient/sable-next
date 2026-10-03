@@ -26,6 +26,9 @@ interface ProfileIdentity {
   avatar_url: string | null;
 }
 
+const PROFILE_LOAD_ATTEMPTS = 4;
+const PROFILE_RETRY_MS = 2000;
+
 export class RoomCosmetics {
   /* eslint-disable svelte/prefer-svelte-reactivity */
   #users = $state.raw(new Map<string, SenderCosmeticsView>());
@@ -75,22 +78,28 @@ export class RoomCosmetics {
 
   async #loadProfiles(users: readonly SenderCosmeticsView[], generation: number): Promise<void> {
     if (!this.core.userProfile) return;
-    const missing = users.filter(
-      (user) =>
-        (user.space_display_name !== null || user.space_avatar_url !== null) &&
-        !this.#profiles.has(user.user_id)
-    );
-    if (missing.length === 0) return;
-    const loaded = await Promise.all(
-      missing.map(
-        async (user) =>
-          [user.user_id, await this.core.userProfile?.(user.user_id).catch(() => null)] as const
-      )
-    );
-    if (generation !== this.#generation) return;
-    const profiles = new Map(this.#profiles);
-    for (const [userId, profile] of loaded) if (profile) profiles.set(userId, profile);
-    this.#profiles = profiles;
+    for (let attempt = 0; attempt < PROFILE_LOAD_ATTEMPTS; attempt += 1) {
+      const missing = users.filter(
+        (user) =>
+          (user.space_display_name !== null || user.space_avatar_url !== null) &&
+          !this.#profiles.has(user.user_id)
+      );
+      if (missing.length === 0) return;
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, PROFILE_RETRY_MS * attempt));
+        if (generation !== this.#generation) return;
+      }
+      const loaded = await Promise.all(
+        missing.map(
+          async (user) =>
+            [user.user_id, await this.core.userProfile?.(user.user_id).catch(() => null)] as const
+        )
+      );
+      if (generation !== this.#generation) return;
+      const profiles = new Map(this.#profiles);
+      for (const [userId, profile] of loaded) if (profile) profiles.set(userId, profile);
+      this.#profiles = profiles;
+    }
   }
   /* eslint-enable svelte/prefer-svelte-reactivity */
 

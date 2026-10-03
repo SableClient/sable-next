@@ -6,7 +6,11 @@ import { RoomCosmetics } from './room-cosmetics.svelte.js';
 const ALICE = '@alice:example.org';
 const profile = { display_name: 'Alice', avatar_url: 'mxc://example.org/profile' };
 
-function cosmetics(user: Partial<SenderCosmeticsView>, known = true): RoomCosmetics {
+function cosmetics(
+  user: Partial<SenderCosmeticsView>,
+  known = true,
+  userProfile = vi.fn().mockResolvedValue(known ? profile : null)
+): RoomCosmetics {
   const view: RoomCosmeticsView = {
     space_id: '!space:example.org',
     users: [
@@ -24,7 +28,7 @@ function cosmetics(user: Partial<SenderCosmeticsView>, known = true): RoomCosmet
   const store = new RoomCosmetics({
     commands: { roomCosmetics: vi.fn().mockResolvedValue(view) },
     subscribeEvents: () => () => {},
-    userProfile: vi.fn().mockResolvedValue(known ? profile : null),
+    userProfile,
   });
   void store.load('!room:example.org', '!space:example.org');
   return store;
@@ -75,5 +79,24 @@ describe('RoomCosmetics.identity', () => {
       name: 'Alice',
       avatar: null,
     });
+  });
+
+  test('a profile that failed to load is fetched again', async () => {
+    vi.useFakeTimers();
+    try {
+      const userProfile = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('rate limited'))
+        .mockResolvedValue(profile);
+      const store = cosmetics({ space_display_name: 'Space Alice' }, true, userProfile);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(store.identity(ALICE, { name: 'Alice', avatar: null }).name).toBe('Alice');
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(store.identity(ALICE, { name: 'Alice', avatar: null }).name).toBe('Space Alice');
+      expect(userProfile).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
