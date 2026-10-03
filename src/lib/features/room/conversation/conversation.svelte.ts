@@ -451,7 +451,8 @@ export class Conversation {
       eventId,
       key,
       this.#threadRoot,
-      mine ? null : sourcePack
+      mine ? null : sourcePack,
+      this.#timeline.subscriptionId
     );
   }
 

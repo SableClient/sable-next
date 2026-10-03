@@ -1467,7 +1467,8 @@ export function createCommands(transport: () => Transport) {
       eventId: string,
       key: string,
       threadRoot: string | null = null,
-      sourcePack: ImageSourcePackView | null = null
+      sourcePack: ImageSourcePackView | null = null,
+      subscription: SubscriptionId | null = null
     ): Promise<void> {
       await transport().send({
         type: 'react',
@@ -1477,6 +1478,7 @@ export function createCommands(transport: () => Transport) {
         key,
         source_pack: $state.snapshot(sourcePack),
         shortcode: null,
+        subscription,
       });
     },
 

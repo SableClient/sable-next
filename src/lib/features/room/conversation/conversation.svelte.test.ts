@@ -61,7 +61,7 @@ function setup(
     select: () => Promise.resolve(),
     ...store,
   } as unknown as PersonaStore;
-  const timeline = { items, aggregations: [] } as unknown as RoomTimeline;
+  const timeline = { items, aggregations: [], subscriptionId: 7 } as unknown as RoomTimeline;
 
   return {
     sendMessage,
@@ -101,7 +101,7 @@ test('quick reactions resume live before choosing the latest message', async () 
   ];
   live.resolve(undefined);
   await reacting;
-  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null, 7);
   expect(fixture.sendMessage).not.toHaveBeenCalled();
 });
 
@@ -120,7 +120,7 @@ test.each(['message', 'image', 'sticker', 'unable_to_decrypt'] as const)(
     } as TimelineItemView;
     const fixture = setup([item('$old', '@ana:example.org'), latest], '@kris:example.org');
     await fixture.conversation.quickReact(ROOM, '😂');
-    expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null);
+    expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', '😂', null, null, 7);
   }
 );
 
@@ -139,7 +139,8 @@ test('quick reactions in a thread target its latest message and preserve the sou
     '$reply',
     'mxc://example.org/wave',
     '$root',
-    sourcePack
+    sourcePack,
+    7
   );
 });
 
@@ -152,7 +153,7 @@ test('toggling an existing custom quick reaction omits its source pack', async (
   };
   const fixture = setup([latest], '@kris:example.org');
   await fixture.conversation.quickReact(ROOM, key, sourcePack);
-  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', key, null, null);
+  expect(fixture.toggleReaction).toHaveBeenCalledWith(ROOM, '$latest', key, null, null, 7);
 });
 
 test('reaction failures reach the composer', async () => {

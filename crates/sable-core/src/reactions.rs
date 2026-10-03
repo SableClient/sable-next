@@ -332,6 +332,7 @@ mod tests {
                         source_pack: None,
                         shortcode: None,
                         thread_root: None,
+                        subscription: None,
                     }))
                     .await,
                     Err(CommandErr::Unsupported)

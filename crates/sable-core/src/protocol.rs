@@ -641,6 +641,8 @@ pub enum Command {
         #[serde(default)]
         #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
         thread_root: Option<OwnedEventId>,
+        #[serde(default)]
+        subscription: Option<SubscriptionId>,
     },
     SendLocation {
         #[cfg_attr(feature = "typegen", specta(type = String))]

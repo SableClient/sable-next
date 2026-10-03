@@ -17,7 +17,7 @@ use matrix_sdk_ui::timeline::{
 use matrix_sdk_base::event_cache::Event;
 
 use crate::ResultExt;
-use crate::protocol::{CommandErr, TimelineFocusView, TimelineItemView};
+use crate::protocol::{CommandErr, SubscriptionId, TimelineFocusView, TimelineItemView};
 use crate::view::aggregation_item;
 
 use crate::{CachedTimeline, Core, SubscriptionKind, ThreadKey};
@@ -128,6 +128,29 @@ impl Core {
             Some(root) => self.thread_timeline(room_id, root).await,
             None => self.timeline(room_id).await,
         }
+    }
+
+    pub(crate) async fn subscribed_timeline(
+        &self,
+        room_id: &OwnedRoomId,
+        thread_root: Option<&OwnedEventId>,
+        subscription: Option<SubscriptionId>,
+    ) -> Result<Arc<Timeline>, CommandErr> {
+        let Some(subscription) = subscription else {
+            return self.timeline_for(room_id, thread_root).await;
+        };
+        let timeline = self
+            .subscriptions
+            .lock()
+            .await
+            .get(&subscription)
+            .filter(|subscription| subscription.thread_root.as_ref() == thread_root)
+            .and_then(|subscription| subscription.timeline.clone())
+            .ok_or(CommandErr::UnknownSubscription)?;
+        if timeline.room().room_id() != room_id {
+            return Err(CommandErr::UnknownSubscription);
+        }
+        Ok(timeline)
     }
 
     #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM

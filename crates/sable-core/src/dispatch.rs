@@ -1469,9 +1469,12 @@ impl Core {
                 source_pack,
                 shortcode,
                 thread_root,
+                subscription,
             } => {
                 self.ensure_reaction_target(&room_id, &event_id).await?;
-                let timeline = self.timeline_for(&room_id, thread_root.as_ref()).await?;
+                let timeline = self
+                    .subscribed_timeline(&room_id, thread_root.as_ref(), subscription)
+                    .await?;
                 let shortcode = match shortcode
                     .or_else(|| source_pack.as_ref().map(|source| source.shortcode.clone()))
                 {
@@ -3004,22 +3007,9 @@ impl Core {
                     return Ok(CommandOk::MarkRead);
                 };
 
-                let timeline = if let Some(subscription) = subscription {
-                    let timeline = self
-                        .subscriptions
-                        .lock()
-                        .await
-                        .get(&subscription)
-                        .filter(|subscription| subscription.thread_root == thread_root)
-                        .and_then(|subscription| subscription.timeline.clone())
-                        .ok_or(CommandErr::UnknownSubscription)?;
-                    if timeline.room().room_id() != room_id {
-                        return Err(CommandErr::UnknownSubscription);
-                    }
-                    timeline
-                } else {
-                    self.timeline_for(&room_id, thread_root.as_ref()).await?
-                };
+                let timeline = self
+                    .subscribed_timeline(&room_id, thread_root.as_ref(), subscription)
+                    .await?;
                 timeline
                     .send_single_receipt(receipt_type, event_id.clone())
                     .await
