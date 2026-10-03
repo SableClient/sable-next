@@ -694,14 +694,16 @@ test('renders a bounded latest window and jumps to a stable key', async () => {
   expect(window.state.pinned).toBe(true);
 });
 
-test('a distant jump requested as smooth moves directly to its rendered destination', async () => {
+test('a distant smooth jump animates the last viewport into its rendered destination', async () => {
   const { window, viewport } = fixture();
   const animate = vi.spyOn(viewport, 'scrollTo').mockImplementation(() => {});
   await window.update(entries(1000));
   await window.jumpTo('20');
   await window.jumpTo(null, 'start', true);
-  expect(animate).not.toHaveBeenCalled();
-  expect(window.state.lastVisible).toBe(999);
+  const end = viewport.scrollHeight - viewport.clientHeight;
+  expect(viewport.scrollTop).toBe(end - viewport.clientHeight);
+  expect(animate).toHaveBeenCalledExactlyOnceWith({ top: end, behavior: 'smooth' });
+  expect(window.state.firstVisible).toBeGreaterThan(900);
 });
 
 test('continuous upward scrolling reaches older rows whose measured heights exceed estimates', async () => {

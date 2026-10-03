@@ -264,8 +264,9 @@ export class TimelineWindow<T> {
       anchors: this.anchors.map((anchor) => ({ ...anchor })),
       offset: this.offset,
     };
+    let leadIn = 0;
     if (index < this.start || index >= this.end) {
-      smooth = false;
+      if (smooth) leadIn = index >= this.end ? -1 : 1;
       await this.renderRange(
         Math.max(0, index - PAGE),
         Math.min(this.items.length, index + PAGE + 1)
@@ -298,6 +299,13 @@ export class TimelineWindow<T> {
     this.jumping = smooth;
     this.active = smooth;
     this.missedDelta = 0;
+    if (leadIn !== 0) {
+      const room =
+        leadIn < 0
+          ? target - this.top
+          : this.top + this.contentHeight - viewport.clientHeight - target;
+      this.writeOffset(target + leadIn * Math.max(0, Math.min(viewport.clientHeight, room)));
+    }
     this.writeOffset(target, smooth);
     if (!smooth && this.atEnd(1)) this.pinned = true;
     if (smooth) this.scheduleSettle();
