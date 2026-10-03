@@ -296,6 +296,7 @@ const ENUMS = {
   theme: ['system', 'dark', 'light'],
   dateFormat: ['auto', 'dmy', 'mdy', 'ymd'],
   enterForNewline: ['adaptive', 'newline', 'send'],
+  composerForm: ['short', 'adaptive', 'tall'],
   weekStart: ['sunday', 'monday', 'saturday'],
   gifProvider: ['default', 'klipy', 'tenor', 'giphy'],
   showRoomIcon: ['always', 'sometimes', 'collapsed', 'never'],
