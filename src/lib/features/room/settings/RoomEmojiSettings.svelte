@@ -59,7 +59,7 @@
   let canEdit = $derived(
     canSendState(levels, permissions?.own_power_level ?? 0, ROOM_IMAGE_PACK_EVENT_TYPE)
   );
-  let roomPacks = $derived(packs.filter((pack) => pack.origin === 'room'));
+  let roomPacks = $derived(packs.filter((pack) => pack.room_id === roomId));
   let viewingPack = $derived(roomPacks.find((pack) => pack.id === viewing) ?? null);
 
   $effect(() => {
