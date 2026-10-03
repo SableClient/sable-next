@@ -29,6 +29,7 @@
   import {
     bestGrid,
     callTiles,
+    presentParticipants,
     GRID_GAP_PX,
     NARROW_STAGE_PX,
     featuredTiles,
@@ -98,11 +99,15 @@
   );
   let settled = $derived(ready && health === 'live' && session.deviceError === null);
 
+  let remotes = $derived(
+    presentParticipants(
+      session.transport.participants,
+      new Set(session.members.map((member) => member.identity))
+    )
+  );
   let tiles = $derived(
     callTiles(
-      session.transport.self
-        ? [session.transport.self, ...session.transport.participants]
-        : session.transport.participants,
+      session.transport.self ? [session.transport.self, ...remotes] : remotes,
       session.watchedScreenShareIds
     )
   );

@@ -71,13 +71,10 @@
     screen ? $i18n.t('call.screenVolume', { name }) : $i18n.t('call.participantVolume', { name })
   );
   let videoOn = $derived(screen || cameraVisible(participant));
-  let watchable = $derived(
-    !participant.local &&
-      !screen &&
-      participant.screenShare !== undefined &&
-      !participant.screenShare.muted &&
-      onWatchScreen !== undefined
+  let sharing = $derived(
+    !screen && participant.screenShare !== undefined && !participant.screenShare.muted
   );
+  let watchable = $derived(!participant.local && sharing && onWatchScreen !== undefined);
   let muted = $derived(participant.microphone === undefined || participant.microphone.muted);
   let speaking = $derived(!screen && !muted && participant.speaking === true);
   let quality = $derived(participant.connectionQuality ?? 'unknown');
@@ -172,6 +169,21 @@
     <div class="placeholder">
       <Avatar src={avatar} {name} id={userId} size="large" />
     </div>
+  {/if}
+
+  {#if sharing}
+    {#if watchable}
+      <button
+        type="button"
+        class="live"
+        title={$i18n.t('call.watchScreen', { name })}
+        onclick={onWatchScreen}
+      >
+        {$i18n.t('call.live')}
+      </button>
+    {:else}
+      <span class="live">{$i18n.t('call.live')}</span>
+    {/if}
   {/if}
 
   <div class="actions">
@@ -391,6 +403,24 @@
     color: var(--crit-main);
   }
 
+  .live {
+    background: var(--crit-main);
+    border: 0;
+    border-radius: var(--radii-300);
+    color: var(--crit-on-main);
+    font-size: var(--font-size-small);
+    font-weight: var(--font-weight-bold);
+    inset: var(--space-200) auto auto var(--space-200);
+    letter-spacing: 0.04em;
+    padding: var(--space-050) var(--space-200);
+    position: absolute;
+    text-transform: uppercase;
+  }
+
+  button.live {
+    cursor: pointer;
+  }
+
   .actions {
     display: flex;
     gap: var(--space-100);
@@ -409,7 +439,7 @@
     pointer-events: auto;
   }
 
-  @media (hover: hover) {
+  @media (any-hover: hover) {
     .tile:hover .actions {
       opacity: 1;
       pointer-events: auto;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { bestGrid, callTiles, featuredTiles, togglePin } from './call-layout';
+import { bestGrid, callTiles, featuredTiles, presentParticipants, togglePin } from './call-layout';
 import type { CallParticipant } from './call-transport';
 
 const track = (muted = false) => ({ id: 't', muted, subscribed: true });
@@ -24,6 +24,18 @@ describe('bestGrid', () => {
 
   it('returns an empty grid before the stage is measured', () => {
     expect(bestGrid(3, 0, 0, 8).width).toBe(0);
+  });
+});
+
+describe('presentParticipants', () => {
+  it('drops a connection that publishes nothing and is no roster member', () => {
+    const publisher: CallParticipant = { identity: '@a:x:D1', microphone: track(true) };
+    const listed: CallParticipant = { identity: '@b:x:D2' };
+    const ghost: CallParticipant = { identity: 'C4xBBxDY6DejjOq73dPNUwHHsq3vuLudRj4hmvc' };
+    expect(presentParticipants([publisher, listed, ghost], new Set(['@b:x:D2']))).toEqual([
+      publisher,
+      listed,
+    ]);
   });
 });
 

@@ -119,3 +119,31 @@ test('a shared screen without sound offers no volume', () => {
 
   expect(screen.queryByRole('button', { name: "Volume of Bob's screen" })).not.toBeInTheDocument();
 });
+
+function mountSharer(onWatchScreen?: () => void) {
+  render(CallParticipantTile, {
+    participant: {
+      identity: '@bob:example.org:DEVICE',
+      screenShare: { id: 'TR_video', muted: false, subscribed: true },
+    },
+    source: 'camera',
+    room: undefined,
+    name: 'Bob',
+    userId: '@bob:example.org',
+    avatar: null,
+    onWatchScreen,
+  });
+}
+
+test('a tile whose person is sharing carries a live badge that opens the share', async () => {
+  const onWatchScreen = vi.fn();
+  mountSharer(onWatchScreen);
+
+  await userEvent.setup().click(screen.getByRole('button', { name: "Watch Bob's screen" }));
+  expect(onWatchScreen).toHaveBeenCalledOnce();
+});
+
+test('a tile with no share has no live badge', () => {
+  mountTile();
+  expect(screen.queryByText('Live')).not.toBeInTheDocument();
+});

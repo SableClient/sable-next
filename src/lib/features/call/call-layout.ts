@@ -21,6 +21,21 @@ export function cameraVisible(participant: CallParticipant): boolean {
   return visible(participant, participant.camera);
 }
 
+const publishesAnything = (participant: CallParticipant): boolean =>
+  Boolean(participant.microphone ?? participant.camera ?? participant.screenShare);
+
+export function presentParticipants(
+  participants: readonly CallParticipant[],
+  memberIdentities: ReadonlySet<string>
+): CallParticipant[] {
+  return participants.filter(
+    (participant) =>
+      participant.local === true ||
+      publishesAnything(participant) ||
+      memberIdentities.has(participant.identity)
+  );
+}
+
 export function callTiles(
   participants: readonly CallParticipant[],
   watchedScreenShareIds: readonly string[] = []
