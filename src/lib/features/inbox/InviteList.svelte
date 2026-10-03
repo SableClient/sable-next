@@ -4,7 +4,10 @@
   import LockSimpleIcon from 'phosphor-svelte/lib/LockSimpleIcon';
   import { SvelteSet } from 'svelte/reactivity';
 
+  import type { ProfileView } from '#src/generated/protocol';
+
   import { useCoreClient } from '#lib/core/context.js';
+  import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { formatDate } from '#lib/ui/date-time.js';
   import { i18n } from '#lib/i18n.js';
   import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
@@ -70,6 +73,22 @@
   let blockSenders = $derived([
     ...new Set(blockTargets.flatMap((invite) => (invite.inviter ? [invite.inviter] : []))),
   ]);
+
+  let profileOpen = $state(false);
+  let profileTarget = $state.raw<{ userId: string; anchor: HTMLElement } | null>(null);
+  let profile = $state.raw<ProfileView | null>(null);
+
+  function openProfile(userId: string, anchor: HTMLElement): void {
+    profileTarget = { userId, anchor };
+    profile = null;
+    profileOpen = true;
+    void core.userProfile(userId).then(
+      (loaded) => {
+        if (profileTarget?.userId === userId) profile = loaded;
+      },
+      () => undefined
+    );
+  }
 
   $effect(() => {
     triage.refresh(pending.map((invite) => invite.room_id));
@@ -228,6 +247,17 @@
   </ConfirmDialog>
 {/if}
 
+{#if profileTarget}
+  <MentionProfile
+    bind:open={profileOpen}
+    userId={profileTarget.userId}
+    member={null}
+    roomId=""
+    {profile}
+    anchor={profileTarget.anchor}
+  />
+{/if}
+
 {#snippet card(invite: TriagedInvite)}
   {@const room = invite.room}
   {@const name = roomLabel(room)}
@@ -266,10 +296,16 @@
             <StatusBadge label={$i18n.t('inbox.inviteNoSharedRooms')} variant="warning" />
           {/if}
           {#if from && fromName}
-            <span class="inviter">
+            <button
+              type="button"
+              class="inviter"
+              onclick={(event) => {
+                openProfile(from, event.currentTarget);
+              }}
+            >
               {$i18n.t('inbox.invitedBy', { name: fromName })}
               <span>({from})</span>
-            </span>
+            </button>
           {/if}
           {#if room.latest_event?.timestamp}
             <span>{formatDate(room.latest_event.timestamp)}</span>
@@ -449,7 +485,21 @@
   }
 
   .inviter {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
     overflow-wrap: anywhere;
+    padding: 0;
+    text-align: start;
+    text-decoration: underline;
+    text-decoration-color: transparent;
+  }
+
+  .inviter:hover,
+  .inviter:focus-visible {
+    text-decoration-color: currentcolor;
   }
 
   .alias {

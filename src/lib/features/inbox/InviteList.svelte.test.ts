@@ -13,9 +13,18 @@ import { core } from '#lib/core/__mocks__/context.js';
 
 const rooms = vi.hoisted(() => [] as RoomSummary[]);
 vi.mock('#lib/rooms/room-list.svelte.js', () => ({
-  useRoomList: () => ({ rooms }),
+  useRoomList: () => ({ rooms, byId: () => undefined }),
+  roomPathParamFromId: (roomId: string) => roomId,
   roomLabel: (room: RoomSummary) => room.name ?? room.room_id,
 }));
+
+vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
+vi.mock('#lib/rooms/presence.svelte.js', async () => {
+  const actual = await vi.importActual<typeof import('#lib/rooms/presence.svelte.js')>(
+    '#lib/rooms/presence.svelte.js'
+  );
+  return { ...actual, usePresenceStore: () => ({ get: () => null }) };
+});
 
 import { dismissedInvites } from '#lib/rooms/dismissed-invites.svelte.js';
 
@@ -139,4 +148,21 @@ test('an invite from someone you know has neither badge', async () => {
   });
   expect(screen.queryByText('No rooms in common')).toBeNull();
   expect(screen.queryByText('Direct message')).toBeNull();
+});
+
+test('clicking the inviter opens their profile', async () => {
+  rooms.push(invite('!a:example.org', 'Alpha'));
+  triaged([['!a:example.org', '@stranger:elsewhere.org', false]]);
+  const userProfile = vi.fn(() =>
+    Promise.resolve({ user_id: '@stranger:elsewhere.org', display_name: 'Stranger' })
+  );
+  Object.assign(core, { userProfile, userRelations: vi.fn(() => new Promise(() => undefined)) });
+  dismissedInvites.start(core as unknown as CoreClient);
+  render(InviteList);
+  await vi.waitFor(() => {
+    expect(names()).toEqual(['Alpha']);
+  });
+  await userEvent.click(screen.getByRole('button', { name: /@stranger:elsewhere.org/ }));
+  expect(userProfile).toHaveBeenCalledWith('@stranger:elsewhere.org');
+  expect(await screen.findByText('Stranger')).toBeTruthy();
 });
