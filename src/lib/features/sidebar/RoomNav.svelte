@@ -76,7 +76,7 @@
   import type { CallVoiceState } from '#lib/features/call/call-session.svelte.js';
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
-  import { participantKeys } from '#lib/features/call/participant-keys.js';
+  import { numberedName, participantKeys } from '#lib/features/call/participant-keys.js';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -892,7 +892,10 @@
           {@const profile = peerProfiles.get(userId)}
           {@const voice =
             room.room_id === callRoomId ? callVoiceStates.get(rowKeys[index] ?? userId) : undefined}
-          {@const displayName = profile?.display_name ?? userId}
+          {@const displayName = numberedName(
+            profile?.display_name ?? userId,
+            rowKeys[index] ?? userId
+          )}
           <li
             class:speaking={voice?.speaking && !voice.muted}
             oncontextmenu={voice && userId !== core.session?.user_id
@@ -917,7 +920,7 @@
                 alt={collapsed ? (profile?.display_name ?? userId) : undefined}
               />
               {#if !collapsed}
-                <span>{profile?.display_name ?? userId}</span>
+                <span>{displayName}</span>
                 {#if voice && (voice.muted || voice.deafened || voice.camera || voice.screen)}
                   <span class="voice-badges">
                     {#if voice.screen}
@@ -1514,7 +1517,7 @@
     background: var(--bg-container-hover);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .rooms-heading:hover {
       background: var(--bg-container-hover);
     }
@@ -1571,7 +1574,7 @@
     width: var(--space-600);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .room-options-slot {
       margin-right: var(--space-100);
       pointer-events: none;
@@ -1608,7 +1611,7 @@
     background: var(--bg-container-hover);
   }
 
-  @media (hover: hover) and (pointer: fine) {
+  @media (any-hover: hover) and (any-pointer: fine) {
     .room-row-wrap:hover {
       --room-icon-plate: var(--bg-container-hover);
 

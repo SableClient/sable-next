@@ -14,7 +14,7 @@
   import LobbyTile from './LobbyTile.svelte';
   import { bestGrid, GRID_GAP_PX, NARROW_STAGE_PX } from './call-layout';
   import { DEVICE_PREFERENCE } from './devices';
-  import { participantKeys } from './participant-keys.js';
+  import { numberedName, participantKeys } from './participant-keys.js';
   import type { CallMedia } from './call-session.svelte.js';
   import { startInputMeter } from './input-meter';
 
@@ -211,7 +211,11 @@
           />
         {/if}
         {#each others as person, index (otherKeys[index])}
-          <LobbyTile name={person.name} userId={person.userId} avatar={person.avatar} />
+          <LobbyTile
+            name={numberedName(person.name, otherKeys[index] ?? person.userId)}
+            userId={person.userId}
+            avatar={person.avatar}
+          />
         {/each}
         {#if alone}
           <li class="waiting"><p>{$i18n.t('call.lobbyEmpty')}</p></li>

@@ -6,3 +6,8 @@ export function participantKeys(userIds: readonly string[]): string[] {
     return count === 0 ? userId : `${userId}#${String(count)}`;
   });
 }
+
+export function numberedName(name: string, key: string): string {
+  const copy = key.match(/#(\d+)$/)?.[1];
+  return copy === undefined ? name : `${name} (${String(Number(copy) + 1)})`;
+}
