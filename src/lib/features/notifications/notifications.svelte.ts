@@ -242,12 +242,22 @@ export class NotificationCenter {
     const open = this.open;
     if (core === null || open === null) return;
 
-    const notification = new Notification(title(view), {
+    const options = {
       body: summarise(lines),
       tag: tag(view),
       icon: await avatar(core, view),
       silent: true,
-    });
+    };
+    let notification: Notification;
+    try {
+      notification = new Notification(title(view), options);
+    } catch {
+      await showFromWorker(title(view), {
+        ...options,
+        data: { roomId: view.room_id, userId: view.user_id, eventId: view.event_id },
+      });
+      return;
+    }
 
     notification.addEventListener('click', () => {
       globalThis.focus();
@@ -267,6 +277,12 @@ async function avatar(core: CoreClient, view: NotificationView): Promise<string>
   if (source === null) return FALLBACK_ICON;
 
   return loadMediaUrl(core, source, AVATAR_SIZE, AVATAR_SIZE).catch(() => FALLBACK_ICON);
+}
+
+async function showFromWorker(title: string, options: NotificationOptions): Promise<void> {
+  if (!('serviceWorker' in navigator)) return;
+  const registration = await navigator.serviceWorker.getRegistration();
+  await registration?.showNotification(title, options);
 }
 
 const FALLBACK_ICON = '/favicon.png';

@@ -270,6 +270,36 @@ test('shows ordinary channel messages when browser notifications are enabled', a
   notifications.stop();
 });
 
+test('a browser without the Notification constructor shows through the service worker', async () => {
+  const showNotification = vi.fn().mockResolvedValue(undefined);
+  const AndroidNotification = Object.assign(
+    function () {
+      throw new TypeError("Failed to construct 'Notification': Illegal constructor.");
+    },
+    { permission: 'granted' }
+  );
+  vi.stubGlobal('Notification', AndroidNotification);
+  vi.stubGlobal('navigator', {
+    serviceWorker: { getRegistration: () => Promise.resolve({ showNotification }) },
+  });
+  preferences.systemNotifications = true;
+  preferences.notificationContent = true;
+  const notifications = center();
+
+  notifications.present({ ...invite(), event_id: '$message', room_name: 'General' });
+
+  await vi.waitFor(() => {
+    expect(showNotification).toHaveBeenCalledWith(
+      'General',
+      expect.objectContaining({
+        tag: '@me:example.org !room:example.org',
+        data: { roomId: '!room:example.org', userId: '@me:example.org', eventId: '$message' },
+      })
+    );
+  });
+  notifications.stop();
+});
+
 test.each(['joined', 'left', 'banned'] as const)(
   'an invite survives unrelated updates until its membership becomes %s',
   (state) => {
