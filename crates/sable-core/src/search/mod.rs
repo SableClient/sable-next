@@ -53,6 +53,8 @@ const BODY_FIELD_COUNT: usize = 1;
 const BODY_FIELD_BOOST: [f64; BODY_FIELD_COUNT] = [1.0];
 const EVENTS_PER_INGEST_YIELD: usize = 16;
 const DOCUMENTS_PER_RESTORE_YIELD: usize = 256;
+const INGEST_WAIT: Duration = Duration::from_millis(25);
+const INGEST_WAIT_ATTEMPTS: usize = 200;
 const RETIRED_KEYS_BEFORE_VACUUM: usize = 64;
 
 const MEMORY_BUDGET: usize = 64 * 1024 * 1024;
@@ -2835,6 +2837,12 @@ impl Core {
         use tokio::sync::broadcast::error::TryRecvError;
 
         let room_id = room.room_id().to_owned();
+        for _ in 0..INGEST_WAIT_ATTEMPTS {
+            if !self.search_crawl.lock().await.is_ingesting(&room_id) {
+                break;
+            }
+            matrix_sdk::sleep::sleep(INGEST_WAIT).await;
+        }
         if self.search_crawl.lock().await.is_ingesting(&room_id) {
             return;
         }
