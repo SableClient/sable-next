@@ -87,6 +87,19 @@ test('an uncached emote shows its shortcode until the bytes arrive', async () =>
   });
 });
 
+test('a pack that stores its address as the description still shows the shortcode', () => {
+  const view = build(
+    'emoticon',
+    emoticon.create({
+      url: 'mxc://example.org/wave',
+      shortcode: 'wave',
+      body: 'mxc://example.org/wave',
+    })
+  );
+
+  expect(view.dom.textContent).toBe(':wave:');
+});
+
 test('an emote destroyed before its bytes arrive does not paint', async () => {
   let settle: (src: string) => void = () => undefined;
   const view = build(

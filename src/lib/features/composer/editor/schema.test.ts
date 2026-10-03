@@ -206,6 +206,20 @@ test('an emote description survives HTML and draft round trips', () => {
   expect(composerSchema.nodeFromJSON(doc.toJSON()).eq(doc)).toBe(true);
 });
 
+test('an emote whose description is its own address is sent with its shortcode', () => {
+  const doc = composerSchema.node('doc', null, [
+    paragraph.create(null, [
+      emoticon.create({
+        url: 'mxc://example.org/wave',
+        shortcode: 'wave',
+        body: 'mxc://example.org/wave',
+      }),
+    ]),
+  ]);
+
+  expect(html(doc)).toContain('alt=":wave:" title=":wave:"');
+});
+
 test('an explicit matrix.to link stays a link and is re-marked on serialise', () => {
   const doc = parse(
     '<a data-org.matrix.msc4550.link href="https://matrix.to/#/@alice:example.org">DM me</a>'

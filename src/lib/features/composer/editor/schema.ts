@@ -1,4 +1,4 @@
-import { DOMParser, Schema, type ParseRule } from 'prosemirror-model';
+import { DOMParser, Schema, type Node as ProseMirrorNode, type ParseRule } from 'prosemirror-model';
 
 import { splitVia } from '#lib/rooms/join-address.js';
 import { parseMatrixLink } from '#lib/rooms/matrix-link.js';
@@ -18,6 +18,11 @@ export function mentionHref(userId: string, via: readonly string[]): string {
   if (!userId.startsWith('!') || via.length === 0) return `${matrixTo}${userId}`;
   const query = new URLSearchParams(via.map((server) => ['via', server]));
   return `${matrixTo}${userId}?${query.toString()}`;
+}
+
+export function emoticonLabel(node: ProseMirrorNode): string {
+  const body = node.attrs.body as string | null;
+  return body && !body.startsWith('mxc://') ? body : `:${node.attrs.shortcode as string}:`;
 }
 
 function languageOf(dom: HTMLElement): string {
@@ -280,7 +285,7 @@ export const composerSchema = new Schema({
           {
             'data-mx-emoticon': '',
             src: node.attrs.url as string,
-            alt: (node.attrs.body as string | null) ?? label,
+            alt: emoticonLabel(node),
             title: label,
             height: '32',
           },
