@@ -46,12 +46,12 @@ afterEach(() => {
 test('saving writes pronouns to the same profile field as Settings', async () => {
   const { profile, core, onNavigateHome } = controller();
   profile.setDisplayName('New');
-  profile.setPronouns('they/them, iel (fr)');
+  profile.setPronouns('they/them, fr:iel');
 
   await profile.save();
 
   expect(core.setProfileField).toHaveBeenCalledWith('io.fsky.nyx.pronouns', [
-    { summary: 'they/them' },
+    { summary: 'they/them', language: 'en' },
     { summary: 'iel', language: 'fr' },
   ]);
   expect(onNavigateHome).toHaveBeenCalledOnce();
