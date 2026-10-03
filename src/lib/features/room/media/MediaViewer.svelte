@@ -151,6 +151,15 @@
   let panPointerId: number | null = null;
   let panOrigin: Vector2 = { x: 0, y: 0 };
   let panStartPointer: Vector2 = { x: 0, y: 0 };
+  let lens = $state<{
+    pointerId: number;
+    x: number;
+    y: number;
+    stage: DOMRect;
+    image: DOMRect;
+  } | null>(null);
+  let lensZoom = $state(2);
+  let lensSize = $state(192);
   let isImage = $derived(item?.kind === 'image' || item?.kind === 'sticker');
   let streamUnavailable = $derived(resource.streamUnavailable);
   let transcode = $derived(
@@ -247,6 +256,10 @@
 
   const MIN_ZOOM = 0.1;
   const ZOOM_STEP = 0.2;
+  const LENS_MIN_ZOOM = 1.25;
+  const LENS_MAX_ZOOM = 16;
+  const LENS_MIN_SIZE = 96;
+  const LENS_MAX_SIZE = 640;
   let maxZoom = $derived(isPdf ? 5 : 500);
   let pannable = $derived(zoom > fitRatio * 1.001 || rotation % 360 !== 0);
 
@@ -347,6 +360,15 @@
     }
     if (!isImage || spoilerHidden) return;
     event.preventDefault();
+    if (lens) {
+      const factor = 1 - (event.deltaY || event.deltaX) * 0.001;
+      if (event.shiftKey) {
+        lensSize = Math.min(LENS_MAX_SIZE, Math.max(LENS_MIN_SIZE, lensSize * factor));
+      } else {
+        lensZoom = Math.min(LENS_MAX_ZOOM, Math.max(LENS_MIN_ZOOM, lensZoom * factor));
+      }
+      return;
+    }
     zoomTowards(event, zoom * (1 - event.deltaY * 0.001));
   }
 
@@ -411,6 +433,22 @@
     if (event.button !== 0) return;
     clearTimeout(tapTimer);
     if (!backdropPress && handleDoubleTap(event)) return;
+    if (
+      event.pointerType === 'mouse' &&
+      stageEl &&
+      imageEl &&
+      event.target === imageEl &&
+      !pannable
+    ) {
+      lens = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        stage: stageEl.getBoundingClientRect(),
+        image: imageEl.getBoundingClientRect(),
+      };
+      return;
+    }
     if (event.pointerType === 'touch') {
       tap =
         touches.size === 0 && !(event.target instanceof Element && event.target.closest('button'))
@@ -453,6 +491,11 @@
         AXIS_LOCK_THRESHOLD
     ) {
       backdropPress = null;
+    }
+    if (lens?.pointerId === event.pointerId) {
+      lens.x = event.clientX;
+      lens.y = event.clientY;
+      return;
     }
     if (!isImage) return;
     if (
@@ -544,6 +587,7 @@
       backdropPress = null;
       if (event.type === 'pointerup' && event.target === stageEl) onClose();
     }
+    if (lens?.pointerId === event.pointerId) lens = null;
     if (!isImage) return;
     if (tap?.pointerId === event.pointerId) {
       if (event.type === 'pointerup') {
@@ -776,6 +820,7 @@
           class:spoilered={spoilerHidden}
           class:has-nav={items.length > 1}
           class:chrome-hidden={chromeHidden}
+          class:magnifying={lens !== null}
           bind:this={stageEl}
           onwheel={handleWheel}
           onpointerdown={startPan}
@@ -844,6 +889,26 @@
                 onload={onImageLoad}
                 oncontextmenu={mouseContextMenu(openImageMenu)}
               />
+              {#if lens}
+                <div
+                  class="lens"
+                  aria-hidden="true"
+                  style:left={`${String(lens.x - lens.stage.x - lensSize / 2)}px`}
+                  style:top={`${String(lens.y - lens.stage.y - lensSize / 2)}px`}
+                  style:width={`${String(lensSize)}px`}
+                  style:height={`${String(lensSize)}px`}
+                >
+                  <img
+                    class:pixelated
+                    src={url}
+                    alt=""
+                    draggable="false"
+                    style:width={`${String(lens.image.width * lensZoom)}px`}
+                    style:height={`${String(lens.image.height * lensZoom)}px`}
+                    style:transform={`translate(${String(lensSize / 2 - (lens.x - lens.image.x) * lensZoom)}px, ${String(lensSize / 2 - (lens.y - lens.image.y) * lensZoom)}px)`}
+                  />
+                </div>
+              {/if}
               <ActionMenu
                 bind:open={imageMenuOpen}
                 label={$i18n.t('viewer.imageMenu')}
@@ -1088,6 +1153,28 @@
 
   .stage img.pixelated {
     image-rendering: pixelated;
+  }
+
+  .stage.magnifying,
+  .stage.magnifying img {
+    cursor: none;
+  }
+
+  .lens {
+    background: var(--viewer-immersive);
+    border-radius: 50%;
+    box-shadow: var(--shadow-float);
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+
+  .stage .lens img {
+    left: 0;
+    position: absolute;
+    top: 0;
+    transition: none;
   }
 
   .stage .media-player {

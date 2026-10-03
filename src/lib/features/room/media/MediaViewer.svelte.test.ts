@@ -303,6 +303,56 @@ test('clamps pointer drag panning to the zoomed overflow', async () => {
   expect(img.style.transform).toContain('translate(0px, 0px)');
 });
 
+test('holding the mouse on a fitted image shows a lens that the wheel zooms and resizes', async () => {
+  stubRects(rect(800, 600), rect(800, 600));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const img = await openImage();
+  const lens = () => document.querySelector<HTMLElement>('.lens');
+  const lensImage = () => document.querySelector<HTMLElement>('.lens img');
+
+  await user.pointer({
+    keys: '[MouseLeft>]',
+    target: img,
+    coords: { clientX: 200, clientY: 150 },
+  });
+
+  expect(lens()?.style.left).toBe('104px');
+  expect(lens()?.style.width).toBe('192px');
+  expect(lensImage()?.style.width).toBe('1600px');
+  expect(lensImage()?.style.transform).toBe('translate(-304px, -204px)');
+
+  await user.pointer({ target: img, coords: { clientX: 400, clientY: 300 } });
+  expect(lensImage()?.style.transform).toBe('translate(-704px, -504px)');
+
+  await fireEvent.wheel(stage(), { deltaY: -100 });
+  expect(lensImage()?.style.width).toBe('1760px');
+  expect(img.style.transform).toContain('scale(1)');
+
+  const shiftWheel = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+  Object.defineProperty(shiftWheel, 'shiftKey', { value: true });
+  await fireEvent(stage(), shiftWheel);
+  expect(parseFloat(lens()?.style.width ?? '')).toBeCloseTo(211.2);
+  expect(lensImage()?.style.width).toBe('1760px');
+
+  await user.pointer({ keys: '[/MouseLeft]', target: img });
+  expect(lens()).toBeNull();
+});
+
+test('a zoomed image pans under the mouse instead of showing the lens', async () => {
+  stubRects(rect(800, 600), rect(1600, 1200));
+  core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
+  const img = await openImage();
+
+  await user.click(screen.getByRole('button', { name: 'viewer.zoomIn' }));
+  await user.pointer([
+    { keys: '[MouseLeft>]', target: img, coords: { clientX: 100, clientY: 100 } },
+    { target: img, coords: { clientX: 60, clientY: 100 } },
+  ]);
+
+  expect(document.querySelector('.lens')).toBeNull();
+  expect(img.style.transform).toContain('translate(-40px, 0px)');
+});
+
 test('arrow keys pan when zoomed and navigate otherwise', async () => {
   stubRects(rect(800, 600), rect(1600, 1200));
   core.fetchMedia.mockResolvedValue(new Uint8Array(new ArrayBuffer()));
