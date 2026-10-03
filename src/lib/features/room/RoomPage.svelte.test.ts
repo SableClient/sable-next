@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { RoomSummary } from '#src/generated/protocol';
 
 const rendered = vi.hoisted(() => [] as { kind: string; roomId: string; extra: unknown }[]);
+const roomList = vi.hoisted(() => ({ start: () => Promise.resolve() }));
 
 vi.mock('$app/state', () => import('#lib/test-support/app-state.js'));
 vi.mock('$app/navigation', () => import('#lib/test-support/app-navigation.js'));
@@ -15,7 +16,7 @@ import { visit } from '#lib/test-support/app-state.js';
 vi.mock('#lib/core/context.js');
 vi.mock('#lib/rooms/room-list.svelte.js', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useRoomList: () => ({ rooms: [], start: () => Promise.resolve() }),
+  useRoomList: () => ({ rooms: [], start: () => roomList.start() }),
 }));
 vi.mock('./RoomView.svelte', () => ({
   default: (_anchor: unknown, props: { roomId: string; room?: unknown }) => {
@@ -39,6 +40,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rendered.length = 0;
+  roomList.start = () => Promise.resolve();
   resetNavigation();
 });
 
@@ -79,6 +81,15 @@ test('a room we left goes through the join', async () => {
   await settle();
 
   expect(rendered.at(-1)?.kind).toBe('join');
+});
+
+test('an alias waits for the room list rather than opening with the alias', async () => {
+  visit('/rooms/%23next:example.org', { roomId: '#next:example.org' });
+  roomList.start = () => new Promise(() => {});
+  render(RoomPage);
+  await settle();
+
+  expect(rendered).toEqual([]);
 });
 
 test('a space opened as a room is sent to its lobby', async () => {

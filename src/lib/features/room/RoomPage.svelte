@@ -85,9 +85,9 @@
 </script>
 
 {#if (space === null || eventTimeline) && mountedRoomId === roomId}
-  {#if joined || !listed || unlistedRoom}
+  {#if joined || unlistedRoom || (!listed && roomId.startsWith('!'))}
     <RoomView {roomId} {eventId} {notifiedEventId} room={unlistedRoom} />
-  {:else}
+  {:else if listed}
     <JoinBeforeNavigate {roomId} {eventId} via={page.url.searchParams.getAll('via')} />
   {/if}
 {/if}
