@@ -2024,13 +2024,23 @@ fn indexable_body(body: &str) -> String {
 
 fn message_text(msgtype: &MessageType) -> String {
     let body = indexable_body(msgtype.body());
-    let MessageType::Gallery(gallery) = msgtype else {
-        return body;
+    let filenames = match msgtype {
+        MessageType::Gallery(gallery) => crate::view::gallery_filenames(gallery),
+        MessageType::Image(image) => vec![image.filename()],
+        MessageType::Video(video) => vec![video.filename()],
+        MessageType::Audio(audio) => vec![audio.filename()],
+        MessageType::File(file) => vec![file.filename()],
+        _ => return body,
     };
     std::iter::once(body.as_str())
-        .chain(crate::view::gallery_filenames(gallery))
+        .chain(filenames)
         .filter(|text| !text.is_empty())
-        .collect::<Vec<_>>()
+        .fold(Vec::<&str>::new(), |mut lines, text| {
+            if !lines.contains(&text) {
+                lines.push(text);
+            }
+            lines
+        })
         .join("\n")
 }
 
@@ -3032,6 +3042,29 @@ mod tests {
         ));
 
         (index, room)
+    }
+
+    #[test]
+    fn single_media_is_searchable_by_its_filename() {
+        use matrix_sdk::ruma::{
+            OwnedMxcUri,
+            events::room::message::{
+                FileMessageEventContent, ImageMessageEventContent, MessageType,
+            },
+        };
+
+        let url = OwnedMxcUri::from("mxc://localhost/a");
+
+        let mut captioned =
+            ImageMessageEventContent::plain("Sunset at the pier".to_owned(), url.clone());
+        captioned.filename = Some("holiday-2026.jpg".to_owned());
+        assert_eq!(
+            super::message_text(&MessageType::Image(captioned)),
+            "Sunset at the pier\nholiday-2026.jpg"
+        );
+
+        let bare = FileMessageEventContent::plain("report.pdf".to_owned(), url);
+        assert_eq!(super::message_text(&MessageType::File(bare)), "report.pdf");
     }
 
     fn picture(seed: &str, sender: &str, ts: u64) -> super::Document {
