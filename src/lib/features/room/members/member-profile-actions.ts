@@ -1,6 +1,7 @@
 import { t } from '#lib/i18n.js';
 import type { CoreClient } from '#lib/core/client.svelte.js';
 import { CoreError } from '#src/transport';
+import { openExternalUrl, opensExternalUrls } from '#lib/platform/external-links.js';
 
 export function moderationErrorMessage(cause: unknown): string {
   return cause instanceof CoreError && cause.detail.code === 'denied'
@@ -28,7 +29,14 @@ export class MemberProfileActions {
   }
 
   openServer(homeserver: string): void {
-    window.open(`https://${homeserver}`, '_blank', 'noopener,noreferrer');
+    const url = `https://${homeserver}`;
+    if (!opensExternalUrls()) {
+      window.open(url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    void openExternalUrl(url).catch((error: unknown) => {
+      console.warn('[sable profile] external link unavailable', url, error);
+    });
   }
 
   async setIgnored(userId: string, ignored: boolean): Promise<boolean> {
