@@ -1,5 +1,7 @@
 import { on } from 'svelte/events';
 
+import { hasIosKeyboardContextQuirk } from './input.js';
+
 function keyboardInset(viewport: VisualViewport): number {
   const scale = viewport.scale || 1;
   const offset = scale === 1 ? viewport.offsetTop : 0;
@@ -22,6 +24,7 @@ export function trackKeyboardInset(): () => void {
   const viewport = window.visualViewport;
   if (!viewport) return () => {};
 
+  const opensWithoutResize = os === 'ios' || hasIosKeyboardContextQuirk();
   let frame = 0;
   let settleFrame = 0;
   let last = -1;
@@ -41,6 +44,7 @@ export function trackKeyboardInset(): () => void {
   };
 
   const settle = (): void => {
+    if (!opensWithoutResize) return;
     cancelAnimationFrame(settleFrame);
     const until = performance.now() + 1000;
     const step = (): void => {

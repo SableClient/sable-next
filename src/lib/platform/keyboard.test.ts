@@ -66,6 +66,23 @@ test('a focus change keeps measuring while the keyboard opens without a resize',
   }
 });
 
+test('a focus change on desktop does not keep measuring', async () => {
+  vi.useFakeTimers();
+  const viewport = Object.assign(new EventTarget(), { height: 800, offsetTop: 0 });
+  vi.stubGlobal('visualViewport', viewport);
+  vi.stubGlobal('innerHeight', 800);
+  const stop = trackKeyboardInset();
+  try {
+    window.dispatchEvent(new FocusEvent('focusin'));
+    await vi.advanceTimersByTimeAsync(100);
+    viewport.height = 500;
+    await vi.advanceTimersByTimeAsync(400);
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
+  } finally {
+    stop();
+  }
+});
+
 test('browsers track keyboard geometry and clean up pending updates', async () => {
   vi.useFakeTimers();
   const viewport = Object.assign(new EventTarget(), { height: 500, offsetTop: 0 });
