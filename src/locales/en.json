@@ -651,6 +651,8 @@
     "spacesHint": "The spaces this room belongs to. A canonical space is the one the room names as its main parent.",
     "spaceCanonical": "Canonical",
     "spaceOther": "Not canonical",
+    "spaceOpen": "Open space",
+    "spaceJoin": "Join",
     "publishRoomHint": "List the room in the public directory so others can find it.",
     "publishSpaceHint": "List the space in the public directory so others can find it.",
     "publishOn": "Published",
