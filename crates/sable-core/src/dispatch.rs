@@ -1168,6 +1168,17 @@ impl Core {
                 })
             }
 
+            Command::ReplacedRooms => {
+                let client = self.client().await?;
+                let mut rooms = Vec::new();
+                for room in client.joined_rooms() {
+                    if room.is_tombstoned() {
+                        rooms.push(view::listless_room_summary(room).await);
+                    }
+                }
+                Ok(CommandOk::ReplacedRooms { rooms })
+            }
+
             Command::RoomCosmetics { room_id, space_id } => Ok(CommandOk::RoomCosmetics(
                 self.room_cosmetics(&room_id, space_id).await?,
             )),

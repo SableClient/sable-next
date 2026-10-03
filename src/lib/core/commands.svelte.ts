@@ -409,6 +409,11 @@ export function createCommands(transport: () => Transport) {
       return response.parents;
     },
 
+    async replacedRooms(): Promise<RoomSummary[]> {
+      const response = await transport().send({ type: 'replaced_rooms' });
+      return response.rooms;
+    },
+
     async roomCosmetics(roomId: string, spaceId: string | null): Promise<RoomCosmeticsView> {
       const response = await transport().send({
         type: 'room_cosmetics',

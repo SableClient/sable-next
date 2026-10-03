@@ -458,6 +458,7 @@ pub enum Command {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
     },
+    ReplacedRooms,
     RoomCosmetics {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -1594,6 +1595,9 @@ pub enum CommandOk {
     },
     UnjoinedSpaceParents {
         parents: Vec<SpaceParentView>,
+    },
+    ReplacedRooms {
+        rooms: Vec<RoomSummary>,
     },
     RoomCosmetics(RoomCosmeticsView),
     RoomOpen(RoomOpenView),

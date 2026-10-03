@@ -77,6 +77,7 @@
   import CallVolumePopover from '#lib/features/call/CallVolumePopover.svelte';
   import MentionProfile from '#lib/features/room/members/MentionProfile.svelte';
   import { numberedName, participantKeys } from '#lib/features/call/participant-keys.js';
+  import ReplacedRooms from './ReplacedRooms.svelte';
   import RoomInvites from './RoomInvites.svelte';
   import RoomOptionsMenu from './RoomOptionsMenu.svelte';
   import ChecksIcon from 'phosphor-svelte/lib/ChecksIcon';
@@ -1019,6 +1020,7 @@
 
   <div class="room-nav-content">
     <RoomInvites {collapsed} {invites} />
+    {#if unspacedSection}<ReplacedRooms {collapsed} />{/if}
 
     <div class="room-nav-actions" class:collapsed>
       {#snippet action(href: string, label: string, icon: Component)}
