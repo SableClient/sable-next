@@ -1463,7 +1463,8 @@
     padding: var(--space-100) 0;
   }
 
-  .room-nav-actions.collapsed a {
+  .room-nav-actions.collapsed a,
+  .room-nav-actions.collapsed :global(.room-nav-trigger) {
     justify-content: center;
     padding: 0;
     width: var(--control-height-medium);
