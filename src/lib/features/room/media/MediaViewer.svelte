@@ -1097,21 +1097,28 @@
   }
 
   .stage {
+    --stage-padding-block: var(--space-200);
+    --stage-padding-left: var(--space-200);
+    --stage-padding-right: var(--space-200);
+
     align-items: center;
     display: flex;
     justify-content: center;
     min-height: 0;
     overflow: hidden;
-    padding: var(--space-200);
+    padding: var(--stage-padding-block) var(--stage-padding-right) var(--stage-padding-block)
+      var(--stage-padding-left);
     position: relative;
     touch-action: none;
   }
 
   .stage.has-nav {
-    padding-inline: calc(
-        max(var(--space-100), var(--safe-left)) + var(--control-height-500) + var(--space-200)
-      )
-      calc(max(var(--space-100), var(--safe-right)) + var(--control-height-500) + var(--space-200));
+    --stage-padding-left: calc(
+      max(var(--space-100), var(--safe-left)) + var(--control-height-500) + var(--space-200)
+    );
+    --stage-padding-right: calc(
+      max(var(--space-100), var(--safe-right)) + var(--control-height-500) + var(--space-200)
+    );
   }
 
   .stage :global(.pdf-viewer) {
@@ -1226,7 +1233,8 @@
 
   @media (width < 48rem) {
     .stage.has-nav {
-      padding-inline: var(--space-200);
+      --stage-padding-left: var(--space-200);
+      --stage-padding-right: var(--space-200);
     }
 
     :global(.nav) {
@@ -1256,7 +1264,8 @@
 
   .stage :global(.viewer-preview) {
     aspect-ratio: auto;
-    inset: var(--space-200);
+    inset: var(--stage-padding-block) var(--stage-padding-right) var(--stage-padding-block)
+      var(--stage-padding-left);
     position: absolute;
   }
 
@@ -1325,11 +1334,14 @@
     }
 
     .stage {
-      padding: var(--space-400);
+      --stage-padding-block: var(--space-400);
+      --stage-padding-left: var(--space-400);
+      --stage-padding-right: var(--space-400);
     }
 
     .stage.has-nav {
-      padding-inline: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
+      --stage-padding-left: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
+      --stage-padding-right: calc(var(--space-600) + var(--control-height-500) + var(--space-200));
     }
 
     :global(.previous) {
