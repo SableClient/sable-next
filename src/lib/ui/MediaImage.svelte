@@ -498,6 +498,7 @@
       {title}
       {width}
       {height}
+      decoding="async"
       onload={imageShown}
       onerror={brokenImage}
       {@attach (node) => {
