@@ -379,3 +379,43 @@ for (const alignOwn of [true, false]) {
     }
   });
 }
+
+test('own trailing reactions clear a wide receipt stack', async ({
+  page,
+  app,
+  timeline,
+  core,
+  installRoomCore,
+}) => {
+  await installRoomCore('ready');
+  await page.addInitScript(() => {
+    localStorage.setItem('sable-preferences', JSON.stringify({ layout: 'bubble' }));
+  });
+  await page.setViewportSize({ width: 500, height: 800 });
+  await app.openRoom(ROOM_ID);
+  await timeline.expectAtLatest(LATEST);
+
+  const subscription = await core.subscription(0);
+  await core.emitTimelineDiff(subscription, [
+    {
+      op: 'push_back',
+      value: {
+        ...timelineItem('own-reacted', 'hello there'),
+        is_own: true,
+        reactions: [{ key: '👍', senders: ['@bob:example.test'] }],
+        read_by: ['@bob:example.test', '@carol:example.test', '@d:example.test', '@e:example.test'],
+      },
+    },
+  ]);
+
+  const row = timeline.container.locator('[data-item-id="own-reacted"]');
+  await expect(row.locator('.read-receipt-stack')).toBeVisible();
+  await expect
+    .poll(async () => {
+      const reactions = await row.locator('.reactions').boundingBox();
+      const badge = await row.locator('.read-receipt-stack').boundingBox();
+      if (!reactions || !badge) return null;
+      return badge.x - (reactions.x + reactions.width);
+    })
+    .toBeGreaterThanOrEqual(0);
+});

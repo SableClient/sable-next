@@ -1887,6 +1887,15 @@
     margin-inline-end: calc(var(--receipt-reserve) + var(--space-200));
   }
 
+  .message.layout-bubble.own.align-own
+    .message-main:has(> .receipt-tail)
+    > :global(*):nth-last-child(2) {
+    margin-inline-end: max(
+      0px,
+      calc(var(--receipt-reserve) + var(--space-200) - var(--avatar-size-small) - var(--space-250))
+    );
+  }
+
   .message.layout-bubble.own.align-own .has-edited {
     align-items: flex-end;
     display: flex;
