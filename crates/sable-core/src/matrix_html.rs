@@ -292,6 +292,54 @@ fn matrix_uri_spans(text: &str) -> Vec<(usize, usize)> {
     spans
 }
 
+/// linkify rejects a bracketed IPv6 host, so `https://[::1]/` has to be spotted separately.
+fn ipv6_url_spans(text: &str) -> Vec<(usize, usize)> {
+    const TRAILING: [char; 9] = ['.', ',', ';', ':', '!', '?', ')', ']', '}'];
+    // ASCII-only lowercasing keeps byte offsets aligned with `text`.
+    let lowercase = text.to_ascii_lowercase();
+    let mut spans = Vec::new();
+    for scheme in ["http://[", "https://["] {
+        let mut search = 0;
+        while let Some(offset) = lowercase.get(search..).and_then(|rest| rest.find(scheme)) {
+            let start = search + offset;
+            let host_start = start + scheme.len();
+            search = host_start;
+            let follows_text = text
+                .get(..start)
+                .and_then(|before| before.chars().next_back())
+                .is_some_and(|character| {
+                    !character.is_whitespace()
+                        && !matches!(character, '(' | '[' | '{' | '<' | '"' | '\'')
+                });
+            let Some(close) = text.get(host_start..).and_then(|rest| rest.find(']')) else {
+                continue;
+            };
+            let host_end = host_start + close;
+            let valid_host = text
+                .get(host_start..host_end)
+                .is_some_and(|host| host.parse::<std::net::Ipv6Addr>().is_ok());
+            let mut end = text
+                .get(host_end + 1..)
+                .and_then(|rest| rest.find(char::is_whitespace))
+                .map_or(text.len(), |length| host_end + 1 + length);
+            while end > host_end + 1
+                && text
+                    .get(host_end + 1..end)
+                    .is_some_and(|tail| tail.ends_with(TRAILING))
+            {
+                end -= 1;
+            }
+            let tail_ok = text
+                .get(host_end + 1..end)
+                .is_some_and(|tail| tail.is_empty() || tail.starts_with([':', '/', '?', '#']));
+            if !follows_text && valid_host && tail_ok {
+                spans.push((start, end));
+            }
+        }
+    }
+    spans
+}
+
 fn msc_spans(text: &str) -> Vec<(usize, usize)> {
     const MAX_DIGITS: usize = 5;
     let is_word = |character: char| character.is_alphanumeric() || character == '_';
@@ -385,6 +433,11 @@ fn linkify_urls(text: &str) -> String {
         })
         .chain(
             matrix_uri_spans(text)
+                .into_iter()
+                .map(|(start, end)| (start, end, SpanKind::Url)),
+        )
+        .chain(
+            ipv6_url_spans(text)
                 .into_iter()
                 .map(|(start, end)| (start, end, SpanKind::Url)),
         )
@@ -1609,6 +1662,20 @@ mod tests {
 
         assert!(html.starts_with("Use &lt;b&gt;text&lt;/b&gt;"));
         assert!(html.contains("href=\"https://example.org/a\""));
+    }
+
+    #[test]
+    fn linkifies_ipv6_literal_urls() {
+        let html = render_plain_text(
+            "see https://[2001:41d0:602:1eea:6767:6767:6767:6767]/ and (http://[::1]:8080/a?b=1).",
+        );
+
+        assert!(
+            html.contains("href=\"https://[2001:41d0:602:1eea:6767:6767:6767:6767]/\""),
+            "{html}"
+        );
+        assert!(html.contains("href=\"http://[::1]:8080/a?b=1\""), "{html}");
+        assert!(!render_plain_text("https://[nope]/").contains("<a "));
     }
 
     #[test]
