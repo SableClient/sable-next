@@ -395,7 +395,7 @@ describe('typed Markdown', () => {
 
     expect(undoInputRule(editor.state, editor.dispatch)).toBe(true);
     expect(editor.state.doc.textContent).toBe('**t**');
-    expect(serializeComposer(editor.state.doc).formatted).toBeNull();
+    expect(serializeComposer(editor.state.doc).formatted).toBe('<span>*</span>*t**');
   });
 
   test.each([

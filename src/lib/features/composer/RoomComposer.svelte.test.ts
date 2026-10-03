@@ -281,8 +281,8 @@ test('a staged attachment names caption mode and changes its placeholder with th
 });
 
 test.each([
-  ['\\*like so*', '*like so*'],
-  ['\\`code\\`', '`code`'],
+  ['\\*like so*', '<span>*</span>like so*'],
+  ['\\`code\\`', '<span>`</span>code`'],
   ['\\$[unixtime 0]', '<span>$</span>[unixtime 0]'],
 ])('Markdown mode renders escapes in %j', async (source, formatted) => {
   setPreference('richTextComposer', false);

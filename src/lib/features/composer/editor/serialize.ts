@@ -18,6 +18,7 @@ import type { OutgoingMentions } from '#lib/core/client.svelte.js';
 import type { ImageSourcePackReferenceView } from '#src/generated/protocol';
 
 import { mfmUnixtime, parseMfmColor, parseMfmUnixtime, utcFallbackLabel } from '../time-markup';
+import { literalPieces, markerOpeners } from './literal-markers';
 import { mfmPlugin } from './mfm';
 import { isMscLink, linkMscs } from './msc-links';
 import { composerSchema, parseMatrixHtml, ROOM_PING } from './schema';
@@ -313,6 +314,26 @@ function html(doc: ProseMirrorNode): string {
     suffix.before(dollar);
   }
 
+  const protectedTexts: Text[] = [];
+  const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (node instanceof Text && !node.parentElement?.closest('code, pre, a, time')) {
+      protectedTexts.push(node);
+    }
+  }
+  for (const node of protectedTexts) {
+    const pieces = literalPieces(node.data);
+    if (pieces.length === 1) continue;
+    node.replaceWith(
+      ...pieces.map((piece, index) => {
+        if (index % 2 === 0) return document.createTextNode(piece);
+        const literal = document.createElement('span');
+        literal.textContent = piece;
+        return literal;
+      })
+    );
+  }
+
   const blocks = Array.from(holder.children);
   if (blocks.length === 1 && blocks[0]?.tagName === 'P') return blocks[0].innerHTML;
   return blocks.map((block) => block.outerHTML).join('');
@@ -382,9 +403,10 @@ export function serializeComposer(doc: ProseMirrorNode): ComposerMessage {
   const flat = expandMfm(source);
   const linked = linkMscs(flat);
   const imageSourcePacks = imageSourcePacksOf(flat);
-  if (isPlain(linked)) {
+  const plainBody = plainTextOf(source).trim();
+  if (isPlain(linked) && markerOpeners(plainBody).length === 0) {
     return {
-      body: plainTextOf(source).trim(),
+      body: plainBody,
       formatted: null,
       mentions,
       ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
@@ -678,7 +700,10 @@ export function serializePlain(doc: ProseMirrorNode): ComposerMessage {
   );
   return {
     body,
-    formatted: isPlain(parsed) && plainTextOf(parsed) === body ? null : html(parsed),
+    formatted:
+      isPlain(parsed) && plainTextOf(parsed) === body && markerOpeners(body).length === 0
+        ? null
+        : html(parsed),
     mentions,
     ...(imageSourcePacks.length > 0 && { imageSourcePacks }),
   };

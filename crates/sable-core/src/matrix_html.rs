@@ -434,6 +434,116 @@ fn linkify_urls(text: &str) -> String {
     html
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Marker {
+    Strong,
+    Emphasis,
+    Strike,
+    Spoiler,
+}
+
+impl Marker {
+    const fn open(self) -> &'static str {
+        match self {
+            Self::Strong => "<strong>",
+            Self::Emphasis => "<em>",
+            Self::Strike => "<del>",
+            Self::Spoiler => "<span data-mx-spoiler=\"\">",
+        }
+    }
+
+    const fn close(self) -> &'static str {
+        match self {
+            Self::Strong => "</strong>",
+            Self::Emphasis => "</em>",
+            Self::Strike => "</del>",
+            Self::Spoiler => "</span>",
+        }
+    }
+}
+
+fn marker_span(text: &str, index: usize) -> Option<(usize, Marker, &str)> {
+    let rest = text.get(index..)?;
+    let first = rest.chars().next()?;
+    let run = rest.chars().take_while(|c| *c == first).count();
+    let marker = match (first, run) {
+        ('*' | '_', 1) => Marker::Emphasis,
+        ('*' | '_', 2) => Marker::Strong,
+        ('~', 2) => Marker::Strike,
+        ('|', 2) => Marker::Spoiler,
+        _ => return None,
+    };
+    let before = text.get(..index)?.chars().next_back();
+    if !before.is_none_or(|c| c.is_whitespace() || "([{<\"'*_~|".contains(c)) {
+        return None;
+    }
+    let body = rest.get(run..)?;
+    if body
+        .chars()
+        .next()
+        .is_none_or(|c| c.is_whitespace() || c == first)
+    {
+        return None;
+    }
+    let mut chars = body.char_indices();
+    let mut previous = None;
+    while let Some((at, c)) = chars.next() {
+        if c == '\\' {
+            chars.next();
+            previous = Some(c);
+            continue;
+        }
+        if c == first {
+            let length = body.get(at..)?.chars().take_while(|x| *x == first).count();
+            let after = body.get(at + length..)?.chars().next();
+            if length == run
+                && previous.is_some_and(|p: char| !p.is_whitespace())
+                && (first != '_' || after.is_none_or(|a| !a.is_alphanumeric()))
+            {
+                return Some((run + at + length, marker, body.get(..at)?));
+            }
+            for _ in 1..length {
+                chars.next();
+            }
+            previous = Some(first);
+            continue;
+        }
+        previous = Some(c);
+    }
+    None
+}
+
+fn code_span(rest: &str, ticks: usize) -> Option<(usize, &str)> {
+    let body = rest.get(ticks..)?;
+    let mut at = 0;
+    while let Some(found) = body.get(at..)?.find('`') {
+        let start = at + found;
+        let length = body.get(start..)?.chars().take_while(|c| *c == '`').count();
+        if length == ticks {
+            let inner = body.get(..start)?;
+            return (!inner.is_empty()).then_some((ticks + start + length, inner));
+        }
+        at = start + length;
+    }
+    None
+}
+
+fn hide_spoiler_bars(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut index = 0;
+    while let Some(rest) = text.get(index..).filter(|rest| !rest.is_empty()) {
+        if let Some((consumed, Marker::Spoiler, _)) = marker_span(text, index) {
+            out.push_str(SPOILER_PLACEHOLDER);
+            index += consumed;
+        } else {
+            let character = rest.chars().next().unwrap_or_default();
+            out.push(character);
+            index += character.len_utf8();
+        }
+    }
+    out
+}
+
 fn rewrite_mfm(text: &str) -> String {
     rewrite_mfm_at_depth(text, 0)
 }
@@ -460,6 +570,17 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
         }
         if rest.starts_with('`') {
             let ticks = rest.bytes().take_while(|byte| *byte == b'`').count();
+            if code_ticks.is_none()
+                && let Some((consumed, inner)) = code_span(rest, ticks)
+            {
+                if let Some(before) = text.get(plain_start..index) {
+                    html.push_str(&linkify_urls(before));
+                }
+                let _ = write!(html, "<code>{}</code>", escape_html(inner));
+                index += consumed;
+                plain_start = index;
+                continue;
+            }
             match code_ticks {
                 Some(open) if open == ticks => code_ticks = None,
                 None => code_ticks = Some(ticks),
@@ -476,6 +597,20 @@ fn rewrite_mfm_at_depth(text: &str, depth: usize) -> String {
                 html.push_str(&linkify_urls(before));
             }
             html.push_str(&element);
+            index += consumed;
+            plain_start = index;
+            continue;
+        }
+        if code_ticks.is_none()
+            && depth < MAX_MFM_DEPTH
+            && let Some((consumed, marker, inner)) = marker_span(text, index)
+        {
+            if let Some(before) = text.get(plain_start..index) {
+                html.push_str(&linkify_urls(before));
+            }
+            html.push_str(marker.open());
+            html.push_str(&rewrite_mfm_at_depth(inner, depth + 1));
+            html.push_str(marker.close());
             index += consumed;
             plain_start = index;
             continue;
@@ -924,13 +1059,13 @@ const SPOILER_PLACEHOLDER: &str = "[Spoiler]";
 #[must_use]
 pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
     let Some(formatted) = formatted else {
-        return body.to_owned();
+        return hide_spoiler_bars(body);
     };
     if nests_too_deeply(formatted) {
         return if formatted.contains(SPOILER_ATTRIBUTE) {
             SPOILER_PLACEHOLDER.to_owned()
         } else {
-            body.to_owned()
+            hide_spoiler_bars(body)
         };
     }
     let html = Html::parse(formatted);
@@ -940,11 +1075,7 @@ pub fn preview_body(body: &str, formatted: Option<&str>) -> String {
         push_preview_text(&node, &mut text);
     }
     let text = text.trim_end_matches('\n');
-    if text.is_empty() {
-        body.to_owned()
-    } else {
-        text.to_owned()
-    }
+    hide_spoiler_bars(if text.is_empty() { body } else { text })
 }
 
 fn push_preview_text(node: &NodeRef, out: &mut String) {
@@ -1301,6 +1432,90 @@ mod tests {
     }
 
     #[test]
+    fn literal_double_bars_become_spoilers() {
+        let html = display_html("", Some("so. ||i could see it|| yes"));
+        assert!(html.contains("so. <span data-mx-spoiler=\"\">i could see it</span> yes"));
+
+        let html = display_html("", Some("a ||b|| and ||c||"));
+        assert_eq!(html.matches("data-mx-spoiler").count(), 2);
+    }
+
+    #[test]
+    fn spaced_escaped_or_verbatim_bars_stay_literal() {
+        for formatted in [
+            "a || b || c",
+            "a \\||b|| c",
+            "<code>||b||</code>",
+            "<a href=\"https://example.org\">||b||</a>",
+            "one || two",
+            "||",
+        ] {
+            assert!(
+                !display_html("", Some(formatted)).contains("data-mx-spoiler"),
+                "{formatted}"
+            );
+        }
+        assert!(display_html("a ||b|| c", None).contains("data-mx-spoiler"));
+    }
+
+    #[test]
+    fn preview_hides_literal_spoiler_bars() {
+        assert_eq!(
+            preview_body("x", Some("see ||this|| now")),
+            "see [Spoiler] now"
+        );
+        assert_eq!(preview_body("see ||this|| now", None), "see [Spoiler] now");
+    }
+
+    #[test]
+    fn unrendered_markdown_markers_become_formatting() {
+        let html = display_html(
+            "",
+            Some("a **b** and *c* and __d__ and _e_ and ~~f~~ `g&amp;h`"),
+        );
+        for expected in [
+            "<strong>b</strong>",
+            "<em>c</em>",
+            "<strong>d</strong>",
+            "<em>e</em>",
+            "<del>f</del>",
+            "<code>g&amp;h</code>",
+        ] {
+            assert!(html.contains(expected), "{expected} in {html}");
+        }
+        assert_eq!(
+            display_html("", Some("**a _b_ c**")),
+            "<strong>a <em>b</em> c</strong>"
+        );
+    }
+
+    #[test]
+    fn ordinary_text_with_markers_is_left_alone() {
+        for formatted in [
+            "2 * 3 * 4",
+            "snake_case_name and a_b_c",
+            "a*b*c",
+            "https://example.org/_a_/*b*",
+            "a ~~ b ~~ c",
+            "lonely *star",
+            "***bold italic***",
+            "<code>**x**</code>",
+        ] {
+            let html = display_html("", Some(formatted));
+            assert!(
+                !html.contains("<em>") && !html.contains("<strong>") && !html.contains("<del>"),
+                "{formatted} became {html}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_marker_split_by_an_empty_span_stays_literal() {
+        let html = display_html("", Some("<span>*</span>like so* and <span>|</span>|x||"));
+        assert!(!html.contains("<em>") && !html.contains("data-mx-spoiler"));
+    }
+
+    #[test]
     fn keeps_spoilers_colours_and_code_languages() {
         let html = display_html(
             "",
@@ -1565,8 +1780,8 @@ mod tests {
     #[test]
     fn escaped_markdown_and_mfm_render_as_literal_text() {
         for (body, formatted, visible) in [
-            ("\\*like so*", "*like so*", "*like so*"),
-            ("\\`code\\`", "`code`", "`code`"),
+            ("\\*like so*", "<span>*</span>like so*", "*like so*"),
+            ("\\`code\\`", "<span>`</span>code`", "`code`"),
             (
                 "\\$[unixtime 0]",
                 "<span>$</span>[unixtime 0]",
