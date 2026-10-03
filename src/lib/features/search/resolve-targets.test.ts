@@ -226,3 +226,27 @@ test('a partial name or localpart suggests the person', () => {
   expect(suggestUserTarget(people, '@ad')).toEqual({ label: 'Ada Lovelace', value: '@ada:x' });
   expect(suggestUserTarget(people, 'bob')).toBeUndefined();
 });
+
+test('a name shared by a space and its room resolves to the room that holds messages', () => {
+  const rooms = [
+    room({ room_id: '!space:example.org', name: 'Sable Next', is_space: true }),
+    room({ room_id: '!room:example.org', name: 'Sable Next' }),
+  ];
+  expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!room:example.org');
+});
+
+test('a name shared with an upgraded predecessor resolves to the current room', () => {
+  const rooms = [
+    room({ room_id: '!old:example.org', name: 'Sable Next', is_tombstoned: true }),
+    room({ room_id: '!new:example.org', name: 'Sable Next' }),
+  ];
+  expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!new:example.org');
+});
+
+test('a joined room wins over an invite with the same name', () => {
+  const rooms = [
+    room({ room_id: '!invite:example.org', name: 'Sable Next', state: 'invited' }),
+    room({ room_id: '!joined:example.org', name: 'Sable Next' }),
+  ];
+  expect(resolveRoomTarget(rooms, 'Sable Next')).toBe('!joined:example.org');
+});
