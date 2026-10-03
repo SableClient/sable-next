@@ -1840,6 +1840,10 @@
     padding-inline-end: calc(var(--receipt-reserve) + var(--space-200));
   }
 
+  .message.layout-bubble .has-receipts:not(.content-bubble) {
+    max-width: min(100%, calc(50rem + var(--receipt-reserve) + var(--space-200)));
+  }
+
   .message.layout-bubble .has-receipts :global(.formatted-body) {
     display: inline-block;
   }

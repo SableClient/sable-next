@@ -1,5 +1,7 @@
-import { expect, test } from './fixtures/test';
+import { expect, test, SIGNED_OUT } from './fixtures/test';
 import { timelineItem } from './fixtures/timeline-items';
+
+test.use({ storageState: SIGNED_OUT });
 
 const ROOM_ID = '!room:example.test';
 const LATEST = 'General message 19';
@@ -312,3 +314,68 @@ test('a short receipted notice keeps its text on one line', async ({
   expect(Math.abs(badge.bottom - receipted.content.bottom)).toBeLessThanOrEqual(1);
   expect(receipted.content.bottom - receipted.body.bottom).toBeLessThanOrEqual(2);
 });
+
+for (const alignOwn of [true, false]) {
+  test(`a long receipted bubble is no wider than its box (align own: ${String(alignOwn)})`, async ({
+    page,
+    app,
+    timeline,
+    core,
+    installRoomCore,
+  }) => {
+    await installRoomCore('ready');
+    await page.addInitScript(
+      (prefs) => {
+        localStorage.setItem('sable-preferences', JSON.stringify(prefs));
+      },
+      { layout: 'bubble', alignOwnMessages: alignOwn }
+    );
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await app.openRoom(ROOM_ID);
+    await timeline.expectAtLatest(LATEST);
+
+    const long = 'long message that goes on and on '.repeat(60);
+    const subscription = await core.subscription(0);
+    await core.emitTimelineDiff(subscription, [
+      {
+        op: 'push_back',
+        value: {
+          ...timelineItem('own-long', long),
+          is_own: true,
+          read_by: ['@bob:example.test', '@carol:example.test'],
+        },
+      },
+      {
+        op: 'push_back',
+        value: {
+          ...timelineItem('other-short', 'back to near-instantaneous now'),
+          read_by: ['@bob:example.test', '@carol:example.test'],
+        },
+      },
+    ]);
+
+    for (const id of ['own-long', 'other-short']) {
+      await expect(timeline.container.locator(`[data-item-id="${id}"]`)).toBeVisible();
+      await expect.poll(async () => (await measure(page, id)).badge !== null).toBe(true);
+      const rects = await page.evaluate((itemId) => {
+        const row = document.querySelector(`[data-item-id="${itemId}"]`);
+        const pick = (selector: string) => {
+          const element = row?.querySelector(selector);
+          if (!element) return null;
+          const box = element.getBoundingClientRect();
+          return { left: Math.round(box.left), right: Math.round(box.right) };
+        };
+        return {
+          body: pick('.formatted-body'),
+          wrapper: pick('.has-receipts'),
+          badge: pick('.read-receipt-stack'),
+        };
+      }, id);
+      if (id === 'own-long') {
+        const { body, wrapper } = rects;
+        if (!body || !wrapper) throw new Error('no box');
+        expect(wrapper.right - wrapper.left).toBeLessThanOrEqual(body.right - body.left + 60);
+      }
+    }
+  });
+}
