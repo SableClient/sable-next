@@ -152,6 +152,7 @@
   class:screen
   class:featured
   class:revealed
+  class:audible={screen && adjustable}
   class:video-on={videoOn}
   onpointerup={reveal}
   oncontextmenu={openVolume}
@@ -402,6 +403,7 @@
 
   .actions:focus-within,
   .revealed .actions,
+  .audible .actions,
   .actions:has(:global([aria-pressed='true'], [aria-expanded='true'])) {
     opacity: 1;
     pointer-events: auto;
