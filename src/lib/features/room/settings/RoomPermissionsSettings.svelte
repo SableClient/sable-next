@@ -500,7 +500,9 @@
         </SettingsRow>
       </ul>
       {#if memberListFailed}
-        <Alert variant="critical" role="alert">{$i18n.t('room.memberListFailed')}</Alert>
+        <div class="settings-form">
+          <Alert variant="critical" role="alert">{$i18n.t('room.memberListFailed')}</Alert>
+        </div>
       {/if}
     </SettingsSection>
 
