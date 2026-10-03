@@ -1637,6 +1637,7 @@
 
   :global(.reply-name) {
     display: inline-block; /* can't */
+    overflow: clip;
   }
 
   .reply-compact {
