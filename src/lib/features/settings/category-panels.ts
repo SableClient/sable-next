@@ -6,6 +6,7 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 
 import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
+import ComposerFormPreview from '#lib/features/settings/ComposerFormPreview.svelte';
 import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
@@ -46,7 +47,10 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: QuickCss, section: 'themes' },
     { component: AppIconSettings, section: 'themes' },
   ],
-  composer: [{ component: ComposerButtonOrder, section: 'composer-button-order' }],
+  composer: [
+    { component: ComposerFormPreview, section: 'form', start: true },
+    { component: ComposerButtonOrder, section: 'composer-button-order' },
+  ],
   timeline: [
     { component: DoubleTapReaction, section: 'messages' },
     {

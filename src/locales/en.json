@@ -2083,6 +2083,8 @@
     "composerFormTall": "Tall",
     "composerFormAdaptive": "Adapts to screen width",
     "composerFormShort": "Always short",
+    "composerFormPreviewPlaceholder": "Message",
+    "composerFormPreviewHint": "Drag the bottom-right corner to resize the preview.",
     "composerSeparator": "Separator",
     "composerGifButton": "GIF button",
     "composerGifButtonHint": "Shows a GIF button beside the composer. It opens the picker on the GIF tab.",
