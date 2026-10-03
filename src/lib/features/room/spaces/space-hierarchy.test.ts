@@ -10,6 +10,7 @@ import {
   edgeSignature,
   levelTargets,
   inAllowList,
+  joinCandidates,
   lobbyAction,
   lobbyPhase,
   localHierarchyRooms,
@@ -426,4 +427,21 @@ test('a suggestion override shows on the edge until the parent agrees', () => {
     room('!root', { is_space: true, children: [edge('!a', { suggested: true }), edge('!sub')] }),
   ];
   expect(pendingSuggestedOverrides(synced, overrides)).toEqual([overrides[1]]);
+});
+
+test('joinCandidates lists unjoined rooms and subspaces and skips knock and joined rooms', () => {
+  const rooms = [
+    room('!root:x', { is_space: true, children: [edge('!sub:x'), edge('!a:x'), edge('!k:x')] }),
+    room('!sub:x', { is_space: true, children: [edge('!b:x')] }),
+    room('!a:x'),
+    room('!k:x', { join_rule: 'knock' }),
+    room('!b:x', { join_rule: 'restricted' }),
+  ];
+  const sections = buildHierarchySections(rooms, '!root:x');
+
+  const candidates = joinCandidates(sections, new Set(['!root:x']), new Set());
+  expect(candidates.map((candidate) => candidate.room.room_id)).toEqual(['!a:x', '!sub:x']);
+
+  const afterSub = joinCandidates(sections, new Set(['!root:x', '!sub:x', '!a:x']), new Set());
+  expect(afterSub.map((candidate) => candidate.room.room_id)).toEqual(['!b:x']);
 });

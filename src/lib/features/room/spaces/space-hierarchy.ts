@@ -58,6 +58,39 @@ export function inAllowList(
     : joinedIds.has(parentId);
 }
 
+export type JoinCandidate = {
+  room: HierarchyRoomView;
+  via: string[];
+  parentId: string;
+};
+
+export function joinCandidates(
+  sections: readonly HierarchySection[],
+  joinedIds: ReadonlySet<string>,
+  invitedIds: ReadonlySet<string>
+): JoinCandidate[] {
+  const seen = new Set<string>();
+  const candidates: JoinCandidate[] = [];
+  const consider = (room: HierarchyRoomView, via: string[], parentId: string): void => {
+    if (seen.has(room.room_id) || joinedIds.has(room.room_id)) return;
+    seen.add(room.room_id);
+    const action = lobbyAction(
+      room.join_rule,
+      invitedIds.has(room.room_id),
+      inAllowList(room, joinedIds, parentId)
+    );
+    if (action === 'join') candidates.push({ room, via, parentId });
+  };
+
+  for (const section of sections) {
+    if (section.space !== null && section.ownerId !== null) {
+      consider(section.space, [], section.ownerId);
+    }
+    for (const entry of section.rooms) consider(entry.room, entry.via, section.parentId);
+  }
+  return candidates;
+}
+
 export function localHierarchyRooms(
   rooms: readonly RoomSummary[],
   rootId: string
