@@ -10,6 +10,13 @@ export function abbreviationKey(entry: AbbreviationEntry): string {
   return entry.cased === true ? `cased:${entry.term}` : `uncased:${entry.term.toLocaleLowerCase()}`;
 }
 
+export function splitTerms(input: string): string[] {
+  return input
+    .split(',')
+    .map((term) => term.trim())
+    .filter((term) => term !== '');
+}
+
 export function upsertAbbreviation(
   entries: readonly AbbreviationEntry[],
   replacingKey: string | null,

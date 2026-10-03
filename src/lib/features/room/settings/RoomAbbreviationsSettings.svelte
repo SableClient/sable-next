@@ -27,6 +27,7 @@
     ABBREVIATIONS_EVENT_TYPE,
     abbreviationKey,
     readAbbreviations,
+    splitTerms,
     upsertAbbreviation,
     type AbbreviationEntry,
   } from './abbreviations';
@@ -152,11 +153,19 @@
     return editingKey !== null && editingKey === abbreviationKey(entry);
   }
 
-  function draft(): AbbreviationEntry | null {
-    const nextTerm = term.trim();
+  function draft(): AbbreviationEntry[] | null {
     const nextDefinition = definition.trim();
-    if (nextTerm === '' || nextDefinition === '') return null;
-    return { term: nextTerm, definition: nextDefinition, ...(cased ? { cased: true } : {}) };
+    if (nextDefinition === '') return null;
+    const drafted = splitTerms(term).map((nextTerm) => ({
+      term: nextTerm,
+      definition: nextDefinition,
+      ...(cased ? { cased: true } : {}),
+    }));
+    const unique = drafted.filter(
+      (entry, index) =>
+        drafted.findIndex((other) => abbreviationKey(other) === abbreviationKey(entry)) === index
+    );
+    return unique.length === 0 ? null : unique;
   }
 
   function isDuplicate(
@@ -181,25 +190,35 @@
 
   async function add(event: SubmitEvent): Promise<void> {
     event.preventDefault();
-    const updated = draft();
-    if (!updated) return;
-    if (isDuplicate(null, updated) || isInheritedDuplicate(updated)) {
+    const drafted = draft();
+    if (!drafted) return;
+    if (drafted.some((updated) => isDuplicate(null, updated) || isInheritedDuplicate(updated))) {
       duplicate = true;
       return;
     }
-    if (await save(upsertAbbreviation(entries, null, updated))) resetForm();
+    const next = drafted.reduce(
+      (list, updated) => upsertAbbreviation(list, null, updated),
+      entries
+    );
+    if (await save(next)) resetForm();
   }
 
   async function applyEdit(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     const replacing = editingKey;
-    const updated = draft();
-    if (replacing === null || !updated) return;
-    if (isDuplicate(replacing, updated) || isInheritedDuplicate(updated)) {
+    const drafted = draft();
+    if (replacing === null || !drafted) return;
+    if (
+      drafted.some((updated) => isDuplicate(replacing, updated) || isInheritedDuplicate(updated))
+    ) {
       duplicate = true;
       return;
     }
-    if (await save(upsertAbbreviation(entries, replacing, updated))) resetForm();
+    const next = drafted.reduce(
+      (list, updated, index) => upsertAbbreviation(list, index === 0 ? replacing : null, updated),
+      entries
+    );
+    if (await save(next)) resetForm();
   }
 
   function startEdit(entry: AbbreviationEntry): void {

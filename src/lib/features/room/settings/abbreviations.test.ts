@@ -1,6 +1,11 @@
 import { expect, test } from 'vitest';
 
-import { abbreviationKey, readAbbreviations, upsertAbbreviation } from './abbreviations';
+import {
+  abbreviationKey,
+  readAbbreviations,
+  splitTerms,
+  upsertAbbreviation,
+} from './abbreviations';
 
 test('reads a term and definition', () => {
   expect(
@@ -114,4 +119,9 @@ test('upsert lets a cased term and an uncased term share the same letters', () =
     { term: 'do', definition: 'to do' },
     { term: 'DO', definition: 'Digital Ocean', cased: true },
   ]);
+});
+
+test('splits comma-separated terms and drops empties', () => {
+  expect(splitTerms(' id1, id1/ ,, ')).toEqual(['id1', 'id1/']);
+  expect(splitTerms(',')).toEqual([]);
 });
