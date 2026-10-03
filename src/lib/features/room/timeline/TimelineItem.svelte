@@ -1136,6 +1136,12 @@
     position: relative;
   }
 
+  @media (pointer: fine) {
+    .message {
+      user-select: text;
+    }
+  }
+
   .message:not(.layout-compact) > :global(.avatar-button),
   .message:not(.layout-compact) > :global(.avatar-root.message-avatar) {
     translate: 0 var(--space-100);

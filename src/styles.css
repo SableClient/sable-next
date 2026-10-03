@@ -474,6 +474,17 @@ body {
   height: 100%;
 }
 
+input,
+textarea,
+[contenteditable],
+.formatted-body,
+.profile-card-bio,
+.topic-full,
+pre,
+code {
+  user-select: text;
+}
+
 *,
 *::before,
 *::after {
@@ -577,6 +588,7 @@ body {
   font-weight: var(--font-weight-normal);
   line-height: var(--line-height-body);
   margin: 0;
+  user-select: none;
 }
 
 input,
