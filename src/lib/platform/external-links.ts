@@ -1,5 +1,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 
+const EXTERNAL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
 export function opensExternalUrls(): boolean {
   return isTauri();
 }
@@ -11,7 +13,7 @@ export async function openExternalUrl(url: string): Promise<void> {
 export function followExternalLink(event: MouseEvent, anchor: HTMLAnchorElement): void {
   if (anchor.target !== '_blank' || event.button > 1) return;
   if (!opensExternalUrls()) return;
-  if (anchor.protocol !== 'http:' && anchor.protocol !== 'https:') return;
+  if (!EXTERNAL_PROTOCOLS.has(anchor.protocol)) return;
 
   event.preventDefault();
   const href = anchor.href;

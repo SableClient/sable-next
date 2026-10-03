@@ -644,7 +644,7 @@ async fn stop_screen_audio() {
 #[allow(clippy::needless_pass_by_value)] // Tauri extracts command inputs by value
 fn open_external_url(app: AppHandle<BrowserEngine>, url: String) -> Result<(), CommandErr> {
     let parsed = tauri::Url::parse(&url).map_err(|_| CommandErr::Denied)?;
-    if !matches!(parsed.scheme(), "http" | "https") {
+    if !matches!(parsed.scheme(), "http" | "https" | "mailto" | "tel") {
         return Err(CommandErr::Denied);
     }
 
@@ -816,7 +816,11 @@ pub fn run() {
 
     if let Err(error) = builder
         .plugin(tauri_plugin_deep_link::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(
+            tauri_plugin_opener::Builder::new()
+                .open_js_links_on_click(false)
+                .build(),
+        )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
