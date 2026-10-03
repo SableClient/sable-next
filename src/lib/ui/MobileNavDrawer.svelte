@@ -237,6 +237,7 @@
     <section
       class="drawer-panel content-panel"
       class:with-quick-tools={showMobileQuickTools}
+      class:with-back-bar={showMobileBackBar}
       inert={open && !appLayout.matches}
     >
       {#if showMobileBackBar}
@@ -335,6 +336,7 @@
       padding-bottom: calc(var(--safe-bottom) - var(--edge-inset-bottom));
     }
 
+    .content-panel.with-back-bar,
     .content-panel:has(> .content > :global([data-inset-owner~='top'])) {
       padding-top: 0;
     }
