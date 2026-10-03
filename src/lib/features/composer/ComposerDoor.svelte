@@ -6,6 +6,7 @@
   import ChartBarIcon from 'phosphor-svelte/lib/ChartBarIcon';
   import ClockIcon from 'phosphor-svelte/lib/ClockIcon';
   import MapPinIcon from 'phosphor-svelte/lib/MapPinIcon';
+  import MicrophoneIcon from 'phosphor-svelte/lib/MicrophoneIcon';
   import PaperclipIcon from 'phosphor-svelte/lib/PaperclipIcon';
   import PlusIcon from 'phosphor-svelte/lib/PlusIcon';
   import VideoCameraIcon from 'phosphor-svelte/lib/VideoCameraIcon';
@@ -24,6 +25,7 @@
     onPoll?: () => void;
     onLocation?: () => void;
     onSchedule?: () => void;
+    onVoice?: () => void;
     onBeforeOpen?: () => void;
   }
 
@@ -35,6 +37,7 @@
     onPoll,
     onLocation,
     onSchedule,
+    onVoice,
     onBeforeOpen,
   }: Props = $props();
   let open = $state(false);
@@ -83,6 +86,12 @@
           <PaperclipIcon />
           {$i18n.t('composer.attachFile')}
         </DropdownMenu.Item>
+        {#if onVoice}
+          <DropdownMenu.Item class="menu-item" onclick={onVoice}>
+            <MicrophoneIcon />
+            {$i18n.t('composer.voiceRecord')}
+          </DropdownMenu.Item>
+        {/if}
         {#if onPoll}
           <DropdownMenu.Item class="menu-item" onclick={onPoll}>
             <ChartBarIcon />
@@ -170,6 +179,19 @@
         <PaperclipIcon />
         {$i18n.t('composer.attachFile')}
       </Button>
+      {#if onVoice}
+        <Button
+          variant="ghost"
+          class="door-action"
+          onclick={() => {
+            open = false;
+            onVoice();
+          }}
+        >
+          <MicrophoneIcon />
+          {$i18n.t('composer.voiceRecord')}
+        </Button>
+      {/if}
       {#if onPoll}
         <Button
           variant="ghost"
