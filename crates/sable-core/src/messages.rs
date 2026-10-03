@@ -1175,6 +1175,7 @@ mod tests {
                     private_receipt: false,
                     thread_root,
                     subscription: Some(subscription),
+                    fully_read: false,
                 })
                 .await;
             assert!(matches!(
@@ -1188,6 +1189,7 @@ mod tests {
             private_receipt: false,
             thread_root: Some(root.to_owned()),
             subscription: Some(subscription),
+            fully_read: false,
         })
         .await
         .unwrap();

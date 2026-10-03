@@ -734,14 +734,21 @@
     await timeline.paginateForward(25);
   }
 
-  async function markRead(eventId: string): Promise<void> {
+  async function markRead(eventId: string, fullyRead: boolean): Promise<void> {
     await core.commands.markRead(
       resolvedRoomId,
       eventId,
       readReceiptIsPrivate(),
       null,
-      timeline.subscriptionId
+      timeline.subscriptionId,
+      fullyRead
     );
+  }
+
+  function setFullyRead(roomId: string, eventId: string): void {
+    void core.commands.setFullyRead(roomId, eventId).catch((error: unknown) => {
+      console.warn('[sable room] moving the read marker failed', error);
+    });
   }
 
   function markUnreadFrom(eventId: string): void {
@@ -764,10 +771,8 @@
     list?.dismissUnread();
   }
 
-  async function loadReadMarker(): Promise<string | null> {
-    const content = await core.commands.roomAccountData(resolvedRoomId, 'm.fully_read');
-    const eventId = (content as { event_id?: unknown } | null)?.event_id;
-    return typeof eventId === 'string' ? eventId : null;
+  function loadReadMarker(): Promise<string | null> {
+    return core.commands.readMarker(resolvedRoomId);
   }
 
   function requestUnread(eventId: string): Promise<void> {
@@ -933,6 +938,7 @@
       onRequestHistory={requestHistory}
       onRequestFuture={requestFuture}
       onRead={markRead}
+      onFullyRead={setFullyRead}
       hasUnread={resolvedRoom === undefined || roomHasUnread}
       onLoadReadMarker={loadReadMarker}
       onRequestUnread={requestUnread}

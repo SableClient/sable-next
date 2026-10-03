@@ -737,6 +737,8 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
     let backupDownload: Extract<CommandOk, { type: 'download_key_backup' }>['download'] | null =
       null;
 
+    const fullyReadEventId = (roomId: string): string =>
+      `$${(joinedRooms.find((room) => room.room_id === roomId)?.name ?? 'General').toLowerCase()}-${workerMode === 'unread' || workerMode === 'unread_history' || workerMode === 'unread_context_error' || workerMode === 'unread_catchup' ? '4' : '19'}:example.test`;
     const handlers: Handlers = {
       discover_homeserver: () => ({
         type: 'discover_homeserver',
@@ -1265,10 +1267,12 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
         type: 'room_account_data',
         content:
           command.event_type === 'm.fully_read'
-            ? {
-                event_id: `$${(joinedRooms.find((room) => room.room_id === command.room_id)?.name ?? 'General').toLowerCase()}-${workerMode === 'unread' || workerMode === 'unread_history' || workerMode === 'unread_context_error' || workerMode === 'unread_catchup' ? '4' : '19'}:example.test`,
-              }
+            ? { event_id: fullyReadEventId(command.room_id) }
             : null,
+      }),
+      read_marker: (command) => ({
+        type: 'read_marker',
+        event_id: fullyReadEventId(command.room_id),
       }),
       account_data_types: () => ({ type: 'account_data_types', event_types: [] }),
       access_token: () => ({ type: 'access_token', token: 'e2e-access-token' }),

@@ -510,6 +510,11 @@ export function createCommands(transport: () => Transport) {
       return response.content;
     },
 
+    async readMarker(roomId: string): Promise<string | null> {
+      const response = await transport().send({ type: 'read_marker', room_id: roomId });
+      return response.event_id;
+    },
+
     async accountDataTypes(): Promise<string[]> {
       const response = await transport().send({ type: 'account_data_types' });
       return response.event_types;
@@ -1652,7 +1657,8 @@ export function createCommands(transport: () => Transport) {
       eventId: string | null,
       privateReceipt = false,
       threadRoot: string | null = null,
-      subscription: SubscriptionId | null = null
+      subscription: SubscriptionId | null = null,
+      fullyRead = false
     ): Promise<void> {
       await transport().send({
         type: 'mark_read',
@@ -1661,7 +1667,12 @@ export function createCommands(transport: () => Transport) {
         private_receipt: privateReceipt,
         thread_root: threadRoot,
         subscription,
+        fully_read: fullyRead,
       });
+    },
+
+    async setFullyRead(roomId: string, eventId: string): Promise<void> {
+      await transport().send({ type: 'set_fully_read', room_id: roomId, event_id: eventId });
     },
 
     async markUnread(roomId: string, readMarker: string | null = null): Promise<void> {

@@ -241,6 +241,38 @@ export function unreadCountAfter(items: readonly TimelineItemView[], index: numb
   return count;
 }
 
+export function withReadMarkerBefore(
+  items: readonly TimelineItemView[],
+  eventId: string
+): TimelineItemView[] {
+  const rest = items.filter((item) => item.content.kind !== 'read_marker');
+  const index = rest.findIndex((item) => item.event_id === eventId);
+  if (index < 0) return rest;
+  const marker = items.find((item) => item.content.kind === 'read_marker') ?? {
+    id: 'unread-marker',
+    event_id: null,
+    transaction_id: null,
+    send_state: null,
+    sender: null,
+    sender_name: null,
+    sender_avatar: null,
+    timestamp: 0,
+    content: { kind: 'read_marker' },
+    in_reply_to: null,
+    thread_root: null,
+    thread_summary: null,
+    reactions: [],
+    is_own: false,
+    read_by: [],
+    per_message_profile: null,
+    bundled_link_previews: [],
+    link_previews_removed: null,
+    mention: 'none',
+    forwarded: null,
+  };
+  return [...rest.slice(0, index), marker, ...rest.slice(index)];
+}
+
 export type PersonaLookup = (eventId: string | null | undefined) => PerMessageProfileView | null;
 
 export function personaLookup(

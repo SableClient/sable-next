@@ -122,6 +122,7 @@ export class RoomTimeline {
   loading = $state(false);
   resumingLive = $state(false);
   hasSnapshot = $state(false);
+  readMarkerEventId = $state<string | null>(null);
   forwardPagination = $state<ForwardPaginationState>('idle');
   error = $state<string | null>(null);
   mode = $state<TimelineMode>({ kind: 'live' });
@@ -305,6 +306,7 @@ export class RoomTimeline {
       this.stagedAggregations = [];
     }
     this.mode = mode;
+    if (mode.kind === 'unread') this.readMarkerEventId = mode.eventId;
     this.forwardPagination = mode.kind === 'thread' ? 'end' : 'idle';
     this.loading = true;
     this.error = null;
@@ -454,6 +456,7 @@ export class RoomTimeline {
       this.replyFallbacks.clear();
       this.aggregations = [];
       this.hasSnapshot = false;
+      this.readMarkerEventId = null;
       this.resumingLive = false;
     }
     this.stagedItems = null;
@@ -578,7 +581,12 @@ export class RoomTimeline {
         session === this.session &&
         !response.items.some((item) => item.content.kind === 'read_marker')
       ) {
-        const eventId = await this.unloadedReadMarker(roomId, response.items);
+        const marker = await this.readMarker(roomId);
+        if (session === this.session) this.readMarkerEventId = marker;
+        const eventId =
+          marker !== null && !response.items.some((item) => item.event_id === marker)
+            ? marker
+            : null;
         const cached =
           eventId !== null &&
           (await this.core.commands.eventCached(roomId, eventId).catch(() => false));
@@ -666,18 +674,8 @@ export class RoomTimeline {
     return true;
   }
 
-  private async unloadedReadMarker(
-    roomId: string,
-    items: readonly TimelineItemView[]
-  ): Promise<string | null> {
-    const content = await this.core.commands
-      .roomAccountData(roomId, 'm.fully_read')
-      .catch(() => null);
-    const eventId = (content as { event_id?: unknown } | null)?.event_id;
-    if (typeof eventId !== 'string' || items.some((item) => item.event_id === eventId)) {
-      return null;
-    }
-    return eventId;
+  private readMarker(roomId: string): Promise<string | null> {
+    return this.core.commands.readMarker(roomId).catch(() => null);
   }
 
   private async subscribeUnreadContext(

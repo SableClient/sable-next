@@ -1978,9 +1978,43 @@ test('a reader at the latest message also reads the hidden events after it', asy
 
   expect(document.querySelector('[data-item-id="join"]')).toBeNull();
   await vi.waitFor(() => {
-    expect(read).toHaveBeenLastCalledWith('$join');
+    expect(read).toHaveBeenLastCalledWith('$join', true);
   });
   setPreference('hideMembershipEvents', false);
+});
+
+test('the read marker waits for the latest message or for the reader to leave', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.items = [item('read'), ...Array.from({ length: 12 }, (_, i) => item(`new-${i}`))];
+  const read = vi.fn((_eventId: string, _fullyRead: boolean) => Promise.resolve());
+  const fullyRead = vi.fn();
+  const { unmount } = render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        roomId: '!room:example.org',
+        hasUnread: true,
+        onLoadReadMarker: () => Promise.resolve('$read'),
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: read,
+        onFullyRead: fullyRead,
+      },
+    },
+  });
+  unreadViewport();
+  await tick();
+  await runAnimationFrames();
+  await vi.waitFor(() => {
+    expect(read).toHaveBeenCalled();
+  });
+  const [eventId, latest] = read.mock.calls.at(-1) ?? [];
+  expect(eventId).not.toBe('$new-11');
+  expect(latest).toBe(false);
+  expect(fullyRead).not.toHaveBeenCalled();
+
+  unmount();
+  expect(fullyRead).toHaveBeenCalledExactlyOnceWith('!room:example.org', eventId);
 });
 
 function unreadViewport(): HTMLDivElement {
@@ -2234,6 +2268,83 @@ test('a notification below unread keeps the bar and blocks receipts until jumpin
   await vi.waitFor(() => {
     expect(read).toHaveBeenCalled();
   });
+});
+
+test('an unread context without an SDK marker lands before returning to live', async () => {
+  const roomTimeline = timeline();
+  roomTimeline.mode = { kind: 'unread', eventId: '$read' };
+  roomTimeline.readMarkerEventId = '$read';
+  roomTimeline.forwardPagination = 'end';
+  roomTimeline.items = [item('read'), ...Array.from({ length: 12 }, (_, i) => item(`new-${i}`))];
+  const order: string[] = [];
+  vi.spyOn(TimelineWindow.prototype, 'jumpTo').mockImplementation((key) => {
+    order.push(`jump:${String(key)}`);
+    return Promise.resolve(true);
+  });
+  const resume = vi.fn(() => {
+    order.push('resume');
+    return new Promise<void>(() => {});
+  });
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        hasUnread: true,
+        onLoadReadMarker: () => new Promise<string | null>(() => {}),
+        onRequestHistory: () => Promise.resolve(false),
+        onRequestFuture: () => Promise.resolve(),
+        onRead: () => Promise.resolve(),
+        onResumeLive: resume,
+      },
+    },
+  });
+  unreadViewport();
+  await tick();
+  await runAnimationFrames();
+  expect(order[0]).toBe('jump:item:unread-marker');
+  expect(order).toContain('resume');
+});
+
+test('the unread marker stays where the room opened while receipts move the read marker', async () => {
+  const roomTimeline = timeline();
+  const unread = Array.from({ length: 12 }, (_, i) => item(`new-${i}`));
+  roomTimeline.items = [item('read'), readMarker('marker'), ...unread];
+  render(TimelineListHarness, {
+    props: {
+      list: {
+        timeline: roomTimeline,
+        hasUnread: true,
+        onRequestHistory: () => Promise.resolve(true),
+        onRequestFuture: async () => {},
+        onRead: async () => {},
+      },
+    },
+  });
+  unreadViewport();
+  await tick();
+  await runAnimationFrames();
+  const markerFollows = (): string | null | undefined =>
+    document
+      .querySelector('.unread')
+      ?.closest('[data-item-id]')
+      ?.nextElementSibling?.getAttribute('data-item-id');
+  expect(markerFollows()).toBe('new-0');
+
+  roomTimeline.items = [
+    item('read'),
+    ...unread.slice(0, 6),
+    readMarker('moved'),
+    ...unread.slice(6),
+  ];
+  await tick();
+  await runAnimationFrames();
+  expect(document.querySelectorAll('.unread')).toHaveLength(1);
+  expect(markerFollows()).toBe('new-0');
+
+  roomTimeline.items = [item('read'), ...unread];
+  await tick();
+  await runAnimationFrames();
+  expect(markerFollows()).toBe('new-0');
 });
 
 test('marking the unread bar as read keeps it on failure and clears it on success', async () => {

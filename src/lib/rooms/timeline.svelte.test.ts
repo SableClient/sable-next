@@ -36,8 +36,8 @@ class FakeCore {
   paginateSubscriptions: number[] = [];
   subscribeCalls: Array<{ roomId: string; focus: TimelineFocusView }> = [];
 
-  roomAccountData(_roomId: string, _eventType: string): Promise<{ event_id: string } | null> {
-    return Promise.resolve({ event_id: '$read' });
+  readMarker(_roomId: string): Promise<string | null> {
+    return Promise.resolve('$read');
   }
 
   eventCached(_roomId: string, _eventId: string): Promise<boolean> {
@@ -519,7 +519,7 @@ test.each(['marker', 'event'] as const)(
       ],
       aggregations: [],
     });
-    const marker = vi.spyOn(core, 'roomAccountData');
+    const marker = vi.spyOn(core, 'readMarker');
     const timeline = new RoomTimeline(core as unknown as CoreClient);
     await timeline.start('!room:example.org', null, false, true);
     expect(subscribe).toHaveBeenCalledTimes(1);
@@ -533,7 +533,7 @@ test.each(['missing', 'failure'] as const)(
   'opens live when the unread marker is %s',
   async (result) => {
     const core = new FakeCore();
-    const marker = vi.spyOn(core, 'roomAccountData');
+    const marker = vi.spyOn(core, 'readMarker');
     if (result === 'missing') marker.mockResolvedValue(null);
     else marker.mockRejectedValue(new Error('account data unavailable'));
     const timeline = new RoomTimeline(core as unknown as CoreClient);
@@ -566,13 +566,13 @@ test('falls back to live when the unread marker context cannot be loaded', async
 
 test('a late unread marker lookup cannot reopen the room after switching away', async () => {
   const core = new FakeCore();
-  const marker = Promise.withResolvers<{ event_id: string }>();
-  vi.spyOn(core, 'roomAccountData').mockReturnValueOnce(marker.promise);
+  const marker = Promise.withResolvers<string>();
+  vi.spyOn(core, 'readMarker').mockReturnValueOnce(marker.promise);
   const timeline = new RoomTimeline(core as unknown as CoreClient);
   const opening = timeline.start('!room:example.org', null, false, true);
   await Promise.resolve();
   await timeline.start('!other:example.org');
-  marker.resolve({ event_id: '$old-read' });
+  marker.resolve('$old-read');
   await opening;
   expect(core.subscribeCalls).toEqual([
     { roomId: '!room:example.org', focus: { kind: 'live' } },

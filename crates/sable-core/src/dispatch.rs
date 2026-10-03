@@ -20,6 +20,7 @@ use matrix_sdk::ruma::api::client::state::{get_state_event_for_key, get_state_ev
 use matrix_sdk::ruma::api::error::ErrorKind;
 use matrix_sdk::ruma::api::federation::discovery::get_server_version;
 use matrix_sdk::ruma::events::InitialStateEvent;
+use matrix_sdk::ruma::events::fully_read::FullyReadEventContent;
 use matrix_sdk::ruma::events::relation::{InReplyTo, Reply, Thread};
 use matrix_sdk::ruma::events::room::ImageInfo;
 use matrix_sdk::ruma::events::room::avatar::RoomAvatarEventContent;
@@ -1266,6 +1267,22 @@ impl Core {
                     .and_then(|raw| raw.get_field::<serde_json::Value>("content").ok().flatten());
 
                 Ok(CommandOk::RoomAccountData { content })
+            }
+
+            Command::ReadMarker { room_id } => {
+                let room = self.room(&room_id).await?;
+                let fully_read = room
+                    .account_data_static::<FullyReadEventContent>()
+                    .await
+                    .map_err(|error| self.room_error("read_marker", error))?
+                    .and_then(|raw| raw.deserialize().ok())
+                    .map(|event| event.content.event_id);
+                let event_id = fully_read.or_else(|| {
+                    room.read_receipts()
+                        .latest_active
+                        .map(|receipt| receipt.event_id)
+                });
+                Ok(CommandOk::ReadMarker { event_id })
             }
 
             Command::EventCached { room_id, event_id } => {
@@ -2986,6 +3003,7 @@ impl Core {
                 private_receipt,
                 thread_root,
                 subscription,
+                fully_read,
             } => {
                 let receipt_type = if private_receipt {
                     matrix_sdk::ruma::api::client::receipt::create_receipt::v3::ReceiptType::ReadPrivate
@@ -3034,13 +3052,22 @@ impl Core {
                     .send_single_receipt(receipt_type, event_id.clone())
                     .await
                     .or_failed(self, "mark_read")?;
-                if thread_root.is_none() {
+                if fully_read && thread_root.is_none() {
                     timeline
                         .send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
                         .await
                         .or_failed(self, "mark_read")?;
                 }
                 Ok(CommandOk::MarkRead)
+            }
+
+            Command::SetFullyRead { room_id, event_id } => {
+                self.room(&room_id)
+                    .await?
+                    .send_multiple_receipts(Receipts::new().fully_read_marker(event_id))
+                    .await
+                    .map_err(|error| self.room_error("set_fully_read", error))?;
+                Ok(CommandOk::SetFullyRead)
             }
 
             Command::MarkUnread {

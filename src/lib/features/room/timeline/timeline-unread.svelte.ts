@@ -24,12 +24,14 @@ export class TimelineUnread {
     items: readonly TimelineItemView[],
     hasUnread: boolean,
     load?: () => Promise<string | null>,
-    visibleItems: readonly TimelineItemView[] = items
+    visibleItems: readonly TimelineItemView[] = items,
+    readEventId: string | null = null
   ): Promise<void> {
     if (this.#task) return this.#task;
     if (this.initialized && !this.failed) return Promise.resolve();
     if (!this.initialized) {
       this.active = items.some((item) => item.content.kind === 'read_marker') || hasUnread;
+      this.#readEventId ??= readEventId;
     }
     this.initialized = true;
     this.failed = false;
@@ -92,6 +94,11 @@ export class TimelineUnread {
   dismiss(): void {
     this.active = false;
     this.reached = true;
+  }
+
+  clear(): void {
+    this.dismiss();
+    this.firstEventId = null;
   }
 
   destroy(): void {

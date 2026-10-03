@@ -12,6 +12,7 @@
     TimelineItemView,
   } from '#src/generated/protocol';
   import { i18n } from '#lib/i18n.js';
+  import { windowActivity } from '#lib/platform/window-activity.js';
   import type { ResumeAnchor, RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { motionMs, shouldReduceMotion } from '#lib/ui/motion.js';
@@ -52,6 +53,7 @@
     unreadCountAfter,
     visibleAggregations,
     visibleTimelineItems,
+    withReadMarkerBefore,
     type ReplyDirection,
   } from './timeline-format';
   import { MAX_EMPTY_REFILLS, TimelinePagination } from './timeline-pagination.svelte.js';
@@ -80,7 +82,8 @@
     onRequestFuture: () => Promise<void>;
     onRetryLoad?: () => Promise<void>;
     threadRootId?: string | null;
-    onRead: (eventId: string) => Promise<void>;
+    onRead: (eventId: string, fullyRead: boolean) => Promise<void>;
+    onFullyRead?: (roomId: string, eventId: string) => void;
     hasUnread?: boolean;
     onLoadReadMarker?: () => Promise<string | null>;
     onRequestUnread?: (eventId: string) => Promise<void>;
@@ -129,6 +132,7 @@
     onRetryLoad,
     threadRootId = null,
     onRead,
+    onFullyRead,
     hasUnread = false,
     onLoadReadMarker,
     onRequestUnread,
@@ -189,9 +193,21 @@
   let switchingToUnread = false;
   let resumeTask: Promise<void> | null = null;
   let resumeFailed = $state(false);
+  const readRoomId = untrack(() => roomId);
+  let readUpTo: string | null = null;
+  let fullyReadAt: string | null = null;
+  function settleFullyRead(): void {
+    if (!readRoomId || !onFullyRead || readUpTo === null || readUpTo === fullyReadAt) return;
+    fullyReadAt = readUpTo;
+    onFullyRead(readRoomId, readUpTo);
+  }
+  $effect(() => {
+    if (!windowActivity.active) untrack(settleFullyRead);
+  });
   onDestroy(() => {
     unreadNavigation?.abort();
     unread.destroy();
+    settleFullyRead();
   });
   let followingRead = $state(false);
   let eventItems = $derived(visibleTimelineItems(timeline.items, preferences, { readOnly }));
@@ -202,7 +218,11 @@
     })
   );
   let visibleItems = $derived(
-    followingRead ? allItems.filter((item) => item.content.kind !== 'read_marker') : allItems
+    unread.firstEventId !== null
+      ? withReadMarkerBefore(allItems, unread.firstEventId)
+      : followingRead
+        ? allItems.filter((item) => item.content.kind !== 'read_marker')
+        : allItems
   );
   let entries = $derived.by((): readonly TimelineEntry<RowValue>[] => {
     identity.reconcile(visibleItems);
@@ -506,7 +526,8 @@
       timeline.items,
       hasUnread,
       onLoadReadMarker,
-      eventItems
+      eventItems,
+      timeline.readMarkerEventId
     );
     if (
       !entries.some(({ value }) => value.item.content.kind === 'read_marker') &&
@@ -736,8 +757,14 @@
   }
   async function markRead(eventId: string): Promise<void> {
     if (windowState.pinned) followingRead = true;
-    await onRead(eventId);
-    if (disposed) return;
+    const fullyRead = eventId === latestEventId(timeline.items);
+    await onRead(eventId, fullyRead);
+    readUpTo = eventId;
+    if (fullyRead) fullyReadAt = eventId;
+    if (disposed) {
+      settleFullyRead();
+      return;
+    }
     if (eventId === latestEventId(timeline.items)) unread.dismiss();
   }
   async function jumpToUnread(): Promise<void> {
@@ -755,7 +782,13 @@
     const deadline = performance.now() + 30_000;
     let emptyPages = 0;
     try {
-      await unread.initialize(timeline.items, hasUnread, onLoadReadMarker, eventItems);
+      await unread.initialize(
+        timeline.items,
+        hasUnread,
+        onLoadReadMarker,
+        eventItems,
+        timeline.readMarkerEventId
+      );
       if (unread.failed) {
         unreadError = 'jump';
         return;
@@ -814,7 +847,7 @@
     try {
       await onMarkRead();
       if (!disposed) {
-        unread.dismiss();
+        unread.clear();
         followingRead = windowState.pinned;
       }
     } catch {
@@ -825,7 +858,7 @@
   }
   export function dismissUnread(): void {
     unreadNavigation?.abort();
-    unread.dismiss();
+    unread.clear();
   }
   export function jumpToEvent(eventId: string): void {
     const key = entryFor(eventId)?.key;

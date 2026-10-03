@@ -518,6 +518,10 @@ pub enum Command {
         room_id: OwnedRoomId,
         event_type: String,
     },
+    ReadMarker {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+    },
     EventCached {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,
@@ -853,6 +857,14 @@ pub enum Command {
         thread_root: Option<OwnedEventId>,
         #[serde(default)]
         subscription: Option<SubscriptionId>,
+        #[serde(default)]
+        fully_read: bool,
+    },
+    SetFullyRead {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        room_id: OwnedRoomId,
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        event_id: OwnedEventId,
     },
     MarkUnread {
         #[cfg_attr(feature = "typegen", specta(type = String))]
@@ -1632,6 +1644,10 @@ pub enum CommandOk {
         #[cfg_attr(feature = "typegen", specta(type = Option<specta_typescript::Unknown>))]
         content: Option<serde_json::Value>,
     },
+    ReadMarker {
+        #[cfg_attr(feature = "typegen", specta(type = Option<String>))]
+        event_id: Option<OwnedEventId>,
+    },
     EventCached {
         cached: bool,
     },
@@ -1770,6 +1786,7 @@ pub enum CommandOk {
     VotePoll,
     EndPoll,
     MarkRead,
+    SetFullyRead,
     MarkUnread,
     RetrySend,
     RetryDecryption,
