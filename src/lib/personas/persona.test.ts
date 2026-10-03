@@ -148,6 +148,36 @@ describe('resolvePersona', () => {
     expect(resolved?.id).toBe('Kris');
   });
 
+  it('prefers the room, then the nearest space, then the account', () => {
+    const space = { persona_id: 'Robin', valid_until: null };
+    const account = { persona_id: 'Kris', valid_until: null };
+    expect(resolvePersona({ personas, spaces: [space], account, now: 1000 })?.id).toBe('Robin');
+    expect(
+      resolvePersona({
+        personas,
+        room: { persona_id: 'Kris', valid_until: null },
+        spaces: [space],
+        now: 1000,
+      })?.id
+    ).toBe('Kris');
+    expect(
+      resolvePersona({
+        personas,
+        spaces: [undefined, { persona_id: 'Gone', valid_until: null }, space],
+        account,
+        now: 1000,
+      })?.id
+    ).toBe('Robin');
+    expect(
+      resolvePersona({
+        personas,
+        spaces: [{ persona_id: 'Robin', valid_until: 500 }],
+        account,
+        now: 1000,
+      })?.id
+    ).toBe('Kris');
+  });
+
   it('ignores a selection pointing at a deleted persona', () => {
     const resolved = resolvePersona({
       personas,

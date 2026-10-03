@@ -4,9 +4,12 @@
 
   import type { PerMessageProfileView, PersonaView } from '#src/generated/protocol';
 
+  import { page } from '$app/state';
   import MessageReproxyDialog from '#lib/features/room/messages/MessageReproxyDialog.svelte';
   import { i18n } from '#lib/i18n.js';
+  import { personaById } from '#lib/personas/persona.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
@@ -15,7 +18,8 @@
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
 
-  import PersonaMenu from './PersonaMenu.svelte';
+  import PersonaMenu, { type PersonaScope } from './PersonaMenu.svelte';
+  import { personaSpaces } from './persona-spaces.js';
 
   interface Props {
     roomId: string;
@@ -28,24 +32,23 @@
 
   let { roomId, onBeforeOpen, edit }: Props = $props();
   const personas = usePersonaStore();
+  const roomList = useRoomList();
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
 
   let desktop = $derived(appLayout.matches);
   let open = $state(false);
-  let scope = $state<'room' | 'account'>('account');
+  let scope = $state<PersonaScope>('account');
 
-  let selected = $derived(personas.selectionFor(scope === 'room' ? roomId : null));
+  let spaces = $derived(personaSpaces(roomList.rooms, roomId, page.params.spaceId));
+  let scopeTarget = $derived(scope === 'room' ? roomId : scope === 'space' ? spaces.target : null);
+  let selected = $derived(personas.selectionFor(scopeTarget));
   let disabled = $derived(personas.disabledIn(roomId));
   let active = $derived(
     disabled
       ? null
-      : (personas.personas.find(
-          (persona) => persona.id === personas.selectionFor(roomId)?.persona_id
-        ) ??
-          personas.personas.find(
-            (persona) => persona.id === personas.selectionFor(null)?.persona_id
-          ) ??
-          null)
+      : ([roomId, ...spaces.order, null]
+          .map((id) => personaById(personas.personas, personas.selectionFor(id)?.persona_id))
+          .find((persona) => persona !== undefined) ?? null)
   );
   let shown = $derived(edit ? edit.current : active);
   let label = $derived(
@@ -68,17 +71,15 @@
     handleOpenChange(true);
   }
 
-  function setScope(next: 'room' | 'account'): void {
+  function setScope(next: PersonaScope): void {
     scope = next;
   }
 
   function choose(persona: PersonaView | null): void {
     open = false;
-    personas
-      .select(scope === 'room' ? roomId : null, persona?.id ?? null)
-      .catch((cause: unknown) => {
-        console.warn('[sable personas] the selection could not be saved', cause);
-      });
+    personas.select(scopeTarget, persona?.id ?? null).catch((cause: unknown) => {
+      console.warn('[sable personas] the selection could not be saved', cause);
+    });
   }
 
   function disable(): void {
@@ -156,6 +157,7 @@
           {selected}
           {disabled}
           {scope}
+          hasSpace={spaces.target !== null}
           onScope={setScope}
           onChoose={choose}
           onDisable={disable}
@@ -196,6 +198,7 @@
       {selected}
       {disabled}
       {scope}
+      hasSpace={spaces.target !== null}
       onScope={setScope}
       onChoose={choose}
       onDisable={disable}

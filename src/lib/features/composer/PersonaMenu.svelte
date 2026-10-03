@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  export type PersonaScope = 'room' | 'space' | 'account';
+</script>
+
 <script lang="ts">
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import ProhibitIcon from 'phosphor-svelte/lib/ProhibitIcon';
@@ -15,13 +19,23 @@
     personas: readonly PersonaView[];
     selected: PersonaSelectionView | null;
     disabled: boolean;
-    scope: 'room' | 'account';
-    onScope: (scope: 'room' | 'account') => void;
+    scope: PersonaScope;
+    hasSpace?: boolean;
+    onScope: (scope: PersonaScope) => void;
     onChoose: (persona: PersonaView | null) => void;
     onDisable: () => void;
   }
 
-  let { personas, selected, disabled, scope, onScope, onChoose, onDisable }: Props = $props();
+  let {
+    personas,
+    selected,
+    disabled,
+    scope,
+    hasSpace = false,
+    onScope,
+    onChoose,
+    onDisable,
+  }: Props = $props();
   let off = $derived(scope === 'room' && disabled);
   let query = $state('');
   let filteredPersonas = $derived(
@@ -35,10 +49,15 @@
     })
   );
 
-  const scopes = [
-    { id: 'room', label: 'personas.scopeRoom' },
-    { id: 'account', label: 'personas.scopeAccount' },
-  ] as const;
+  let scopes = $derived(
+    (
+      [
+        { id: 'room', label: 'personas.scopeRoom' },
+        { id: 'space', label: 'personas.scopeSpace' },
+        { id: 'account', label: 'personas.scopeAccount' },
+      ] as const
+    ).filter((tab) => hasSpace || tab.id !== 'space')
+  );
 </script>
 
 <div class="persona-menu">
@@ -83,7 +102,7 @@
         </button>
       </li>
     {/if}
-    {#if scope === 'room'}
+    {#if scope === 'room' || scope === 'space'}
       <li>
         <button
           type="button"
@@ -97,6 +116,8 @@
           {#if !selected && !off}<CheckIcon />{/if}
         </button>
       </li>
+    {/if}
+    {#if scope === 'room'}
       <li>
         <button type="button" class="persona-option" onclick={onDisable}>
           <Avatar size="small"><ProhibitIcon /></Avatar>

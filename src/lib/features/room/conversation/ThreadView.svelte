@@ -5,10 +5,13 @@
   import ArrowUpIcon from 'phosphor-svelte/lib/ArrowUpIcon';
   import BackIcon from 'phosphor-svelte/lib/CaretLeftIcon';
 
+  import { page } from '$app/state';
   import { useCoreClient } from '#lib/core/context.js';
+  import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { readReceiptIsPrivate } from '#lib/settings/preferences.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
+  import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import { RoomTimeline } from '#lib/rooms/timeline.svelte.js';
   import PanelHeader from '#lib/ui/primitives/PanelHeader.svelte';
   import PanelHeaderButton from '#lib/ui/primitives/PanelHeaderButton.svelte';
@@ -82,12 +85,14 @@
 
   const core = useCoreClient();
   const personas = usePersonaStore();
+  const roomList = useRoomList();
   const timeline = new RoomTimeline(core);
   const conversation = new Conversation({
     core,
     personas,
     timeline,
     roomId: () => roomId,
+    spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => encrypted,
     threadRoot: untrack(() => rootEventId),
   });

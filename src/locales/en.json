@@ -3201,6 +3201,7 @@
     "pickerOffGlobal": "No profile",
     "pickerHeading": "Send as",
     "scopeRoom": "This room",
+    "scopeSpace": "This space",
     "scopeAccount": "Everywhere",
     "scopeLatchOff": "Disabled",
     "scopeLatchRoom": "Latch in room",

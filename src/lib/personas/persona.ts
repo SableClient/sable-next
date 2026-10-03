@@ -48,23 +48,22 @@ export function resolvePersona({
   personas,
   proxied,
   room,
+  spaces = [],
   account,
   now,
 }: {
   personas: readonly PersonaView[];
   proxied?: PersonaView | undefined;
   room?: PersonaSelectionView | undefined;
+  spaces?: readonly (PersonaSelectionView | undefined)[];
   account?: PersonaSelectionView | undefined;
   now: number;
 }): PersonaView | undefined {
   if (proxied) return proxied;
 
-  if (live(room, now)) {
-    const selected = personaById(personas, room?.persona_id);
-    if (selected) return selected;
-  }
-  if (live(account, now)) {
-    const selected = personaById(personas, account?.persona_id);
+  for (const selection of [room, ...spaces, account]) {
+    if (!live(selection, now)) continue;
+    const selected = personaById(personas, selection?.persona_id);
     if (selected) return selected;
   }
   return undefined;

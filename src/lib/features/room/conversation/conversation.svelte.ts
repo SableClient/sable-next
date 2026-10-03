@@ -49,6 +49,7 @@ export type ConversationDeps = {
   personas: PersonaStore;
   timeline: RoomTimeline;
   roomId: () => string;
+  spaceIds?: (roomId: string) => readonly string[];
   encrypted?: () => boolean | null;
   beforeSend?: () => Promise<void>;
   threadRoot?: string | null;
@@ -68,6 +69,7 @@ export class Conversation {
   readonly #personas: PersonaStore;
   readonly #timeline: RoomTimeline;
   readonly #roomId: () => string;
+  readonly #spaceIds: (roomId: string) => readonly string[];
   readonly #encrypted: () => boolean | null;
   readonly #threadRoot: string | null;
   readonly #beforeSend: () => Promise<void>;
@@ -79,6 +81,7 @@ export class Conversation {
     personas,
     timeline,
     roomId,
+    spaceIds = () => [],
     encrypted,
     beforeSend = () => Promise.resolve(),
     threadRoot = null,
@@ -87,6 +90,7 @@ export class Conversation {
     this.#personas = personas;
     this.#timeline = timeline;
     this.#roomId = roomId;
+    this.#spaceIds = spaceIds;
     this.#encrypted = encrypted ?? (() => null);
     this.#threadRoot = threadRoot;
     this.#beforeSend = beforeSend;
@@ -637,6 +641,7 @@ export class Conversation {
       personas: personas.personas,
       proxied: proxied?.persona,
       room: personas.selectionFor(targetRoomId) ?? undefined,
+      spaces: this.#spaceIds(targetRoomId).map((id) => personas.selectionFor(id) ?? undefined),
       account: personas.selectionFor(null) ?? undefined,
       now: Date.now(),
     });

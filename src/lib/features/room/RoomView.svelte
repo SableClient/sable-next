@@ -32,6 +32,7 @@
   import { useBookmarks } from '#lib/rooms/bookmarks.svelte.js';
   import ConversationComposer from './conversation/ConversationComposer.svelte';
   import { Conversation } from './conversation/conversation.svelte.js';
+  import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { usePersonaStore } from '#lib/personas/personas.svelte.js';
   import { i18n } from '#lib/i18n.js';
   import { afterOverlayPops, holdOverlayBack } from '#lib/platform/overlay-back.svelte.js';
@@ -139,6 +140,7 @@
     personas,
     timeline,
     roomId: () => resolvedRoomId,
+    spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
     beforeSend: () => timelineList?.resumeLive(false) ?? resumeLive(),
   });

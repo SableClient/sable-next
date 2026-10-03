@@ -1,8 +1,10 @@
 <script lang="ts">
   import type { RoomPermissionsView } from '#src/generated/protocol';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
 
   import { useCoreClient } from '#lib/core/context.js';
+  import { personaSpaces } from '#lib/features/composer/persona-spaces.js';
   import { eventTimelinePath } from '#lib/features/room/event-timeline.js';
   import ConversationComposer from '#lib/features/room/conversation/ConversationComposer.svelte';
   import ThreadView from '#lib/features/room/conversation/ThreadView.svelte';
@@ -78,6 +80,7 @@
     personas,
     timeline: forumThreads.roomTimeline,
     roomId: () => resolvedRoomId,
+    spaceIds: (id) => personaSpaces(roomList.rooms, id, page.params.spaceId).order,
     encrypted: () => resolvedRoom?.encrypted ?? null,
   });
 

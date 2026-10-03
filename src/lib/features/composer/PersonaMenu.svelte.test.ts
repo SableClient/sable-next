@@ -52,3 +52,26 @@ test('lists personas with duplicate IDs without crashing', () => {
 
   expect(screen.getAllByText('duplicate')).toHaveLength(2);
 });
+
+test('offers the space tab only when the room is in a space', () => {
+  const props = {
+    personas: [],
+    selected: null,
+    disabled: false,
+    scope: 'space' as const,
+    onScope: vi.fn(),
+    onChoose: vi.fn(),
+    onDisable: vi.fn(),
+  };
+  const { unmount } = render(PersonaMenu, props);
+  expect(screen.queryByRole('tab', { name: 'personas.scopeSpace' })).toBeNull();
+  unmount();
+
+  render(PersonaMenu, { ...props, hasSpace: true });
+  expect(screen.getByRole('tab', { name: 'personas.scopeSpace' })).toHaveAttribute(
+    'aria-selected',
+    'true'
+  );
+  expect(screen.getByText('personas.pickerNone')).toBeInTheDocument();
+  expect(screen.queryByText('personas.pickerOff')).toBeNull();
+});
