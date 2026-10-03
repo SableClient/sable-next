@@ -112,6 +112,7 @@ afterEach(() => {
   preferences.callScreenResolution = 'auto';
   preferences.callScreenBitrate = 'auto';
   preferences.callScreenCodec = 'auto';
+  preferences.callSimulcast = true;
 });
 
 test('automatic video quality leaves capture and encoding choices to LiveKit', async () => {
@@ -125,6 +126,22 @@ test('automatic video quality leaves capture and encoding choices to LiveKit', a
   expect(publish).not.toHaveProperty('screenShareEncoding');
   expect(publish).not.toHaveProperty('videoCodec');
   await transport.disconnect();
+});
+
+test('turning simulcast off applies to camera and screen publishing', async () => {
+  preferences.callSimulcast = false;
+  const fixture = roomFixture();
+  const transport = createLivekitTransport({ encryptMedia: false, createRoom: () => fixture.room });
+  try {
+    await transport.connect({ ...connectOptions, cameraEnabled: true });
+    expect(fixture.camera).toHaveBeenCalledWith(true, {}, { simulcast: false });
+    await transport.capabilities.screenShare?.setEnabled(true);
+    expect(fixture.localParticipant.setScreenShareEnabled.mock.calls[0][2]).toMatchObject({
+      simulcast: false,
+    });
+  } finally {
+    await transport.disconnect();
+  }
 });
 
 test('camera quality applies on join and when enabling the camera later', async () => {
@@ -141,7 +158,6 @@ test('camera quality applies on join and when enabling the camera later', async 
     const publish = {
       videoEncoding: { maxBitrate: 250_000 },
       videoCodec: 'h264',
-      simulcast: false,
       backupCodec: { codec: 'vp8', encoding: { maxBitrate: 250_000 } },
     };
     expect(createRoom).toHaveBeenCalledWith(
@@ -180,7 +196,6 @@ test.each([false, true])(
         expect.objectContaining({
           screenShareEncoding: { maxBitrate: 1_000_000 },
           videoCodec: 'vp9',
-          simulcast: false,
           backupCodec: { codec: 'vp8', encoding: { maxBitrate: 1_000_000 } },
         })
       );

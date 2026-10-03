@@ -2202,6 +2202,8 @@
     "callScreenResolution": "Screen sharing resolution",
     "callScreenBitrate": "Screen sharing maximum bitrate",
     "callScreenCodec": "Screen sharing codec",
+    "callSimulcast": "Use simulcast",
+    "callSimulcastHint": "Uploads your camera and screen share at several quality levels so others can pick one. Uses more bandwidth and processing power. Takes effect the next time you join a call.",
     "callVideoAutomatic": "Automatic",
     "callVideoResolutionHint": "Lower resolutions use less bandwidth. Takes effect the next time you join a call.",
     "callVideoBitrateHint": "Limits outgoing video bandwidth. Audio is separate. Takes effect the next time you join a call.",

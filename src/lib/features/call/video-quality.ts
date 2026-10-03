@@ -15,15 +15,16 @@ export function videoResolution(value: CallVideoResolution): VideoResolution | u
 export function videoPublishOptions(
   source: 'camera' | 'screen',
   bitrate: CallVideoBitrate,
-  codec: CallVideoCodec
+  codec: CallVideoCodec,
+  simulcast: boolean
 ): TrackPublishOptions {
   const options: TrackPublishOptions = {};
   if (codec !== 'auto') options.videoCodec = codec;
+  if (!simulcast) options.simulcast = false;
   if (bitrate !== 'auto') {
     const encoding = { maxBitrate: Number(bitrate) * 1000 };
     if (source === 'camera') options.videoEncoding = encoding;
     else options.screenShareEncoding = encoding;
-    options.simulcast = false;
     options.backupCodec = { codec: 'vp8', encoding };
   }
   return options;

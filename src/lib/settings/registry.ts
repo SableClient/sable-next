@@ -1465,6 +1465,15 @@ export const settingsCategories: SettingsCategory[] = [
         supported: () => !hasNativeCalls(),
       },
       {
+        key: 'callSimulcast',
+        section: 'call-camera',
+        icon: MonitorIcon,
+        name: 'settings.callSimulcast',
+        description: 'settings.callSimulcastHint',
+        type: 'boolean',
+        supported: () => !hasNativeCalls(),
+      },
+      {
         key: 'noiseSuppression',
         section: 'microphone',
         icon: MicrophoneIcon,

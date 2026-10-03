@@ -234,6 +234,7 @@ export interface Preferences {
   callScreenResolution: CallVideoResolution;
   callScreenBitrate: CallVideoBitrate;
   callScreenCodec: CallVideoCodec;
+  callSimulcast: boolean;
 
   /** Empty falls back to `config.json`; see `hasCompleteOverride`. */
   pushGatewayUrl: string;
@@ -498,6 +499,7 @@ const DEFAULTS: Preferences = {
   callScreenResolution: 'auto',
   callScreenBitrate: 'auto',
   callScreenCodec: 'auto',
+  callSimulcast: true,
 
   pushGatewayUrl: '',
   pushVapidKey: '',

@@ -130,7 +130,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   const cameraPublish = videoPublishOptions(
     'camera',
     preferences.callCameraBitrate,
-    preferences.callCameraCodec
+    preferences.callCameraCodec,
+    preferences.callSimulcast
   );
   const screenCapture: ScreenShareCaptureOptions =
     preferences.callScreenResolution === 'auto'
@@ -139,7 +140,8 @@ export function createLivekitTransport(options: LivekitTransportOptions): Liveki
   const screenPublish = videoPublishOptions(
     'screen',
     preferences.callScreenBitrate,
-    preferences.callScreenCodec
+    preferences.callScreenCodec,
+    preferences.callSimulcast
   );
 
   const room = (options.createRoom ?? ((config) => new LivekitRoom(config)))({
