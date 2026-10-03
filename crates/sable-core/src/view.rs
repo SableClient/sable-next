@@ -445,6 +445,26 @@ pub async fn restricted_parents(client: &Client, room: &Room) -> Vec<OwnedRoomId
     parents
 }
 
+pub async fn listing_spaces(
+    client: &Client,
+    room_id: &matrix_sdk::ruma::RoomId,
+) -> Vec<OwnedRoomId> {
+    let mut spaces = Vec::new();
+    for space in client.joined_space_rooms() {
+        if space.is_tombstoned() {
+            continue;
+        }
+        let lists_room = space_children(&space)
+            .await
+            .iter()
+            .any(|edge| edge.room_id == room_id && !edge.via.is_empty());
+        if lists_room {
+            spaces.push(space.room_id().to_owned());
+        }
+    }
+    spaces
+}
+
 #[must_use]
 pub fn public_room(chunk: &PublicRoomsChunk) -> PublicRoomView {
     PublicRoomView {

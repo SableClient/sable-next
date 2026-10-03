@@ -250,7 +250,17 @@ pub(crate) async fn unjoined_space_parents(
         .collect()
 }
 
-async fn first_space_parent(room: &matrix_sdk::Room) -> Option<OwnedRoomId> {
+async fn first_space_parent(
+    client: &matrix_sdk::Client,
+    room: &matrix_sdk::Room,
+) -> Option<OwnedRoomId> {
+    if let Some(space) = crate::view::listing_spaces(client, room.room_id())
+        .await
+        .into_iter()
+        .next()
+    {
+        return Some(space);
+    }
     space_parents(room)
         .await
         .into_iter()
@@ -295,7 +305,7 @@ impl Core {
         let space_id = match space_id {
             Some(space_id) if space_id != room.room_id() => Some(space_id),
             Some(_) => None,
-            None => first_space_parent(room).await,
+            None => first_space_parent(client, room).await,
         };
         let space = space_id
             .as_ref()
