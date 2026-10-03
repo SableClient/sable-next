@@ -1192,4 +1192,55 @@ mod tests {
         .await
         .unwrap();
     }
+
+    #[tokio::test]
+    async fn a_thread_timeline_is_already_at_its_end_going_forward() {
+        use crate::protocol::{Command, CommandOk, PaginationDirection};
+        use matrix_sdk_test::{ALICE, JoinedRoomBuilder, event_factory::EventFactory};
+        let server = MatrixMockServer::new().await;
+        let client = server.client_builder().build().await;
+        client.event_cache().subscribe().unwrap();
+        let room_id = room_id!("!thread:example.org");
+        let root = event_id!("$root");
+        let factory = EventFactory::new().room(room_id).sender(*ALICE);
+        server.mock_room_state_encryption().plain().mount().await;
+        server
+            .sync_room(
+                &client,
+                JoinedRoomBuilder::new(room_id)
+                    .add_timeline_event(factory.text_msg("root").event_id(root)),
+            )
+            .await;
+        let core = core(&server, client).await;
+        let subscription = core.allocate_subscription();
+        let timeline = core
+            .thread_timeline(&room_id.to_owned(), &root.to_owned())
+            .await
+            .unwrap();
+        core.subscriptions.lock().await.insert(
+            subscription,
+            crate::Subscription {
+                tasks: Vec::new(),
+                timeline: Some(timeline),
+                thread_root: Some(root.to_owned()),
+                kind: crate::SubscriptionKind::FocusedTimeline(room_id.to_owned()),
+            },
+        );
+
+        let result = core
+            .dispatch(Command::Paginate {
+                subscription,
+                direction: PaginationDirection::Forward,
+                count: 20,
+            })
+            .await;
+
+        assert!(matches!(
+            result,
+            Ok(CommandOk::Paginate {
+                direction: PaginationDirection::Forward,
+                reached_end: true,
+            })
+        ));
+    }
 }

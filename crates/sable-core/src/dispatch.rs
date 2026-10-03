@@ -377,7 +377,7 @@ impl Core {
                 direction,
                 count,
             } => {
-                let (timeline, focused) = self
+                let (timeline, focused, thread) = self
                     .subscriptions
                     .lock()
                     .await
@@ -387,12 +387,19 @@ impl Core {
                             (
                                 timeline,
                                 matches!(subscription.kind, SubscriptionKind::FocusedTimeline(_)),
+                                subscription.thread_root.is_some(),
                             )
                         })
                     })
                     .ok_or(CommandErr::UnknownSubscription)?;
                 if matches!(direction, PaginationDirection::Forward) && !focused {
                     return Err(CommandErr::InvalidPaginationDirection);
+                }
+                if matches!(direction, PaginationDirection::Forward) && thread {
+                    return Ok(CommandOk::Paginate {
+                        direction,
+                        reached_end: true,
+                    });
                 }
                 let _foreground = self.begin_foreground_pagination();
                 let reached_end = match direction {
