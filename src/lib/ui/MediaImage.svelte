@@ -699,11 +699,14 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .media-image-blurhash,
-    .media-image-placeholder {
+    .media-image-blurhash {
       transition:
         opacity var(--duration-slow) ease-in-out,
         filter var(--duration-slow) ease-in-out;
+    }
+
+    .media-image-placeholder {
+      transition: opacity var(--duration-slow) ease-in-out;
     }
   }
 
