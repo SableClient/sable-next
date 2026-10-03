@@ -115,6 +115,8 @@ html {
   --mx-uc-6: initial;
   --mx-uc-7: initial;
   --mx-uc-8: initial;
+
+  overscroll-behavior-y: none;
 }
 
 @media (prefers-color-scheme: dark) {
