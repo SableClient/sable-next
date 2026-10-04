@@ -648,3 +648,191 @@ jobs:
               | grep -aoE 'download/nightly-[^/]+' | cut -d/ -f2 | tr '\n' ',')"
           done
           node scripts/ci/forgejo-release.mjs prune --keep "$NIGHTLY_KEEP" --protect "$protect"
+  distribute-aur:
+    name: Publish to the AUR
+    needs: [setup-release, linux]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+      IS_NIGHTLY: ${{ needs.setup-release.outputs.nightly }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the deb
+        run: |
+          mkdir debs
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-next-${VERSION}-linux-x86_64.deb" --dir debs
+          ls debs | grep -q . || { echo 'The x86_64 deb is not on the release' >&2; exit 1; }
+      - name: Push to the AUR
+        env:
+          AUR_KEY: ${{ secrets.AUR_KEY }}
+        run: |
+          if [ -z "${AUR_KEY:-}" ]; then
+            echo '::notice::AUR_KEY is not set; skipping the AUR publish.'
+            exit 0
+          fi
+          if [ "$IS_NIGHTLY" = 'true' ]; then
+            pkg=sable-nightly-bin
+            pkgver="${VERSION//-/.}"
+            relver="$VERSION"
+          else
+            pkg=sable-bin
+            pkgver="$VERSION"
+            relver=-
+          fi
+          sha="$(sha256sum "debs/sable-next-${VERSION}-linux-x86_64.deb" | awk '{print $1}')"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur_key
+          chmod 600 ~/.ssh/aur_key
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur_key -o IdentitiesOnly=yes"
+
+          git clone "ssh://aur@aur.archlinux.org/${pkg}.git" aur-repo
+          bash scripts/ci/render-aur.sh "$pkg" "$pkgver" "$relver" "$sha" aur-render
+          cp aur-render/PKGBUILD aur-render/.SRCINFO "aur-render/${pkg}.install" aur-repo/
+
+          cd aur-repo
+          git config user.name 'Sable release'
+          git config user.email 'release@sable.moe'
+          git add PKGBUILD .SRCINFO "${pkg}.install"
+          if git diff --cached --quiet; then
+            echo 'Nothing changed; skipping the push.'
+            exit 0
+          fi
+          git commit -m "${pkg} ${VERSION}"
+          git push
+  distribute-homebrew:
+    name: Publish the Homebrew cask
+    needs: [setup-release, github-bundles]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the DMG
+        run: |
+          mkdir dmg
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-next-${VERSION}-macos-universal.dmg" --dir dmg
+          ls dmg | grep -q . || { echo 'The DMG is not on the release' >&2; exit 1; }
+      - name: Push the cask to the tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -z "${HOMEBREW_TAP_TOKEN:-}" ]; then
+            echo '::notice::HOMEBREW_TAP_TOKEN is not set; skipping the Homebrew publish.'
+            exit 0
+          fi
+          sha="$(sha256sum "dmg/sable-next-${VERSION}-macos-universal.dmg" | awk '{print $1}')"
+          git clone --depth 1 \
+            "https://x-access-token:${HOMEBREW_TAP_TOKEN}@git.sable.moe/SableClient/homebrew-sable.git" tap
+
+          mkdir -p tap/Casks
+          sed \
+            -e "s/^  version .*/  version '${VERSION}'/" \
+            -e "s/^  sha256 .*/  sha256 '${sha}'/" \
+            packaging/homebrew/sable.rb > tap/Casks/sable.rb
+
+          cd tap
+          git config user.name 'Sable release'
+          git config user.email 'release@sable.moe'
+          git add Casks/sable.rb
+          if git diff --cached --quiet; then
+            echo 'Nothing changed; skipping the push.'
+            exit 0
+          fi
+          git commit -m "sable ${VERSION}"
+          git push origin HEAD:refs/heads/main
+  distribute-flathub:
+    name: Open the Flathub update PR
+    needs: [setup-release, github-bundles]
+    if: ${{ needs.setup-release.outputs.nightly != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ needs.setup-release.outputs.tag }}
+      VERSION: ${{ needs.setup-release.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.setup-release.outputs.ref }}
+          persist-credentials: false
+      - name: Download the tarballs
+        run: |
+          mkdir tarballs
+          node scripts/ci/forgejo-release.mjs download \
+            --pattern "sable-next-${VERSION}-linux-*.tar.gz" --dir tarballs
+      - name: Open the Flathub PR
+        env:
+          FLATHUB_TOKEN: ${{ secrets.FLATHUB_TOKEN }}
+        run: |
+          if [ -z "${FLATHUB_TOKEN:-}" ]; then
+            echo '::notice::FLATHUB_TOKEN is not set; skipping the Flathub PR.'
+            exit 0
+          fi
+          if ! git clone --depth 1 \
+            "https://x-access-token:${FLATHUB_TOKEN}@github.com/flathub/moe.sable.client.git" flathub; then
+            echo '::notice::flathub/moe.sable.client does not exist yet; submit the app first.'
+            exit 0
+          fi
+
+          arch_args() {
+            local file="tarballs/sable-next-${VERSION}-linux-$1.tar.gz"
+            if [ -e "$file" ]; then
+              echo "$(sha256sum "$file" | awk '{print $1}'):$(stat -c %s "$file")"
+            else
+              echo '-'
+            fi
+          }
+          node scripts/ci/render-flatpak-stable.mjs "$VERSION" "$(arch_args x86_64)" "$(arch_args aarch64)"
+
+          src=packaging/flatpak
+          sed 's#\.\./\.\./LICENSE#LICENSE#' "$src/moe.sable.client.yml" > flathub/moe.sable.client.yml
+          cp "$src/moe.sable.client.desktop" "$src/moe.sable.client.metainfo.xml" "$src/flathub.json" "$src/sable-next.sh" flathub/
+          cp LICENSE flathub/LICENSE
+          rm -rf flathub/icons && cp -r "$src/icons" flathub/icons
+
+          cd flathub
+          git config user.name 'Sable release'
+          git config user.email 'release@sable.moe'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nothing changed; skipping the Flathub PR.'
+            exit 0
+          fi
+          git checkout -b "update-${VERSION}"
+          git commit -m "Update Sable to ${VERSION}"
+          git push origin "update-${VERSION}"
+          VERSION="$VERSION" python3 - <<'PY' | curl -fsS -X POST \
+            -H "Authorization: Bearer ${FLATHUB_TOKEN}" -H 'Accept: application/vnd.github+json' \
+            -d @- https://api.github.com/repos/flathub/moe.sable.client/pulls
+          import json, os
+          version = os.environ["VERSION"]
+          print(json.dumps({
+              "title": f"Update Sable to {version}",
+              "head": f"update-{version}",
+              "base": "master",
+              "body": f"Bumps the release tarballs to {version}.",
+          }))
+          PY
