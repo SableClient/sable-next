@@ -266,9 +266,12 @@
 
 <style>
   .widgets-panel {
-    background: var(--surface-container);
+    --ghost-hover: var(--bg-container-hover);
+    --ghost-active: var(--bg-container-active);
+
+    background: var(--bg-container);
     box-sizing: border-box;
-    color: var(--surface-on-container);
+    color: var(--bg-on-container);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
