@@ -16,19 +16,34 @@ export class PersonaStore {
 
   private loaded = false;
   private inFlight: Promise<void> | null = null;
+  private revision: number | null = null;
 
   constructor(private readonly core: CoreClient) {}
 
   async load(force = false): Promise<void> {
+    if (this.revision !== this.core.accountRevision) this.reset();
     if (this.loaded && !force) return;
     this.inFlight ??= this.fetch();
     await this.inFlight;
   }
 
+  private reset(): void {
+    this.revision = this.core.accountRevision;
+    this.personas = [];
+    this.account = null;
+    this.rooms = {};
+    this.disabledRooms = [];
+    this.error = null;
+    this.loaded = false;
+    this.inFlight = null;
+  }
+
   private async fetch(): Promise<void> {
+    const revision = this.revision;
     this.loading = true;
     try {
       const catalog = await this.core.commands.personas();
+      if (revision !== this.revision) return;
       this.personas = catalog.personas;
       this.account = catalog.account;
       this.rooms = catalog.rooms;
@@ -36,11 +51,14 @@ export class PersonaStore {
       this.loaded = true;
       this.error = null;
     } catch (cause) {
+      if (revision !== this.revision) return;
       console.warn('[sable personas] loading the catalog failed', cause);
       this.error = 'personas.loadFailed';
     } finally {
-      this.loading = false;
-      this.inFlight = null;
+      if (revision === this.revision) {
+        this.loading = false;
+        this.inFlight = null;
+      }
     }
   }
 
