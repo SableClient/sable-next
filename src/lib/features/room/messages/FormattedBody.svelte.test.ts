@@ -702,3 +702,17 @@ test('inline images load at once where media previews are on', async () => {
   expect(screen.queryByRole('button', { name: 'Show images' })).not.toBeInTheDocument();
   mediaPreviewSettings.global = {};
 });
+
+test.each([
+  ['a block with no language', '<pre><code>const a = 1;</code></pre>'],
+  [
+    'a block over the size limit',
+    `<pre><code class="language-js">${'a'.repeat(20_001)}</code></pre>`,
+  ],
+])('%s is left unhighlighted', async (_name, html) => {
+  render(FormattedBody, { props: { html } });
+  await tick();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  expect(document.querySelector('pre code')?.querySelector('span')).toBeNull();
+});

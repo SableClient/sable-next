@@ -408,6 +408,7 @@
 
   /** Past this many lines a block collapses behind a toggle. */
   const CODE_LINE_LIMIT = 14;
+  const CODE_HIGHLIGHT_LIMIT = 20_000;
 
   function classLanguage(element: Element | null): string | null {
     const named = [...(element?.classList ?? [])].find((name) => name.startsWith('language-'));
@@ -471,10 +472,14 @@
   async function paintHighlight(block: HTMLPreElement, language: string | null): Promise<void> {
     const code = block.querySelector('code');
     const source = code?.textContent;
-    if (!code || !source) return;
+    if (!code || !source || language === null || source.length > CODE_HIGHLIGHT_LIMIT) return;
 
-    const { highlightCode } = await import('./code-highlight');
-    const html = await highlightCode(source, language);
+    const html = await import('./code-highlight')
+      .then(({ highlightCode }) => highlightCode(source, language))
+      .catch((error: unknown) => {
+        console.debug('[sable code] highlighter chunk unavailable', error);
+        return null;
+      });
     // The row may have scrolled out of the virtualiser while the grammar loaded.
     if (html === null || !code.isConnected) return;
     code.innerHTML = html;
