@@ -21,8 +21,14 @@ export function searchSettings(
 
       const name = translate(setting.name).toLowerCase();
       const description = setting.description ? translate(setting.description).toLowerCase() : '';
+      const terms = setting.terms?.map((key) => translate(key).toLowerCase()) ?? [];
 
-      if (name.includes(term) || description.includes(term) || categoryName.includes(term)) {
+      if (
+        name.includes(term) ||
+        description.includes(term) ||
+        categoryName.includes(term) ||
+        terms.some((entry) => entry.includes(term))
+      ) {
         hits.push({ category, setting });
       }
     }

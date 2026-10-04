@@ -89,7 +89,6 @@
         loading={isAuthenticating}
         disabled={isCheckingHomeserver}
         variant="primary"
-        size="large"
       >
         {isAuthenticating ? $i18n.t('auth.signingIn') : $i18n.t('auth.signInWithPassword')}</Button
       >

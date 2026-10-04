@@ -2,6 +2,7 @@
   import type { ClassValue } from 'svelte/elements';
   import type { Snippet } from 'svelte';
   import SettingsAnchorLink from './SettingsAnchorLink.svelte';
+  import './settings-row.css';
 
   type Props = {
     title: string;
@@ -35,7 +36,7 @@
         <SettingsAnchorLink anchor={headingId} />
         {#if titleActions}{@render titleActions()}{/if}
       </div>
-      {#if description}<p>{description}</p>{/if}
+      {#if description}<p class="settings-description">{description}</p>{/if}
     </div>
     {#if actions}<div class="settings-section-actions">{@render actions()}</div>{/if}
   </header>
@@ -48,7 +49,7 @@
     display: flex;
     gap: var(--space-400);
     justify-content: space-between;
-    padding: var(--space-300) var(--space-400) var(--space-150);
+    padding: var(--space-200) var(--space-300) var(--space-100);
   }
 
   .settings-section-heading {
@@ -80,26 +81,18 @@
   }
 
   h2 {
-    font-size: var(--font-size-subheading);
-    line-height: var(--line-height-heading);
+    color: var(--sec-main);
+    font-size: var(--font-size-label);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0;
+    line-height: var(--line-height-body);
     margin: 0;
-  }
-
-  p {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: var(--space-050) 0 0;
+    padding: 0;
+    text-transform: none;
   }
 
   .settings-section-actions {
     flex: 0 0 auto;
-  }
-
-  .settings-section-content {
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
   }
 
   @media (width >= 42rem) {

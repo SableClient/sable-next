@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import type {
     MentionNotificationModeView,
     MentionNotificationsView,
@@ -106,7 +107,7 @@
     <h3 id="mention-notifications" data-settings-outline>{$i18n.t('settings.mentions')}</h3>
     <SettingsAnchorLink anchor="mention-notifications" />
   </div>
-  <p class="hint">{$i18n.t('settings.mentionsHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.mentionsHint')}</p>
 
   {#if failed}
     <Alert variant="warning" role="status">
@@ -114,13 +115,9 @@
     </Alert>
   {/if}
 
-  <div class="rows">
+  <ul class="settings-rows">
     {#each shown as { rule, key, label, hint } (rule)}
-      <label>
-        <span>
-          {label}
-          {#if hint}<small>{hint}</small>{/if}
-        </span>
+      <SettingsRow title={label} description={hint}>
         {#if current}
           <Select
             aria-label={label}
@@ -131,55 +128,7 @@
             }}
           />
         {/if}
-      </label>
+      </SettingsRow>
     {/each}
-  </div>
+  </ul>
 </section>
-
-<style>
-  .mentions {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  h3 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-  }
-
-  .rows {
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  small {
-    color: var(--surface-var-on-container);
-    display: block;
-    font-size: var(--font-size-small);
-  }
-
-  label {
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-200);
-    justify-content: space-between;
-  }
-
-  @media (width >= 32rem) {
-    label {
-      align-items: center;
-      display: grid;
-      gap: var(--space-400);
-      grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
-    }
-  }
-</style>

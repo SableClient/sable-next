@@ -20,7 +20,6 @@
     id={anchor}
     data-settings-focus={anchor}
     title={$i18n.t('settings.doubleTapReaction')}
-    description={$i18n.t('settings.doubleTapReactionHint')}
     {disabled}
     badge={disabled
       ? $i18n.t('settings.needsSetting', { name: $i18n.t('settings.doubleTapReact') })

@@ -18,9 +18,10 @@ async function ensureBundle(code: string): Promise<void> {
 }
 
 function applyLanguage(code: string): void {
-  setCurrentLanguage(code);
+  const language = availableLocales.includes(code) ? code : 'en';
+  setCurrentLanguage(language);
   if (typeof document === 'undefined') return;
-  document.documentElement.lang = code;
+  document.documentElement.lang = language;
 }
 
 const initialLanguage = chosenLanguage();
@@ -55,8 +56,9 @@ export async function setLanguage(value: string): Promise<void> {
     await i18next.changeLanguage();
     return;
   }
-  await ensureBundle(value);
-  await i18next.changeLanguage(value);
+  const language = availableLocales.includes(value) ? value : 'en';
+  await ensureBundle(language);
+  await i18next.changeLanguage(language);
 }
 
 if (initialLanguage !== undefined) {

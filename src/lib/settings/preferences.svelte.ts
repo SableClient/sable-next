@@ -81,12 +81,86 @@ export type CallVideoBitrate = (typeof CALL_VIDEO_BITRATES)[number];
 export type CallVideoCodec = (typeof CALL_VIDEO_CODECS)[number];
 export type ComposerForm = 'short' | 'adaptive' | 'tall';
 export type EnterKey = 'adaptive' | 'newline' | 'send';
-export type ComposerButton = 'gif' | 'sticker' | 'emoticon' | 'separator' | 'persona' | 'format';
+export const COMPOSER_ACTIONS = ['gif', 'sticker', 'emoticon', 'persona', 'format'] as const;
+export type ComposerAction = (typeof COMPOSER_ACTIONS)[number];
+
+export const COMPOSER_SEPARATOR_MAX = 9;
+export type ComposerSeparatorId = `separator:${number}`;
+
+export type ComposerButton = ComposerAction | 'separator' | ComposerSeparatorId;
+
+export function isComposerSeparator(id: string): id is 'separator' | ComposerSeparatorId {
+  return id === 'separator' || /^separator:\d+$/.test(id);
+}
+
+export function composerSeparatorId(index: number): ComposerSeparatorId {
+  return `separator:${index}`;
+}
+
+export function composerSeparatorCount(order: readonly ComposerButton[]): number {
+  return order.filter(isComposerSeparator).length;
+}
+
+function normalizeComposerOrder(order: readonly unknown[]): ComposerButton[] {
+  const result: ComposerButton[] = [];
+  for (const entry of order) {
+    if (typeof entry !== 'string') continue;
+    const id = entry === 'separator' ? 'separator:0' : entry;
+    if (result.includes(id as ComposerButton)) continue;
+    if ((COMPOSER_ACTIONS as readonly string[]).includes(id)) result.push(id as ComposerAction);
+    else if (isComposerSeparator(id)) {
+      const index = Number(id.slice('separator:'.length));
+      if (
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < COMPOSER_SEPARATOR_MAX &&
+        composerSeparatorCount(result) < COMPOSER_SEPARATOR_MAX
+      )
+        result.push(id);
+    }
+  }
+  for (const action of COMPOSER_ACTIONS) if (!result.includes(action)) result.push(action);
+  return result;
+}
+
+export function withComposerSeparatorCount(
+  order: readonly ComposerButton[],
+  count: number
+): ComposerButton[] {
+  const wanted = Math.min(
+    COMPOSER_SEPARATOR_MAX,
+    Math.max(0, Math.floor(Number.isFinite(count) ? count : 0))
+  );
+  const result = normalizeComposerOrder(order);
+  const current = composerSeparatorCount(result);
+  if (current > wanted) {
+    let remaining = wanted;
+    return result.filter((id) => !isComposerSeparator(id) || remaining-- > 0);
+  }
+  const added = Array.from({ length: COMPOSER_SEPARATOR_MAX }, (_, index) =>
+    composerSeparatorId(index)
+  )
+    .filter((id) => !result.includes(id))
+    .slice(0, wanted - current);
+  let insertAt = result.length;
+  while (insertAt > 0 && !isComposerSeparator(result[insertAt - 1])) insertAt--;
+  if (insertAt === 0) {
+    insertAt = result.length;
+    while (
+      insertAt > 0 &&
+      (result[insertAt - 1] === 'persona' || result[insertAt - 1] === 'format')
+    )
+      insertAt -= 1;
+  }
+  result.splice(insertAt, 0, ...added);
+  return result;
+}
+
 export const COMPOSER_BUTTONS = [
   'gif',
   'sticker',
   'emoticon',
-  'separator',
+  'separator:0',
   'persona',
   'format',
 ] as const satisfies readonly ComposerButton[];
@@ -558,15 +632,7 @@ export function sanitize(stored: Record<string, unknown>, base: Preferences): Pr
       }
     } else if (key === 'composerButtonOrder') {
       if (Array.isArray(value)) {
-        const order = value.filter(
-          (entry): entry is ComposerButton =>
-            typeof entry === 'string' && COMPOSER_BUTTONS.includes(entry as ComposerButton)
-        );
-        const unique = order.filter((entry, index) => order.indexOf(entry) === index);
-        (next as Record<string, unknown>)[key] = [
-          ...unique,
-          ...COMPOSER_BUTTONS.filter((entry) => !unique.includes(entry)),
-        ];
+        next.composerButtonOrder = normalizeComposerOrder(value);
       }
     } else if (key in PREFERENCE_RANGES) {
       if (typeof value === 'number' && Number.isFinite(value)) {

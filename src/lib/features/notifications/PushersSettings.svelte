@@ -153,7 +153,7 @@
       <ArrowClockwiseIcon />
     </IconButton>
   </div>
-  <p class="hint">{$i18n.t('settings.pushersHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.pushersHint')}</p>
 
   {#if error}
     <Alert variant="warning" role="status">
@@ -305,29 +305,10 @@
 </section>
 
 <style>
-  .pushers {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-  }
-
   .pushers-head {
     align-items: center;
     display: flex;
     gap: var(--space-200);
-  }
-
-  h3 {
-    flex: 1;
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
   }
 
   .pushers-empty {

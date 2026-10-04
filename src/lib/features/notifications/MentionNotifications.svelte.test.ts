@@ -32,11 +32,11 @@ test('shows every mention rule at its account mode', async () => {
   render(MentionNotifications);
 
   await vi.waitFor(() => {
-    expect(selector('Mentions of your user ID (@erwan:example.org)')).toHaveTextContent('Loud');
+    expect(selector('User ID (@erwan:example.org)')).toHaveTextContent('Loud');
   });
-  expect(selector('Messages with your display name (Erwan)')).toHaveTextContent('Off');
-  expect(selector('Messages with your username (erwan)')).toHaveTextContent('Loud');
-  expect(selector('Mention @room')).toHaveTextContent('Notify');
+  expect(selector('Display name (Erwan)')).toHaveTextContent('Off');
+  expect(selector('Username (erwan)')).toHaveTextContent('Loud');
+  expect(selector('@room')).toHaveTextContent('Notify');
 });
 
 test('hides the legacy rules a server has removed', async () => {
@@ -45,10 +45,10 @@ test('hides the legacy rules a server has removed', async () => {
   render(MentionNotifications);
 
   await vi.waitFor(() => {
-    expect(selector('Mention @room')).toHaveTextContent('Notify');
+    expect(selector('@room')).toHaveTextContent('Notify');
   });
-  expect(screen.queryByLabelText(/^Messages with your display name/)).not.toBeInTheDocument();
-  expect(screen.queryByLabelText(/^Messages with your username/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/^Display name/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/^Username/)).not.toBeInTheDocument();
 });
 
 test('reports a failed lookup', async () => {

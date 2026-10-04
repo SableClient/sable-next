@@ -5,11 +5,11 @@
   import IconContext from 'phosphor-svelte/lib/IconContext';
 
   import Button from './Button.svelte';
-  import type { ButtonProps, ButtonSize } from './button-types';
+  import type { ButtonProps, IconButtonSize } from './button-types';
 
   type Props = Omit<ButtonProps, 'children' | 'class' | 'size'> & {
     label: string;
-    size?: Exclude<ButtonSize, 'icon'>;
+    size?: IconButtonSize;
     class?: ClassValue;
     children?: Snippet;
   };

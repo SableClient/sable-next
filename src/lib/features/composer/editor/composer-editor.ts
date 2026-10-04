@@ -623,7 +623,7 @@ export class ComposerEditor {
       /* No `aria-multiline`: it is a textbox property, invalid on a combobox. */
       spellcheck: 'true',
       autocapitalize: 'sentences',
-      enterkeyhint: enterInsertsNewline() ? 'enter' : 'send',
+      enterkeyhint: !enterInsertsNewline() ? 'send' : 'enter',
       ...(this.options.describedBy ? { 'aria-describedby': this.options.describedBy } : {}),
     };
   }
@@ -745,10 +745,11 @@ export class ComposerEditor {
             this.pasteAsText(pasteView, event),
           transformPastedHTML: lineDivsAsBreaks,
           transformPasted: (slice, pasteView) => this.pastedMentions(pasteView.state, slice),
-          clipboardTextParser: (text, _context, plain) =>
-            plain || this.source || !preferences.richTextComposer
+          clipboardTextParser: (text, _context, plain) => {
+            return plain || this.source || !preferences.richTextComposer
               ? textSlice(text)
-              : markdownSlice(text),
+              : markdownSlice(text);
+          },
           handleTextInput: (inputView, from, to, text) => {
             const end = inputView.state.doc.content.size;
             if (from < 0 || to < from || to > end) {

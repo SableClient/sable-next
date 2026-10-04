@@ -335,6 +335,7 @@ html {
   --opacity-p400: 0.9;
   --opacity-p300: 0.75;
   --opacity-placeholder: 0.5;
+  --opacity-secondary: 0.65;
   --opacity-disabled: 0.38;
   --control-height-touch: 2.75rem;
   --control-height-300: 2rem;

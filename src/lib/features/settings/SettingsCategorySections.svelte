@@ -3,6 +3,7 @@
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Button from '#lib/ui/primitives/Button.svelte';
   import '#lib/ui/primitives/form-control.css';
+  import '#lib/ui/primitives/settings-row.css';
   import Select from '#lib/ui/primitives/Select.svelte';
   import Slider from '#lib/ui/primitives/Slider.svelte';
   import SettingsSection from '#lib/ui/primitives/SettingsSection.svelte';
@@ -24,7 +25,9 @@
 
   let { category }: Props = $props();
 
-  const items = $derived(category.items.filter((setting) => setting.supported?.() !== false));
+  const items = $derived(
+    category.items.filter((setting) => setting.supported?.() !== false && setting.panel !== true)
+  );
 
   const supportedSettings = $derived(
     settingsCategories.flatMap((entry) =>
@@ -61,7 +64,7 @@
 </script>
 
 {#snippet settingRows(rows: SettingDefinition[])}
-  <ul class="settings">
+  <ul class="settings settings-rows">
     {#each rows as setting (setting.key)}
       {@const gate = gated(setting)}
       {@const disabled = setting.unavailable === true || gate}
@@ -85,6 +88,7 @@
           {@const key = setting.key}
           <Select
             {disabled}
+            forceDropdown={setting.key === 'profileChangePropagation'}
             aria-label={$i18n.t(setting.name)}
             value={preferences[key]}
             items={setting.options.map((option) => ({
@@ -116,9 +120,9 @@
                 setting.onChange?.(value);
               }}
             />
-            <label class="range-reading">
+            <label class="form-control range-reading">
               <input
-                class="form-control range-input"
+                class="range-input"
                 type="number"
                 inputmode="numeric"
                 {disabled}
@@ -137,7 +141,7 @@
                   }
                   event.currentTarget.value = String(Math.round(preferences[key] * 100));
                 }}
-              />%
+              /><span class="range-suffix" aria-hidden="true">%</span>
             </label>
           </div>
         {:else}
@@ -193,38 +197,10 @@
 </div>
 
 <style>
-  .range {
-    align-items: center;
-    display: flex;
-    gap: var(--space-150);
-    width: 100%;
-  }
-
-  .range-reading {
-    align-items: center;
-    display: flex;
-    flex: none;
-    font-size: var(--font-size-small);
-    gap: var(--space-050);
-  }
-
-  .range-input {
-    appearance: textfield;
-    font-variant-numeric: tabular-nums;
-    inline-size: 3.5rem;
-    padding-inline: var(--space-150);
-    text-align: end;
-  }
-
-  .range-input::-webkit-inner-spin-button,
-  .range-input::-webkit-outer-spin-button {
-    appearance: none;
-    margin: 0;
-  }
-
   .settings-stack {
     display: grid;
     gap: var(--space-300);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .settings-card {
@@ -232,11 +208,5 @@
     border-radius: var(--radius);
     color: var(--bg-on-container);
     overflow: hidden;
-  }
-
-  .settings {
-    list-style: none;
-    margin: 0;
-    padding: 0;
   }
 </style>

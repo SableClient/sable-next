@@ -18,10 +18,10 @@ import StatusBadge from './StatusBadge.svelte';
 import TextArea from './TextArea.svelte';
 
 test('button variants expose loading and disabled state consistently', () => {
-  render(Button, { variant: 'primary', size: 'large', loading: true, block: true });
+  render(Button, { variant: 'primary', loading: true, block: true });
 
   const button = screen.getByRole('button');
-  expect(button).toHaveClass('btn-primary', 'btn-large', 'btn-loading', 'btn-block');
+  expect(button).toHaveClass('btn-primary', 'btn-medium', 'btn-loading', 'btn-block');
   expect(button).toBeDisabled();
   expect(button).toHaveAttribute('aria-busy', 'true');
 });

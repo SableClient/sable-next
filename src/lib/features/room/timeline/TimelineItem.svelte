@@ -378,7 +378,8 @@
       stalled === null
   );
 
-  let trailingReceiptBadge = $derived(actionable && showReceiptBadge && !receiptsInline);
+  let receiptsVisible = $derived(showReceiptBadge && (actionable || preview));
+  let trailingReceiptBadge = $derived(receiptsVisible && !receiptsInline);
 
   function selectedText(): string {
     const selection = getSelection();
@@ -759,7 +760,7 @@
           </div>
         {/if}
         {#if item.content.kind === 'message' && item.content.emote}
-          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
+          {@const inlineReceipts = receiptsVisible && receiptsInline}
           <div
             class={['emote', { 'has-receipts': inlineReceipts }]}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}
@@ -778,7 +779,7 @@
             {/if}
           </div>
         {:else if item.content.kind === 'message'}
-          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
+          {@const inlineReceipts = receiptsVisible && receiptsInline}
           <div
             class={[
               jumbo === null ? undefined : `jumbo jumbo-${String(jumbo)}`,
@@ -807,7 +808,7 @@
             {/each}
           {/if}
         {:else if item.content.kind === 'redacted'}
-          {@const inlineReceipts = actionable && showReceiptBadge && receiptsInline}
+          {@const inlineReceipts = receiptsVisible && receiptsInline}
           <div
             class={{ 'content-bubble': layout === 'bubble', 'has-receipts': inlineReceipts }}
             style:--receipt-reserve={inlineReceipts ? `${String(receiptWidth)}px` : undefined}

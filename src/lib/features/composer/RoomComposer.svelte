@@ -112,6 +112,7 @@
   import { ROOM_MENTION, suggestionsFor } from './suggestions';
   import VoiceRecorder from './VoiceRecorder.svelte';
   import { isVoiceRecordingSupported } from './voice-recorder-support';
+  import './composer-chrome.css';
 
   interface Props {
     roomId: string;
@@ -325,7 +326,7 @@
   let showPersonaPicker = $derived(preferences.personaPicker && personas.personas.length > 0);
 
   let canSchedule = $derived(onSchedule !== undefined && hasContent && !readOnly);
-  let sendShortcut = $derived(enterInsertsNewline() ? 'Shift+Enter' : 'Enter');
+  let sendShortcut = $derived(!enterInsertsNewline() ? 'Enter' : 'Shift+Enter');
   let keyboardHint = $derived(
     $i18n.t(
       !hasContent && canDeleteEdited
@@ -1761,60 +1762,6 @@
 />
 
 <style>
-  .composer-stack {
-    --composer-gutter: var(--space-200);
-    --target: var(--control-height-small);
-
-    margin: 0 auto;
-    position: relative;
-    width: calc(100% - var(--composer-gutter) - var(--composer-gutter));
-  }
-
-  @media (pointer: coarse) {
-    .composer-stack {
-      --target: var(--control-height-400);
-    }
-
-    .composer-stack :global(.icon-button-small) {
-      --button-height: var(--target);
-    }
-  }
-
-  @media (width >= 32rem) {
-    .composer-stack {
-      --composer-gutter: var(--page-gutter);
-    }
-
-    .composer-row {
-      gap: var(--space-200);
-    }
-  }
-
-  .composer-shell {
-    align-items: end;
-    display: flex;
-    position: relative;
-  }
-
-  .composer {
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
-    container-type: inline-size;
-    display: flex;
-    flex: 0 0 auto;
-    flex-direction: column;
-    min-width: 0;
-    position: relative;
-    width: 100%;
-  }
-
-  .composer:has(:global([contenteditable='true']):focus) {
-    border-color: var(--primary-main);
-    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
-  }
-
   .drop-overlay {
     align-items: center;
     background: var(--overlay);
@@ -1850,68 +1797,6 @@
     overflow-wrap: anywhere;
   }
 
-  .composer-row {
-    align-items: center;
-    display: grid;
-    gap: var(--space-100);
-    grid-template-areas:
-      'field field field'
-      'before hint after';
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    padding: var(--space-100);
-    width: 100%;
-  }
-
-  .composer-row[hidden] {
-    display: none;
-  }
-
-  .composer-row.formatting-open {
-    grid-template-areas:
-      'field field field'
-      'before formatting after';
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .composer-formatting {
-    grid-area: formatting;
-    min-width: 0;
-  }
-
-  .composer-before,
-  .composer-after {
-    align-items: center;
-    display: flex;
-    gap: var(--space-100);
-  }
-
-  @container (width < 24rem) {
-    .composer-row {
-      grid-template-areas:
-        'field field'
-        'before after';
-      grid-template-columns: auto minmax(0, 1fr);
-    }
-
-    .composer-row.formatting-open {
-      grid-template-areas:
-        'field field'
-        'formatting formatting'
-        'before after';
-    }
-
-    .composer-after {
-      flex-wrap: wrap;
-      gap: 0;
-      justify-content: end;
-      min-width: 0;
-    }
-  }
-
-  .composer-row > :global(.voice-recorder) {
-    grid-column: 1 / -1;
-  }
-
   .composer-measurer {
     box-sizing: border-box;
     height: 0;
@@ -1935,132 +1820,12 @@
     padding: var(--space-200) var(--space-300);
   }
 
-  .composer-field {
-    align-items: center;
-    display: flex;
-    grid-area: field;
-    min-width: 0;
-    position: relative;
-  }
-
-  @media (any-pointer: fine) {
-    @container (width >= 44rem) {
-      .composer-formatting :global(.formatting) {
-        flex-wrap: wrap;
-        height: auto;
-        justify-content: end;
-        overflow: visible;
-      }
-    }
-  }
-
-  :global(.composer-separator) {
-    align-self: center;
-    border-left: var(--border-width-500) solid var(--surface-var-container-line);
-    border-radius: var(--radius-pill);
-    height: var(--size-x400);
-    margin-inline: var(--space-100);
-  }
-
-  .composer-before {
-    align-self: end;
-    grid-area: before;
-  }
-
-  .composer-after {
-    grid-area: after;
-    place-self: end;
-  }
-
   .composer-file {
     height: 1px;
     opacity: 0;
     pointer-events: none;
     position: absolute;
     width: 1px;
-  }
-
-  :global(.composer-format) {
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
-    flex: 0 0 auto;
-    height: var(--target);
-    min-height: var(--target);
-    position: relative;
-    width: var(--target);
-  }
-
-  :global(.composer-format)::after {
-    border-radius: inherit;
-    content: '';
-    inset: calc((var(--target) - var(--target-hit)) / 2);
-    position: absolute;
-  }
-
-  :global(.composer-format svg) {
-    display: block;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  :global(.composer-send),
-  :global(.composer-voice) {
-    border-radius: var(--radius);
-    color: var(--primary-main);
-    height: var(--target);
-    min-height: var(--target);
-    position: relative;
-    width: var(--target);
-  }
-
-  :global(.composer-voice) {
-    color: var(--surface-var-on-container);
-  }
-
-  :global(.composer-send)::after,
-  :global(.composer-voice)::after {
-    border-radius: inherit;
-    content: '';
-    inset: calc((var(--target) - var(--target-hit)) / 2);
-    position: absolute;
-  }
-
-  :global(.composer-send:disabled),
-  :global(.composer-voice:disabled) {
-    color: var(--sec-main);
-  }
-
-  :global(.composer-send:not(:disabled):hover),
-  :global(.composer-send:not(:disabled):focus-visible),
-  :global(.composer-voice:not(:disabled):hover),
-  :global(.composer-voice:not(:disabled):focus-visible) {
-    background: var(--surface-container-hover);
-  }
-
-  :global(.composer-send[data-pressing]) {
-    background: var(--surface-container-hover);
-  }
-
-  :global(.composer-send svg),
-  :global(.composer-voice svg) {
-    display: block;
-    height: var(--icon-size-small);
-    width: var(--icon-size-small);
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    :global(.composer-send svg) {
-      transition: transform var(--motion-fast) var(--motion-easing-standard);
-    }
-
-    :global(.composer-send[data-pressing] svg) {
-      transform: scale(1.3);
-      transition: transform var(--press-ms) linear;
-    }
-
-    .composer {
-      transition: border-color var(--motion-fast) var(--motion-easing-standard);
-    }
   }
 
   .composer-field :global(.icon-button-small.composer-expand) {
@@ -2077,34 +1842,5 @@
     content: '';
     inset: calc((var(--size-x500) - var(--target-hit)) / 2);
     position: absolute;
-  }
-
-  .composer-row.short {
-    grid-template-areas: 'before field after';
-
-    &.formatting-open {
-      grid-template-areas:
-        'formatting formatting formatting'
-        'before field after';
-    }
-
-    :global(.composer-expand),
-    :global(.composer-separator) {
-      display: none;
-    }
-
-    :global(.editor) {
-      padding: var(--space-200);
-      padding-block: var(--space-100);
-
-      &::before {
-        top: var(--space-100);
-      }
-    }
-
-    .composer-before,
-    .composer-after {
-      align-self: start;
-    }
   }
 </style>

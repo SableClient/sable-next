@@ -8,6 +8,7 @@
     preferences,
     setPreference,
   } from '#lib/settings/preferences.svelte.js';
+  import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
   import SettingsAnchorLink from '#lib/ui/primitives/SettingsAnchorLink.svelte';
   import Alert from '#lib/ui/primitives/Alert.svelte';
   import Select from '#lib/ui/primitives/Select.svelte';
@@ -103,12 +104,11 @@
     </h3>
     <SettingsAnchorLink anchor="notification-badges" />
   </div>
-  <p class="hint">{$i18n.t('settings.notificationBadgesHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.notificationBadgesHint')}</p>
 
-  <div class="rows">
+  <ul class="settings-rows">
     {#each badgeRows as { key, label } (key)}
-      <label>
-        <span>{$i18n.t(label)}</span>
+      <SettingsRow title={$i18n.t(label)}>
         <Select
           aria-label={`${$i18n.t('settings.notificationBadges')}: ${$i18n.t(label)}`}
           value={preferences[key]}
@@ -117,9 +117,9 @@
             setPreference(key, value as BadgeNotificationMode);
           }}
         />
-      </label>
+      </SettingsRow>
     {/each}
-  </div>
+  </ul>
 </section>
 
 <section class="defaults settings-form" aria-labelledby="notification-push">
@@ -129,7 +129,7 @@
     </h3>
     <SettingsAnchorLink anchor="notification-push" />
   </div>
-  <p class="hint">{$i18n.t('settings.notificationPushHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.notificationPushHint')}</p>
 
   {#if failed}
     <Alert variant="warning" role="status">
@@ -137,10 +137,9 @@
     </Alert>
   {/if}
 
-  <div class="rows">
+  <ul class="settings-rows">
     {#each pushRows as { key, label, direct } (key)}
-      <label>
-        <span>{$i18n.t(label)}</span>
+      <SettingsRow title={$i18n.t(label)}>
         {#if current}
           <Select
             aria-label={`${$i18n.t('settings.notificationPush')}: ${$i18n.t(label)}`}
@@ -151,11 +150,10 @@
             }}
           />
         {/if}
-      </label>
+      </SettingsRow>
     {/each}
     {#if membership !== null}
-      <label>
-        <span>{$i18n.t('settings.notificationMembership')}</span>
+      <SettingsRow title={$i18n.t('settings.notificationMembership')}>
         <Select
           aria-label={$i18n.t('settings.notificationMembership')}
           value={membership ? 'on' : 'off'}
@@ -164,49 +162,7 @@
             saveMembership(value === 'on');
           }}
         />
-      </label>
+      </SettingsRow>
     {/if}
-  </div>
+  </ul>
 </section>
-
-<style>
-  .defaults {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  h3 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-  }
-
-  .rows {
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  label {
-    align-items: stretch;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-200);
-    justify-content: space-between;
-  }
-
-  @media (width >= 32rem) {
-    label {
-      align-items: center;
-      display: grid;
-      gap: var(--space-400);
-      grid-template-columns: minmax(0, 1fr) minmax(14rem, 20rem);
-    }
-  }
-</style>

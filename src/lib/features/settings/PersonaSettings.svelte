@@ -437,7 +437,7 @@
 <style>
   .persona-stack {
     display: grid;
-    gap: var(--space-400);
+    gap: var(--space-300);
   }
 
   .persona-list {

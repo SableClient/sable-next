@@ -143,7 +143,6 @@
     <Button
       {...props}
       variant="secondary"
-      size="large"
       class="test-mic"
       aria-disabled={media.microphone ? undefined : 'true'}
       aria-pressed={testing && media.microphone}
@@ -164,7 +163,7 @@
 {/snippet}
 
 {#snippet joinAction()}
-  <Button variant="primary" size="large" disabled={joining} loading={joining} onclick={onJoin}>
+  <Button variant="primary" disabled={joining} loading={joining} onclick={onJoin}>
     <PhoneIcon aria-hidden="true" weight="fill" />
     {joining ? $i18n.t('call.joining') : $i18n.t('call.joinVoice')}
   </Button>

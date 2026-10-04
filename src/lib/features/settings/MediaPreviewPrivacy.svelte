@@ -39,11 +39,7 @@
       }}
     />
   </SettingsRow>
-  <SettingsRow
-    title={$i18n.t('settings.inviteAvatars')}
-    description={$i18n.t('settings.inviteAvatarsHint')}
-    control={avatarsId}
-  >
+  <SettingsRow title={$i18n.t('settings.inviteAvatars')} control={avatarsId}>
     <Switch
       id={avatarsId}
       checked={mediaPreviewSettings.inviteAvatars === 'on'}

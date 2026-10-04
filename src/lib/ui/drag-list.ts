@@ -36,6 +36,7 @@ export function dropInstructionAt(
 
 export interface DropTargetOptions<T> {
   allowInto?: boolean;
+  axis?: 'vertical' | 'horizontal';
   onState: (state: DropState<T> | null) => void;
   onDrop: (source: T, target: T, instruction: DropInstruction) => void;
 }
@@ -90,12 +91,14 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
       };
     },
 
-    dropTarget(item, { allowInto = false, onState, onDrop }) {
+    dropTarget(item, { allowInto = false, axis = 'vertical', onState, onDrop }) {
       return (node) => {
-        const instructionAt = (clientY: number): DropInstruction => {
+        const instructionAt = (event: DragEvent): DropInstruction => {
           const box = node.getBoundingClientRect();
-
-          return dropInstructionAt(clientY - box.top, box.height, allowInto);
+          if (axis === 'horizontal') {
+            return dropInstructionAt(event.clientX - box.left, box.width, allowInto);
+          }
+          return dropInstructionAt(event.clientY - box.top, box.height, allowInto);
         };
 
         const over = (event: DragEvent): void => {
@@ -110,7 +113,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move';
 
           hovered = item;
-          onState({ item, instruction: instructionAt(event.clientY) });
+          onState({ item, instruction: instructionAt(event) });
         };
 
         const leave = (): void => {
@@ -128,7 +131,7 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           event.stopPropagation();
           hovered = null;
           onState(null);
-          if (!equals(source, item)) onDrop(source, item, instructionAt(event.clientY));
+          if (!equals(source, item)) onDrop(source, item, instructionAt(event));
           finishDrag?.();
         };
 

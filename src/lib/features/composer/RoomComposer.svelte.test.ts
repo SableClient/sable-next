@@ -1669,7 +1669,12 @@ test('the format button follows the configured button order', async () => {
   await tick();
 
   const after = document.querySelector('.composer-after');
-  expect(after?.firstElementChild?.classList.contains('composer-format')).toBe(true);
+  const first = after?.firstElementChild;
+  expect(
+    Boolean(
+      first?.classList.contains('composer-format') || first?.querySelector('.composer-format')
+    )
+  ).toBe(true);
 });
 
 function pressInEditor(init: KeyboardEventInit): void {

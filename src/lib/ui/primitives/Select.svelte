@@ -3,11 +3,13 @@
   import CaretDownIcon from 'phosphor-svelte/lib/CaretDownIcon';
   import CheckIcon from 'phosphor-svelte/lib/CheckIcon';
   import type { ClassValue } from 'svelte/elements';
+  import { getContext } from 'svelte';
   import { i18n } from '#lib/i18n.js';
   import { BREAKPOINTS } from '#lib/ui/breakpoints.js';
   import { createMediaQuery } from '#lib/ui/media-query.svelte.js';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
   import BottomSheet from './BottomSheet.svelte';
+  import Switcher, { settingsChoices } from './Switcher.svelte';
   import './form-control.css';
   import './menu.css';
 
@@ -29,6 +31,7 @@
     disabled?: boolean;
     placeholder?: string;
     class?: ClassValue;
+    forceDropdown?: boolean;
     'aria-label'?: string;
     onValueChange?: (value: string) => void;
   };
@@ -42,11 +45,21 @@
     disabled = false,
     placeholder,
     class: className = '',
+    forceDropdown = false,
     'aria-label': ariaLabel,
     onValueChange,
   }: Props = $props();
 
   const appLayout = createMediaQuery(BREAKPOINTS.appLayout);
+  const inlineChoices = getContext<boolean>(settingsChoices) ?? false;
+  const useSwitcher = $derived(
+    !forceDropdown &&
+      inlineChoices &&
+      Boolean(ariaLabel || placeholder) &&
+      items.length >= 2 &&
+      items.length <= 3 &&
+      !items.some((item) => item.image)
+  );
   let sheetOpen = $state(false);
   let selectedLabel = $derived(items.find((item) => item.value === value)?.label);
 
@@ -71,7 +84,18 @@
   {#if selected}<CheckIcon class="select-check" aria-hidden="true" />{/if}
 {/snippet}
 
-{#if !appLayout.matches}
+{#if useSwitcher}
+  <Switcher
+    {id}
+    {items}
+    bind:value
+    label={ariaLabel ?? placeholder ?? ''}
+    {name}
+    {required}
+    {disabled}
+    {onValueChange}
+  />
+{:else if !appLayout.matches}
   <button
     type="button"
     {id}
@@ -145,17 +169,35 @@
 
 <style>
   :global(.select) {
+    --form-control-padding-inline: var(--space-200);
+    --form-control-padding-inline-end: var(--space-200);
+
     align-items: center;
     cursor: pointer;
     display: flex;
     gap: var(--space-300);
+    height: var(--control-height-300);
     justify-content: space-between;
+    min-height: var(--control-height-300);
+    position: relative;
     text-align: left;
     width: 100%;
   }
 
+  :global(.select::after) {
+    content: '';
+    inset-block: calc((var(--target-hit) - var(--control-height-300)) / -2);
+    inset-inline: 0;
+    position: absolute;
+  }
+
   :global(.select-text) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-transform: none;
+    white-space: nowrap;
   }
 
   :global(.selection-label) {

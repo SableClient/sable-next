@@ -36,6 +36,7 @@
 <style>
   .editor {
     flex: 1;
+    font-size: max(var(--font-size-editor), var(--font-size-input-min));
     max-height: 10rem;
     min-height: var(--target);
     min-width: 0;
@@ -47,14 +48,12 @@
 
   /* `white-space` comes from prosemirror.css, imported by `composer-editor.ts`. */
   .editor :global([contenteditable='true']) {
-    font-size: max(var(--font-size-editor), var(--font-size-input-min));
     outline: 0;
     overflow-wrap: anywhere;
   }
 
   .editor :global(.keyboard-reset) {
     border: 0;
-    font-size: max(var(--font-size-editor), var(--font-size-input-min));
     inset: 0;
     opacity: 0;
     padding: 0;

@@ -13,7 +13,7 @@
         control: 'select',
         options: ['primary', 'secondary', 'subtle', 'ghost', 'danger'],
       },
-      size: { control: 'select', options: ['small', 'medium', 'large', 'icon'] },
+      size: { control: 'select', options: ['small', 'medium', 'icon'] },
       loading: { control: 'boolean' },
       block: { control: 'boolean' },
       disabled: { control: 'boolean' },
@@ -28,7 +28,7 @@
   });
 
   const variants = ['primary', 'secondary', 'subtle', 'ghost', 'danger'] as const;
-  const sizes = ['small', 'medium', 'large'] as const;
+  const sizes = ['small', 'medium'] as const;
 </script>
 
 {#snippet template(args: ComponentProps<typeof Button>)}

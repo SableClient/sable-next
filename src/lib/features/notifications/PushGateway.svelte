@@ -201,7 +201,7 @@
     <h3 id="push-gateway" data-settings-outline>{$i18n.t('settings.pushGateway')}</h3>
     <SettingsAnchorLink anchor="push-gateway" />
   </div>
-  <p class="hint">{$i18n.t('settings.pushGatewayHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.pushGatewayHint')}</p>
 
   {#if !deliversWebPush() && !native}
     <Alert variant="info">
@@ -269,26 +269,6 @@
 </section>
 
 <style>
-  .gateway {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  h3 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
-
   .rows {
     display: grid;
     gap: var(--space-300);

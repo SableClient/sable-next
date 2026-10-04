@@ -148,7 +148,7 @@
     </h3>
     <SettingsAnchorLink anchor="notification-keywords" />
   </div>
-  <p class="hint">{$i18n.t('settings.notificationKeywordsHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.notificationKeywordsHint')}</p>
 
   {#if error}
     <Alert variant="warning" role="status">
@@ -229,24 +229,6 @@
 />
 
 <style>
-  .keywords {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  h3 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-  }
-
   .keywords-empty {
     color: var(--surface-var-on-container);
     margin: 0;
@@ -278,6 +260,7 @@
 
   .keyword-list li :global(.keyword-mode) {
     flex: none;
+    max-width: min(100%, 11rem);
     width: auto;
   }
 

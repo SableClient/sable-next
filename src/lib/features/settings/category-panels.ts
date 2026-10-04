@@ -6,9 +6,9 @@ import { preferences } from '#lib/settings/preferences.svelte.js';
 import { SETTINGS_ACCOUNT_SECTION } from '#lib/settings/registry.js';
 
 import AppIconSettings from '#lib/features/settings/AppIconSettings.svelte';
-import ComposerFormPreview from '#lib/features/settings/ComposerFormPreview.svelte';
-import ComposerButtonOrder from '#lib/features/settings/ComposerButtonOrder.svelte';
 import CallDeviceSettings from '#lib/features/call/CallDeviceSettings.svelte';
+import ComposerButtons from '#lib/features/settings/ComposerButtons.svelte';
+import ComposerEnterSetting from '#lib/features/settings/ComposerEnterSetting.svelte';
 import CustomThemes from '#lib/features/settings/CustomThemes.svelte';
 import QuickCss from '#lib/features/settings/QuickCss.svelte';
 import DoubleTapReaction from '#lib/features/settings/DoubleTapReaction.svelte';
@@ -48,8 +48,8 @@ export const categoryPanels: Record<string, CategoryPanel[]> = {
     { component: AppIconSettings, section: 'themes' },
   ],
   composer: [
-    { component: ComposerFormPreview, section: 'form', start: true },
-    { component: ComposerButtonOrder, section: 'composer-button-order' },
+    { component: ComposerEnterSetting, section: 'writing', start: true },
+    { component: ComposerButtons, section: 'composer-buttons' },
   ],
   timeline: [
     { component: DoubleTapReaction, section: 'messages' },

@@ -10,7 +10,7 @@
 
 <script lang="ts">
   import { Dialog } from 'bits-ui';
-  import { untrack } from 'svelte';
+  import { setContext, untrack } from 'svelte';
   import ArrowLeftIcon from 'phosphor-svelte/lib/ArrowLeftIcon';
   import XIcon from 'phosphor-svelte/lib/XIcon';
 
@@ -19,6 +19,7 @@
   import { shouldReduceMotion } from '#lib/ui/motion.js';
   import { SwipeBack } from '#lib/ui/swipe-back.svelte.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
+  import { settingsChoices } from '#lib/ui/primitives/Switcher.svelte';
   import SettingsJumpSheet from './SettingsJumpSheet.svelte';
   import SettingsOutline from './SettingsOutline.svelte';
   import { OutlineTracker } from './settings-outline.svelte.js';
@@ -52,6 +53,7 @@
     onBack,
     onClose,
   }: Props = $props();
+  setContext(settingsChoices, true);
   const SWIPE_IGNORE = '.slider, [data-sheet-no-drag]';
   const outline = new OutlineTracker();
   const pages = createMasterDetail(
@@ -243,7 +245,7 @@
     border-bottom: var(--border-width) solid var(--surface-container-line);
     color: var(--surface-on-container);
     flex: 0 0 auto;
-    gap: var(--space-300);
+    gap: var(--space-150);
     justify-content: flex-start;
   }
 

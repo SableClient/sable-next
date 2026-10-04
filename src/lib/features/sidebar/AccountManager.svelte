@@ -211,7 +211,7 @@
       crest={preferences.sendPresence ? statusBubble : undefined}
       actions={editProfile}
     />
-    <Button variant="secondary" size="large" block onclick={() => void goto(resolve('settings'))}
+    <Button variant="secondary" block onclick={() => void goto(resolve('settings'))}
       ><GearIcon aria-hidden="true" />{$i18n.t('nav.settings')}</Button
     >
   </div>

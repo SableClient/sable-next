@@ -86,3 +86,56 @@ describe('searchSettings', () => {
     expect(hits).toEqual([]);
   });
 });
+
+const enterCopy: Record<string, string> = {
+  'settings.enterForNewline': 'Enter starts a new line',
+  'settings.enterForNewlineAdaptive': 'Newline on touch screens, send otherwise',
+  'settings.enterForNewlineNewline': 'Always inserts a newline',
+  'settings.enterForNewlineSend': 'Always sends',
+  'settings.enterKey': 'Enter key',
+  'settings.enterSends': 'Enter sends',
+};
+
+function translateEnter(key: string): string {
+  return enterCopy[key] ?? key;
+}
+
+describe('enter setting search', () => {
+  it('shows the selected mode and matches the switcher choices without a description', async () => {
+    const { settingsCategories } = await import('#lib/settings/registry.js');
+    const { preferences } = await import('#lib/settings/preferences.svelte.js');
+    const previousNewline = preferences.enterForNewline;
+
+    function hit() {
+      return searchSettings('Enter sends', settingsCategories, translateEnter).find(
+        (entry) => entry.setting.key === 'enterForNewline'
+      )?.setting;
+    }
+
+    try {
+      preferences.enterForNewline = 'send';
+      expect(hit()?.name).toBe('settings.enterSends');
+      expect(hit()?.description).toBeUndefined();
+      expect(
+        searchSettings('starts a new line', settingsCategories, translateEnter).some(
+          (entry) => entry.setting.key === 'enterForNewline'
+        )
+      ).toBe(true);
+      preferences.enterForNewline = 'newline';
+      expect(hit()?.name).toBe('settings.enterForNewline');
+      expect(hit()?.description).toBeUndefined();
+      expect(hit()).toBeDefined();
+
+      preferences.enterForNewline = 'adaptive';
+      expect(hit()?.name).toBe('settings.enterForNewlineAdaptive');
+      expect(hit()?.description).toBeUndefined();
+      expect(
+        searchSettings('Enter sends', settingsCategories, translateEnter).some(
+          (entry) => entry.setting.key === 'enterForNewline'
+        )
+      ).toBe(true);
+    } finally {
+      preferences.enterForNewline = previousNewline;
+    }
+  }, 10_000);
+});

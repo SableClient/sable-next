@@ -97,7 +97,7 @@
     </h3>
     <SettingsAnchorLink anchor="notification-troubleshoot" />
   </div>
-  <p class="hint">{$i18n.t('settings.troubleshootHint')}</p>
+  <p class="hint settings-description">{$i18n.t('settings.troubleshootHint')}</p>
 
   {#if started}
     <ol class="checks">
@@ -158,24 +158,6 @@
 </section>
 
 <style>
-  .troubleshoot {
-    background: var(--surface-var-container);
-    border-radius: var(--radius);
-    display: grid;
-    gap: var(--space-300);
-  }
-
-  h3 {
-    font-size: var(--font-size-heading);
-    margin: 0;
-  }
-
-  .hint {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: 0;
-  }
-
   .checks {
     display: grid;
     gap: var(--space-300);

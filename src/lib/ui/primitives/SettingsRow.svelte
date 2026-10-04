@@ -4,6 +4,7 @@
   import SettingsAnchorLink from './SettingsAnchorLink.svelte';
   import { settingsAnchors } from './settings-anchors.js';
   import StatusBadge from './StatusBadge.svelte';
+  import './settings-row.css';
 
   interface Props {
     title?: string;
@@ -47,19 +48,18 @@
 >
   {#if before}<span class="row-before">{@render before()}</span>{/if}
   <div class="row-copy">
-    {#if control}<label class="row-hit" for={control}></label>{/if}
     {#if copy}
       {@render copy()}
     {:else}
       <div class="row-name">
-        <span class="name">{title}</span>
+        {#if control}<label class="name" for={control}>{title}</label>
+        {:else}<span class="name">{title}</span>{/if}
         {#if badge}<StatusBadge variant="neutral" label={badge} />{/if}
         {#if id}<SettingsAnchorLink anchor={id} />{/if}
       </div>
-      {#if typeof description === 'string'}<p>{description}</p>
-      {:else if description}
-        <p>
-          {@render description()}
+      {#if description}
+        <p class="settings-description">
+          {#if typeof description === 'string'}{description}{:else}{@render description()}{/if}
         </p>
       {/if}
     {/if}
@@ -70,11 +70,12 @@
 <style>
   .setting-row {
     align-items: center;
+    box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-400);
-    min-height: calc(var(--control-height-medium) + var(--space-200));
-    padding: var(--space-250) var(--space-400);
+    gap: var(--space-100) var(--space-400);
+    min-height: var(--target-hit);
+    padding: var(--space-150) var(--space-400);
 
     :global(img),
     :global(.media-image) {
@@ -84,7 +85,7 @@
   }
 
   :global(.setting-row + .setting-row) {
-    border-top: var(--border-width) solid var(--bg-container-line);
+    box-shadow: inset 0 var(--border-width) 0 var(--bg-container-line);
   }
 
   .row-before {
@@ -94,15 +95,9 @@
   }
 
   .row-copy {
-    flex: 1 1 12rem;
-    min-width: 0;
+    flex: 1 1 0;
+    min-width: min(var(--space-1100), 100%);
     position: relative;
-  }
-
-  .row-hit {
-    cursor: pointer;
-    inset: 0;
-    position: absolute;
   }
 
   .row-name :global(.anchor-link) {
@@ -112,7 +107,7 @@
   .row-name {
     align-items: center;
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: var(--space-200);
   }
 
@@ -121,25 +116,13 @@
     overflow-wrap: anywhere;
   }
 
-  .row-copy p {
-    color: var(--surface-var-on-container);
-    font-size: var(--font-size-small);
-    margin: var(--space-050) 0 0;
-    max-width: 60ch;
-    overflow-wrap: anywhere;
-  }
-
   .setting-row.disabled .row-copy {
-    opacity: 0.65;
+    opacity: var(--opacity-secondary);
   }
 
   .setting-row.highlighted {
     background: var(--primary-container);
     color: var(--primary-on-container);
-  }
-
-  .setting-row.highlighted .row-copy p {
-    color: inherit;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -151,11 +134,12 @@
   .row-control {
     align-items: center;
     display: flex;
-    flex: 1 1 100%;
+    flex: 0 1 auto;
     flex-wrap: wrap;
     gap: var(--space-300);
-    justify-content: flex-start;
+    justify-content: flex-end;
     max-width: 100%;
+    min-height: var(--target-hit);
     min-width: 0;
     width: auto;
   }
@@ -164,24 +148,7 @@
     flex: 0 0 auto;
   }
 
-  .row-control.wide {
-    min-width: 11rem;
-  }
-
   .row-control :global(.select) {
     min-width: min(11rem, 100%);
-  }
-
-  @media (width >= 42rem) {
-    .setting-row {
-      flex-wrap: nowrap;
-    }
-
-    .row-control {
-      flex: 0 0 auto;
-      justify-content: flex-end;
-      padding-left: 0;
-      width: auto;
-    }
   }
 </style>
