@@ -173,6 +173,17 @@ describe('a swipe that starts inside editable text', () => {
     expect(startOn(element('input'))).toBeUndefined();
   });
 
+  it('is refused on a slider, so dragging the thumb does not swipe the page', () => {
+    const slider = element('div');
+    slider.className = 'slider';
+    const thumb = element('span');
+    thumb.setAttribute('role', 'slider');
+    slider.append(thumb);
+
+    expect(startOn(slider)).toBeUndefined();
+    expect(startOn(thumb)).toBeUndefined();
+  });
+
   it('is allowed on content that is not editable', () => {
     expect(startOn(element('span', 'false'))).toBeDefined();
     expect(startOn(element('p'))).toBeDefined();

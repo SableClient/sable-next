@@ -43,14 +43,15 @@ export function startsInHorizontalScroller(target: EventTarget | null, root: Ele
   return false;
 }
 
-const EDITABLE = 'input, textarea, [contenteditable]:not([contenteditable="false"])';
+const NO_SWIPE =
+  'input, textarea, .slider, [role="slider"], [contenteditable]:not([contenteditable="false"])';
 
 export function startSwipeGesture(
   event: TouchEvent,
   startPosition: number
 ): SwipeGesture | undefined {
   if (event.touches.length !== 1) return undefined;
-  if (event.target instanceof Element && event.target.closest(EDITABLE)) return undefined;
+  if (event.target instanceof Element && event.target.closest(NO_SWIPE)) return undefined;
   if (
     event.currentTarget instanceof Element &&
     startsInHorizontalScroller(event.target, event.currentTarget)
