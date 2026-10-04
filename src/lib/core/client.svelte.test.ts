@@ -1014,22 +1014,30 @@ test('a lookup in flight when the profile changes does not refill the cache', as
   }
 });
 
-test('profile lookups are spaced out', async () => {
+test('profile lookups run a few at a time', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
-  fake.send.mockResolvedValue({ profile: {} });
+  const release: (() => void)[] = [];
+  fake.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release.push(() => {
+          resolve({ profile: {} });
+        });
+      })
+  );
   try {
-    const lookups = Array.from({ length: 3 }, (_, index) =>
+    const lookups = Array.from({ length: 8 }, (_, index) =>
       core.userProfile(`@user${index}:example.org`)
     );
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(150);
-    expect(fake.send).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(150);
+    expect(fake.send).toHaveBeenCalledTimes(6);
+    for (const resolve of release.splice(0)) resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(8);
+    for (const resolve of release.splice(0)) resolve();
     await Promise.all(lookups);
-    expect(fake.send).toHaveBeenCalledTimes(3);
   } finally {
     core.stop();
     vi.useRealTimers();
@@ -1079,7 +1087,7 @@ test('a profile lookup that stayed rate limited is not remembered as failed', as
   }
 });
 
-test('lookups slow down after a rate limit that carries no hint', async () => {
+test('a rate limit without a hint pauses every lookup for a second', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
@@ -1088,13 +1096,10 @@ test('lookups slow down after a rate limit that carries no hint', async () => {
     .mockResolvedValue({ profile: {} });
   try {
     const first = core.userProfile('@a:example.org');
+    await vi.advanceTimersByTimeAsync(0);
     const second = core.userProfile('@b:example.org');
-    await vi.advanceTimersByTimeAsync(299);
+    await vi.advanceTimersByTimeAsync(999);
     expect(fake.send).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fake.send).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(299);
-    expect(fake.send).toHaveBeenCalledTimes(2);
     await vi.advanceTimersByTimeAsync(1);
     await Promise.all([first, second]);
     expect(fake.send).toHaveBeenCalledTimes(3);
