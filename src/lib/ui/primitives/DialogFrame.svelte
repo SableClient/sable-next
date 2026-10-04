@@ -120,12 +120,11 @@
     box-shadow: var(--shadow-dialog);
     color: var(--bg-on-container);
     height: 100dvh;
-    left: 50%;
+    left: 0;
     max-width: 68rem;
     overflow: hidden;
     padding-block: var(--safe-top) var(--safe-bottom);
-    top: 50%;
-    transform: translate(-50%, -50%);
+    top: 0;
     width: 100%;
   }
 
@@ -188,8 +187,10 @@
       border: var(--border-width) solid var(--surface-container-line);
       border-radius: var(--radius);
       height: min(52rem, calc(100dvh - 3rem - var(--titlebar-height)));
+      left: 50%;
       padding-block: 0;
       top: calc(50% + var(--titlebar-height) / 2);
+      transform: translate(-50%, -50%);
       width: calc(100% - 3rem);
     }
   }
