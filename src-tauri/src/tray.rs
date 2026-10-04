@@ -81,6 +81,7 @@ pub fn apply<R: Runtime>(
         .show_system_tray_icon
         .store(settings.show_system_tray_icon, Ordering::Relaxed);
 
+    crate::window_geometry::remember_custom_title_bar(app, settings.use_custom_title_bar);
     apply_title_bar(app, settings.use_custom_title_bar)?;
 
     let wanted = settings.show_system_tray_icon && cfg!(not(target_os = "macos"));

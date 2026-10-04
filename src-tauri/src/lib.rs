@@ -384,6 +384,8 @@ fn setup(app: &mut tauri::App<BrowserEngine>) -> Result<(), Box<dyn std::error::
             });
         #[cfg(desktop)]
         let builder = window_geometry::restore(app.handle(), builder, &config.label);
+        #[cfg(desktop)]
+        let builder = window_geometry::restore_title_bar(app.handle(), builder);
         #[cfg(all(desktop, not(all(feature = "cef", target_os = "linux"))))]
         let builder = match proxy::launch_proxy() {
             Ok(Some(url)) => builder.proxy_url(tauri::Url::parse(url)?),

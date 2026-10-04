@@ -85,3 +85,34 @@ fn intersects(monitor: &Monitor, saved: &SavedGeometry) -> bool {
     .into_iter()
     .any(|(x, y)| x >= left && x < right && y >= top && y < bottom)
 }
+
+const CUSTOM_TITLE_BAR_FILE: &str = "custom_title_bar";
+
+pub fn remember_custom_title_bar<R: Runtime>(app: &AppHandle<R>, custom: bool) {
+    let Ok(dir) = app.path().app_config_dir() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(
+        dir.join(CUSTOM_TITLE_BAR_FILE),
+        if custom { "1" } else { "0" },
+    );
+}
+
+pub fn restore_title_bar<'a, R: Runtime, M: Manager<R>>(
+    app: &AppHandle<R>,
+    builder: WebviewWindowBuilder<'a, R, M>,
+) -> WebviewWindowBuilder<'a, R, M> {
+    if cfg!(target_os = "macos") {
+        return builder;
+    }
+    let Some(custom) = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .and_then(|dir| std::fs::read_to_string(dir.join(CUSTOM_TITLE_BAR_FILE)).ok())
+    else {
+        return builder;
+    };
+    builder.decorations(custom.trim() != "1")
+}
