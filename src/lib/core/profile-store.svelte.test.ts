@@ -92,7 +92,7 @@ test('a rate-limited lookup is retried as soon as it is asked again', async () =
   await expect(store.load('@a:x')).resolves.toEqual(profile('a'));
 });
 
-test('invalidating wakes the profile again for the same user only once per burst', async () => {
+test('a burst of invalidations causes a single refetch', async () => {
   const { store, fetch } = setup();
   fetch.mockResolvedValue(profile('a'));
   await store.load('@a:x');
