@@ -6,6 +6,7 @@
 
   import { useCoreClient } from '#lib/core/context.js';
   import { i18n } from '#lib/i18n.js';
+  import { roomSectionPath } from '#lib/rooms/permalink.js';
   import { useRoomList } from '#lib/rooms/room-list.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
@@ -26,7 +27,10 @@
   const headingId = $props.id();
 
   let fetched = $state.raw<RoomSummary[]>([]);
-  let replaced = $derived(fetched.filter((room) => !isReplacedRoomDismissed(room.room_id)));
+  let replaced = $derived(fetched);
+  let pendingCount = $derived(
+    fetched.filter((room) => !isReplacedRoomDismissed(room.room_id)).length
+  );
   let listedCount = $derived(roomList.rooms.length);
 
   $effect(() => {
@@ -51,7 +55,9 @@
     {#each replaced as room (room.room_id)}
       {@const name = room.name ?? room.room_id}
       <li title={name} aria-label={name}>
-        <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
+        <a href={roomSectionPath(roomList.rooms, room.room_id)} draggable="false">
+          <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
+        </a>
       </li>
     {/each}
   </ul>
@@ -59,14 +65,21 @@
   <section class="replaced" aria-labelledby={headingId}>
     <h3 id={headingId}>
       {$i18n.t('room.replacedTitle')}
-      <span class="count">{replaced.length}</span>
+      {#if pendingCount > 0}<span class="count">{pendingCount}</span>{/if}
     </h3>
     <ul>
       {#each replaced as room (room.room_id)}
         {@const name = room.name ?? room.room_id}
-        <li>
-          <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
-          <span class="replaced-name" title={name}>{name}</span>
+        {@const handled = isReplacedRoomDismissed(room.room_id)}
+        <li class:handled>
+          <a
+            class="replaced-link"
+            href={roomSectionPath(roomList.rooms, room.room_id)}
+            draggable="false"
+          >
+            <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
+            <span class="replaced-name" title={name}>{name}</span>
+          </a>
           <IconButton
             variant="ghost"
             size="medium"
@@ -77,16 +90,18 @@
           >
             <SignOutIcon />
           </IconButton>
-          <IconButton
-            variant="ghost"
-            size="medium"
-            label={$i18n.t('room.replacedDismissLabel', { room: name })}
-            onclick={() => {
-              dismissReplacedRoom(room.room_id);
-            }}
-          >
-            <XIcon />
-          </IconButton>
+          {#if !handled}
+            <IconButton
+              variant="ghost"
+              size="medium"
+              label={$i18n.t('room.replacedDismissLabel', { room: name })}
+              onclick={() => {
+                dismissReplacedRoom(room.room_id);
+              }}
+            >
+              <XIcon />
+            </IconButton>
+          {/if}
         </li>
       {/each}
     </ul>
@@ -131,6 +146,10 @@
     padding: 0 var(--space-100) 0 var(--space-200);
   }
 
+  li.handled {
+    opacity: 0.7;
+  }
+
   li:hover {
     background: var(--bg-container-hover);
   }
@@ -152,6 +171,16 @@
     --avatar-size: 1.75rem;
 
     font-size: var(--font-size-small);
+  }
+
+  .replaced-link {
+    align-items: center;
+    color: inherit;
+    display: flex;
+    flex: 1;
+    gap: var(--space-200);
+    min-width: 0;
+    text-decoration: none;
   }
 
   .replaced-name {

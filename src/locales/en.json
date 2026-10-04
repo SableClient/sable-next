@@ -309,7 +309,7 @@
     "inviteDeclineLabel": "Decline invite to {{room}}",
     "replacedTitle": "Replaced rooms",
     "replacedLeaveLabel": "Leave replaced room {{room}}",
-    "replacedDismissLabel": "Hide replaced room {{room}}",
+    "replacedDismissLabel": "Dismiss replaced room {{room}}",
     "inviteFailed": "That invitation could not be answered.",
     "settingsJoinRuleUnsettable": "This room is set to {{rule}}. Sable cannot write that rule, so picking one below will replace it.",
     "joinRule": {
