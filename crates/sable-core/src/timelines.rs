@@ -51,6 +51,7 @@ impl Core {
         room_id: &OwnedRoomId,
         hidden_events: bool,
     ) -> Result<Arc<Timeline>, CommandErr> {
+        tracing::info!(%room_id, "live_timeline: waiting for session");
         let session = self.session.read().await;
         let room = session
             .as_ref()
@@ -68,11 +69,13 @@ impl Core {
             }
         }
 
+        tracing::info!(%room_id, "live_timeline: building");
         let timeline = Arc::new(
             build_room_timeline(&room, &TimelineFocusView::Live, hidden_events)
                 .await
                 .or_failed(self, "build_timeline")?,
         );
+        tracing::info!(%room_id, "live_timeline: built");
 
         let subscribed_room_ids = self
             .subscriptions
