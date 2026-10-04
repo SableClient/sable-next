@@ -6,7 +6,6 @@
 
   import { i18n } from '#lib/i18n.js';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
-  import FormattedBody from '#lib/features/room/messages/FormattedBody.svelte';
 
   import type { ComposerContext } from './composer-context';
 
@@ -35,11 +34,7 @@
     </span>
   {/if}
   <div class="context-body">
-    {#if context.kind === 'reply' && context.html}
-      <FormattedBody html={context.html} />
-    {:else}
-      {context.body}
-    {/if}
+    {context.body}
   </div>
   {#if context.kind === 'reply'}
     <IconButton
