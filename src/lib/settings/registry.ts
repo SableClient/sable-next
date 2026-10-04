@@ -843,6 +843,13 @@ export const settingsCategories: SettingsCategory[] = [
         type: 'boolean',
       },
       {
+        key: 'showRoleTooltip',
+        section: 'messages',
+        icon: UserCircleIcon,
+        name: 'settings.showRoleTooltip',
+        type: 'boolean',
+      },
+      {
         key: 'hour24Clock',
         section: 'time-date',
         icon: ClockIcon,

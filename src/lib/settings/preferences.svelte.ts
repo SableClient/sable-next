@@ -222,6 +222,7 @@ export interface Preferences {
   captionPosition: CaptionPosition;
   usernameClick: UsernameClick;
   doubleTapReact: boolean;
+  showRoleTooltip: boolean;
   doubleTapReaction: string;
   hideTypingIndicators: boolean;
   memberSort: MemberSort;
@@ -488,6 +489,7 @@ const DEFAULTS: Preferences = {
   captionPosition: 'below',
   usernameClick: 'mention',
   doubleTapReact: true,
+  showRoleTooltip: false,
   doubleTapReaction: '❤️',
   hideTypingIndicators: false,
   memberSort: 'name-asc',

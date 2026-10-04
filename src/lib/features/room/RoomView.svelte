@@ -420,9 +420,10 @@
     if (!tags || !Object.values(tags).some((tag) => tag.icon || tag.color)) return {};
     return Object.fromEntries(
       memberLoader.members.flatMap((member) => {
-        const icon = tagForLevel(tags, member.power_level)?.icon ?? null;
+        const tag = tagForLevel(tags, member.power_level);
+        const icon = tag?.icon ?? null;
         const color = powerTag(member.power_level, $i18n.t, tags).color;
-        return icon || color ? [[member.user_id, { icon, color }]] : [];
+        return icon || color ? [[member.user_id, { icon, name: tag?.name ?? null, color }]] : [];
       })
     );
   });

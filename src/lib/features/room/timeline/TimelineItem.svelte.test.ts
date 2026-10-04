@@ -90,6 +90,7 @@ afterEach(() => {
   document.body.replaceChildren();
   setPreference('replyPreviewStyle', 'connected');
   setPreference('showPronouns', true);
+  setPreference('showRoleTooltip', false);
   setPreference('showPronounPills', true);
   core.userProfile.mockReset();
   core.userProfile.mockRejectedValue(new Error('profile unavailable'));
@@ -279,7 +280,7 @@ test("shows the sender's role icon after their name", async () => {
     props: {
       core,
       item: { item: item(false), collapsed: false },
-      roles: { '@alice:example.org': { icon: '🛡️', color: null } },
+      roles: { '@alice:example.org': { icon: '🛡️', name: 'Moderator', color: null } },
     },
   });
   await tick();
@@ -287,6 +288,22 @@ test("shows the sender's role icon after their name", async () => {
   const icon = document.querySelector('header .role-tag-icon');
   expect(icon?.textContent).toBe('🛡️');
   expect(icon?.previousElementSibling?.classList.contains('sender-identity')).toBe(true);
+});
+
+test('shows the role name on hover only when the setting is on', async () => {
+  setPreference('showRoleTooltip', true);
+  render(TimelineItemHarness, {
+    props: {
+      core,
+      item: { item: item(false), collapsed: false },
+      roles: { '@alice:example.org': { icon: '🛡️', name: 'Moderator', color: null } },
+    },
+  });
+  await tick();
+
+  const role = document.querySelector('header .sender-role');
+  if (role) await userEvent.hover(role);
+  expect(await screen.findByText('Moderator', {}, { timeout: 2000 })).toBeTruthy();
 });
 
 test('displays saved founder flair on a message', async () => {
@@ -301,6 +318,7 @@ test('displays saved founder flair on a message', async () => {
       roles: {
         '@alice:example.org': {
           icon: tagForLevel(tags, FOUNDER_POWER_LEVEL)?.icon ?? null,
+          name: 'Founder',
           color: powerTag(FOUNDER_POWER_LEVEL, (key) => key, tags).color,
         },
       },

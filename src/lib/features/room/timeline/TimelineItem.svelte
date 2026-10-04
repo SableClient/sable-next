@@ -32,6 +32,7 @@
   import { preferences, type TimelineLayout } from '#lib/settings/preferences.svelte.js';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import Skeleton from '#lib/ui/primitives/Skeleton.svelte';
+  import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { nameColorOnDark, nameColorOnLight } from '#lib/ui/primitives/readable-color.js';
   import PencilSimpleIcon from 'phosphor-svelte/lib/PencilSimpleIcon';
   import ReplyIcon from 'phosphor-svelte/lib/ArrowBendUpLeftIcon';
@@ -704,7 +705,16 @@
               onViaProfile={openSenderAccountProfileAt}
             />
             {#if senderRoleIcon}
-              <RoleTagIcon icon={senderRoleIcon} />
+              {#if preferences.showRoleTooltip && senderRole?.name}
+                <Tooltip label={senderRole.name}>
+                  {#snippet trigger({ props })}
+                    <span {...props} class="sender-role"><RoleTagIcon icon={senderRoleIcon} /></span
+                    >
+                  {/snippet}
+                </Tooltip>
+              {:else}
+                <RoleTagIcon icon={senderRoleIcon} />
+              {/if}
             {/if}
           {/if}
           <div class="message-details">
@@ -1417,6 +1427,10 @@
     display: flex;
     gap: var(--space-200);
     min-width: 0;
+  }
+
+  .sender-role {
+    display: inline-flex;
   }
 
   .message header :global(.sender-identity) {

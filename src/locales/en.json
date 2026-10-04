@@ -2006,6 +2006,7 @@
     "captionPositionInline": "Beside",
     "captionPositionHidden": "Hidden",
     "doubleTapReact": "Double tap to react",
+    "showRoleTooltip": "Show role name on hover",
     "doubleTapReaction": "Double tap reaction",
     "hideTypingIndicators": "Hide typing indicators",
     "groupMembersByPresence": "Group members by presence",

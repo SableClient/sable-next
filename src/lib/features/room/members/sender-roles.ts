@@ -2,6 +2,7 @@ import { createContext } from 'svelte';
 
 export interface SenderRole {
   icon: string | null;
+  name: string | null;
   color: string | null;
 }
 
