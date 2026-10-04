@@ -110,6 +110,21 @@ android {
 }
 
 androidComponents {
+    onVariants { variant ->
+        if (!fossBuild) return@onVariants
+        val abiCode = when (variant.flavorName) {
+            "arm" -> 1
+            "arm64" -> 2
+            "x86" -> 3
+            "x86_64" -> 4
+            else -> 0
+        }
+        variant.outputs.forEach { output ->
+            output.versionCode.set(
+                tauriProperties.getProperty("tauri.android.versionCode", "1").toInt() * 10 + abiCode
+            )
+        }
+    }
     onVariants(selector().withBuildType("debug")) { variant ->
         variant.packaging.jniLibs.keepDebugSymbols.addAll(
             "*/arm64-v8a/*.so",
