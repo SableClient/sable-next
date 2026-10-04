@@ -21,6 +21,7 @@ vi.mock('#lib/rooms/room-list.svelte.js', () => ({
 import {
   backToRoomList,
   contextSearchPath,
+  goToPage,
   leaveRoomView,
   scopedSearchPath,
   searchInRoom,
@@ -135,4 +136,28 @@ test('the back arrow on a phone opens the drawer over the room rather than leavi
     replace: true,
     state: { mobileDrawer: 'open' },
   });
+});
+
+test.each([
+  ['/rooms/other', true],
+  ['/direct/other', true],
+  ['/space/space/other', true],
+  ['/space/space/lobby', false],
+  ['/rooms', false],
+])('on a phone, opening %s from a room replaces the entry: %s', (href, replaced) => {
+  page.url = new URL('https://app.test/rooms/room');
+  page.params = { roomId: 'room' };
+
+  goToPage(href);
+
+  expect(goto).toHaveBeenLastCalledWith(href, { replace: replaced });
+});
+
+test('on a phone, opening a room from the room list pushes', () => {
+  page.url = new URL('https://app.test/rooms');
+  page.params = {};
+
+  goToPage('/rooms/other');
+
+  expect(goto).toHaveBeenLastCalledWith('/rooms/other', { replace: false });
 });

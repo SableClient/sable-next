@@ -17,7 +17,7 @@
   } from './swipe-gesture';
   import { BREAKPOINTS } from './breakpoints';
   import { createMediaQuery } from './media-query.svelte';
-  import { backToRoomList } from '#lib/features/room/room-navigation.js';
+  import { backToRoomList, goToPage, isRoomSwitch } from '#lib/features/room/room-navigation.js';
 
   interface Props {
     children: Snippet;
@@ -173,9 +173,18 @@
   function revealCurrentPage(event: MouseEvent) {
     if (appLayout.matches || !(event.target instanceof Element)) return;
     const link = event.target.closest('a[href]');
-    if (!(link instanceof HTMLAnchorElement) || link.pathname !== pathname) return;
-    event.preventDefault();
-    setOpen(false);
+    if (!(link instanceof HTMLAnchorElement)) return;
+    if (link.pathname === pathname) {
+      event.preventDefault();
+      setOpen(false);
+      return;
+    }
+    const plain =
+      event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+    if (plain && isRoomSwitch(link.href)) {
+      event.preventDefault();
+      goToPage(link.href);
+    }
   }
 
   function handleKeydown(event: KeyboardEvent) {

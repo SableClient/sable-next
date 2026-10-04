@@ -51,6 +51,19 @@ export function backToRoomList(): void {
   });
 }
 
+const ROOM_PATH =
+  /^\/(?:(?:rooms|direct)\/[^/]+|space\/[^/]+\/(?!lobby$|create-room$|create-space$)[^/]+)$/;
+
+export function isRoomSwitch(href: string): boolean {
+  const target = new URL(href, page.url.href).pathname;
+  return (
+    page.params.roomId !== undefined &&
+    target !== page.url.pathname &&
+    ROOM_PATH.test(target) &&
+    !window.matchMedia(BREAKPOINTS.appLayout).matches
+  );
+}
+
 export function goToPage(href: string): void {
   const samePage = new URL(href, page.url.href).pathname === page.url.pathname;
   if (samePage && !window.matchMedia(BREAKPOINTS.appLayout).matches) {
@@ -61,7 +74,7 @@ export function goToPage(href: string): void {
     });
     return;
   }
-  void goto(href);
+  void goto(href, { replace: isRoomSwitch(href) });
 }
 
 export function scopedSearchQuery(
