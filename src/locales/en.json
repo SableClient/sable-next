@@ -1000,6 +1000,7 @@
     "mediaUnavailable": "Media unavailable",
     "mediaUnavailableDetail": "This media may have been deleted or its server is offline.",
     "openMedia": "Open {{name}}",
+    "loadMedia": "Load media",
     "openMediaUnnamed": "Open media",
     "playGif": "Play GIF",
     "stopGif": "Stop GIF",
