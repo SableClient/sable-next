@@ -2456,6 +2456,7 @@
     "composerEnterNewline": "New line",
     "composerEnterAdaptive": "Auto",
     "composerPreview": "Composer preview",
+    "composerButtonOrderHint": "Drag buttons to reorder",
     "composerSeparatorCount": "Separators",
     "composerButtonOrderDragHintNone": "Select a button, then its position to reorder.",
     "composerChipLabels": {

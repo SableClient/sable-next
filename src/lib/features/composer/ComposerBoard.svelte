@@ -495,12 +495,6 @@
     cursor: grab;
   }
 
-  :global(
-    .composer-board-slot.is-separator + .composer-board-slot.is-separator .composer-separator
-  ) {
-    visibility: hidden;
-  }
-
   .sr-only {
     clip-path: inset(50%);
     height: 1px;

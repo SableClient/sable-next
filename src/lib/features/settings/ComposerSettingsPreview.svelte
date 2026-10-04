@@ -102,7 +102,7 @@
 </script>
 
 <aside class="composer-preview" aria-label={$i18n.t('settings.composerPreview')}>
-  <p class="preview-label">{$i18n.t('settings.composerPreview')}</p>
+  <p class="preview-label">{$i18n.t('settings.composerButtonOrderHint')}</p>
   <div class="composer-stack">
     <div class="composer-shell">
       <div class="composer" role="group" aria-label={$i18n.t('settings.composerPreview')}>

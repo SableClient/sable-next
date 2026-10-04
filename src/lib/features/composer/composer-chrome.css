@@ -257,6 +257,18 @@
   top: var(--space-100);
 }
 
+@media (any-pointer: fine) {
+  .composer-row.short .composer-field,
+  .composer-row.short .editor {
+    align-self: stretch;
+  }
+
+  .composer-row.short .editor.empty::before {
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
 .composer-row.short .composer-before,
 .composer-row.short .composer-after {
   align-self: start;
