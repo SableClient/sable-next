@@ -61,6 +61,10 @@ jobs:
         with:
           build: 'true'
 
+      - name: Carry over the previous build's assets
+        if: ${{ github.event_name != 'pull_request' }}
+        run: node scripts/ci/retain-previous-web-assets.mjs https://next.sable.moe dist
+
       - name: Upload Cloudflare assets
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
         with:

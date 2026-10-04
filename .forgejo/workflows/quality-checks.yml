@@ -131,6 +131,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: node --test scripts/ci/check-web-assets.test.mjs
 
+      - name: Test retained web assets
+        if: ${{ !cancelled() }}
+        run: node --test scripts/ci/retain-previous-web-assets.test.mjs
+
       - name: Upload coverage report
         if: ${{ !cancelled() }}
         uses: https://code.forgejo.org/forgejo/upload-artifact@cb8afe72b42edc798abfb8fcb556cf660d894245 # v5
