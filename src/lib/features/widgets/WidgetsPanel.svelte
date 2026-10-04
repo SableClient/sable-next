@@ -153,6 +153,8 @@
         <PanelHeaderButton label={$i18n.t('widgets.back')} onclick={() => (activeId = null)}>
           <ArrowLeftIcon />
         </PanelHeaderButton>
+      {:else}
+        <GridFourIcon aria-hidden="true" />
       {/if}
     {/snippet}
     {#snippet suffix()}
@@ -266,9 +268,12 @@
 
 <style>
   .widgets-panel {
-    background: var(--surface-container);
+    --ghost-hover: var(--bg-container-hover);
+    --ghost-active: var(--bg-container-active);
+
+    background: var(--bg-container);
     box-sizing: border-box;
-    color: var(--surface-on-container);
+    color: var(--bg-on-container);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     height: 100%;
@@ -309,20 +314,24 @@
   .widgets-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-100);
+    gap: var(--space-150);
     overflow-y: auto;
     padding: var(--space-300);
   }
 
   .widgets-item {
     align-items: center;
-    background: var(--surface-var-container);
-    border: var(--border-width) solid var(--surface-var-container-line);
-    border-radius: var(--radius);
-    color: var(--surface-var-on-container);
+    background: var(--surface-container);
+    border-radius: var(--radius-inner);
+    color: var(--surface-on-container);
     display: flex;
-    gap: var(--space-100);
-    padding-inline-end: var(--space-100);
+    gap: var(--space-150);
+    padding-inline-end: var(--space-300);
+  }
+
+  .widgets-item:hover {
+    background: var(--surface-container-hover);
+    box-shadow: inset 0 0 0 var(--border-width) var(--surface-container-line);
   }
 
   .widgets-item button:first-child {
