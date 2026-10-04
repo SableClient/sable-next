@@ -110,7 +110,7 @@ pub(crate) fn previews_removed_edit(
 }
 
 impl Core {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "mirrors the protocol fields")]
     pub(crate) async fn edit_message(
         &self,
         room_id: &OwnedRoomId,
@@ -665,7 +665,10 @@ const FORWARD_META: &str = "com.famedly.app.forwarded";
 const SABLE_FORWARD_META: &str = "moe.sable.message.forward";
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod tests {
     use std::sync::{Arc, Mutex};
 

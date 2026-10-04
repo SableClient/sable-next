@@ -59,7 +59,7 @@ impl Core {
         Ok(response.delay_id)
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments, reason = "mirrors the protocol fields")]
     pub(crate) async fn schedule_attachment(
         &self,
         room_id: &OwnedRoomId,

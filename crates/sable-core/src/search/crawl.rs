@@ -787,7 +787,6 @@ fn crawls_first(room: &Room) -> bool {
 }
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
 mod tests {
     use std::collections::HashSet;
     use std::sync::atomic::Ordering;

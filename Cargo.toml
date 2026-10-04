@@ -9,6 +9,12 @@ resolver = "3"
 [patch."https://github.com/SableClient/tauri-plugin-edge-to-edge.git"]
 tauri-plugin-edge-to-edge = { path = "vendor/tauri-plugin-edge-to-edge" }
 
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-or-later"
+rust-version = "1.97.1"
+publish = false
+
 [workspace.dependencies]
 matrix-sdk-common = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e" }
 matrix-sdk = { version = "0.19.1", git = "https://github.com/matrix-org/matrix-rust-sdk", rev = "bc2502ee3d3ba1dc687740df5be0f8635032399e", default-features = false, features = [
@@ -48,6 +54,8 @@ unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 pedantic = { level = "deny", priority = -1 }
 # Selected stable nursery lints; keep the full nursery group disabled.
 missing_const_for_fn = "deny"

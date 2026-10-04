@@ -552,7 +552,10 @@ pub fn register_actions<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-#[cfg_attr(desktop, allow(clippy::unused_async))]
+#[cfg_attr(
+    desktop,
+    expect(clippy::unused_async, reason = "mirrors the mobile signature")
+)]
 pub async fn allow_encrypted_content<R: Runtime>(app: &AppHandle<R>, allowed: bool) {
     #[cfg(mobile)]
     let result = app

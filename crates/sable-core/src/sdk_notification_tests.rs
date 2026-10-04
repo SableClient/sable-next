@@ -23,7 +23,7 @@ use crate::{
     store::MemorySessionStore,
 };
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn watching(
     server: &MatrixMockServer,
     client: &Client,
@@ -45,7 +45,7 @@ async fn watching(
     (core, events)
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[expect(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 async fn next_notification(events: &mut UnboundedReceiver<CoreEvent>) -> NotificationView {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -143,7 +143,6 @@ async fn a_replayed_invite_alerts_once() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_replayed_message_alerts_once() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -234,7 +233,10 @@ async fn a_replayed_message_alerts_once() {
 }
 
 #[tokio::test]
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
 async fn bridge_status_events_do_not_notify() {
     use matrix_sdk::ruma::push::{Action, NewPushRule, NewSimplePushRule, Ruleset};
     use matrix_sdk::ruma::{
@@ -361,7 +363,6 @@ async fn bridge_status_events_do_not_notify() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_message_alerts_when_the_server_reports_no_counts() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -432,7 +433,10 @@ async fn a_message_alerts_when_the_server_reports_no_counts() {
 }
 
 #[tokio::test]
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
 async fn sticker_notifications_do_not_block_sync_or_reappear_after_reading() {
     for mark_read in [false, true] {
         let server = MatrixMockServer::new().await;
@@ -591,7 +595,6 @@ async fn an_encrypted_room_defaults_to_the_rule_its_decrypted_messages_hit() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
     use crate::protocol::NotificationModeView;
     use crate::push_rules::{PushRules, plan_room_mode, room_mode};
@@ -648,7 +651,6 @@ async fn a_second_room_mode_change_before_the_sync_echo_still_lands() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_missing_rule_on_delete_is_not_a_failure() {
     use crate::push_rules::{PushRules, plan_room_mode};
 

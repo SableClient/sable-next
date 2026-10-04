@@ -162,7 +162,7 @@ pub async fn discover_gateway(endpoint: &str) -> Option<String> {
 }
 
 #[cfg(target_family = "wasm")]
-#[allow(clippy::unused_async)]
+#[expect(clippy::unused_async, reason = "mirrors the native signature")]
 pub async fn discover_gateway(_endpoint: &str) -> Option<String> {
     None
 }

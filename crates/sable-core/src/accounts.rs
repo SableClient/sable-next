@@ -687,7 +687,10 @@ impl Core {
         session.take()
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential flow kept in a single function"
+    )]
     pub(crate) async fn start_session(
         self: &Arc<Self>,
         client: matrix_sdk::Client,
@@ -1089,7 +1092,6 @@ async fn reset_account_cache(account: &PersistedAccount) -> Result<(), String> {
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(clippy::large_futures)]
 mod regression_tests {
     use crate::session::{self, Credentials};
     use std::sync::Arc;
@@ -1144,7 +1146,7 @@ mod regression_tests {
         }
     }
 
-    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    #[expect(clippy::unwrap_used, reason = "test code")]
     async fn core_with_room() -> (MatrixMockServer, Arc<Core>, Room) {
         let server = MatrixMockServer::new().await;
         server

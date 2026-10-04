@@ -193,7 +193,7 @@ fn apply_env_defaults(defaults: &[(&str, std::ffi::OsString)]) {
             continue;
         }
         // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code, reason = "FFI call")]
         unsafe {
             std::env::set_var(key, value);
         }
@@ -209,7 +209,7 @@ fn mark_own_audio() {
         _ => marker.to_owned(),
     };
     // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code, reason = "FFI call")]
     unsafe {
         std::env::set_var("PULSE_PROP", value);
     }
@@ -285,7 +285,7 @@ fn main() {
     #[cfg(all(feature = "cef", target_os = "linux"))]
     if !is_cef_views() {
         // SAFETY: single-threaded, before anything Tauri or CEF spawns a thread.
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code, reason = "FFI call")]
         unsafe {
             std::env::set_var("GDK_BACKEND", "x11");
         }

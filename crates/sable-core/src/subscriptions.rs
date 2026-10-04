@@ -136,8 +136,17 @@ impl Core {
         })
     }
 
-    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
-    #[allow(clippy::too_many_lines)] // Keep subscription registration and owned tasks together.
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "matrix timelines are single-threaded on WASM"
+        )
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "keep subscription registration and owned tasks together"
+    )]
     pub(crate) async fn subscribe_timeline(
         self: &Arc<Self>,
         room_id: OwnedRoomId,

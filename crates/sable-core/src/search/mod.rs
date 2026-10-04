@@ -1476,7 +1476,10 @@ impl MessageIndex {
         }
     }
 
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential flow kept in a single function"
+    )]
     pub(crate) async fn ingest(
         &mut self,
         room_id: &OwnedRoomId,
@@ -2813,7 +2816,13 @@ impl Core {
         );
     }
 
-    #[cfg_attr(not(target_family = "wasm"), allow(unused_variables))]
+    #[cfg_attr(
+        not(target_family = "wasm"),
+        expect(
+            unused_variables,
+            reason = "only the WASM build reads the index handle"
+        )
+    )]
     pub(crate) fn watch_search_index(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
@@ -2914,7 +2923,6 @@ impl Core {
 }
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
 mod tests {
     use matrix_sdk::ruma::room_version_rules::RedactionRules;
     use matrix_sdk::ruma::{

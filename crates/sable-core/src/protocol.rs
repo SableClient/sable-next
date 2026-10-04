@@ -2585,7 +2585,10 @@ pub struct SearchContextView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // These are independent room capabilities, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct RoomSummary {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
@@ -2626,7 +2629,10 @@ pub struct RoomSummary {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct EncryptionStatusView {
     /// Whether *this* device is signed by our own identity.
     pub verification: VerificationStateView,
@@ -2805,7 +2811,10 @@ pub struct EmojiView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // These are independent facts about one device, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct DeviceView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub device_id: OwnedDeviceId,
@@ -2910,7 +2919,10 @@ pub struct RoomPreviewView {
 
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct PublicRoomView {
     #[cfg_attr(feature = "typegen", specta(type = String))]
     pub room_id: OwnedRoomId,
@@ -3204,7 +3216,10 @@ pub struct PredecessorRoomView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // Each field is an independent capability, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct RoomPermissionsView {
     #[cfg_attr(feature = "typegen", specta(type = specta_typescript::Number))]
     pub own_power_level: i64,
@@ -4357,7 +4372,10 @@ pub struct ProfileFieldView {
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
 // These are independent server capabilities, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct LoginFlowsView {
     pub password: bool,
     pub oidc: bool,
@@ -4432,7 +4450,10 @@ pub enum InboxFilter {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[cfg_attr(feature = "typegen", derive(specta::Type))]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct InboxItemView {
     pub room_id: String,
     pub event_id: String,

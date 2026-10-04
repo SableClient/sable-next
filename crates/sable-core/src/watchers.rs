@@ -111,7 +111,10 @@ impl Core {
         );
     }
 
-    #[allow(clippy::too_many_lines)] // Keep registration and its worker lifetime together.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "keep registration and its worker lifetime together"
+    )]
     pub(crate) async fn watch_notifications(
         self: &Arc<Self>,
         client: &matrix_sdk::Client,
@@ -134,7 +137,13 @@ impl Core {
         } else {
             // `Room` is not `Send` on wasm, whose runtime is single-threaded; the
             // alias stays `Arc` because the native target shares it across threads.
-            #[allow(clippy::arc_with_non_send_sync)]
+            #[cfg_attr(
+                target_family = "wasm",
+                expect(
+                    clippy::arc_with_non_send_sync,
+                    reason = "the WASM core is single-threaded"
+                )
+            )]
             let route: NotificationRoute = Arc::new(std::sync::Mutex::new(None));
             let handler_route = route.clone();
             client

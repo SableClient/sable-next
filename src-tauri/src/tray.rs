@@ -166,7 +166,7 @@ fn apply_title_bar<R: Runtime>(app: &AppHandle<R>, custom: bool) -> tauri::Resul
 }
 
 #[cfg(target_os = "linux")]
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 fn appindicator_available() -> bool {
     const CANDIDATES: [&str; 4] = [
         "libayatana-appindicator3.so.1",

@@ -53,7 +53,10 @@ async fn import_fixture(core: &Core, data: &Value) {
 }
 
 #[tokio::test]
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
 async fn imports_actual_v1_identity_sessions_secrets_trust_and_decrypts_old_and_new_messages() {
     let data = fixture();
     let directory = tempfile::tempdir().unwrap();

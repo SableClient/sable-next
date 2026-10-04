@@ -25,7 +25,10 @@ const MAX_ZOOM: u32 = 19;
 static CLIENT: OnceLock<Option<Client>> = OnceLock::new();
 static LANE: Semaphore = Semaphore::const_new(MAX_CONCURRENT_REQUESTS);
 
-#[allow(clippy::needless_pass_by_value)] // Tauri hands the handler both by value.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "tauri hands the handler both by value"
+)]
 pub fn respond<R: Runtime>(
     ctx: UriSchemeContext<'_, R>,
     request: Request<Vec<u8>>,

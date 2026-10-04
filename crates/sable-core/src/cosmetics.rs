@@ -410,7 +410,6 @@ impl Core {
 }
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
 mod tests {
     use matrix_sdk::ruma::serde::Raw;
     use matrix_sdk::ruma::{OwnedRoomId, RoomId, room_id};

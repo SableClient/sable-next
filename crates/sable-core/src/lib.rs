@@ -217,7 +217,6 @@ enum SubscriptionKind {
 }
 
 impl Core {
-    #[allow(clippy::arc_with_non_send_sync)] // WASM keeps the core on one event-loop thread
     pub fn new(
         store_id: impl Into<String>,
         sessions: Box<dyn SessionStore>,
@@ -225,7 +224,13 @@ impl Core {
         Self::new_with_event_cache(store_id, sessions, true)
     }
 
-    #[allow(clippy::arc_with_non_send_sync)] // WASM keeps the core on one event-loop thread
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "WASM keeps the core on one event-loop thread"
+        )
+    )]
     pub fn new_with_event_cache(
         store_id: impl Into<String>,
         sessions: Box<dyn SessionStore>,
@@ -614,7 +619,10 @@ impl Core {
 }
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod tests {
     use super::*;
     use crate::protocol::{Command, CommandErr, CommandOk};
@@ -914,23 +922,38 @@ mod tests {
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod sdk_timeline_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod sdk_notification_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod sdk_helpers_tests;
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod sdk_verification_tests;
 
 #[cfg(test)]
-#[allow(clippy::large_futures)]
+#[expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 mod live_tests {
     use super::*;
     use crate::protocol::{Command, CommandErr, CommandOk};

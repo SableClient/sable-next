@@ -1,4 +1,7 @@
-#[cfg_attr(target_family = "wasm", allow(clippy::unused_async))]
+#[cfg_attr(
+    target_family = "wasm",
+    expect(clippy::unused_async, reason = "the WASM store has nothing to await")
+)]
 pub(crate) async fn discard(base_store_id: &str, store_id: &str) -> Result<(), String> {
     if store_id != base_store_id
         && !crate::session::removable_account_store(base_store_id, store_id)

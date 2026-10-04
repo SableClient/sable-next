@@ -1,4 +1,7 @@
-#![allow(clippy::large_futures)]
+#![expect(
+    clippy::large_futures,
+    reason = "the dispatch future is large and cannot be boxed"
+)]
 
 use std::sync::Arc;
 

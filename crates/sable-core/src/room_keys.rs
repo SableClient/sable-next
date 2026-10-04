@@ -134,12 +134,7 @@ impl Core {
 }
 
 #[cfg(all(test, not(target_family = "wasm")))]
-#[allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::large_futures
-)]
+#[expect(clippy::unwrap_used, clippy::panic, reason = "test code")]
 mod tests {
     use std::{sync::Arc, time::Duration};
 
@@ -183,7 +178,6 @@ ngjgWgEDc8qQHBtDJPz+m+yphv/xZAFw4Wldrz8mal3cudGfUnueAlwgf2wvzk2ZCT+kfo95tRqyWuhF
     const ELEMENT_SESSION: &str = "gM8i47Xhu0q52xLfgUXzanCMpLinoyVyH7R58cBuVBU";
 
     #[tokio::test]
-    #[allow(clippy::too_many_lines)]
     async fn restored_backups_respect_the_account_preference() {
         use matrix_sdk_base::crypto::store::types::BackupDecryptionKey;
         use wiremock::{

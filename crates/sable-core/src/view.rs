@@ -70,7 +70,10 @@ use crate::protocol::{
 };
 
 // These are independent room capabilities, not a state machine.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "wire type mirroring the protocol"
+)]
 pub struct RoomInfo {
     pub is_space: bool,
     pub is_direct: bool,
@@ -1486,7 +1489,10 @@ fn audio_waveform(audio: &AudioMessageEventContent) -> Option<Vec<f32>> {
             .iter()
             .map(|amplitude| {
                 let value = u64::from(amplitude.get());
-                #[allow(clippy::cast_precision_loss)]
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "lossy conversion is display-only"
+                )]
                 let normalised = value as f32 / f32::from(UnstableAmplitude::MAX);
                 normalised
             })

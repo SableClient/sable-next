@@ -45,7 +45,13 @@ impl Core {
 
     /// The cache holds one live timeline per room, so a `hidden_events` that no
     /// longer matches replaces it rather than sitting alongside it.
-    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "matrix timelines are single-threaded on WASM"
+        )
+    )]
     pub(crate) async fn live_timeline(
         &self,
         room_id: &OwnedRoomId,
@@ -156,7 +162,13 @@ impl Core {
         Ok(timeline)
     }
 
-    #[allow(clippy::arc_with_non_send_sync)] // Matrix timelines are single-threaded on WASM
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "matrix timelines are single-threaded on WASM"
+        )
+    )]
     pub(crate) async fn thread_timeline(
         &self,
         room_id: &OwnedRoomId,

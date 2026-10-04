@@ -152,7 +152,6 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for MakeJsLogWriter {
 }
 
 #[wasm_bindgen(js_name = setPanicHandler)]
-#[allow(clippy::needless_pass_by_value)] // wasm-bindgen maps the JS function boundary to an owned value
 pub fn set_panic_handler(notify: Function) {
     PANIC_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
 
@@ -173,7 +172,6 @@ pub fn set_panic_handler(notify: Function) {
 }
 
 #[wasm_bindgen(js_name = setLogHandler)]
-#[allow(clippy::needless_pass_by_value)]
 pub fn set_log_handler(notify: Function) {
     LOG_NOTIFIER.with_borrow_mut(|slot| *slot = Some(notify));
 }
@@ -199,7 +197,10 @@ impl SableCore {
     /// `"info,matrix_sdk::http_client=debug"` is the only way to see the SDK's
     /// requests at all: a `SharedWorker`'s never reach the page's network panel.
     #[wasm_bindgen(constructor)]
-    #[allow(clippy::needless_pass_by_value)] // wasm-bindgen maps the JS string boundary to an owned value
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "wasm-bindgen maps the JS string boundary to an owned value"
+    )]
     #[must_use]
     pub fn new(
         store_id: String,

@@ -38,7 +38,7 @@ impl Device {
     }
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn device(server: &MatrixMockServer, id: &str) -> Device {
     let client = server
         .client_builder_for_crypto_end_to_end(
@@ -97,7 +97,7 @@ async fn deliver(
     }
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn two_devices(
     server: &MatrixMockServer,
     cross_signed: bool,
@@ -215,7 +215,6 @@ async fn history_bundles_require_owner_signed_recipient_devices() {
     }
 }
 
-#[allow(clippy::unwrap_used)]
 #[tokio::test]
 async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
     let server = MatrixMockServer::new().await;
@@ -255,7 +254,6 @@ async fn crossed_self_verification_requests_are_cancelled_without_retrying() {
     }
 }
 
-#[allow(clippy::unwrap_used)]
 #[tokio::test]
 async fn a_self_verification_completes_with_a_qr_code() {
     use base64::Engine;

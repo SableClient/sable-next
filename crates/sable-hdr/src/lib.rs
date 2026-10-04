@@ -185,7 +185,10 @@ fn unpack_210(source: &[u8], red: u32, blue: u32) -> impl Iterator<Item = [f32; 
     let (pixels, _) = source.as_chunks::<4>();
     pixels.iter().map(move |&bytes| {
         let word = u32::from_le_bytes(bytes);
-        #[allow(clippy::cast_precision_loss)]
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "lossy conversion is display-only"
+        )]
         let code = |shift: u32| ((word >> shift) & 0x3ff) as f32 / 1023.0;
         [code(red), code(10), code(blue)]
     })
@@ -366,7 +369,11 @@ mod packed {
         linear_srgb::tf::linear_to_pq(nits / 10_000.0)
     }
 
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "value is range-checked; value is non-negative"
+    )]
     fn ten_bit(nits: f32) -> u32 {
         (code(nits) * 1023.0).round() as u32
     }

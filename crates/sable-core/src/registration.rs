@@ -647,7 +647,10 @@ impl Core {
         }
     }
 
-    #[allow(deprecated)]
+    #[expect(
+        deprecated,
+        reason = "the legacy email flow stays until the stage is dropped upstream"
+    )]
     pub(super) async fn request_registration_email(
         self: &Arc<Self>,
         address: String,

@@ -185,7 +185,10 @@ mod tests {
 
     #[tokio::test]
     #[cfg(not(target_family = "wasm"))]
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential flow kept in a single function"
+    )]
     async fn nested_reactions_are_ignored() {
         use std::{collections::BTreeSet, sync::Arc};
 

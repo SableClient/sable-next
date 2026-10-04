@@ -635,7 +635,6 @@ pub(crate) fn base_client(store_id: &str) -> Option<SharedBaseClient> {
 ///
 /// This function relies on `ClientMetadata` being serializable because all
 /// fields are constructed from validated URLs and static protocol values.
-#[allow(clippy::expect_used)] // metadata serialization is an invariant of this typed value
 #[must_use]
 pub fn client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     metadata_with(redirect_uri, false)
@@ -649,7 +648,10 @@ pub fn qr_client_metadata(redirect_uri: &Url) -> Raw<ClientMetadata> {
     metadata_with(redirect_uri, true)
 }
 
-#[allow(clippy::expect_used)] // metadata serialization is an invariant of this typed value
+#[expect(
+    clippy::expect_used,
+    reason = "metadata serialization is an invariant of this typed value"
+)]
 fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
     let loopback = matches!(
         redirect_uri.host_str(),
@@ -692,7 +694,10 @@ fn metadata_with(redirect_uri: &Url, device_code: bool) -> Raw<ClientMetadata> {
 }
 
 fn canonical_client_uri() -> Url {
-    #[allow(clippy::expect_used)] // this compile-time URL is part of the OAuth protocol contract
+    #[expect(
+        clippy::expect_used,
+        reason = "this compile-time URL is part of the OAuth protocol contract"
+    )]
     {
         Url::parse("https://next.sable.moe").expect("static URL is valid")
     }
@@ -712,7 +717,6 @@ fn origin_url(redirect_uri: &Url) -> Url {
 /// # Errors
 ///
 /// Returns the sync-service error if its initial state cannot be built.
-#[allow(clippy::arc_with_non_send_sync)] // the WASM sync service is intentionally single-threaded
 pub async fn start_sync(
     client: Client,
 ) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {
@@ -724,7 +728,13 @@ pub async fn start_sync(
 /// # Errors
 ///
 /// Returns the sync-service error if its initial state cannot be built.
-#[allow(clippy::arc_with_non_send_sync)]
+#[cfg_attr(
+    target_family = "wasm",
+    expect(
+        clippy::arc_with_non_send_sync,
+        reason = "the WASM core is single-threaded"
+    )
+)]
 pub async fn build_sync(
     client: Client,
 ) -> Result<Arc<SyncService>, matrix_sdk_ui::sync_service::Error> {

@@ -27,7 +27,7 @@ pub struct Ring {
 // SAFETY: the COM objects are only kept alive here; they are created and
 // posted on the UI thread and never called from another one. Writes go
 // through the raw address, which stays mapped for as long as `Ring` lives.
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 unsafe impl Send for Ring {}
 
 impl Ring {
@@ -37,7 +37,7 @@ impl Ring {
     /// # Errors
     ///
     /// Fails when the `WebView2` runtime is too old for shared buffers.
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code, reason = "FFI call")]
     pub fn create(
         environment: &ICoreWebView2Environment,
         controller: &ICoreWebView2Controller,
@@ -83,7 +83,7 @@ impl Ring {
 
     /// Copies a BGRA frame into `slot`. Returns `false` when the slot does not
     /// exist or the frame does not match the ring's size.
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code, reason = "FFI call")]
     #[must_use]
     pub fn write(&self, slot: usize, frame: &[u8]) -> bool {
         let Some(target) = self.slots.get(slot) else {

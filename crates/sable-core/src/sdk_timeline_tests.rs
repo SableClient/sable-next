@@ -2234,7 +2234,7 @@ async fn fetching_members_names_a_bridge_ghost_the_sync_never_shipped() {
     assert_eq!(named, "Marie");
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn dispatch_mark_read(
     server: &MatrixMockServer,
     client: matrix_sdk::Client,
@@ -2265,7 +2265,12 @@ async fn dispatch_mark_read(
     .unwrap();
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used, clippy::too_many_lines)]
+#[expect(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::too_many_lines,
+    reason = "test code; one sequential flow kept in a single function"
+)]
 async fn mark_read_body(
     private_receipt: bool,
     event_id: Option<matrix_sdk::ruma::OwnedEventId>,
@@ -2383,7 +2388,6 @@ async fn mark_read_body(
     )
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 #[tokio::test]
 async fn marking_unread_writes_the_room_account_data_flag() {
     let server = MatrixMockServer::new().await;
@@ -2441,7 +2445,6 @@ async fn marking_unread_writes_the_room_account_data_flag() {
     assert_eq!(body["unread"], json!(true));
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
 #[tokio::test]
 async fn marking_unread_from_a_message_walks_the_read_marker_back() {
     let server = MatrixMockServer::new().await;
@@ -2551,7 +2554,6 @@ async fn marking_a_room_read_uses_the_latest_threaded_event() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -2598,7 +2600,7 @@ async fn a_receipt_short_of_the_latest_message_leaves_the_marker() {
     .await;
 }
 
-#[allow(clippy::unwrap_used, clippy::expect_used)]
+#[expect(clippy::unwrap_used, clippy::expect_used, reason = "test code")]
 async fn read_marker_for(fully_read: bool) -> CommandOk {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;

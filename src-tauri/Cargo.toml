@@ -3,10 +3,11 @@ name = "app"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
-license = "AGPL-3.0-or-later"
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
 repository = ""
-edition = "2024"
-rust-version = "1.97.1"
+edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

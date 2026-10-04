@@ -87,7 +87,13 @@ impl Core {
             }
         };
 
-        #[allow(clippy::arc_with_non_send_sync)]
+        #[cfg_attr(
+            target_family = "wasm",
+            expect(
+                clippy::arc_with_non_send_sync,
+                reason = "the WASM core is single-threaded"
+            )
+        )]
         let handle = Arc::new(handle);
         *self.pending_identity_reset.lock().await =
             Some(PendingIdentityReset { generation, handle });

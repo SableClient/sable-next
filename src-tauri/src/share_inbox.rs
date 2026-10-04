@@ -25,7 +25,7 @@ pub struct ShareBatch {
 
 #[derive(Deserialize)]
 struct ShareManifest {
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "the manifest version is parsed but not read")]
     version: u32,
     items: Vec<ShareItem>,
 }

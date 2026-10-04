@@ -203,7 +203,10 @@ impl Core {
     ///
     /// Returns a protocol error when the command is invalid, the user is not
     /// authenticated, or the Matrix operation fails.
-    #[allow(clippy::too_many_lines)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one sequential flow kept in a single function"
+    )]
     pub async fn dispatch(self: &Arc<Self>, command: Command) -> Result<CommandOk, CommandErr> {
         match command {
             Command::DiscoverHomeserver { server_name } => {

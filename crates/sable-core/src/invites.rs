@@ -84,7 +84,6 @@ pub(crate) async fn triage(client: &Client) -> Vec<InviteTriageView> {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use matrix_sdk::{
         ruma::{room_id, user_id},

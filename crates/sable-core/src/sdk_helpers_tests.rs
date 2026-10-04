@@ -21,7 +21,7 @@ use crate::{
     store::MemorySessionStore,
 };
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn core(server: &MatrixMockServer, client: matrix_sdk::Client) -> Arc<Core> {
     let sync_service = Arc::new(SyncService::builder(client.clone()).build().await.unwrap());
     let (core, _events) = Core::new("helpers-test", Box::new(MemorySessionStore::default()));
@@ -778,7 +778,6 @@ async fn a_room_outside_the_list_still_has_a_summary() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn an_original_streams_with_progress_and_is_cached() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -832,7 +831,6 @@ async fn an_original_streams_with_progress_and_is_cached() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn an_encrypted_thumbnail_downloads_the_original() {
     use std::io::Read;
 
@@ -929,7 +927,6 @@ async fn corrupt_encrypted_media_is_rejected_before_returning_plaintext() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();
@@ -987,7 +984,6 @@ async fn sticker_previews_reuse_a_cached_original_without_retrying_thumbnails() 
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn sticker_previews_prefer_the_persisted_thumbnail_over_the_original() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();
@@ -1051,7 +1047,6 @@ async fn sticker_previews_prefer_the_persisted_thumbnail_over_the_original() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn cached_sticker_reads_bypass_six_stalled_downloads() {
     let server = MatrixMockServer::new().await;
     let store = tempfile::tempdir().unwrap();
@@ -1138,7 +1133,6 @@ async fn cached_sticker_reads_bypass_six_stalled_downloads() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn large_cached_photos_do_not_replace_plain_thumbnails() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1178,7 +1172,6 @@ async fn large_cached_photos_do_not_replace_plain_thumbnails() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn bulk_original_downloads_leave_all_preview_slots_available() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1246,7 +1239,6 @@ async fn bulk_original_downloads_leave_all_preview_slots_available() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn queued_previews_recheck_the_original_cache() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1288,7 +1280,6 @@ async fn queued_previews_recheck_the_original_cache() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn legacy_original_downloads_can_take_longer_than_thirty_seconds() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1317,7 +1308,6 @@ async fn legacy_original_downloads_can_take_longer_than_thirty_seconds() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn sdk_original_retry_can_take_longer_than_thirty_seconds() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1359,7 +1349,6 @@ async fn sdk_original_retry_can_take_longer_than_thirty_seconds() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1401,7 +1390,6 @@ async fn a_server_whose_media_keeps_failing_is_refused_without_a_request() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn a_refused_server_still_serves_what_is_cached() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1444,7 +1432,6 @@ async fn a_refused_server_still_serves_what_is_cached() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn forbidden_media_never_opens_the_circuit() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1472,7 +1459,6 @@ async fn forbidden_media_never_opens_the_circuit() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn forgotten_media_is_fetched_again() {
     let server = MatrixMockServer::new().await;
     let client = server
@@ -1497,7 +1483,7 @@ async fn forgotten_media_is_fetched_again() {
     core.media_thumbnail(source, 0, 0).await.unwrap();
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn space_child_writes(
     child: Option<serde_json::Value>,
     command: Command,
@@ -1633,7 +1619,7 @@ async fn forgetting_an_invalid_uri_is_refused() {
     ));
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn sync_secret_storage_key(
     server: &MatrixMockServer,
     client: &matrix_sdk::Client,
@@ -1928,7 +1914,6 @@ async fn an_approved_oauth_identity_reset_completes_its_session() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn profile_updates_send_the_chosen_msc4466_propagation() {
     use crate::protocol::ProfilePropagationView;
     use wiremock::matchers::{path_regex, query_param, query_param_is_missing};
@@ -1988,7 +1973,6 @@ async fn profile_updates_send_the_chosen_msc4466_propagation() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn account_data_types_survive_a_restart_and_include_stored_known_types() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -2027,7 +2011,6 @@ async fn account_data_types_survive_a_restart_and_include_stored_known_types() {
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn account_data_types_include_what_the_server_lists_but_sync_never_delivered() {
     let server = MatrixMockServer::new().await;
     let client = server.client_builder().build().await;
@@ -2056,7 +2039,7 @@ async fn account_data_types_include_what_the_server_lists_but_sync_never_deliver
     );
 }
 
-#[allow(clippy::unwrap_used)]
+#[expect(clippy::unwrap_used, reason = "test code")]
 async fn last_put_body(server: &MatrixMockServer, event_type: &str) -> serde_json::Value {
     let requests = server.server().received_requests().await.unwrap();
     let request = requests
@@ -2070,7 +2053,6 @@ async fn last_put_body(server: &MatrixMockServer, event_type: &str) -> serde_jso
 }
 
 #[tokio::test]
-#[allow(clippy::unwrap_used)]
 async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
     use matrix_sdk_base::crypto::secret_storage::SecretStorageKey;
 
@@ -2159,7 +2141,6 @@ async fn recovery_adopts_an_account_data_key_that_seals_our_documents() {
     assert!(document.can_seal);
 }
 
-#[allow(clippy::unwrap_used)]
 #[tokio::test]
 async fn event_cached_reports_only_events_the_cache_holds() {
     use matrix_sdk::ruma::{event_id, user_id};

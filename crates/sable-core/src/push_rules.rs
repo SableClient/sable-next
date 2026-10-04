@@ -31,7 +31,13 @@ pub struct PushRules {
 }
 
 impl PushRules {
-    #[allow(clippy::arc_with_non_send_sync)]
+    #[cfg_attr(
+        target_family = "wasm",
+        expect(
+            clippy::arc_with_non_send_sync,
+            reason = "the WASM core is single-threaded"
+        )
+    )]
     pub async fn load(client: &Client) -> Arc<Self> {
         let initial = client
             .account()
@@ -567,7 +573,10 @@ pub fn pushes_every_encrypted_event(rules: &Ruleset) -> bool {
 }
 
 fn mention_rule(rules: &Ruleset, rule: MentionRuleView) -> Option<(RuleKind, String)> {
-    #[allow(deprecated)]
+    #[expect(
+        deprecated,
+        reason = "the legacy room-notif rule is still matched on older servers"
+    )]
     let candidates: &[(RuleKind, &str)] = match rule {
         MentionRuleView::Room => &[
             (

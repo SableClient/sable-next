@@ -1,4 +1,4 @@
-#![allow(clippy::missing_errors_doc)]
+#![expect(clippy::missing_errors_doc, reason = "internal module")]
 
 use std::{
     collections::BTreeMap,
@@ -401,7 +401,10 @@ async fn validate_account(
     Ok(account)
 }
 
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one sequential flow kept in a single function"
+)]
 async fn import_batch(
     store: &SqliteCryptoStore,
     expected: &PersistedSession,

@@ -37,7 +37,7 @@ fn press_escape() -> Result<(), String> {
         .map_err(|error| error.to_string())
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 fn class_name(hwnd: HWND) -> Option<String> {
     let mut buffer = [0u16; 256];
     // SAFETY: writes at most the length of a live local buffer.
@@ -46,7 +46,7 @@ fn class_name(hwnd: HWND) -> Option<String> {
     Some(OsString::from_wide(name).to_string_lossy().into_owned())
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 fn exe_name(hwnd: HWND) -> Option<String> {
     let mut process_id = 0;
     // SAFETY: writes to a live local.
@@ -76,7 +76,7 @@ fn exe_name(hwnd: HWND) -> Option<String> {
     )
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 fn pointer_on_flyout() -> bool {
     let mut point = POINT { x: 0, y: 0 };
     // SAFETY: writes to a live local.

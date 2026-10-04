@@ -53,7 +53,7 @@ fn header<T>(
     }
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code, reason = "FFI call")]
 fn display_state(gdi_device_name: &str) -> Option<DisplayState> {
     let (mut path_count, mut mode_count) = (0u32, 0u32);
     // SAFETY: both counts are valid out-pointers for the duration of the call.
@@ -133,7 +133,10 @@ fn display_state(gdi_device_name: &str) -> Option<DisplayState> {
         let flags = unsafe { color.Anonymous.value };
         return Some(DisplayState {
             hdr: color_ok && flags & ADVANCED_COLOR_ENABLED != 0,
-            #[allow(clippy::cast_precision_loss)]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "lossy conversion is display-only"
+            )]
             sdr_white_nits: (white_ok && white.SDRWhiteLevel > 0)
                 .then_some(white.SDRWhiteLevel as f32 * SDR_WHITE_LEVEL_UNIT),
         });
