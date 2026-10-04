@@ -16,6 +16,8 @@ export type ShortcutId =
   | 'room.markAllRead'
   | 'room.replyOlder'
   | 'room.replyNewer'
+  | 'room.editOlder'
+  | 'room.editNewer'
   | 'call.toggleMute'
   | 'call.toggleDeafen'
   | 'call.toggleCamera'
@@ -124,6 +126,18 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
     labelKey: 'shortcuts.replyNewer',
     category: 'room',
     binding: 'ctrl+down',
+  },
+  {
+    id: 'room.editOlder',
+    labelKey: 'shortcuts.editOlder',
+    category: 'room',
+    binding: 'ctrl+shift+up',
+  },
+  {
+    id: 'room.editNewer',
+    labelKey: 'shortcuts.editNewer',
+    category: 'room',
+    binding: 'ctrl+shift+down',
   },
   {
     id: 'call.toggleMute',

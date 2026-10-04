@@ -3337,6 +3337,8 @@
     "markAllRead": "Mark every room as read",
     "replyOlder": "Reply to the previous message",
     "replyNewer": "Reply to the next message",
+    "editOlder": "Edit your previous message",
+    "editNewer": "Edit your next message",
     "pressKeys": "Press keys, Esc to cancel…",
     "conflict": "That combination is already used by “{{name}}”.",
     "resetOne": "Reset to default",

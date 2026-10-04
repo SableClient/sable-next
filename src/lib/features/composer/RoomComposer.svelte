@@ -1293,6 +1293,11 @@
     'room.replyNewer': 'newer',
   };
 
+  const EDIT_STEPS: Partial<Record<string, ReplyDirection>> = {
+    'room.editOlder': 'older',
+    'room.editNewer': 'newer',
+  };
+
   function stepReply(event: KeyboardEvent): void {
     if (
       !onReplyStep ||
@@ -1311,6 +1316,29 @@
 
     event.preventDefault();
     onReplyStep(direction);
+  }
+
+  function stepEdit(event: KeyboardEvent): void {
+    if (
+      !onEditLast ||
+      !onEditNext ||
+      panelOpen ||
+      editingScheduled ||
+      event.defaultPrevented ||
+      (context && context.kind !== 'edit') ||
+      (!context && (!empty || staged.length > 0))
+    )
+      return;
+    const isMac = isMacPlatform();
+    const shortcut = effectiveShortcuts().find(
+      (candidate) => EDIT_STEPS[candidate.id] && matchesBinding(candidate.binding, event, isMac)
+    );
+    const direction = shortcut && EDIT_STEPS[shortcut.id];
+    if (!direction) return;
+
+    event.preventDefault();
+    if (direction === 'older') onEditLast(context?.eventId);
+    else if (context) onEditNext(context.eventId);
   }
 
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
@@ -1466,7 +1494,10 @@
           hidden={activeBotCommand !== null}
           bind:this={rowEl}
           onmousedown={focusFromRow}
-          onkeydown={stepReply}
+          onkeydown={(event) => {
+            stepReply(event);
+            stepEdit(event);
+          }}
           onsubmit={(event) => {
             event.preventDefault();
             void send();
