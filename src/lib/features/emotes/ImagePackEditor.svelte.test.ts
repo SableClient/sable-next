@@ -148,3 +148,27 @@ test('a new pack picture is saved as soon as it uploads', async () => {
   expect(applied[0].images.map((image) => image.shortcode)).toEqual(['wave']);
   expect(button('Apply changes')).toBeDisabled();
 });
+
+test('pressing Enter in the shortcode field saves the rename', async () => {
+  const applied: PackDraft[] = [];
+  render(ImagePackEditor, {
+    props: {
+      pack: pack(['sticker']),
+      canEdit: true,
+      onApply: (draft: PackDraft) => {
+        applied.push(draft);
+        return Promise.resolve();
+      },
+    },
+  });
+
+  await userEvent.click(screen.getByRole('button', { name: /rename/i }));
+  const [input] = screen.getAllByRole('textbox', { name: 'Shortcode' });
+  await userEvent.clear(input);
+  await userEvent.type(input, 'hello{Enter}');
+
+  await vi.waitFor(() => {
+    expect(applied).toHaveLength(1);
+  });
+  expect(applied[0].images.map((image) => image.shortcode)).toEqual(['hello']);
+});
