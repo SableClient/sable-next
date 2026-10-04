@@ -2198,6 +2198,11 @@ pub enum CoreEvent {
         room_id: OwnedRoomId,
     },
 
+    ProfileChanged {
+        #[cfg_attr(feature = "typegen", specta(type = String))]
+        user_id: OwnedUserId,
+    },
+
     BotCommandsChanged {
         #[cfg_attr(feature = "typegen", specta(type = String))]
         room_id: OwnedRoomId,

@@ -762,6 +762,7 @@ impl Core {
         self.watch_widget_feed(&client, generation);
         self.watch_room_widgets(&client, generation);
         self.watch_cosmetics(&client, generation);
+        self.watch_profile_changes(&client, generation);
         self.watch_bot_commands(&client, generation);
         self.watch_image_packs(&client, generation);
         self.watch_joined_invites(&client);

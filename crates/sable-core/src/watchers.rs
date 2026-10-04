@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures_util::{StreamExt, pin_mut};
 use matrix_sdk::executor::{JoinHandleExt, spawn};
 use matrix_sdk::ruma::MilliSecondsSinceUnixEpoch;
-use matrix_sdk::ruma::events::room::member::MembershipState;
+use matrix_sdk::ruma::events::room::member::{MembershipState, OriginalSyncRoomMemberEvent};
 use matrix_sdk::ruma::events::typing::SyncTypingEvent;
 use matrix_sdk::ruma::events::{AnyGlobalAccountDataEvent, AnyStrippedStateEvent};
 use matrix_sdk_ui::sync_service::State as SyncState;
@@ -395,6 +395,39 @@ impl Core {
         self.track_session_task(
             spawn(crate::rooms::reconcile_joined_invites(client.clone())).abort_on_drop(),
         );
+    }
+
+    pub(crate) fn watch_profile_changes(
+        self: &Arc<Self>,
+        client: &matrix_sdk::Client,
+        generation: u64,
+    ) {
+        let handle = client.add_event_handler({
+            let core = self.clone();
+            move |event: OriginalSyncRoomMemberEvent| {
+                let core = core.clone();
+                async move {
+                    let Some(previous) = event.prev_content() else {
+                        return;
+                    };
+                    let content = &event.content;
+                    if content.membership != MembershipState::Join
+                        || previous.membership != MembershipState::Join
+                    {
+                        return;
+                    }
+                    if content.displayname == previous.displayname
+                        && content.avatar_url == previous.avatar_url
+                    {
+                        return;
+                    }
+                    if let Ok(user_id) = event.state_key.as_str().try_into() {
+                        core.emit_if_current(generation, CoreEvent::ProfileChanged { user_id });
+                    }
+                }
+            }
+        });
+        self.track_session_handler(client, handle);
     }
 
     pub(crate) fn watch_space_sidebar(

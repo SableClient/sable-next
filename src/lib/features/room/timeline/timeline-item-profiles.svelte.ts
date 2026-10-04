@@ -2,58 +2,85 @@ import type { ProfileView } from '#src/generated/protocol';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
 
-export class TimelineItemProfiles {
-  sender = $state<ProfileView | null>(null);
-  reply = $state<ProfileView | null>(null);
+const RETRY_DELAYS_MS = [3000, 10_000, 30_000];
 
-  #senderId: string | null = null;
-  #replyId: string | null = null;
-  #senderGeneration = 0;
-  #replyGeneration = 0;
-  #senderPreview = false;
-  #replyPreview = false;
+class ProfileSlot {
+  profile = $state<ProfileView | null>(null);
+
+  #userId: string | null = null;
+  #preview = false;
+  #generation = 0;
+  #retry: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly core: CoreClient) {}
 
-  sync(senderId: string | null, replyId: string | null, preview: boolean): void {
-    this.#syncSender(senderId, preview);
-    this.#syncReply(replyId, preview);
+  sync(userId: string | null, preview: boolean): void {
+    if (this.#userId === userId && this.#preview === preview) return;
+    this.#userId = userId;
+    this.#preview = preview;
+    this.profile = null;
+    this.#load(0);
+  }
+
+  refresh(userId: string): void {
+    if (userId === this.#userId) this.#load(0);
   }
 
   dispose(): void {
-    this.#senderGeneration += 1;
-    this.#replyGeneration += 1;
-    this.#senderId = null;
-    this.#replyId = null;
+    this.#userId = null;
+    this.#load(0);
   }
 
-  #syncSender(userId: string | null, preview: boolean): void {
-    if (this.#senderId === userId && this.#senderPreview === preview) return;
-    this.#senderId = userId;
-    this.#senderPreview = preview;
-    const generation = ++this.#senderGeneration;
-    this.sender = null;
-    if (userId === null || preview) return;
+  #load(attempt: number): void {
+    if (this.#retry !== null) clearTimeout(this.#retry);
+    this.#retry = null;
+    const generation = ++this.#generation;
+    const userId = this.#userId;
+    if (userId === null || this.#preview) return;
     void this.core.userProfile(userId).then(
       (profile) => {
-        if (generation === this.#senderGeneration) this.sender = profile;
+        if (generation === this.#generation) this.profile = profile;
       },
-      () => {}
+      () => {
+        if (generation !== this.#generation || attempt >= RETRY_DELAYS_MS.length) return;
+        this.#retry = setTimeout(() => {
+          this.#load(attempt + 1);
+        }, RETRY_DELAYS_MS[attempt]);
+      }
     );
   }
+}
 
-  #syncReply(userId: string | null, preview: boolean): void {
-    if (this.#replyId === userId && this.#replyPreview === preview) return;
-    this.#replyId = userId;
-    this.#replyPreview = preview;
-    const generation = ++this.#replyGeneration;
-    this.reply = null;
-    if (userId === null || preview) return;
-    void this.core.userProfile(userId).then(
-      (profile) => {
-        if (generation === this.#replyGeneration) this.reply = profile;
-      },
-      () => {}
-    );
+export class TimelineItemProfiles {
+  readonly #sender: ProfileSlot;
+  readonly #reply: ProfileSlot;
+  readonly #unsubscribe: () => void;
+
+  constructor(core: CoreClient) {
+    this.#sender = new ProfileSlot(core);
+    this.#reply = new ProfileSlot(core);
+    this.#unsubscribe = core.onProfileChanged((userId) => {
+      this.#sender.refresh(userId);
+      this.#reply.refresh(userId);
+    });
+  }
+
+  get sender(): ProfileView | null {
+    return this.#sender.profile;
+  }
+
+  get reply(): ProfileView | null {
+    return this.#reply.profile;
+  }
+
+  sync(senderId: string | null, replyId: string | null, preview: boolean): void {
+    this.#sender.sync(senderId, preview);
+    this.#reply.sync(replyId, preview);
+  }
+
+  dispose(): void {
+    this.#unsubscribe();
+    this.#sender.dispose();
+    this.#reply.dispose();
   }
 }

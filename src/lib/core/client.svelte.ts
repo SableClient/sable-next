@@ -37,12 +37,13 @@ import {
 type WellKnownResponse = { 'm.homeserver'?: { base_url?: unknown } };
 export type { CallGrant, CreateRoomOptions, OutgoingMentions } from './commands.svelte.js';
 
-const profileCacheFreshMs = 10 * 60 * 1000;
+const profileCacheFreshMs = 2 * 60 * 1000;
 const profileFailureRetryMs = 60 * 1000;
 const relationsCacheFreshMs = 60 * 1000;
 const MAX_PROFILE_CACHE_ENTRIES = 256;
 const MAX_RELATIONS_CACHE_ENTRIES = 128;
 const PROFILE_LOOKUP_GAP_MS = 150;
+const PROFILE_CHANGE_NOTIFY_MS = 500;
 const PROFILE_LOOKUP_MAX_GAP_MS = 4000;
 const PROFILE_RETRY_AFTER_CAP_MS = 30_000;
 
@@ -173,6 +174,9 @@ export class CoreClient {
     string,
     { accountId: string | null; error: unknown }
   >({ maxSize: MAX_PROFILE_CACHE_ENTRIES, maxAge: profileFailureRetryMs });
+  private readonly profileChangeListeners = new Set<(userId: string) => void>();
+  private readonly changedProfiles = new Set<string>();
+  private profileChangeTimer: ReturnType<typeof setTimeout> | null = null;
   private profileNextAt = 0;
   private profileGap = PROFILE_LOOKUP_GAP_MS;
   private readonly relationsCache = new QuickLRU<
@@ -516,8 +520,10 @@ export class CoreClient {
 
     const request = this.lookUpProfile(userId)
       .then((profile) => {
-        this.profileFailures.delete(userId);
-        this.profileCache.set(userId, { accountId, profile });
+        if (this.profileRequests.get(userId)?.request === request) {
+          this.profileFailures.delete(userId);
+          this.profileCache.set(userId, { accountId, profile });
+        }
         return profile;
       })
       .catch((error: unknown) => {
@@ -535,6 +541,26 @@ export class CoreClient {
     };
     void request.then(clearRequest, clearRequest);
     return request;
+  }
+
+  onProfileChanged(listener: (userId: string) => void): () => void {
+    this.profileChangeListeners.add(listener);
+    return () => this.profileChangeListeners.delete(listener);
+  }
+
+  private invalidateProfile(userId: string): void {
+    this.profileCache.delete(userId);
+    this.profileFailures.delete(userId);
+    this.profileRequests.delete(userId);
+    this.changedProfiles.add(userId);
+    this.profileChangeTimer ??= setTimeout(() => {
+      this.profileChangeTimer = null;
+      const changed = [...this.changedProfiles];
+      this.changedProfiles.clear();
+      for (const id of changed) {
+        for (const listener of this.profileChangeListeners) listener(id);
+      }
+    }, PROFILE_CHANGE_NOTIFY_MS);
   }
 
   private async lookUpProfile(userId: string): Promise<ProfileView> {
@@ -790,6 +816,9 @@ export class CoreClient {
     this.profileCache.clear();
     this.profileRequests.clear();
     this.profileFailures.clear();
+    this.changedProfiles.clear();
+    if (this.profileChangeTimer !== null) clearTimeout(this.profileChangeTimer);
+    this.profileChangeTimer = null;
     this.relationsCache.clear();
     this.sync = null;
     this.crashed = null;
@@ -1004,6 +1033,9 @@ export class CoreClient {
         return;
       case 'devices_changed':
         this.deviceList = event.devices;
+        return;
+      case 'profile_changed':
+        this.invalidateProfile(event.user_id);
         return;
       case 'search_coverage':
         this.searchCoverage = event.coverage;
