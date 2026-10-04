@@ -571,7 +571,7 @@ export class CoreClient {
     try {
       return await this.requestProfile(userId, false);
     } finally {
-      const next = this.profileLookupQueue.shift();
+      const next = this.profileLookupQueue.pop();
       if (next) next();
       else this.profileLookups -= 1;
     }

@@ -1044,6 +1044,35 @@ test('profile lookups run a bounded number at a time', async () => {
   }
 });
 
+test('the newest queued profile lookup runs first', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const release: (() => void)[] = [];
+  fake.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release.push(() => {
+          resolve({ profile: {} });
+        });
+      })
+  );
+  try {
+    for (let index = 0; index < 24; index += 1) void core.userProfile(`@old${index}:example.org`);
+    void core.userProfile('@older:example.org');
+    void core.userProfile('@newest:example.org');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(24);
+    release.shift()?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.send).toHaveBeenCalledTimes(25);
+    expect(fake.send.mock.calls[24]?.[0]).toMatchObject({ user_id: '@newest:example.org' });
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('an urgent profile lookup skips the queue', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
