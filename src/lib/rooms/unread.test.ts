@@ -157,6 +157,18 @@ test('badge mentions mode keeps unread but drops the counted badge', () => {
   });
 });
 
+test('badge quiet mode keeps only the mentions', () => {
+  const loud = roomUnread(room({ unread: 6, notifying: 6, highlight: 2 }), 'all');
+  expect(applyBadgeMode(loud, 'quiet')).toEqual({
+    unread: 2,
+    highlight: 2,
+    marked: false,
+    notifying: 0,
+  });
+  const none = roomUnread(room({ unread: 6, notifying: 6 }), 'all');
+  expect(applyBadgeMode(none, 'quiet').unread).toBe(0);
+});
+
 test('badge all mode promotes quiet unread into a counted badge', () => {
   const quiet = roomUnread(room({ unread: 6, notifying: 0 }), 'mentions');
   expect(applyBadgeMode(quiet, 'all')).toEqual({
