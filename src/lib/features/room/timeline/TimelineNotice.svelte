@@ -179,11 +179,11 @@
     <div class="debug-body">
       <span><StateEventText {item} {members} {onSenderProfile} /></span>
       {#if raw !== null}
-        <Collapsible.Root bind:open={peekOpen}>
+        <Collapsible.Root bind:open={peekOpen} class="debug-peek-root">
           <Collapsible.Trigger class="debug-peek-trigger">
             {peekOpen ? $i18n.t('timeline.hidePeek') : $i18n.t('timeline.showPeek')}
           </Collapsible.Trigger>
-          <Collapsible.Content>
+          <Collapsible.Content class="debug-peek-content">
             <pre class="debug-peek">{JSON.stringify(raw, null, 2)}</pre>
           </Collapsible.Content>
         </Collapsible.Root>
@@ -307,8 +307,20 @@
   }
 
   .debug-body {
-    display: grid;
-    gap: var(--space-050);
+    align-items: baseline;
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: var(--space-050) var(--space-200);
+    min-width: 0;
+  }
+
+  .debug-body :global(.debug-peek-root) {
+    display: contents;
+  }
+
+  .debug-body :global(.debug-peek-content) {
+    flex: 0 0 100%;
     min-width: 0;
   }
 
@@ -336,9 +348,11 @@
   }
 
   .debug-event code {
-    flex: 0 0 auto;
+    flex: 0 0 18ch;
     font-family: var(--font-family-mono);
     margin-inline-start: calc(var(--avatar-size-small) + var(--space-250));
+    overflow-wrap: anywhere;
+    text-align: end;
   }
 
   .date-divider {
