@@ -64,7 +64,7 @@
       : []
   );
   let profileLabel = $derived($i18n.t('timeline.senderProfile', { name: displayName }));
-  let presence = $derived(presenceStore.get(userId));
+  let presence = $derived(presenceStore.peek(userId));
   let userStatus = $derived(showStatus ? resolveUserStatus(profile, presence) : null);
 
   $effect(() => {

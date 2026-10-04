@@ -722,7 +722,7 @@
       unread === 0 &&
       !marked}
     {@const peerId = room?.is_direct ? dmPeerId(room) : null}
-    {@const peerPresence = peerId ? presenceStore.get(peerId) : null}
+    {@const peerPresence = peerId ? presenceStore.peek(peerId) : null}
     {@const peerStatus = peerId ? resolveUserStatus(peerProfiles.get(peerId), peerPresence) : null}
     <div class="room-row-wrap">
       {@render threadLines(item.threads)}
