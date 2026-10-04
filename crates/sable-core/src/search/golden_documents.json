@@ -7,17 +7,13 @@
     "has_link": true,
     "in_thread": false,
     "media": [],
-    "mentions": [
-      "@erwan:localhost"
-    ],
+    "mentions": ["@erwan:localhost"],
     "origin_server_ts": 1000,
     "sender": "@erwan:localhost",
     "state": false
   },
   {
-    "attachments": [
-      "image"
-    ],
+    "attachments": ["image"],
     "body": "beach.png",
     "edited_at": null,
     "event_id": "$golden1",
@@ -45,9 +41,7 @@
     "state": false
   },
   {
-    "attachments": [
-      "file"
-    ],
+    "attachments": ["file"],
     "body": "notes.pdf",
     "edited_at": null,
     "event_id": "$golden2",
@@ -71,9 +65,7 @@
     "state": false
   },
   {
-    "attachments": [
-      "audio"
-    ],
+    "attachments": ["audio"],
     "body": "memo.ogg",
     "edited_at": null,
     "event_id": "$golden3",
@@ -110,10 +102,7 @@
     "state": false
   },
   {
-    "attachments": [
-      "image",
-      "file"
-    ],
+    "attachments": ["image", "file"],
     "body": "dune.png\nstatuts.pdf",
     "edited_at": null,
     "event_id": "$golden5",
@@ -158,9 +147,7 @@
     "has_link": true,
     "in_thread": false,
     "media": [],
-    "mentions": [
-      "@alice:localhost"
-    ],
+    "mentions": ["@alice:localhost"],
     "origin_server_ts": 1000,
     "sender": "@erwan:localhost",
     "state": false
@@ -179,9 +166,7 @@
     "state": false
   },
   {
-    "attachments": [
-      "poll"
-    ],
+    "attachments": ["poll"],
     "body": "Lunch spot?\nRamen\nTacos",
     "edited_at": null,
     "event_id": "$golden8",
