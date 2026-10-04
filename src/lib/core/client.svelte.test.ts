@@ -1014,7 +1014,7 @@ test('a lookup in flight when the profile changes does not refill the cache', as
   }
 });
 
-test('profile lookups run a few at a time', async () => {
+test('profile lookups run a bounded number at a time', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
   const core = createCoreClient(() => fake.transport);
@@ -1032,7 +1032,7 @@ test('profile lookups run a few at a time', async () => {
       core.userProfile(`@user${index}:example.org`)
     );
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.send).toHaveBeenCalledTimes(6);
+    expect(fake.send).toHaveBeenCalledTimes(24);
     for (const resolve of release.splice(0)) resolve();
     await vi.advanceTimersByTimeAsync(0);
     expect(fake.send).toHaveBeenCalledTimes(26);
