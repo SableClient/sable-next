@@ -24,7 +24,9 @@ const CRAWL_READABLE_PAUSE: Duration = Duration::from_secs(3);
 pub(super) const CRAWL_MAX_AGE_MS: u64 = 26 * 7 * 24 * 60 * 60 * 1000;
 const CRAWL_IDLE: Duration = Duration::from_secs(30);
 const CRAWL_BASE_EVENTS: usize = 20_000;
-const MAX_CRAWLED_EVENTS: usize = 200_000;
+const MAX_CRAWLED_EVENTS: usize = 50_000;
+const CRAWL_START_DELAY: Duration = Duration::from_secs(90);
+const CRAWL_LATENCY_FACTOR: u32 = 10;
 const CRAWL_TRICKLE_PAUSE: Duration = Duration::from_secs(10);
 const BLIND_EVENTS_BEFORE_SKIP: usize = 200;
 const CRAWL_BACKOFF_CAP: Duration = Duration::from_mins(5);
@@ -148,13 +150,18 @@ impl CrawlProgress {
     }
 
     fn paced(&self, pause: Duration) -> Duration {
-        if self.trickling() {
+        let pause = if self.trickling() {
             pause.max(Duration::from_millis(u64::from(
                 self.tuning.trickle_pause_ms,
             )))
         } else {
             pause
-        }
+        };
+        let latency = self
+            .metrics
+            .last_request_ms
+            .map_or(Duration::ZERO, Duration::from_millis);
+        pause.max((latency * CRAWL_LATENCY_FACTOR).min(CRAWL_BACKOFF_CAP))
     }
 
     pub(crate) fn is_ingesting(&self, room_id: &OwnedRoomId) -> bool {
@@ -332,6 +339,9 @@ impl Core {
             progress.restore(stored.rooms);
             progress.metrics.started_ms.get_or_insert_with(now_ms);
         }
+
+        self.report_coverage(client, &mut reported).await;
+        matrix_sdk::sleep::sleep(CRAWL_START_DELAY).await;
 
         loop {
             self.report_coverage(client, &mut reported).await;
@@ -871,6 +881,18 @@ mod tests {
 
         progress.events = MAX_CRAWLED_EVENTS;
         assert!(progress.spent());
+    }
+
+    #[test]
+    fn test_a_slow_homeserver_stretches_the_pause() {
+        let mut progress = CrawlProgress::default();
+        assert_eq!(progress.paced(CRAWL_READABLE_PAUSE), CRAWL_READABLE_PAUSE);
+
+        progress.metrics.last_request_ms = Some(800);
+        assert_eq!(progress.paced(CRAWL_READABLE_PAUSE), Duration::from_secs(8));
+
+        progress.metrics.last_request_ms = Some(u64::MAX / 100);
+        assert_eq!(progress.paced(CRAWL_READABLE_PAUSE), CRAWL_BACKOFF_CAP);
     }
 
     #[test]

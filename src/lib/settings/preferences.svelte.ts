@@ -461,7 +461,7 @@ const DEFAULTS: Preferences = {
   searchFlushInterval: '60',
   searchBatchSize: '50',
   searchBaseEvents: '20000',
-  searchMaxEvents: '200000',
+  searchMaxEvents: '50000',
   searchCrawler: true,
   searchUnmeteredOnly: true,
   serverSearch: true,
