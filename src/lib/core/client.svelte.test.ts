@@ -1102,7 +1102,7 @@ test('a cancelled queued profile lookup is never sent', async () => {
     for (const resolve of release.splice(0)) resolve();
     await vi.advanceTimersByTimeAsync(0);
     const requested = fake.send.mock.calls.map(
-      ([command]) => (command as { user_id: string }).user_id
+      ([command]) => (command as unknown as { user_id: string }).user_id
     );
     expect(requested).toContain('@shared:example.org');
     expect(requested).not.toContain('@alone:example.org');
