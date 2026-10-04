@@ -159,14 +159,15 @@ export class ProfileStore {
   }
 
   #fail(userId: string, accountId: string | null, error: unknown, attempts: number): void {
-    const rateLimited = error instanceof CoreError && error.detail.code === 'rate_limited';
+    const code = error instanceof CoreError ? error.detail.code : null;
+    const rateLimited = code === 'rate_limited';
     this.#failures.set(userId, {
       accountId,
       error,
       attempts,
       retryAt: rateLimited ? 0 : Date.now() + FAILURE_RETRY_MS,
     });
-    this.#scheduleRetry(userId, attempts, rateLimited);
+    if (code !== 'unavailable') this.#scheduleRetry(userId, attempts, rateLimited);
   }
 
   #scheduleRetry(userId: string, attempts: number, rateLimited: boolean): void {
@@ -176,6 +177,8 @@ export class ProfileStore {
     const timer = setTimeout(
       () => {
         this.#retries.delete(userId);
+        const failure = this.#failures.get(userId);
+        if (failure) failure.retryAt = 0;
         this.#signals.get(userId)?.notify();
       },
       rateLimited ? backoff : Math.max(backoff, FAILURE_RETRY_MS)

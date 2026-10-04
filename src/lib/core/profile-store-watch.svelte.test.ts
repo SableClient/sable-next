@@ -61,3 +61,38 @@ test('a watching effect sees a changed profile without remounting', async () => 
   expect(seen.at(-1)).toEqual(profile('new'));
   stop();
 });
+
+test('a watching effect retries a failed lookup once its cool-down ends', async () => {
+  const { store, fetch } = setup();
+  fetch.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce(profile('a'));
+  const seen: (ProfileView | null)[] = [];
+  const stop = $effect.root(() => {
+    $effect(() => {
+      seen.push(store.get('@a:x'));
+    });
+  });
+  flushSync();
+  await vi.advanceTimersByTimeAsync(59_000);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1000);
+  flushSync();
+  await vi.advanceTimersByTimeAsync(0);
+  flushSync();
+  expect(seen.at(-1)).toEqual(profile('a'));
+  stop();
+});
+
+test('an unavailable profile is not retried', async () => {
+  const { store, fetch } = setup();
+  fetch.mockRejectedValue(new CoreError({ code: 'unavailable' }));
+  const stop = $effect.root(() => {
+    $effect(() => {
+      store.get('@a:x');
+    });
+  });
+  flushSync();
+  await vi.advanceTimersByTimeAsync(120_000);
+  flushSync();
+  expect(fetch).toHaveBeenCalledTimes(1);
+  stop();
+});
