@@ -33,7 +33,7 @@
           "kind": "image",
           "mime": "image/png",
           "source": "mxc://localhost/beach",
-          "spoiler": null,
+          "spoiler": "",
           "thumbnail": null,
           "width": 640
         }
@@ -72,12 +72,51 @@
   },
   {
     "attachments": [
+      "audio"
+    ],
+    "body": "memo.ogg",
+    "edited_at": null,
+    "event_id": "$golden3",
+    "has_link": false,
+    "in_thread": false,
+    "media": [
+      [
+        null,
+        {
+          "filename": "memo.ogg",
+          "kind": "file",
+          "mime": "audio/ogg",
+          "size": 2048,
+          "source": "mxc://localhost/memo"
+        }
+      ]
+    ],
+    "mentions": [],
+    "origin_server_ts": 1003,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [],
+    "body": "reply text",
+    "edited_at": null,
+    "event_id": "$golden4",
+    "has_link": false,
+    "in_thread": true,
+    "media": [],
+    "mentions": [],
+    "origin_server_ts": 1004,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [
       "image",
       "file"
     ],
     "body": "dune.png\nstatuts.pdf",
     "edited_at": null,
-    "event_id": "$golden3",
+    "event_id": "$golden5",
     "has_link": false,
     "in_thread": false,
     "media": [
@@ -107,8 +146,77 @@
       ]
     ],
     "mentions": [],
-    "origin_server_ts": 1003,
+    "origin_server_ts": 1005,
     "sender": "@erwan:localhost",
     "state": false
+  },
+  {
+    "attachments": [],
+    "body": "see https://example.org/b",
+    "edited_at": 1006,
+    "event_id": "$golden0",
+    "has_link": true,
+    "in_thread": false,
+    "media": [],
+    "mentions": [
+      "@alice:localhost"
+    ],
+    "origin_server_ts": 1000,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [],
+    "body": "",
+    "edited_at": null,
+    "event_id": "$golden0",
+    "has_link": false,
+    "in_thread": false,
+    "media": [],
+    "mentions": [],
+    "origin_server_ts": 1006,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [
+      "poll"
+    ],
+    "body": "Lunch spot?\nRamen\nTacos",
+    "edited_at": null,
+    "event_id": "$golden8",
+    "has_link": false,
+    "in_thread": false,
+    "media": [],
+    "mentions": [],
+    "origin_server_ts": 1008,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [],
+    "body": "moai",
+    "edited_at": null,
+    "event_id": "$golden9",
+    "has_link": false,
+    "in_thread": false,
+    "media": [],
+    "mentions": [],
+    "origin_server_ts": 1009,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [],
+    "body": "Design crew",
+    "edited_at": null,
+    "event_id": "$golden10",
+    "has_link": false,
+    "in_thread": false,
+    "media": [],
+    "mentions": [],
+    "origin_server_ts": 1010,
+    "sender": "@erwan:localhost",
+    "state": true
   }
 ]
