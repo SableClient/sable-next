@@ -17,6 +17,7 @@
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import Tooltip from '#lib/ui/primitives/Tooltip.svelte';
   import { overlayLayer } from '#lib/ui/overlay-layer.js';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import PersonaMenu, { type PersonaScope } from './PersonaMenu.svelte';
   import { personaSpaces } from './persona-spaces.js';
@@ -79,6 +80,7 @@
     open = false;
     personas.select(scopeTarget, persona?.id ?? null).catch((cause: unknown) => {
       console.warn('[sable personas] the selection could not be saved', cause);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 
@@ -86,6 +88,7 @@
     open = false;
     personas.disable(roomId).catch((cause: unknown) => {
       console.warn('[sable personas] the selection could not be saved', cause);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 </script>

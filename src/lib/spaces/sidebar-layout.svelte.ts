@@ -2,7 +2,9 @@ import { createContext } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 
 import type { CoreClient } from '#lib/core/client.svelte.js';
+import { t } from '#lib/i18n.js';
 import { readJson, writeJson } from '#lib/platform/local-json.js';
+import { toasts } from '#lib/ui/toasts.svelte.js';
 
 import { isFolder, sameLayout, type SidebarItem } from './sidebar-layout.js';
 
@@ -71,6 +73,7 @@ export class SpaceSidebar {
       },
       (error: unknown) => {
         console.warn('[sable nav] space layout not saved', error);
+        toasts.error(t('errors.actionFailed'));
         if (this.pending !== pending) return;
 
         this.pending = null;

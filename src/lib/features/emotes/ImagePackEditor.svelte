@@ -24,6 +24,7 @@
   import {
     ALL_USAGES,
     emptyDraft,
+    invalidShortcode,
     normalizeShortcode,
     packDraft,
     shortcodeWithoutExtension,
@@ -61,6 +62,7 @@
   let transferFailed = $state<'export' | 'import' | null>(null);
 
   let dirty = $derived(draft !== null);
+  let rejected = $derived(draft === null ? null : invalidShortcode(draft.images));
 
   function edit(next: PackDraft): void {
     draft = next;
@@ -244,9 +246,6 @@
 </script>
 
 <div class="pack-editor">
-  {#if failed}
-    <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
-  {/if}
   {#if transferFailed !== null}
     <Alert variant="critical" role="alert">
       {transferFailed === 'export'
@@ -359,7 +358,10 @@
                   commitRename(image);
                 }}
                 onkeydown={(event: KeyboardEvent) => {
-                  if (event.key === 'Enter') commitRename(image);
+                  if (event.key === 'Enter') {
+                    commitRename(image);
+                    if (rejected === null) void apply();
+                  }
                   if (event.key === 'Escape') renaming = null;
                 }}
               />
@@ -469,6 +471,14 @@
   </SettingsSection>
 
   {#if canEdit}
+    {#if rejected !== null}
+      <Alert variant="warning" role="alert" title={$i18n.t('emotes.invalidShortcodeTitle')}>
+        <p>{$i18n.t('emotes.invalidShortcode', { shortcode: rejected })}</p>
+      </Alert>
+    {/if}
+    {#if failed}
+      <Alert variant="critical" role="alert">{$i18n.t('emotes.saveFailed')}</Alert>
+    {/if}
     <div class="save-bar">
       {#if dirty}
         <p class="save-status" role="status">{$i18n.t('emotes.unsaved')}</p>
@@ -487,7 +497,7 @@
       <Button
         size="small"
         variant="primary"
-        disabled={!dirty || busy}
+        disabled={!dirty || busy || rejected !== null}
         loading={busy}
         onclick={() => {
           void apply();

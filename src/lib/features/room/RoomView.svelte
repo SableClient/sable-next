@@ -757,12 +757,14 @@
       .markUnread(resolvedRoomId, eventBefore(timeline.items, eventId))
       .catch((error: unknown) => {
         console.warn('[sable room] mark as unread failed', error);
+        toasts.error($i18n.t('errors.actionFailed'));
       });
   }
 
   function markRoomRead(): void {
     void markAllRead().catch((error: unknown) => {
       console.warn('[sable room] mark as read failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 
@@ -792,6 +794,7 @@
   function markRoomUnread(): void {
     void core.commands.markUnread(resolvedRoomId).catch((error: unknown) => {
       console.warn('[sable room] mark as unread failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 

@@ -411,6 +411,7 @@
       removed.add(entry.key);
     } catch (error) {
       console.warn('[sable lobby] remove failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 

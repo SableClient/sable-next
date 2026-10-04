@@ -3458,6 +3458,8 @@
     "reset": "Reset",
     "apply": "Apply changes",
     "saveFailed": "Those changes could not be saved.",
+    "invalidShortcodeTitle": "Rename an image to apply",
+    "invalidShortcode": "\":{{shortcode}}:\" is not a valid shortcode. Use only letters, numbers, - and _, and keep each one unique.",
     "transfer": "Export and import",
     "transferHint": "A pack file carries the pictures themselves, so it imports on a server that cannot reach this one.",
     "export": "Export pack",

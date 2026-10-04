@@ -311,12 +311,14 @@
       .markRead(resolvedRoomId, null, readReceiptIsPrivate())
       .catch((error: unknown) => {
         console.warn('[sable calendar] mark as read failed', error);
+        toasts.error($i18n.t('errors.actionFailed'));
       });
   }
 
   function markUnread(): void {
     void core.commands.markUnread(resolvedRoomId).catch((error: unknown) => {
       console.warn('[sable calendar] mark as unread failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     });
   }
 

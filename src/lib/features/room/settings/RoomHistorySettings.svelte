@@ -5,6 +5,7 @@
   import { i18n } from '#lib/i18n.js';
   import Select from '#lib/ui/primitives/Select.svelte';
   import SettingsRow from '#lib/ui/primitives/SettingsRow.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   import { canSendState } from './permission-groups';
 
@@ -44,6 +45,7 @@
       })
       .catch((error: unknown) => {
         console.debug('[sable room] history visibility unavailable', error);
+        toasts.error($i18n.t('errors.actionFailed'));
       });
   });
 

@@ -3,6 +3,7 @@
   import Button from '#lib/ui/primitives/Button.svelte';
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import FormActions from '#lib/ui/primitives/FormActions.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   interface Props {
     open?: boolean;
@@ -18,6 +19,7 @@
       copied = true;
     } catch (error) {
       console.debug('[sable timeline] clipboard unavailable', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 </script>

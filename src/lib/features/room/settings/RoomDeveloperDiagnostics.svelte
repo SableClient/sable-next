@@ -63,6 +63,7 @@
       toasts.info($i18n.t('room.devCopied'));
     } catch (error) {
       console.warn('[sable room] copy failed', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 </script>

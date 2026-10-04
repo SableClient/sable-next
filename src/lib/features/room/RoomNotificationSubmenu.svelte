@@ -11,6 +11,7 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import ActionMenuItem from '#lib/ui/primitives/ActionMenuItem.svelte';
   import ActionMenuSub from '#lib/ui/primitives/ActionMenuSub.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   interface Props {
     roomId: string;
@@ -71,6 +72,7 @@
       },
       (error: unknown) => {
         console.warn('[sable room] notification mode failed', error);
+        toasts.error($i18n.t('errors.actionFailed'));
         void read();
       }
     );

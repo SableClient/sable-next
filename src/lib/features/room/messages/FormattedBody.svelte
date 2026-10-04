@@ -39,6 +39,7 @@
   import { replyPreviewBody } from './reply-preview';
   import { FormattedBodyImages } from './formatted-body-images';
   import ImageSpoilerControl from '#lib/ui/ImageSpoilerControl.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   interface Props {
     html: string;
@@ -507,6 +508,7 @@
       })
       .catch((error: unknown) => {
         console.debug('[sable code] clipboard unavailable', error);
+        toasts.error($i18n.t('errors.actionFailed'));
       });
     return true;
   }

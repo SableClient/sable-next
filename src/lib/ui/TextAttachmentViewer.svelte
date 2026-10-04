@@ -7,6 +7,7 @@
   import DialogFrame from '#lib/ui/primitives/DialogFrame.svelte';
   import IconButton from '#lib/ui/primitives/IconButton.svelte';
   import LinkButton from '#lib/ui/primitives/LinkButton.svelte';
+  import { toasts } from '#lib/ui/toasts.svelte.js';
 
   const MAX_HIGHLIGHT_CHARS = 100_000;
   const PREVIEW_LINES = 12;
@@ -99,6 +100,7 @@
       copied = true;
     } catch (error) {
       console.debug('[sable media] clipboard unavailable', error);
+      toasts.error($i18n.t('errors.actionFailed'));
     }
   }
 </script>
