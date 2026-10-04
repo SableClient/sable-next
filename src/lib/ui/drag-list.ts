@@ -61,13 +61,17 @@ export function createDragList<T>(equals: (left: T, right: T) => boolean): DragL
           stopDocumentEnd?.();
           stopDocumentEnd = listen(
             on(document, 'dragend', end, { capture: true }),
-            on(document, 'pointermove', end, { capture: true })
+            on(document, 'pointermove', resumed, { capture: true })
           );
           finishDrag = end;
           onDragging(item);
           event.dataTransfer?.setData('text/plain', '');
           event.dataTransfer?.setData(REORDER_DRAG_TYPE, '');
           if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
+        };
+        const resumed = (event: Event): void => {
+          if (event instanceof PointerEvent && event.buttons !== 0) return;
+          end();
         };
         const end = (): void => {
           if (dragged === null || !equals(dragged, item)) return;

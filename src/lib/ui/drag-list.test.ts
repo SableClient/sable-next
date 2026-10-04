@@ -200,6 +200,21 @@ describe('the drag protocol', () => {
     cleanup?.();
   });
 
+  it('keeps the drag when a pointer event arrives while a button is held', async () => {
+    const { source } = mount(40);
+    const list = createDragList<Ref>(refsEqual);
+    const dragging: (Ref | null)[] = [];
+    const cleanup = list.draggable(ref('!a'), (next) => dragging.push(next))(source);
+
+    source.dispatchEvent(dragEvent('dragstart'));
+    await Promise.resolve();
+    source.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, buttons: 1 }));
+
+    expect(dragging).toEqual([ref('!a')]);
+
+    cleanup?.();
+  });
+
   it('forgets the drag when it ends', () => {
     const { source, target } = mount(40);
     const list = createDragList<Ref>(refsEqual);
