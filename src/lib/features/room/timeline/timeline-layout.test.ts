@@ -55,6 +55,10 @@ test('a picture row is reserved from the column it will actually get', () => {
   expect(phone).toBeLessThan(desktop ?? 0);
 });
 
+test('a small picture is reserved at its intrinsic size, not scaled up', () => {
+  expect(estimateRowSize(image(300, 200), mediaColumnPx(646))).toBeCloseTo(200 + CHROME_PX, 5);
+});
+
 test('a portrait is reserved from the width its ratio leaves, not from the full column', () => {
   const portrait = estimateRowSize(image(600, 900), mediaColumnPx(646));
   const landscape = estimateRowSize(image(1600, 900), mediaColumnPx(646));

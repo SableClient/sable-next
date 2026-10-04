@@ -43,11 +43,11 @@ export function estimatedColumnPx(viewportWidth: number): number {
   return viewportWidth - TIMELINE_LAYOUT.mediaInsetRem * ROOT_FONT_PX;
 }
 
-function pictureRow(columnPx: number, ratio: number): number {
+function pictureRow(columnPx: number, ratio: number, intrinsicPx = Infinity): number {
   const heightCapPx = TIMELINE_LAYOUT.mediaMaxRem * ROOT_FONT_PX;
   const width = Math.min(
     columnPx,
-    Math.max(TIMELINE_LAYOUT.mediaMinRem * ROOT_FONT_PX, heightCapPx * ratio)
+    Math.max(TIMELINE_LAYOUT.mediaMinRem * ROOT_FONT_PX, Math.min(heightCapPx * ratio, intrinsicPx))
   );
   return Math.min(width / ratio, heightCapPx) + TIMELINE_LAYOUT.mediaRowChromePx;
 }
@@ -56,8 +56,14 @@ export function estimateRowSize(
   content: TimelineItemContentView,
   columnPx: number
 ): number | undefined {
-  if (content.kind === 'image' || content.kind === 'video')
-    return pictureRow(columnPx, pictureRatio(content.width, content.height));
+  if (content.kind === 'image' || content.kind === 'video') {
+    const ratio = pictureRatio(content.width, content.height);
+    const intrinsic =
+      content.kind === 'image' && content.height !== null
+        ? (content.width ?? undefined)
+        : undefined;
+    return pictureRow(columnPx, ratio, intrinsic);
+  }
   if (content.kind === 'sticker') {
     const width = TIMELINE_LAYOUT.stickerWidthRem * ROOT_FONT_PX;
     return width / pictureRatio(content.width, content.height) + TIMELINE_LAYOUT.mediaRowChromePx;
