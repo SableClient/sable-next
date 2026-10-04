@@ -19,8 +19,6 @@ import java.io.FileOutputStream
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
-import io.sentry.Sentry
-import io.sentry.android.core.SentryAndroid
 
 class MainActivity : TauriActivity() {
   private external fun nativeInitSystemBars()
@@ -28,7 +26,7 @@ class MainActivity : TauriActivity() {
   private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    applySentryConsent(getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
+    NativeSentry.apply(this, getSharedPreferences("sentry", MODE_PRIVATE).getBoolean("enabled", false))
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     instance = this
@@ -71,24 +69,6 @@ class MainActivity : TauriActivity() {
       networkCallback = callback
     }.onFailure { error ->
       Log.w("SableNetwork", "Could not monitor network cost", error)
-    }
-  }
-
-  private fun applySentryConsent(enabled: Boolean) {
-    runCatching {
-      if (!enabled) {
-        Sentry.close()
-        return@runCatching
-      }
-      if (Sentry.isEnabled() || BuildConfig.SENTRY_DSN.isBlank()) return@runCatching
-      SentryAndroid.init(applicationContext) { options ->
-        options.dsn = BuildConfig.SENTRY_DSN
-        options.environment = BuildConfig.SENTRY_ENVIRONMENT.ifBlank { null }
-        options.release = BuildConfig.SENTRY_RELEASE.ifBlank { null }
-        options.isSendDefaultPii = false
-      }
-    }.onFailure { error ->
-      Log.e("SableSentry", "Sentry setup failed", error)
     }
   }
 
@@ -264,7 +244,7 @@ class MainActivity : TauriActivity() {
       val activity = instance ?: return
       activity.runOnUiThread {
         activity.getSharedPreferences("sentry", MODE_PRIVATE).edit().putBoolean("enabled", enabled).apply()
-        activity.applySentryConsent(enabled)
+        NativeSentry.apply(activity, enabled)
       }
     }
   }

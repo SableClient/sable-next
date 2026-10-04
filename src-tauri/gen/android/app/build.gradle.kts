@@ -8,18 +8,19 @@ plugins {
     id("io.sentry.android.gradle") version "6.19.0"
 }
 
+val fossBuild = providers.environmentVariable("SABLE_FOSS").orNull == "1"
+
 sentry {
     org.set(System.getenv("SENTRY_ORG"))
     projectName.set(System.getenv("SENTRY_PROJECT"))
     authToken.set(System.getenv("SENTRY_AUTH_TOKEN"))
     autoUploadProguardMapping.set(!System.getenv("SENTRY_AUTH_TOKEN").isNullOrBlank())
+    includeProguardMapping.set(!fossBuild)
     tracingInstrumentation { enabled.set(false) }
     autoInstallation { enabled.set(false) }
     telemetry.set(false)
     ignoredBuildTypes.set(setOf("debug"))
 }
-
-val fossBuild = providers.environmentVariable("SABLE_FOSS").orNull == "1"
 
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
@@ -149,8 +150,10 @@ configurations.all {
 }
 
 dependencies {
-    implementation("io.sentry:sentry-android:8.58.0")
-    implementation("io.sentry:sentry-android-ndk:8.58.0")
+    if (!fossBuild) {
+        implementation("io.sentry:sentry-android:8.58.0")
+        implementation("io.sentry:sentry-android-ndk:8.58.0")
+    }
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
@@ -176,6 +179,10 @@ val sortTauriConfig by tasks.registering {
         config.writeText(groovy.json.JsonOutput.toJson(sorted(groovy.json.JsonSlurper().parse(config))))
     }
 }
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    exclude(if (fossBuild) "**/google/NativeSentry.kt" else "**/foss/NativeSentry.kt")
+}
+
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
     dependsOn(sortTauriConfig)
 }
