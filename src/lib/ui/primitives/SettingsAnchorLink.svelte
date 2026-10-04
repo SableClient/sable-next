@@ -33,7 +33,10 @@
       if (!host) return undefined;
       return longPress({
         onPress: () => {
-          void copy(build).then(() => toasts.info($i18n.t('settings.linkCopied')));
+          copy(build).then(
+            () => toasts.info($i18n.t('settings.linkCopied')),
+            () => toasts.error($i18n.t('errors.copyFailed'))
+          );
         },
       })(host);
     };
