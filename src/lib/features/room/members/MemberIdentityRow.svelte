@@ -10,7 +10,6 @@
   import { preferences } from '#lib/settings/preferences.svelte.js';
   import { usePresenceStore } from '#lib/rooms/presence.svelte.js';
   import { resolveUserStatus } from '#lib/rooms/user-status.js';
-  import UserSupporterBadge from '#lib/supporter/UserSupporterBadge.svelte';
   import Avatar from '#lib/ui/primitives/Avatar.svelte';
   import PresenceDot from '#lib/ui/primitives/PresenceDot.svelte';
 
@@ -111,9 +110,6 @@
         compact={pronouns.length === 0}
       />
       {@render secondary?.()}
-      {#if profile?.supporter_awards}
-        <UserSupporterBadge {userId} awards={profile.supporter_awards} />
-      {/if}
       {#if userStatus}
         <span
           class="member-identity-status"

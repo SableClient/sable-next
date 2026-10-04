@@ -12,13 +12,6 @@ const presence = vi.hoisted(() => ({
 }));
 
 vi.mock('#lib/core/context.js');
-vi.mock('#lib/supporter/config.js', () => ({
-  supporterConfig: () =>
-    Promise.resolve({
-      serviceUrl: 'https://awards.test',
-      keys: { '1': '6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw' },
-    }),
-}));
 
 import { core } from '#lib/core/__mocks__/context.js';
 
@@ -31,8 +24,6 @@ vi.mock('#lib/rooms/presence.svelte.js', async () => {
     usePresenceStore: () => ({ get: () => presence.entry, peek: () => presence.entry }),
   };
 });
-
-import { FIXTURE_USER, VALID } from '#lib/supporter/fixtures.js';
 
 import MemberIdentityRow from './MemberIdentityRow.svelte';
 
@@ -163,27 +154,4 @@ test('leaves the status out unless the row asks for it', async () => {
   await mountRow({});
 
   expect(screen.queryByText('Shipping')).not.toBeInTheDocument();
-});
-
-test('shows a verified supporter badge beside the name', async () => {
-  core.userProfile.mockResolvedValue({
-    ...profileFor(FIXTURE_USER),
-    supporter_awards: JSON.stringify([VALID]),
-  });
-  render(MemberIdentityRow, { userId: FIXTURE_USER, members });
-
-  expect(await screen.findByText('Donor')).toBeInTheDocument();
-});
-
-test('ignores a supporter badge copied from another account', async () => {
-  core.userProfile.mockResolvedValue({
-    ...profileFor('@mallory:example.org'),
-    supporter_awards: JSON.stringify([VALID]),
-  });
-  render(MemberIdentityRow, { userId: '@mallory:example.org', members });
-
-  await screen.findByText('Bob');
-  await vi.waitFor(() => {
-    expect(screen.queryByText('Donor')).not.toBeInTheDocument();
-  });
 });
