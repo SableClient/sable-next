@@ -39,7 +39,16 @@
   }
 </script>
 
-{#if replaced.length > 0 && !collapsed}
+{#if replaced.length > 0 && collapsed}
+  <ul class="replaced-collapsed" aria-label={$i18n.t('room.replacedTitle')}>
+    {#each replaced as room (room.room_id)}
+      {@const name = room.name ?? room.room_id}
+      <li title={name} aria-label={name}>
+        <Avatar class="replaced-icon" id={room.room_id} src={room.avatar_url} {name} />
+      </li>
+    {/each}
+  </ul>
+{:else if replaced.length > 0}
   <section class="replaced" aria-labelledby={headingId}>
     <h3 id={headingId}>
       {$i18n.t('room.replacedTitle')}
@@ -107,6 +116,19 @@
 
   li:hover {
     background: var(--bg-container-hover);
+  }
+
+  .replaced-collapsed {
+    display: grid;
+    gap: var(--space-100);
+    justify-items: center;
+    list-style: none;
+    margin: 0;
+    padding: 0 0 var(--space-200);
+  }
+
+  .replaced-collapsed li {
+    padding: 0;
   }
 
   :global(.avatar-root.replaced-icon) {
