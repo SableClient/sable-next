@@ -1315,7 +1315,14 @@
 
   function navigate(key: 'ArrowUp' | 'ArrowDown' | 'Enter' | 'Tab' | 'Escape'): boolean {
     if (!panelOpen) {
-      if (key === 'ArrowUp' && empty && staged.length === 0 && !context && onEditLast) {
+      if (
+        key === 'ArrowUp' &&
+        empty &&
+        editor.isPristine() &&
+        staged.length === 0 &&
+        !context &&
+        onEditLast
+      ) {
         onEditLast();
         return true;
       }
