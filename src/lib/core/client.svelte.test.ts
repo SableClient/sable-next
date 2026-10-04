@@ -1073,6 +1073,47 @@ test('the newest queued profile lookup runs first', async () => {
   }
 });
 
+test('a cancelled queued profile lookup is never sent', async () => {
+  vi.useFakeTimers();
+  const fake = fakeTransport();
+  const core = createCoreClient(() => fake.transport);
+  const release: (() => void)[] = [];
+  fake.send.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release.push(() => {
+          resolve({ profile: {} });
+        });
+      })
+  );
+  try {
+    for (let index = 0; index < 24; index += 1) void core.userProfile(`@busy${index}:example.org`);
+    const cancelled = new AbortController();
+    const kept = new AbortController();
+    const first = core.userProfile('@shared:example.org', false, cancelled.signal);
+    const second = core.userProfile('@shared:example.org', false, kept.signal);
+    const alone = new AbortController();
+    const lonely = core.userProfile('@alone:example.org', false, alone.signal);
+    await vi.advanceTimersByTimeAsync(0);
+    cancelled.abort();
+    alone.abort();
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(lonely).rejects.toMatchObject({ name: 'AbortError' });
+    for (const resolve of release.splice(0)) resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    const requested = fake.send.mock.calls.map(
+      ([command]) => (command as { user_id: string }).user_id
+    );
+    expect(requested).toContain('@shared:example.org');
+    expect(requested).not.toContain('@alone:example.org');
+    for (const resolve of release.splice(0)) resolve();
+    await expect(second).resolves.toEqual({});
+  } finally {
+    core.stop();
+    vi.useRealTimers();
+  }
+});
+
 test('an urgent profile lookup skips the queue', async () => {
   vi.useFakeTimers();
   const fake = fakeTransport();
