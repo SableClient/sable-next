@@ -1,5 +1,6 @@
 <script lang="ts">
   import PronounPill from '#lib/ui/primitives/PronounPill.svelte';
+  import UserSupporterBadge from '#lib/supporter/UserSupporterBadge.svelte';
   import type {
     MemberView,
     ProfileView,
@@ -397,6 +398,9 @@
 {#snippet pronounRow()}
   {#if pronouns.length > 0}
     <PronounPill class="profile-pronoun-pill" {pronouns} />
+  {/if}
+  {#if currentProfile?.supporter_awards}
+    <UserSupporterBadge {userId} awards={currentProfile.supporter_awards} />
   {/if}
 {/snippet}
 {#snippet metaRow()}
