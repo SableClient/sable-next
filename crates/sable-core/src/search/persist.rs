@@ -8,8 +8,8 @@ use tracing::{info, warn};
 use super::Document;
 use crate::store::StoreError;
 
-const SCHEMA: u32 = 5;
-const LEGACY_SCHEMAS: [u32; 2] = [3, 4];
+const SCHEMA: u32 = 6;
+const LEGACY_SCHEMAS: [u32; 0] = [];
 
 pub(super) type ChunkId = u32;
 
@@ -456,8 +456,8 @@ async fn unlist_room(client: &matrix_sdk::Client, room_id: &OwnedRoomId) -> bool
     rooms.len() == before || write(client, &rooms_key(), &rooms).await.is_some()
 }
 
-const CRAWL_SCHEMA: u32 = 3;
-const CRAWL_SCHEMAS_READ: [u32; 2] = [3, 4];
+const CRAWL_SCHEMA: u32 = 5;
+const CRAWL_SCHEMAS_READ: [u32; 1] = [5];
 
 fn crawl_key() -> Vec<u8> {
     b"sable.search.crawl".to_vec()

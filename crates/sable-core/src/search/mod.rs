@@ -5154,8 +5154,88 @@ mod tests {
         assert!(!restored.dirty);
     }
 
+    #[test]
+    fn test_ingest_output_matches_the_golden_corpus() {
+        let corpus = [
+            serde_json::json!({
+                "msgtype": "m.text",
+                "body": "see https://example.org/a now",
+                "m.mentions": { "user_ids": ["@erwan:localhost"] }
+            }),
+            serde_json::json!({
+                "msgtype": "m.image",
+                "body": "beach.png",
+                "url": "mxc://localhost/beach",
+                "info": { "mimetype": "image/png", "w": 640, "h": 480, "size": 1024 }
+            }),
+            serde_json::json!({
+                "msgtype": "m.file",
+                "body": "notes.pdf",
+                "url": "mxc://localhost/notes",
+                "info": { "mimetype": "application/pdf", "size": 4096 }
+            }),
+            serde_json::json!({
+                "msgtype": "dm.filament.gallery",
+                "body": "",
+                "itemtypes": [
+                    {
+                        "itemtype": "m.image",
+                        "body": "dune.png",
+                        "url": "mxc://localhost/dune"
+                    },
+                    {
+                        "itemtype": "m.file",
+                        "body": "statuts.pdf",
+                        "info": { "mimetype": "application/pdf", "size": 86253 },
+                        "file": {
+                            "hashes": { "sha256": "LddWbhqio1QFowJZotQFXzsDBdJpipd5OhiY1jKLv0M" },
+                            "iv": "38FDuSh6tsgAAAAAAAAAAA",
+                            "key": {
+                                "alg": "A256CTR",
+                                "ext": true,
+                                "k": "iClvSnBe_h01iKMzGdeyDrWSmSZ0Omhy-9tc5m7Ra6s",
+                                "key_ops": ["decrypt", "encrypt"],
+                                "kty": "oct"
+                            },
+                            "url": "mxc://localhost/statuts",
+                            "v": "v2"
+                        }
+                    }
+                ]
+            }),
+        ];
+
+        let documents: Vec<serde_json::Value> = corpus
+            .into_iter()
+            .enumerate()
+            .map(|(position, content)| {
+                let raw: matrix_sdk::ruma::serde::Raw<
+                    matrix_sdk::ruma::events::AnySyncTimelineEvent,
+                > = serde_json::from_value(serde_json::json!({
+                    "type": "m.room.message",
+                    "event_id": format!("$golden{position}"),
+                    "sender": "@erwan:localhost",
+                    "origin_server_ts": 1_000 + position,
+                    "content": content,
+                }))
+                .expect("event");
+                let event = matrix_sdk::deserialized_responses::TimelineEvent::from_plaintext(raw);
+                let (message, content) = super::room_message(&event).expect("a room message");
+                serde_json::to_value(super::document_of(&message, content.as_ref()))
+                    .expect("document json")
+            })
+            .collect();
+
+        let expected: Vec<serde_json::Value> =
+            serde_json::from_str(include_str!("golden_documents.json")).expect("golden json");
+        assert_eq!(
+            documents, expected,
+            "document_of changed what it stores: update golden_documents.json and bump SCHEMA and CRAWL_SCHEMA"
+        );
+    }
+
     #[async_test]
-    async fn test_a_v3_blob_from_main_is_split_into_chunks_without_a_recrawl() {
+    async fn test_a_blob_from_an_older_schema_is_discarded_and_its_checkpoint_dropped() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         let room_id = room_id!("!legacy:localhost").to_owned();
@@ -5164,30 +5244,10 @@ mod tests {
             .sync_room(&client, JoinedRoomBuilder::new(&room_id))
             .await;
 
-        let documents: Vec<super::Document> = (0..3_000)
-            .map(|seed| {
-                document(
-                    &format!("old{seed}"),
-                    &format!("archaeology {seed}"),
-                    "@erwan:localhost",
-                    seed,
-                    None,
-                    Vec::new(),
-                )
-            })
-            .collect();
-        let documents: Vec<serde_json::Value> = documents
-            .iter()
-            .map(|document| {
-                let mut json = serde_json::to_value(document).expect("document json");
-                json.as_object_mut().expect("an object").remove("media");
-                json
-            })
-            .collect();
         let legacy = serde_json::json!({
-            "version": 3,
-            "documents": documents,
-            "classified": ["$old0", "$reaction"],
+            "version": 4,
+            "documents": [],
+            "classified": ["$old0"],
             "edits": [],
         });
         client
@@ -5204,44 +5264,16 @@ mod tests {
             Box::new(crate::store::MemorySessionStore::default()),
         );
         core.restore_persisted_index(&client).await;
-        assert_eq!(
-            in_room(
-                &*core.search_index.lock().await,
-                &room_id,
-                "archaeology",
-                5_000,
-                0
-            )
-            .len(),
-            3_000
-        );
-        core.flush_search_index(&client).await;
 
-        let store = client.state_store();
         assert!(
-            store
+            client
+                .state_store()
                 .get_custom_value(format!("sable.search.documents.{room_id}").as_bytes())
                 .await
                 .expect("read")
                 .is_none()
         );
-        assert_eq!(
-            super::persist::listed_rooms(&client).await,
-            vec![room_id.clone()]
-        );
-
-        let (second, _second_events) = crate::Core::new(
-            "search-legacy-second",
-            Box::new(crate::store::MemorySessionStore::default()),
-        );
-        second.restore_persisted_index(&client).await;
-        let index = second.search_index.lock().await;
-        assert_eq!(
-            in_room(&index, &room_id, "archaeology", 5_000, 0).len(),
-            3_000
-        );
-        assert!(index.rooms[&room_id].already_classified(event_id!("$reaction")));
-        assert!(index.rooms[&room_id].chunks.len() > 1);
+        assert!(!core.search_index.lock().await.rooms.contains_key(&room_id));
 
         drop(room);
     }

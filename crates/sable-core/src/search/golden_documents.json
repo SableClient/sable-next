@@ -1,0 +1,114 @@
+[
+  {
+    "attachments": [],
+    "body": "see https://example.org/a now",
+    "edited_at": null,
+    "event_id": "$golden0",
+    "has_link": true,
+    "in_thread": false,
+    "media": [],
+    "mentions": [
+      "@erwan:localhost"
+    ],
+    "origin_server_ts": 1000,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [
+      "image"
+    ],
+    "body": "beach.png",
+    "edited_at": null,
+    "event_id": "$golden1",
+    "has_link": false,
+    "in_thread": false,
+    "media": [
+      [
+        null,
+        {
+          "blurhash": null,
+          "filename": "beach.png",
+          "height": 480,
+          "kind": "image",
+          "mime": "image/png",
+          "source": "mxc://localhost/beach",
+          "spoiler": null,
+          "thumbnail": null,
+          "width": 640
+        }
+      ]
+    ],
+    "mentions": [],
+    "origin_server_ts": 1001,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [
+      "file"
+    ],
+    "body": "notes.pdf",
+    "edited_at": null,
+    "event_id": "$golden2",
+    "has_link": false,
+    "in_thread": false,
+    "media": [
+      [
+        null,
+        {
+          "filename": "notes.pdf",
+          "kind": "file",
+          "mime": "application/pdf",
+          "size": 4096,
+          "source": "mxc://localhost/notes"
+        }
+      ]
+    ],
+    "mentions": [],
+    "origin_server_ts": 1002,
+    "sender": "@erwan:localhost",
+    "state": false
+  },
+  {
+    "attachments": [
+      "image",
+      "file"
+    ],
+    "body": "dune.png\nstatuts.pdf",
+    "edited_at": null,
+    "event_id": "$golden3",
+    "has_link": false,
+    "in_thread": false,
+    "media": [
+      [
+        0,
+        {
+          "blurhash": null,
+          "filename": "dune.png",
+          "height": null,
+          "kind": "image",
+          "mime": null,
+          "source": "mxc://localhost/dune",
+          "spoiler": null,
+          "thumbnail": null,
+          "width": null
+        }
+      ],
+      [
+        1,
+        {
+          "filename": "statuts.pdf",
+          "kind": "file",
+          "mime": "application/pdf",
+          "size": 86253,
+          "source": "{\"file\":{\"url\":\"mxc://localhost/statuts\",\"v\":\"v2\",\"key\":{\"kty\":\"oct\",\"key_ops\":[\"decrypt\",\"encrypt\"],\"alg\":\"A256CTR\",\"k\":\"iClvSnBe_h01iKMzGdeyDrWSmSZ0Omhy-9tc5m7Ra6s\",\"ext\":true},\"iv\":\"38FDuSh6tsgAAAAAAAAAAA\",\"hashes\":{\"sha256\":\"LddWbhqio1QFowJZotQFXzsDBdJpipd5OhiY1jKLv0M\"}}}"
+        }
+      ]
+    ],
+    "mentions": [],
+    "origin_server_ts": 1003,
+    "sender": "@erwan:localhost",
+    "state": false
+  }
+]

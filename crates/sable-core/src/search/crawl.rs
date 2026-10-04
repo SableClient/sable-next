@@ -1256,7 +1256,7 @@ mod tests {
     }
 
     #[async_test]
-    async fn test_checkpoints_written_by_main_survive_the_upgrade() {
+    async fn test_checkpoints_written_by_an_older_schema_are_dropped() {
         let server = MatrixMockServer::new().await;
         let client = server.client_builder().build().await;
         client
@@ -1274,13 +1274,7 @@ mod tests {
 
         let stored = super::super::persist::load_crawl(&client).await;
 
-        assert_eq!(
-            stored
-                .rooms
-                .get(&room())
-                .and_then(|room| room.token.as_deref()),
-            Some("t42")
-        );
+        assert!(stored.rooms.is_empty());
     }
 
     #[test]
