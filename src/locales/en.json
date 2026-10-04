@@ -953,6 +953,7 @@
     "noEmoji": "No emoji match that.",
     "toReact": "to react",
     "viewReactions": "View reactions",
+    "removeReaction": "Remove reaction from {{name}}",
     "noReceipts": "Nobody has read this yet.",
     "via": "via",
     "viaAccount": "Open the account behind this profile, {{user}}",

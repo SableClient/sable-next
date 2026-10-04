@@ -58,6 +58,7 @@ declare global {
     __e2eSendError?: string;
     __e2eFetchMedia?: (source: string, width: number, height: number) => Promise<Uint8Array>;
     __e2eMembers?: MemberView[];
+    __e2eRelationEvents?: unknown[];
     __e2eMediaReady?: Promise<void>;
     __e2eReleaseMedia: () => void;
     __e2eAnchorPositions: number[];
@@ -1441,7 +1442,7 @@ export async function installFakeCore(page: Page, mode: WorkerMode): Promise<voi
       room_sticky_events: () => ({ type: 'room_sticky_events', events: [] }),
       room_event_relations: () => ({
         type: 'room_event_relations',
-        relations: { chunk: [], next_batch: null, prev_batch: null },
+        relations: { chunk: window.__e2eRelationEvents ?? [], next_batch: null, prev_batch: null },
       }),
       turn_server: () => ({
         type: 'turn_server',
