@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hash::BuildHasher;
 use std::sync::Arc;
 
@@ -830,7 +830,7 @@ pub fn aggregation_item(
         thread_summary: None,
         reactions: Vec::new(),
         read_by: Vec::new(),
-        read_timestamps: Default::default(),
+        read_timestamps: BTreeMap::new(),
         per_message_profile: None,
         bundled_link_previews: Vec::new(),
         link_previews_removed: None,
@@ -917,7 +917,7 @@ pub async fn standalone_item(
         sender: Some(sender),
         reactions: Vec::new(),
         read_by: Vec::new(),
-        read_timestamps: Default::default(),
+        read_timestamps: BTreeMap::new(),
         bundled_link_previews: bundled_link_previews(raw.message()),
         link_previews_removed: link_previews_removed(raw.message()),
         per_message_profile: message_profile,
@@ -1029,7 +1029,7 @@ pub fn timeline_item(
                 reactions: Vec::new(),
                 is_own: false,
                 read_by: Vec::new(),
-                read_timestamps: Default::default(),
+                read_timestamps: BTreeMap::new(),
                 per_message_profile: None,
                 bundled_link_previews: Vec::new(),
                 link_previews_removed: None,
