@@ -488,27 +488,38 @@ export class TimelineWindow<T> {
     if (previous) this.countBucket(previous.bucket, -previous.height);
     this.countBucket(bucket, height);
     this.sizes.set(key, { height, bucket });
-    if (previous === undefined) this.prefix = null;
+    if (previous === undefined && this.prefix !== null) {
+      const row = this.rows.find((candidate) => candidate.key === key);
+      if (row && row.index < this.prefix.start) {
+        const counted = this.prefix.unmeasured.get(this.bucketOf(row.value));
+        if (counted) counted.count -= 1;
+        this.prefix.measured += height;
+      }
+    }
   }
 
   private estimatePrefix(): number {
     let cache = this.prefix;
-    if (cache === null || cache.items !== this.items || cache.start !== this.start) {
-      cache = { items: this.items, start: this.start, measured: 0, unmeasured: new Map() };
-      for (const item of this.items.slice(0, this.start)) {
-        const size = this.sizes.get(item.key);
-        if (size === undefined) {
-          const bucket = this.bucketOf(item.value);
-          const counted = cache.unmeasured.get(bucket);
-          if (counted) counted.count += 1;
-          else
-            cache.unmeasured.set(bucket, {
-              count: 1,
-              hint: this.options.estimateSize?.(item.value),
-            });
-        } else cache.measured += size.height;
-      }
+    if (cache === null || cache.items !== this.items) {
+      cache = { items: this.items, start: 0, measured: 0, unmeasured: new Map() };
       this.prefix = cache;
+    }
+    if (cache.start !== this.start) {
+      const from = Math.min(cache.start, this.start);
+      const sign = this.start > cache.start ? 1 : -1;
+      for (const item of this.items.slice(from, Math.max(cache.start, this.start))) {
+        const size = this.sizes.get(item.key);
+        if (size !== undefined) {
+          cache.measured += sign * size.height;
+          continue;
+        }
+        const bucket = this.bucketOf(item.value);
+        const counted = cache.unmeasured.get(bucket);
+        if (counted) counted.count += sign;
+        else
+          cache.unmeasured.set(bucket, { count: 1, hint: this.options.estimateSize?.(item.value) });
+      }
+      cache.start = this.start;
     }
     let total = cache.measured;
     for (const [bucket, { count, hint }] of cache.unmeasured)
