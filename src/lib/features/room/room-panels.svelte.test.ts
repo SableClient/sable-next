@@ -45,3 +45,11 @@ test('toggling the open panel closes it', () => {
   expect(panels.toggleMembers(false)).toBe(true);
   expect(panels.toggleMembers(false)).toBe(false);
 });
+
+test('a closed desktop member list stays closed in the next room', () => {
+  const first = new RoomPanels();
+  first.closeMembers(true);
+  expect(new RoomPanels().desktopMembersOpen).toBe(false);
+  first.toggleMembers(true);
+  expect(new RoomPanels().desktopMembersOpen).toBe(true);
+});

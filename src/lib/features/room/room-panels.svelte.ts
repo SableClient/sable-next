@@ -1,10 +1,12 @@
+let desktopMembersPreferred = true;
+
 export class RoomPanels {
   threadRootId = $state<string | null>(null);
   threadsOpen = $state(false);
   attachmentsOpen = $state(false);
   searchOpen = $state(false);
   membersOpen = $state(false);
-  desktopMembersOpen = $state(true);
+  desktopMembersOpen = $state(desktopMembersPreferred);
   widgetsOpen = $state(false);
 
   reset(): void {
@@ -55,13 +57,17 @@ export class RoomPanels {
   toggleMembers(desktop: boolean): boolean {
     const open = !(desktop ? this.desktopMembersOpen : this.membersOpen);
     this.#closeAll();
-    if (desktop) this.desktopMembersOpen = open;
-    else this.membersOpen = open;
+    if (desktop) {
+      this.desktopMembersOpen = open;
+      desktopMembersPreferred = open;
+    } else this.membersOpen = open;
     return open;
   }
 
   closeMembers(desktop: boolean): void {
-    if (desktop) this.desktopMembersOpen = false;
-    else this.membersOpen = false;
+    if (desktop) {
+      this.desktopMembersOpen = false;
+      desktopMembersPreferred = false;
+    } else this.membersOpen = false;
   }
 }
