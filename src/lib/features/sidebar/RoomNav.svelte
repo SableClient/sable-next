@@ -1601,7 +1601,7 @@
         :global(.room-options-trigger[data-state='open'])
       )
       .room-row {
-      padding-right: calc(var(--space-100) + 1.5rem);
+      padding-right: calc(var(--space-100) + var(--space-600));
     }
 
     .room-options-slot {

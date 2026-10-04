@@ -711,7 +711,7 @@ test('falls back to the role colour when the sender profile has none', async () 
     props: {
       core,
       item: { item: item(false), collapsed: false },
-      roles: { '@alice:example.org': { icon: null, color: '#c04040' } },
+      roles: { '@alice:example.org': { icon: null, name: null, color: '#c04040' } },
     },
   });
   await tick();
