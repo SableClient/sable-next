@@ -18,6 +18,7 @@
     active?: number;
     onMemberProfile?: (userId: string, anchor: HTMLElement) => void;
     tab: Snippet<[T]>;
+    memberAction?: Snippet<[T, string]>;
   }
 
   let {
@@ -30,6 +31,7 @@
     active = $bindable(0),
     onMemberProfile,
     tab,
+    memberAction,
   }: Props = $props();
   let selected = $derived<T | undefined>(tabs[Math.min(active, tabs.length - 1)]);
 </script>
@@ -59,6 +61,7 @@
         {#each userIds(selected) as userId (userId)}
           <li>
             <MemberIdentityRow {userId} {members} onProfile={onMemberProfile} />
+            {@render memberAction?.(selected, userId)}
           </li>
         {/each}
       </ul>
@@ -110,5 +113,11 @@
     max-height: 16rem;
     overflow-y: auto;
     padding: 0;
+  }
+
+  li {
+    align-items: center;
+    display: flex;
+    gap: var(--space-200);
   }
 </style>

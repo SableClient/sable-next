@@ -205,8 +205,12 @@
       bind:open={() => true, setOpen}
       active={entry.active}
       reactions={item.reactions}
+      eventId={item.event_id}
       {roomId}
       {members}
+      {currentUserId}
+      {canRedactOwn}
+      {canRedactOthers}
       onMemberProfile={onSenderProfile}
     />
   {:else if entry.kind === 'receipts'}
